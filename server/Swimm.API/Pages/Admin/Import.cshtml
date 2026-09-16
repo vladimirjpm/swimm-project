@@ -411,6 +411,69 @@
             </div>
         </div>
 
+        <!-- ================================================================ -->
+        <!-- ПРОГОН ПО СТРАНАМ (11.1.4). Национальные рекорды всех стран       -->
+        <!-- источника: WR один раз + NR по стране, час-два фоном.             -->
+        <!-- ================================================================ -->
+        <div class="admin-card p-4 mb-6" id="countries-run-card">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                <div>
+                    <div class="font-semibold text-admin-text">Прогон по странам</div>
+                    <div class="text-xs text-admin-text-muted mt-0.5">
+                        Национальные рекорды (<code>open</code>) всех стран источника.
+                        Мировые качаются один раз на прогон, дальше по паре файлов на страну.
+                    </div>
+                </div>
+                <div class="text-xs text-admin-text-muted text-right whitespace-nowrap">
+                    стран в источнике: <span id="cr-countries-total">—</span>
+                </div>
+            </div>
+
+            @* Израиль исключается САМИМ прогоном, даже если его попросили явно (инвариант 2
+               плана 11.1.2): на country/ISR/open федерация обязана применяться ПОСЛЕ World
+               Aquatics, иначе молча откатятся её более свежие рекорды. *@
+            <div class="text-[11px] text-admin-text-muted mb-3 leading-relaxed">
+                ⚠ Израиль в прогон не входит никогда — его обновляет только
+                <code>--records-refresh</code>, где порядок источников зашит (data-integrity, И-13).
+                Прогон живёт в памяти процесса: рестарт API его теряет, дифф придётся собирать заново.
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <button id="cr-run-all" class="admin-btn admin-btn-primary py-2 px-5 text-sm">
+                    ▶ Прогнать все страны
+                </button>
+                <button id="cr-toggle-subset" class="admin-btn admin-btn-ghost py-1.5 px-3 text-xs">
+                    Коды вручную
+                </button>
+                <span id="cr-hint" class="text-xs text-admin-text-muted"></span>
+            </div>
+
+            @* Список кодов — НЕ выбор охвата (он решён: все страны), а два узких случая:
+               повтор упавших и одна страна для отладки. Потому и спрятан. *@
+            <div id="cr-subset" class="hidden mt-3 flex flex-wrap items-end gap-2">
+                <label class="text-[11px] text-admin-text-muted flex flex-col gap-0.5 flex-1 min-w-[16rem]">
+                    Коды стран через запятую — повтор упавших или одна страна для отладки
+                    <input id="cr-codes" class="admin-input w-full text-xs" placeholder="AGU, JAM" />
+                </label>
+                <button id="cr-run-subset" class="admin-btn admin-btn-ghost py-2 px-4 text-xs">Прогнать выбранные</button>
+            </div>
+
+            <div id="cr-progress" class="hidden mt-4">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs mb-2">
+                    <span id="cr-state" class="text-admin-accent"></span>
+                    <span class="text-admin-text-muted">строк набрано: <span id="cr-rows">0</span></span>
+                    <span class="text-admin-text-muted">мировые: <span id="cr-world">—</span></span>
+                    <span id="cr-israel" class="text-admin-text-muted"></span>
+                </div>
+                <div class="h-1.5 w-full rounded bg-admin-bg overflow-hidden">
+                    <div id="cr-bar" class="h-full bg-admin-accent transition-all" style="width:0%"></div>
+                </div>
+                <div id="cr-failed" class="hidden mt-3 text-xs"></div>
+                <div id="cr-mismatch" class="hidden mt-2 text-[11px] text-admin-text-muted"></div>
+            </div>
+        </div>
+
+
         <!-- Diff preview -->
         <div id="records-diff" class="hidden admin-card p-5 mb-6">
             <h3 class="text-lg mb-3 text-admin-accent">Превью диффа: <span id="records-diff-source"></span></h3>
@@ -500,6 +563,7 @@
             recordsStatusLoaded = true;
             loadRecordSourceStatus();
             loadRecordSourceLinks();
+            loadCountriesCount();
         }
     }
     topTabCompetitions.addEventListener('click', () => setTopMode('competitions'));
@@ -1106,6 +1170,8 @@
         'wa-masters': 'Masters World Records',
         'isrorg-age': 'Age Records',
         'isrorg-masters': 'Masters Records',
+        // Не источник, а прогон по странам: дифф у него такой же, показывается тем же блоком.
+        countries: 'Прогон по странам',
     };
     let currentDiffId = null;
 
@@ -1294,6 +1360,143 @@
 
         recordsDiff.classList.remove('hidden');
     }
+
+    // ─── Прогон рекордов по странам (11.1.4) ────────────────────────────────
+    // Дифф прогона — обычный RecordDiffResult, поэтому показывается тем же showRecordsDiff
+    // и применяется той же кнопкой «Применить выбранное». Отдельного Apply тут нет нарочно:
+    // два пути записи в Records — это два места, где можно разойтись.
+
+    const crRunAll = document.getElementById('cr-run-all');
+    const crRunSubset = document.getElementById('cr-run-subset');
+    const crToggleSubset = document.getElementById('cr-toggle-subset');
+    const crSubset = document.getElementById('cr-subset');
+    const crCodes = document.getElementById('cr-codes');
+    const crProgress = document.getElementById('cr-progress');
+    const crState = document.getElementById('cr-state');
+    const crBar = document.getElementById('cr-bar');
+    const crRows = document.getElementById('cr-rows');
+    const crWorld = document.getElementById('cr-world');
+    const crIsrael = document.getElementById('cr-israel');
+    const crFailed = document.getElementById('cr-failed');
+    const crMismatch = document.getElementById('cr-mismatch');
+    const crHint = document.getElementById('cr-hint');
+
+    // Прогон идёт час-два: опрашивать чаще смысла нет, а лишние запросы в лог попадут.
+    const CR_POLL_MS = 4000;
+    let crTimer = null;
+
+    // Элемент ищем внутри, а не держим в const выше: функцию зовёт setTopMode, который при
+    // заходе с ?diff=records отрабатывает РАНЬШЕ этих объявлений — const в temporal dead zone
+    // уронил бы всю инициализацию страницы.
+    function loadCountriesCount() {
+        const crTotal = document.getElementById('cr-countries-total');
+        if (!crTotal) return;
+        fetch('/api/admin/records/countries', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                if (!d) return;
+                crTotal.textContent = d.error ? 'источник недоступен' : (d.countries || []).length;
+                if (d.error) crTotal.title = d.error;
+            })
+            .catch(() => { crTotal.textContent = 'не удалось проверить'; });
+    }
+
+    function crBusy(busy) {
+        crRunAll.disabled = busy;
+        crRunSubset.disabled = busy;
+    }
+
+    async function startCountryRun(codes) {
+        crBusy(true);
+        crFailed.classList.add('hidden');
+        crMismatch.classList.add('hidden');
+        crHint.textContent = '';
+        try {
+            const data = await api('/api/admin/records/countries/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codes: codes && codes.length ? codes : null }),
+            });
+            crProgress.classList.remove('hidden');
+            crState.textContent = 'в очереди…';
+            pollCountryRun(data.runId);
+        } catch (e) {
+            crBusy(false);
+            toast('Ошибка: ' + e.message, 4000);
+        }
+    }
+
+    function pollCountryRun(runId) {
+        clearTimeout(crTimer);
+        fetch(`/api/admin/records/countries/run/${runId}`, { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error('прогон не найден — API перезапускали?')))
+            .then(s => {
+                renderCountryRun(s);
+                if (s.state === 'Running' || s.state === 'Queued') {
+                    crTimer = setTimeout(() => pollCountryRun(runId), CR_POLL_MS);
+                    return;
+                }
+                crBusy(false);
+                if (s.state === 'Failed') {
+                    toast('Прогон упал: ' + (s.error || 'причина не указана'), 5000);
+                    return;
+                }
+                if (s.diff) {
+                    showRecordsDiff('countries', s.diff);
+                    crHint.textContent = 'дифф ниже — записи ещё нет, применяйте кнопкой';
+                    recordsDiff.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            })
+            .catch(e => { crBusy(false); toast('Ошибка: ' + e.message, 5000); });
+    }
+
+    function renderCountryRun(s) {
+        crProgress.classList.remove('hidden');
+
+        const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0;
+        crBar.style.width = pct + '%';
+        crState.textContent = s.state === 'Completed'
+            ? `готово: ${s.done} из ${s.total}`
+            : s.state === 'Failed'
+                ? 'прогон упал'
+                : `страна ${s.done} из ${s.total}${s.currentCode ? ' · ' + s.currentCode : ''}`;
+
+        crRows.textContent = fmtN(s.rowsFetched || 0);
+        crWorld.textContent = s.worldFetched ? '✓' : '—';
+        // Поле есть именно для того, чтобы пропуск Израиля был ВИДЕН, а не подразумевался.
+        crIsrael.textContent = s.israelSkipped ? 'Израиль пропущен (И-13)' : '';
+
+        const failed = s.failed || [];
+        if (failed.length) {
+            crFailed.classList.remove('hidden');
+            crFailed.innerHTML =
+                `<div class="text-admin-danger mb-1">не скачались: ${failed.length}</div>` +
+                `<div class="text-admin-text-muted mb-2">${failed.map(f => `${esc(f.code)} — ${esc(f.error)}`).join('<br>')}</div>` +
+                `<button class="admin-btn admin-btn-ghost py-1 px-3 text-xs" id="cr-retry">Повторить упавшие</button>`;
+            // Отдельного эндпоинта для ретрая нет: это тот же запуск, но со списком кодов.
+            document.getElementById('cr-retry').onclick = () => startCountryRun(failed.map(f => f.code));
+        }
+
+        const mism = s.mismatches || [];
+        if (s.mismatchCount > 0) {
+            crMismatch.classList.remove('hidden');
+            // Строка с чужим кодом страны не пишется вовсе — она только здесь и видна.
+            crMismatch.innerHTML =
+                `⚠ источник вернул ${fmtN(s.mismatchCount)} строк с чужим кодом страны — они НЕ записаны. ` +
+                `Первые: ` + mism.slice(0, 5).map(m =>
+                    `${esc(m.requestedCode)}→${esc(m.reportedCountry || '—')} ${esc(m.gender)} ${esc(m.poolType)} ${esc(m.style)} ${esc(m.distance)}`
+                ).join('; ');
+        }
+    }
+
+    crToggleSubset?.addEventListener('click', () => crSubset.classList.toggle('hidden'));
+    crRunAll?.addEventListener('click', () => startCountryRun(null));
+    crRunSubset?.addEventListener('click', () => {
+        const codes = (crCodes.value || '').split(',').map(c => c.trim().toUpperCase()).filter(Boolean);
+        if (!codes.length) { toast('Укажите хотя бы один код страны', 3000); return; }
+        startCountryRun(codes);
+    });
+
 
     recordsApplyBtn.addEventListener('click', async () => {
         if (!currentDiffId) return;

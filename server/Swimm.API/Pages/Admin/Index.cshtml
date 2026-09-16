@@ -128,7 +128,6 @@
         info:   'text-admin-accent',
     };
     function toneCls(tone, v) { return TONE_CLS[v === 0 ? 'ok' : tone] || TONE_CLS.gray; }
-    function fmtN(n) { return (n ?? 0).toLocaleString('ru-RU'); }
     // «812 Б», «41 КБ», «1,8 МБ» — как CacheOverview.Human на сервере.
     function fmtBytes(b) {
         b = b || 0;

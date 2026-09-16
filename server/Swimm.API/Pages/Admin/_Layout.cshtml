@@ -60,6 +60,10 @@ function toast(msg, duration) {
     setTimeout(() => el.classList.remove('opacity-100'), duration || 2500);
 }
 
+// Числа в админке — с разделителями разрядов: «1 240», а не «1240». Жил копией на
+// дашборде, переехал сюда, когда понадобился второй странице (прогон по странам).
+function fmtN(n) { return (n ?? 0).toLocaleString('ru-RU'); }
+
 function esc(s) {
     if (!s) return '';
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
