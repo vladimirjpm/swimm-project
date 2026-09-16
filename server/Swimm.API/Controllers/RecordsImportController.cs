@@ -21,17 +21,23 @@ public class RecordsImportController : ControllerBase
     private readonly IRecordDiffService _diffService;
     private readonly IRecordQualityService _quality;
     private readonly IRecordSourceLinksProvider _links;
+    private readonly IRecordCountriesProvider _countries;
+    private readonly IRecordCountryRunQueue _runs;
 
     public RecordsImportController(
         IEnumerable<IRecordSourceProvider> providers,
         IRecordDiffService diffService,
         IRecordQualityService quality,
-        IRecordSourceLinksProvider links)
+        IRecordSourceLinksProvider links,
+        IRecordCountriesProvider countries,
+        IRecordCountryRunQueue runs)
     {
         _providers = providers.ToDictionary(p => p.Source, StringComparer.OrdinalIgnoreCase);
         _diffService = diffService;
         _quality = quality;
         _links = links;
+        _countries = countries;
+        _runs = runs;
     }
 
     [HttpGet("source-status")]
@@ -103,9 +109,47 @@ public class RecordsImportController : ControllerBase
         if (parsed.Count == 0)
             return BadRequest(new { error = "Источник разобран, но не дал ни одной строки — проверьте файл/URL." });
 
-        var diff = await _diffService.BuildDiffAsync(source, parsed, HttpContext.RequestAborted);
+        var diff = await _diffService.BuildDiffAsync(source, parsed, ct: HttpContext.RequestAborted);
         return Ok(diff);
     }
+
+    /// <summary>
+    /// Страны источника для выбора в админке (11.1.1): 235 реальных, псевдо-сборные отсеяны.
+    /// Ходит в сеть, поэтому недоступность источника — мягкий ответ с текстом ошибки, как у
+    /// ссылок isr.org.il: список стран не должен ронять страницу целиком.
+    /// </summary>
+    [HttpGet("countries")]
+    public async Task<IActionResult> GetCountries()
+    {
+        try
+        {
+            var countries = await _countries.GetCountriesAsync(HttpContext.RequestAborted);
+            return Ok(new { countries, skipped = RecordCountryRun.SkippedCode });
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)
+        {
+            return Ok(new { countries = Array.Empty<RecordCountryDto>(), error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Запустить прогон по странам (11.1.2). Отвечает сразу: 470 файлов качаются час-два,
+    /// ход прогона смотреть через <see cref="GetCountryRun"/>, применять — обычным Apply по
+    /// <c>DiffId</c> из результата.
+    ///
+    /// Пустой список кодов — все страны источника. Израиль в прогон не попадает никогда
+    /// (инвариант 2 плана): его обновляет только <c>--records-refresh</c>.
+    /// </summary>
+    [HttpPost("countries/run")]
+    public IActionResult StartCountryRun([FromBody] RecordCountryRunRequest? request)
+        => Ok(new { runId = _runs.Enqueue(request?.Codes) });
+
+    /// <summary>Ход прогона: сколько стран пройдено, кто упал, готов ли дифф.</summary>
+    [HttpGet("countries/run/{runId:guid}")]
+    public IActionResult GetCountryRun(Guid runId)
+        => _runs.GetStatus(runId) is { } status
+            ? Ok(status)
+            : NotFound(new { error = "Прогон не найден: он живёт в памяти процесса и теряется при рестарте." });
 
     [HttpPost("apply")]
     public async Task<IActionResult> Apply([FromBody] RecordDiffApplyRequest request)

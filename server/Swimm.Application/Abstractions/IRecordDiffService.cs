@@ -10,7 +10,13 @@ namespace Swimm.Application.Abstractions;
 /// </summary>
 public interface IRecordDiffService
 {
-    Task<RecordDiffResult> BuildDiffAsync(string source, IReadOnlyList<ParsedRecordDto> parsed, CancellationToken ct = default);
+    /// <param name="previewTtl">
+    /// Сколько диффу жить до Apply. По умолчанию 10 минут — сессия превью в админке; у прогона
+    /// по странам (11.1.2) он идёт часами, поэтому тот просит больше.
+    /// </param>
+    Task<RecordDiffResult> BuildDiffAsync(
+        string source, IReadOnlyList<ParsedRecordDto> parsed,
+        TimeSpan? previewTtl = null, CancellationToken ct = default);
 
     Task<RecordDiffApplyResult> ApplyAsync(RecordDiffApplyRequest request, CancellationToken ct = default);
 

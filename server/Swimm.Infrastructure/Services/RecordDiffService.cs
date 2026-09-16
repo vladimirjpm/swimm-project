@@ -11,7 +11,8 @@ namespace Swimm.Infrastructure.Services;
 /// <summary>
 /// Дифф спарсенных рекордов (<see cref="IRecordSourceProvider"/>) с текущими Records +
 /// применение выбранных групп. Диффы держим в <see cref="IMemoryCache"/> 10 минут (сессия
-/// превью в UI — Fetch → показать дифф → Apply); это не публичный HTTP-кэш
+/// превью в UI — Fetch → показать дифф → Apply), а прогон по странам просит больше —
+/// он сам идёт час-два (11.1.2); это не публичный HTTP-кэш
 /// (<see cref="ICacheService"/>) — тот Apply сбрасывает сам, сохранением через EF (К4).
 /// </summary>
 public class RecordDiffService : IRecordDiffService
@@ -25,6 +26,9 @@ public class RecordDiffService : IRecordDiffService
         ("isrorg-masters", "masters"),
     };
 
+    /// <summary>Сколько живёт дифф превью в админке, если вызывающий не попросил другого.</summary>
+    private static readonly TimeSpan DefaultPreviewTtl = TimeSpan.FromMinutes(10);
+
     private readonly SwimmDbContext _db;
     private readonly IMemoryCache _memoryCache;
 
@@ -34,7 +38,9 @@ public class RecordDiffService : IRecordDiffService
         _memoryCache = memoryCache;
     }
 
-    public async Task<RecordDiffResult> BuildDiffAsync(string source, IReadOnlyList<ParsedRecordDto> parsed, CancellationToken ct = default)
+    public async Task<RecordDiffResult> BuildDiffAsync(
+        string source, IReadOnlyList<ParsedRecordDto> parsed,
+        TimeSpan? previewTtl = null, CancellationToken ct = default)
     {
         // Источник может давать НЕСКОЛЬКО строк на одну дисциплину: рекорд, установленный
         // дважды («equalled», worldaquatics даёт обе даты), или прогрессию времён. Без
@@ -44,8 +50,15 @@ public class RecordDiffService : IRecordDiffService
         var categories = parsed.Select(p => p.Category).Distinct().ToHashSet();
         var regionTypes = parsed.Select(p => p.RegionType).Distinct().ToHashSet();
 
+        // Сужаем до регионов, которые источник вообще принёс. Иначе при прогоне по одной
+        // стране (11.1.2) все остальные страны категории open выглядели бы «пропавшими из
+        // источника»: раньше это было незаметно, потому что регион был ровно один.
+        var regionCodes = parsed.Select(p => p.RegionCode).Distinct().ToHashSet();
+
         var existing = await _db.Records.AsNoTracking()
-            .Where(r => categories.Contains(r.Category) && regionTypes.Contains(r.RegionType))
+            .Where(r => categories.Contains(r.Category)
+                        && regionTypes.Contains(r.RegionType)
+                        && regionCodes.Contains(r.RegionCode))
             .ToListAsync(ct);
 
         var existingByKey = existing.ToDictionary(Key, r => r);
@@ -95,7 +108,8 @@ public class RecordDiffService : IRecordDiffService
             addedEntries.Concat(changedEntries), await WorldReferenceAsync(parsed, ct));
 
         var diffId = Guid.NewGuid().ToString("N");
-        _memoryCache.Set(DiffCacheKey(diffId), new CachedRecordDiff(source, added, changed, suspicious), TimeSpan.FromMinutes(10));
+        _memoryCache.Set(DiffCacheKey(diffId), new CachedRecordDiff(source, added, changed, suspicious),
+            previewTtl ?? DefaultPreviewTtl);
 
         return new RecordDiffResult(diffId, source, added.Count, changed.Count, unchanged, missingInSource,
             addedEntries, changedEntries, suspicious);
@@ -123,7 +137,7 @@ public class RecordDiffService : IRecordDiffService
     public async Task<RecordDiffApplyResult> ApplyAsync(RecordDiffApplyRequest request, CancellationToken ct = default)
     {
         if (!_memoryCache.TryGetValue(DiffCacheKey(request.DiffId), out CachedRecordDiff? cached) || cached == null)
-            return new RecordDiffApplyResult(false, "Дифф не найден или истёк (10 минут) — повторите Fetch.", 0);
+            return new RecordDiffApplyResult(false, "Дифф не найден или истёк — повторите Fetch или прогон.", 0);
 
         var toApply = new List<ParsedRecordDto>();
         if (request.ApplyAdded) toApply.AddRange(cached.Added);
