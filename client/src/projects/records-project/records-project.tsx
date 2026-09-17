@@ -6,7 +6,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
-import { parseRecordsQuery } from '../../utils/routes';
+import { parseRecordsQuery, routes } from '../../utils/routes';
 import { useRecordsRanking } from '../../hooks/useRecordsRanking';
 import RkDisciplinePicker from './components/rk-discipline-picker';
 import RkWorldCard from './components/rk-world-card';
@@ -93,6 +93,13 @@ function RecordsProject() {
             <div className="rk-head__sub">
               {title}
               {isRelay(filters.distance) && <span className="rk-head__tag">relay</span>}
+              {' · '}
+              {/* Единственный вход на `/records/compare`: в топбаре пункт один, «Records» —
+                  это рейтинг. Дисциплину не переносим (там все сразу), а бассейн и пол —
+                  те же оси, что и здесь. */}
+              <a className="rc-link" href={routes.recordsCompare({
+                poolType: filters.poolType, gender: filters.gender,
+              })}>compare two countries</a>
             </div>
           </div>
           <UI_ModeToggle />
