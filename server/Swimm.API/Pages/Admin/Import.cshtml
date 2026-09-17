@@ -1328,7 +1328,8 @@
             statCard('Изменилось', data.changedCount, '#ffa726'),
             statCard('Без изменений', data.unchangedCount, '#546e7a'),
             statCard('Нет в источнике', data.missingInSourceCount, '#4fc3f7'),
-            ...(suspicious.size > 0 ? [statCard('Неправдоподобно → в реестр', suspicious.size, '#ef5350')] : [])
+            ...(suspicious.size > 0 ? [statCard('Неправдоподобно → в реестр', suspicious.size, '#ef5350')] : []),
+            ...(data.protectedCount > 0 ? [statCard('Защищено реестром', data.protectedCount, '#ab47bc')] : [])
         ].join('');
 
         recordsAddedCount.textContent = data.addedCount;
@@ -1341,19 +1342,26 @@
             ...(data.added || []).map(e => ({ e, kind: 'added' })),
             ...(data.changed || []).map(e => ({ e, kind: 'changed' }))
         ].map(r => ({ ...r, flag: suspicious.get(diffKey(r.e, r.e.newTime)) }));
-        // Подозрительные — наверх: иначе при большом диффе они уйдут за MAX_ROWS.
-        rows.sort((a, b) => (b.flag ? 1 : 0) - (a.flag ? 1 : 0));
+        // Подозрительные и защищённые — наверх: иначе при большом диффе они уйдут за MAX_ROWS.
+        const weight = r => (r.e.protectedByIssue ? 2 : 0) + (r.flag ? 1 : 0);
+        rows.sort((a, b) => weight(b) - weight(a));
         const shown = rows.slice(0, MAX_ROWS);
 
         recordsDiffRows.innerHTML = shown.map(({ e, kind, flag }) => {
             const was = kind === 'added' ? '<span class="text-admin-text-muted">— новый —</span>' : `${esc(e.oldTime)} · ${esc(e.oldHolderName || '')}`;
             const will = `${esc(e.newTime)} · ${esc(e.newHolderName || '')}`;
-            const rowClass = kind === 'added' ? 'text-[#66bb6a]' : 'text-[#ffa726]';
+            // Защита оспоренного времени (И-25): значение зачёркнуто — Apply его не возьмёт,
+            // в базе останется то, что в колонке «было».
+            const guarded = e.protectedByIssue === true;
+            const rowClass = guarded ? 'text-[#ab47bc] line-through' : (kind === 'added' ? 'text-[#66bb6a]' : 'text-[#ffa726]');
             const note = flag ? `<div class="text-[11px] text-admin-warning">⚠ ${esc(flag.note)}</div>` : '';
+            const guard = guarded
+                ? '<div class="text-[11px] text-[#ab47bc] no-underline">🛡 защищено реестром: это значение уже разобрано как ошибка источника — не перезапишется</div>'
+                : '';
             return `<tr class="border-b border-admin-border/30">
                 <td class="py-1 pr-2">${discipline(e)}</td>
                 <td class="py-1 pr-2 text-admin-text-muted">${was}</td>
-                <td class="py-1 pr-2 ${rowClass}">${will}${note}</td>
+                <td class="py-1 pr-2 ${rowClass}">${will}${note}${guard}</td>
             </tr>`;
         }).join('') || '<tr><td class="py-2 text-admin-text-muted" colspan="3">нет новых/изменившихся строк</td></tr>';
 

@@ -161,14 +161,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             var allWords = page.GetWords().ToList();
             Log($"Page {page.Number}: {allWords.Count} words");
 
-            var rows = allWords
-                .GroupBy(w => Math.Round(w.BoundingBox.Bottom / 3.0) * 3.0)
-                .OrderByDescending(g => g.Key)
-                .Select(g => (
-                    words: g.OrderBy(w => w.BoundingBox.Left).ToList(),
-                    yCenter: g.Average(w => (w.BoundingBox.Bottom + w.BoundingBox.Top) / 2.0)
-                ))
-                .ToList();
+            var rows = GroupIntoRows(allWords);
 
             Log($"Page {page.Number}: {rows.Count} rows");
 
@@ -237,6 +230,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
         {
             var (rowWords, yCenter, rowLayout) = allRows[i];
             var cols = AssignWordsToColumns(rowWords, rowLayout);
+            cols = ReclaimNameWords(cols);
 
             var distRaw = NormalizeColumnValue(cols.distance);
             var styleRaw = NormalizeColumnValue(cols.style);
@@ -249,7 +243,8 @@ public class IsrOrgAgeRecordsParser : IFormatParser
 
             bool hasTime = TimeRx.IsMatch(timeRaw);
 
-            var rowTextForLog = string.Join(' ', rowWords.Select(w => w.Text));
+            var rowText = string.Join(' ', rowWords.Select(w => w.Text));
+            var rowTextForLog = rowText;
             Log($"  ROW[{i}] y={yCenter:F0}: '{(rowTextForLog.Length > 100 ? rowTextForLog[..100] : rowTextForLog)}'");
             Log($"    -> COLS: dist='{distRaw}' style='{styleRaw}' gender='{genderRaw}' " +
                 $"age='{ageRaw}' time='{timeRaw}' date='{dateRaw}' name='{nameRaw}' club='{clubRaw}'");
@@ -326,6 +321,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
                 AgeRaw = ageRaw,
                 TimeRaw = timeRaw,
                 DateRaw = dateRaw,
+                RowRaw = rowText,
                 NameRaw = nameRaw,
                 ClubRaw = clubRaw,
                 NameWords = cols.name,
@@ -457,7 +453,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             var pr = dataRows[di];
 
             var time = TimeRx.Match(pr.TimeRaw).Value;
-            var date = DateRx.IsMatch(pr.DateRaw) ? DateRx.Match(pr.DateRaw).Value : "";
+            var date = ExtractDate(pr);
             var ageCategory = ExtractAgeCategory(pr.AgeRaw);
             var (swimmerName, club) = SplitNameAndClub(pr.NameWords, pr.ClubWords, pr.RowLayout);
 
@@ -582,6 +578,8 @@ public class IsrOrgAgeRecordsParser : IFormatParser
         public string AgeRaw { get; set; } = "";
         public string TimeRaw { get; set; } = "";
         public string DateRaw { get; set; } = "";
+        /// <summary>Весь текст строки — запасной источник даты, см. <c>ExtractDate</c>.</summary>
+        public string RowRaw { get; set; } = "";
         public string NameRaw { get; set; } = "";
         public string ClubRaw { get; set; } = "";
         // Raw Word objects for name+club re-splitting
@@ -821,6 +819,187 @@ public class IsrOrgAgeRecordsParser : IFormatParser
     }
 
     /// <summary>
+    /// Уточняет границу «имя | клуб» по самому широкому зазору рядом с геометрической
+    /// серединой колонок. Окно — доля расстояния между центрами колонок: шире брать нельзя,
+    /// иначе разрывом покажется пробел внутри длинного клуба.
+    /// </summary>
+    private const double SplitWindow = 0.35;
+
+    private static double RefineNameClubBoundary(List<Word> allWords, double boundary, ColumnLayout layout)
+    {
+        if (allWords.Count < 2 || layout.NameX < 0 || layout.ClubX < 0) return boundary;
+
+        var window = Math.Abs(layout.NameX - layout.ClubX) * SplitWindow;
+        if (window <= 0) return boundary;
+
+        double bestGap = 0, bestCut = boundary;
+        // Список уже отсортирован по убыванию Left (RTL): сосед справа, затем левее.
+        for (int i = 0; i + 1 < allWords.Count; i++)
+        {
+            var right = allWords[i];
+            var left = allWords[i + 1];
+            var gap = right.BoundingBox.Left - left.BoundingBox.Right;
+            if (gap <= 0) continue;
+
+            var cut = (right.BoundingBox.Left + left.BoundingBox.Right) / 2.0;
+            if (Math.Abs(cut - boundary) > window) continue;
+
+            if (gap > bestGap) { bestGap = gap; bestCut = cut; }
+        }
+        return bestCut;
+    }
+
+    /// <summary>
+    /// Возвращает имени слова, утёкшие в колонку даты.
+    ///
+    /// Колонка выбирается по «кто ближе по X», поэтому у ДЛИННОГО состава эстафеты крайнее
+    /// правое слово — а в RTL это начало имени — оказывается ближе к дате, чем к имени, и
+    /// пропадает из состава: «עמית קסטן מגורי, …» превращалось в «מגורי, …», «אברהם אבישי, …»
+    /// в «אבישי, …». В выпуске 17.08.2026 таких строк не было, в 17.09.2026 стало 21 — верстку
+    /// подвинули, и дифф показал «федерация переписала составы», хотя она их не трогала
+    /// (docs/data-integrity.md И-26).
+    ///
+    /// Отбор строгий: переносим только слова С БУКВАМИ. Сама дата (<c>dd/MM/yyyy</c>), номер
+    /// бассейна и прочие числа остаются на месте, поэтому колонка даты ничего не теряет.
+    /// </summary>
+    private static (List<Word> distance, List<Word> style, List<Word> gender, List<Word> age,
+                    List<Word> time, List<Word> date, List<Word> name, List<Word> club, List<Word> place)
+        ReclaimNameWords(
+            (List<Word> distance, List<Word> style, List<Word> gender, List<Word> age,
+             List<Word> time, List<Word> date, List<Word> name, List<Word> club, List<Word> place) cols)
+    {
+        if (cols.date.Count == 0) return cols;
+
+        var strays = cols.date.Where(HasLetters).ToList();
+        if (strays.Count == 0) return cols;
+
+        cols.date.RemoveAll(HasLetters);
+        cols.name.AddRange(strays);
+        cols.name.Sort((x, y) => x.BoundingBox.Left.CompareTo(y.BoundingBox.Left));
+        return cols;
+
+        static bool HasLetters(Word w) => (w.Text ?? "").Any(char.IsLetter);
+    }
+
+    /// <summary>
+    /// Склеивает слова одной ячейки в строку, ВОССТАНАВЛИВАЯ слова, которые PdfPig разрезал.
+    ///
+    /// Извлечение даёт не только слова: «אמילי גולוס» приезжает четырьмя кусками
+    /// (<c>אמיל | י | גולו | ס</c>), и наивный <c>string.Join(' ')</c> печатал «אמיל י גולו ס»
+    /// — ровно это лежало в справочнике на витрине. Причина у кусков не смысловая, а
+    /// метрическая: внутри слова зазор между глифами почти нулевой, между словами — заметный.
+    /// Поэтому и склеиваем по зазору: меньше <see cref="GlueGapRatio"/> средней ширины
+    /// символа — один кусок слова, больше — разные слова.
+    ///
+    /// Порог берётся от САМОГО текста (ширина куска / число символов), а не константой в
+    /// пунктах: у справочника разные кегли в разных таблицах, и фиксированный порог сшивал бы
+    /// мелкий шрифт в кашу.
+    /// </summary>
+    private const double GlueGapRatio = 0.25;
+
+    private static string JoinRtlWords(List<Word> words)
+    {
+        if (words.Count == 0) return "";
+
+        var sb = new System.Text.StringBuilder();
+        Word? prev = null;
+        foreach (var w in words)
+        {
+            var text = NormalizeWordChars(w.Text);
+            if (prev != null)
+            {
+                // RTL: предыдущее слово ПРАВЕЕ текущего, поэтому зазор меряем от его левого края.
+                var gap = prev.BoundingBox.Left - w.BoundingBox.Right;
+                if (gap > GlueGap(prev) && gap > GlueGap(w)) sb.Append(' ');
+            }
+            sb.Append(text);
+            prev = w;
+        }
+
+        // Запятая разделяет ноги эстафеты, и склейка по зазору иногда лепит её к соседу
+        // («… סופי נחמני,דניאל יהודיאן»). Приводим к одному виду: запятая липнет к слову
+        // слева, дальше ровно один пробел.
+        return Regex.Replace(sb.ToString(), @"\s*,\s*", ", ").Trim().TrimEnd(',').Trim();
+
+        static double GlueGap(Word w)
+        {
+            var chars = Math.Max(1, w.Text?.Trim().Length ?? 1);
+            return w.BoundingBox.Width / chars * GlueGapRatio;
+        }
+    }
+
+    /// <summary>
+    /// Слова → строки таблицы. Режем там, где по вертикали ЕСТЬ РАЗРЫВ, а не по сетке бинов.
+    ///
+    /// ⚠ Раньше здесь было бинирование <c>Math.Round(Bottom / 3.0) * 3.0</c>, и оно рвало
+    /// строку, когда её слова ложились по разные стороны границы бина. Цена была не
+    /// теоретическая: дата рекорда печатается на пункт выше базовой линии своей строки
+    /// (<c>y=673</c> против <c>y=672</c>) и регулярно уезжала в собственную строку —
+    /// «ROW: 27/12/2024» отдельно, «ROW: … 00:22.16 …» отдельно. Дата в такой строке просто
+    /// пропадала: в файле 17.08.2026 так потерялось 37 дат, в 17.09.2026 — 28, и у РАЗНЫХ
+    /// строк, отчего дифф между выпусками показывал десятки ложных изменений
+    /// (docs/data-integrity.md И-26).
+    ///
+    /// Кластеризация этим не страдает: два слова с разницей меньше <see cref="RowGap"/>
+    /// всегда попадают в одну строку, где бы ни проходила воображаемая сетка. Слипания
+    /// соседних строк не будет — шаг таблицы около 8 пунктов, вдвое с лишним больше порога.
+    /// </summary>
+    private const double RowGap = 3.0;
+
+    private static List<(List<Word> words, double yCenter)> GroupIntoRows(List<Word> allWords)
+    {
+        var rows = new List<(List<Word> words, double yCenter)>();
+        if (allWords.Count == 0) return rows;
+
+        // Сверху вниз: порядок строк на странице и есть порядок чтения таблицы.
+        var ordered = allWords.OrderByDescending(w => w.BoundingBox.Bottom).ToList();
+
+        var current = new List<Word> { ordered[0] };
+        var last = ordered[0].BoundingBox.Bottom;
+
+        foreach (var w in ordered.Skip(1))
+        {
+            var bottom = w.BoundingBox.Bottom;
+            if (last - bottom > RowGap)
+            {
+                rows.Add(Finish(current));
+                current = [];
+            }
+            current.Add(w);
+            last = bottom;
+        }
+        rows.Add(Finish(current));
+        return rows;
+
+        static (List<Word> words, double yCenter) Finish(List<Word> words) => (
+            words.OrderBy(w => w.BoundingBox.Left).ToList(),
+            words.Average(w => (w.BoundingBox.Bottom + w.BoundingBox.Top) / 2.0));
+    }
+
+    /// <summary>
+    /// Дата рекорда: сперва своя колонка, а если там пусто — ЛЮБАЯ дата из строки.
+    ///
+    /// Слова раскладываются по колонкам «кто ближе по X», и длинное имя сдвигает соседей:
+    /// дата уезжает в чужую корзину и пропадает, хотя в файле она есть. Потери при этом
+    /// ПЛАВАЮТ от выпуска к выпуску — в файле 17.08.2026 их было 37, в 17.09.2026 уже 28,
+    /// но у ДРУГИХ строк, поэтому дифф показывал 28 «потерянных» дат и 36 «появившихся»,
+    /// хотя федерация не трогала ни одной (docs/data-integrity.md И-26).
+    ///
+    /// Фоллбек безопасен: формат <c>dd/MM/yyyy</c> в строке справочника больше нигде не
+    /// встречается — ни время (<c>00:25.03</c>), ни возраст, ни клуб так не выглядят.
+    /// Своя колонка всё равно идёт первой: если дат в строке несколько, выбор остаётся за
+    /// разметкой, а не за порядком слов.
+    /// </summary>
+    private static string ExtractDate(ParsedRow pr)
+    {
+        var own = DateRx.Match(pr.DateRaw);
+        if (own.Success) return own.Value;
+
+        var anywhere = DateRx.Match(pr.RowRaw);
+        return anywhere.Success ? anywhere.Value : "";
+    }
+
+    /// <summary>
     /// Split name and club using raw Word objects and their X positions.
     /// Merges all words from name+club columns, sorts by X descending (RTL: rightmost = name),
     /// and splits at the boundary between nameX and clubX column centers.
@@ -863,23 +1042,29 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             return ($"{normalized[0]} {normalized[1]}", string.Join(' ', normalized.Skip(2)));
         }
 
+        // Геометрическая середина — только ОРИЕНТИР. Настоящая граница колонок видна как
+        // самый широкий зазор между словами рядом с ней: у длинного состава эстафеты имя
+        // перехлёстывает середину, и по ней отрезало хвост — «… יובל סגל» превращалось в
+        // «… יובל» (docs/data-integrity.md И-26). Ищем разрыв в окне ±SplitWindow от
+        // середины; не нашли — остаётся прежнее поведение.
+        boundary = RefineNameClubBoundary(allWords, boundary, layout);
+
         // Split: words RIGHT of boundary = name, words LEFT of boundary = club
-        // Word center X > boundary -> name; ????? -> club
-        var nameList = new List<string>();
-        var clubList = new List<string>();
+        // Word center X > boundary -> name; иначе -> club
+        var nameWordsOut = new List<Word>();
+        var clubWordsOut = new List<Word>();
         foreach (var w in allWords)
         {
             double wx = (w.BoundingBox.Left + w.BoundingBox.Right) / 2.0;
-            var norm = NormalizeWordChars(w.Text);
             if (wx > boundary)
-                nameList.Add(norm);
+                nameWordsOut.Add(w);
             else
-                clubList.Add(norm);
+                clubWordsOut.Add(w);
         }
 
-        // nameList is already sorted RTL (rightmost first) which is correct reading order
-        var name = string.Join(' ', nameList).Trim();
-        var club = string.Join(' ', clubList).Trim();
+        // Списки уже в порядке RTL (правое слово первым) — это и есть порядок чтения.
+        var name = JoinRtlWords(nameWordsOut);
+        var club = JoinRtlWords(clubWordsOut);
 
         // Strip trailing numbers from name (venue artifacts)
         name = Regex.Replace(name, @"\s+\d{2}\s*$", "").Trim();
