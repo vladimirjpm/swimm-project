@@ -126,20 +126,26 @@ public class RecordDiffService : IRecordDiffService
     /// <summary>
     /// Мировые рекорды из базы и из этого диффа — эталон правила «быстрее мирового».
     /// Источник возрастных рекордов мировых строк не приносит, поэтому база нужна всегда.
+    ///
+    /// Берём ОБЕ мировые категории: <c>open</c> — абсолютный потолок для всех, <c>masters</c> —
+    /// потолок своей полосы для мастерсов (17.09.2026; до этого мастерс мерился абсолютным, и
+    /// правило для него было почти мёртвым — см. <see cref="RecordPlausibility.WorldReference"/>).
     /// </summary>
     private async Task<Dictionary<string, (int Ms, string Time)>> WorldReferenceAsync(
         IReadOnlyList<ParsedRecordDto> parsed, CancellationToken ct)
     {
         var fromDb = await _db.Records.AsNoTracking()
-            .Where(r => r.RegionType == "world" && r.Category == "open")
-            .Select(r => new { r.Gender, r.PoolType, r.Style, r.Distance, r.Time })
+            .Where(r => r.RegionType == "world" && (r.Category == "open" || r.Category == "masters"))
+            .Select(r => new { r.Category, r.AgeKey, r.Gender, r.PoolType, r.Style, r.Distance, r.Time })
             .ToListAsync(ct);
 
         return RecordPlausibility.WorldReference(
-            fromDb.Select(r => (r.Gender, r.PoolType, r.Style, r.Distance, r.Time))
+            fromDb.Select(r => new RecordPlausibility.WorldRow(
+                    r.Category, r.AgeKey, r.Gender, r.PoolType, r.Style, r.Distance, r.Time))
                 .Concat(parsed
-                    .Where(p => p.RegionType == "world" && p.Category == "open")
-                    .Select(p => (p.Gender, p.PoolType, p.Style, p.Distance, p.Time))));
+                    .Where(p => p.RegionType == "world" && p.Category is "open" or "masters")
+                    .Select(p => new RecordPlausibility.WorldRow(
+                        p.Category, p.AgeKey, p.Gender, p.PoolType, p.Style, p.Distance, p.Time))));
     }
 
     public async Task<RecordDiffApplyResult> ApplyAsync(RecordDiffApplyRequest request, CancellationToken ct = default)

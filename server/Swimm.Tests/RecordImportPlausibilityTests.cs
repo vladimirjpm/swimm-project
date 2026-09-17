@@ -187,14 +187,104 @@ public class RecordImportPlausibilityTests
     {
         // Честный новый WR 22.50 — национальный 22.70 медленнее него, находки нет, хотя он
         // быстрее старого 22.83.
-        var fresh = RecordPlausibility.WorldReference(
-            [("female", "25m", "freestyle", "50m", "22.83"), ("female", "25m", "freestyle", "50m", "22.50")]);
+        var fresh = RecordPlausibility.WorldReference([World("22.83"), World("22.50")]);
         Assert.Empty(RecordPlausibility.Check([Entry("country", "22.70")], fresh));
 
         // Мусорно-МЕДЛЕННЫЙ новый WR 25.00 не делает честный национальный 23.00 «быстрее мирового».
-        var slowGarbage = RecordPlausibility.WorldReference(
-            [("female", "25m", "freestyle", "50m", "22.83"), ("female", "25m", "freestyle", "50m", "25.00")]);
+        var slowGarbage = RecordPlausibility.WorldReference([World("22.83"), World("25.00")]);
         Assert.Empty(RecordPlausibility.Check([Entry("country", "23.00")], slowGarbage));
+    }
+
+    // ── правило 2 для мастерсов: планка не абсолютная, а по полосе (17.09.2026) ──────
+
+    /// <summary>
+    /// Суть правки. Мастерский рекорд страны 58.00 в полосе 70-74 медленнее АБСОЛЮТНОГО
+    /// мирового (51.68), и старое правило его пропускало. Но мировой рекорд самой полосы —
+    /// 01:06.68, и 58.00 быстрее него: так не бывает.
+    /// </summary>
+    [Fact]
+    public void Masters_FasterThanItsOwnBand_IsFound_EvenWhenSlowerThanAbsolute()
+    {
+        var reference = RecordPlausibility.WorldReference([
+            World("51.68"),
+            World("01:06.68", category: "masters", ageKey: "70-74"),
+        ]);
+
+        var found = Assert.Single(RecordPlausibility.Check([MastersEntry("70-74", "58.00")], reference));
+
+        Assert.Equal(RecordIssueReasons.FasterThanWorldRecord, found.Reason);
+        // В обосновании должна стоять ПОЛОСА, иначе человек в реестре не поймёт, с чем сравнивали.
+        Assert.Contains("70-74", found.Note);
+        Assert.Contains("01:06.68", found.Note);
+    }
+
+    /// <summary>Честный мастерский рекорд своей полосы находкой не становится.</summary>
+    [Fact]
+    public void Masters_SlowerThanItsBand_IsFine()
+    {
+        var reference = RecordPlausibility.WorldReference([
+            World("51.68"),
+            World("01:06.68", category: "masters", ageKey: "70-74"),
+        ]);
+
+        Assert.Empty(RecordPlausibility.Check([MastersEntry("70-74", "01:10.00")], reference));
+    }
+
+    /// <summary>
+    /// Полоса берётся СВОЯ — проверяем обе стороны ошибки на ОДНОМ времени 01:00.00.
+    /// Схватить чужую полосу можно в любую сторону, и обе дороги: взяли бы полосу помоложе —
+    /// потеряли бы находку, взяли бы постарше — выдумали бы её на честной строке.
+    /// </summary>
+    [Fact]
+    public void Masters_IsMeasuredByItsOwnBand_NotAnother()
+    {
+        var reference = RecordPlausibility.WorldReference([
+            World("51.68"),
+            World("56.96", category: "masters", ageKey: "25-29"),
+            World("01:06.68", category: "masters", ageKey: "70-74"),
+        ]);
+
+        // В полосе 70-74 это быстрее её рекорда 01:06.68 — находка. Мерили бы полосой 25-29
+        // (56.96) или абсолютом (51.68) — пропустили бы.
+        Assert.Single(RecordPlausibility.Check([MastersEntry("70-74", "01:00.00")], reference));
+
+        // В полосе 25-29 то же время медленнее её рекорда 56.96 — честная строка. Схвати мы
+        // тут полосу постарше, получили бы находку на ровном месте.
+        Assert.Empty(RecordPlausibility.Check([MastersEntry("25-29", "01:00.00")], reference));
+    }
+
+    /// <summary>
+    /// Полосы в world/masters нет (её просто не принёс источник) — планка откатывается на
+    /// абсолютный мировой, то есть на старое поведение, а не пропадает совсем.
+    /// </summary>
+    [Fact]
+    public void Masters_WithoutBandInWorld_FallsBackToAbsolute()
+    {
+        var reference = RecordPlausibility.WorldReference([World("51.68")]);
+
+        Assert.Empty(RecordPlausibility.Check([MastersEntry("70-74", "58.00")], reference));
+
+        var found = Assert.Single(RecordPlausibility.Check([MastersEntry("70-74", "40.11")], reference));
+        Assert.Contains("51.68", found.Note);
+        Assert.DoesNotContain("полосе", found.Note);
+    }
+
+    /// <summary>
+    /// Мировая ось мастерсов сама себя правилом 2 не судит: у world рекорд полосы и есть
+    /// потолок, сравнивать его с собой бессмысленно (ветка world уходит в правила 1 и 3).
+    /// </summary>
+    [Fact]
+    public void WorldMastersRow_IsNotJudgedAgainstItself()
+    {
+        var reference = RecordPlausibility.WorldReference([
+            World("51.68"),
+            World("01:06.68", category: "masters", ageKey: "70-74"),
+        ]);
+
+        var worldMasters = new RecordDiffEntry("world", "", "masters", "70-74", "female", "25m",
+            "freestyle", "50m", "01:06.68", null, null, "01:05.00", null, null);
+
+        Assert.Empty(RecordPlausibility.Check([worldMasters], reference));
     }
 
     [Fact]
@@ -297,6 +387,15 @@ public class RecordImportPlausibilityTests
 
     private static RecordDiffEntry Entry(string regionType, string newTime, string? oldTime = null) =>
         new(regionType, regionType == "world" ? "" : "ISR", "open", "", "female", "25m", "freestyle", "50m",
+            oldTime, null, null, newTime, null, null);
+
+    /// <summary>Мировая строка эталона на той же дисциплине, что и <see cref="Entry"/>.</summary>
+    private static RecordPlausibility.WorldRow World(string time, string category = "open", string ageKey = "") =>
+        new(category, ageKey, "female", "25m", "freestyle", "50m", time);
+
+    /// <summary>Строка диффа мастерского рекорда страны в полосе.</summary>
+    private static RecordDiffEntry MastersEntry(string ageKey, string newTime, string? oldTime = null) =>
+        new("country", "ISR", "masters", ageKey, "female", "25m", "freestyle", "50m",
             oldTime, null, null, newTime, null, null);
 
     private sealed class NoopCacheService : ICacheService

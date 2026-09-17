@@ -1,5 +1,6 @@
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -43,18 +44,25 @@ public sealed class RecordCountryRunner
     private readonly IRecordCountriesProvider _countries;
     private readonly IRecordCountryFetcher _fetcher;
     private readonly IRecordDiffService _diff;
+    private readonly IRecordRunArchive? _archive;
     private readonly TimeSpan _pause;
 
+    /// <param name="archive">
+    /// Куда сложить выгрузку разобранных строк. null — прогон не архивируется (так и в тестах,
+    /// которым диск не нужен).
+    /// </param>
     /// <param name="pause">Пауза между странами; в тестах — ноль.</param>
     public RecordCountryRunner(
         IRecordCountriesProvider countries,
         IRecordCountryFetcher fetcher,
         IRecordDiffService diff,
+        IRecordRunArchive? archive = null,
         TimeSpan? pause = null)
     {
         _countries = countries;
         _fetcher = fetcher;
         _diff = diff;
+        _archive = archive;
         _pause = pause ?? DefaultPause;
     }
 
@@ -136,6 +144,17 @@ public sealed class RecordCountryRunner
                 failed.Count > 0
                     ? $"Прогон не дал ни одной строки: не скачалась ни одна страна из {status.Total}."
                     : "Прогон не дал ни одной строки — проверьте список стран.");
+
+        // Архив ДО диффа и до Apply: файл фиксирует, что источник отдал сегодня, независимо
+        // от того, применят прогон или посмотрят и закроют. Иначе «что стояло в прошлый раз»
+        // снова остаётся без ответа — ровно как в И-21 и И-22.
+        if (_archive != null)
+        {
+            var saved = await _archive.SaveCountryRunAsync(
+                _fetcher.Source, codes, RecordCsvDump.Build(rows), ct);
+            status.ArchivePath = saved.Path;
+            status.ArchiveError = saved.Error;
+        }
 
         status.Diff = await _diff.BuildDiffAsync(_fetcher.Source, rows, DiffTtl, ct);
     }

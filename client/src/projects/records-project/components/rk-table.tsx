@@ -19,14 +19,21 @@ interface Props {
 }
 
 /**
- * Отставание отрицательное — рекорд страны быстрее мирового. Это не достижение, а
- * расхождение в самом справочнике (И-22, И-23): один из двух файлов источника врёт.
- * Показываем как аномалию, потому что рейтинг, где страна молча стоит выше мирового
- * рекорда, читается как сломанный.
+ * Отставание отрицательное — рекорд страны быстрее мирового. Показываем как аномалию,
+ * потому что рейтинг, где страна молча стоит выше мирового рекорда, читается как сломанный.
+ *
+ * ⚠ Но это НЕ обязательно ошибка справочника, и раньше подпись утверждала обратное
+ * («два файла источника спорят»). Разбор 17.09.2026 (И-23): World Aquatics ведёт мировые
+ * рекорды эстафет 4×50 только с 2013 года, поэтому заплыв 2008-го может быть быстрее
+ * мирового рекорда и при этом быть честной строкой — обеими честными строками.
+ * Единственный живой случай на всю базу — Франция, 4×50 в/с м 25 м (1:20.77 против 1:21.80).
+ * Ошибка справочника — тоже возможная причина (И-22), поэтому текст называет обе и не
+ * берётся решать, какая здесь.
  */
 const AHEAD_TITLE =
-  'Faster than the world record for this event — the two source files disagree. '
-  + 'We publish both exactly as they come and flag the conflict.';
+  'Faster than the world record listed for this event. Not an error by itself — World Aquatics '
+  + 'has only ratified 4×50 relay records since 2013, so the best swim ever can be older than '
+  + 'the record list. We publish both rows exactly as the source gives them.';
 
 const RkTable: React.FC<Props> = ({ rows, highlight }) => (
   <div className="rk-table" role="table" aria-label="Country records ranking">

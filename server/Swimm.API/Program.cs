@@ -790,41 +790,17 @@ if (args.Contains("--records-dump"))
     var dumped = await dumpProvider.FetchAsync(
         new Swimm.Application.Dtos.RecordSourceRequest(dumpSource, null, null, null, null, null));
 
-    static string Csv(string? v)
-    {
-        v ??= "";
-        // Кавычим по правилам RFC 4180. Перевод строки в полях справочника не встречался,
-        // но проверяем: одна такая строка сдвинула бы весь CSV и сделала бы diff нечитаемым.
-        var needsQuotes = v.IndexOfAny(['"', ',', '\r', '\n']) >= 0;
-        return needsQuotes ? '"' + v.Replace("\"", "\"\"") + '"' : v;
-    }
-
-    var lines = new List<string>
-    {
-        "RegionType,RegionCode,Category,AgeKey,Gender,PoolType,Style,Distance,Time,HolderName,Club,HolderCountry,RecordDate"
-    };
-    lines.AddRange(dumped
-        .OrderBy(r => r.RegionType, StringComparer.Ordinal)
-        .ThenBy(r => r.RegionCode, StringComparer.Ordinal)
-        .ThenBy(r => r.Category, StringComparer.Ordinal)
-        .ThenBy(r => r.AgeKey, StringComparer.Ordinal)
-        .ThenBy(r => r.Gender, StringComparer.Ordinal)
-        .ThenBy(r => r.PoolType, StringComparer.Ordinal)
-        .ThenBy(r => r.Style, StringComparer.Ordinal)
-        .ThenBy(r => r.Distance, StringComparer.Ordinal)
-        .Select(r => string.Join(',', new[]
-        {
-            Csv(r.RegionType), Csv(r.RegionCode), Csv(r.Category), Csv(r.AgeKey), Csv(r.Gender),
-            Csv(r.PoolType), Csv(r.Style), Csv(r.Distance), Csv(r.Time), Csv(r.HolderName),
-            Csv(r.Club), Csv(r.HolderCountry), Csv(r.RecordDate)
-        })));
-
-    // UTF-8 БЕЗ BOM и перевод строки ЯВНО LF, а не Environment.NewLine: выгрузка коммитится
-    // и сверяется контрольной суммой, а она обязана совпадать на любой машине. WriteAllLines
-    // дал бы CRLF на Windows и LF на Linux — сумма разъехалась бы на ровном месте (та же
-    // ловушка, что у бандла админки, см. .gitattributes).
+    // Формат и порядок строк — общие с выгрузкой боевого прогона по странам
+    // (Swimm.Application/Mapping/RecordCsvDump.cs). Две копии этого кода разъехались бы на
+    // первой же правке, а весь смысл архива в том, что выгрузки разных дней сравнимы
+    // построчно.
+    //
+    // UTF-8 БЕЗ BOM: выгрузка коммитится и сверяется контрольной суммой, BOM её сдвинет.
+    // Перевод строки LF ставит сам RecordCsvDump: WriteAllLines дал бы CRLF на Windows и LF
+    // на Linux, и сумма разъехалась бы на ровном месте (та же ловушка, что у бандла админки,
+    // см. .gitattributes).
     await File.WriteAllTextAsync(
-        dumpPath, string.Join("\n", lines) + "\n", new System.Text.UTF8Encoding(false));
+        dumpPath, RecordCsvDump.Build(dumped), new System.Text.UTF8Encoding(false));
     Console.WriteLine($"{dumpSource}: {dumped.Count} строк -> {dumpPath}");
     return;
 }

@@ -84,10 +84,26 @@ public static class DependencyInjection
         // (дифф ходит в БД). Пауза между странами по умолчанию, тесты подставляют свою.
         services.AddSingleton<RecordCountryRunQueue>();
         services.AddSingleton<IRecordCountryRunQueue>(sp => sp.GetRequiredService<RecordCountryRunQueue>());
+        // Архив источников: боевой прогон сам кладёт выгрузку разобранных строк в
+        // !records-sources/ (правило 11 pre-push). Путь из конфига, относительный считается от
+        // ContentRoot; пустой — архив выключен.
+        services.AddSingleton<IRecordRunArchive>(sp =>
+        {
+            var configured = configuration["RecordsImport:SourceArchiveDir"];
+            var dir = string.IsNullOrWhiteSpace(configured)
+                ? null
+                : Path.GetFullPath(Path.Combine(
+                    sp.GetRequiredService<IHostEnvironment>().ContentRootPath, configured));
+
+            return new FileRecordRunArchive(
+                dir, sp.GetRequiredService<ILogger<FileRecordRunArchive>>());
+        });
+
         services.AddScoped(sp => new RecordCountryRunner(
             sp.GetRequiredService<IRecordCountriesProvider>(),
             sp.GetRequiredService<IRecordCountryFetcher>(),
-            sp.GetRequiredService<IRecordDiffService>()));
+            sp.GetRequiredService<IRecordDiffService>(),
+            sp.GetRequiredService<IRecordRunArchive>()));
 
         // Repositories
         services.AddScoped<IResultRepository, ResultRepository>();
