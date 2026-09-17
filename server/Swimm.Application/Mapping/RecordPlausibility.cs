@@ -41,22 +41,41 @@ public static class RecordPlausibility
     /// </summary>
     public const double WorldMaxImprovement = 0.03;
 
+    /// <summary>Строка мировой оси для эталона. Категория и полоса нужны мастерсам.</summary>
+    public readonly record struct WorldRow(
+        string Category, string AgeKey, string Gender, string PoolType, string Style,
+        string Distance, string Time);
+
     /// <summary>
-    /// Эталон «мировой рекорд дисциплины» для правила 2: из того, что лежит в базе, и того,
-    /// что приехало в этом диффе, берётся ЛУЧШЕЕ. Так эталон не портится ни в одну сторону:
-    /// мусорно-быстрый новый WR (40.11) ложных находок не даёт — всё медленнее него, а сам он
-    /// пойман правилом 1; мусорно-медленный новый WR не превращает честные национальные
-    /// рекорды в «быстрее мирового».
+    /// Эталоны для правила 2: из того, что лежит в базе, и того, что приехало в этом диффе,
+    /// берётся ЛУЧШЕЕ. Так эталон не портится ни в одну сторону: мусорно-быстрый новый WR
+    /// (40.11) ложных находок не даёт — всё медленнее него, а сам он пойман правилом 1;
+    /// мусорно-медленный новый WR не превращает честные национальные рекорды в «быстрее
+    /// мирового».
+    ///
+    /// Эталонов в словаре ДВА вида, и это правка 17.09.2026. Раньше мастерский рекорд страны
+    /// мерился АБСОЛЮТНЫМ мировым, и правило для мастерсов было почти мёртвым: на 100 в/с ж
+    /// 50 м запас между полосой и абсолютом — 5.3 с в полосе 25-29 и 54.5 с в полосе 90-94,
+    /// то есть источник мог отдать полминуты бреда и остаться незамеченным. Ось
+    /// <c>world/masters</c> загружена (1095 строк), поэтому планка опускается до рекорда ТОЙ
+    /// ЖЕ полосы. Замер 17.09: полосы сходятся один в один — все 845 израильских мастерских
+    /// строк имеют пару в <c>world/masters</c>.
+    ///
+    /// Ключи разной формы и не сталкиваются: у полосы впереди <c>masters|&lt;полоса&gt;</c>,
+    /// у абсолютного — только дисциплина.
     /// </summary>
-    public static Dictionary<string, (int Ms, string Time)> WorldReference(
-        IEnumerable<(string Gender, string PoolType, string Style, string Distance, string Time)> worldRows)
+    public static Dictionary<string, (int Ms, string Time)> WorldReference(IEnumerable<WorldRow> worldRows)
     {
         var map = new Dictionary<string, (int Ms, string Time)>();
-        foreach (var (gender, pool, style, distance, time) in worldRows)
+        foreach (var row in worldRows)
         {
-            if (SwimTime.ParseToMs(time) is not int ms) continue;
-            var key = DisciplineKey(gender, pool, style, distance);
-            if (!map.TryGetValue(key, out var best) || ms < best.Ms) map[key] = (ms, time.Trim());
+            if (SwimTime.ParseToMs(row.Time) is not int ms) continue;
+
+            var key = IsMasters(row.Category)
+                ? BandKey(row.AgeKey, row.Gender, row.PoolType, row.Style, row.Distance)
+                : DisciplineKey(row.Gender, row.PoolType, row.Style, row.Distance);
+
+            if (!map.TryGetValue(key, out var best) || ms < best.Ms) map[key] = (ms, row.Time.Trim());
         }
         return map;
     }
@@ -95,11 +114,19 @@ public static class RecordPlausibility
                 continue;
             }
 
-            if (worldReference.TryGetValue(DisciplineKey(e.Gender, e.PoolType, e.Style, e.Distance), out var world)
-                && newMs < world.Ms)
-                found.Add(Finding(e, RecordIssueReasons.FasterThanWorldRecord,
-                    $"{e.NewTime} быстрее мирового рекорда той же дисциплины ({world.Time}). " +
-                    "Рекорд страны, возраста или мастерса не может быть быстрее абсолютного."));
+            // У мастерса планка — рекорд ЕГО полосы; абсолютный остаётся фоллбеком на случай,
+            // когда полосы в world/masters нет (эстафеты мы не берём вовсе, у них другая ось).
+            var band = IsMasters(e.Category)
+                ? Lookup(worldReference, BandKey(e.AgeKey, e.Gender, e.PoolType, e.Style, e.Distance))
+                : null;
+            var world = band ?? Lookup(worldReference, DisciplineKey(e.Gender, e.PoolType, e.Style, e.Distance));
+
+            if (world is { } reference && newMs < reference.Ms)
+                found.Add(Finding(e, RecordIssueReasons.FasterThanWorldRecord, band != null
+                    ? $"{e.NewTime} быстрее мирового рекорда мастерсов в полосе {e.AgeKey.Trim()} " +
+                      $"({reference.Time}). Рекорд страны не может быть быстрее мирового своей полосы."
+                    : $"{e.NewTime} быстрее мирового рекорда той же дисциплины ({reference.Time}). " +
+                      "Рекорд страны, возраста или мастерса не может быть быстрее абсолютного."));
         }
         return found;
     }
@@ -132,6 +159,19 @@ public static class RecordPlausibility
             style.Trim().ToLowerInvariant(),
             // Records хранит дистанцию с суффиксом ("100m") — как и в RecordIssueKey.
             distance.Trim().ToLowerInvariant().TrimEnd('m'));
+
+    /// <summary>Полоса мастерса × дисциплина — ось, на которой живёт мировой рекорд мастерсов.</summary>
+    public static string BandKey(
+        string ageKey, string gender, string poolType, string style, string distance) =>
+        "masters|" + ageKey.Trim().ToLowerInvariant() + "|"
+        + DisciplineKey(gender, poolType, style, distance);
+
+    private static bool IsMasters(string category) =>
+        category.Trim().Equals("masters", StringComparison.OrdinalIgnoreCase);
+
+    private static (int Ms, string Time)? Lookup(
+        IReadOnlyDictionary<string, (int Ms, string Time)> reference, string key) =>
+        reference.TryGetValue(key, out var found) ? found : null;
 
     private static RecordSuspiciousEntry Finding(RecordDiffEntry e, string reason, string note) =>
         new(e.RegionType, e.RegionCode, e.Category, e.AgeKey, e.Gender, e.PoolType, e.Style,
