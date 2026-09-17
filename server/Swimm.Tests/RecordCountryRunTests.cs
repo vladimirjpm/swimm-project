@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
 using Xunit;
@@ -202,6 +203,71 @@ public class RecordCountryRunTests
         Assert.DoesNotContain("\"state\":1", json);
     }
 
+    // ── архив источников (правило 11 pre-push) ───────────────────────────────────────
+
+    /// <summary>
+    /// Боевой прогон обязан сам сохранить выгрузку. Ради этого архив и заводился: ручной
+    /// <c>--records-dump</c> сходил бы в источник ещё раз на час-два и принёс бы уже не то,
+    /// что применили.
+    /// </summary>
+    [Fact]
+    public async Task Run_ArchivesParsedRows_WhenAllCountries()
+    {
+        var archive = new SpyArchive();
+        var (runner, _) = Runner(CreateDb(nameof(Run_ArchivesParsedRows_WhenAllCountries)), archive);
+        var status = NewStatus();
+
+        await runner.RunAsync(status, null, default);
+
+        Assert.Equal(1, archive.Calls);
+        Assert.Null(archive.LastScope);
+        Assert.NotNull(status.ArchivePath);
+        Assert.Null(status.ArchiveError);
+
+        // В файле именно разобранные строки прогона, а не что-нибудь из базы.
+        Assert.StartsWith(RecordCsvDump.Header, archive.LastCsv);
+        Assert.Contains("AGU", archive.LastCsv);
+    }
+
+    /// <summary>
+    /// Прогон подмножеством — отладка («повтор упавших или одна страна»), а не боевой прогон.
+    /// Архив такие не пишет, иначе завалит мусором тот самый инструмент, ради которого заведён.
+    /// Прогон при этом обязан пройти нормально.
+    /// </summary>
+    [Fact]
+    public async Task Run_DoesNotArchive_WhenSubsetOfCountries()
+    {
+        var archive = new SpyArchive();
+        var (runner, _) = Runner(CreateDb(nameof(Run_DoesNotArchive_WhenSubsetOfCountries)), archive);
+        var status = NewStatus();
+
+        await runner.RunAsync(status, ["AGU"], default);
+
+        Assert.Equal(["AGU"], archive.LastScope);
+        Assert.Null(status.ArchivePath);
+        Assert.Null(status.ArchiveError);
+        Assert.NotNull(status.Diff);
+    }
+
+    /// <summary>
+    /// Беда архива не отменяет прогон: час-два работы дороже файла. Ошибка едет отдельным
+    /// полем статуса, а дифф всё равно строится.
+    /// </summary>
+    [Fact]
+    public async Task Run_SurvivesArchiveFailure()
+    {
+        var archive = new SpyArchive("диск переполнен");
+        var (runner, _) = Runner(CreateDb(nameof(Run_SurvivesArchiveFailure)), archive);
+        var status = NewStatus();
+
+        await runner.RunAsync(status, null, default);
+
+        Assert.Equal("диск переполнен", status.ArchiveError);
+        Assert.Null(status.ArchivePath);
+        Assert.NotNull(status.Diff);
+        Assert.Null(status.Error);
+    }
+
     // ── обвязка ──────────────────────────────────────────────────────────────────────
 
     private static RecordCountryRunStatus NewStatus() => new()
@@ -220,12 +286,39 @@ public class RecordCountryRunTests
     private static (RecordCountryRunner Runner, StubFetcher Fetcher) Runner(string dbName) =>
         Runner(CreateDb(dbName));
 
-    private static (RecordCountryRunner Runner, StubFetcher Fetcher) Runner(SwimmDbContext db)
+    private static (RecordCountryRunner Runner, StubFetcher Fetcher) Runner(
+        SwimmDbContext db, IRecordRunArchive? archive = null)
     {
         var fetcher = new StubFetcher();
         var diff = new RecordDiffService(db, new MemoryCache(new MemoryCacheOptions()));
         // Пауза ноль: в бою между странами 2 с вежливости к источнику, в тесте спать незачем.
-        return (new RecordCountryRunner(new StubCountries(), fetcher, diff, TimeSpan.Zero), fetcher);
+        return (new RecordCountryRunner(new StubCountries(), fetcher, diff, archive, TimeSpan.Zero), fetcher);
+    }
+
+    /// <summary>
+    /// Архив, который ничего не пишет на диск, а запоминает, о чём его попросили: прогон
+    /// обязан быть проверяем без файловой системы.
+    /// </summary>
+    private sealed class SpyArchive(string? error = null) : IRecordRunArchive
+    {
+        public int Calls { get; private set; }
+        public IReadOnlyList<string>? LastScope { get; private set; }
+        public string? LastCsv { get; private set; }
+
+        public Task<RecordArchiveResult> SaveCountryRunAsync(
+            string source, IReadOnlyList<string>? scope, string csv, CancellationToken ct = default)
+        {
+            Calls++;
+            LastScope = scope;
+            LastCsv = csv;
+
+            // Настоящий FileRecordRunArchive отладочные прогоны подмножеством не пишет —
+            // повторяем это правило, чтобы тест проверял поведение прогона, а не заглушки.
+            if (error != null) return Task.FromResult(new RecordArchiveResult(null, error));
+            return Task.FromResult(scope is { Count: > 0 }
+                ? RecordArchiveResult.Skipped
+                : new RecordArchiveResult("archive/worldrecords-countries__fetched-2026-09-17.csv", null));
+        }
     }
 
     private static Swimm.Domain.Entities.Record Existing(

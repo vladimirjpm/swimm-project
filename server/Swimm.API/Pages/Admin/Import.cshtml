@@ -470,6 +470,9 @@
                 </div>
                 <div id="cr-failed" class="hidden mt-3 text-xs"></div>
                 <div id="cr-mismatch" class="hidden mt-2 text-[11px] text-admin-text-muted"></div>
+                @* Куда легла выгрузка разобранных строк: её надо закоммитить, а значит — найти.
+                   Правило 11 в docs/pre-push-rules.md. *@
+                <div id="cr-archive" class="hidden mt-2 text-[11px] text-admin-text-muted"></div>
             </div>
         </div>
 
@@ -1372,6 +1375,7 @@
     const crSubset = document.getElementById('cr-subset');
     const crCodes = document.getElementById('cr-codes');
     const crProgress = document.getElementById('cr-progress');
+    const crArchive = document.getElementById('cr-archive');
     const crState = document.getElementById('cr-state');
     const crBar = document.getElementById('cr-bar');
     const crRows = document.getElementById('cr-rows');
@@ -1410,6 +1414,7 @@
         crBusy(true);
         crFailed.classList.add('hidden');
         crMismatch.classList.add('hidden');
+        crArchive.classList.add('hidden');
         crHint.textContent = '';
         try {
             const data = await api('/api/admin/records/countries/run', {
@@ -1475,6 +1480,16 @@
                 `<button class="admin-btn admin-btn-ghost py-1 px-3 text-xs" id="cr-retry">Повторить упавшие</button>`;
             // Отдельного эндпоинта для ретрая нет: это тот же запуск, но со списком кодов.
             document.getElementById('cr-retry').onclick = () => startCountryRun(failed.map(f => f.code));
+        }
+
+        // Архив источников: путь показываем, чтобы файл не пришлось искать перед коммитом.
+        // Подмножество стран не архивируется вовсе — это отладка, а не боевой прогон.
+        if (s.archiveError) {
+            crArchive.classList.remove('hidden');
+            crArchive.innerHTML = `<span class="text-admin-danger">⚠ выгрузка прогона НЕ сохранена: ${esc(s.archiveError)}</span>`;
+        } else if (s.archivePath) {
+            crArchive.classList.remove('hidden');
+            crArchive.textContent = 'выгрузка прогона сохранена: ' + s.archivePath + ' — закоммитить вместе с итогом (правило 11)';
         }
 
         const mism = s.mismatches || [];

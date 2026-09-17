@@ -83,6 +83,19 @@ public sealed class RecordCountryRunStatus
     /// <summary>Итог прогона: дифф, который ждёт Apply. null, пока прогон не закончился.</summary>
     public RecordDiffResult? Diff { get; set; }
 
+    /// <summary>
+    /// Куда легла выгрузка разобранных строк (архив источников, правило 11 в
+    /// docs/pre-push-rules.md). null — прогон не архивируется: подмножество стран это
+    /// отладка, а не боевой прогон. Показывается админу, чтобы файл не пришлось искать.
+    /// </summary>
+    public string? ArchivePath { get; set; }
+
+    /// <summary>
+    /// Почему выгрузка не сохранилась, если сохранить не удалось. Отдельно от
+    /// <see cref="Error"/>: прогон при этом УСПЕШЕН, терять его результат из-за архива нельзя.
+    /// </summary>
+    public string? ArchiveError { get; set; }
+
     public string? Error { get; set; }
 }
 

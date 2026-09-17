@@ -163,8 +163,12 @@ public class WorldRecordsParser : IFormatParser
             // Дата в формате DD/MM/YYYY
             string date = dateVal;
 
-            // Имя спортсмена
-            var (firstName, lastName) = ParseAthleteName(athleteVal);
+            // Имя спортсмена. У эстафеты его нет — есть СОСТАВ, и разбирается он иначе
+            // (см. ParseRelayRoster). Кладём состав целиком в firstName: HolderName у всех
+            // потребителей этого парсера собирается как "{FirstName} {LastName}".
+            var (firstName, lastName) = evIsRelay
+                ? (ParseRelayRoster(athleteVal), "")
+                : ParseAthleteName(athleteVal);
             string fullName = $"{firstName} {lastName}".Trim();
 
             Log($"  Row {row}: event='{eventVal}' -> gender={gender}, pool={poolType}, " +
@@ -498,6 +502,50 @@ public class WorldRecordsParser : IFormatParser
         }
 
         return trimmed;
+    }
+
+    /// <summary>
+    /// Состав эстафеты: «BERNARD Alain, LEVEAUX Amaury, GILOT Fabien, BOUSQUET Frederick» →
+    /// «Alain Bernard, Amaury Leveaux, Fabien Gilot, Frederick Bousquet».
+    ///
+    /// Одним разбором чинятся два разных дефекта:
+    ///
+    /// 1. <b>Разбор имени рвал состав.</b> <see cref="ParseAthleteName"/> написан под ОДНОГО
+    ///    спортсмена и считает первый блок заглавных фамилией. На списке из четверых он
+    ///    уносил фамилию первой ноги в самый конец строки: в базе лежало и на витрине
+    ///    показывалось «Alain, LEVEAUX Amaury, GILOT Fabien, BOUSQUET Frederick Bernard».
+    ///
+    /// 2. <b>Порядок ног в источнике не фиксирован.</b> Один и тот же рекорд приезжает то
+    ///    «A, B, C, D», то «B, A, D, C» — время и дата те же. Из-за этого эстафетные строки
+    ///    показывались изменившимися при КАЖДОМ прогоне (docs/data-integrity.md, хвост
+    ///    «эстафеты шумят в диффе»), и «изменившихся мало» не означало «источник ничего не
+    ///    поправил». Лечится устойчивым порядком: ноги сортируются по нормализованному имени.
+    ///
+    /// ⚠ Порядок плавания этим теряется — но его и не было: источник его не сохраняет
+    /// (колонка сплитов идёт отдельно и у нас не разбирается). Стабильный порядок лучше
+    /// случайного: без него бессмыслен и архив источников, где выгрузки сравниваются
+    /// построчно (`!records-sources/README.md`).
+    ///
+    /// Сортировка <see cref="StringComparer.Ordinal"/>, а не культурная: результат обязан
+    /// быть одинаковым на любой машине, иначе прогон на Windows и на раннере дадут разные
+    /// строки — тот же класс беды, что с бандлом админки.
+    /// </summary>
+    internal static string ParseRelayRoster(string athlete)
+    {
+        if (string.IsNullOrWhiteSpace(athlete)) return "";
+
+        var legs = athlete
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(leg =>
+            {
+                var (firstName, lastName) = ParseAthleteName(leg);
+                return $"{firstName} {lastName}".Trim();
+            })
+            .Where(name => name.Length > 0)
+            .ToList();
+
+        legs.Sort(StringComparer.Ordinal);
+        return string.Join(", ", legs);
     }
 
     /// <summary>
