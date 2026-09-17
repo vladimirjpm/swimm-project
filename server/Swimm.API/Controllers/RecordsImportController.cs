@@ -165,9 +165,19 @@ public class RecordsImportController : ControllerBase
 
         // Подозрительные значения записаны как в источнике, но заведены в реестр кандидатами —
         // админ должен узнать об этом сразу, а не при следующем заходе на дашборд.
-        var message = result.CandidatesCreated > 0
-            ? $"Применено: {result.AppliedCount}. В реестр спорных — кандидатов: {result.CandidatesCreated} (/Admin/Records?tab=issues)"
-            : $"Применено: {result.AppliedCount}";
-        return Ok(new { message, applied = result.AppliedCount, candidates = result.CandidatesCreated });
+        var message = $"Применено: {result.AppliedCount}";
+        if (result.CandidatesCreated > 0)
+            message += $". В реестр спорных — кандидатов: {result.CandidatesCreated} (/Admin/Records?tab=issues)";
+        // Защита оспоренного времени (И-25): молчать тут нельзя — «применено 0» при непустом
+        // диффе иначе выглядит как сбой.
+        if (result.ProtectedCount > 0)
+            message += $". Защищено реестром (не перезаписано): {result.ProtectedCount}";
+        return Ok(new
+        {
+            message,
+            applied = result.AppliedCount,
+            candidates = result.CandidatesCreated,
+            protectedCount = result.ProtectedCount,
+        });
     }
 }

@@ -115,13 +115,69 @@ public class RecordDiffService : IRecordDiffService
         var suspicious = RecordPlausibility.Check(
             addedEntries.Concat(changedEntries), await WorldReferenceAsync(parsed, ct));
 
+        // Защита оспоренного времени (И-25): значения, которые человек уже признал ошибкой
+        // источника, Apply не берёт. Считаем ЗДЕСЬ, а не в Apply, чтобы пометка была видна
+        // в превью — иначе «изменённых 1, применено 0» выглядит как баг.
+        var protectedKeys = await ProtectedTimeKeysAsync(added.Concat(changed).ToList(), ct);
+        addedEntries = MarkProtected(addedEntries, protectedKeys);
+        changedEntries = MarkProtected(changedEntries, protectedKeys);
+        var protectedCount = addedEntries.Concat(changedEntries).Count(e => e.ProtectedByIssue);
+
         var diffId = Guid.NewGuid().ToString("N");
-        _memoryCache.Set(DiffCacheKey(diffId), new CachedRecordDiff(source, added, changed, suspicious),
+        _memoryCache.Set(DiffCacheKey(diffId), new CachedRecordDiff(source, added, changed, suspicious, protectedKeys),
             previewTtl ?? DefaultPreviewTtl);
 
         return new RecordDiffResult(diffId, source, added.Count, changed.Count, unchanged, missingInSource,
-            addedEntries, changedEntries, suspicious);
+            addedEntries, changedEntries, suspicious, protectedCount);
     }
+
+    /// <summary>
+    /// Ключи (8 осей + время) тех значений источника, которые человек уже признал ошибкой:
+    /// претензия в реестре со статусом из <see cref="RecordIssueStatuses.SourceOverruled"/>.
+    ///
+    /// Претензия висит на ЗНАЧЕНИИ, а не на клетке лестницы (<see cref="RecordIssueKey"/>),
+    /// поэтому ищем по времени, которое приехало из источника. Как только федерация исправит
+    /// файл, время в источнике станет другим, ключ не совпадёт — и защита снимется сама, без
+    /// правки реестра. В этом и смысл: защита не «замораживает клетку», а отвергает одно
+    /// конкретное неверное число.
+    /// </summary>
+    private async Task<HashSet<string>> ProtectedTimeKeysAsync(
+        IReadOnlyList<ParsedRecordDto> incoming, CancellationToken ct)
+    {
+        if (incoming.Count == 0) return [];
+
+        var times = incoming.Select(p => p.Time.Trim()).Where(t => t.Length > 0).Distinct().ToList();
+        if (times.Count == 0) return [];
+
+        // Фильтр по времени в SQL сужает выборку до горстки строк; ключ (с нормализацией
+        // регистра и суффикса дистанции) считается уже в памяти, как и в AddIssueCandidatesAsync.
+        var rows = await _db.RecordIssues.AsNoTracking()
+            .Where(i => RecordIssueStatuses.SourceOverruled.Contains(i.Status) && times.Contains(i.FlaggedTime))
+            .Select(i => new { i.RegionType, i.RegionCode, i.Category, i.AgeKey, i.Gender, i.PoolType, i.Style, i.Distance, i.FlaggedTime })
+            .ToListAsync(ct);
+
+        return rows
+            .Select(i => IssueKey(i.RegionType, i.RegionCode, i.Category, i.AgeKey, i.Gender,
+                i.PoolType, i.Style, i.Distance, i.FlaggedTime))
+            .ToHashSet();
+    }
+
+    private static List<RecordDiffEntry> MarkProtected(
+        List<RecordDiffEntry> entries, HashSet<string> protectedKeys)
+    {
+        if (protectedKeys.Count == 0) return entries;
+        return entries
+            .Select(e => IsProtected(e, protectedKeys) ? e with { ProtectedByIssue = true } : e)
+            .ToList();
+    }
+
+    private static bool IsProtected(RecordDiffEntry e, HashSet<string> protectedKeys) =>
+        protectedKeys.Contains(IssueKey(e.RegionType, e.RegionCode, e.Category, e.AgeKey,
+            e.Gender, e.PoolType, e.Style, e.Distance, e.NewTime));
+
+    private static bool IsProtected(ParsedRecordDto p, HashSet<string> protectedKeys) =>
+        protectedKeys.Contains(IssueKey(p.RegionType, p.RegionCode, p.Category, p.AgeKey,
+            p.Gender, p.PoolType, p.Style, p.Distance, p.Time));
 
     /// <summary>
     /// Мировые рекорды из базы и из этого диффа — эталон правила «быстрее мирового».
@@ -157,10 +213,21 @@ public class RecordDiffService : IRecordDiffService
         if (request.ApplyAdded) toApply.AddRange(cached.Added);
         if (request.ApplyChanged) toApply.AddRange(cached.Changed);
 
+        // Защита оспоренного времени (И-25): значение, на которое человек завёл претензию в
+        // статусе SourceOverruled, не записывается — в базе остаётся то, что там лежит.
+        // Набор ключей считан при построении диффа: пересчитывать нельзя, иначе Apply взял бы
+        // не то, что человек видел в превью.
+        var protectedCount = 0;
+        if (cached.ProtectedKeys.Count > 0)
+        {
+            protectedCount = toApply.Count(p => IsProtected(p, cached.ProtectedKeys));
+            toApply = toApply.Where(p => !IsProtected(p, cached.ProtectedKeys)).ToList();
+        }
+
         if (toApply.Count == 0)
         {
             _memoryCache.Remove(DiffCacheKey(request.DiffId));
-            return new RecordDiffApplyResult(true, null, 0);
+            return new RecordDiffApplyResult(true, null, 0, ProtectedCount: protectedCount);
         }
 
         var categories = toApply.Select(p => p.Category).Distinct().ToHashSet();
@@ -213,7 +280,7 @@ public class RecordDiffService : IRecordDiffService
         await _db.SaveChangesAsync(ct);
         _memoryCache.Remove(DiffCacheKey(request.DiffId));
 
-        return new RecordDiffApplyResult(true, null, toApply.Count, candidates);
+        return new RecordDiffApplyResult(true, null, toApply.Count, candidates, protectedCount);
     }
 
     /// <summary>
@@ -355,5 +422,5 @@ public class RecordDiffService : IRecordDiffService
 
     private sealed record CachedRecordDiff(
         string Source, IReadOnlyList<ParsedRecordDto> Added, IReadOnlyList<ParsedRecordDto> Changed,
-        IReadOnlyList<RecordSuspiciousEntry> Suspicious);
+        IReadOnlyList<RecordSuspiciousEntry> Suspicious, HashSet<string> ProtectedKeys);
 }

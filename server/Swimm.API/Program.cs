@@ -741,6 +741,17 @@ if (args.Contains("--records-refresh"))
                     + $"{s.Style,-18} {s.Distance,-7} {s.Time,9}  {s.Reason}");
         }
 
+        // Защита оспоренного времени (И-25): человек уже разобрал эти значения как ошибку
+        // источника, Apply их не возьмёт — в базе останется то, что лежит.
+        var protectedEntries = diff.Changed.Concat(diff.Added).Where(e => e.ProtectedByIssue).ToList();
+        if (protectedEntries.Count > 0)
+        {
+            Console.WriteLine($"  🛡 защищено реестром: {protectedEntries.Count} — Apply НЕ перезапишет (/Admin/Records?tab=issues)");
+            foreach (var e in protectedEntries)
+                Console.WriteLine($"    🛡 {e.RegionType,-7} {e.RegionCode,-3} {e.AgeKey,-6} {e.Gender,-6} {e.PoolType,-4} "
+                    + $"{e.Style,-18} {e.Distance,-7} {e.OldTime ?? "(пусто)",9} <- отвергнут {e.NewTime}");
+        }
+
         if (dryRun) { Console.WriteLine("  --dry-run: не применяю"); continue; }
 
         var applied = await diffService.ApplyAsync(
@@ -748,6 +759,7 @@ if (args.Contains("--records-refresh"))
         Console.WriteLine(applied.Success
             ? $"  применено: {applied.AppliedCount}"
                 + (applied.CandidatesCreated > 0 ? $"; в реестр кандидатами: {applied.CandidatesCreated}" : "")
+                + (applied.ProtectedCount > 0 ? $"; защищено реестром: {applied.ProtectedCount}" : "")
             : $"  ОШИБКА: {applied.Error}");
     }
 

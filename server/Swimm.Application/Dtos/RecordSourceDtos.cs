@@ -44,7 +44,13 @@ public sealed record RecordDiffEntry(
     string? OldRecordDate,
     string NewTime,
     string? NewHolderName,
-    string? NewRecordDate);
+    string? NewRecordDate,
+    /// <summary>
+    /// Значение из источника, которое Apply НЕ ВОЗЬМЁТ: человек уже завёл на него претензию
+    /// в реестре со статусом из <c>RecordIssueStatuses.SourceOverruled</c> (И-25). Строка
+    /// остаётся в диффе видимой — иначе «изменённых 1, применено 0» выглядело бы как баг.
+    /// </summary>
+    bool ProtectedByIssue = false);
 
 /// <summary>
 /// Результат сравнения фетча с текущими Records. missingInSource — только информационно,
@@ -64,7 +70,9 @@ public sealed record RecordDiffResult(
     int MissingInSourceCount,
     IReadOnlyList<RecordDiffEntry> Added,
     IReadOnlyList<RecordDiffEntry> Changed,
-    IReadOnlyList<RecordSuspiciousEntry>? Suspicious = null);
+    IReadOnlyList<RecordSuspiciousEntry>? Suspicious = null,
+    /// <summary>Сколько строк диффа защищено реестром от перезаписи (И-25).</summary>
+    int ProtectedCount = 0);
 
 /// <summary>
 /// Неправдоподобное время в диффе рекордов — кандидат в реестр спорных записей.
@@ -91,7 +99,10 @@ public sealed record RecordDiffApplyRequest(string DiffId, bool ApplyAdded, bool
 /// Сколько подозрительных значений Apply завёл в реестр кандидатами (статус <c>candidate</c>).
 /// Уже разобранные человеком претензии на то же значение не трогаются и сюда не входят.
 /// </param>
-public sealed record RecordDiffApplyResult(bool Success, string? Error, int AppliedCount, int CandidatesCreated = 0);
+public sealed record RecordDiffApplyResult(bool Success, string? Error, int AppliedCount,
+    int CandidatesCreated = 0,
+    /// <summary>Сколько значений источника Apply не взял из-за претензии в реестре (И-25).</summary>
+    int ProtectedCount = 0);
 
 /// <summary>Статус источника для карточки в UI: когда последний раз реально обновлялись его рекорды.</summary>
 public sealed record RecordSourceStatusDto(string Source, DateTime? LastUpdatedAt);
