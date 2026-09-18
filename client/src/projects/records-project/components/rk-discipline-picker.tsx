@@ -15,6 +15,16 @@ import {
 interface Props {
   filters: RkFilters;
   onChange: (patch: Partial<RkFilters>) => void;
+  /**
+   * Показывать ли стиль и дистанцию. Табу «World records» они не нужны: он показывает все
+   * дисциплины сразу, и выбор дистанции там ничего бы не значил.
+   */
+  showEvent?: boolean;
+  /**
+   * Показывать ли эстафеты. У мастерсов их нет ни в одной оси: в мировых мастерских мы их
+   * не берём (там полоса — СУММА возрастов четвёрки, другая ось), в израильских их нет.
+   */
+  allowRelays?: boolean;
 }
 
 const POOLS: Array<{ key: '25m' | '50m'; label: string }> = [
@@ -27,10 +37,12 @@ const GENDERS: Array<{ key: 'male' | 'female'; label: string }> = [
   { key: 'female', label: 'Women' },
 ];
 
-const RkDisciplinePicker: React.FC<Props> = ({ filters, onChange }) => {
+const RkDisciplinePicker: React.FC<Props> = ({
+  filters, onChange, showEvent = true, allowRelays = true,
+}) => {
   const stroke = strokeByKey(filters.stroke);
   const distances = stroke?.distances ?? [];
-  const relays = stroke?.relays ?? [];
+  const relays = allowRelays ? (stroke?.relays ?? []) : [];
 
   /**
    * Смена стиля может оставить дистанцию, которой у нового стиля нет (800 вольным → спина).
@@ -39,7 +51,7 @@ const RkDisciplinePicker: React.FC<Props> = ({ filters, onChange }) => {
   const pickStroke = (key: string) => {
     const next = strokeByKey(key);
     const keep = next && filters.distance
-      && [...next.distances, ...next.relays].includes(filters.distance);
+      && [...next.distances, ...(allowRelays ? next.relays : [])].includes(filters.distance);
     onChange({ stroke: key, distance: keep ? filters.distance : (next?.distances[0] ?? null) });
   };
 
@@ -79,56 +91,60 @@ const RkDisciplinePicker: React.FC<Props> = ({ filters, onChange }) => {
         </div>
       </div>
 
-      <div className="rk-picker__row">
-        <span className="rk-picker__label">Stroke</span>
-        <div className="rk-chips">
-          {RK_STROKES.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className={`rk-chip${filters.stroke === s.key ? ' rk-chip--on' : ''}`}
-              aria-pressed={filters.stroke === s.key}
-              onClick={() => pickStroke(s.key)}
-            >
-              {s.label}
-            </button>
-          ))}
+      {showEvent && (
+        <>
+        <div className="rk-picker__row">
+          <span className="rk-picker__label">Stroke</span>
+          <div className="rk-chips">
+            {RK_STROKES.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className={`rk-chip${filters.stroke === s.key ? ' rk-chip--on' : ''}`}
+                aria-pressed={filters.stroke === s.key}
+                onClick={() => pickStroke(s.key)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="rk-picker__row">
-        <span className="rk-picker__label">Distance</span>
-        <div className="rk-chips">
-          {distances.map((d) => (
-            <button
-              key={d}
-              type="button"
-              className={`rk-chip${filters.distance === d ? ' rk-chip--on' : ''}`}
-              aria-pressed={filters.distance === d}
-              onClick={() => onChange({ distance: d })}
-            >
-              {distanceLabel(d)}
-            </button>
-          ))}
-          {relays.length > 0 && (
-            <>
-              <span className="rk-chips__sep" aria-hidden="true" />
-              {relays.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  className={`rk-chip rk-chip--relay${filters.distance === d ? ' rk-chip--on' : ''}`}
-                  aria-pressed={filters.distance === d}
-                  onClick={() => onChange({ distance: d })}
-                  title="Relay"
-                >
-                  {distanceLabel(d)}
-                </button>
-              ))}
-            </>
-          )}
+        <div className="rk-picker__row">
+          <span className="rk-picker__label">Distance</span>
+          <div className="rk-chips">
+            {distances.map((d) => (
+              <button
+                key={d}
+                type="button"
+                className={`rk-chip${filters.distance === d ? ' rk-chip--on' : ''}`}
+                aria-pressed={filters.distance === d}
+                onClick={() => onChange({ distance: d })}
+              >
+                {distanceLabel(d)}
+              </button>
+            ))}
+            {relays.length > 0 && (
+              <>
+                <span className="rk-chips__sep" aria-hidden="true" />
+                {relays.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={`rk-chip rk-chip--relay${filters.distance === d ? ' rk-chip--on' : ''}`}
+                    aria-pressed={filters.distance === d}
+                    onClick={() => onChange({ distance: d })}
+                    title="Relay"
+                  >
+                    {distanceLabel(d)}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

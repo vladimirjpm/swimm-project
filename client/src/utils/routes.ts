@@ -118,8 +118,14 @@ export const routes = {
     poolType?: string | null;
     /** Какую страну подсветить; на состав рейтинга не влияет. */
     highlight?: string | null;
+    /**
+     * Таб страницы: `world` — мировые рекорды, `masters` — мастерсы Израиля против мировых
+     * по полосам. Рейтинг стран — таб по умолчанию, в адрес не пишется.
+     */
+    tab?: RecordsTab | null;
   } = {}) => {
     const params = new URLSearchParams();
+    if (q.tab && q.tab !== 'countries') params.set('tab', q.tab);
     if (q.stroke) params.set('stroke', q.stroke);
     if (q.distance) params.set('distance', q.distance);
     if (q.gender) params.set('gender', q.gender);
@@ -313,7 +319,14 @@ export function parseSeasonBestQuery(search: string = window.location.search): S
  * Иначе «пользователь выбрал 50 вольным» и «мы подставили 50 вольным» стали бы одним и тем
  * же состоянием, и первое же изменение дефолта переписало бы чужие ссылки.
  */
+/** Табы страницы `/records`. `countries` — рейтинг стран, он же вид по умолчанию. */
+export type RecordsTab = 'countries' | 'world' | 'masters';
+
+const RECORDS_TABS: readonly RecordsTab[] = ['countries', 'world', 'masters'];
+
 export interface RecordsQuery {
+  /** Незнакомое значение в адресе даёт `countries`, а не пустую страницу. */
+  tab: RecordsTab;
   stroke: string | null;
   /** Как в справочнике: «50m», «4X100m» (заглавная X у эстафет — форма базы). */
   distance: string | null;
@@ -329,7 +342,10 @@ export function parseRecordsQuery(search: string = window.location.search): Reco
   const pool = (p.get('pool') ?? '').toLowerCase();
   const distance = (p.get('distance') ?? '').trim();
 
+  const tab = (p.get('tab') ?? '').trim().toLowerCase() as RecordsTab;
+
   return {
+    tab: RECORDS_TABS.includes(tab) ? tab : 'countries',
     stroke: (p.get('stroke') || '').trim().toLowerCase() || null,
     // Форма справочника: «4x50m» из чужой ссылки обязан найтись как «4X50m» (то же
     // приведение, что в серверном RecordRankingQuery.Create).
