@@ -44,4 +44,22 @@ public class IsrOrgMastersDateTests
 
         Assert.Equal("05/01/2025", result);
     }
+
+    /// <summary>
+    /// Дата выпуска файла решает неоднозначную строку (И-27, 19.09.2026): выпуск 10.1.2026
+    /// содержит `9/1/2026` и `10/1/2026` — старт 9–10 января, записанный Д/М. М/Д дал бы
+    /// 1 сентября и 1 октября, позже выпуска, — значит Д/М. В двух выпусках таких 50 строк.
+    /// </summary>
+    [Theory]
+    [InlineData("9/1/2026", "2026-01-10", "09/01/2026")]
+    [InlineData("10/1/2026", "2026-01-10", "10/01/2026")]
+    [InlineData("4/5/2025", "2025-04-06", "05/04/2025")]  // выпуск 6.4.2025
+    [InlineData("3/12/2022", "2026-01-10", "12/03/2022")] // обе даты до выпуска → М/Д, как раньше
+    [InlineData("7/20/2019", "2026-01-10", "20/07/2019")] // однозначная М/Д не трогается
+    public void ParseSourceDate_DateAfterFileRelease_FlipsToDayFirst(string input, string released, string expected)
+    {
+        var result = IsrOrgMastersRecordsParser.ParseSourceDate(input, '/', DateTime.Parse(released));
+
+        Assert.Equal(expected, result);
+    }
 }
