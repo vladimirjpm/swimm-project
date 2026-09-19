@@ -111,6 +111,7 @@ public class SwimmersPublicController : ControllerBase
             Quality = r.IssueReason is null
                 ? null
                 : new SwimQualityDto { Kind = "record", Reason = r.IssueReason },
+            RelayLeadOff = r.RelayLeadOff,
         }).ToList();
         dto.RecordsHeld = dto.Records.Count;
 

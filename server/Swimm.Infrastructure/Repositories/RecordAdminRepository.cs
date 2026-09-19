@@ -78,6 +78,7 @@ public class RecordAdminRepository : IRecordAdminRepository
         record.HolderName = Norm(input.HolderName);
         record.Club = Norm(input.Club);
         record.HolderCountry = Norm(input.HolderCountry);
+        if (input.IsRelayLeadOff is bool leadOff) record.IsRelayLeadOff = leadOff;
         record.RecordDate = Norm(input.RecordDate);
         record.UpdatedAt = DateTime.UtcNow;
 
@@ -203,6 +204,7 @@ public class RecordAdminRepository : IRecordAdminRepository
         record.Club = Norm(input.Club);
         record.HolderCountry = Norm(input.HolderCountry);
         record.RecordDate = Norm(input.RecordDate);
+        if (input.IsRelayLeadOff is bool leadOff) record.IsRelayLeadOff = leadOff;
     }
 
     private static void ApplyStandardInput(NormativeStandard standard, NormativeStandardInputDto input)
@@ -258,6 +260,7 @@ public class RecordAdminRepository : IRecordAdminRepository
         Time = r.Time,
         HolderName = r.HolderName,
         HolderNameEn = r.HolderNameEn,
+        IsRelayLeadOff = r.IsRelayLeadOff,
         Club = r.Club,
         HolderCountry = r.HolderCountry,
         RecordDate = r.RecordDate,

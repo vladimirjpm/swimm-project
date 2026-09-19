@@ -30,6 +30,11 @@ export interface SwimmerHeldRecord {
   time: string;
   date?: string | null;
   quality?: SwimQuality | null;
+  /**
+   * Рекорд проплыт первым этапом эстафеты — пометка админа или эстафета с промежуточными в
+   * базе. Без подписи дата и время рекорда не находятся среди личных заплывов пловца.
+   */
+  relayLeadOff?: boolean;
 }
 
 /** Сезон для карусели. Ровно у одного `isDisplayDefault` — витринный (см. season-boundary-rule). */

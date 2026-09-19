@@ -102,7 +102,7 @@ public sealed record NationalAgeRecordRow(
 public sealed record HeldRecordRow(
     string RegionType, string RegionCode, string Category, string AgeKey, string Gender,
     string PoolType, string Style, string Distance, string Time, string? RecordDate,
-    string? IssueReason);
+    string? IssueReason, bool RelayLeadOff = false);
 
 /// <summary>
 /// Лучшее время ОДНОГО сверстника в одной дисциплине за сезон — вход для фильтра «Season best».

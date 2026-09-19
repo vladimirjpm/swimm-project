@@ -60,6 +60,10 @@ public class RecordDto
     [JsonPropertyName("holder_name_en")]
     public string? HolderNameEn { get; set; }
 
+    /// <summary>Ручная пометка «проплыт первым этапом эстафеты» (`Records.IsRelayLeadOff`).</summary>
+    [JsonPropertyName("is_relay_lead_off")]
+    public bool IsRelayLeadOff { get; set; }
+
     [JsonPropertyName("club")]
     public string? Club { get; set; }
 

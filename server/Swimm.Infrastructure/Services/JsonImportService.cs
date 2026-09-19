@@ -702,6 +702,10 @@ public class JsonImportService : IImportService
                     if (item.RelaySwimmers?.Any(l => !string.IsNullOrWhiteSpace(l.SplitTime)) == true)
                         competitionsWithSplits.Add(competition.Id);
                 }
+                else if (!string.IsNullOrWhiteSpace(item.TimeSplit))
+                {
+                    competitionsWithSplits.Add(competition.Id);
+                }
 
                 // 7. Gallery — created but NOT saved yet; will be inserted via ResultRecord.Gallery navigation
                 Gallery? gallery = null;
@@ -1294,7 +1298,10 @@ public class JsonImportService : IImportService
         old.PositionAgeGroup = incoming.PositionAgeGroup;
         old.TimeMillisecond = incoming.TimeMillisecond;
         old.TimeOriginal = incoming.TimeOriginal;
-        old.TimeSplit = incoming.TimeSplit;
+        // Промежуточные приходят не из каждого источника (личные — только из пособытийных PDF
+        // loglig у чемпионатов, docs/relays.md): переимпорт без них не должен стирать уже
+        // сохранённые — например, когда loglig в этот раз не ответил.
+        if (!string.IsNullOrWhiteSpace(incoming.TimeSplit)) old.TimeSplit = incoming.TimeSplit;
         old.TimeFail = incoming.TimeFail;
         old.TimeFailNote = incoming.TimeFailNote;
         old.InternationalPoints = incoming.InternationalPoints;
