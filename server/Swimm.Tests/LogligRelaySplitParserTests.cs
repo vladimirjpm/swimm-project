@@ -35,6 +35,11 @@ public class LogligRelaySplitParserTests
             (lead.Order, lead.LastName, lead.FirstName, lead.BirthYear, lead.SplitTime));
         // Фамилия из двух слов — граница колонок, а не первое слово.
         Assert.Equal(("ברילר גולן", "דגנית"), (team.Legs[2].LastName, team.Legs[2].FirstName));
+
+        // Обрывки в 10 pt над и под строкой ноги («BEN» / «SHOHA» / «M»): при узком пороге
+        // терялся верхний кусок и выходила «SHOHAM» — вторая карточка той же пловчихи.
+        var shoham = Assert.Single(Women, t => t.Time == "02:28.56");
+        Assert.Equal("BEN SHOHAM", shoham.Legs[3].LastName);
     }
 
     [Fact]
@@ -51,6 +56,17 @@ public class LogligRelaySplitParserTests
         Assert.Equal("טיטינשניידר", shoham.Legs[0].LastName);
         // Латиница читается слева направо, перенос «SHOHA» + «M».
         Assert.Equal(("BEN SHOHAM", "Shirli"), (shoham.Legs[3].LastName, shoham.Legs[3].FirstName));
+    }
+
+    [Fact]
+    public void WrapAfterFinalLetter_IsNewWord()
+    {
+        // «רבינוביץ» / «בץ»: строка кончается конечной ץ — слово закончилось, это две части
+        // фамилии, а не перенос посреди слова (иначе «רבינוביץבץ» — пловец-тень).
+        var men = Parse("loglig-split-relay-13805-73027-men-freestyle.pdf");
+        var team = Assert.Single(men, t => t.Time == "01:35.78");
+        Assert.Equal(("רבינוביץ בץ", "טל", "00:24.18"),
+            (team.Legs[1].LastName, team.Legs[1].FirstName, team.Legs[1].SplitTime));
     }
 
     [Fact]

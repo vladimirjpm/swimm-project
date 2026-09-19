@@ -2,6 +2,7 @@ import React from 'react';
 import { RelaySwimmer } from '../../../../utils/interfaces/results';
 import UI_ClubIcon from '../club-icon/club-icon';
 import UI_RecordBadge, { type RecordKind } from '../record-badge/record-badge';
+import UI_SwimTime from '../swim-time/swim-time';
 import '../text-effect/text-effect.css';
 
 interface SwimmerNameCellProps {
@@ -76,11 +77,22 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   let relayList: React.ReactNode = null;
   if (isRelay) {
     if (relaySwimmersList && relaySwimmersList.length > 0) {
+      // Время этапа — рядом с ногой, через UI_SwimTime (единственный вывод времени).
+      // Есть только там, где источник публикует промежуточные (docs/relays.md).
       relayList = (
         <div className={secondLineClassName}>
           {relaySwimmersList.map((s, i) => (
-            <div key={i}>
-              {s.first_name} {s.last_name}{s.birth_year ? ` (${s.birth_year})` : ''}
+            // Имя не режется и не рвётся по словам: не влезает рядом — время уходит строкой ниже.
+            <div key={i} className="flex flex-wrap items-baseline gap-x-2">
+              <span className="whitespace-nowrap">{`${s.first_name} ${s.last_name}`.trim()}</span>
+              {s.split_time && (
+                <UI_SwimTime
+                  // Этап эстафеты короче минуты почти всегда — «00:» только съедает
+                  // ширину узкой ячейки: «30.25», а не «00:30.25».
+                  time={s.split_time.replace(/^00:/, '')}
+                  className="shrink-0 tabular-nums opacity-70 src-swimmer-name-cell"
+                />
+              )}
             </div>
           ))}
         </div>

@@ -32,7 +32,8 @@ public sealed record SplitRelayTeam(int Heat, int Lane, string? Time, string Clu
 /// - имя и фамилия — разные колонки; граница берётся из шапки («פרטי» / «משפחה»), а не из
 ///   порядка слов: у «דגנית ברילר גולן» фамилия из двух слов, у «הייא חאג יחיא» тоже;
 /// - длинная фамилия переносится на строку ВЫШЕ и НИЖЕ строки ноги («מרמור» / «סירוטה»,
-///   «גוסטמלסק» / «י»): обрывок до двух букв приклеивается без пробела, длиннее — через пробел;
+///   «גוסטמלסק» / «י»): обрывок до двух букв приклеивается без пробела, длиннее — через пробел,
+///   но после конечной буквы (ץ ך ם ן ף) слово кончилось — «רבינוביץ» / «בץ» через пробел;
 /// - команда может начаться внизу страницы, а ноги уйти на следующую — состояние сквозное.
 /// Собралось не ровно четыре ноги — команда возвращается без ног (fail-safe, без догадок).
 /// </summary>
@@ -46,8 +47,13 @@ public static class LogligRelaySplitParser
     private const string FirstNameHeaderVisual = "יטרפ"; // «פרטי»
     private const string LastNameHeaderVisual = "החפשמ"; // «משפחה»
 
-    /// <summary>Строки по Y ближе этого — одна строка таблицы (обрывки имён лежат в ±4–8 pt).</summary>
-    private const double WrapReach = 9.5;
+    /// <summary>
+    /// Дальность обрывка имени от строки ноги. Живые файлы: ±4 pt («גוסטמלסק»/«י») и до
+    /// ±10 pt («BEN» / «SHOHA» / «M» — при 9.5 терялся то верхний, то нижний кусок, и одна
+    /// пловчиха заводилась дважды: «BEN SHOHA» и «SHOHAM»). Ноги идут с шагом от 12 pt, а
+    /// обрывок достаётся только БЛИЖАЙШЕЙ ноге — соседнюю он не захватит.
+    /// </summary>
+    private const double WrapReach = 12;
 
     public static List<SplitRelayTeam> Parse(Stream pdf)
     {
@@ -144,11 +150,20 @@ public static class LogligRelaySplitParser
                 : words.OrderBy(w => w.BoundingBox.Left).Select(w => w.Text);
             var part = string.Join(' ', ordered);
             if (result.Length == 0) result = part;
-            else if (part.Length <= 2) result += part; // перенос посреди слова: «גוסטמלסק» + «י»
+            else if (IsMidWordWrap(result, part)) result += part; // «גוסטמלסק» + «י»
             else result += " " + part;
         }
         return result.Trim();
     }
+
+    /// <summary>
+    /// Перенос посреди слова или между словами. Обрывок короче трёх букв — почти всегда хвост
+    /// слова («גוסטמלסק»+«י», «SHOHA»+«M»), но не когда строка кончается ивритской КОНЕЧНОЙ
+    /// буквой (ץ ך ם ן ף): ими слово заканчивается, значит дальше новое слово —
+    /// «רבינוביץ»+«בץ» это «רבינוביץ בץ», а не «רבינוביץבץ» (пойман 19.09.2026, мастерс 13805).
+    /// </summary>
+    private static bool IsMidWordWrap(string before, string part) =>
+        part.Length <= 2 && !"ךםןףץ".Contains(before[^1]);
 
     private static string Logical(string visual) =>
         visual.Any(IsHebrew) ? new string(visual.Reverse().ToArray()) : visual;

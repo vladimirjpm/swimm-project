@@ -74,6 +74,19 @@ public static class ResultMapping
         MemberSwimmerIds = r.Relay != null
             ? r.Relay.Members.Select(m => m.SwimmerId).ToList()
             : null,
+        RelaySwimmers = r.Relay != null
+            ? r.Relay.Members.OrderBy(m => m.LegOrder).Select(m => new RelaySwimmerDto
+            {
+                Order = m.LegOrder,
+                SwimmerId = m.SwimmerId,
+                LastName = m.Swimmer.LastName,
+                FirstName = m.Swimmer.FirstName,
+                LastNameEn = m.Swimmer.LastNameEn,
+                FirstNameEn = m.Swimmer.FirstNameEn,
+                BirthYear = m.Swimmer.BirthYear,
+                SplitTime = m.SplitTime,
+            }).ToList()
+            : null,
         Gallery = r.Gallery != null
             ? r.Gallery.Items.Select(i => new GalleryItemDto
             {
