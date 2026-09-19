@@ -48,6 +48,9 @@ public class CompetitionDiscoveryServiceTests
             int logligId, CancellationToken ct = default)
             => throw new NotSupportedException();
 
+        public Task<byte[]> FetchDisciplineSplitPdfAsync(int logligId, int disciplineId, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task<LogligStartListDto> FetchStartListAsync(int disciplineId, CancellationToken ct = default)
             => throw new NotSupportedException();
     }

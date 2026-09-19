@@ -248,6 +248,9 @@ public class JsonImportService : IImportService
         var verifiedNewCompetitions = new HashSet<int>();
         // Ordered list of competition keys touched in this import (for ImportHistory)
         var touchedCompetitionKeys = new List<string>();
+        // Соревнования, где у ног эстафет пришли промежуточные (флаг HasSplits). Отдельным
+        // набором, а не правкой сущности по месту: индекс соревнований AsNoTracking.
+        var competitionsWithSplits = new HashSet<int>();
         // Соревнования, которым уже применили флаги из превью (по одному разу на соревнование,
         // а не на каждую строку файла).
         var flagsAppliedTo = new HashSet<int>();
@@ -696,6 +699,8 @@ public class JsonImportService : IImportService
                         SwimmersName = item.RelaySwimmersName
                     };
                     relay.Members = await ResolveRelayMembersAsync(item.RelaySwimmers, swimmerCache);
+                    if (item.RelaySwimmers?.Any(l => !string.IsNullOrWhiteSpace(l.SplitTime)) == true)
+                        competitionsWithSplits.Add(competition.Id);
                 }
 
                 // 7. Gallery — created but NOT saved yet; will be inserted via ResultRecord.Gallery navigation
@@ -933,6 +938,16 @@ public class JsonImportService : IImportService
                 targetEvent.EndDate = parsed.Max();
                 await _db.SaveChangesAsync();
             }
+        }
+
+        // Промежуточные: только ставим, не снимаем (см. Competition.HasSplits).
+        if (competitionsWithSplits.Count > 0)
+        {
+            foreach (var c in await _db.Competitions
+                         .Where(c => competitionsWithSplits.Contains(c.Id) && !c.HasSplits).ToListAsync())
+                c.HasSplits = true;
+            await _db.SaveChangesAsync();
+            diagnosticLog.Add($"Промежуточные эстафет есть — HasSplits у соревнований: {string.Join(", ", competitionsWithSplits)}");
         }
 
         // Штамп OrgCompId (compID сайта) на «первичное» соревнование этого импорта — приходит

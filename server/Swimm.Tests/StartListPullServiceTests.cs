@@ -35,6 +35,9 @@ public class StartListPullServiceTests
         public Task<IReadOnlyList<LogligDisciplineGridRowDto>> FetchDisciplineGridAsync(
             int logligId, CancellationToken ct = default) => Task.FromResult(grid);
 
+        public Task<byte[]> FetchDisciplineSplitPdfAsync(int logligId, int disciplineId, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
         public Task<LogligStartListDto> FetchStartListAsync(int disciplineId, CancellationToken ct = default)
         {
             if (failing?.Contains(disciplineId) == true)

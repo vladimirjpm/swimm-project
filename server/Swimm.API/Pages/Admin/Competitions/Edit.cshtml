@@ -132,6 +132,11 @@
                 <input asp-for="Input.IsChampionship" class="w-4 h-4 cursor-pointer" />
                 <span class="text-admin-text">🏆 Чемпионат Израиля</span>
             </label>
+            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none"
+                   title="В результатах есть промежуточные времена (этапы эстафет из PDF «זמני ביניים» loglig). Ставит импорт чемпионата; снять — если промежуточных на самом деле нет.">
+                <input asp-for="Input.HasSplits" class="w-4 h-4 cursor-pointer" />
+                <span class="text-admin-text">⏱ Есть промежуточные</span>
+            </label>
             <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
                 <input asp-for="Input.ShowCombineAllResults" class="w-4 h-4 cursor-pointer" />
                 <span class="text-admin-text">Combine all results</span>

@@ -577,6 +577,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             IsMasters = c.IsMasters,
             IsAward = c.IsAward,
             IsChampionship = c.IsChampionship,
+            HasSplits = c.HasSplits,
             ShowCombineAllResults = c.ShowCombineAllResults,
             EventId = c.EventId,
             EventName = c.Event?.Name,
@@ -753,6 +754,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         comp.IsMasters = input.CategoryKeys.Contains(Category.MastersKey);
         comp.IsAward = input.IsAward;
         comp.IsChampionship = input.IsChampionship;
+        comp.HasSplits = input.HasSplits;
         comp.ShowCombineAllResults = input.ShowCombineAllResults;
         // Пустая строка из формы = «Авто» (null), иначе мусор поехал бы в БД.
         comp.StandingKindOverride = string.IsNullOrWhiteSpace(input.StandingKindOverride)
@@ -994,6 +996,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 PoolType = input.PoolType,
                 IsAward = input.IsAward,
                 IsChampionship = input.IsChampionship,
+                // Промежуточные — факт данных дня, а не регламента события: быстрая правка их не трогает.
+                HasSplits = current.HasSplits,
                 ShowCombineAllResults = input.ShowCombineAllResults,
                 CategoryKeys = input.CategoryKeys,
                 PointRuleClubsId = input.PointRuleClubsId,

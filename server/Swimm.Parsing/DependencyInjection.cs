@@ -44,6 +44,9 @@ public static class DependencyInjection
         // Автозабор соревнований isr.org.il (фаза 6): singleton — троттлинг общий на процесс
         services.AddSingleton<ICompetitionDiscoveryProvider, Discovery.IsrOrgDiscoveryProvider>();
 
+        // Промежуточные эстафет чемпионатов из пособытийных PDF loglig (docs/relays.md).
+        services.AddSingleton<IRelaySplitProvider, Discovery.LogligRelaySplitProvider>();
+
         // Резолвер актуальных ссылок на PDF со страницы «שיאי ישראל» — им пользуются
         // оба isr.org.il-источника рекордов, поэтому регистрируется отдельно.
         services.AddSingleton<RecordSources.IsrOrgRecordsPageResolver>();

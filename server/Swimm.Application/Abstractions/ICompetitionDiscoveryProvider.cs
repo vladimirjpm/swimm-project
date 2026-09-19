@@ -23,6 +23,14 @@ public interface ICompetitionDiscoveryProvider
     Task<byte[]> FetchResultsPdfAsync(int logligId, string culture = "he-IL", CancellationToken ct = default);
 
     /// <summary>
+    /// PDF промежуточных времён ОДНОЙ дисциплины (кнопка «זמני ביניים» на странице
+    /// результатов события). Нужен для эстафет: общий протокол промежуточных не печатает, а
+    /// его вариант с промежуточными другой вёрстки (docs/relays.md, «Промежуточные эстафет»).
+    /// Не PDF в ответе — <see cref="InvalidOperationException"/>.
+    /// </summary>
+    Task<byte[]> FetchDisciplineSplitPdfAsync(int logligId, int disciplineId, CancellationToken ct = default);
+
+    /// <summary>
     /// Идентификаторы ПОСОБЫТИЙНЫХ результатов соревнования (страница AthleticsDisciplines):
     /// по одному на дисциплину-категорию, в порядке программы. Нужны там, где PDF-экспорт
     /// беднее сайта: он склеивает утреннюю и вечернюю сессии в один список, а сайт держит

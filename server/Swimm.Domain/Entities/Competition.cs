@@ -43,6 +43,14 @@ public class Competition
   public bool IsChampionship { get; set; }
 
   /// <summary>
+  /// В результатах есть промежуточные времена (сейчас — этапы эстафет из пособытийных PDF
+  /// loglig, docs/relays.md). Ставит импорт, когда хоть у одной ноги пришло промежуточное;
+  /// сам не снимает — переимпорт без промежуточных не должен молча стирать признак.
+  /// Правится руками на /Admin/Competitions/Edit.
+  /// </summary>
+  public bool HasSplits { get; set; }
+
+  /// <summary>
   /// Признак: отображать объединённую таблицу всех результатов (без разбивки по полу/возрасту).
   /// </summary>
   public bool ShowCombineAllResults { get; set; }

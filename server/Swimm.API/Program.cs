@@ -649,6 +649,15 @@ if (args.Contains("--repull"))
         pdfStream, $"isrorg-{row.OrgCompId}-loglig-{logligId}-he.pdf", "IsrOrg", Language: "he"));
     Console.WriteLine($"Распознано строк: {parsed.ResultCount}");
 
+    // Промежуточные эстафет — тем же правилом, что у кнопки «Затянуть»: только чемпионаты.
+    if (Swimm.Infrastructure.Repositories.CompetitionAdminRepository.IsChampionship(row.Name))
+    {
+        var splits = await scope.ServiceProvider.GetRequiredService<IRelaySplitProvider>()
+            .EnrichAsync(logligId, parsed.ResultsJson);
+        parsed = parsed with { ResultsJson = splits.ResultsJson };
+        Console.WriteLine($"Эстафеты: {splits.Message}");
+    }
+
     var deleteMissing = args.Contains("--delete-missing");
     using var json = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(parsed.ResultsJson));
     var result = await importer.ImportAsync(
