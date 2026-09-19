@@ -189,6 +189,8 @@ public class IsrOrgMastersRecordsParser : IFormatParser
         string currentStyle = "";
         bool currentIsRelay = false;
         string poolType = poolTypeOverride;
+        // Дата выпуска файла из шапки — верхняя граница дат рекордов (И-27, 19.09.2026).
+        DateTime? fileUpdated = null;
         int totalResults = 0;
         int skippedAge = 0;
 
@@ -222,6 +224,9 @@ public class IsrOrgMastersRecordsParser : IFormatParser
                     var extractedDate = TryExtractUpdateDate(rowTextRaw, rowText);
                     if (!string.IsNullOrEmpty(extractedDate))
                     {
+                        if (DateTime.TryParseExact(extractedDate, ParserConstants.DateFormat,
+                                CultureInfo.InvariantCulture, DateTimeStyles.None, out var upd))
+                            fileUpdated = upd;
                         onUpdateDate?.Invoke(extractedDate);
                         Log($"  Update date extracted: '{extractedDate}' from row: '{rowText}'");
                     }
@@ -305,7 +310,7 @@ public class IsrOrgMastersRecordsParser : IFormatParser
 
                 // Parse the data row
                 var record = ParseDataRow(rowWords, rowText, rowTextRaw,
-                    currentGender, currentDistance, currentStyle, currentIsRelay, poolType);
+                    currentGender, currentDistance, currentStyle, currentIsRelay, poolType, fileUpdated);
 
                 if (record == null)
                 {
@@ -500,7 +505,8 @@ public class IsrOrgMastersRecordsParser : IFormatParser
     /// </summary>
     private MastersRecord? ParseDataRow(
         List<Word> rowWords, string normalizedText, string rawText,
-        string gender, string distance, string style, bool isRelay, string poolType)
+        string gender, string distance, string style, bool isRelay, string poolType,
+        DateTime? fileUpdated = null)
     {
         // Extract time
         var timeMatch = TimeRx.Match(rawText);
@@ -512,7 +518,7 @@ public class IsrOrgMastersRecordsParser : IFormatParser
         var dateMatch = DateRx.Match(rawText);
         if (dateMatch.Success)
         {
-            recordDate = ParseSourceDate(dateMatch.Value, '/');
+            recordDate = ParseSourceDate(dateMatch.Value, '/', fileUpdated);
         }
         else
         {
@@ -637,8 +643,12 @@ public class IsrOrgMastersRecordsParser : IFormatParser
     /// вторая часть &gt; 12 (точно М/Д) и только у 5 первая часть &gt; 12 (точно Д/М — свежие
     /// строки, которые федерация дописывает руками в другом порядке).
     /// Правило: <c>a &gt; 12</c> → это день/месяц (Д/М), иначе → месяц/день (М/Д, формат файла).
-    /// Известная цена (осознанно принята): свежая строка Д/М, у которой обе части ≤ 12,
-    /// прочитается как М/Д — отличить нечем, таких в справочнике единицы.
+    /// Неоднозначную строку (обе части ≤ 12) решает дата выпуска файла <paramref name="notAfter"/>:
+    /// рекорд не может быть позже выпуска. Если М/Д уводит дату за выпуск, а Д/М — нет, берём
+    /// Д/М. Так выпуск 10.1.2026 читает `9/1/2026` как 9 января, а не 1 сентября: свежий старт
+    /// федерация вписала в Д/М, и таких строк в двух выпусках оказалось 50, а не «единицы»,
+    /// как считалось при постановке И-27. Осталась цена только у Д/М-строк, которые по обоим
+    /// чтениям не позже выпуска, — отличить их нечем.
     ///
     /// ⚠ Правило только для КОСОЙ черты. Через ТОЧКУ федерация пишет одну дату — дату
     /// обновления в шапке файла («תאריך עידכון: 6.4.2025»), — и она ДЕНЬ.МЕСЯЦ: файл
@@ -646,7 +656,7 @@ public class IsrOrgMastersRecordsParser : IFormatParser
     /// строках рекордов точек нет ни одной (проверено по обоим PDF). Прочитай её по правилу
     /// косой черты — выйдет 4 июня 2025 и 1 октября 2026, дата в будущем.
     /// </summary>
-    internal static string ParseSourceDate(string dateStr, char separator)
+    internal static string ParseSourceDate(string dateStr, char separator, DateTime? notAfter = null)
     {
         var parts = dateStr.Split(separator);
         if (parts.Length != 3) return dateStr;
@@ -659,6 +669,10 @@ public class IsrOrgMastersRecordsParser : IFormatParser
         // Точка — дата обновления в шапке, всегда Д.М (см. выше).
         // Косая: a > 12 однозначно день (месяца 13+ не бывает) → Д/М; иначе М/Д — формат файла.
         bool dayFirst = separator == '.' || a > 12;
+        if (!dayFirst && notAfter is { } limit && b <= 12
+            && TryDate(year, a, b) is { } monthFirst && monthFirst > limit
+            && TryDate(year, b, a) is { } dayFirstDate && dayFirstDate <= limit)
+            dayFirst = true;
         int day = dayFirst ? a : b;
         int month = dayFirst ? b : a;
 
@@ -672,6 +686,10 @@ public class IsrOrgMastersRecordsParser : IFormatParser
             return dateStr;
         }
     }
+
+    private static DateTime? TryDate(int year, int month, int day)
+        => month is >= 1 and <= 12 && day >= 1 && day <= DateTime.DaysInMonth(year, month)
+            ? new DateTime(year, month, day) : null;
 
     // ── Result building ──
 
