@@ -248,6 +248,9 @@ public class JsonImportService : IImportService
         var verifiedNewCompetitions = new HashSet<int>();
         // Ordered list of competition keys touched in this import (for ImportHistory)
         var touchedCompetitionKeys = new List<string>();
+        // Соревнования, где у ног эстафет пришли промежуточные (флаг HasSplits). Отдельным
+        // набором, а не правкой сущности по месту: индекс соревнований AsNoTracking.
+        var competitionsWithSplits = new HashSet<int>();
         // Соревнования, которым уже применили флаги из превью (по одному разу на соревнование,
         // а не на каждую строку файла).
         var flagsAppliedTo = new HashSet<int>();
@@ -696,6 +699,8 @@ public class JsonImportService : IImportService
                         SwimmersName = item.RelaySwimmersName
                     };
                     relay.Members = await ResolveRelayMembersAsync(item.RelaySwimmers, swimmerCache);
+                    if (item.RelaySwimmers?.Any(l => !string.IsNullOrWhiteSpace(l.SplitTime)) == true)
+                        competitionsWithSplits.Add(competition.Id);
                 }
 
                 // 7. Gallery — created but NOT saved yet; will be inserted via ResultRecord.Gallery navigation
@@ -933,6 +938,16 @@ public class JsonImportService : IImportService
                 targetEvent.EndDate = parsed.Max();
                 await _db.SaveChangesAsync();
             }
+        }
+
+        // Промежуточные: только ставим, не снимаем (см. Competition.HasSplits).
+        if (competitionsWithSplits.Count > 0)
+        {
+            foreach (var c in await _db.Competitions
+                         .Where(c => competitionsWithSplits.Contains(c.Id) && !c.HasSplits).ToListAsync())
+                c.HasSplits = true;
+            await _db.SaveChangesAsync();
+            diagnosticLog.Add($"Промежуточные эстафет есть — HasSplits у соревнований: {string.Join(", ", competitionsWithSplits)}");
         }
 
         // Штамп OrgCompId (compID сайта) на «первичное» соревнование этого импорта — приходит
@@ -1307,6 +1322,29 @@ public class JsonImportService : IImportService
     }
 
     /// <summary>
+    /// Запасной ключ ноги эстафеты: английское имя + год. Нужен, когда протокол пишет пловца
+    /// латиницей не так, как лежит его карточка: у Shirli Ben Shoham в карточке «SHOHAM BEN»
+    /// (латиница в ивритском поле, обратный порядок), а loglig печатает «BEN SHOHAM» — совпадает
+    /// с её английским именем. Без запасного ключа каждый переимпорт заводил ей новую карточку
+    /// (19.09.2026, comp 64). Регистр не важен; берём только ОДНОЗНАЧНОЕ совпадение — двое
+    /// с тем же латинским именем и годом значит, что гадать нельзя, и заводится новая карточка.
+    /// </summary>
+    private async Task<Swimmer?> FindLegByEnglishNameAsync(RelaySwimmerJson leg)
+    {
+        var last = (leg.LastName ?? "").Trim().ToUpperInvariant();
+        var first = (leg.FirstName ?? "").Trim().ToUpperInvariant();
+        if (last.Length == 0 || leg.BirthYear is not int year || year == 0) return null;
+
+        var found = await _db.Swimmers
+            .Where(s => s.BirthYear == year
+                        && s.LastNameEn.ToUpper() == last
+                        && s.FirstNameEn.ToUpper() == first)
+            .Take(2)
+            .ToListAsync();
+        return found.Count == 1 ? found[0] : null;
+    }
+
+    /// <summary>
     /// Резолвит ноги эстафеты (леги из парсера) в <see cref="RelayMember"/>: каждое имя —
     /// в Swimmer тем же матчингом, что и обычный пловец (кэш → БД → заглушка). Анонимные
     /// леги (без имени) пропускаем — членство им не атрибутировать. Дубли SwimmerId внутри
@@ -1333,6 +1371,8 @@ public class JsonImportService : IImportService
                     s.LastName == (leg.LastName ?? "") &&
                     s.FirstName == (leg.FirstName ?? "") &&
                     s.BirthYear == (leg.BirthYear ?? 0));
+
+                swimmer ??= await FindLegByEnglishNameAsync(leg);
 
                 if (swimmer == null)
                 {

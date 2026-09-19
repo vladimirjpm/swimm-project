@@ -29,6 +29,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     private readonly IOfficialClubStandingService _clubStandings;
     private readonly IRegulationFetchService _regulations;
     private readonly ICategoryRepository _categories;
+    private readonly IRelaySplitProvider _relaySplits;
     private readonly IMemoryCache _cache;
     private readonly ILogger<DiscoveryPreviewService> _logger;
 
@@ -41,6 +42,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         IOfficialClubStandingService clubStandings,
         IRegulationFetchService regulations,
         ICategoryRepository categories,
+        IRelaySplitProvider relaySplits,
         IMemoryCache cache,
         ILogger<DiscoveryPreviewService> logger)
     {
@@ -52,6 +54,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         _clubStandings = clubStandings;
         _regulations = regulations;
         _categories = categories;
+        _relaySplits = relaySplits;
         _cache = cache;
         _logger = logger;
     }
@@ -132,6 +135,8 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         await _discovery.SetEmptySourceAsync(discoveredId, false, "auto", ct);
         await _discovery.AddLanguagesAsync(discoveredId, languages, ct);
 
+        parsed = await AddRelaySplitsAsync(discoveredId, parsed, ct);
+
         // Официальный клубный зачёт: есть ли он и по какой шкале. Кладём В КЭШ вместе с превью —
         // из него потом заводится правило кнопкой, и второй поход в loglig (десяток запросов
         // ради той же шкалы) был бы лишним.
@@ -154,6 +159,29 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         return new DiscoveryPreviewResult(
             previewId, parsed, languages, existingCompetitionId, existingMatches, recordPreview,
             standingProbe, flags);
+    }
+
+    /// <summary>
+    /// Промежуточные эстафет — только у чемпионатов (решение Влада 19.09.2026): там эстафеты
+    /// дают рекорды (первый этап засчитывается личным), и там организатор их публикует. На
+    /// остальных стартах лишние десятки запросов к loglig ради пустых PDF не нужны.
+    /// Сбой не роняет превью — протокол затягивается как раньше, причина уходит в предупреждения.
+    /// </summary>
+    private async Task<ParsedCompetition> AddRelaySplitsAsync(int discoveredId, ParsedCompetition parsed, CancellationToken ct)
+    {
+        var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
+        if (row?.LogligId is not int logligId || !CompetitionAdminRepository.IsChampionship(row.Name))
+            return parsed;
+        if (!parsed.ResultsJson.Contains("\"is_relay\":true", StringComparison.Ordinal))
+            return parsed;
+
+        var outcome = await _relaySplits.EnrichAsync(logligId, parsed.ResultsJson, ct);
+        _logger.LogInformation("Discovery {Id}: {Message}", discoveredId, outcome.Message);
+        return parsed with
+        {
+            ResultsJson = outcome.ResultsJson,
+            Warnings = parsed.Warnings.Append(outcome.Message).ToList(),
+        };
     }
 
     /// <summary>

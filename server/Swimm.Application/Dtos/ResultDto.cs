@@ -230,11 +230,45 @@ public class ResultDto
     [JsonPropertyName("member_swimmer_ids")]
     public List<int>? MemberSwimmerIds { get; set; }
 
-    // relay_swimmers[] (структурный состав) ОТЛОЖЕН: в БД хранится только Relay.SwimmersName
-    // (строка), структурированного массива нет — восстановить нельзя.
+    /// <summary>
+    /// Ноги эстафеты по порядку этапов (RelayMembers) — с промежуточным этапа, где оно
+    /// известно (docs/relays.md, «Промежуточные эстафет»). null для личных заплывов; пустой
+    /// список — состав не привязан, клиент откатывается на <see cref="RelaySwimmersName"/>.
+    /// </summary>
+    [JsonPropertyName("relay_swimmers")]
+    public List<RelaySwimmerDto>? RelaySwimmers { get; set; }
 
     [JsonPropertyName("gallery")]
     public List<GalleryItemDto>? Gallery { get; set; }
+}
+
+/// <summary>Нога эстафеты для JSON API (совпадает с клиентским RelaySwimmer).</summary>
+public class RelaySwimmerDto
+{
+    [JsonPropertyName("order")]
+    public int Order { get; set; }
+
+    [JsonPropertyName("swimmer_id")]
+    public int SwimmerId { get; set; }
+
+    [JsonPropertyName("last_name")]
+    public string LastName { get; set; } = string.Empty;
+
+    [JsonPropertyName("first_name")]
+    public string FirstName { get; set; } = string.Empty;
+
+    [JsonPropertyName("last_name_en")]
+    public string? LastNameEn { get; set; }
+
+    [JsonPropertyName("first_name_en")]
+    public string? FirstNameEn { get; set; }
+
+    [JsonPropertyName("birth_year")]
+    public int BirthYear { get; set; }
+
+    /// <summary>Время этапа («00:30.25»); null — промежуточных у источника нет.</summary>
+    [JsonPropertyName("split_time")]
+    public string? SplitTime { get; set; }
 }
 
 /// <summary>Элемент галереи для JSON API (совпадает с клиентским GalleryItem).</summary>

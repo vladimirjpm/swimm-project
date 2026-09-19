@@ -126,11 +126,14 @@ export interface ResultWrap {
   }
   export interface RelaySwimmer {
   order: number; // 1..4
+  /** Id карточки ноги — приходит из API (RelayMembers); у легаси-JSON нет. */
+  swimmer_id?: number;
   last_name: string;
   first_name: string;
   birth_year?: number;
   club?: string;
-  split_time?: string;
+  /** Время этапа («00:30.25»); null — промежуточных у источника нет. */
+  split_time?: string | null;
 }
 export interface GalleryItem {
   type: 'image' | 'video';

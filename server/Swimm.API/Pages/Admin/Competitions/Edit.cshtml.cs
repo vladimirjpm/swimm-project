@@ -100,6 +100,8 @@ public class EditModel : PageModel
         public bool IsAward { get; set; }
         /// <summary>Чемпионат Израиля — ручной флаг (галка в форме).</summary>
         public bool IsChampionship { get; set; }
+        /// <summary>В результатах есть промежуточные (ставит импорт, галка — ручная поправка).</summary>
+        public bool HasSplits { get; set; }
         public bool ShowCombineAllResults { get; set; }
         /// <summary>Роль в клубном зачёте вручную; пусто/null — «Авто» (по IsChampionship + PoolType).</summary>
         public string? StandingKindOverride { get; set; }
@@ -278,6 +280,7 @@ public class EditModel : PageModel
         OrgCompId = d.OrgCompId,
         IsAward = d.IsAward,
         IsChampionship = d.IsChampionship,
+        HasSplits = d.HasSplits,
         ShowCombineAllResults = d.ShowCombineAllResults,
         StandingKindOverride = d.StandingKindOverride,
         CategoryKeys = d.CategoryKeys,
@@ -296,6 +299,7 @@ public class EditModel : PageModel
         OrgCompId = f.OrgCompId,
         IsAward = f.IsAward,
         IsChampionship = f.IsChampionship,
+        HasSplits = f.HasSplits,
         ShowCombineAllResults = f.ShowCombineAllResults,
         StandingKindOverride = f.StandingKindOverride,
         CategoryKeys = f.CategoryKeys ?? [],

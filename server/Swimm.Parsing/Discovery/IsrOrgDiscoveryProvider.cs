@@ -35,6 +35,13 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
     private const string StartListUrlTemplate =
         "https://loglig.com:2053/LeagueTable/StartList/{0}?isModal=True";
 
+    /// <summary>
+    /// PDF промежуточных одной дисциплины: форма «זמני ביניים» на странице результатов события,
+    /// POST с <c>DisciplineCompetitionId</c> (выяснено 19.09.2026 по разметке кнопки).
+    /// </summary>
+    private const string DisciplineSplitPdfUrlTemplate =
+        "https://loglig.com:2053/LeagueTable/ExportSwimmingDisciplineResults?leagueId={0}&IsSplitResults=True";
+
     private const string PdfUrlTemplate =
         "https://loglig.com/Leagues/ExportSwimmingCompetitionResults?competitionId={0}&culture={1}&isSplitResults=false&isByHeat=false";
 
@@ -87,6 +94,20 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
         if (bytes.Length < 4 || bytes[0] != '%' || bytes[1] != 'P' || bytes[2] != 'D' || bytes[3] != 'F')
             throw new InvalidOperationException(
                 $"loglig вернул не PDF для competitionId={logligId} (результаты ещё не опубликованы или экспорт изменился).");
+        return bytes;
+    }
+
+    public async Task<byte[]> FetchDisciplineSplitPdfAsync(int logligId, int disciplineId, CancellationToken ct = default)
+    {
+        var url = string.Format(CultureInfo.InvariantCulture, DisciplineSplitPdfUrlTemplate, logligId);
+        var form = new Dictionary<string, string>
+        {
+            ["DisciplineCompetitionId"] = disciplineId.ToString(CultureInfo.InvariantCulture),
+        };
+        var bytes = await PostFormBytesAsync(url, form, $"splits-{logligId}-{disciplineId}.pdf", ct);
+        if (bytes.Length < 4 || bytes[0] != '%' || bytes[1] != 'P' || bytes[2] != 'D' || bytes[3] != 'F')
+            throw new InvalidOperationException(
+                $"loglig вернул не PDF промежуточных для дисциплины {disciplineId} (соревнование {logligId}).");
         return bytes;
     }
 
@@ -293,6 +314,29 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
             client.DefaultRequestHeaders.Add("Cookie", cookie);
 
         var response = await client.GetAsync(uri, ct);
+        response.EnsureSuccessStatusCode();
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+
+        SaveSnapshot(snapshotName, bytes);
+        return bytes;
+    }
+
+    /// <summary>POST формы — тот же вежливый режим (whitelist, пауза, снапшот), что у GET.</summary>
+    private async Task<byte[]> PostFormBytesAsync(
+        string url, IReadOnlyDictionary<string, string> form, string snapshotName, CancellationToken ct)
+    {
+        var uri = new Uri(url);
+        if (!IsAllowedHost(uri.Host))
+            throw new InvalidOperationException($"Домен '{uri.Host}' не в whitelist автозабора.");
+
+        await ThrottleAsync(ct);
+
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(60);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("SwimmBot/1.0 (+swimm-project discovery)");
+
+        using var content = new FormUrlEncodedContent(form);
+        var response = await client.PostAsync(uri, content, ct);
         response.EnsureSuccessStatusCode();
         var bytes = await response.Content.ReadAsByteArrayAsync(ct);
 

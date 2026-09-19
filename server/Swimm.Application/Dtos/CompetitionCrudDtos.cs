@@ -123,6 +123,8 @@ public sealed class CompetitionEditDto
     public bool IsAward { get; set; }
     /// <summary>Чемпионат Израиля (ручной флаг).</summary>
     public bool IsChampionship { get; set; }
+    /// <summary>В результатах есть промежуточные (этапы эстафет) — ставит импорт, правится руками.</summary>
+    public bool HasSplits { get; set; }
     public bool ShowCombineAllResults { get; set; }
     // Многодневность управляется импортом — тут только для чтения/отображения.
     public int? EventId { get; set; }
@@ -173,6 +175,8 @@ public sealed class CompetitionInputDto
     public bool IsAward { get; set; }
     /// <summary>Чемпионат Израиля (ручной флаг).</summary>
     public bool IsChampionship { get; set; }
+    /// <summary>В результатах есть промежуточные (этапы эстафет) — ставит импорт, правится руками.</summary>
+    public bool HasSplits { get; set; }
     public bool ShowCombineAllResults { get; set; }
     /// <summary>Выбранные категории. IsMasters у соревнования выводится из членства в категории Masters.</summary>
     public List<string> CategoryKeys { get; set; } = [];
