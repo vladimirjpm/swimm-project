@@ -79,12 +79,27 @@ public class LogligRelaySplitParserTests
     }
 
     [Fact]
-    public void DisqualifiedOrSplitlessTeams_HaveNoLegs()
+    public void DisqualifiedOrSplitlessTeams_HaveLegsWithoutSplits()
     {
+        // DQ: статус вместо времени, ноги есть (имена нужны при сборке эстафет целиком).
         var dq = Assert.Single(Women, t => t.Time is null);
-        Assert.Empty(dq.Legs);
-        // Команда с итогом, но без промежуточных в источнике — без догадок.
-        Assert.Empty(Assert.Single(Mixed, t => t.Time == "02:05.73").Legs);
+        Assert.Equal("DQ", dq.Status);
+        Assert.Equal(4, dq.Legs.Count);
+        Assert.All(dq.Legs, l => Assert.Null(l.SplitTime));
+
+        // Итог есть, промежуточных источник не дал — ноги без времён, без догадок.
+        var bare = Assert.Single(Mixed, t => t.Time == "02:05.73");
+        Assert.Equal(4, bare.Legs.Count);
+        Assert.All(bare.Legs, l => Assert.Null(l.SplitTime));
+    }
+
+    [Fact]
+    public void MastersBand_ComesFromBandRow()
+    {
+        // «100-119 מאסטרס שליחים» над первой командой, «160-199» — над следующими.
+        Assert.Equal("100-119", Assert.Single(Women, t => t.Time == "03:25.30").Band);
+        Assert.Equal("160-199", Assert.Single(Women, t => t.Time == "02:34.67").Band);
+        Assert.All(Women, t => Assert.NotNull(t.Band));
     }
 
     [Fact]
@@ -113,6 +128,73 @@ public class LogligRelaySplitParserTests
             ((string?)rows[0]!["last_name"], (string?)rows[0]!["first_name"], (int?)rows[0]!["birth_year"]));
         Assert.Null((string?)rows[1]!["relay_swimmers"]![0]!["split_time"]);
         Assert.Equal("a", (string?)rows[2]!["relay_swimmers"]![0]!["last_name"]);
+    }
+
+    [Fact]
+    public void MastersBuilder_ReplacesRelays_WithBandsGenderAndPlaces()
+    {
+        // Основной разбор: одна личная строка + одна кривая эстафета (сквозное место, mix на всех).
+        var json = new JsonArray(
+            new JsonObject { ["competition"] = "Comp", ["date"] = "10/01/2026", ["is_relay"] = false, ["time"] = "00:32.06" },
+            new JsonObject
+            {
+                ["competition"] = "Comp", ["date"] = "10/01/2026", ["is_relay"] = true, ["time"] = "02:34.67",
+                ["position"] = 18, ["event_category"] = "mix-120-159",
+            }).ToJsonString();
+
+        var events = new[]
+        {
+            new RelayBuildEvent("individual_medley", "4X50", "female", "4X50 מעורב שליחים", Women),
+            new RelayBuildEvent("individual_medley", "4X50", "none", "4X50 מעורב שליחים", Mixed),
+        };
+        Assert.True(RelayMastersBuilder.CanBuild(events));
+        var built = RelayMastersBuilder.Build(json, events)!.Value;
+        Assert.Equal(1, built.Replaced);
+        Assert.Equal(Women.Count + Mixed.Count, built.Relays);
+
+        var rows = JsonNode.Parse(built.Json)!.AsArray();
+        Assert.Equal(1 + built.Relays, rows.Count); // личная строка на месте
+
+        // Женская команда Гостомельской: 3-я в полосе 160-199 (loglig showCategories), пол female.
+        var own = rows.Single(r => (string?)r!["time"] == "02:34.67")!;
+        Assert.Equal(("female", "160-199", "160-199", "160", 3),
+            ((string?)own["event_style_gender"], (string?)own["event_category"], (string?)own["age_group"],
+             (string?)own["event_style_age"], (int?)own["position"]));
+        Assert.Equal("00:30.25", (string?)own["relay_swimmers"]![0]!["split_time"]);
+
+        // Микст: пол none, категория mix-<полоса>, 1-е место в mix-160-199.
+        var mixed = rows.Single(r => (string?)r!["time"] == "01:58.43")!;
+        Assert.Equal(("none", "mix-160-199", 1),
+            ((string?)mixed["event_style_gender"], (string?)mixed["event_category"], (int?)mixed["position"]));
+
+        // DQ — без места, статус в time_fail_note.
+        var dqs = rows.Where(r => (string?)r!["time_fail_note"] == "DQ").ToList();
+        Assert.NotEmpty(dqs);
+        Assert.All(dqs, dq =>
+        {
+            Assert.Null((int?)dq!["position"]);
+            Assert.True((bool?)dq["time_fail"]);
+        });
+    }
+
+    [Fact]
+    public void MastersBuilder_RefusesWithoutBands()
+    {
+        var noBand = Women.Select(t => t with { Band = null }).ToList();
+        var events = new[] { new RelayBuildEvent("individual_medley", "4X50", "female", "x", noBand) };
+        Assert.False(RelayMastersBuilder.CanBuild(events));
+        Assert.Null(RelayMastersBuilder.Build("[]", events));
+    }
+
+    [Theory]
+    [InlineData("מאסטרס נ 21-99", "female")]
+    [InlineData("מאסטרס ג 21-99", "male")]
+    [InlineData("מיקס מיקס 21-99", "none")]
+    [InlineData("בנות 11-12", "female")]
+    public void RelayGender_ReadsGenderWordAnywhereInCategory(string category, string expected)
+    {
+        // Сетка loglig берёт пол из первого слова и у мастерсов («מאסטרס …») отдаёт none.
+        Assert.Equal(expected, Swimm.Parsing.Discovery.LogligRelaySplitProvider.RelayGender(category, "none"));
     }
 
     private static JsonObject Row(string time, int heat, int lane, params (int Year, string Last, string First)[] legs) => new()
