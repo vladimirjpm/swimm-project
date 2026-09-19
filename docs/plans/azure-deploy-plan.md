@@ -774,8 +774,8 @@ Communication Services — все дают SMTP-endpoint, под который 
 
 **В13. Форма деплоя.** ✅ **РЕШЕНО 27.08: publish-profile и только по кнопке.** Реализовано в A6.
 
-**В14. Мелочи:** удалить `client/public/data/json` и `/excel` (15,4 МБ, ни один модуль их не
-читает)? Добавлять ли `postgres:16` в CI ради двух PG-тестов? Нужен ли Application Insights
+**В14. Мелочи:** ✅ `client/public/data/json` удалён 19.09.2026 (13 МБ, 14 файлов; данные давно
+в БД). `/excel` — **оставить** (решение Влада 19.09.2026). Добавлять ли `postgres:16` в CI ради двух PG-тестов? Нужен ли Application Insights
 сразу?
 
 ---
