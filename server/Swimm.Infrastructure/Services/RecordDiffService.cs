@@ -245,6 +245,8 @@ public class RecordDiffService : IRecordDiffService
                 // ПЕРЕД перезаписью Time: правило опирается на то, тот же это рекорд или уже
                 // другой, а после присваивания прежнее время было бы потеряно.
                 rec.HolderNameEn = HolderLatinName.CarryOver(p.HolderName, p.Time, rec.Time, rec.HolderNameEn);
+                // Пометка «первый этап эстафеты» — про КОНКРЕТНОЕ значение: новый рекорд её не наследует.
+                if (rec.Time != p.Time) rec.IsRelayLeadOff = false;
                 rec.Time = p.Time;
                 rec.HolderName = p.HolderName;
                 rec.Club = p.Club;

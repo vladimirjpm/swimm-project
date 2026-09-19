@@ -353,7 +353,8 @@ else if (Model.Tab == "records")
                 <thead>
                     <tr>
                         <th>ID</th><th>Region</th><th>Category</th><th>Age</th><th>Gender</th><th>Pool</th>
-                        <th>Style</th><th>Dist</th><th>Time</th><th>Holder</th><th>Holder (latin)</th><th>Club</th><th>Country</th><th>Date</th><th></th>
+                        <th>Style</th><th>Dist</th><th>Time</th><th>Holder</th><th>Holder (latin)</th><th>Club</th><th>Country</th><th>Date</th>
+                        <th title="Рекорд проплыт первым этапом эстафеты — метка «Relay lead-off» на витрине">Relay 1st</th><th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -375,6 +376,10 @@ else if (Model.Tab == "records")
                             <td><input class="admin-input w-32" data-field="club" value="@r.Club" /></td>
                             <td><input class="admin-input w-16" data-field="holderCountry" value="@r.HolderCountry" /></td>
                             <td><input class="admin-input w-24" data-field="recordDate" value="@r.RecordDate" /></td>
+                            @* Ручная пометка для рекордов без протокола у нас; где эстафета с промежуточными
+                               есть в базе, витрина узнаёт это сама. Смена времени импортом галку снимает. *@
+                            <td class="text-center"><input type="checkbox" class="w-4 h-4 cursor-pointer" data-field="isRelayLeadOff"
+                                       checked="@r.IsRelayLeadOff" title="Проплыт первым этапом эстафеты" /></td>
                             <td class="whitespace-nowrap text-right">
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5" onclick="saveRecord(@r.Id)">Save</button>
                                 @{
@@ -563,6 +568,7 @@ else
                         club: rowField(row, 'club').value,
                         holderCountry: rowField(row, 'holderCountry').value,
                         recordDate: rowField(row, 'recordDate').value,
+                        isRelayLeadOff: rowField(row, 'isRelayLeadOff').checked,
                     }),
                 });
                 toast('Сохранено');

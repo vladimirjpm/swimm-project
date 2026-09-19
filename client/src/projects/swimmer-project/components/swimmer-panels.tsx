@@ -526,7 +526,21 @@ function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
             date={r.date}
             // Класс рекорда — тем же бейджем, что в H2H и в таблице результатов: подпись
             // «ISR · masters» отвечает на вопрос «какая ступень», бейдж — «какого веса».
-            extras={<UI_RecordBadge kind={recordKindOf(r.category)} scope={recordScope(r)} />}
+            extras={
+              <>
+                <UI_RecordBadge kind={recordKindOf(r.category)} scope={recordScope(r)} />
+                {/* Время первого этапа эстафеты засчитывается личным: без подписи рекорд
+                    «не находится» среди личных заплывов пловца (30.25 Гостомельской, И-28). */}
+                {r.relayLeadOff && (
+                  <span
+                    className="whitespace-nowrap rounded-full border border-[var(--t-border)] px-2 py-[2px] text-[10px] font-extrabold uppercase tracking-wide text-[var(--t-text-2)]"
+                    title="Set as the first leg of a relay — a lead-off time counts as an individual record"
+                  >
+                    Relay lead-off
+                  </span>
+                )}
+              </>
+            }
           />
         ))}
       </div>

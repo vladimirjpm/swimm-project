@@ -113,7 +113,12 @@ public class ResultRecord
     [MaxLength(20)]
     public string TimeOriginal { get; set; } = string.Empty;
 
-    [MaxLength(50)]
+    /// <summary>
+    /// Время каждого отрезка через «;» («31.52;34.84»). Было 50 символов — хватало до 200 м;
+    /// промежуточные loglig у чемпионатов (docs/relays.md) дают 800/1500 м по 50: до 30
+    /// отрезков, ~200 символов. 400 — с запасом (И-28, 19.09.2026).
+    /// </summary>
+    [MaxLength(400)]
     public string TimeSplit { get; set; } = string.Empty;
 
     public bool TimeFail { get; set; }

@@ -158,10 +158,18 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             .Select(r => new
             {
                 r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
-                r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate,
+                r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, r.IsRelayLeadOff,
             })
             .ToListAsync();
         if (records.Count == 0) return [];
+
+        // Первые этапы эстафет пловца с промежуточным: рекорд, совпавший с таким этапом,
+        // проплыт на эстафете (RelayLeadOffMatcher). Единицы строк на пловца.
+        var leadOffs = await _read.RelayMembers.AsNoTracking()
+            .Where(m => m.SwimmerId == swimmerId && m.LegOrder == 1 && m.SplitTime != null)
+            .Join(_read.Results.AsNoTracking(), m => m.RelayId, r => r.RelayId,
+                (m, r) => new RelayLeadOffLeg(m.SplitTime!, r.CompetitionDate, r.Distance, r.Style.Name, r.Competition.PoolType))
+            .ToListAsync();
 
         // Претензии тянем целиком: таблица штучная (единицы строк), а сузить её запросом
         // нельзя — рекорды пловца разбросаны по регионам, категориям и ступеням.
@@ -180,9 +188,12 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             .Select(r =>
             {
                 issues.TryGetValue(IssueKey(r.PoolType, r.Style, r.Distance, r.Time), out var issue);
+                // Ручная пометка админа (протокола у нас нет) или эстафета из базы.
+                var leadOff = r.IsRelayLeadOff || leadOffs.Any(l =>
+                    RelayLeadOffMatcher.Matches(r.Time, r.RecordDate, r.Distance, r.Style, r.PoolType, l));
                 return new HeldRecordRow(
                     r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
-                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, issue);
+                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, issue, leadOff);
             })
             .ToList();
     }

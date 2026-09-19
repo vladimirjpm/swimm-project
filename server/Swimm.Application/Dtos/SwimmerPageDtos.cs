@@ -266,6 +266,14 @@ public sealed class SwimmerHeldRecordDto
     /// </summary>
     [JsonPropertyName("quality")]
     public SwimQualityDto? Quality { get; set; }
+
+    /// <summary>
+    /// Рекорд проплыт ПЕРВЫМ ЭТАПОМ эстафеты: ручная пометка админа (`Records.IsRelayLeadOff`)
+    /// или эстафета с промежуточными в базе (`RelayLeadOffMatcher`). Витрина подписывает
+    /// «Relay lead-off» — иначе дата и время рекорда не находятся среди личных заплывов.
+    /// </summary>
+    [JsonPropertyName("relayLeadOff")]
+    public bool RelayLeadOff { get; set; }
 }
 
 /// <summary>Ссылка на соревнование в строке результата.</summary>

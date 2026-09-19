@@ -117,6 +117,15 @@ public class Record
     [MaxLength(400)]
     public string? HolderNameEn { get; set; }
 
+    /// <summary>
+    /// Рекорд проплыт ПЕРВЫМ ЭТАПОМ эстафеты (время первого этапа засчитывается личным).
+    /// Ручная пометка админа (/Admin/Records) — для случаев, когда протокола у нас нет
+    /// (рекорды 2014 года и старше). Где эстафета с промежуточными есть в базе, витрина
+    /// узнаёт это сама (<c>SwimmerPageRepository.GetRecordsHeldAsync</c>), галка не нужна.
+    /// Привязана к конкретному значению: смена <see cref="Time"/> её снимает.
+    /// </summary>
+    public bool IsRelayLeadOff { get; set; }
+
     /// <summary>Клуб держателя (age/masters-рекорды).</summary>
     [MaxLength(200)]
     public string? Club { get; set; }

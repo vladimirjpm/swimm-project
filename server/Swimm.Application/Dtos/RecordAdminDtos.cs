@@ -42,6 +42,9 @@ public sealed class RecordInputDto
     public string? Club { get; set; }
     public string? HolderCountry { get; set; }
     public string? RecordDate { get; set; }
+
+    /// <summary>Проплыт первым этапом эстафеты (ручная пометка; null — не менять).</summary>
+    public bool? IsRelayLeadOff { get; set; }
 }
 
 /// <summary>Инлайн-редактирование существующего рекорда — оси (позиция в дереве) не меняются.</summary>
@@ -55,6 +58,9 @@ public sealed class RecordQuickEditDto
     public string? Club { get; set; }
     public string? HolderCountry { get; set; }
     public string? RecordDate { get; set; }
+
+    /// <summary>Проплыт первым этапом эстафеты (ручная пометка; null — не менять).</summary>
+    public bool? IsRelayLeadOff { get; set; }
 }
 
 /// <summary>Полный набор полей для создания норматива.</summary>

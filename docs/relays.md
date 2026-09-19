@@ -126,6 +126,14 @@ freestyle-эстафета (где он первая нога), но не medley
 - **Витрина:** `/api/results` отдаёт `relay_swimmers` (ноги из `RelayMembers` по порядку
   этапов, с `split_time`); `UI_SwimmerNameCell` пишет время этапа рядом с ногой через
   `UI_SwimTime` («30.25» — ведущее «00:» срезано). Нет списка — откат на `relay_swimmers_name`.
+- **Личные заплывы:** те же PDF «זמני ביניים» у личных дисциплин длиннее 50 м
+  (`LogligIndividualSplitParser` → `IndividualSplitEnricher`) дают `time_split` («31.52;34.84»,
+  отрезки, не нарастающее; сумма обязана дать итог). Колонка `Results.TimeSplit` расширена до
+  400 (миграция `WidenResultTimeSplit`: 1500 м — до 30 отрезков). Переимпорт без промежуточных
+  сохранённые не стирает.
+- **Рекорд проплыт первым этапом** — метка «Relay lead-off» на странице пловца: сам находит
+  `RelayLeadOffMatcher` (этап с тем же временем, дистанция/стиль этапа, дата ±1 день), руками —
+  галка «Relay 1st» на `/Admin/Records` ([admin-pages/records.md](admin-pages/records.md)).
 - `Competition.HasSplits` — «в результатах есть промежуточные». Ставит импорт, когда у ноги
   пришло промежуточное; сам не снимает. Галка «⏱ Есть промежуточные» на `/Admin/Competitions/Edit`.
 
