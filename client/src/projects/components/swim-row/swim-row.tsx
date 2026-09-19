@@ -13,6 +13,7 @@ import UI_DateIcon from '../mix/date-icon/date-icon';
 import UI_SwimmerNameCell from '../mix/swimmer-name-cell/swimmer-name-cell';
 import UI_NormativeLevelIcon from '../mix/normative-level-icon/normative-level-icon';
 import UI_RankOfPeers from '../mix/rank-of-peers/rank-of-peers';
+import UI_RecordBadge, { type RecordKind } from '../mix/record-badge/record-badge';
 import Helper from '../../../utils/helpers/data-helper';
 
 /**
@@ -107,6 +108,13 @@ export interface SwimRowProps {
   timeFailNote?: string | null;
   /** SB сильнее BEST и ЗАМЕЩАЕТ его: одна строка не носит два чипа. */
   badge?: SwimRowBadge;
+  /**
+   * Официальный рекорд — бейдж `UI_RecordBadge` ПОД ВРЕМЕНЕМ, на месте чипа. Правило меток
+   * «рекорд > SB > PB»: задан рекорд — чип `badge` не рисуется. Пометка качества его не
+   * прячет (в отличие от чипа): спорная запись справочника всё равно числится рекордом,
+   * а оговорку показывает само время.
+   */
+  record?: { kind: RecordKind; scope?: string | null } | null;
 
   place?: SwimRowPlace;
   /** 'prelim' | 'final' | null — пометку рисует `UI_PrelimLabel`, единственный её носитель. */
@@ -210,6 +218,7 @@ function SwimRow({
   timeFail = false,
   timeFailNote = null,
   badge = null,
+  record = null,
   place,
   heatType,
   swimmer,
@@ -336,9 +345,10 @@ function SwimRow({
             secondLineClassName="swim-row__time-sub"
             className="swim-row__time-cell"
           />
-          {showAchievements && badge === 'best' && <span className="swim-row__chip">BEST</span>}
-          {showAchievements && badge === 'pb' && <span className="swim-row__chip">PB</span>}
-          {showAchievements && badge === 'sb' && (
+          {record && <UI_RecordBadge kind={record.kind} scope={record.scope} />}
+          {!record && showAchievements && badge === 'best' && <span className="swim-row__chip">BEST</span>}
+          {!record && showAchievements && badge === 'pb' && <span className="swim-row__chip">PB</span>}
+          {!record && showAchievements && badge === 'sb' && (
             <span
               className="swim-row__chip swim-row__chip--sb"
               title="Fastest in the age group this season"

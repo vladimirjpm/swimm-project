@@ -10,7 +10,7 @@ import { MIN_PEERS_FOR_RANK } from '../../components/mix/rank-of-peers/rank-of-p
 import { useFavoritesContext } from '../../../hooks/favorites-context';
 import UI_H2HCompare, { h2hScopeLabel } from '../../components/mix/h2h/h2h-compare';
 import UI_H2HRivalPicker from '../../components/mix/h2h/h2h-rival-picker';
-import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
+import type { RecordKind } from '../../components/mix/record-badge/record-badge';
 import type { H2HSlot } from '../../components/mix/h2h/h2h.types';
 import { routes } from '../../../utils/routes';
 import { peerGroupLabel, seasonLabel } from '../../../utils/helpers/season-helper';
@@ -526,20 +526,19 @@ function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
             date={r.date}
             // Класс рекорда — тем же бейджем, что в H2H и в таблице результатов: подпись
             // «ISR · masters» отвечает на вопрос «какая ступень», бейдж — «какого веса».
+            // Стоит ПОД ВРЕМЕНЕМ, где у season best чип SB: рекорд > SB > PB.
+            record={{ kind: recordKindOf(r.category), scope: recordScope(r) }}
+            // Время первого этапа эстафеты засчитывается личным: без подписи рекорд
+            // «не находится» среди личных заплывов пловца (30.25 Гостомельской, И-28).
             extras={
-              <>
-                <UI_RecordBadge kind={recordKindOf(r.category)} scope={recordScope(r)} />
-                {/* Время первого этапа эстафеты засчитывается личным: без подписи рекорд
-                    «не находится» среди личных заплывов пловца (30.25 Гостомельской, И-28). */}
-                {r.relayLeadOff && (
-                  <span
-                    className="whitespace-nowrap rounded-full border border-[var(--t-border)] px-2 py-[2px] text-[10px] font-extrabold uppercase tracking-wide text-[var(--t-text-2)]"
-                    title="Set as the first leg of a relay — a lead-off time counts as an individual record"
-                  >
-                    Relay lead-off
-                  </span>
-                )}
-              </>
+              r.relayLeadOff ? (
+                <span
+                  className="whitespace-nowrap rounded-full border border-[var(--t-border)] px-2 py-[2px] text-[10px] font-extrabold uppercase tracking-wide text-[var(--t-text-2)]"
+                  title="Set as the first leg of a relay — a lead-off time counts as an individual record"
+                >
+                  Relay lead-off
+                </span>
+              ) : undefined
             }
           />
         ))}

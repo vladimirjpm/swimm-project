@@ -1,11 +1,16 @@
 # Карточка официального рекорда на странице пловца
 
-Статус: **НЕ начат** (заведён 19.09.2026 по просьбе Влада — «записать, чтобы не забыть»).
+Статус: **§1 СДЕЛАН 19.09.2026** (проп `record` у `SwimRow`); §2 не начат. Заведён 19.09.2026
+по просьбе Влада — «записать, чтобы не забыть».
 Где: таб Results → Records & PB, секция «Official records» — `HeldRecordsSection` в
 `client/src/projects/swimmer-project/components/swimmer-panels.tsx`, строка — общий `SwimRow`
 (`client/src/projects/components/swim-row/swim-row.tsx`).
 
-## 1. REC-M под время
+## 1. REC-M под время — ✅ сделано 19.09.2026
+
+Итог: у `SwimRow` новый проп `record` (`{ kind, scope }`), бейдж рисуется под временем и
+замещает чип `badge`; «Relay lead-off» остался в `extras`. Проверено на /swimmers/7424
+(18 рекордов, Season best не изменился).
 
 Сейчас бейдж рекорда (`UI_RecordBadge`) стоит внизу справа, во второй линии, а чип SB у
 season best — прямо под временем. Причина не в решении, а в API строки: проп `badge` у
