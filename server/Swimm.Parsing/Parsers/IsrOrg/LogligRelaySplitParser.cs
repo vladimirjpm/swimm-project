@@ -12,8 +12,14 @@ namespace Swimm.Parsing.Parsers.IsrOrg;
 
 /// <summary>Команда эстафеты из PDF «זמני ביניים» одной дисциплины loglig.</summary>
 /// <param name="Time">Итог команды как в протоколе («02:34.67»); null — DQ/NS и т. п.</param>
-/// <param name="Legs">Ноги в порядке плавания, с промежуточным временем этапа.</param>
-public sealed record SplitRelayTeam(int Heat, int Lane, string? Time, string Club, IReadOnlyList<RelaySwimmer> Legs);
+/// <param name="Legs">Ноги в порядке плавания; промежуточное этапа — где источник его дал
+/// (у DQ и у команд без промежуточных ноги есть, времён нет).</param>
+/// <param name="Band">Полоса мастерсов по СУММЕ возрастов («160-199») из строки
+/// «160-199 מאסטרס שליחים» над командами; null — строки полосы нет (не мастерс).</param>
+/// <param name="Status">Статус вместо времени («DQ», «NS», «DNF»); null — время есть.</param>
+public sealed record SplitRelayTeam(
+    int Heat, int Lane, string? Time, string Club, IReadOnlyList<RelaySwimmer> Legs,
+    string? Band = null, string? Status = null);
 
 /// <summary>
 /// Разбор PDF промежуточных времён ОДНОЙ эстафетной дисциплины loglig
@@ -36,12 +42,16 @@ public sealed record SplitRelayTeam(int Heat, int Lane, string? Time, string Clu
 ///   но после конечной буквы (ץ ך ם ן ף) слово кончилось — «רבינוביץ» / «בץ» через пробел;
 /// - команда может начаться внизу страницы, а ноги уйти на следующую — состояние сквозное.
 /// Собралось не ровно четыре ноги — команда возвращается без ног (fail-safe, без догадок).
+/// Над командами стоит строка полосы мастерсов («160-199 מאסטרס שליחים») — она уходит в
+/// <see cref="SplitRelayTeam.Band"/>; у DQ и у команд без промежуточных ноги есть, времён нет.
 /// </summary>
 public static class LogligRelaySplitParser
 {
     private static readonly Regex TimeRx = new(@"^\d{1,2}:\d{2}\.\d{2}$", RegexOptions.Compiled);
     private static readonly Regex YearRx = new(@"^(19|20)\d{2}$", RegexOptions.Compiled);
     private static readonly Regex IntRx = new(@"^\d{1,2}$", RegexOptions.Compiled);
+    private static readonly Regex BandRx = new(@"^\d{2,3}-\d{2,3}$", RegexOptions.Compiled);
+    private static readonly string[] Statuses = { "DQ", "NS", "DNS", "DNF" };
 
     private const string PlaceWordVisual = "םוקימ"; // «מיקום» в визуальном порядке PdfPig
     private const string FirstNameHeaderVisual = "יטרפ"; // «פרטי»
@@ -61,6 +71,7 @@ public static class LogligRelaySplitParser
         var teams = new List<TeamDraft>();
 
         TeamDraft? current = null;
+        string? band = null;
         double nameBoundaryX = 519; // уточняется по шапке колонок на каждой странице
         double nameZoneX = 490;
 
@@ -87,16 +98,27 @@ public static class LogligRelaySplitParser
 
             foreach (var row in rows)
             {
+                // Строка полосы: «160-199 מאסטרס שליחים» — действует до следующей такой строки.
+                var bandWord = row.Words.FirstOrDefault(w => BandRx.IsMatch(w.Text));
+                if (bandWord != null && row.Words.Count <= 4 && !row.Words.Any(w => TimeRx.IsMatch(w.Text)))
+                {
+                    band = bandWord.Text;
+                    continue;
+                }
+
                 if (row.Words.Any(w => w.Text == PlaceWordVisual || w.Text == "מיקום"))
                 {
                     current = TeamDraft.FromRow(row);
+                    current.Band = band;
                     teams.Add(current);
                     continue;
                 }
 
                 var times = row.Words.Where(w => TimeRx.IsMatch(w.Text)).ToList();
                 var hasYear = row.Words.Any(w => YearRx.IsMatch(w.Text));
-                if (current != null && times.Count >= 2 && hasYear)
+                // Строка ноги — по году рождения: у DQ и у команд без промежуточных времён в ней
+                // нет, а нога есть (имя нужно, когда эстафеты строятся целиком — этап 2).
+                if (current != null && hasYear)
                 {
                     legRows.Add((row, current));
                     continue;
@@ -133,7 +155,7 @@ public static class LogligRelaySplitParser
         return new RelaySwimmerDraft(
             last, first,
             int.Parse(year.Text, CultureInfo.InvariantCulture),
-            times[0].Text);
+            times.Count >= 2 ? times[0].Text : null);
     }
 
     /// <summary>Собирает имя из строк (сверху вниз), каждое слово — в логическом порядке.</summary>
@@ -172,13 +194,15 @@ public static class LogligRelaySplitParser
 
     private sealed record Row(double Y, List<Word> Words);
 
-    private sealed record RelaySwimmerDraft(string LastName, string FirstName, int BirthYear, string Split);
+    private sealed record RelaySwimmerDraft(string LastName, string FirstName, int BirthYear, string? Split);
 
     private sealed class TeamDraft
     {
         public int Heat;
         public int Lane;
         public string? Time;
+        public string? Status;
+        public string? Band;
         public string Club = "";
         public readonly List<RelaySwimmerDraft> Legs = new();
 
@@ -187,7 +211,11 @@ public static class LogligRelaySplitParser
             var w = row.Words;
             var timeWord = w.FirstOrDefault(x => TimeRx.IsMatch(x.Text));
             var ints = w.Where(x => IntRx.IsMatch(x.Text)).ToList();
-            var draft = new TeamDraft { Time = timeWord?.Text };
+            var draft = new TeamDraft
+            {
+                Time = timeWord?.Text,
+                Status = timeWord == null ? w.FirstOrDefault(x => Statuses.Contains(x.Text))?.Text : null,
+            };
             // Дорожка и заплыв — два последних числа строки (самые правые колонки).
             if (ints.Count >= 3)
             {
@@ -205,10 +233,10 @@ public static class LogligRelaySplitParser
 
         public SplitRelayTeam Build()
         {
-            IReadOnlyList<RelaySwimmer> legs = Time != null && Legs.Count == 4
+            IReadOnlyList<RelaySwimmer> legs = Legs.Count == 4
                 ? Legs.Select((l, i) => new RelaySwimmer(i + 1, l.LastName, l.FirstName, l.BirthYear, null, l.Split)).ToList()
                 : Array.Empty<RelaySwimmer>();
-            return new SplitRelayTeam(Heat, Lane, Time, Club, legs);
+            return new SplitRelayTeam(Heat, Lane, Time, Club, legs, Band, Status);
         }
     }
 }
