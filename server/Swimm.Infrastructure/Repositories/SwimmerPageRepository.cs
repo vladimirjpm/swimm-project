@@ -158,7 +158,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             .Select(r => new
             {
                 r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
-                r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, r.IsRelayLeadOff,
+                r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, r.IsRelayLeadOff, r.TimeMs,
             })
             .ToListAsync();
         if (records.Count == 0) return [];
@@ -168,8 +168,23 @@ public class SwimmerPageRepository : ISwimmerPageRepository
         var leadOffs = await _read.RelayMembers.AsNoTracking()
             .Where(m => m.SwimmerId == swimmerId && m.LegOrder == 1 && m.SplitTime != null)
             .Join(_read.Results.AsNoTracking(), m => m.RelayId, r => r.RelayId,
-                (m, r) => new RelayLeadOffLeg(m.SplitTime!, r.CompetitionDate, r.Distance, r.Style.Name, r.Competition.PoolType))
+                (m, r) => new RelayLeadOffLeg(m.SplitTime!, r.CompetitionDate, r.Distance, r.Style.Name, r.Competition.PoolType,
+                    new RecordMeet(r.CompetitionId, r.Competition.EventId, r.Competition.Name, r.Competition.IsChampionship, r.Id)))
             .ToListAsync();
+
+        // Личные заплывы пловца с временем любого из его рекордов — кандидаты в «где проплыт
+        // рекорд» (RecordMeetMatcher): в справочнике соревнования нет. Индекс (SwimmerId,
+        // TimeMillisecond) — единицы строк.
+        var recordMs = records.Select(r => r.TimeMs).OfType<int>().Distinct().ToList();
+        var swims = recordMs.Count == 0
+            ? []
+            : await _read.Results.AsNoTracking()
+                .Where(x => x.SwimmerId == swimmerId && x.RelayId == null
+                            && x.TimeMillisecond != null && recordMs.Contains(x.TimeMillisecond.Value))
+                .Select(x => new RecordMeetSwim(x.TimeMillisecond!.Value, x.CompetitionDate, x.Distance, x.Style.Name,
+                    x.Competition.PoolType,
+                    new RecordMeet(x.CompetitionId, x.Competition.EventId, x.Competition.Name, x.Competition.IsChampionship, x.Id)))
+                .ToListAsync();
 
         // Претензии тянем целиком: таблица штучная (единицы строк), а сузить её запросом
         // нельзя — рекорды пловца разбросаны по регионам, категориям и ступеням.
@@ -191,9 +206,10 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                 // Ручная пометка админа (протокола у нас нет) или эстафета из базы.
                 var leadOff = r.IsRelayLeadOff || leadOffs.Any(l =>
                     RelayLeadOffMatcher.Matches(r.Time, r.RecordDate, r.Distance, r.Style, r.PoolType, l));
+                var meet = RecordMeetMatcher.Find(r.Time, r.RecordDate, r.Distance, r.Style, r.PoolType, swims, leadOffs);
                 return new HeldRecordRow(
                     r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
-                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, issue, leadOff);
+                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, issue, leadOff, meet);
             })
             .ToList();
     }

@@ -35,6 +35,17 @@ export interface SwimmerHeldRecord {
    * базе. Без подписи дата и время рекорда не находятся среди личных заплывов пловца.
    */
   relayLeadOff?: boolean;
+  /**
+   * Где проплыт рекорд — сервер нашёл среди заплывов пловца (время, дисциплина, бассейн,
+   * дата ±1 день); в справочнике поля нет. null — рекорд до наших данных или заграничный.
+   */
+  meet?: {
+    competitionId: number;
+    eventId?: number | null;
+    name: string;
+    isChampionship: boolean;
+    resultId: number;
+  } | null;
 }
 
 /** Сезон для карусели. Ровно у одного `isDisplayDefault` — витринный (см. season-boundary-rule). */

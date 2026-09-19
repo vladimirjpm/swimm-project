@@ -500,7 +500,7 @@ function recordScope(r: SwimmerHeldRecord): string {
  * ⚠ Держатель в справочнике записан СТРОКОЙ имени, `SwimmerId` у рекорда нет — тёзка заберёт
  * чужой рекорд. Подпись под секцией обязана это признавать, а не делать вид, что связь точная.
  */
-function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
+function HeldRecordsSection({ records, swimmerId }: { records: SwimmerHeldRecord[]; swimmerId: number }) {
   return (
     <div className="deep-records-block">
       <PanelHead
@@ -519,10 +519,16 @@ function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
             quality={r.quality}
             // Места у записи справочника нет: это не заплыв протокола, а строка реестра.
             place={{ kind: 'none' }}
-            // «🏆 ISR · age 12» — область и ступень рекорда встают на место старта: именно
-            // они отвечают на вопрос «чей это рекорд».
-            competition={{ name: recordScope(r), isChampionship: true }}
-            meetPlacement="line1"
+            // «🏆 ISR · age 12» — область и ступень рекорда в первой линии: именно они
+            // отвечают на вопрос «чей это рекорд». Старт, где он проплыт, — во второй, у даты,
+            // как у season best; справочник его не знает, сервер находит среди заплывов пловца.
+            headline={<><span aria-hidden="true">🏆 </span>{recordScope(r)}</>}
+            competition={r.meet ? { name: r.meet.name, isChampionship: r.meet.isChampionship } : null}
+            meetPlacement="line2"
+            // Нашёлся старт — строка ведёт к заплывам пловца на нём (весь турнир, если дней несколько).
+            href={r.meet
+              ? routes.competitionSwims(r.meet.competitionId, { swimmerId, eventId: r.meet.eventId })
+              : undefined}
             date={r.date}
             // Класс рекорда — тем же бейджем, что в H2H и в таблице результатов: подпись
             // «ISR · masters» отвечает на вопрос «какая ступень», бейдж — «какого веса».
@@ -557,12 +563,14 @@ function HeldRecordsSection({ records }: { records: SwimmerHeldRecord[] }) {
  * сверху: это разные вещи — рекорд из справочника федерации и «моё лучшее за карьеру».
  */
 export function PersonalBestsPanel({
-  rows, poolType, onPoolType, records, gender, age, state,
+  rows, poolType, onPoolType, records, swimmerId, gender, age, state,
 }: {
   rows: SwimmerPersonalBest[] | null;
   poolType: string;
   onPoolType: (pool: string) => void;
   records?: SwimmerHeldRecord[] | null;
+  /** Для ссылки строки рекорда на заплывы пловца в найденном старте. */
+  swimmerId: number;
   /** Нормативы у мужчин и женщин разные — без пола дуга уровня врёт. */
   gender: 'male' | 'female';
   /** Возраст в витринном сезоне — тот же, по которому сервер считал обе дельты. */
@@ -579,7 +587,7 @@ export function PersonalBestsPanel({
 
   return (
     <>
-      {records && records.length > 0 && <HeldRecordsSection records={records} />}
+      {records && records.length > 0 && <HeldRecordsSection records={records} swimmerId={swimmerId} />}
 
       <PanelHead
         title="Personal bests"

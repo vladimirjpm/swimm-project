@@ -468,6 +468,7 @@ function SwimmerProject() {
                 poolType={poolType}
                 onPoolType={setPoolType}
                 records={profile.records}
+                swimmerId={profile.id}
                 gender={gender}
                 age={profile.ageInSeason}
                 state={personalBests}

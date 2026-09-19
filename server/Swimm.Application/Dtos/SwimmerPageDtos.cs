@@ -274,6 +274,34 @@ public sealed class SwimmerHeldRecordDto
     /// </summary>
     [JsonPropertyName("relayLeadOff")]
     public bool RelayLeadOff { get; set; }
+
+    /// <summary>
+    /// Где проплыт рекорд — найден среди заплывов пловца (`RecordMeetMatcher`: время, дисциплина,
+    /// бассейн, дата ±1 день). В справочнике этого поля нет; null — рекорд до наших данных
+    /// или заграничный.
+    /// </summary>
+    [JsonPropertyName("meet")]
+    public SwimmerHeldRecordMeetDto? Meet { get; set; }
+}
+
+/// <summary>Соревнование официального рекорда (см. <see cref="SwimmerHeldRecordDto.Meet"/>).</summary>
+public sealed class SwimmerHeldRecordMeetDto
+{
+    [JsonPropertyName("competitionId")]
+    public int CompetitionId { get; set; }
+
+    /// <summary>Многодневный старт: ссылка ведёт на весь турнир.</summary>
+    [JsonPropertyName("eventId")]
+    public int? EventId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("isChampionship")]
+    public bool IsChampionship { get; set; }
+
+    [JsonPropertyName("resultId")]
+    public long ResultId { get; set; }
 }
 
 /// <summary>Ссылка на соревнование в строке результата.</summary>

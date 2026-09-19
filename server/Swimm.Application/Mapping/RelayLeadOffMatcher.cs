@@ -6,7 +6,9 @@ namespace Swimm.Application.Mapping;
 /// <param name="Split">Время этапа из <c>RelayMembers.SplitTime</c> («00:30.25»).</param>
 /// <param name="RelayDistance">Дистанция эстафеты как в Results («4X50»).</param>
 /// <param name="RelayStyle">Стиль эстафеты («freestyle» / «individual_medley»).</param>
-public sealed record RelayLeadOffLeg(string Split, DateTime Date, string RelayDistance, string RelayStyle, string PoolType);
+/// <param name="Meet">Соревнование этой эстафеты — подпись «где проплыт рекорд» (<see cref="RecordMeetMatcher"/>).</param>
+public sealed record RelayLeadOffLeg(
+    string Split, DateTime Date, string RelayDistance, string RelayStyle, string PoolType, RecordMeet? Meet = null);
 
 /// <summary>
 /// Узнаёт рекорд, проплытый ПЕРВЫМ ЭТАПОМ эстафеты (время первого этапа засчитывается
@@ -27,12 +29,17 @@ public static class RelayLeadOffMatcher
         if (LegDistance(leg.RelayDistance) != recordDistance.TrimEnd('m', 'M')) return false;
         if (!string.Equals(LegStyle(leg.RelayStyle), recordStyle, StringComparison.OrdinalIgnoreCase)) return false;
         if (ToMs(leg.Split) is not long legMs || ToMs(recordTime) is not long recMs || legMs != recMs) return false;
-
-        if (!DateTime.TryParseExact(recordDate?.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out var recDate))
-            return false;
-        return Math.Abs((leg.Date.Date - recDate.Date).TotalDays) <= 1;
+        return DateClose(leg.Date, recordDate);
     }
+
+    /// <summary>
+    /// Дата заплыва и дата рекорда (dd/MM/yyyy) не дальше дня: федерация датирует рекорды
+    /// многодневного старта его первым днём. Нет даты у рекорда — совпадения нет.
+    /// </summary>
+    internal static bool DateClose(DateTime swimDate, string? recordDate) =>
+        DateTime.TryParseExact(recordDate?.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var recDate)
+        && Math.Abs((swimDate.Date - recDate.Date).TotalDays) <= 1;
 
     /// <summary>«4X50» → «50».</summary>
     private static string LegDistance(string relayDistance)
@@ -45,7 +52,7 @@ public static class RelayLeadOffMatcher
     private static string LegStyle(string relayStyle) =>
         relayStyle.Contains("medley", StringComparison.OrdinalIgnoreCase) ? "backstroke" : relayStyle;
 
-    private static long? ToMs(string time)
+    internal static long? ToMs(string time)
     {
         double seconds = 0;
         foreach (var p in time.Trim().Split(':'))

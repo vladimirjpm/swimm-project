@@ -112,6 +112,16 @@ public class SwimmersPublicController : ControllerBase
                 ? null
                 : new SwimQualityDto { Kind = "record", Reason = r.IssueReason },
             RelayLeadOff = r.RelayLeadOff,
+            Meet = r.Meet is null
+                ? null
+                : new SwimmerHeldRecordMeetDto
+                {
+                    CompetitionId = r.Meet.CompetitionId,
+                    EventId = r.Meet.EventId,
+                    Name = r.Meet.Name,
+                    IsChampionship = r.Meet.IsChampionship,
+                    ResultId = r.Meet.ResultId,
+                },
         }).ToList();
         dto.RecordsHeld = dto.Records.Count;
 
