@@ -139,6 +139,12 @@ export interface SwimRowProps {
 
   competition?: { name: string; isChampionship?: boolean } | null;
   /**
+   * Своя подпись первой линии там, где пловца нет, а соревнование живёт во второй
+   * (`meetPlacement="line2"`): у официального рекорда это «🏆 ISR · masters 45-49» —
+   * ступень отвечает на вопрос «чей рекорд», а старт — «где проплыт».
+   */
+  headline?: React.ReactNode;
+  /**
    * Где показать соревнование. По умолчанию: есть `swimmer` — во второй линии (его место в
    * первой занято именем), нет — в первой. Карточка спортсмена держит его во второй линии
    * рядом с датой и передаёт 'line2' явно.
@@ -223,6 +229,7 @@ function SwimRow({
   heatType,
   swimmer,
   competition,
+  headline,
   meetPlacement,
   date,
   points,
@@ -319,6 +326,8 @@ function SwimRow({
               nameBlockClassName="min-w-0 flex-1"
               className="min-w-0"
             />
+          ) : headline ? (
+            <span className="swim-row__meet-name" dir="auto">{headline}</span>
           ) : (
             meetSide === 'line1' &&
             competition && (
