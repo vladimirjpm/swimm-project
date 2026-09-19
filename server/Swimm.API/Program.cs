@@ -649,8 +649,10 @@ if (args.Contains("--repull"))
         pdfStream, $"isrorg-{row.OrgCompId}-loglig-{logligId}-he.pdf", "IsrOrg", Language: "he"));
     Console.WriteLine($"Распознано строк: {parsed.ResultCount}");
 
-    // Промежуточные эстафет — тем же правилом, что у кнопки «Затянуть»: только чемпионаты.
-    if (Swimm.Infrastructure.Repositories.CompetitionAdminRepository.IsChampionship(row.Name))
+    // Промежуточные эстафет — тем же правилом, что у кнопки «Затянуть»: только чемпионаты
+    // (по имени ИЛИ по галке соревнования в базе — у возрастных «ישראל» в имени нет).
+    if (await Swimm.Infrastructure.Repositories.CompetitionAdminRepository.ShouldFetchSplitsAsync(
+            db, row.Name, row.OrgCompId))
     {
         var splits = await scope.ServiceProvider.GetRequiredService<IRelaySplitProvider>()
             .EnrichAsync(logligId, parsed.ResultsJson);

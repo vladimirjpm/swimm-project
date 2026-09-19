@@ -4,6 +4,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Validation;
 using Swimm.Infrastructure.Repositories;
+using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -30,6 +31,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     private readonly IRegulationFetchService _regulations;
     private readonly ICategoryRepository _categories;
     private readonly IRelaySplitProvider _relaySplits;
+    private readonly SwimmDbContext _db;
     private readonly IMemoryCache _cache;
     private readonly ILogger<DiscoveryPreviewService> _logger;
 
@@ -43,6 +45,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         IRegulationFetchService regulations,
         ICategoryRepository categories,
         IRelaySplitProvider relaySplits,
+        SwimmDbContext db,
         IMemoryCache cache,
         ILogger<DiscoveryPreviewService> logger)
     {
@@ -55,6 +58,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         _regulations = regulations;
         _categories = categories;
         _relaySplits = relaySplits;
+        _db = db;
         _cache = cache;
         _logger = logger;
     }
@@ -170,7 +174,9 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     private async Task<ParsedCompetition> AddRelaySplitsAsync(int discoveredId, ParsedCompetition parsed, CancellationToken ct)
     {
         var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
-        if (row?.LogligId is not int logligId || !CompetitionAdminRepository.IsChampionship(row.Name))
+        // Имя ИЛИ галка соревнования в базе: у возрастных чемпионатов «ישראל» в имени нет.
+        if (row?.LogligId is not int logligId
+            || !await CompetitionAdminRepository.ShouldFetchSplitsAsync(_db, row.Name, row.OrgCompId, ct))
             return parsed;
         if (!parsed.ResultsJson.Contains("\"is_relay\":true", StringComparison.Ordinal))
             return parsed;
