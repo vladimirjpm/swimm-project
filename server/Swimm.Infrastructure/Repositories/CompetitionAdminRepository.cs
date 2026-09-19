@@ -299,6 +299,23 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         IsChampionship(name)
         || (regulationSaysChampionship && MentionsChampionshipWord(name));
 
+    /// <summary>
+    /// Качать ли промежуточные (эстафеты + личные) для строки discovery. Имени мало: у
+    /// возрастного чемпионата «אליפות חורף ארנה גילאי 11-10 מחוז צפון» нет «ישראל», и
+    /// бэкфилл 19.09.2026 прошёл его без доклейки (discovery 201/202). Поэтому вторая улика —
+    /// галка <c>Competition.IsChampionship</c>, если соревнование уже в базе: по OrgCompId
+    /// или через склейку <c>CompetitionSources</c>. Галка — решение админа, она сильнее имени.
+    /// </summary>
+    public static async Task<bool> ShouldFetchSplitsAsync(
+        SwimmDbContext db, string? name, int? orgCompId, CancellationToken ct = default)
+    {
+        if (IsChampionship(name)) return true;
+        if (orgCompId is not int id) return false;
+        return await db.Competitions.AnyAsync(c => c.OrgCompId == id && c.IsChampionship, ct)
+            || await db.CompetitionSources.AnyAsync(
+                s => s.OrgCompId == id && s.Competition!.IsChampionship, ct);
+    }
+
     /// <summary>Есть ли в названии слово «чемпионат» — на иврите или по-английски.</summary>
     public static bool MentionsChampionshipWord(string? name) =>
         !string.IsNullOrEmpty(name)
