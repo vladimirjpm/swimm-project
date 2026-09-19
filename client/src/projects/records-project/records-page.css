@@ -347,7 +347,7 @@
 }
 
 .rk-row--masters {
-  grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr) 72px;
+  grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .rk-cell--band {
@@ -365,6 +365,9 @@
 }
 
 .rk-side__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--t-text-2);
   overflow: hidden;
@@ -372,7 +375,19 @@
   white-space: nowrap;
 }
 
-.rk-side__date { color: var(--t-text-3); font-variant-numeric: tabular-nums; }
+.rk-side__who bdi { overflow: hidden; text-overflow: ellipsis; }
+
+.rk-side__date { font-size: 12px; color: var(--t-text-3); font-variant-numeric: tabular-nums; }
+
+/* Разрыв до мирового рекорда полосы — индексом у времени Израиля. Быстрее мира — аномалия
+   справочника, она остаётся тоном предупреждения. */
+.rk-gap {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-good);
+}
+.rk-gap--ahead { color: var(--t-warn); }
 
 .rk-side__line { display: flex; align-items: baseline; gap: 6px; }
 
@@ -386,8 +401,6 @@
   color: var(--t-text-3);
   min-width: 40px;
 }
-
-.rk-cell--gap { text-align: right; }
 
 @media (max-width: 720px) {
   /* Мировой рекорд: дисциплина и время сверху, держатель, страна и дата — строкой ниже. */
@@ -406,16 +419,15 @@
 
   /* Мастерсы: полоса слева во всю высоту, две стороны друг под другом, разрыв справа. */
   .rk-row--masters {
-    grid-template-columns: 56px 1fr auto;
+    grid-template-columns: 56px 1fr;
     grid-template-areas:
-      'band israel gap'
-      'band world  gap';
+      'band israel'
+      'band world';
     row-gap: 6px;
   }
   .rk-row--masters .rk-cell--band { grid-area: band; align-self: center; }
   .rk-row--masters .rk-cell--side:nth-of-type(2) { grid-area: israel; }
   .rk-row--masters .rk-cell--side:nth-of-type(3) { grid-area: world; }
-  .rk-row--masters .rk-cell--gap { grid-area: gap; align-self: center; }
   .rk-side__tag { display: inline-block; }
 }
 

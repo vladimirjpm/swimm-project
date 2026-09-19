@@ -25,6 +25,8 @@ interface Props {
    * не берём (там полоса — СУММА возрастов четвёрки, другая ось), в израильских их нет.
    */
   allowRelays?: boolean;
+  /** Возрастные группы мастерсов для ряда «Age group»; не передан — ряда нет. */
+  ageGroups?: string[];
 }
 
 const POOLS: Array<{ key: '25m' | '50m'; label: string }> = [
@@ -38,8 +40,11 @@ const GENDERS: Array<{ key: 'male' | 'female'; label: string }> = [
 ];
 
 const RkDisciplinePicker: React.FC<Props> = ({
-  filters, onChange, showEvent = true, allowRelays = true,
+  filters, onChange, showEvent = true, allowRelays = true, ageGroups,
 }) => {
+  // Группа из адреса, которой у текущей дисциплины нет, показывается как «All».
+  const activeAge = filters.ageGroup && ageGroups?.includes(filters.ageGroup) ? filters.ageGroup : null;
+
   const stroke = strokeByKey(filters.stroke);
   const distances = stroke?.distances ?? [];
   const relays = allowRelays ? (stroke?.relays ?? []) : [];
@@ -144,6 +149,25 @@ const RkDisciplinePicker: React.FC<Props> = ({
           </div>
         </div>
         </>
+      )}
+
+      {ageGroups && ageGroups.length > 0 && (
+        <div className="rk-picker__row">
+          <span className="rk-picker__label">Age group</span>
+          <div className="rk-chips">
+            {[null, ...ageGroups].map((g) => (
+              <button
+                key={g ?? 'all'}
+                type="button"
+                className={`rk-chip${activeAge === g ? ' rk-chip--on' : ''}`}
+                aria-pressed={activeAge === g}
+                onClick={() => onChange({ ageGroup: g })}
+              >
+                {g ?? 'All'}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

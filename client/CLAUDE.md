@@ -158,7 +158,7 @@ style»; чип «⚠ Under review» вместо голого значка вк
 Страницы темы **deep** (`/my-media`, семья hp — `/home`, `/competitions`, `/groups`) красятся
 не токенами палитры напрямую, а РОЛЯМИ: `--t-accent`, `--t-text` / `--t-text-2` / `--t-text-3`,
 `--t-surface` / `--t-surface-strong` / `--t-card` / `--t-input-bg`, `--t-border`, `--t-scrim`,
-`--t-warn`, `--t-danger`, `--t-live`, `--t-like`, `--t-list-head`, `--t-plate`. Карта ролей на палитру — **одна
+`--t-warn`, `--t-danger`, `--t-live`, `--t-good`, `--t-like`, `--t-list-head`, `--t-plate`. Карта ролей на палитру — **одна
 на продукт**, в [`deep-theme.css`](src/projects/components/deep/deep-theme.css), объявлена на
 тех же `.theme-deep` / `.theme-deep-light`: у кого есть класс темы — у того есть и роли.
 
