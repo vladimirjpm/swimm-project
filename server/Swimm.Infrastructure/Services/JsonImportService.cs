@@ -1322,6 +1322,29 @@ public class JsonImportService : IImportService
     }
 
     /// <summary>
+    /// Запасной ключ ноги эстафеты: английское имя + год. Нужен, когда протокол пишет пловца
+    /// латиницей не так, как лежит его карточка: у Shirli Ben Shoham в карточке «SHOHAM BEN»
+    /// (латиница в ивритском поле, обратный порядок), а loglig печатает «BEN SHOHAM» — совпадает
+    /// с её английским именем. Без запасного ключа каждый переимпорт заводил ей новую карточку
+    /// (19.09.2026, comp 64). Регистр не важен; берём только ОДНОЗНАЧНОЕ совпадение — двое
+    /// с тем же латинским именем и годом значит, что гадать нельзя, и заводится новая карточка.
+    /// </summary>
+    private async Task<Swimmer?> FindLegByEnglishNameAsync(RelaySwimmerJson leg)
+    {
+        var last = (leg.LastName ?? "").Trim().ToUpperInvariant();
+        var first = (leg.FirstName ?? "").Trim().ToUpperInvariant();
+        if (last.Length == 0 || leg.BirthYear is not int year || year == 0) return null;
+
+        var found = await _db.Swimmers
+            .Where(s => s.BirthYear == year
+                        && s.LastNameEn.ToUpper() == last
+                        && s.FirstNameEn.ToUpper() == first)
+            .Take(2)
+            .ToListAsync();
+        return found.Count == 1 ? found[0] : null;
+    }
+
+    /// <summary>
     /// Резолвит ноги эстафеты (леги из парсера) в <see cref="RelayMember"/>: каждое имя —
     /// в Swimmer тем же матчингом, что и обычный пловец (кэш → БД → заглушка). Анонимные
     /// леги (без имени) пропускаем — членство им не атрибутировать. Дубли SwimmerId внутри
@@ -1348,6 +1371,8 @@ public class JsonImportService : IImportService
                     s.LastName == (leg.LastName ?? "") &&
                     s.FirstName == (leg.FirstName ?? "") &&
                     s.BirthYear == (leg.BirthYear ?? 0));
+
+                swimmer ??= await FindLegByEnglishNameAsync(leg);
 
                 if (swimmer == null)
                 {

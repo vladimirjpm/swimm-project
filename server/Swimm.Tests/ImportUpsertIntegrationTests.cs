@@ -362,6 +362,79 @@ public class ImportUpsertIntegrationTests
         Assert.False(await db.Results.AnyAsync(r => r.Lane == 2));
     }
 
+    private static object RelayWithLegs(params (string Last, string First, int Year)[] legs) => new
+    {
+        country = "ISR",
+        competition = "Comp",
+        date = "01/06/2026",
+        event_style_name = "Freestyle",
+        event_style_len = "4x50",
+        event_style_gender = "female",
+        pool_type = "25m",
+        position = 1,
+        heat = 1,
+        lane = 1,
+        last_name = legs[0].Last,
+        first_name = legs[0].First,
+        birth_year = legs[0].Year,
+        club = "Club",
+        time = "02:00.00",
+        is_relay = true,
+        relay_team_name = "Club",
+        relay_swimmers_name = string.Join(", ", legs.Select(l => $"{l.First} {l.Last}")),
+        relay_swimmers = legs.Select((l, i) => new
+        {
+            order = i + 1, last_name = l.Last, first_name = l.First, birth_year = l.Year, split_time = "00:30.00",
+        }).ToArray(),
+    };
+
+    [Fact]
+    public async Task RelayLeg_MatchesByEnglishName_WhenHebrewFieldsDiffer()
+    {
+        await using var db = CreateDb(nameof(RelayLeg_MatchesByEnglishName_WhenHebrewFieldsDiffer));
+        // Карточка Ширли: латиница в ивритском поле в обратном порядке, верное имя — в английском.
+        var shirli = new Swimm.Domain.Entities.Swimmer
+        {
+            LastName = "SHOHAM BEN", FirstName = "Shirli", LastNameEn = "BEN SHOHAM", FirstNameEn = "Shirli", BirthYear = 1979,
+        };
+        db.Swimmers.Add(shirli);
+        await db.SaveChangesAsync();
+
+        var svc = new JsonImportService(db, new NullCacheService());
+        var result = await svc.ImportAsync(ToStream(new[]
+        {
+            RelayWithLegs(("כהן", "רונית", 1969), ("סלע", "תמי", 1980), ("גולן", "יאיר", 1981), ("BEN SHOHAM", "Shirli", 1979)),
+        }));
+
+        Assert.Empty(result.ErrorMessages);
+        var legIds = await db.RelayMembers.Select(m => m.SwimmerId).ToListAsync();
+        Assert.Contains(shirli.Id, legIds);
+        Assert.Equal(1, await db.Swimmers.CountAsync(s => s.FirstName == "Shirli"));
+    }
+
+    [Fact]
+    public async Task RelayLeg_AmbiguousEnglishName_CreatesNewCard()
+    {
+        await using var db = CreateDb(nameof(RelayLeg_AmbiguousEnglishName_CreatesNewCard));
+        foreach (var hebrew in new[] { "כהן", "כוהן" })
+            db.Swimmers.Add(new Swimm.Domain.Entities.Swimmer
+            {
+                LastName = hebrew, FirstName = "דנה", LastNameEn = "COHEN", FirstNameEn = "Dana", BirthYear = 1990,
+            });
+        await db.SaveChangesAsync();
+
+        var svc = new JsonImportService(db, new NullCacheService());
+        await svc.ImportAsync(ToStream(new[]
+        {
+            RelayWithLegs(("a", "b", 1970), ("c", "d", 1971), ("e", "f", 1972), ("Cohen", "Dana", 1990)),
+        }));
+
+        // Двое подходят — гадать нельзя: ни одна из двух карточек ногу не получает.
+        var legSwimmers = await db.RelayMembers.Select(m => m.Swimmer.LastName).ToListAsync();
+        Assert.Contains("Cohen", legSwimmers);
+        Assert.DoesNotContain("כהן", legSwimmers);
+    }
+
     [Fact]
     public async Task AnonymousRelayLeg_ReplacedByNamedSwimmer_PreservesResultId_MaccabiahCase()
     {
