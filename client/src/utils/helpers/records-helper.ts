@@ -136,6 +136,9 @@ export default class RecordsHelper {
   private static openCache: OpenRecordsTree | null = null;
   private static ageCache: AgeRecordsTree | null = null;
   private static mastersCache: AgeRecordsTree | null = null;
+  // Мировые мастерские рекорды (region=world&category=masters) — полосы 25-29…105-109,
+  // те же ключи полос, что у израильских (см. решения этапа 11.4).
+  private static worldMastersCache: AgeRecordsTree | null = null;
   private static standardsCache: StandardsTree | null = null;
   private static mastersStandardsCache: MastersStandardsTree | null = null;
   private static warmedUp = false;
@@ -147,6 +150,7 @@ export default class RecordsHelper {
     void this.loadOpenRecords();
     void this.loadAgeRecords();
     void this.loadMastersRecords();
+    void this.loadWorldMastersRecords();
     void this.loadStandards();
     void this.loadMastersStandards();
   }
@@ -185,9 +189,9 @@ export default class RecordsHelper {
     }
   }
 
-  private static async loadCategoryAsAgeTree(category: string): Promise<AgeRecordsTree | null> {
+  private static async loadCategoryAsAgeTree(category: string, region: string = HOME_REGION): Promise<AgeRecordsTree | null> {
     try {
-      const rows = await fetchRecords(`region=${HOME_REGION}&category=${category}`);
+      const rows = await fetchRecords(`region=${region}&category=${category}`);
       const tree: AgeRecordsTree = { normatives: {} as AgeRecordsTree['normatives'] };
       rows.forEach((rec) => {
         const g = rec.gender as Gender;
@@ -224,6 +228,12 @@ export default class RecordsHelper {
   private static async loadMastersRecords(): Promise<void> {
     const tree = await this.loadCategoryAsAgeTree('masters');
     if (tree) this.mastersCache = tree;
+  }
+
+  /** Мировые мастерские рекорды (region=world) — та же форма дерева, полосы совпадают с ISR. */
+  private static async loadWorldMastersRecords(): Promise<void> {
+    const tree = await this.loadCategoryAsAgeTree('masters', 'world');
+    if (tree) this.worldMastersCache = tree;
   }
 
   private static async loadStandards(): Promise<void> {
@@ -287,6 +297,11 @@ export default class RecordsHelper {
     return this.mastersCache ?? (this.emptyTree as AgeRecordsTree);
   }
 
+  /** Мировые мастерс-рекорды (region=world) — по полосам, для сравнения со своей полосой. */
+  static getWorldMastersRecords(): AgeRecordsTree {
+    return this.worldMastersCache ?? (this.emptyTree as AgeRecordsTree);
+  }
+
   /** Обычные нормативы уровней. */
   static getStandards(): StandardsTree {
     return this.standardsCache ?? (this.emptyTree as StandardsTree);
@@ -302,6 +317,7 @@ export default class RecordsHelper {
     this.openCache = null;
     this.ageCache = null;
     this.mastersCache = null;
+    this.worldMastersCache = null;
     this.standardsCache = null;
     this.mastersStandardsCache = null;
     this.warmedUp = false;
