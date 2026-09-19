@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppSelector } from '../../../store/store';
 import Helper from '../../../utils/helpers/data-helper';
-import RecordsHelper, { maxUpdatedAtLabel } from '../../../utils/helpers/records-helper';
+import RecordsHelper, { maxUpdatedAtLabel, type AgeRecordsTree } from '../../../utils/helpers/records-helper';
 import { HOME_REGION, HOME_REGION_LABEL } from '../../../utils/constants/home-region';
 import useMode from '../../../hooks/useMode';
 import './popup-content-normative.css';
@@ -97,6 +97,25 @@ const getRecordCell = (
   const byStroke = poolNode?.[stroke];
   const byDist = byStroke?.[distance];
   return byDist?.[kind] ?? null;
+};
+
+// Общий минимальный тип клетки рекорда — то немногое, что реально использует fmtRecord
+// (OpenRecordCell и AgeRecordCell из records-helper.ts несовместимы целиком, но оба несут
+// эти три поля).
+type RecordCellMin = { time: string | number | null; name: string | null; updated_at?: string };
+
+// Клетка мастерского рекорда своей полосы: gender -> poolType -> stroke -> distance ->
+// ageGroup, БЕЗ фоллбека на 50м бассейн (решение 2 этапа 11.4 — нет полосы, значит пусто).
+const getMastersRecordCell = (
+  tree: AgeRecordsTree,
+  gender: Gender,
+  poolType: PoolType,
+  stroke: string,
+  distance: string,
+  ageGroup: string,
+): RecordCellMin | null => {
+  const cell = tree?.normatives?.[gender]?.[poolType]?.[stroke]?.[distance]?.[ageGroup];
+  return cell ?? null;
 };
 
 // ==================== Дизайн-токены (design_handoff_normative_info) ====================
@@ -228,6 +247,26 @@ const PopupContentNormative: React.FC = () => {
   const [othersOpen, setOthersOpen] = useState(false);
   const ddRef = useRef<HTMLDivElement>(null);
 
+  // Мастерские деревья рекордов (свой + мировой) грузятся асинхронно: RecordsHelper.warmUp()
+  // мог не успеть к открытию попапа, и геттеры до загрузки отдают пустое дерево. Подписки у
+  // RecordsHelper нет, поэтому опрашиваем: раз в 300 мс тик перерисовки, пока оба дерева не
+  // придут. ⚠ Опрос ОГРАНИЧЕН (~6 с): упала загрузка — дерево пустое навсегда, и без предела
+  // интервал крутился бы всё время, пока открыт попап. Не дождались — колонки остаются «—».
+  const [recordsTick, setRecordsTick] = useState(0);
+  useEffect(() => {
+    if (!isMastersBool) return undefined;
+    const ready = () =>
+      Object.keys(RecordsHelper.getMastersRecords().normatives).length > 0 &&
+      Object.keys(RecordsHelper.getWorldMastersRecords().normatives).length > 0;
+    if (ready()) return undefined;
+    let tries = 0;
+    const id = window.setInterval(() => {
+      setRecordsTick((t) => t + 1);
+      if (ready() || ++tries >= 20) window.clearInterval(id);
+    }, 300);
+    return () => window.clearInterval(id);
+  }, [isMastersBool]);
+
   // Закрытие дропдауна по клику снаружи
   useEffect(() => {
     if (!styleOpen) return;
@@ -338,8 +377,20 @@ const PopupContentNormative: React.FC = () => {
   };
   const womenPillStyle: React.CSSProperties = { ...menPillStyle, background: U.womenPill, color: U.womenText };
 
+  // В режиме мастерсов с выбранной полосой берём рекорд ЭТОЙ полосы (WR — мировой мастерский,
+  // NR — израильский мастерский); иначе — прежние абсолютные open-рекорды. Решения 1-2 этапа 11.4.
+  const useMastersBandRecords = isMastersBool && !!selectedAgeGroup;
+  // Одно место выбора клетки — на ячейку таблицы и на подпись «updated»: разойдутся — подпись
+  // будет говорить про одни рекорды, а таблица показывать другие.
+  const pickRecordCell = (g: Gender, d: string, kind: 'WR' | 'NR'): RecordCellMin | null =>
+    useMastersBandRecords
+      ? getMastersRecordCell(
+          kind === 'WR' ? RecordsHelper.getWorldMastersRecords() : RecordsHelper.getMastersRecords(),
+          g, poolType, stroke, d, selectedAgeGroup,
+        )
+      : getRecordCell(recordsTree, g, poolType, stroke, d, kind);
   const fmtRecord = (g: Gender, d: string, kind: 'WR' | 'NR') => {
-    const cell = getRecordCell(recordsTree, g, poolType, stroke, d, kind);
+    const cell = pickRecordCell(g, d, kind);
     return {
       text: Helper.formatSecondsToTimeString(Helper.parseTimeToSeconds(String(cell?.time ?? ''))),
       holder: cell?.name ?? undefined,
@@ -356,13 +407,13 @@ const PopupContentNormative: React.FC = () => {
     allDistanceKeys.forEach((d) => {
       (['WR', 'NR'] as const).forEach((kind) => {
         (['male', 'female'] as Gender[]).forEach((g) => {
-          stamps.push(getRecordCell(recordsTree, g, poolType, stroke, d, kind)?.updated_at);
+          stamps.push(pickRecordCell(g, d, kind)?.updated_at);
         });
       });
     });
     return maxUpdatedAtLabel(stamps);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordsTree, poolType, stroke, allDistanceKeys.join(',')]);
+  }, [recordsTree, poolType, stroke, allDistanceKeys.join(','), useMastersBandRecords, selectedAgeGroup, recordsTick]);
 
   // ==== Мобильный пейджер: пара [текущий, следующий (быстрее)] ====
   const rawPairIdx = pairIdx ?? (myIdx > 0 ? myIdx : 1);
@@ -562,6 +613,7 @@ const PopupContentNormative: React.FC = () => {
                       <div className="nrm-med" style={medStyle(C.rec)}>{kind === 'WR' ? 'WR' : HOME_REGION}</div>
                       <div style={{ fontSize: 9, fontWeight: 700, color: U.label, marginTop: 4, textAlign: 'center', letterSpacing: '.04em' }}>
                         {kind === 'WR' ? 'World' : HOME_REGION_LABEL}
+                        {useMastersBandRecords ? ` · ${selectedAgeGroup}` : ''}
                       </div>
                       {recordsUpdatedLabel && (
                         <div style={{ fontSize: 8, fontWeight: 600, color: U.label, marginTop: 2, textAlign: 'center', opacity: 0.75 }}>

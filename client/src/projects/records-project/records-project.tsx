@@ -114,15 +114,15 @@ function RecordsProject() {
   // Подписи — живые данные, как требует хендофф табов: где числа ещё нет, стоит слово.
   const tabs: DeepTabItem<RecordsTab>[] = [
     {
-      id: 'countries', icon: '🌍', label: 'Countries',
+      id: 'countries', icon: '🌍', label: 'National Records', shortLabel: 'NR',
       sub: data ? `${data.total} countries · one event` : 'ranking by event',
     },
     {
-      id: 'world', icon: '🏆', label: 'World records', shortLabel: 'World',
+      id: 'world', icon: '🏆', label: 'World records', shortLabel: 'WR',
       sub: worldCount != null ? `${worldCount} records` : 'every event',
     },
     {
-      id: 'masters', icon: '⏱', label: 'Masters',
+      id: 'masters', icon: '⏱', label: 'Masters WR',
       sub: 'Israel vs world · by age band',
     },
   ];

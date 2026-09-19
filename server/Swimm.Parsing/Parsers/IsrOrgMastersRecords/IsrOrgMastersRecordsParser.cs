@@ -343,20 +343,20 @@ public class IsrOrgMastersRecordsParser : IFormatParser
         // Try d.M.yyyy or d/M/yyyy in raw text first
         var dotMatch = DateDotRx.Match(rawText);
         if (dotMatch.Success)
-            return NormalizeDate(dotMatch.Value, '.');
+            return ParseSourceDate(dotMatch.Value, '.');
 
         var slashMatch = DateRx.Match(rawText);
         if (slashMatch.Success)
-            return NormalizeDate(slashMatch.Value, '/');
+            return ParseSourceDate(slashMatch.Value, '/');
 
         // Try in normalized text
         dotMatch = DateDotRx.Match(normalizedText);
         if (dotMatch.Success)
-            return NormalizeDate(dotMatch.Value, '.');
+            return ParseSourceDate(dotMatch.Value, '.');
 
         slashMatch = DateRx.Match(normalizedText);
         if (slashMatch.Success)
-            return NormalizeDate(slashMatch.Value, '/');
+            return ParseSourceDate(slashMatch.Value, '/');
 
         return null;
     }
@@ -512,13 +512,13 @@ public class IsrOrgMastersRecordsParser : IFormatParser
         var dateMatch = DateRx.Match(rawText);
         if (dateMatch.Success)
         {
-            recordDate = NormalizeDate(dateMatch.Value, '/');
+            recordDate = ParseSourceDate(dateMatch.Value, '/');
         }
         else
         {
             var dateDotMatch = DateDotRx.Match(rawText);
             if (dateDotMatch.Success)
-                recordDate = NormalizeDate(dateDotMatch.Value, '.');
+                recordDate = ParseSourceDate(dateDotMatch.Value, '.');
         }
 
         // Extract age group
@@ -631,28 +631,46 @@ public class IsrOrgMastersRecordsParser : IFormatParser
     }
 
     /// <summary>
-    /// Normalize date from d/M/yyyy or d.M.yyyy to dd/MM/yyyy (ParserConstants.DateFormat).
+    /// Разбор даты источника isrorg-masters: файл федерации пишет МЕСЯЦ/ДЕНЬ/ГОД (без ведущих
+    /// нулей), а не ДЕНЬ/МЕСЯЦ, как остальные источники (см. docs/data-integrity.md, И-27).
+    /// Проверено по архивным PDF (`!records-sources/isrorg-masters-*`): из ~917 дат у 451
+    /// вторая часть &gt; 12 (точно М/Д) и только у 5 первая часть &gt; 12 (точно Д/М — свежие
+    /// строки, которые федерация дописывает руками в другом порядке).
+    /// Правило: <c>a &gt; 12</c> → это день/месяц (Д/М), иначе → месяц/день (М/Д, формат файла).
+    /// Известная цена (осознанно принята): свежая строка Д/М, у которой обе части ≤ 12,
+    /// прочитается как М/Д — отличить нечем, таких в справочнике единицы.
+    ///
+    /// ⚠ Правило только для КОСОЙ черты. Через ТОЧКУ федерация пишет одну дату — дату
+    /// обновления в шапке файла («תאריך עידכון: 6.4.2025»), — и она ДЕНЬ.МЕСЯЦ: файл
+    /// `source-2025-04` обновлён 6 апреля 2025, `source-2026-01` — 10.1.2026, 10 января. В
+    /// строках рекордов точек нет ни одной (проверено по обоим PDF). Прочитай её по правилу
+    /// косой черты — выйдет 4 июня 2025 и 1 октября 2026, дата в будущем.
     /// </summary>
-    private static string NormalizeDate(string dateStr, char separator)
+    internal static string ParseSourceDate(string dateStr, char separator)
     {
         var parts = dateStr.Split(separator);
         if (parts.Length != 3) return dateStr;
 
-        if (int.TryParse(parts[0], out int day) &&
-            int.TryParse(parts[1], out int month) &&
-            int.TryParse(parts[2], out int year))
+        if (!int.TryParse(parts[0], out int a) ||
+            !int.TryParse(parts[1], out int b) ||
+            !int.TryParse(parts[2], out int year))
+            return dateStr;
+
+        // Точка — дата обновления в шапке, всегда Д.М (см. выше).
+        // Косая: a > 12 однозначно день (месяца 13+ не бывает) → Д/М; иначе М/Д — формат файла.
+        bool dayFirst = separator == '.' || a > 12;
+        int day = dayFirst ? a : b;
+        int month = dayFirst ? b : a;
+
+        try
         {
-            try
-            {
-                var dt = new DateTime(year, month, day);
-                return dt.ToString(ParserConstants.DateFormat, CultureInfo.InvariantCulture);
-            }
-            catch
-            {
-                return dateStr;
-            }
+            var dt = new DateTime(year, month, day);
+            return dt.ToString(ParserConstants.DateFormat, CultureInfo.InvariantCulture);
         }
-        return dateStr;
+        catch
+        {
+            return dateStr;
+        }
     }
 
     // ── Result building ──
