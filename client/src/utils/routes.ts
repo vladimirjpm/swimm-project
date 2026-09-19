@@ -123,6 +123,8 @@ export const routes = {
      * по полосам. Рейтинг стран — таб по умолчанию, в адрес не пишется.
      */
     tab?: RecordsTab | null;
+    /** Возрастная группа мастерсов («35-39»), только для таба `masters`. */
+    ageGroup?: string | null;
   } = {}) => {
     const params = new URLSearchParams();
     if (q.tab && q.tab !== 'countries') params.set('tab', q.tab);
@@ -131,6 +133,7 @@ export const routes = {
     if (q.gender) params.set('gender', q.gender);
     if (q.poolType) params.set('pool', q.poolType);
     if (q.highlight) params.set('country', q.highlight);
+    if (q.ageGroup) params.set('age', q.ageGroup);
     const query = params.toString();
     return query ? `/records?${query}` : '/records';
   },
@@ -334,6 +337,8 @@ export interface RecordsQuery {
   poolType: '25m' | '50m' | null;
   /** Страна для подсветки строки (alpha-3). */
   highlight: string | null;
+  /** Возрастная группа мастерсов «35-39» (`?age=`); незнакомая форма — null. */
+  ageGroup: string | null;
 }
 
 export function parseRecordsQuery(search: string = window.location.search): RecordsQuery {
@@ -353,6 +358,7 @@ export function parseRecordsQuery(search: string = window.location.search): Reco
     gender: gender === 'male' || gender === 'female' ? gender : null,
     poolType: pool === '25m' || pool === '50m' ? pool : null,
     highlight: (p.get('country') || '').trim().toUpperCase() || null,
+    ageGroup: /^\d{2,3}-\d{2,3}$/.test((p.get('age') ?? '').trim()) ? p.get('age')!.trim() : null,
   };
 }
 

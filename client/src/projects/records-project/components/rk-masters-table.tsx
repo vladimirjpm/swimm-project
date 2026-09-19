@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
 import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
 import type { RegionRecord } from '../../../hooks/useRegionRecords';
 import HelperTime from '../../../utils/helpers/helper-time';
@@ -47,30 +48,55 @@ const AHEAD_TITLE =
   'Faster than the masters world record of the same age band. The source lists both rows; '
   + 'one of them is likely wrong — we publish them exactly as given.';
 
+/** Строки таблицы: объединение полос двух сторон по одной дисциплине, по возрасту. */
+function buildRows(israel: RegionRecord[], world: RegionRecord[], f: RkFilters): BandRow[] {
+  const same = (r: RegionRecord) =>
+    r.style === f.stroke && r.distance === f.distance
+    && r.gender === f.gender && r.pool_type === f.poolType;
+
+  const byBand = new Map<string, BandRow>();
+  const slot = (band: string) => {
+    let row = byBand.get(band);
+    if (!row) { row = { band, behindMs: null }; byBand.set(band, row); }
+    return row;
+  };
+
+  israel.filter(same).forEach((r) => { slot(r.age_key).israel = r; });
+  world.filter(same).forEach((r) => { slot(r.age_key).world = r; });
+
+  return [...byBand.values()]
+    .map((row) => {
+      const a = row.israel ? toMs(row.israel.time) : null;
+      const b = row.world ? toMs(row.world.time) : null;
+      return { ...row, behindMs: a != null && b != null ? a - b : null };
+    })
+    .sort((x, y) => bandStart(x.band) - bandStart(y.band));
+}
+
+/**
+ * Возрастные группы дисциплины для фильтра «Age group» в общей карточке. Считаются тем же
+ * `buildRows`, что и таблица, — иначе кнопки и строки разъедутся.
+ */
+export function mastersBands(
+  israel: RegionRecord[] | null | undefined,
+  world: RegionRecord[] | null | undefined,
+  f: RkFilters,
+): string[] {
+  if (!israel || !world) return [];
+  return buildRows(israel, world, f).map((r) => r.band);
+}
+
 const RkMastersTable: React.FC<Props> = ({ israel, world, filters }) => {
-  const rows = useMemo<BandRow[]>(() => {
-    const same = (r: RegionRecord) =>
-      r.style === filters.stroke && r.distance === filters.distance
-      && r.gender === filters.gender && r.pool_type === filters.poolType;
+  const rows = useMemo<BandRow[]>(
+    () => buildRows(israel, world, filters),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [israel, world, filters.stroke, filters.distance, filters.gender, filters.poolType],
+  );
 
-    const byBand = new Map<string, BandRow>();
-    const slot = (band: string) => {
-      let row = byBand.get(band);
-      if (!row) { row = { band, behindMs: null }; byBand.set(band, row); }
-      return row;
-    };
-
-    israel.filter(same).forEach((r) => { slot(r.age_key).israel = r; });
-    world.filter(same).forEach((r) => { slot(r.age_key).world = r; });
-
-    return [...byBand.values()]
-      .map((row) => {
-        const a = row.israel ? toMs(row.israel.time) : null;
-        const b = row.world ? toMs(row.world.time) : null;
-        return { ...row, behindMs: a != null && b != null ? a - b : null };
-      })
-      .sort((x, y) => bandStart(x.band) - bandStart(y.band));
-  }, [israel, world, filters.stroke, filters.distance, filters.gender, filters.poolType]);
+  // Группа из адреса, которой у дисциплины нет, — показываем все, а не пустую таблицу.
+  const activeBand = filters.ageGroup && rows.some((r) => r.band === filters.ageGroup)
+    ? filters.ageGroup : null;
+  const shown = activeBand ? rows.filter((r) => r.band === activeBand) : rows;
 
   if (rows.length === 0) {
     return <div className="rk-state">No masters records for this event.</div>;
@@ -89,10 +115,9 @@ const RkMastersTable: React.FC<Props> = ({ israel, world, filters }) => {
           <span role="columnheader">Band</span>
           <span role="columnheader">Israel</span>
           <span role="columnheader">World</span>
-          <span role="columnheader">Gap</span>
         </div>
 
-        {rows.map((row) => {
+        {shown.map((row) => {
           const ahead = row.behindMs != null && row.behindMs < 0;
           const qIsr = row.israel?.issue_reason ? { kind: 'record' as const, reason: row.israel.issue_reason } : null;
           const qWorld = row.world?.issue_reason ? { kind: 'record' as const, reason: row.world.issue_reason } : null;
@@ -111,21 +136,22 @@ const RkMastersTable: React.FC<Props> = ({ israel, world, filters }) => {
             >
               <span className="rk-cell rk-cell--band" role="cell">{row.band}</span>
 
+              {/* Разрыв до мира — верхним индексом у времени Израиля: колонка под одно
+                  число съедала ширину, а читается оно именно как поправка к этому времени. */}
               <MastersSide record={row.israel} quality={qIsr} label={HOME_REGION}
-                emptyTitle={`No ${HOME_REGION} record in this band`} />
-              <MastersSide record={row.world} quality={qWorld} label="World"
-                emptyTitle="No world record kept for this band" />
-
-              <span className="rk-cell rk-cell--gap" role="cell">
-                {behindLabel(row.behindMs) ? (
-                  <span
-                    className={`rk-behind${ahead ? ' rk-behind--ahead' : ''}`}
+                country={HOME_REGION}
+                emptyTitle={`No ${HOME_REGION} record in this band`}
+                gap={behindLabel(row.behindMs) ? (
+                  <sup
+                    className={`rk-gap${ahead ? ' rk-gap--ahead' : ''}`}
                     title={ahead ? AHEAD_TITLE : 'Behind the world record of this band'}
                   >
                     {behindLabel(row.behindMs)}
-                  </span>
-                ) : <span className="rk-dash">—</span>}
-              </span>
+                  </sup>
+                ) : null} />
+              <MastersSide record={row.world} quality={qWorld} label="World"
+                country={row.world?.holder_country ?? null}
+                emptyTitle="No world record kept for this band" />
             </div>
           );
         })}
@@ -144,8 +170,11 @@ const MastersSide: React.FC<{
   record?: RegionRecord;
   quality: { kind: 'record'; reason: string } | null;
   label: string;
+  /** Флаг у имени держателя: у Израиля всегда ISR, у мира — страна рекордсмена. */
+  country: string | null;
   emptyTitle: string;
-}> = ({ record, quality, label, emptyTitle }) => {
+  gap?: React.ReactNode;
+}> = ({ record, quality, label, country, emptyTitle, gap }) => {
   const tag = <span className="rk-side__tag">{label}</span>;
   if (!record) {
     return (
@@ -168,13 +197,16 @@ const MastersSide: React.FC<{
           chipSize="sm"
           className="rk-time src-rk-masters-table"
         />
+        {gap}
       </span>
-      {/* <bdi> обязателен: ивритское имя рядом с датой без изоляции переставляет строку
-          («07/09/2010 · זילברמן גלעד» вместо «זילברמן גלעד · 07/09/2010»). */}
+      {/* <bdi> обязателен: ивритское имя рядом с флагом без изоляции уезжает не в ту сторону. */}
       <span className="rk-side__who">
+        {country && (
+          <UI_FlagEmoji countryCode={country} size="24x18" className="rk-flag src-rk-masters-table" />
+        )}
         <bdi>{holderLabel(record) || '—'}</bdi>
-        {record.record_date && <span className="rk-side__date"> · {record.record_date}</span>}
       </span>
+      {record.record_date && <span className="rk-side__date">{record.record_date}</span>}
     </span>
   );
 };

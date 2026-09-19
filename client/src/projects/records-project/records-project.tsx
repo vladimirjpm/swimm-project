@@ -14,7 +14,7 @@ import RkDisciplinePicker from './components/rk-discipline-picker';
 import RkWorldCard from './components/rk-world-card';
 import RkTable from './components/rk-table';
 import RkWorldList from './components/rk-world-list';
-import RkMastersTable from './components/rk-masters-table';
+import RkMastersTable, { mastersBands } from './components/rk-masters-table';
 import {
   HOME_REGION, RK_DEFAULT, disciplineLabel, isRelay, strokeByKey, type RkFilters,
 } from './rk-disciplines';
@@ -60,6 +60,7 @@ function RecordsProject() {
     gender: query.gender ?? RK_DEFAULT.gender,
     poolType: query.poolType ?? RK_DEFAULT.poolType,
     highlight: query.highlight,
+    ageGroup: query.ageGroup,
   }));
 
   // Адрес — единственный носитель состояния: перезагрузка и «поделиться ссылкой» обязаны
@@ -76,6 +77,7 @@ function RecordsProject() {
     set('gender', filters.gender);
     set('pool', filters.poolType);
     set('country', filters.highlight);
+    set('age', tab === 'masters' ? filters.ageGroup : null);
     window.history.replaceState(null, '', url.toString());
   }, [filters, tab]);
 
@@ -127,6 +129,13 @@ function RecordsProject() {
     },
   ];
 
+  // Возрастные группы для фильтра — из тех же данных, что таблица: у каждой дисциплины своя
+  // лестница, и кнопка группы, которой в ней нет, была бы пустым экраном.
+  const ageGroups = useMemo(
+    () => (tab === 'masters' ? mastersBands(israelMasters.data, worldMasters.data, filters) : []),
+    [tab, israelMasters.data, worldMasters.data, filters],
+  );
+
   const mastersLoading = israelMasters.loading || worldMasters.loading;
   const mastersError = israelMasters.error ?? worldMasters.error;
 
@@ -166,6 +175,7 @@ function RecordsProject() {
               onChange={patch}
               showEvent={tab !== 'world'}
               allowRelays={tab !== 'masters'}
+              ageGroups={tab === 'masters' ? ageGroups : undefined}
             />
 
             {tab === 'world' && (
