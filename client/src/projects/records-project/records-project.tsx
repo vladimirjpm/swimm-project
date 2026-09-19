@@ -6,18 +6,26 @@ import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
-import { parseRecordsQuery, routes } from '../../utils/routes';
+import { parseRecordsQuery, routes, type RecordsTab } from '../../utils/routes';
 import { useRecordsRanking } from '../../hooks/useRecordsRanking';
+import { useRegionRecords } from '../../hooks/useRegionRecords';
+import DeepTabs, { type DeepTabItem } from '../components/deep/tabs';
 import RkDisciplinePicker from './components/rk-discipline-picker';
 import RkWorldCard from './components/rk-world-card';
 import RkTable from './components/rk-table';
+import RkWorldList from './components/rk-world-list';
+import RkMastersTable from './components/rk-masters-table';
 import {
-  HOME_REGION, RK_DEFAULT, disciplineLabel, isRelay, type RkFilters,
+  HOME_REGION, RK_DEFAULT, disciplineLabel, isRelay, strokeByKey, type RkFilters,
 } from './rk-disciplines';
 
 /**
- * Страница `/records` — рейтинг национальных рекордов (этап 11.2.2,
- * docs/plans/records-all-countries-plan.md §5).
+ * Страница `/records` — три таба в шаблоне «папки» `DeepTabs` (18.09.2026):
+ * - **Countries** — рейтинг национальных рекордов по одной дисциплине (этап 11.2.2,
+ *   docs/plans/records-all-countries-plan.md §5), описан ниже;
+ * - **World records** — все мировые рекорды бассейна и пола (`RkWorldList`);
+ * - **Masters** — мастерсы Израиля против мирового рекорда своей полосы (`RkMastersTable`).
+ * Дисциплина и пикер общие для всех табов, таб живёт в адресе (`?tab=`).
  *
  * Показывает одну дисциплину: кто из стран быстрее и насколько отстаёт от мирового.
  * Данные — `GET /api/records/ranking` (11.2.1): места, мировой рекорд отдельным полем,
@@ -39,6 +47,10 @@ function RecordsProject() {
 
   const query = useMemo(() => parseRecordsQuery(), []);
 
+  // Таб — тот же шаблон «папки», что у страниц клуба, спортсмена и группы (DeepTabs). Живёт
+  // в адресе рядом с дисциплиной: ссылка на «мастерсы 50 вольным» обязана открывать именно их.
+  const [tab, setTab] = useState<RecordsTab>(query.tab);
+
   // Дефолт подставляем ЗДЕСЬ, а не в parseRecordsQuery: разбор адреса обязан отличать
   // «пользователь выбрал 50 вольным» от «мы показали 50 вольным, потому что надо же
   // что-то показать». Иначе первая же смена дефолта перепишет смысл чужих ссылок.
@@ -58,13 +70,22 @@ function RecordsProject() {
       if (!value) url.searchParams.delete(key);
       else url.searchParams.set(key, value);
     };
+    set('tab', tab === 'countries' ? null : tab);
     set('stroke', filters.stroke);
     set('distance', filters.distance);
     set('gender', filters.gender);
     set('pool', filters.poolType);
     set('country', filters.highlight);
     window.history.replaceState(null, '', url.toString());
-  }, [filters]);
+  }, [filters, tab]);
+
+  // У мастерсов эстафет нет ни в одной оси. Пришли на таб с «4×100m» — берём первую личную
+  // дистанцию стиля: пустая таблица без объяснения читается как «данных нет».
+  useEffect(() => {
+    if (tab !== 'masters' || !isRelay(filters.distance)) return;
+    const first = strokeByKey(filters.stroke)?.distances[0] ?? RK_DEFAULT.distance;
+    setFilters((f) => ({ ...f, distance: first }));
+  }, [tab, filters.distance, filters.stroke]);
 
   const ranking = useRecordsRanking({
     stroke: filters.stroke,
@@ -78,9 +99,36 @@ function RecordsProject() {
     [],
   );
 
+  // Справочники табов грузятся, только когда таб открыт: смотрят обычно один из трёх.
+  const worldOpen = useRegionRecords('WORLD', 'open', tab === 'world');
+  const israelMasters = useRegionRecords(HOME_REGION, 'masters', tab === 'masters');
+  const worldMasters = useRegionRecords('WORLD', 'masters', tab === 'masters');
+
   const data = ranking.data;
   const title = disciplineLabel(filters);
   const home = data?.rows.find((r) => r.region_code === HOME_REGION) ?? null;
+
+  const worldCount = worldOpen.data
+    ?.filter((r) => r.pool_type === filters.poolType && r.gender === filters.gender).length;
+
+  // Подписи — живые данные, как требует хендофф табов: где числа ещё нет, стоит слово.
+  const tabs: DeepTabItem<RecordsTab>[] = [
+    {
+      id: 'countries', icon: '🌍', label: 'Countries',
+      sub: data ? `${data.total} countries · one event` : 'ranking by event',
+    },
+    {
+      id: 'world', icon: '🏆', label: 'World records', shortLabel: 'World',
+      sub: worldCount != null ? `${worldCount} records` : 'every event',
+    },
+    {
+      id: 'masters', icon: '⏱', label: 'Masters',
+      sub: 'Israel vs world · by age band',
+    },
+  ];
+
+  const mastersLoading = israelMasters.loading || worldMasters.loading;
+  const mastersError = israelMasters.error ?? worldMasters.error;
 
   return (
     <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
@@ -89,10 +137,12 @@ function RecordsProject() {
       <main className="rk-page">
         <div className="rk-topline">
           <div>
-            <h1 className="rk-head__title">National records</h1>
+            <h1 className="rk-head__title">Records</h1>
             <div className="rk-head__sub">
-              {title}
-              {isRelay(filters.distance) && <span className="rk-head__tag">relay</span>}
+              {tab === 'world'
+                ? `${filters.poolType} pool · ${filters.gender === 'female' ? 'women' : 'men'}`
+                : title}
+              {tab !== 'world' && isRelay(filters.distance) && <span className="rk-head__tag">relay</span>}
               {' · '}
               {/* Единственный вход на `/records/compare`: в топбаре пункт один, «Records» —
                   это рейтинг. Дисциплину не переносим (там все сразу), а бассейн и пол —
@@ -105,49 +155,88 @@ function RecordsProject() {
           <UI_ModeToggle />
         </div>
 
-        <RkDisciplinePicker filters={filters} onChange={patch} />
+        {/* «Папка» (шаблон DeepTabs): плитки и панель — один корпус, между ними ничего
+            вставлять нельзя, иначе разорвётся стык активной плитки с панелью. */}
+        <div className="deep-folder mb-4">
+          <DeepTabs ariaLabel="Records sections" active={tab} onSelect={setTab} tabs={tabs} />
 
-        <RkWorldCard world={data?.world} filters={filters} />
+          <div className="deep-tabs-panel rk-panel">
+            <RkDisciplinePicker
+              filters={filters}
+              onChange={patch}
+              showEvent={tab !== 'world'}
+              allowRelays={tab !== 'masters'}
+            />
 
-        {/* Место Израиля — отдельной строкой над таблицей: в списке из двух сотен стран
-            домашнюю подсветку ещё надо доскроллить, а вопрос «а мы где?» первый. */}
-        {home && (
-          <div className="rk-home-note">
-            <span className="rk-home-note__label">Israel</span>
-            <span className="rk-home-note__rank">#{home.rank}</span>
-            <span className="rk-home-note__of">of {data!.total}</span>
-          </div>
-        )}
+            {tab === 'world' && (
+              <>
+                {worldOpen.loading && <div className="rk-state">Loading…</div>}
+                {worldOpen.error && (
+                  <div className="rk-state rk-state--error">Could not load world records ({worldOpen.error}).</div>
+                )}
+                {worldOpen.data && <RkWorldList records={worldOpen.data} filters={filters} />}
+              </>
+            )}
 
-        {ranking.loading && <div className="rk-state">Loading…</div>}
+            {tab === 'masters' && (
+              <>
+                {mastersLoading && <div className="rk-state">Loading…</div>}
+                {mastersError && (
+                  <div className="rk-state rk-state--error">Could not load masters records ({mastersError}).</div>
+                )}
+                {!mastersLoading && !mastersError && israelMasters.data && worldMasters.data && (
+                  <RkMastersTable israel={israelMasters.data} world={worldMasters.data} filters={filters} />
+                )}
+              </>
+            )}
 
-        {ranking.error && (
-          <div className="rk-state rk-state--error">
-            Could not load the ranking ({ranking.error}).
-          </div>
-        )}
+            {tab === 'countries' && (
+              <>
+              <RkWorldCard world={data?.world} filters={filters} />
 
-        {!ranking.loading && !ranking.error && data && data.rows.length === 0 && (
-          <div className="rk-state">
-            No national records for {title} yet.
-          </div>
-        )}
-
-        {!ranking.loading && data && data.rows.length > 0 && (
-          <>
-            <div className="rk-count">
-              {data.total} {data.total === 1 ? 'country' : 'countries'}
-              {/* Строку с неразобранным временем не ранжируем — но и не прячем: «страны нет
-                  в рейтинге» и «её время не разобралось» разные вещи (см. 11.2.1). */}
-              {data.unparsed_skipped > 0 && (
-                <span className="rk-count__skipped">
-                  · {data.unparsed_skipped} skipped (time not parsed)
-                </span>
+              {/* Место Израиля — отдельной строкой над таблицей: в списке из двух сотен стран
+                  домашнюю подсветку ещё надо доскроллить, а вопрос «а мы где?» первый. */}
+              {home && (
+                <div className="rk-home-note">
+                  <span className="rk-home-note__label">Israel</span>
+                  <span className="rk-home-note__rank">#{home.rank}</span>
+                  <span className="rk-home-note__of">of {data!.total}</span>
+                </div>
               )}
-            </div>
-            <RkTable rows={data.rows} highlight={filters.highlight} />
-          </>
-        )}
+
+              {ranking.loading && <div className="rk-state">Loading…</div>}
+
+              {ranking.error && (
+                <div className="rk-state rk-state--error">
+                  Could not load the ranking ({ranking.error}).
+                </div>
+              )}
+
+              {!ranking.loading && !ranking.error && data && data.rows.length === 0 && (
+                <div className="rk-state">
+                  No national records for {title} yet.
+                </div>
+              )}
+
+              {!ranking.loading && data && data.rows.length > 0 && (
+                <>
+                  <div className="rk-count">
+                    {data.total} {data.total === 1 ? 'country' : 'countries'}
+                    {/* Строку с неразобранным временем не ранжируем — но и не прячем: «страны нет
+                        в рейтинге» и «её время не разобралось» разные вещи (см. 11.2.1). */}
+                    {data.unparsed_skipped > 0 && (
+                      <span className="rk-count__skipped">
+                        · {data.unparsed_skipped} skipped (time not parsed)
+                      </span>
+                    )}
+                  </div>
+                  <RkTable rows={data.rows} highlight={filters.highlight} />
+                </>
+              )}
+              </>
+            )}
+          </div>
+        </div>
       </main>
     </div>
   );

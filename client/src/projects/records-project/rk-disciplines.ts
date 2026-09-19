@@ -95,3 +95,23 @@ export function behindLabel(ms: number | null | undefined): string | null {
   const sign = ms > 0 ? '+' : '−';
   return `${sign}${(Math.abs(ms) / 1000).toFixed(2)}`;
 }
+
+/* ── Табы «World records» и «Masters» ─────────────────────────────────────────────── */
+
+/**
+ * Полоса мастерсов «25-29» → 25, чтобы полосы шли по возрасту, а не по строке: «100-104»
+ * строкой встаёт раньше «25-29». Незнакомая форма уходит в конец, а не теряется.
+ */
+export function bandStart(band: string): number {
+  const n = parseInt(band, 10);
+  return Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER;
+}
+
+/**
+ * Имя держателя для таблиц табов. Правило то же, что у всего сайта: иврит по умолчанию,
+ * латиница — только когда иврита нет (CLAUDE.md, «имена пловцов — ивритские»). У мировых
+ * рекордов иврита нет в принципе, поэтому там сама собой печатается латиница.
+ */
+export function holderLabel(r: { holder_name?: string | null; holder_name_en?: string | null }): string | null {
+  return r.holder_name?.trim() || r.holder_name_en?.trim() || null;
+}

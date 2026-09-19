@@ -327,6 +327,98 @@
   .rk-cell--date { grid-area: date; text-align: right; }
 }
 
+/* ═══ Табы: «World records» и «Masters» ═══════════════════════════════════════
+   Та же таблица .rk-table/.rk-row, что у рейтинга стран, — только своя сетка колонок.
+   Сетка задаётся модификатором строки, а не новой таблицей: шапка, границы, подсветка
+   аномалии и лента «под вопросом» остаются общими и не разъезжаются. */
+
+/* Пикер сидит прямо в панели «папки» — отступ снизу отделяет его от таблицы. */
+.rk-panel .rk-picker { margin-bottom: 12px; }
+
+.rk-row--wr {
+  grid-template-columns: minmax(0, 1.3fr) 140px minmax(0, 1fr) 104px 104px;
+}
+
+.rk-cell--event {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.rk-row--masters {
+  grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr) 72px;
+}
+
+.rk-cell--band {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-text);
+}
+
+/* Сторона сравнения: время, под ним держатель и дата мелко. */
+.rk-cell--side {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rk-side__who {
+  font-size: 12px;
+  color: var(--t-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rk-side__date { color: var(--t-text-3); font-variant-numeric: tabular-nums; }
+
+.rk-side__line { display: flex; align-items: baseline; gap: 6px; }
+
+/* Метка стороны («ISR» / «World») нужна только на мобайле — на десктопе её роль играет шапка. */
+.rk-side__tag {
+  display: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-text-3);
+  min-width: 40px;
+}
+
+.rk-cell--gap { text-align: right; }
+
+@media (max-width: 720px) {
+  /* Мировой рекорд: дисциплина и время сверху, держатель, страна и дата — строкой ниже. */
+  .rk-row--wr {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'event time'
+      'holder date';
+  }
+  .rk-row--wr .rk-cell--event { grid-area: event; }
+  .rk-row--wr .rk-cell--time { grid-area: time; }
+  .rk-row--wr .rk-cell--holder { grid-area: holder; }
+  .rk-row--wr .rk-cell--date { grid-area: date; }
+  /* Страна на мобайле уходит: флаг и код дублируют имя, а места в строке нет. */
+  .rk-row--wr .rk-cell--country { display: none; }
+
+  /* Мастерсы: полоса слева во всю высоту, две стороны друг под другом, разрыв справа. */
+  .rk-row--masters {
+    grid-template-columns: 56px 1fr auto;
+    grid-template-areas:
+      'band israel gap'
+      'band world  gap';
+    row-gap: 6px;
+  }
+  .rk-row--masters .rk-cell--band { grid-area: band; align-self: center; }
+  .rk-row--masters .rk-cell--side:nth-of-type(2) { grid-area: israel; }
+  .rk-row--masters .rk-cell--side:nth-of-type(3) { grid-area: world; }
+  .rk-row--masters .rk-cell--gap { grid-area: gap; align-self: center; }
+  .rk-side__tag { display: inline-block; }
+}
+
 /* ═══ /records/compare — сравнение двух стран ═══════════════════════════════ */
 
 .rc-controls {
