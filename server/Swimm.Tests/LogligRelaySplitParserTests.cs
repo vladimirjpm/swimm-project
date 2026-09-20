@@ -102,6 +102,29 @@ public class LogligRelaySplitParserTests
         Assert.All(Women, t => Assert.NotNull(t.Band));
     }
 
+    /// <summary>
+    /// Путь импорта с 20.09.2026 (Д7): состав и владельца строки склейщик ставит, а ВРЕМЕНА
+    /// ЭТАПОВ — нет, их пишет --attach-splits по строкам базы. Два писателя одного поля —
+    /// та самая ситуация, из которой выросли дубли 1581.
+    /// </summary>
+    [Fact]
+    public void Enricher_WithoutSplitTimes_FixesOwnerButLeavesLegTimesEmpty()
+    {
+        var json = new JsonArray(
+            Row("02:34.67", 2, 8, (1981, "קיגוסטמלס", "אניה"), (1990, "נוסם", "שירי"), (1981, "ברילר", "דגנית"), (1974, "קמר", "פלר"))
+        ).ToJsonString();
+
+        var (outJson, report) = RelaySplitEnricher.Apply(json,
+            new[] { new RelaySplitEvent("individual_medley", "4X50", Women) }, writeSplitTimes: false);
+
+        Assert.Equal(1, report.Enriched);
+        var rows = JsonNode.Parse(outJson)!.AsArray();
+        var legs = rows[0]!["relay_swimmers"]!.AsArray();
+        Assert.Equal("גוסטמלסקי", (string?)legs[0]!["last_name"]);
+        Assert.Null((string?)legs[0]!["split_time"]);
+        Assert.Equal("גוסטמלסקי", (string?)rows[0]!["last_name"]);
+    }
+
     [Fact]
     public void Enricher_MatchesByHeatLaneTime_AndChecksBirthYears()
     {
