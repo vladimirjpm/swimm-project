@@ -1,0 +1,73 @@
+/* Бейдж рекорда — три класса, разный вес (хендофф `design_handoff_h2h_addrecords` §5).
+
+   ПРАВИЛО ЦВЕТА, которое нельзя размывать: золото носит ТОЛЬКО национальный рекорд (и
+   медали). Возрастные ступени и мастерские полосы — серебро: у подростка десяток возрастных
+   рекордов одного и того же достижения, и золотом они обесценили бы настоящий национальный.
+
+   ⚠ ЦВЕТА ПАРНЫЕ ПО ТЕМЕ, а не фиксированные, как у медальных кружков. Медаль — физический
+   объект на любом фоне, а бейдж это текст: значения хендоффа (dark) на светлой таблице
+   результатов давали серебро по белому и не читались вовсе (поймано 02.09.2026). Светлая
+   пара берёт те же оттенки на два шага темнее.
+
+   Переключатель — `data-mode` на <html> (общий для всех страниц, ставит `useMode`), поэтому
+   бейдж одинаково работает и на deep-страницах, и в палитре results. */
+
+.rec-badge {
+  display: inline-flex; align-items: center; white-space: nowrap;
+  font-size: 9.5px; font-weight: 900; letter-spacing: .5px;
+  border-radius: 4px; padding: 1px 5px;
+}
+/* Суффикс класса («·AGE», «·M») — тот же бейдж, но тише: сначала читается «REC». */
+.rec-badge__suffix { opacity: .7; font-weight: 800; }
+/* Префикс «HOLDER» — наоборот, читается ПЕРВЫМ: он отвечает на вопрос «это про человека
+   или про заплыв». Отделён точкой-разделителем, чтобы не слипался с классом. */
+.rec-badge__prefix { opacity: .75; font-weight: 800; margin-right: 4px; }
+.rec-badge__prefix::after { content: '·'; margin-left: 4px; opacity: .6; }
+
+/* ── Светлая тема (по умолчанию) ─────────────────────────────────────────── */
+
+/* Мировой и национальный — золото: правило «золото только рекордам страны и выше».
+   Мировой отличается насыщенностью рамки, а не другим цветом: это соседние ступени одной
+   лестницы, и разные цвета читались бы как разные сущности. */
+.rec-badge--world,
+.rec-badge--national {
+  color: #b17d11; background: rgba(217,164,32,.14); border: 1px solid rgba(178,125,17,.45);
+}
+.rec-badge--world { border-width: 1.5px; }
+.rec-badge--age,
+.rec-badge--masters {
+  color: #64748b; background: rgba(100,116,139,.10); border: 1px solid rgba(100,116,139,.35);
+}
+
+/* ── Тёмная тема — значения хендоффа ─────────────────────────────────────── */
+
+[data-mode="dark"] .rec-badge--world,
+[data-mode="dark"] .rec-badge--national {
+  color: #fbbf24; background: rgba(251,191,36,.14); border-color: rgba(251,191,36,.45);
+}
+[data-mode="dark"] .rec-badge--age,
+[data-mode="dark"] .rec-badge--masters {
+  color: #cbd5e1; background: rgba(203,213,225,.10); border-color: rgba(203,213,225,.4);
+}
+
+/* ── «Рекорд побит ЗДЕСЬ» ────────────────────────────────────────────────── */
+
+/* Событие, а не свойство дистанции: заливка вместо контура, чтобы в длинной таблице
+   результатов его было видно с прокрутки. Класс рекорда сохраняется — звезда добавляется
+   к нему, а не заменяет. Заливка тёмная в обеих темах, текст белый: это акцент. */
+.rec-badge--new { gap: 3px; color: #fff; border-color: transparent; }
+.rec-badge--new.rec-badge--world,
+.rec-badge--new.rec-badge--national,
+[data-mode="dark"] .rec-badge--new.rec-badge--world,
+[data-mode="dark"] .rec-badge--new.rec-badge--national {
+  color: #fff; background: linear-gradient(135deg,#f0b429,#c8860a); border-color: transparent;
+}
+.rec-badge--new.rec-badge--age,
+.rec-badge--new.rec-badge--masters,
+[data-mode="dark"] .rec-badge--new.rec-badge--age,
+[data-mode="dark"] .rec-badge--new.rec-badge--masters {
+  color: #fff; background: linear-gradient(135deg,#94a3b8,#64748b); border-color: transparent;
+}
+/* Отступ звезде задан margin-ом, а не gap контейнера: «REC» — текстовый узел, а не
+   элемент, и flex-gap между ними не работает (получалось «★REC·M»). */
+.rec-badge__star { font-size: 8.5px; line-height: 1; margin-right: 3px; }

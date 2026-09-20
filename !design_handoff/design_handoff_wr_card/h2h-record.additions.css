@@ -1,0 +1,26 @@
+/* ── Proposed additions to h2h.css — variant="record" of UI_H2HEventCard ── */
+.h2h-time__who{display:flex;align-items:center;gap:5px;min-width:0;font-size:11px;font-weight:700;color:var(--deep-text-mute);white-space:nowrap}
+.h2h-time--left .h2h-time__who{justify-content:flex-end}
+.h2h-time__flag{width:16px;height:12px;border-radius:2px;flex:none;object-fit:cover}
+.h2h-time__extra{margin-top:3px}
+.h2h-badge--relay{color:var(--deep-text-mute);border:1px solid var(--deep-card-border);border-radius:var(--deep-radius-pill);padding:1px 7px;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.h2h-pool__delta--behind{color:var(--deep-live)}
+.h2h-event--record .h2h-pool + .h2h-pool{border-top:1px solid var(--deep-divider);padding-top:8px}
+.h2h-group{display:flex;flex-direction:column;gap:8px}
+.h2h-group__head{display:flex;align-items:center;gap:10px;padding:4px 4px 2px;font-size:13.5px;font-weight:900;letter-spacing:.04em;color:var(--deep-gold);white-space:nowrap}
+.h2h-group__head .rec-badge{font-size:10.5px;padding:2px 6px}
+.h2h-group__line{flex:1;height:1px;background:linear-gradient(90deg,var(--deep-gold-border),transparent)}
+.h2h-group__wr{color:var(--deep-text-mute)}
+.h2h-event--record{background:var(--deep-gold-soft);border-color:var(--deep-gold-border)}
+.h2h-event--record .h2h-event__hairline{background:transparent}
+.h2h-event--record .h2h-pool + .h2h-pool{border-top-color:var(--deep-gold-border)}
+.h2h-event--record .h2h-time__box{background:var(--deep-gold-chip);border-color:var(--deep-gold-border)}
+/* Обе стороны выравниваются по ВЕРХУ: время и имя стоят на одной высоте, а плашка и
+   «Relay lead-off» не сдвигают левую колонку вниз. Правая сторона получает тот же
+   внутренний отступ, что у плашки (5px + 1px рамки), чтобы базовые линии совпали. */
+.h2h-event--record .h2h-pool{align-items:start}
+.h2h-event--record .h2h-time--right{padding-top:6px}
+.h2h-event--record .h2h-pool__mid{padding-top:8px}
+.h2h-event--record .h2h-time__box .h2h-time__value{color:var(--deep-gold)}
+.h2h-event__icon{position:relative}
+.h2h-event__dist{position:absolute;top:4px;right:10px;font-size:18px;font-weight:700;color:#e0433f;line-height:1}
