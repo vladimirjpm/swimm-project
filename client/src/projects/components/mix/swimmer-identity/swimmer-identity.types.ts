@@ -55,8 +55,19 @@ export const identityInitial = (name: string): string =>
   (name.trim().charAt(0) || '?').toUpperCase();
 
 /**
- * Дефолтная картинка пловца по полу (`public/images/swimmers/default-*.png`).
- * Пол в данных бывает пустым — тогда женская, как и было в карточке до выноса.
+ * Дефолтная картинка пловца по полу (`public/images/swimmers/default-*`).
+ *
+ * ⚠ Полов ТРИ, и третий — «не указан». Раньше правило было `male ? мужской : женский`, то
+ * есть отсутствие пола молча выдавалось за женский: мужчина на табе H2H показывался девочкой,
+ * пока слот не получал данных (поймано Владом 21.09.2026 на 7467). Пустой пол — это
+ * незнание, а не значение, и у него свой нейтральный портрет `default-unknown.svg`.
+ *
+ * Значения приходят из разных источников («male»/«female», иногда с регистром и пробелами),
+ * поэтому сравниваем нормализованно, а не строкой как есть.
  */
-export const identityDefaultAvatar = (gender?: string | null, base = '/'): string =>
-  `${base}images/swimmers/default-${gender === 'male' ? 'male' : 'female'}.png`;
+export const identityDefaultAvatar = (gender?: string | null, base = '/'): string => {
+  const g = (gender ?? '').trim().toLowerCase();
+  if (g === 'male') return `${base}images/swimmers/default-male.png`;
+  if (g === 'female') return `${base}images/swimmers/default-female.png`;
+  return `${base}images/swimmers/default-unknown.svg`;
+};
