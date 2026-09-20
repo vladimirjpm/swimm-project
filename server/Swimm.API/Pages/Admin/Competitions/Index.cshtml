@@ -632,8 +632,26 @@ else
                                             data-title="@rowTitle"
                                             title="Из каких compID федерации собирается стартовый протокол">⇄ Источники</button>
                                 }
+                                @* Доклейка промежуточных (Д5): пишет два поля к строкам, которые
+                                   УЖЕ в базе, — поэтому нужна только там, где строки есть.
+                                   Переимпорт ради промежуточных задваивал соревнование (И-28). *@
+                                @if (head != null && rowResults > 0)
+                                {
+                                    <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 splits-btn"
+                                            data-competition-id="@head.Id"
+                                            data-title="@rowTitle"
+                                            title="Скачать промежуточные с loglig и дописать их к строкам, которые уже в базе (сперва сухой прогон)">⏱ Промежуточные</button>
+                                }
                                 @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: u.Db != null) : "")
                             </div>
+
+                            @if (head != null && rowResults > 0)
+                            {
+                                @* Отчёт доклейки. Без «Сверки с файлом» он ЕДИНСТВЕННЫЙ контроль
+                                   (план, Д3) — поэтому печатается целиком, с разбивкой по дням. *@
+                                <div class="splits-box mt-3 hidden rounded-md border border-admin-border bg-admin-surface/60 p-3 text-[12.5px]"
+                                     data-comp="@head.Id"></div>
+                            }
 
                             @if (u.Db is { IsEvent: true } evp)
                             {
@@ -1576,6 +1594,87 @@ else
 
             // Незакрытая пачка с прошлой загрузки страницы — показываем её снова.
             if (batchId) watch();
+        })();
+
+        // ── Доклейка промежуточных (Д5, docs/plans/splits-attach-without-repull-plan.md) ──
+        // Сперва СУХОЙ прогон, применяем отдельной кнопкой: отчёт здесь — единственный
+        // контроль («Сверки с файлом» у этой операции нет, она не переимпорт).
+        (function () {
+            const API = '/api/admin/splits';
+
+            function esc(v) { const d = document.createElement('div'); d.textContent = v ?? ''; return d.innerHTML; }
+
+            function render(box, r) {
+                const writes = (r.legWrites || 0) + (r.swimWrites || 0);
+                const days = (r.days || []).map(d =>
+                    `<div class="text-admin-text-muted">#${d.competitionId} ${esc(d.date)} «${esc(d.name)}»: ` +
+                    `ног ${d.legWrites}, личных ${d.swimWrites}</div>`).join('');
+                const head = r.ok
+                    ? esc(r.message)
+                    : `<span class="text-admin-danger">${esc(r.message)}</span>`;
+                // Применять предлагаем только после сухого прогона и только если есть что писать:
+                // повторный боевой прогон пишет 0, но дёргать loglig зря незачем.
+                const apply = (r.dryRun && r.ok && writes > 0)
+                    ? `<button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 splits-apply">Применить</button>`
+                    : '';
+                const applied = (!r.dryRun && r.applied && writes > 0)
+                    ? `<span class="text-admin-success">Записано. Обновить страницу, чтобы увидеть флаг ⏱.</span>`
+                    : '';
+                box.innerHTML =
+                    `<div class="font-semibold text-admin-text">${head}</div>` +
+                    (days ? `<div class="mt-1.5 space-y-0.5">${days}</div>` : '') +
+                    `<div class="mt-2 flex flex-wrap items-center gap-2">` +
+                    `${apply}${applied}` +
+                    `<label class="text-[11px] text-admin-text-muted" ` +
+                    `title="Нужен только стартам без строки «входящих» — склейкам из окружных и старому импорту из JSON">` +
+                    `loglig id <input type="number" class="admin-input w-28 py-0.5 px-1.5 text-[12px] splits-loglig" ` +
+                    `value="${r.logligId || ''}" /></label>` +
+                    `<button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 splits-dry">Сухой прогон заново</button>` +
+                    `</div>` +
+                    `<div class="mt-1 text-[11px] text-admin-text-muted">Пишутся только промежуточные ` +
+                    `(этапы эстафет и отрезки личных) к строкам, которые уже в базе: строки не создаются и не удаляются.</div>`;
+            }
+
+            async function run(box, apply) {
+                // Прогон идёт минуты, а кнопка «⏱ Промежуточные» остаётся снаружи панели:
+                // без замка второй клик запускает ВТОРУЮ качку источника (поймано на 1581).
+                if (box.dataset.busy === '1') return;
+                box.dataset.busy = '1';
+                const compId = box.dataset.comp;
+                const loglig = box.querySelector('.splits-loglig')?.value?.trim();
+                box.classList.remove('hidden');
+                box.textContent = apply
+                    ? 'Доклеиваю промежуточные… (идёт минуты)'
+                    : 'Сухой прогон: качаю промежуточные с loglig и сверяю со строками базы… (идёт минуты: источник качается по одной дисциплине)';
+                const q = new URLSearchParams({ apply: apply ? 'true' : 'false' });
+                if (loglig) q.set('loglig', loglig);
+                try {
+                    const res = await fetch(`${API}/${compId}?${q}`, {
+                        method: 'POST', credentials: 'same-origin',
+                        headers: { 'X-XSRF-TOKEN': _csrfToken }
+                    });
+                    let body = null;
+                    try { body = await res.json(); } catch { /* пустое тело */ }
+                    if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+                    render(box, body);
+                } catch (e) {
+                    box.innerHTML = `<span class="text-admin-danger">Ошибка: ${esc(e.message)}</span>`;
+                } finally {
+                    box.dataset.busy = '';
+                }
+            }
+
+            // Делегирование: панели строк рисует сервер, кнопок много и они переживают F5.
+            document.addEventListener('click', (ev) => {
+                const btn = ev.target.closest('.splits-btn, .splits-dry, .splits-apply');
+                if (!btn) return;
+                const panel = btn.closest('.row-panel') ?? btn.closest('td');
+                const box = btn.classList.contains('splits-btn')
+                    ? panel?.querySelector('.splits-box')
+                    : btn.closest('.splits-box');
+                if (!box) return;
+                run(box, btn.classList.contains('splits-apply'));
+            });
         })();
 
         // ── Действия Discovery (перенос из /Admin/Discovery; после мутаций перезагружаем SSR) ──
