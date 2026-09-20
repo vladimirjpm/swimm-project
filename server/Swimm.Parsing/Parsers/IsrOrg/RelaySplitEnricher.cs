@@ -45,7 +45,14 @@ public static class RelaySplitEnricher
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static (string Json, RelaySplitReport Report) Apply(string resultsJson, IReadOnlyList<RelaySplitEvent> events)
+    /// <param name="writeSplitTimes">
+    /// false — состав и владельца строки ставим, а ВРЕМЕНА ЭТАПОВ не пишем: с 20.09.2026
+    /// их пишет доклейка по строкам базы (<c>--attach-splits</c>, решение Влада Д7), а
+    /// импорту остаётся только то, что меняет сами строки. Два писателя одного поля —
+    /// ровно та ситуация, из которой выросли дубли 1581.
+    /// </param>
+    public static (string Json, RelaySplitReport Report) Apply(
+        string resultsJson, IReadOnlyList<RelaySplitEvent> events, bool writeSplitTimes = true)
     {
         var root = JsonNode.Parse(resultsJson) as JsonArray
                    ?? throw new InvalidOperationException("Ожидался JSON-массив результатов.");
@@ -88,7 +95,7 @@ public static class RelaySplitEnricher
                 ["first_name"] = l.FirstName,
                 ["birth_year"] = l.BirthYear,
                 ["club"] = null,
-                ["split_time"] = l.SplitTime,
+                ["split_time"] = writeSplitTimes ? l.SplitTime : null,
             }).ToArray());
             row["relay_swimmers_name"] = string.Join(", ", team.Legs.Select(l => $"{l.FirstName} {l.LastName}".Trim()));
             // Владелец строки — первая нога (так строку собирает и основной парсер,
