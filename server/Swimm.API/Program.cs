@@ -613,6 +613,51 @@ if (args.Contains("--delete-empty-clubs"))
     return;
 }
 
+// Доклейка промежуточных БЕЗ переимпорта — основной путь получать промежуточные
+// (решение Влада 20.09.2026, docs/plans/splits-attach-without-repull-plan.md):
+//   dotnet run -- --attach-splits <competitionId> [--loglig <id>] [--dry-run]
+//
+// Пишет ровно два поля (RelayMembers.SplitTime, Results.TimeSplit) к строкам, которые уже в
+// базе. Переимпорт ради промежуточных при разъехавшемся ключе upsert заводит второй комплект
+// соревнования (1581: 3561 строка, И-28) — здесь этого не может быть по устройству.
+// Прогон идёт по ВСЕМ дням события, какой бы день ни передали.
+if (args.Contains("--attach-splits"))
+{
+    var idIndex = Array.IndexOf(args, "--attach-splits") + 1;
+    if (idIndex >= args.Length || !int.TryParse(args[idIndex], out var competitionId))
+    {
+        Console.Error.WriteLine(
+            "Usage: dotnet run -- --attach-splits <competitionId> [--loglig <id>] [--dry-run]");
+        Environment.Exit(1);
+        return;
+    }
+
+    // LogligId нужен только тем стартам, у которых нет строки discovery (склейки из
+    // окружных, старый импорт из JSON) — остальным он находится сам.
+    int? logligOverride = null;
+    var logligIndex = Array.IndexOf(args, "--loglig") + 1;
+    if (logligIndex > 0 && logligIndex < args.Length && int.TryParse(args[logligIndex], out var lg))
+        logligOverride = lg;
+
+    var apply = !args.Contains("--dry-run");
+    using var scope = app.Services.CreateScope();
+    var attach = scope.ServiceProvider.GetRequiredService<ISplitAttachService>();
+
+    Console.WriteLine(apply
+        ? $"Доклейка промежуточных соревнованию {competitionId}…"
+        : $"Доклейка промежуточных соревнованию {competitionId} — СУХОЙ ПРОГОН…");
+    var outcome = await attach.AttachAsync(competitionId, logligOverride, apply);
+
+    Console.WriteLine($"\n{outcome.Message}");
+    // Разбивка по дням — единственный способ увидеть, что день многодневки остался пустым.
+    foreach (var day in outcome.Days)
+        Console.WriteLine($"  #{day.CompetitionId} {day.Date} «{day.Name}»: "
+            + $"ног {day.LegWrites}, личных {day.SwimWrites}");
+    if (!apply && (outcome.Report.LegWrites > 0 || outcome.Report.SwimWrites > 0))
+        Console.WriteLine("\nПовтори без --dry-run, чтобы записать.");
+    return;
+}
+
 // Переимпорт протокола из Discovery без админки (docs/data-integrity.md, чек-лист §8):
 //   dotnet run -- --repull <discoveredId> [--delete-missing]
 // Тот же путь, что кнопка «Перезатянуть»: качаем HE-протокол, парсим, импортируем с
