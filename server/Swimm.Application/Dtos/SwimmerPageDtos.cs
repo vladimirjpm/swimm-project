@@ -282,6 +282,38 @@ public sealed class SwimmerHeldRecordDto
     /// </summary>
     [JsonPropertyName("meet")]
     public SwimmerHeldRecordMeetDto? Meet { get; set; }
+
+    /// <summary>
+    /// Мировой рекорд мастерс той же ступени — правая сторона карточки. null у немастерских
+    /// рекордов: справочника мировых по юношеским возрастам нет, правая сторона пустая.
+    /// </summary>
+    [JsonPropertyName("worldRecord")]
+    public SwimmerWorldRecordDto? WorldRecord { get; set; }
+}
+
+/// <summary>Мировой рекорд мастерс — см. <see cref="SwimmerHeldRecordDto.WorldRecord"/>.</summary>
+public sealed class SwimmerWorldRecordDto
+{
+    /// <summary>Время как напечатано в справочнике.</summary>
+    [JsonPropertyName("time")]
+    public string Time { get; set; } = string.Empty;
+
+    [JsonPropertyName("date")]
+    public string? Date { get; set; }
+
+    [JsonPropertyName("holder")]
+    public string? Holder { get; set; }
+
+    /// <summary>alpha-3 страны держателя — флаг рисует UI_FlagEmoji.</summary>
+    [JsonPropertyName("countryCode")]
+    public string? CountryCode { get; set; }
+
+    /// <summary>
+    /// Качество записи мирового справочника (kind = record). Инвариант И11: показано
+    /// время — показан и признак его качества, чей бы рекорд это ни был.
+    /// </summary>
+    [JsonPropertyName("quality")]
+    public SwimQualityDto? Quality { get; set; }
 }
 
 /// <summary>Соревнование официального рекорда (см. <see cref="SwimmerHeldRecordDto.Meet"/>).</summary>

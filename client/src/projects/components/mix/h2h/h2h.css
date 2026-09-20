@@ -310,6 +310,12 @@
   background: var(--deep-accent-soft); border: 1px solid var(--deep-accent-border);
 }
 .h2h-time__box .h2h-time__value { color: var(--deep-accent); }
+/* Вид плашки задаёт ВЫЗЫВАЮЩИЙ (проп `box` у `UI_H2HTimeCell`), а не вариант карточки:
+   «плашка с заливкой» — это про роль времени, а не про то, на каком она экране.
+   Геометрия у всех трёх одинаковая: рамка гасится ЦВЕТОМ, иначе стороны разъезжаются
+   на её ширину. */
+.h2h-time__box--outline { background: transparent; }
+.h2h-time__box--none { background: transparent; border-color: transparent; }
 /* nowrap + flex обязательны: иначе бейдж переносится под время (проверено в макете). */
 .h2h-time__line {
   display: flex; align-items: center; gap: 6px; white-space: nowrap;
@@ -402,6 +408,63 @@
 }
 .h2h-clear:hover { color: var(--deep-text); }
 
+/* ── Вариант «рекорд против мирового» (variant="record") ──────────────────── */
+
+/* Та же карточка заплыва, но слева рекорд пловца, справа — мировой рекорд мастерс той же
+   ступени. Золотая семья токенов отделяет её от обычного H2H: там сравниваются двое наших,
+   здесь наш против мира. Вариант "h2h" эти правила не задевает — все селекторы начинаются
+   с `.h2h-event--record` либо описывают новые элементы. */
+.h2h-event--record { background: var(--deep-gold-soft); border-color: var(--deep-gold-border); }
+/* Hairline в шапке гасится, а не убирается разметкой: сетка шапки та же, что у "h2h". */
+.h2h-event--record .h2h-event__hairline { background: transparent; }
+.h2h-event--record .h2h-pool + .h2h-pool { border-top: 1px solid var(--deep-gold-border); padding-top: 8px; }
+.h2h-event--record .h2h-time__box .h2h-time__value { color: var(--deep-gold); }
+/* Плашка занимает ВСЮ ширину своей колонки, а не ширину содержимого: рамки стоят в одну
+   линию по всему столбцу. По содержимому они прыгали от строки к строке — «29.94» уже,
+   чем «01:13.08», и колонка выглядела рваной (замечание Влада 20.09.2026).
+   `box-sizing` обязателен: у плашки свои паддинги и рамка, без него 100% вылезает за колонку. */
+.h2h-event--record .h2h-time__box { display: block; width: 100%; box-sizing: border-box; }
+
+/* Обе стороны выравниваются по ВЕРХУ: время и имя стоят на одной высоте, а плашка и
+   «Relay lead-off» не сдвигают левую колонку вниз. Правая сторона получает тот же
+   внутренний отступ, что у плашки (5px + 1px рамки), чтобы базовые линии совпали. */
+.h2h-event--record .h2h-pool { align-items: start; }
+.h2h-event--record .h2h-time--right { padding-top: 6px; }
+.h2h-event--record .h2h-pool__mid { padding-top: 8px; }
+
+/* Кто держит время — под самим временем. Слева пловец, справа держатель мирового. */
+.h2h-time__who {
+  display: flex; align-items: center; gap: 5px; min-width: 0;
+  font-size: 11px; font-weight: 700; color: var(--deep-text-mute); white-space: nowrap;
+  /* Имя держателя бывает длинным («LIUKKONEN Ari-Pekka»), а колонка на телефоне узкая:
+     без обрезки оно вылезало за край карточки. Флаг при этом не сжимается (`flex: none`),
+     многоточие съедает только имя. */
+  overflow: hidden;
+}
+.h2h-time__who-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.h2h-time--left .h2h-time__who { justify-content: flex-end; }
+.h2h-time__flag { width: 16px; height: 12px; border-radius: 2px; flex: none; object-fit: cover; }
+.h2h-time__extra { margin-top: 3px; }
+.h2h-badge--relay {
+  color: var(--deep-text-mute); border: 1px solid var(--deep-card-border);
+  border-radius: var(--deep-radius-pill); padding: 1px 7px;
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap;
+}
+/* Разрыв «в минус»: пловец медленнее мирового — это норма, а не проигрыш, поэтому не
+   красный «win/lose», а нейтрально-живой тон. */
+.h2h-pool__delta--behind { color: var(--deep-live); }
+
+/* Шапка группы одной возрастной ступени: «🏆 ISR · MASTERS 45-49» — бейдж — линия — «MASTERS WR». */
+.h2h-group { display: flex; flex-direction: column; gap: 8px; }
+.h2h-group__head {
+  display: flex; align-items: center; gap: 10px; padding: 4px 4px 2px;
+  font-size: 13.5px; font-weight: 900; letter-spacing: .04em;
+  color: var(--deep-gold); white-space: nowrap;
+}
+.h2h-group__head .rec-badge { font-size: 10.5px; padding: 2px 6px; }
+.h2h-group__line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--deep-gold-border), transparent); }
+.h2h-group__wr { color: var(--deep-text-mute); }
+
 /* ── Узкий контейнер ──────────────────────────────────────────────────────── */
 
 /* Порог 780px — по КОНТЕЙНЕРУ, а не по окну. Замеры на живой странице: в панели таба
@@ -485,4 +548,13 @@
   /* Дата под временем — первое, что уходит: полоса бассейна на телефоне это две цифры
      и разрыв между ними. В колонке 780 места хватает, там дата остаётся. */
   .h2h-time__date { display: none; }
+
+  /* Дистанция под иконкой мельче: 30px подобраны под широкую плиту десктопа, а на телефоне
+     плита сжимается и число начинает спорить с самим рисунком (замечание Влада 21.09.2026).
+     Правим ПРЯМО кеглем, а не переменной `--swim-len`: её компонент ставит инлайном на свой
+     корень, и правило на корень отсюда не выиграло бы.
+     ⚠ Три класса в селекторе обязательны: у `.dv-swimm-icon .style-len` в
+     `swimm-style-icon.css` та же специфичность, и при равной решает порядок в бандле —
+     а он не наш (проверено: правило из двух классов проигрывало, кегль оставался 30px). */
+  .h2h-event .h2h-event__icon .style-len--below { font-size: 20px; }
 }

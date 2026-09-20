@@ -19,6 +19,16 @@ export interface H2HPoolSide {
   badge?: 'SB' | { record: RecordKind; scope?: string | null } | null;
   /** Протокол этого заплыва — у КАЖДОЙ стороны свой: времена принадлежат разным людям. */
   href?: string;
+  /** Кто держит время — имя и страна под цифрой (вариант `record`). */
+  who?: { name: string; countryCode?: string | null } | null;
+  /** Подпись к времени («Relay lead-off»). */
+  extras?: React.ReactNode;
+  /** Плашка победителя принудительно: у рекорда она всегда у пловца, разрыв тут ни при чём. */
+  isWinner?: boolean;
+  /** Подсказка на времени, когда ссылки нет (WR в варианте `record`). */
+  title?: string;
+  /** Вид плашки вокруг времени — см. `UI_H2HTimeCell`. */
+  box?: 'fill' | 'outline' | 'none';
 }
 
 interface Props {
@@ -27,6 +37,17 @@ interface Props {
   right: H2HPoolSide | null;
   /** «Левое минус правое», мс: отрицательное — быстрее левый. null — плавал только один. */
   deltaMs?: number | null;
+  /**
+   * Тон разрыва: `win` — цифра в пользу левого (H2H), `behind` — левый медленнее и это
+   * норма (рекорд пловца против мирового). В варианте `record` всегда `behind`.
+   */
+  deltaTone?: 'win' | 'behind';
+  /**
+   * Что стоит в середине вместо метки бассейна. Заведено под `/records?tab=masters`: там
+   * бассейн выбран фильтром на всю страницу и одинаков во всех строках, а различает строки
+   * возрастная полоса («25-29»). Не задано — печатается метка бассейна, как было.
+   */
+  midLabel?: React.ReactNode;
 }
 
 /**
@@ -36,9 +57,16 @@ interface Props {
 const deltaLabel = (ms: number): string =>
   ms === 0 ? '=' : `${ms < 0 ? '−' : '+'}${(Math.abs(ms) / 1000).toFixed(2)}`;
 
-const UI_H2HPoolRow: React.FC<Props> = ({ poolType, left, right, deltaMs = null }) => {
+const UI_H2HPoolRow: React.FC<Props> = ({
+  poolType, left, right, deltaMs = null, deltaTone = 'win', midLabel,
+}) => {
   const leftWins = deltaMs != null && deltaMs < 0;
   const rightWins = deltaMs != null && deltaMs > 0;
+  // `behind` — у левой стороны своя плашка (`left.isWinner`), и цифра разрыва не красится
+  // «в чью-то пользу»: сравнение не соревнование.
+  const deltaClass = deltaTone === 'behind'
+    ? ' h2h-pool__delta--behind'
+    : (leftWins ? ' h2h-pool__delta--win' : '');
 
   return (
     <div className="h2h-pool">
@@ -48,16 +76,22 @@ const UI_H2HPoolRow: React.FC<Props> = ({ poolType, left, right, deltaMs = null 
         quality={left?.quality}
         badge={left?.badge ?? null}
         href={left?.href}
-        isWinner={leftWins}
+        who={left?.who}
+        extras={left?.extras}
+        title={left?.title}
+        box={left?.box}
+        isWinner={left?.isWinner ?? leftWins}
         side="left"
       />
 
       <div className="h2h-pool__mid">
         {/* Метка бассейна — тот же компонент, что в строке заплыва всего продукта:
             «--25m--» / «-----50m-----». */}
-        <UI_PoolIcon styleType="icon-text-center" label={poolType} labelClassName="h2h-pool__label" />
+        {midLabel ?? (
+          <UI_PoolIcon styleType="icon-text-center" label={poolType} labelClassName="h2h-pool__label" />
+        )}
         {deltaMs != null && (
-          <span className={`h2h-pool__delta${leftWins ? ' h2h-pool__delta--win' : ''}`}>
+          <span className={`h2h-pool__delta${deltaClass}`}>
             {deltaLabel(deltaMs)}
           </span>
         )}
@@ -69,7 +103,11 @@ const UI_H2HPoolRow: React.FC<Props> = ({ poolType, left, right, deltaMs = null 
         quality={right?.quality}
         badge={right?.badge ?? null}
         href={right?.href}
-        isWinner={rightWins}
+        who={right?.who}
+        extras={right?.extras}
+        title={right?.title}
+        box={right?.box}
+        isWinner={right?.isWinner ?? rightWins}
         side="right"
       />
     </div>

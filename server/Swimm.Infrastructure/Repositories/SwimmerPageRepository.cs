@@ -186,6 +186,26 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                     new RecordMeet(x.CompetitionId, x.Competition.EventId, x.Competition.Name, x.Competition.IsChampionship, x.Id)))
                 .ToListAsync();
 
+        // Правая сторона карточки «рекорд против мирового»: мировые рекорды мастерс тех же
+        // ступеней, что у найденных рекордов пловца. Ступени мировые и израильские совпадают
+        // один в один, поэтому матч точный (AgeKey+Gender+PoolType+Style+Distance) и делается
+        // в памяти — десятки строк.
+        var ageKeys = records.Select(r => r.AgeKey).Where(k => !string.IsNullOrEmpty(k)).Distinct().ToList();
+        var worldRecords = ageKeys.Count == 0
+            ? new Dictionary<string, WorldRecordRow>()
+            : (await _read.Records.AsNoTracking()
+                    .Where(r => r.RegionType == "world" && r.Category == "masters"
+                                && ageKeys.Contains(r.AgeKey))
+                    .Select(r => new
+                    {
+                        r.AgeKey, r.Gender, r.PoolType, r.Style, r.Distance,
+                        r.Time, r.RecordDate, r.HolderName, r.HolderCountry,
+                    })
+                    .ToListAsync())
+                .GroupBy(r => WorldRecordKey(r.AgeKey, r.Gender, r.PoolType, r.Style, r.Distance))
+                .ToDictionary(g => g.Key, g => new WorldRecordRow(
+                    g.First().Time, g.First().RecordDate, g.First().HolderName, g.First().HolderCountry));
+
         // Претензии тянем целиком: таблица штучная (единицы строк), а сузить её запросом
         // нельзя — рекорды пловца разбросаны по регионам, категориям и ступеням.
         var issues = (await _read.RecordIssues.AsNoTracking()
@@ -207,9 +227,19 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                 var leadOff = r.IsRelayLeadOff || leadOffs.Any(l =>
                     RelayLeadOffMatcher.Matches(r.Time, r.RecordDate, r.Distance, r.Style, r.PoolType, l));
                 var meet = RecordMeetMatcher.Find(r.Time, r.RecordDate, r.Distance, r.Style, r.PoolType, swims, leadOffs);
+                worldRecords.TryGetValue(
+                    WorldRecordKey(r.AgeKey, r.Gender, r.PoolType, r.Style, r.Distance), out var world);
+                if (world is not null)
+                {
+                    // Претензия ищется по тому же ключу, что у рекорда пловца: реестр мировых
+                    // рекордов ошибается так же, и показанное время обязано нести качество (И11).
+                    issues.TryGetValue(
+                        IssueKey(r.PoolType, r.Style, r.Distance, world.Time), out var worldIssue);
+                    world = world with { IssueReason = worldIssue };
+                }
                 return new HeldRecordRow(
                     r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
-                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, issue, leadOff, meet);
+                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, issue, leadOff, meet, world);
             })
             .ToList();
     }
@@ -466,6 +496,18 @@ public class SwimmerPageRepository : ISwimmerPageRepository
     }
 
     /// <summary>Ключ претензии без возрастной ступени — одно достижение живёт на нескольких.</summary>
+    /// <summary>
+    /// Ключ матча «рекорд пловца ↔ мировой рекорд мастерс»: ступень + пол + бассейн + стиль +
+    /// дистанция. Нормализация как в <see cref="IssueKey"/> — справочник пишет «200m», а не «200».
+    /// </summary>
+    private static string WorldRecordKey(string? ageKey, string? gender, string? poolType, string? style, string? distance) =>
+        string.Join('|',
+            (ageKey ?? "").Trim().ToLowerInvariant(),
+            (gender ?? "").Trim().ToLowerInvariant(),
+            (poolType ?? "").Trim().ToLowerInvariant(),
+            (style ?? "").Trim().ToLowerInvariant(),
+            (distance ?? "").Trim().ToLowerInvariant().TrimEnd('m'));
+
     private static string IssueKey(string? poolType, string? style, string? distance, string? time) =>
         string.Join('|',
             (poolType ?? "").Trim().ToLowerInvariant(),

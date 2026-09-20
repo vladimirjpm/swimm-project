@@ -10,10 +10,14 @@ import { MIN_PEERS_FOR_RANK } from '../../components/mix/rank-of-peers/rank-of-p
 import { useFavoritesContext } from '../../../hooks/favorites-context';
 import UI_H2HCompare, { h2hScopeLabel } from '../../components/mix/h2h/h2h-compare';
 import UI_H2HRivalPicker from '../../components/mix/h2h/h2h-rival-picker';
+import UI_H2HEventCard from '../../components/mix/h2h/h2h-event-card';
+import UI_H2HPoolRow from '../../components/mix/h2h/h2h-pool-row';
+import UI_RecordBadge from '../../components/mix/record-badge/record-badge';
 import type { RecordKind } from '../../components/mix/record-badge/record-badge';
 import type { H2HSlot } from '../../components/mix/h2h/h2h.types';
 import { routes } from '../../../utils/routes';
 import { peerGroupLabel, seasonLabel } from '../../../utils/helpers/season-helper';
+import { timeToMs } from '../../../utils/helpers/recalculate-positions';
 import type {
   SwimmerBestTime, SwimmerCompare, SwimmerCompetition, SwimmerDisciplineRank,
   SwimmerPersonalBest, SwimmerProgress, SwimmerSearchHit, SwimmerSeasonRanks, SwimmerSummary,
@@ -500,53 +504,175 @@ function recordScope(r: SwimmerHeldRecord): string {
  * ⚠ Держатель в справочнике записан СТРОКОЙ имени, `SwimmerId` у рекорда нет — тёзка заберёт
  * чужой рекорд. Подпись под секцией обязана это признавать, а не делать вид, что связь точная.
  */
-function HeldRecordsSection({ records, swimmerId }: { records: SwimmerHeldRecord[]; swimmerId: number }) {
+/**
+ * Группировка рекордов для карточек: ступень (`ageKey` в рамках региона и категории) →
+ * дисциплина (`stroke+distance`) → бассейн. Порядок сохраняется тот, в котором рекорды
+ * пришли с сервера, — он там уже осмысленный (страна выше, дистанция по возрастанию).
+ */
+interface RecordDisciplineGroup {
+  key: string;
+  stroke: string;
+  distance: string;
+  rows: SwimmerHeldRecord[];
+}
+
+interface RecordAgeGroup {
+  key: string;
+  scope: string;
+  /** Нижняя граница ступени — по ней и строится порядок групп. */
+  minAge: number;
+  kind: RecordKind;
+  /** «MASTERS WR» справа печатается только там, где мировой рекорд действительно есть. */
+  hasWorldRecord: boolean;
+  disciplines: RecordDisciplineGroup[];
+}
+
+/**
+ * Нижняя граница возрастной ступени: «45-49» → 45, «16» → 16. У открытой категории ключа
+ * нет — она уходит В КОНЕЦ: «open» это не возраст, и вклинивать её в лестницу между
+ * ступенями значило бы читать её как ещё одну ступень.
+ */
+function stepMinAge(ageKey: string): number {
+  const n = parseInt(ageKey, 10);
+  return Number.isNaN(n) ? Number.MAX_SAFE_INTEGER : n;
+}
+
+function groupHeldRecords(records: SwimmerHeldRecord[]): RecordAgeGroup[] {
+  const groups: RecordAgeGroup[] = [];
+  const byKey = new Map<string, RecordAgeGroup>();
+
+  for (const r of records) {
+    const scope = recordScope(r);
+    let group = byKey.get(scope);
+    if (!group) {
+      group = {
+        key: scope, scope, minAge: stepMinAge(r.ageKey),
+        kind: recordKindOf(r.category), hasWorldRecord: false, disciplines: [],
+      };
+      byKey.set(scope, group);
+      groups.push(group);
+    }
+    if (r.worldRecord) group.hasWorldRecord = true;
+
+    const discKey = `${r.stroke}-${r.distance}`;
+    let disc = group.disciplines.find((d) => d.key === discKey);
+    if (!disc) {
+      disc = { key: discKey, stroke: r.stroke ?? '', distance: r.distance, rows: [] };
+      group.disciplines.push(disc);
+    }
+    disc.rows.push(r);
+  }
+
+  // Порядок групп — ПО ВОЗРАСТУ ступени, а не по тому, как рекорды легли в справочнике:
+  // сервер сортирует строки по региону и дистанции, и ступени приезжали вперемешку
+  // (40-44 между 30-34 и 45-49). Возрастная лестница обязана читаться сверху вниз.
+  return groups.sort((a, b) => a.minAge - b.minAge);
+}
+
+/** Подпись мирового рекорда: она же title правой ячейки — ссылки у WR нет. */
+const worldRecordTitle = (r: SwimmerHeldRecord): string =>
+  `Masters world record · ${r.ageKey} · ${r.distance} ${swimRowStrokeLabel(r.stroke ?? '')} `
+  + `${r.poolType === '25m' ? 'SCM' : 'LCM'}`;
+
+/**
+ * Секция официальных рекордов НАД таблицей личников — показывается только тому, кто их
+ * держит (решение Влада: есть рекорды → «Records & PB» и рекорды впереди отдельной секцией).
+ *
+ * Рисуется КАРТОЧКАМИ семьи `UI_H2H*` в варианте `record`: слева рекорд пловца, справа —
+ * мировой рекорд мастерс той же ступени с держателем и флагом, посередине разрыв. Карточками
+ * идут ВСЕ официальные рекорды, включая немастерские (решение Влада 20.09.2026): у них правая
+ * сторона пустая — справочника мировых по юношеским возрастам у нас нет. Появится — правая
+ * сторона заполнится сама, разметку менять не придётся.
+ *
+ * ⚠ Держатель в справочнике записан СТРОКОЙ имени, `SwimmerId` у рекорда нет — тёзка заберёт
+ * чужой рекорд. Подпись под секцией обязана это признавать, а не делать вид, что связь точная.
+ */
+function HeldRecordsSection({
+  records, swimmerId, swimmerName, swimmerCountry,
+}: {
+  records: SwimmerHeldRecord[];
+  swimmerId: number;
+  swimmerName: string;
+  swimmerCountry?: string | null;
+}) {
+  const groups = groupHeldRecords(records);
+
   return (
     <div className="deep-records-block">
       <PanelHead
         title={records.length === 1 ? 'Official record' : `Official records · ${records.length}`}
         hint="records where the federation register names this swimmer as the holder"
       />
-      <div className="deep-list">
-        {records.map((r, i) => (
-          <SwimRow
-            key={`${r.regionCode}-${r.category}-${r.ageKey}-${r.stroke}-${r.distance}-${i}`}
-            className="deep-swim-row deep-record-row"
-            stroke={r.stroke ?? ''}
-            distance={r.distance}
-            poolType={r.poolType}
-            time={r.time}
-            quality={r.quality}
-            // Места у записи справочника нет: это не заплыв протокола, а строка реестра.
-            place={{ kind: 'none' }}
-            // «🏆 ISR · age 12» — область и ступень рекорда в первой линии: именно они
-            // отвечают на вопрос «чей это рекорд». Старт, где он проплыт, — во второй, у даты,
-            // как у season best; справочник его не знает, сервер находит среди заплывов пловца.
-            headline={<><span aria-hidden="true">🏆 </span>{recordScope(r)}</>}
-            competition={r.meet ? { name: r.meet.name, isChampionship: r.meet.isChampionship } : null}
-            meetPlacement="line2"
-            // Нашёлся старт — строка ведёт к заплывам пловца на нём (весь турнир, если дней несколько).
-            href={r.meet
-              ? routes.competitionSwims(r.meet.competitionId, { swimmerId, eventId: r.meet.eventId })
-              : undefined}
-            date={r.date}
-            // Класс рекорда — тем же бейджем, что в H2H и в таблице результатов: подпись
-            // «ISR · masters» отвечает на вопрос «какая ступень», бейдж — «какого веса».
-            // Стоит ПОД ВРЕМЕНЕМ, где у season best чип SB: рекорд > SB > PB.
-            record={{ kind: recordKindOf(r.category), scope: recordScope(r) }}
-            // Время первого этапа эстафеты засчитывается личным: без подписи рекорд
-            // «не находится» среди личных заплывов пловца (30.25 Гостомельской, И-28).
-            extras={
-              r.relayLeadOff ? (
-                <span
-                  className="whitespace-nowrap rounded-full border border-[var(--t-border)] px-2 py-[2px] text-[10px] font-extrabold uppercase tracking-wide text-[var(--t-text-2)]"
-                  title="Set as the first leg of a relay — a lead-off time counts as an individual record"
-                >
-                  Relay lead-off
-                </span>
-              ) : undefined
-            }
-          />
+      <div className="h2h-scope deep-list">
+        {groups.map((group) => (
+          <div className="h2h-group" key={group.key}>
+            <div className="h2h-group__head">
+              <span><span aria-hidden="true">🏆 </span>{group.scope.toUpperCase()}</span>
+              <UI_RecordBadge kind={group.kind} />
+              <span className="h2h-group__line" />
+              {/* Только там, где WR есть: иначе шапка обещает колонку, которой в группе нет. */}
+              {group.hasWorldRecord && <span className="h2h-group__wr">MASTERS WR</span>}
+            </div>
+
+            {group.disciplines.map((disc) => (
+              <UI_H2HEventCard
+                key={disc.key}
+                variant="record"
+                stroke={disc.stroke}
+                distance={disc.distance}
+              >
+                {disc.rows.map((r) => {
+                  const wr = r.worldRecord ?? null;
+                  // Разрыв считается на клиенте: у справочника рекордов миллисекунд нет.
+                  // Тон всегда `behind` — пловец медленнее мирового, и это не проигрыш.
+                  const ms = wr ? timeToMs(r.time) - timeToMs(wr.time) : null;
+                  return (
+                    <UI_H2HPoolRow
+                      key={`${disc.key}-${r.poolType}`}
+                      poolType={r.poolType}
+                      deltaMs={ms != null && Number.isFinite(ms) ? ms : null}
+                      deltaTone="behind"
+                      left={{
+                        time: r.time,
+                        date: r.date,
+                        quality: r.quality,
+                        who: { name: swimmerName, countryCode: swimmerCountry },
+                        // Плашка ВСЕГДА у пловца: это его рекорд, а не победа в сравнении.
+                        // Без заливки и рамки: время и так золотое, а колонку очерчивают
+                        // разделители строк (решение Влада 20.09.2026).
+                        isWinner: true,
+                        box: 'none',
+                        // Нашёлся старт — время ведёт к заплывам пловца на нём.
+                        href: r.meet
+                          ? routes.competitionSwims(r.meet.competitionId, { swimmerId, eventId: r.meet.eventId })
+                          : undefined,
+                        // Время первого этапа эстафеты засчитывается личным: без подписи
+                        // рекорд «не находится» среди личных заплывов (30.25, И-28).
+                        extras: r.relayLeadOff ? (
+                          <span
+                            className="h2h-badge h2h-badge--relay"
+                            title="Set as the first leg of a relay — a lead-off time counts as an individual record"
+                          >
+                            Relay lead-off
+                          </span>
+                        ) : undefined,
+                      }}
+                      right={wr ? {
+                        time: wr.time,
+                        date: wr.date,
+                        quality: wr.quality,
+                        who: wr.holder ? { name: wr.holder, countryCode: wr.countryCode } : null,
+                        // Плашки у мирового нет НИКОГДА: разрыв всегда «+», и автоматический
+                        // `rightWins` по знаку выдал бы её как победу в сравнении.
+                        isWinner: false,
+                        title: worldRecordTitle(r),
+                      } : null}
+                    />
+                  );
+                })}
+              </UI_H2HEventCard>
+            ))}
+          </div>
         ))}
       </div>
       <div className="deep-legend deep-legend--block">
@@ -563,7 +689,7 @@ function HeldRecordsSection({ records, swimmerId }: { records: SwimmerHeldRecord
  * сверху: это разные вещи — рекорд из справочника федерации и «моё лучшее за карьеру».
  */
 export function PersonalBestsPanel({
-  rows, poolType, onPoolType, records, swimmerId, gender, age, state,
+  rows, poolType, onPoolType, records, swimmerId, swimmerName, swimmerCountry, gender, age, state,
 }: {
   rows: SwimmerPersonalBest[] | null;
   poolType: string;
@@ -571,6 +697,9 @@ export function PersonalBestsPanel({
   records?: SwimmerHeldRecord[] | null;
   /** Для ссылки строки рекорда на заплывы пловца в найденном старте. */
   swimmerId: number;
+  /** Имя и страна пловца — левая сторона карточки рекорда (кто держит время). */
+  swimmerName: string;
+  swimmerCountry?: string | null;
   /** Нормативы у мужчин и женщин разные — без пола дуга уровня врёт. */
   gender: 'male' | 'female';
   /** Возраст в витринном сезоне — тот же, по которому сервер считал обе дельты. */
@@ -587,7 +716,14 @@ export function PersonalBestsPanel({
 
   return (
     <>
-      {records && records.length > 0 && <HeldRecordsSection records={records} swimmerId={swimmerId} />}
+      {records && records.length > 0 && (
+        <HeldRecordsSection
+          records={records}
+          swimmerId={swimmerId}
+          swimmerName={swimmerName}
+          swimmerCountry={swimmerCountry}
+        />
+      )}
 
       <PanelHead
         title="Personal bests"
@@ -822,7 +958,7 @@ export function ProgressPanel({
  */
 export function H2HPanel({
   compare, query, onQuery, hits, hitsState, onPick, onClear, rivalId, swimmerId, profileName,
-  season, state,
+  owner, season, state,
 }: {
   compare: SwimmerCompare | null;
   /** Строка поиска — состояние живёт на странице, чтобы переживать смену сезона. */
@@ -838,6 +974,14 @@ export function H2HPanel({
   swimmerId: number;
   /** Имя хозяина страницы: слот рисуется ещё до того, как приедет сравнение. */
   profileName: string;
+  /**
+   * Остальная внешность хозяина страницы — из профиля, который на странице уже есть.
+   * ⚠ Без неё слот до приезда сравнения оставался БЕЗ ПОЛА, а дефолтный портрет
+   * (`identityDefaultAvatar`) считает «не male» женщиной: мужчина на табе H2H показывался
+   * девочкой, пока соперник не выбран, — а без соперника сравнения и не запрашивают, так
+   * что это было состояние по умолчанию (поймано Владом 21.09.2026 на 7467).
+   */
+  owner?: { gender?: string | null; avatarUrl?: string | null; countryCode?: string | null };
   /** Сезон карусели — уезжает в ссылку на страницу `/h2h`, чтобы она открыла тот же период. */
   season: number | null;
   state: PanelLoad;
@@ -898,7 +1042,13 @@ export function H2HPanel({
         gender: compare.mine.gender,
         countryCode: compare.mine.countryCode,
       }
-      : { id: swimmerId, name: profileName },
+      : {
+        id: swimmerId,
+        name: profileName,
+        avatarUrl: owner?.avatarUrl,
+        gender: owner?.gender,
+        countryCode: owner?.countryCode,
+      },
     ...favProps(swimmerId),
     // Хозяина страницы сменить нельзя — это его профиль.
     onClear: null,

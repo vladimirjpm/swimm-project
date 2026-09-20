@@ -2,6 +2,7 @@ import React from 'react';
 import './h2h.css';
 import UI_SwimTime, { type SwimQuality } from '../swim-time/swim-time';
 import UI_RecordBadge, { type RecordKind } from '../record-badge/record-badge';
+import UI_FlagEmoji from '../flag-icon/flag-icon';
 
 /**
  * Ячейка времени одной стороны (макет 1b, §3).
@@ -29,11 +30,36 @@ interface Props {
    * времени в протокол левого пловца (поймано 02.09.2026 на паре 7424/62115).
    */
   href?: string;
+  /**
+   * Кто держит это время — имя и страна (alpha-3) под временем. Нужно варианту `record`:
+   * слева пловец, справа держатель мирового рекорда. В обычном H2H имена стоят в шапке
+   * сравнения, и здесь их не дублируют.
+   */
+  who?: { name: string; countryCode?: string | null } | null;
+  /** Подпись к времени — «Relay lead-off» и прочее, что объясняет саму цифру. */
+  extras?: React.ReactNode;
+  /** Подсказка на самом времени — там, где ссылки нет (мировой рекорд). */
+  title?: string;
+  /**
+   * Как выглядит плашка вокруг времени, когда она есть (`isWinner`):
+   *
+   * - `fill` — **по умолчанию**: заливка и рамка. Так выглядит победитель в H2H, где плашка
+   *   и есть способ сказать «этот быстрее».
+   * - `outline` — только рамка, без заливки.
+   * - `none` — ни заливки, ни рамки: плашка остаётся лишь коробкой выравнивания. Так стоит
+   *   вариант `record` (решение Влада 20.09.2026) — там время и так золотое, а колонку
+   *   очерчивают разделители строк.
+   *
+   * Геометрия во всех трёх одинаковая: `none` гасит рамку ЦВЕТОМ, а не убирает её, иначе
+   * стороны разъезжаются на её ширину.
+   */
+  box?: 'fill' | 'outline' | 'none';
   side: 'left' | 'right';
 }
 
 const UI_H2HTimeCell: React.FC<Props> = ({
-  time, date, quality, isWinner = false, badge = null, href, side,
+  time, date, quality, isWinner = false, badge = null, href, who = null, extras, title,
+  box = 'fill', side,
 }) => {
   if (!time) {
     return (
@@ -52,15 +78,27 @@ const UI_H2HTimeCell: React.FC<Props> = ({
           <UI_RecordBadge kind={badge.record} scope={badge.scope} />
         )}
       </div>
+      {who && (
+        <div className="h2h-time__who">
+          {who.countryCode && (
+            <UI_FlagEmoji countryCode={who.countryCode} size="16x12" className="h2h-time__flag" />
+          )}
+          <span className="h2h-time__who-name">{who.name}</span>
+        </div>
+      )}
       {date && <div className="h2h-time__date">{date}</div>}
     </>
   );
 
-  const inner = isWinner ? <div className="h2h-time__box">{body}</div> : body;
+  const inner = isWinner
+    ? <div className={`h2h-time__box${box === 'fill' ? '' : ` h2h-time__box--${box}`}`}>{body}</div>
+    : body;
 
   return (
-    <div className={`h2h-time h2h-time--${side}`}>
+    <div className={`h2h-time h2h-time--${side}`} title={title}>
       {href ? <a className="h2h-time__link" href={href}>{inner}</a> : inner}
+      {/* Подпись ВНЕ ссылки и вне плашки: она объясняет время, а не является им. */}
+      {extras && <div className="h2h-time__extra">{extras}</div>}
     </div>
   );
 };
