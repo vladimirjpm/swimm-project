@@ -120,6 +120,10 @@ public sealed class LogligRelaySplitProvider : IRelaySplitProvider
     /// Стиль сетки loglig в форме основного парсера: комплексные эстафеты основной разбор
     /// пишет как <c>individual_medley</c> (NormalizeStyleName схлопывает medley).
     /// </summary>
-    private static string ParserStyle(string gridStyle) =>
+    private static string ParserStyle(string gridStyle) => ParserStyleOf(gridStyle);
+
+    /// <inheritdoc cref="ParserStyle"/>
+    /// <remarks>Тем же словарём пользуется доклейка без переимпорта (LogligSplitSourceProvider).</remarks>
+    internal static string ParserStyleOf(string gridStyle) =>
         gridStyle.Contains("medley", StringComparison.OrdinalIgnoreCase) ? "individual_medley" : gridStyle;
 }

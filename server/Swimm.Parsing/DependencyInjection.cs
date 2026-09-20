@@ -46,6 +46,7 @@ public static class DependencyInjection
 
         // Промежуточные эстафет чемпионатов из пособытийных PDF loglig (docs/relays.md).
         services.AddSingleton<IRelaySplitProvider, Discovery.LogligRelaySplitProvider>();
+        services.AddSingleton<ISplitSourceProvider, Discovery.LogligSplitSourceProvider>();
 
         // Резолвер актуальных ссылок на PDF со страницы «שיאי ישראל» — им пользуются
         // оба isr.org.il-источника рекордов, поэтому регистрируется отдельно.
