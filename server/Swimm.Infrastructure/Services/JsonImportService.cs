@@ -226,9 +226,12 @@ public class JsonImportService : IImportService
 
         var swimmerCache = new Dictionary<string, Swimmer>();
         var swimmerCacheEn = new Dictionary<string, Swimmer>();
+        // Фоллбек «то же имя, другая граница фамилии» — см. SwimmerFullNameKey.
+        var swimmerCacheByFullName = new Dictionary<string, Swimmer>();
         foreach (var s in await _db.Swimmers.ToListAsync())
         {
             swimmerCache.TryAdd(SwimmerMatchKey(s.LastName, s.FirstName, s.BirthYear), s);
+            swimmerCacheByFullName.TryAdd(SwimmerFullNameKey(s.LastName, s.FirstName, s.BirthYear), s);
             if (!string.IsNullOrWhiteSpace(s.LastNameEn))
                 swimmerCacheEn.TryAdd(SwimmerMatchKey(s.LastNameEn, s.FirstNameEn, s.BirthYear), s);
         }
@@ -614,6 +617,11 @@ public class JsonImportService : IImportService
                             swimmer.FirstNameEn = item.FirstNameEn ?? string.Empty;
                         }
                     }
+                    else if (swimmerCacheByFullName.TryGetValue(
+                                 SwimmerFullNameKey(item.LastName, item.FirstName, item.BirthYear), out swimmer))
+                    {
+                        // Тот же человек, разрезанный на имя и фамилию иначе, — не новый пловец.
+                    }
                     else
                     {
                         // Not in pre-loaded cache — may still exist if duplicate key collision was silenced
@@ -638,6 +646,8 @@ public class JsonImportService : IImportService
                     }
 
                     swimmerCache[swimmerKey] = swimmer;
+                    swimmerCacheByFullName.TryAdd(
+                        SwimmerFullNameKey(swimmer.LastName, swimmer.FirstName, swimmer.BirthYear), swimmer);
                 }
 
                 // Страж тёзок: тот же пловец уже плыл в ЭТОМ соревновании за другой клуб —
@@ -1336,6 +1346,24 @@ public class JsonImportService : IImportService
     /// (19.09.2026, comp 64). Регистр не важен; берём только ОДНОЗНАЧНОЕ совпадение — двое
     /// с тем же латинским именем и годом значит, что гадать нельзя, и заводится новая карточка.
     /// </summary>
+    /// <summary>
+    /// Нога, записанная с ДРУГОЙ границей между именем и фамилией: ищем по всем словам
+    /// полного имени и году рождения (<see cref="SwimmerFullNameKey"/>). Неоднозначность
+    /// (двое под одним ключом) — не матчим: лучше тень, чем чужие результаты в профиле.
+    /// </summary>
+    private async Task<Swimmer?> FindLegByFullNameAsync(RelaySwimmerJson leg)
+    {
+        var year = leg.BirthYear ?? 0;
+        if (year == 0) return null;
+
+        var key = SwimmerFullNameKey(leg.LastName, leg.FirstName, year);
+        var sameYear = await _db.Swimmers.Where(s => s.BirthYear == year).ToListAsync();
+        var hits = sameYear
+            .Where(s => SwimmerFullNameKey(s.LastName, s.FirstName, s.BirthYear) == key)
+            .ToList();
+        return hits.Count == 1 ? hits[0] : null;
+    }
+
     private async Task<Swimmer?> FindLegByEnglishNameAsync(RelaySwimmerJson leg)
     {
         var last = (leg.LastName ?? "").Trim().ToUpperInvariant();
@@ -1379,6 +1407,9 @@ public class JsonImportService : IImportService
                     s.FirstName == (leg.FirstName ?? "") &&
                     s.BirthYear == (leg.BirthYear ?? 0));
 
+                // Та же нога, разрезанная на имя и фамилию иначе (протокол гадает границу,
+                // loglig берёт её из колонок) — не новый пловец, см. SwimmerFullNameKey.
+                swimmer ??= await FindLegByFullNameAsync(leg);
                 swimmer ??= await FindLegByEnglishNameAsync(leg);
 
                 if (swimmer == null)
@@ -1515,6 +1546,33 @@ public class JsonImportService : IImportService
     /// </summary>
     private static string SwimmerMatchKey(string? last, string? first, int? year) =>
         $"{SwimmerDedupService.Normalize(last ?? "")}|{SwimmerDedupService.Normalize(first ?? "")}|{year ?? 0}";
+
+    /// <summary>
+    /// Ключ пловца, НЕ ЗАВИСЯЩИЙ от того, где прошла граница между именем и фамилией:
+    /// все слова полного имени по алфавиту + год рождения.
+    ///
+    /// Зачем: границу знает не каждый источник. Основной протокол даёт ногу эстафеты плоской
+    /// строкой «Фамилия… Имя Год» и вынужден гадать — <c>ParseRelaySwimmerLine</c> отдаёт имени
+    /// ровно одно слово, поэтому «בניסים שרה רוז 2015» превращается в фамилию «בניסים שרה» и
+    /// имя «רוז». У PDF промежуточных loglig имя и фамилия лежат в РАЗНЫХ КОЛОНКАХ, и тот же
+    /// человек разрезан правильно. Обычный ключ «фамилия|имя|год» на этих двух написаниях
+    /// разный, и импорт заводит пловца-тень рядом с настоящим: 20.09.2026 так появилось
+    /// 50 дублей за один прогон (docs/data-integrity.md, И-28).
+    ///
+    /// ⚠ ПОРЯДОК СЛОВ ЗНАЧИМ: склеиваем «фамилия + имя» как есть, без пробелов. «שני עידו» и
+    /// «עידו שני» остаются РАЗНЫМИ людьми — решение зафиксировано тестом
+    /// <c>Import_NameSurnameSwap_NotMerged</c>: в иврите обе половины бывают и именем, и
+    /// фамилией, и перестановка склеила бы двух разных детей. Сдвиг границы при этом ловится:
+    /// «בניסים שרה»+«רוז» и «בניסים»+«שרה רוז» дают одну и ту же склейку.
+    /// ⚠ Это ФОЛЛБЕК, а не основной ключ: сначала пробуем точное совпадение, и только если его
+    /// нет — этот. Сторож тёзок по клубам (И-11) работает после и не отключается.
+    /// </summary>
+    private static string SwimmerFullNameKey(string? last, string? first, int? year)
+    {
+        var glued = $"{SwimmerDedupService.Normalize(last ?? "")}{SwimmerDedupService.Normalize(first ?? "")}"
+            .Replace(" ", string.Empty);
+        return $"{glued}|{year ?? 0}";
+    }
 
     /// <summary>
     /// Дополняет данные спортсмена полями из результатов:
