@@ -28,6 +28,9 @@
     <ProjectReference Include="..\Swimm.Application\Swimm.Application.csproj" />
     <ProjectReference Include="..\Swimm.Domain\Swimm.Domain.csproj" />
     <ProjectReference Include="..\Swimm.Parsing\Swimm.Parsing.csproj" />
+    <!-- Тесты контроллеров (SplitsAdminControllerTests): контроллер зовётся напрямую,
+         хост не поднимается — WebApplicationFactory тут не нужен. -->
+    <ProjectReference Include="..\Swimm.API\Swimm.API.csproj" />
   </ItemGroup>
 
 </Project>
