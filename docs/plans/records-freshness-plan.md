@@ -1,7 +1,7 @@
 # Свежесть справочника рекордов: проверка обновлений и «Checked …» на витрине (U1–U7)
 
 **Статус: НЕ НАЧАТО (план 21.09.2026), решения §7 приняты — можно брать в работу.**
-Кода нет. Решение Влада: продумать проверку обновлений для ВСЕХ источников рекордов — мастерс, юниорских (будущий `wa-junior`,
+Кода нет. Решение Влада: продумать проверку обновлений для ВСЕХ источников рекордов — мастерс, юниорских (`wa-junior`,
 [world-junior-records-plan.md](world-junior-records-plan.md)) и остальных — и показ даты
 последнего обновления на клиенте.
 
@@ -10,7 +10,7 @@
 - **Источники** (`IRecordSourceProvider`, ключ `Source`), порядок применения — САМО
   ПРАВИЛО (решение Влада 24.08, И-13), живёт в `Program.cs` у `--records-refresh`:
   `worldrecords` (WR + NR World Aquatics, XLSX) → `wa-masters` (PDF WA) → `isrorg-age` →
-  `isrorg-masters` (PDF федерации). Будущий `wa-junior` встаёт к World Aquatics, до федерации.
+  `isrorg-masters` (PDF федерации). `wa-junior` (21.09.2026) стоит за `wa-masters`, до федерации.
 - **Прогон:** `dotnet run -- --records-refresh [--dry-run]` — fetch → дифф
   (`RecordDiffService`: изменится / новых / нет в источнике) → apply. В админке то же —
   `/api/admin/records/fetch` + `/apply` на `/Admin/Import`, и отдельно прогон по странам.
@@ -95,7 +95,7 @@ slower-than-stored) остаются в силе.
 - **Где на витрине** — дата **своя у каждого таба**, не одна на страницу (решение §7-1):
   - `/records` — строкой под заголовком: «World records checked 21 Sep 2026 · World
     Aquatics». На табе Masters — дата `wa-masters` и `isrorg-masters`, на NR — `worldrecords`
-    и `isrorg-*`, будущий World Junior — `wa-junior`.
+    и `isrorg-*`, World Junior — `wa-junior`.
   - страница пловца, секция «Official records» — мелко в легенде под карточками, рядом с
     уже существующей подписью про тёзок, **по строке на источник**, реально попавший в
     карточки («Masters checked 3 days ago · World Aquatics», «Israeli records checked …»).

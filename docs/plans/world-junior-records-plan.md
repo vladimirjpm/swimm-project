@@ -1,8 +1,9 @@
 # Мировые юниорские рекорды (WJR) — правая сторона карточки у юношеских рекордов (J1–J7)
 
-**Статус: J0–J3 СДЕЛАНЫ (21.09.2026), ветка `world-junior-records`; WJR залиты в локальную базу
-(70 строк, `--records-refresh --source wa-junior`, архив — `!records-sources/`).** J4 тоже
-сделан (таб World Junior на `/records`). J5 проверен. Дальше — J6 (тесты: сделаны по ходу J1–J2) и J7 доки. Продолжение
+**Статус: СДЕЛАНО — J0–J7 (21.09.2026), ветка `world-junior-records`.** WJR залиты в локальную
+базу (70 строк, `--records-refresh --source wa-junior`, архив — `!records-sources/`). Хвост вне
+плана — эстафетные WJR: ждут СРОЧНОГО пункта [ROADMAP](../ROADMAP.md) «Эстафеты в справочнике
+рекордов» (провайдер их уже разбирает и пропускает с предупреждением). Продолжение
 [records-world-compare-plan.md](records-world-compare-plan.md) (Р1–Р7, в master, PR #83) —
 читать его §1–§4 первым: карточка, `worldRecord`, варианты `UI_H2H*` уже есть.
 
@@ -124,10 +125,13 @@ Aquatics их не ведёт. Официальные есть только **Wo
   нового кэш-ключа нет. Было в плане: `GetRecordsHeldAsync` кэша не имеет; справочные страницы `/records` — через
   `GetOrCreateAsync`, метки ставятся сами (К3). Если появится новый кэш-ключ — правило 1
   pre-push-rules (`/Admin/Cache`, `cache.md`).
-- **J6. Тесты.** По образцу `HeldRecordWorldMatchTests`: возраст в полосе / вне полосы
+- **J6. Тесты — СДЕЛАНЫ по ходу J1–J2:** `WaJuniorRecordsSourceProviderTests`,
+  `RecordImportPlausibilityTests` (`Junior_*`), `HeldRecordWorldJuniorMatchTests`. Было в плане: По образцу `HeldRecordWorldMatchTests`: возраст в полосе / вне полосы
   (13, и 18 у девушек) / граница полосы (14 и 17 у девушек, 15 и 18 у юношей) /
   другой пол / другой бассейн / мастерский рекорд НЕ получает WJR. Плюс тест провайдера.
-- **J7. Доки.** Этот план → «сделано»; [ui-components.md](../ui-components.md) (подпись
+- **J7. Доки — СДЕЛАНЫ 21.09.2026:** этот план, `plans/README.md`, `ui-components.md`,
+  `data-integrity.md`, `admin-pages/import.md`, `important.md`, `ROADMAP.md` (Фаза 11),
+  `DocsCatalog`, `records-freshness-plan.md` (`wa-junior` больше не «будущий»). Было в плане: Этот план → «сделано»; [ui-components.md](../ui-components.md) (подпись
   варианта `record`). Строка в `DocsCatalog.Sections` (правило 9) уже есть — добавлена
   вместе с этим планом.
 

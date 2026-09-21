@@ -643,6 +643,13 @@ API, решения, «как вернуться»). Дизайн-материа
   Эстафеты сознательно не берём — в модель `Record` они не ложатся.
   **Залито 16.09.2026** боевым `--records-refresh`: `world/masters` — 1095 строк.
   → решение Влада 16.09.2026, [data-integrity.md](data-integrity.md), «Мастерские мировые рекорды».
+- ✅ **Мировые юниорские рекорды (WJR)** — 21.09.2026, план
+  [world-junior-records-plan.md](plans/world-junior-records-plan.md) (J0–J7). Источник
+  `wa-junior` — JSON-выдача World Aquatics, ось `world/junior`, полоса в `AgeKey` (ж 14-17,
+  м 15-18); в `--records-refresh` за `wa-masters`. Израильский возрастной рекорд в полосе
+  получает WJR правой стороной карточки («World Junior» + плашка «Ages 14–17»), на `/records`
+  — таб World Junior. **Залито 21.09.2026** (`--records-refresh --source wa-junior`): 70 строк.
+  Эстафетные WJR — после пункта «⚠ СРОЧНО» выше.
 
 ### 11.4 Мастерские рекорды в нормативах — ЗАКРЫТ 2026-09-19
 
