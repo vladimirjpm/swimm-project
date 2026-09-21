@@ -17,7 +17,8 @@ namespace Swimm.Application.Mapping;
 /// Три правила:
 /// <list type="number">
 /// <item>мировой рекорд улучшен за раз больше чем на <see cref="WorldMaxImprovement"/>;</item>
-/// <item>не мировой рекорд (страна, возраст, мастерс) быстрее мирового той же дисциплины;</item>
+/// <item>не мировой рекорд (страна, возраст, мастерс) быстрее мирового той же дисциплины;
+/// мировой ЮНИОРСКИЙ (<c>world/junior</c>) — тоже: WJR законно медленнее WR, но не быстрее;</item>
 /// <item>строка стала МЕДЛЕННЕЕ той, что уже лежит в базе (И-21) — см. <see cref="IsContestedSlot"/>.</item>
 /// </list>
 /// Порога улучшения для национальных рекордов нет сознательно: у малых федераций скачки на
@@ -71,6 +72,11 @@ public static class RecordPlausibility
         {
             if (SwimTime.ParseToMs(row.Time) is not int ms) continue;
 
+            // Юниорский мировой — не эталон: он сам меряется абсолютным (правило 2 для
+            // world/junior). Пусти его в словарь — и в ключ дисциплины он встал бы как
+            // «абсолютный», хотя всегда медленнее настоящего.
+            if (IsJunior(row.Category)) continue;
+
             var key = IsMasters(row.Category)
                 ? BandKey(row.AgeKey, row.Gender, row.PoolType, row.Style, row.Distance)
                 : DisciplineKey(row.Gender, row.PoolType, row.Style, row.Distance);
@@ -103,6 +109,15 @@ public static class RecordPlausibility
 
             if (e.RegionType == "world")
             {
+                // Правило 2 для мирового юниорского: рекорд, который могут ставить только
+                // 14–18-летние, не бывает быстрее абсолютного (21.09.2026, WJR-план J1).
+                if (IsJunior(e.Category)
+                    && Lookup(worldReference, DisciplineKey(e.Gender, e.PoolType, e.Style, e.Distance)) is { } wr
+                    && newMs < wr.Ms)
+                    found.Add(Finding(e, RecordIssueReasons.FasterThanWorldRecord,
+                        $"Мировой юниорский {e.NewTime} быстрее абсолютного мирового рекорда той же " +
+                        $"дисциплины ({wr.Time}). Юниорский может быть равен абсолютному, но не быстрее."));
+
                 if (SwimTime.ParseToMs(e.OldTime) is not int oldMs || newMs >= oldMs) continue;
 
                 var gain = (oldMs - newMs) / (double)oldMs;
@@ -139,8 +154,9 @@ public static class RecordPlausibility
     /// пропускает — иначе кандидатом становился бы каждый израильский откат, а их в прогоне
     /// World Aquatics десятки, и все до одного возвращает следующий шаг цепочки.
     ///
-    /// Остальные слоты однохозяйные: <c>world</c> пишет только <c>worldrecords</c>,
-    /// <c>age</c> — только <c>isrorg-age</c>, <c>masters</c> — только <c>isrorg-masters</c>
+    /// Остальные слоты однохозяйные: <c>world/open</c> пишет только <c>worldrecords</c>,
+    /// <c>world/masters</c> — <c>wa-masters</c>, <c>world/junior</c> — <c>wa-junior</c>,
+    /// <c>age</c> — только <c>isrorg-age</c>, <c>country/masters</c> — только <c>isrorg-masters</c>
     /// (<c>RecordDiffService.SourceScopes</c>), и там замедление означает дефект источника.
     /// </summary>
     private static bool IsContestedSlot(RecordDiffEntry e) =>
@@ -165,6 +181,9 @@ public static class RecordPlausibility
         string ageKey, string gender, string poolType, string style, string distance) =>
         "masters|" + ageKey.Trim().ToLowerInvariant() + "|"
         + DisciplineKey(gender, poolType, style, distance);
+
+    private static bool IsJunior(string category) =>
+        category.Trim().Equals("junior", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsMasters(string category) =>
         category.Trim().Equals("masters", StringComparison.OrdinalIgnoreCase);

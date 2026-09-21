@@ -385,6 +385,54 @@ public class RecordImportPlausibilityTests
         Assert.Equal(expectedReason, row.IssueReason);
     }
 
+    // ── правило 2 для мирового юниорского (WJR-план J1, 21.09.2026) ─────────────────
+
+    /// <summary>
+    /// WJR законно медленнее WR, но не быстрее: рекорд, доступный только 14–18-летним, не
+    /// может обогнать абсолютный. Раньше world-строки до правила 2 не доходили вовсе.
+    /// </summary>
+    [Fact]
+    public void Junior_FasterThanAbsoluteWorld_IsFound()
+    {
+        var reference = RecordPlausibility.WorldReference([World("23.61")]);
+
+        var found = Assert.Single(RecordPlausibility.Check([JuniorEntry("23.50")], reference));
+
+        Assert.Equal(RecordIssueReasons.FasterThanWorldRecord, found.Reason);
+        Assert.Contains("23.61", found.Note);
+    }
+
+    [Theory]
+    [InlineData("24.17")] // честный WJR медленнее WR
+    [InlineData("23.61")] // равен — бывает (юниор поставил абсолютный)
+    public void Junior_NotFasterThanAbsolute_IsFine(string time)
+    {
+        var reference = RecordPlausibility.WorldReference([World("23.61")]);
+        Assert.Empty(RecordPlausibility.Check([JuniorEntry(time)], reference));
+    }
+
+    /// <summary>
+    /// Юниорский — не эталон. Попади он в словарь, встал бы на ключ дисциплины как
+    /// «абсолютный»: мусорно-быстрый WJR 20.00 опустил бы планку, и национальный 22.00 —
+    /// быстрее настоящего WR 23.61 — перестал бы быть находкой.
+    /// </summary>
+    [Fact]
+    public void Junior_IsNotUsedAsReference()
+    {
+        var reference = RecordPlausibility.WorldReference([
+            World("23.61"),
+            World("20.00", category: "junior", ageKey: "14-17"),
+        ]);
+
+        var found = Assert.Single(RecordPlausibility.Check([Entry("country", "22.00")], reference));
+        Assert.Contains("23.61", found.Note);
+    }
+
+    /// <summary>Строка диффа мирового юниорского рекорда.</summary>
+    private static RecordDiffEntry JuniorEntry(string newTime, string? oldTime = null) =>
+        new("world", "", "junior", "14-17", "female", "25m", "freestyle", "50m",
+            oldTime, null, null, newTime, null, null);
+
     private static RecordDiffEntry Entry(string regionType, string newTime, string? oldTime = null) =>
         new(regionType, regionType == "world" ? "" : "ISR", "open", "", "female", "25m", "freestyle", "50m",
             oldTime, null, null, newTime, null, null);

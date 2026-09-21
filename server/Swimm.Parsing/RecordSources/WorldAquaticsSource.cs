@@ -70,6 +70,14 @@ public static class WorldAquaticsSource
     public static Uri ReportUrl(string query) =>
         EnsureWhitelisted($"https://{ApiHost}/fina/records/report?{query}");
 
+    /// <summary>
+    /// URL JSON-выдачи рекордов — той, что питает страницу worldaquatics.com/swimming/records
+    /// (<c>/fina/records/SW</c>, SW — плавание). Нужна для кодов, которые XLSX-отчёт не
+    /// собирает за таймаут шлюза: <c>WJ</c> там — 504 (WJR-план, J0).
+    /// </summary>
+    public static Uri RecordsJsonUrl(string query) =>
+        EnsureWhitelisted($"https://{ApiHost}/fina/records/SW?{query}");
+
     /// <summary>Список стран источника: GUID ↔ alpha-3 (11.1.1).</summary>
     public static Uri CountriesUrl => EnsureWhitelisted($"https://{ApiHost}/fina/countries");
 

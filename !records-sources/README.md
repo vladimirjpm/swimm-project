@@ -53,8 +53,9 @@ CSV — наша интерпретация, PDF — первоисточник.
 <источник>__fetched-<дата скачивания>.csv
 ```
 
-- **источник** — ключ `IRecordSourceProvider`: `wa-masters`, `isrorg-masters`, `isrorg-age`,
-  `worldrecords`.
+- **источник** — ключ `IRecordSourceProvider`: `wa-masters`, `wa-junior`, `isrorg-masters`,
+  `isrorg-age`, `worldrecords`. У `wa-junior` сырьё — JSON (`wa-junior-<пол>-<бассейн>`), даты
+  справочника у источника нет, поэтому `__source-` в имени нет.
 - **бассейн** — `lcm`/`50m` длинная, `scm`/`25m` короткая. У CSV его нет: провайдер тянет оба
   файла разом, и выгрузка у него одна на источник.
 - **source** — дата САМОГО справочника, как её объявляет источник: «as of 01.09.2026» в подписи

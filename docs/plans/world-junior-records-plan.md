@@ -1,6 +1,7 @@
 # Мировые юниорские рекорды (WJR) — правая сторона карточки у юношеских рекордов (J1–J7)
 
-**Статус: J0 СДЕЛАН (21.09.2026) — источник найден, образцы в архиве; кода нет.** Продолжение
+**Статус: J0–J1 СДЕЛАНЫ (21.09.2026), ветка `world-junior-records`; в базу ещё НЕ залито.**
+Дальше — боевой Apply `wa-junior` на `/Admin/Import` (правило 11 pre-push), затем J2. Продолжение
 [records-world-compare-plan.md](records-world-compare-plan.md) (Р1–Р7, в master, PR #83) —
 читать его §1–§4 первым: карточка, `worldRecord`, варианты `UI_H2H*` уже есть.
 
@@ -83,11 +84,13 @@ Aquatics их не ведёт. Официальные есть только **Wo
 
 - **J0. Источник — СДЕЛАН 21.09.2026** (§4-1): JSON `fina/records/SW?recordCode=WJ`, образцы в
   `!records-sources/`, строки в `SHA256SUMS.txt`.
-- **J1. Импорт.** Новый `IRecordSourceProvider` (ключ `wa-junior`, JSON — свой маленький парсер, не `WorldRecordsParser`: тот читает XLSX), пишет
-  `RegionType=world, Category=junior`. Ось упсерта не пересекается ни с `world/open`, ни с
-  `world/masters` — порядка «кто после кого» нет. Проверить сторожа импорта рекордов:
-  правило `faster-than-world-record` и соседи должны понимать категорию `junior`
-  (WJR законно медленнее WR — не аномалия; а вот WJR быстрее WR — аномалия).
+- **J1. Импорт — СДЕЛАН 21.09.2026.** `WaJuniorRecordsSourceProvider` (JSON, 4 запроса
+  параллельно, повтор на 5xx, проверка `totalRowCount`), карточка на `/Admin/Import`, строка
+  в «Проверить апдейты» дашборда, место в `--records-refresh` за `wa-masters`. Сторож:
+  WJR быстрее WR → `faster-than-world-record`; юниорский в эталон не входит. Тесты —
+  `WaJuniorRecordsSourceProviderTests` (реальные ответы J0), `RecordImportPlausibilityTests`
+  (`Junior_*`). Живая выгрузка: 74 строки (70 после дедупа), 8 эстафетных пропущено.
+  Пишет `world/junior`; ось упсерта ни с кем не пересекается — порядка источников нет.
 - **J2. Сервер: матч по полосе.** В `GetRecordsHeldAsync` для строк `country/age` — второй
   путь рядом с мастерским: WJR того же пола/бассейна/стиля/дистанции, если возраст в
   полосе. Отдать в DTO **вид эталона**: `worldRecord.kind = 'masters' | 'junior'` (или

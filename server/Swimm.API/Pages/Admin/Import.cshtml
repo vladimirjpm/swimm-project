@@ -360,6 +360,30 @@
                 </div>
             </div>
 
+            <div class="admin-card p-4 records-source-card" data-source="wa-junior">
+                <div class="text-2xl mb-1">🌍</div>
+                <div class="font-semibold text-admin-text mb-1">World Junior Records</div>
+                <div class="text-xs text-admin-text-muted mb-2">api.worldaquatics.com · JSON, 4 запроса (ж 14-17, м 15-18), авто · до 3 мин</div>
+                <div class="text-xs text-admin-text-muted mb-3">Обновлено: <span class="rs-status" data-source="wa-junior">—</span></div>
+                <div class="flex gap-2 mb-2">
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="wa-junior" data-pool-primary="50m">⬇ Fetch</button>
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-file-toggle" data-source="wa-junior">📁 Файл</button>
+                </div>
+                <div class="rs-file-panel hidden space-y-2 mt-2" data-source="wa-junior">
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">JSON-ответ (пол и бассейн — внутри файла)</label>
+                        <input type="file" accept=".json" class="admin-input w-full text-xs rs-file-primary">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">Второй JSON (опц.)</label>
+                        <input type="file" accept=".json" class="admin-input w-full text-xs rs-file-secondary">
+                    </div>
+                    <button class="admin-btn admin-btn-primary w-full text-xs rs-parse-files-btn" data-source="wa-junior" data-pool-primary="50m">
+                        Разобрать файл(ы)
+                    </button>
+                </div>
+            </div>
+
             <div class="admin-card p-4 records-source-card" data-source="isrorg-age">
                 <div class="text-2xl mb-1">🇮🇱</div>
                 <div class="font-semibold text-admin-text mb-1">Age Records</div>
@@ -1171,6 +1195,7 @@
     const SOURCE_LABELS = {
         worldrecords: 'World Records',
         'wa-masters': 'Masters World Records',
+        'wa-junior': 'World Junior Records',
         'isrorg-age': 'Age Records',
         'isrorg-masters': 'Masters Records',
         // Не источник, а прогон по странам: дифф у него такой же, показывается тем же блоком.

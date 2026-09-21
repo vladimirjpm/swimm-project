@@ -754,7 +754,8 @@ if (args.Contains("--records-refresh"))
     // wa-masters стоит рядом с worldrecords: это тоже World Aquatics, и он единственный
     // владелец world/masters — ни с кем ключами упсерта не спорит, поэтому его место в списке
     // определяется только здравым смыслом «сначала мир, потом федерация».
-    string[] order = ["worldrecords", "wa-masters", "isrorg-age", "isrorg-masters"];
+    // wa-junior — туда же и по той же причине: единственный владелец world/junior.
+    string[] order = ["worldrecords", "wa-masters", "wa-junior", "isrorg-age", "isrorg-masters"];
     foreach (var sourceKey in order)
     {
         if (!providers.TryGetValue(sourceKey, out var provider))
@@ -837,7 +838,7 @@ if (args.Contains("--records-dump"))
     var dumpIdx = Array.IndexOf(args, "--records-dump") + 1;
     if (dumpIdx + 1 >= args.Length)
     {
-        Console.Error.WriteLine("Usage: dotnet run -- --records-dump <worldrecords|wa-masters|isrorg-age|isrorg-masters> <файл.csv>");
+        Console.Error.WriteLine("Usage: dotnet run -- --records-dump <worldrecords|wa-masters|wa-junior|isrorg-age|isrorg-masters> <файл.csv>");
         Environment.Exit(1);
         return;
     }

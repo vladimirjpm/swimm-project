@@ -13,7 +13,7 @@ namespace Swimm.Application.Abstractions;
 /// </summary>
 public interface IRecordSourceProvider
 {
-    /// <summary>Ключ источника: worldrecords | isrorg-age | isrorg-masters | wa-masters.</summary>
+    /// <summary>Ключ источника: worldrecords | isrorg-age | isrorg-masters | wa-masters | wa-junior.</summary>
     string Source { get; }
 
     Task<IReadOnlyList<ParsedRecordDto>> FetchAsync(RecordSourceRequest request, CancellationToken ct = default);
