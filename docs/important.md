@@ -208,6 +208,8 @@
 
 - **Перед каждым push — [pre-push-rules.md](pre-push-rules.md)**: «поменял X → обнови Y».
 - **Не коммитить и не пушить без просьбы.** Ветка по умолчанию — `master`.
+- **Не предлагать push / PR в конце ответа** (решение Влада 21.09.2026): после коммита — только
+  хэш; про push — лишь фактом, если коммит иначе потеряется. → [CLAUDE.md](../CLAUDE.md), «Golden rules».
 - **Clean Architecture соблюдается**: контроллеры берут только интерфейсы `Swimm.Application`.
   → [CLAUDE.md](../CLAUDE.md), [server/Swimm.Application/CLAUDE.md](../server/Swimm.Application/CLAUDE.md).
 - **База: порт 5445, два `DbContext` (EF-команды — с `--context SwimmDbContext`), порядок на
