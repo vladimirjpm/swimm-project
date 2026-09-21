@@ -743,6 +743,7 @@ if (args.Contains("--repull"))
 // ключа упсерта у них нет. Важно только, что оба поверх WA.
 // isrorg-masters добавлен 2026-09-16: с 2026-08-24 его в списке не было, и команда не
 // трогала 726 из 1 683 строк справочника вообще (пробел числился в plans/azure-deploy-plan.md).
+// `--source <ключ>` — один источник (21.09.2026, для wa-junior; см. предупреждение ниже).
 if (args.Contains("--records-refresh"))
 {
     var dryRun = args.Contains("--dry-run");
@@ -756,6 +757,25 @@ if (args.Contains("--records-refresh"))
     // определяется только здравым смыслом «сначала мир, потом федерация».
     // wa-junior — туда же и по той же причине: единственный владелец world/junior.
     string[] order = ["worldrecords", "wa-masters", "wa-junior", "isrorg-age", "isrorg-masters"];
+
+    // --source <ключ> — один источник из списка. Безопасно только для однохозяйной оси
+    // (wa-masters, wa-junior): у country/ISR/open два владельца (И-13), и прогон одного
+    // worldrecords без федерации откатит израильские рекорды — поэтому тут предупреждение.
+    var onlyIdx = Array.IndexOf(args, "--source");
+    if (onlyIdx >= 0)
+    {
+        var only = onlyIdx + 1 < args.Length ? args[onlyIdx + 1] : "";
+        if (!order.Contains(only, StringComparer.OrdinalIgnoreCase))
+        {
+            Console.Error.WriteLine($"--source: '{only}' не из списка {string.Join(", ", order)}");
+            Environment.Exit(1);
+            return;
+        }
+        if (only.Equals("worldrecords", StringComparison.OrdinalIgnoreCase))
+            Console.Error.WriteLine("⚠ worldrecords без isrorg-* откатит country/ISR/open (И-13) — догони федеральными.");
+        order = [only];
+    }
+
     foreach (var sourceKey in order)
     {
         if (!providers.TryGetValue(sourceKey, out var provider))

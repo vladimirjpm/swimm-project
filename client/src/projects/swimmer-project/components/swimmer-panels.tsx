@@ -522,8 +522,13 @@ interface RecordAgeGroup {
   /** Нижняя граница ступени — по ней и строится порядок групп. */
   minAge: number;
   kind: RecordKind;
-  /** «MASTERS WR» справа печатается только там, где мировой рекорд действительно есть. */
-  hasWorldRecord: boolean;
+  /**
+   * Вид мирового эталона группы — от него подпись справа в шапке: «MASTERS WR» или
+   * «WORLD JUNIOR». null — эталона в группе нет, и подпись не печатается: иначе шапка
+   * обещает колонку, которой нет. Вид в группе один: ступень мастерс получает только
+   * мастерский, возрастная — только юниорский.
+   */
+  worldKind: 'masters' | 'junior' | null;
   disciplines: RecordDisciplineGroup[];
 }
 
@@ -547,12 +552,12 @@ function groupHeldRecords(records: SwimmerHeldRecord[]): RecordAgeGroup[] {
     if (!group) {
       group = {
         key: scope, scope, minAge: stepMinAge(r.ageKey),
-        kind: recordKindOf(r.category), hasWorldRecord: false, disciplines: [],
+        kind: recordKindOf(r.category), worldKind: null, disciplines: [],
       };
       byKey.set(scope, group);
       groups.push(group);
     }
-    if (r.worldRecord) group.hasWorldRecord = true;
+    if (r.worldRecord) group.worldKind = r.worldRecord.kind ?? 'masters';
 
     const discKey = `${r.stroke}-${r.distance}`;
     let disc = group.disciplines.find((d) => d.key === discKey);
@@ -569,20 +574,34 @@ function groupHeldRecords(records: SwimmerHeldRecord[]): RecordAgeGroup[] {
   return groups.sort((a, b) => a.minAge - b.minAge);
 }
 
-/** Подпись мирового рекорда: она же title правой ячейки — ссылки у WR нет. */
-const worldRecordTitle = (r: SwimmerHeldRecord): string =>
-  `Masters world record · ${r.ageKey} · ${r.distance} ${swimRowStrokeLabel(r.stroke ?? '')} `
-  + `${r.poolType === '25m' ? 'SCM' : 'LCM'}`;
+/** «14-17» → «14–17»: в подписи полоса читается диапазоном, а не вычитанием. */
+const bandLabel = (band: string): string => band.replace('-', '–');
+
+/**
+ * Подпись мирового эталона: она же title правой ячейки — ссылки у WR нет. У World Junior в
+ * подписи ПОЛОСА, а не ступень пловца: WJR один на всю полосу, и «World Junior record · 15»
+ * читалось бы как мировой рекорд 15-летних, которого не существует (WJR-план §3).
+ */
+const worldRecordTitle = (r: SwimmerHeldRecord): string => {
+  const event = `${r.distance} ${swimRowStrokeLabel(r.stroke ?? '')} ${r.poolType === '25m' ? 'SCM' : 'LCM'}`;
+  const wr = r.worldRecord;
+  if (wr?.kind === 'junior') {
+    const who = r.gender === 'female' ? 'women' : 'men';
+    return `World Junior record · ${who} ${wr.band ? bandLabel(wr.band) : ''} · ${event}`;
+  }
+  return `Masters world record · ${r.ageKey} · ${event}`;
+};
 
 /**
  * Секция официальных рекордов НАД таблицей личников — показывается только тому, кто их
  * держит (решение Влада: есть рекорды → «Records & PB» и рекорды впереди отдельной секцией).
  *
  * Рисуется КАРТОЧКАМИ семьи `UI_H2H*` в варианте `record`: слева рекорд пловца, справа —
- * мировой рекорд мастерс той же ступени с держателем и флагом, посередине разрыв. Карточками
- * идут ВСЕ официальные рекорды, включая немастерские (решение Влада 20.09.2026): у них правая
- * сторона пустая — справочника мировых по юношеским возрастам у нас нет. Появится — правая
- * сторона заполнится сама, разметку менять не придётся.
+ * мировой эталон с держателем и флагом, посередине разрыв. Эталон двух видов: у мастерса —
+ * мировой рекорд той же ступени, у возрастного — World Junior Record, если возраст в полосе
+ * WJR (ж 14–17, м 15–18; полоса подписана плашкой «Ages 14–17»). Карточками идут ВСЕ
+ * официальные рекорды (решение Влада 20.09.2026): вне полосы и у абсолюта страны правая
+ * сторона пустая — официального мирового эталона там нет в принципе.
  *
  * ⚠ Держатель в справочнике записан СТРОКОЙ имени, `SwimmerId` у рекорда нет — тёзка заберёт
  * чужой рекорд. Подпись под секцией обязана это признавать, а не делать вид, что связь точная.
@@ -610,8 +629,12 @@ function HeldRecordsSection({
               <span><span aria-hidden="true">🏆 </span>{group.scope.toUpperCase()}</span>
               <UI_RecordBadge kind={group.kind} />
               <span className="h2h-group__line" />
-              {/* Только там, где WR есть: иначе шапка обещает колонку, которой в группе нет. */}
-              {group.hasWorldRecord && <span className="h2h-group__wr">MASTERS WR</span>}
+              {/* Только там, где эталон есть: иначе шапка обещает колонку, которой в группе нет. */}
+              {group.worldKind && (
+                <span className="h2h-group__wr">
+                  {group.worldKind === 'junior' ? 'WORLD JUNIOR' : 'MASTERS WR'}
+                </span>
+              )}
             </div>
 
             {group.disciplines.map((disc) => (
@@ -666,6 +689,16 @@ function HeldRecordsSection({
                         // `rightWins` по знаку выдал бы её как победу в сравнении.
                         isWinner: false,
                         title: worldRecordTitle(r),
+                        // Полоса WJR — видимо, не только в title: одно время стоит против
+                        // нескольких ступеней, и 14-летняя не должна читать его как «рекорд 14».
+                        extras: wr.kind === 'junior' && wr.band ? (
+                          <span
+                            className="h2h-badge h2h-badge--band"
+                            title="World Junior records are kept for one age band, not per age"
+                          >
+                            Ages {bandLabel(wr.band)}
+                          </span>
+                        ) : undefined,
                       } : null}
                     />
                   );
