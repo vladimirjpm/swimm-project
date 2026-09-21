@@ -94,6 +94,7 @@ dotnet run --project server/Swimm.API -- --records-dump <источник> <пу
 | файл | URL |
 |---|---|
 | `wa-masters-lcm` / `wa-masters-scm` | страница-оглавление [worldaquatics.com/masters/records](https://www.worldaquatics.com/masters/records) → «Masters World Records - LCM/SCM». Прямой адрес содержит дату и GUID и протухает при каждом обновлении |
+| `wa-junior-{f,m}-{lcm,scm}` (`.json`) | JSON-эндпоинт страницы [worldaquatics.com/swimming/records](https://www.worldaquatics.com/swimming/records) (Record Type = World Junior): `api.worldaquatics.com/fina/records/SW?recordCode=WJ&gender=F\|M&pool=LCM\|SCM`. Сырые ответы, по файлу на пол×бассейн (J0, 21.09.2026). ⚠ XLSX-отчёт `/fina/records/report?recordCode=WJ` не годится — 504 |
 | `isrorg-age-25m` / `isrorg-age-50m` | страница [«שיאי ישראל»](https://isr.org.il/data.asp?id=1013), ссылки «שיאי ישראל בוגרים ונוער» |
 | `isrorg-masters-50m` | та же страница, ссылка «שיאי מאסטרס: בריכת 50 מטר» |
 | `isrorg-masters-25m` | **со страницы не резолвится**: ссылка «שיאי מאסטרס: בריכת 25 מטר» ведёт на файл длинной воды и не-мастерс (И-15). Адрес найден через архив Wayback и прописан вручную в `RecordsImport:IsrOrgMastersRecordsUrl25m` |
