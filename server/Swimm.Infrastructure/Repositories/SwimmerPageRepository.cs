@@ -206,6 +206,20 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                 .ToDictionary(g => g.Key, g => new WorldRecordRow(
                     g.First().Time, g.First().RecordDate, g.First().HolderName, g.First().HolderCountry));
 
+        // Второй путь — мировые ЮНИОРСКИЕ (WJR-план J2) для возрастных рекордов страны. Матч не
+        // точный, а по ПОЛОСЕ: израильский ключ — один возраст, WJR — «14-17»/«15-18»
+        // (WorldJuniorBand). Вся ось — ~70 строк, фильтр в памяти.
+        var juniorRecords = !records.Any(r => r.RegionType == "country" && r.Category == "age")
+            ? []
+            : await _read.Records.AsNoTracking()
+                .Where(r => r.RegionType == "world" && r.Category == "junior")
+                .Select(r => new
+                {
+                    r.AgeKey, r.Gender, r.PoolType, r.Style, r.Distance,
+                    r.Time, r.RecordDate, r.HolderName, r.HolderCountry,
+                })
+                .ToListAsync();
+
         // Претензии тянем целиком: таблица штучная (единицы строк), а сузить её запросом
         // нельзя — рекорды пловца разбросаны по регионам, категориям и ступеням.
         var issues = (await _read.RecordIssues.AsNoTracking()
@@ -229,6 +243,17 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                 var meet = RecordMeetMatcher.Find(r.Time, r.RecordDate, r.Distance, r.Style, r.PoolType, swims, leadOffs);
                 worldRecords.TryGetValue(
                     WorldRecordKey(r.AgeKey, r.Gender, r.PoolType, r.Style, r.Distance), out var world);
+                if (world is null && r.RegionType == "country" && r.Category == "age")
+                {
+                    // Дисциплина — точно (пол, бассейн, стиль, дистанция), возраст — в полосе.
+                    var discipline = WorldRecordKey("", r.Gender, r.PoolType, r.Style, r.Distance);
+                    var junior = juniorRecords.FirstOrDefault(j =>
+                        WorldRecordKey("", j.Gender, j.PoolType, j.Style, j.Distance) == discipline
+                        && WorldJuniorBand.Covers(j.AgeKey, r.AgeKey));
+                    if (junior is not null)
+                        world = new WorldRecordRow(junior.Time, junior.RecordDate, junior.HolderName,
+                            junior.HolderCountry, Kind: WorldRecordKinds.Junior, Band: junior.AgeKey);
+                }
                 if (world is not null)
                 {
                     // Претензия ищется по тому же ключу, что у рекорда пловца: реестр мировых

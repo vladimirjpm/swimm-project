@@ -106,20 +106,34 @@ public sealed record HeldRecordRow(
     WorldRecordRow? WorldRecord = null);
 
 /// <summary>
-/// Мировой рекорд мастерс ТОЙ ЖЕ ступени — правая сторона карточки «рекорд против мирового».
-/// Берётся из того же справочника <c>Records</c> (<c>RegionType='world'</c>,
-/// <c>Category='masters'</c>); ступени мировые и израильские совпадают один в один
-/// (25-29 … 90-94), поэтому матч точный по <c>AgeKey+Gender+PoolType+Style+Distance</c>.
-///
-/// У немастерских рекордов (ISR age, ISR open) поле <c>null</c>: справочника мировых
-/// рекордов по юношеским возрастам у нас нет — правая сторона карточки остаётся пустой.
+/// Мировой эталон рекорда пловца — правая сторона карточки «рекорд против мирового».
+/// Берётся из того же справочника <c>Records</c> (<c>RegionType='world'</c>), и эталонов ДВА
+/// вида — <paramref name="Kind"/>:
+/// <list type="bullet">
+/// <item><c>masters</c> — к мастерскому рекорду: ступени мировые и израильские совпадают один
+/// в один (25-29 … 90-94), матч точный по <c>AgeKey+Gender+PoolType+Style+Distance</c>;</item>
+/// <item><c>junior</c> — World Junior Record к возрастному (<c>country/age</c>): матч по
+/// ПОЛОСЕ (<see cref="WorldJuniorBand"/>), и одно время встаёт против нескольких ступеней.
+/// <paramref name="Band"/> — полоса WJR («14-17»): витрина обязана её показать, иначе
+/// 14-летняя прочтёт WJR как «мировой рекорд 14 лет», которого не существует.</item>
+/// </list>
+/// Вне полосы (10–13, 18 у девушек, 14 у юношей) и у <c>adults</c> поле <c>null</c> —
+/// официального мирового эталона там нет в принципе.
 ///
 /// <paramref name="IssueReason"/> обязателен по инварианту И11 ровно по той же причине, что
 /// у самого <see cref="HeldRecordRow"/>: мировой справочник — такая же запись реестра и
 /// ошибается так же (<c>Sys_RecordIssues</c>, качество <c>record</c>).
 /// </summary>
 public sealed record WorldRecordRow(
-    string Time, string? Date, string? Holder, string? HolderCountry, string? IssueReason = null);
+    string Time, string? Date, string? Holder, string? HolderCountry, string? IssueReason = null,
+    string Kind = WorldRecordKinds.Masters, string? Band = null);
+
+/// <summary>Вид мирового эталона в <see cref="WorldRecordRow.Kind"/> — от него зависит подпись витрины.</summary>
+public static class WorldRecordKinds
+{
+    public const string Masters = "masters";
+    public const string Junior = "junior";
+}
 
 /// <summary>
 /// Лучшее время ОДНОГО сверстника в одной дисциплине за сезон — вход для фильтра «Season best».
