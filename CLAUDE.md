@@ -52,6 +52,9 @@ plus repo-specific footguns.
   inward, controllers inject only `Swimm.Application` interfaces — never `Swimm.Infrastructure`
   types directly.
 - **Don't commit or push unless asked.** Default branch is `master`; branch first if asked to commit.
+- **Не предлагай push / PR / «закоммитить?» в конце ответа — никогда.** Влад сам скажет.
+  После коммита — только хэш. Исключение: реальная ловушка (коммит иначе потеряется) —
+  одной фразой-фактом, без вопроса.
 - **Перед каждым push — пройди [`docs/pre-push-rules.md`](docs/pre-push-rules.md) по диффу.**
   Там собраны правила «поменял X → обнови Y» (кэш → страница `/Admin/Cache`, новая админ-страница
   → её MD, Tailwind → бандл, маршрут → три зеркала…). Новое правило такого вида — строкой туда,
