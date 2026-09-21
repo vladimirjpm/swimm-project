@@ -102,7 +102,24 @@ public sealed record NationalAgeRecordRow(
 public sealed record HeldRecordRow(
     string RegionType, string RegionCode, string Category, string AgeKey, string Gender,
     string PoolType, string Style, string Distance, string Time, string? RecordDate,
-    string? IssueReason, bool RelayLeadOff = false, RecordMeet? Meet = null);
+    string? IssueReason, bool RelayLeadOff = false, RecordMeet? Meet = null,
+    WorldRecordRow? WorldRecord = null);
+
+/// <summary>
+/// Мировой рекорд мастерс ТОЙ ЖЕ ступени — правая сторона карточки «рекорд против мирового».
+/// Берётся из того же справочника <c>Records</c> (<c>RegionType='world'</c>,
+/// <c>Category='masters'</c>); ступени мировые и израильские совпадают один в один
+/// (25-29 … 90-94), поэтому матч точный по <c>AgeKey+Gender+PoolType+Style+Distance</c>.
+///
+/// У немастерских рекордов (ISR age, ISR open) поле <c>null</c>: справочника мировых
+/// рекордов по юношеским возрастам у нас нет — правая сторона карточки остаётся пустой.
+///
+/// <paramref name="IssueReason"/> обязателен по инварианту И11 ровно по той же причине, что
+/// у самого <see cref="HeldRecordRow"/>: мировой справочник — такая же запись реестра и
+/// ошибается так же (<c>Sys_RecordIssues</c>, качество <c>record</c>).
+/// </summary>
+public sealed record WorldRecordRow(
+    string Time, string? Date, string? Holder, string? HolderCountry, string? IssueReason = null);
 
 /// <summary>
 /// Лучшее время ОДНОГО сверстника в одной дисциплине за сезон — вход для фильтра «Season best».

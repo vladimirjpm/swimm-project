@@ -46,6 +46,20 @@ export interface SwimmerHeldRecord {
     isChampionship: boolean;
     resultId: number;
   } | null;
+  /**
+   * Мировой рекорд мастерс ТОЙ ЖЕ ступени и бассейна — правая сторона карточки рекорда.
+   * null у немастерских рекордов (ISR age, ISR open): справочника мировых по юношеским
+   * возрастам нет, правая сторона карточки остаётся пустой.
+   */
+  worldRecord?: {
+    time: string;
+    date?: string | null;
+    holder?: string | null;
+    /** alpha-3 — флаг рисует UI_FlagEmoji. */
+    countryCode?: string | null;
+    /** Качество записи мирового справочника — И11: время показано вместе с ним. */
+    quality?: SwimQuality | null;
+  } | null;
 }
 
 /** Сезон для карусели. Ровно у одного `isDisplayDefault` — витринный (см. season-boundary-rule). */

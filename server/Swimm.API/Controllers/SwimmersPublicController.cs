@@ -122,6 +122,18 @@ public class SwimmersPublicController : ControllerBase
                     IsChampionship = r.Meet.IsChampionship,
                     ResultId = r.Meet.ResultId,
                 },
+            WorldRecord = r.WorldRecord is null
+                ? null
+                : new SwimmerWorldRecordDto
+                {
+                    Time = r.WorldRecord.Time,
+                    Date = r.WorldRecord.Date,
+                    Holder = r.WorldRecord.Holder,
+                    CountryCode = r.WorldRecord.HolderCountry,
+                    Quality = r.WorldRecord.IssueReason is null
+                        ? null
+                        : new SwimQualityDto { Kind = "record", Reason = r.WorldRecord.IssueReason },
+                },
         }).ToList();
         dto.RecordsHeld = dto.Records.Count;
 

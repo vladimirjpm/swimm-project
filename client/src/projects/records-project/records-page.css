@@ -621,3 +621,32 @@
   .rc-row > .rc-cell:nth-child(3) { grid-area: b; justify-self: end; text-align: right; }
   .rc-row > .rc-cell:nth-child(3) .rc-side { align-items: flex-end; }
 }
+
+/* ── Таб Masters: карточка «Израиль против мира» ───────────────────────────── */
+
+/* Полоса выбранного стоит ВПРИТЫК к карточкам и отделена от пикера воздухом: она
+   принадлежит им, а не чипам сверху (у карточки своей шапки нет — см. rk-masters-table). */
+.rk-fb { margin: 14px 0 10px; }
+
+/* Приписка справа от полосы в двухстрочном (мобильном) виде: словами то, что иконка
+   чипа Event говорит картинкой. В колонках FilterBar её не рисует. */
+.rk-fb__aside { font-size: 11px; font-weight: 700; color: var(--deep-text-mute); }
+
+/* Возрастная полоса в середине строки — там, где у карточки заплыва метка бассейна.
+   Подпись над значением, как у колонок полосы фильтров: без неё «25-29» между двумя
+   временами читается неоднозначно (просьба Влада 20.09.2026). Скобки — часть значения,
+   они отделяют полосу от цифр времени слева и справа. */
+.rk-band {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  white-space: nowrap;
+}
+.rk-band__label {
+  font-size: 8.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--deep-text-faint);
+}
+.rk-band__value {
+  font-size: 13px; font-weight: 900; letter-spacing: .03em; color: var(--deep-gold);
+}
+
+/* Карточка на всю ширину панели таба: у неё одна дисциплина и полтора десятка строк. */
+.rk-bands { display: block; }

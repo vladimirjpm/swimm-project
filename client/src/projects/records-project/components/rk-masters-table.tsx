@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
-import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
+import UI_H2HEventCard from '../../components/mix/h2h/h2h-event-card';
+import UI_RecordBadge from '../../components/mix/record-badge/record-badge';
+import UI_H2HPoolRow from '../../components/mix/h2h/h2h-pool-row';
 import type { RegionRecord } from '../../../hooks/useRegionRecords';
 import HelperTime from '../../../utils/helpers/helper-time';
 import {
@@ -23,6 +24,13 @@ import {
  * ⚠ Рекорд Израиля БЫСТРЕЕ мирового своей полосы — аномалия справочника (сторож импорта ловит
  * это правилом `faster-than-world-record` с планкой полосы). Показываем, а не прячем: так же,
  * как рейтинг стран показывает отрицательное отставание.
+ *
+ * Рисуется КАРТОЧКОЙ семьи `UI_H2H*` в варианте `record` — той же, что секция официальных
+ * рекордов на странице пловца (20.09.2026): там слева рекорд пловца, здесь рекорд Израиля,
+ * справа в обоих случаях мировой мастерс. Своей вёрстки сравнения у страницы больше нет.
+ * Отличий от страницы пловца два, и оба от того, что дисциплина тут ОДНА на весь экран:
+ * карточка без шапки (стиль и дистанция — в полосе фильтров, `RkFilterBar`), а середина
+ * строки печатает возрастную полосу вместо метки бассейна.
  */
 
 interface Props {
@@ -110,104 +118,81 @@ const RkMastersTable: React.FC<Props> = ({ israel, world, filters }) => {
         Israel holds a record in {held} of {rows.length} age bands
       </div>
 
-      <div className="rk-table" role="table" aria-label="Masters records by age band">
-        <div className="rk-row rk-row--masters rk-row--head" role="row">
-          <span role="columnheader">Band</span>
-          <span role="columnheader">Israel</span>
-          <span role="columnheader">World</span>
+      {/* Контейнер `h2h-scope` обязателен: узкие ступени карточки — контейнерные запросы
+          (`@container h2h`), и без него они не срабатывают вовсе. */}
+      <div className="h2h-scope rk-bands">
+        {/* Шапка колонок — та же `.h2h-group__head`, что над группами рекордов на странице
+            пловца, но БЕЗ ступени: полоса тут у каждой строки своя и стоит в середине.
+            Нужна за тем же, за чем там: без неё не сказать, чьё время слева, а чьё справа
+            (просьба Влада 20.09.2026). */}
+        <div className="h2h-group__head">
+          <span><span aria-hidden="true">🏆 </span>{HOME_REGION} · MASTERS</span>
+          <UI_RecordBadge kind="masters" />
+          <span className="h2h-group__line" />
+          <span className="h2h-group__wr">MASTERS WR</span>
         </div>
 
-        {shown.map((row) => {
-          const ahead = row.behindMs != null && row.behindMs < 0;
-          const qIsr = row.israel?.issue_reason ? { kind: 'record' as const, reason: row.israel.issue_reason } : null;
-          const qWorld = row.world?.issue_reason ? { kind: 'record' as const, reason: row.world.issue_reason } : null;
-          const flagged = swimFlaggedRowProps(qIsr ?? qWorld);
+        {/* ОДНА карточка на дисциплину, строка — возрастная полоса. Шапки у неё нет
+            (`head={false}`): стиль и дистанция общие на всю страницу и названы в полосе
+            фильтров сверху — иконка над каждой из шестнадцати полос повторяла бы одно и
+            то же (решение Влада 20.09.2026). */}
+        <UI_H2HEventCard
+          variant="record"
+          stroke={filters.stroke}
+          distance={filters.distance ?? ''}
+          head={false}
+        >
+          {shown.map((row) => {
+            const ahead = row.behindMs != null && row.behindMs < 0;
+            const qIsr = row.israel?.issue_reason
+              ? { kind: 'record' as const, reason: row.israel.issue_reason } : null;
+            const qWorld = row.world?.issue_reason
+              ? { kind: 'record' as const, reason: row.world.issue_reason } : null;
 
-          return (
-            <div
-              key={row.band}
-              role="row"
-              className={[
-                'rk-row', 'rk-row--masters',
-                ahead ? 'rk-row--ahead' : '',
-                flagged.className ?? '',
-              ].filter(Boolean).join(' ')}
-              title={flagged.title ?? (ahead ? AHEAD_TITLE : undefined)}
-            >
-              <span className="rk-cell rk-cell--band" role="cell">{row.band}</span>
-
-              {/* Разрыв до мира — верхним индексом у времени Израиля: колонка под одно
-                  число съедала ширину, а читается оно именно как поправка к этому времени. */}
-              <MastersSide record={row.israel} quality={qIsr} label={HOME_REGION}
-                country={HOME_REGION}
-                emptyTitle={`No ${HOME_REGION} record in this band`}
-                gap={behindLabel(row.behindMs) ? (
-                  <sup
-                    className={`rk-gap${ahead ? ' rk-gap--ahead' : ''}`}
-                    title={ahead ? AHEAD_TITLE : 'Behind the world record of this band'}
-                  >
-                    {behindLabel(row.behindMs)}
-                  </sup>
-                ) : null} />
-              <MastersSide record={row.world} quality={qWorld} label="World"
-                country={row.world?.holder_country ?? null}
-                emptyTitle="No world record kept for this band" />
-            </div>
-          );
-        })}
+            return (
+              <UI_H2HPoolRow
+                key={row.band}
+                poolType={filters.poolType ?? ''}
+                // Различает строки ПОЛОСА, а не бассейн: бассейн выбран фильтром и во всех
+                // строках один.
+                midLabel={(
+                  <span className="rk-band">
+                    <span className="rk-band__label">Age Group</span>
+                    <span className="rk-band__value">[{row.band}]</span>
+                  </span>
+                )}
+                deltaMs={row.behindMs}
+                // Израиль быстрее мирового своей полосы — аномалия справочника, но показываем
+                // её как есть (см. шапку файла). Тон `win` честно говорит, в чью пользу цифра.
+                deltaTone={ahead ? 'win' : 'behind'}
+                left={row.israel ? {
+                  time: row.israel.time,
+                  date: row.israel.record_date,
+                  quality: qIsr,
+                  who: { name: holderLabel(row.israel) ?? '—', countryCode: HOME_REGION },
+                  // Плашка всегда у домашней стороны: это её рекорд, а не победа в сравнении.
+                  // Без заливки и рамки — см. `box` у UI_H2HTimeCell.
+                  isWinner: true,
+                  box: 'none' as const,
+                  title: ahead ? AHEAD_TITLE : `${HOME_REGION} masters record · ${row.band}`,
+                } : null}
+                right={row.world ? {
+                  time: row.world.time,
+                  date: row.world.record_date,
+                  quality: qWorld,
+                  who: {
+                    name: holderLabel(row.world) ?? '—',
+                    countryCode: row.world.holder_country,
+                  },
+                  isWinner: false,
+                  title: `Masters world record · ${row.band}`,
+                } : null}
+              />
+            );
+          })}
+        </UI_H2HEventCard>
       </div>
     </>
-  );
-};
-
-/**
- * Одна сторона сравнения: время, под ним держатель и дата.
- *
- * `label` виден только на мобайле: там шапки таблицы нет, стороны встают друг под другом,
- * и без метки не понять, где Израиль, а где мир.
- */
-const MastersSide: React.FC<{
-  record?: RegionRecord;
-  quality: { kind: 'record'; reason: string } | null;
-  label: string;
-  /** Флаг у имени держателя: у Израиля всегда ISR, у мира — страна рекордсмена. */
-  country: string | null;
-  emptyTitle: string;
-  gap?: React.ReactNode;
-}> = ({ record, quality, label, country, emptyTitle, gap }) => {
-  const tag = <span className="rk-side__tag">{label}</span>;
-  if (!record) {
-    return (
-      <span className="rk-cell rk-cell--side" role="cell">
-        <span className="rk-side__line">
-          {tag}
-          <span className="rk-dash" title={emptyTitle}>—</span>
-        </span>
-      </span>
-    );
-  }
-  return (
-    <span className="rk-cell rk-cell--side" role="cell">
-      <span className="rk-side__line">
-        {tag}
-        <UI_SwimTime
-          time={record.time}
-          quality={quality}
-          marker="chip"
-          chipSize="sm"
-          className="rk-time src-rk-masters-table"
-        />
-        {gap}
-      </span>
-      {/* <bdi> обязателен: ивритское имя рядом с флагом без изоляции уезжает не в ту сторону. */}
-      <span className="rk-side__who">
-        {country && (
-          <UI_FlagEmoji countryCode={country} size="24x18" className="rk-flag src-rk-masters-table" />
-        )}
-        <bdi>{holderLabel(record) || '—'}</bdi>
-      </span>
-      {record.record_date && <span className="rk-side__date">{record.record_date}</span>}
-    </span>
   );
 };
 

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/nocturne-3978daaf-7d36-4ab2-84e0-eb90f8270590/styles.css">
+<script src="_ds/nocturne-3978daaf-7d36-4ab2-84e0-eb90f8270590/_ds_bundle.js"></script>
+<link rel="stylesheet" href="assets/css/deep-theme.css">
+<link rel="stylesheet" href="assets/css/h2h.css">
+<link rel="stylesheet" href="assets/css/record-badge.css">
+<style>
+body{margin:0;background:#04182b;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+a{color:#22d3ee}a:hover{color:#67e8f9}
+/* ── Proposed additions to h2h.css — variant="record" of UI_H2HEventCard ── */
+.h2h-time__who{display:flex;align-items:center;gap:5px;min-width:0;font-size:11px;font-weight:700;color:var(--deep-text-mute);white-space:nowrap}
+.h2h-time--left .h2h-time__who{justify-content:flex-end}
+.h2h-time__flag{width:16px;height:12px;border-radius:2px;flex:none;object-fit:cover}
+.h2h-time__extra{margin-top:3px}
+.h2h-badge--relay{color:var(--deep-text-mute);border:1px solid var(--deep-card-border);border-radius:var(--deep-radius-pill);padding:1px 7px;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.h2h-pool__delta--behind{color:var(--deep-live)}
+.h2h-event--record .h2h-pool + .h2h-pool{border-top:1px solid var(--deep-divider);padding-top:8px}
+.h2h-group{display:flex;flex-direction:column;gap:8px}
+.h2h-group__head{display:flex;align-items:center;gap:10px;padding:4px 4px 2px;font-size:13.5px;font-weight:900;letter-spacing:.04em;color:var(--deep-gold);white-space:nowrap}
+.h2h-group__head .rec-badge{font-size:10.5px;padding:2px 6px}
+.h2h-group__line{flex:1;height:1px;background:linear-gradient(90deg,var(--deep-gold-border),transparent)}
+.h2h-group__wr{color:var(--deep-text-mute)}
+.h2h-event--record{background:var(--deep-gold-soft);border-color:var(--deep-gold-border)}
+.h2h-event--record .h2h-event__hairline{background:transparent}
+.h2h-event--record .h2h-pool + .h2h-pool{border-top-color:var(--deep-gold-border)}
+.h2h-event--record .h2h-time__box{background:var(--deep-gold-chip);border-color:var(--deep-gold-border)}
+/* Обе стороны выравниваются по ВЕРХУ: время и имя стоят на одной высоте, а плашка и
+   «Relay lead-off» не сдвигают левую колонку вниз. Правая сторона получает тот же
+   внутренний отступ, что у плашки (5px + 1px рамки), чтобы базовые линии совпали. */
+.h2h-event--record .h2h-pool{align-items:start}
+.h2h-event--record .h2h-time--right{padding-top:6px}
+.h2h-event--record .h2h-pool__mid{padding-top:8px}
+.h2h-event--record .h2h-time__box .h2h-time__value{color:var(--deep-gold)}
+.h2h-event__icon{position:relative}
+.h2h-event__dist{position:absolute;top:4px;right:10px;font-size:18px;font-weight:700;color:#e0433f;line-height:1}
+</style>
+</helmet>
+<section style="display:flex;flex-direction:column;gap:48px;padding:40px;color:#ffffff">
+<sc-for list="{{ variants }}" as="v" hint-placeholder-count="2">
+<div id="{{ v.id }}" style="display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:flex-start;gap:10px"><a href="{{ v.href }}" style="display:inline-flex;flex:none;align-items:center;justify-content:center;width:34px;height:22px;border-radius:6px;background:#22d3ee;color:#04182b;font-size:12px;font-weight:800;text-decoration:none">{{ v.id }}</a><span style="flex:1;min-width:0;font-size:13px;line-height:22px;color:rgba(255,255,255,.55)"><code style="color:#22d3ee">{{ v.prop }}</code> — {{ v.caption }}</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+<sc-for list="{{ frames }}" as="f" hint-placeholder-count="3">
+<div class="{{ f.theme }}" style="{{ f.style }}">
+<div class="h2h-scope">
+<sc-for list="{{ v.groups }}" as="g" hint-placeholder-count="2">
+<div class="h2h-group">
+<sc-if value="{{ v.isRecord }}" hint-placeholder-val="{{ false }}">
+<div class="h2h-group__head"><span>🏆 ISR · MASTERS {{ g.age }}</span><span class="rec-badge rec-badge--masters" title="Masters record">REC<span class="rec-badge__suffix">·M</span></span><span class="h2h-group__line"></span><span class="h2h-group__wr">MASTERS WR</span></div>
+</sc-if>
+<sc-for list="{{ g.cards }}" as="c" hint-placeholder-count="1">
+<div class="h2h-event {{ v.cls }}">
+<div class="h2h-event__head">
+<div class="h2h-event__hairline"></div>
+<div class="h2h-event__icon"><img src="{{ c.icon }}" alt="{{ c.stroke }}"><span class="h2h-event__dist">{{ c.dist }}</span></div>
+<div class="h2h-event__hairline"></div>
+</div>
+<sc-for list="{{ c.pools }}" as="p" hint-placeholder-count="1">
+<div class="h2h-pool">
+<div class="h2h-time h2h-time--left">
+<div class="h2h-time__box">
+<div class="h2h-time__line"><span class="h2h-time__value">{{ p.time }}</span><sc-if value="{{ p.sb }}" hint-placeholder-val="{{ false }}"><span class="h2h-badge h2h-badge--sb">SB</span></sc-if></div>
+<sc-if value="{{ v.isRecord }}" hint-placeholder-val="{{ false }}"><div class="h2h-time__who"><span>{{ swimmer }}</span><img class="h2h-time__flag" src="{{ swimmerFlag }}" alt="IL"></div></sc-if>
+<div class="h2h-time__date">{{ p.date }}</div>
+<sc-if value="{{ p.relay }}" hint-placeholder-val="{{ false }}"><div class="h2h-time__extra"><span class="h2h-badge h2h-badge--relay">Relay lead-off</span></div></sc-if>
+</div>
+</div>
+<div class="h2h-pool__mid">
+<span class="h2h-pool__label">{{ p.label }}</span>
+<span class="{{ p.deltaCls }}">{{ p.gap }}</span>
+</div>
+<div class="h2h-time h2h-time--right" title="{{ p.title }}">
+<div class="h2h-time__line"><span class="h2h-time__value">{{ p.wr }}</span></div>
+<sc-if value="{{ v.isRecord }}" hint-placeholder-val="{{ false }}"><div class="h2h-time__who"><img class="h2h-time__flag" src="{{ p.flag }}" alt="{{ p.cc }}"><span>{{ p.holder }}</span></div></sc-if>
+<div class="h2h-time__date">{{ p.wrDate }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const flag = cc => `https://flagcdn.com/w40/${cc}.png`;
+    const rec = (label, o) => ({ label, title: `Masters world record · 50 ${o.stroke} ${label === '--25m--' ? 'SCM' : 'LCM'}`, flag: flag(o.cc), cc: o.cc.toUpperCase(), deltaCls: 'h2h-pool__delta h2h-pool__delta--behind', ...o });
+    const h2h = (label, o) => ({ label, deltaCls: 'h2h-pool__delta h2h-pool__delta--win', ...o });
+    const recordGroups = [
+      { age: '25-29', cards: [{ stroke: 'freestyle', dist: '50', icon: 'assets/stroke/freestyle.png', pools: [
+        rec('--25m--', { stroke: 'freestyle', time: '25.91', wr: '21.78', cc: 'br', holder: 'Nicholas Santos', gap: '+4.13', date: '14 MAR 2009', wrDate: '6 DEC 2008' }),
+        rec('-----50m-----', { stroke: 'freestyle', time: '26.48', wr: '22.32', cc: 'br', holder: 'Nicholas Santos', gap: '+4.16', date: '20 JUN 2009', wrDate: '11 JUL 2009' }) ] }] },
+      { age: '45-49', cards: [
+        { stroke: 'backstroke', dist: '50', icon: 'assets/stroke/backstroke.png', pools: [ rec('--25m--', { stroke: 'backstroke', time: '30.25', wr: '27.10', cc: 'fr', holder: 'Nicolas Granger', gap: '+3.15', date: '9 JAN 2026', wrDate: '22 NOV 2019', relay: true }) ] },
+        { stroke: 'freestyle', dist: '50', icon: 'assets/stroke/freestyle.png', pools: [ rec('--25m--', { stroke: 'freestyle', time: '29.07', wr: '23.44', cc: 'ua', holder: 'Sergey Fesenko', gap: '+5.63', date: '10 JAN 2026', wrDate: '3 FEB 2018' }) ] } ] }
+    ];
+    const h2hGroups = [{ cards: [
+      { stroke: 'backstroke', dist: '50', icon: 'assets/stroke/backstroke.png', pools: [
+        h2h('--25m--', { time: '00:48.52', sb: true, date: '2026-02-06', wr: '00:54.34', wrDate: '2026-02-15', gap: '−5.82' }),
+        h2h('-----50m-----', { time: '00:49.64', sb: true, date: '2026-07-16', wr: '00:49.79', wrDate: '2026-07-16', gap: '−0.15' }) ] },
+      { stroke: 'individual_medley', dist: '100', icon: 'assets/stroke/individual_medley.png', pools: [
+        h2h('--25m--', { time: '01:43.33', date: '2026-02-06', wr: '01:45.26', wrDate: '2026-02-15', gap: '−1.93' }) ] } ] }];
+    return {
+      swimmer: 'I. Gostomelska', swimmerFlag: flag('il'),
+      variants: [
+        { id: '4a', href: '#4a', prop: 'variant="h2h"', cls: '', isRecord: false, groups: h2hGroups, caption: 'как сейчас: два пловца, cyan-плашка победителя, SB, без имён и заголовков групп' },
+        { id: '4b', href: '#4b', prop: 'variant="record"', cls: 'h2h-event--record', isRecord: true, groups: recordGroups, caption: 'пловец против masters WR: золотые токены (--deep-gold-*), имя+флаг у каждого времени, заголовок группы по возрасту с REC·M, разрыв всегда «+» у пловца' }
+      ],
+      frames: [
+        { theme: 'theme-deep', style: 'width:640px;padding:16px;border-radius:16px;background:var(--deep-page-bg)' },
+        { theme: 'theme-deep', style: 'width:343px;padding:12px;border-radius:24px;background:var(--deep-page-bg);border:1px solid rgba(255,255,255,.10)' },
+        { theme: 'theme-deep-light', style: 'width:640px;padding:16px;border-radius:16px;background:var(--deep-page-bg)' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

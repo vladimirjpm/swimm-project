@@ -15,6 +15,7 @@ import RkWorldCard from './components/rk-world-card';
 import RkTable from './components/rk-table';
 import RkWorldList from './components/rk-world-list';
 import RkMastersTable, { mastersBands } from './components/rk-masters-table';
+import RkFilterBar from './components/rk-filter-bar';
 import {
   HOME_REGION, RK_DEFAULT, disciplineLabel, isRelay, strokeByKey, type RkFilters,
 } from './rk-disciplines';
@@ -194,8 +195,14 @@ function RecordsProject() {
                 {mastersError && (
                   <div className="rk-state rk-state--error">Could not load masters records ({mastersError}).</div>
                 )}
+                {/* Полоса выбранного — над карточками: у карточки рекорда своей шапки нет,
+                    и «какой это заплыв» отвечает она (решение Влада 20.09.2026). Чипы
+                    пикера остаются на месте — ими и выбирают. */}
                 {!mastersLoading && !mastersError && israelMasters.data && worldMasters.data && (
-                  <RkMastersTable israel={israelMasters.data} world={worldMasters.data} filters={filters} />
+                  <>
+                    <RkFilterBar filters={filters} className="rk-fb" />
+                    <RkMastersTable israel={israelMasters.data} world={worldMasters.data} filters={filters} />
+                  </>
                 )}
               </>
             )}

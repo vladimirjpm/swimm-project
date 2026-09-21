@@ -44,6 +44,7 @@ public static class DocsCatalog
             new("docs/plans/cache-tags-plan.md", "Кэш", "сброс по меткам, готовность к Redis"),
             new("docs/plans/cache-row-precision-plan.md", "Кэш: точность до строки", "метки строк и служебных колонок, правило сужения"),
             new("docs/plans/club-subscribers-plan.md", "Клуб — не группа", "почему у клуба нет подписчиков"),
+            new("docs/plans/records-world-compare-plan.md", "Рекорды против мирового", "карточки вместо строк; у немастерских правая часть пока пуста"),
         ]),
     ];
 

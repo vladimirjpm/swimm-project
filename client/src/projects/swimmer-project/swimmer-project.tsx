@@ -469,6 +469,8 @@ function SwimmerProject() {
                 onPoolType={setPoolType}
                 records={profile.records}
                 swimmerId={profile.id}
+                swimmerName={profile.fullName}
+                swimmerCountry={profile.countryCode}
                 gender={gender}
                 age={profile.ageInSeason}
                 state={personalBests}
@@ -521,6 +523,11 @@ function SwimmerProject() {
             rivalId={rivalId}
             swimmerId={profile.id}
             profileName={profile.fullName}
+            owner={{
+              gender: profile.gender,
+              avatarUrl: profile.avatarUrl,
+              countryCode: profile.countryCode,
+            }}
             season={activeSeason}
             state={compare}
           />
