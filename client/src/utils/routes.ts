@@ -323,9 +323,9 @@ export function parseSeasonBestQuery(search: string = window.location.search): S
  * же состоянием, и первое же изменение дефолта переписало бы чужие ссылки.
  */
 /** Табы страницы `/records`. `countries` — рейтинг стран, он же вид по умолчанию. */
-export type RecordsTab = 'countries' | 'world' | 'masters';
+export type RecordsTab = 'countries' | 'world' | 'masters' | 'junior';
 
-const RECORDS_TABS: readonly RecordsTab[] = ['countries', 'world', 'masters'];
+const RECORDS_TABS: readonly RecordsTab[] = ['countries', 'world', 'masters', 'junior'];
 
 export interface RecordsQuery {
   /** Незнакомое значение в адресе даёт `countries`, а не пустую страницу. */

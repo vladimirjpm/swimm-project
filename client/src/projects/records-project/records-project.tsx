@@ -15,6 +15,7 @@ import RkWorldCard from './components/rk-world-card';
 import RkTable from './components/rk-table';
 import RkWorldList from './components/rk-world-list';
 import RkMastersTable, { mastersBands } from './components/rk-masters-table';
+import RkJuniorTable from './components/rk-junior-table';
 import RkFilterBar from './components/rk-filter-bar';
 import {
   HOME_REGION, RK_DEFAULT, disciplineLabel, isRelay, strokeByKey, type RkFilters,
@@ -25,7 +26,9 @@ import {
  * - **Countries** — рейтинг национальных рекордов по одной дисциплине (этап 11.2.2,
  *   docs/plans/records-all-countries-plan.md §5), описан ниже;
  * - **World records** — все мировые рекорды бассейна и пола (`RkWorldList`);
- * - **Masters** — мастерсы Израиля против мирового рекорда своей полосы (`RkMastersTable`).
+ * - **Masters** — мастерсы Израиля против мирового рекорда своей полосы (`RkMastersTable`);
+ * - **World Junior** — возрастные рекорды Израиля против World Junior Record (`RkJuniorTable`,
+ *   21.09.2026): WJR один на полосу (ж 14–17, м 15–18), строки — возрасты внутри неё.
  * Дисциплина и пикер общие для всех табов, таб живёт в адресе (`?tab=`).
  *
  * Показывает одну дисциплину: кто из стран быстрее и насколько отстаёт от мирового.
@@ -82,13 +85,15 @@ function RecordsProject() {
     window.history.replaceState(null, '', url.toString());
   }, [filters, tab]);
 
-  // У мастерсов эстафет нет ни в одной оси. Пришли на таб с «4×100m» — берём первую личную
-  // дистанцию стиля: пустая таблица без объяснения читается как «данных нет».
+  // У мастерсов эстафет нет ни в одной оси, у юниорских — пока тоже (Records их не умеет,
+  // СРОЧНЫЙ пункт ROADMAP). Пришли на таб с «4×100m» — берём первую личную дистанцию стиля:
+  // пустая таблица без объяснения читается как «данных нет».
+  const personalOnly = tab === 'masters' || tab === 'junior';
   useEffect(() => {
-    if (tab !== 'masters' || !isRelay(filters.distance)) return;
+    if (!personalOnly || !isRelay(filters.distance)) return;
     const first = strokeByKey(filters.stroke)?.distances[0] ?? RK_DEFAULT.distance;
     setFilters((f) => ({ ...f, distance: first }));
-  }, [tab, filters.distance, filters.stroke]);
+  }, [personalOnly, filters.distance, filters.stroke]);
 
   const ranking = useRecordsRanking({
     stroke: filters.stroke,
@@ -106,6 +111,8 @@ function RecordsProject() {
   const worldOpen = useRegionRecords('WORLD', 'open', tab === 'world');
   const israelMasters = useRegionRecords(HOME_REGION, 'masters', tab === 'masters');
   const worldMasters = useRegionRecords('WORLD', 'masters', tab === 'masters');
+  const israelAge = useRegionRecords(HOME_REGION, 'age', tab === 'junior');
+  const worldJunior = useRegionRecords('WORLD', 'junior', tab === 'junior');
 
   const data = ranking.data;
   const title = disciplineLabel(filters);
@@ -128,6 +135,10 @@ function RecordsProject() {
       id: 'masters', icon: '⏱', label: 'Masters WR',
       sub: 'Israel vs world · by age band',
     },
+    {
+      id: 'junior', icon: '🌱', label: 'World Junior',
+      sub: 'Israel ages vs world junior',
+    },
   ];
 
   // Возрастные группы для фильтра — из тех же данных, что таблица: у каждой дисциплины своя
@@ -139,6 +150,12 @@ function RecordsProject() {
 
   const mastersLoading = israelMasters.loading || worldMasters.loading;
   const mastersError = israelMasters.error ?? worldMasters.error;
+  const juniorLoading = israelAge.loading || worldJunior.loading;
+  const juniorError = israelAge.error ?? worldJunior.error;
+  // Полоса WJR выбранной дисциплины — из данных (ключ строки «14-17»), не константой по полу.
+  const juniorBand = worldJunior.data?.find((r) =>
+    r.style === filters.stroke && r.distance === filters.distance
+    && r.gender === filters.gender && r.pool_type === filters.poolType)?.age_key ?? null;
 
   return (
     <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
@@ -175,7 +192,7 @@ function RecordsProject() {
               filters={filters}
               onChange={patch}
               showEvent={tab !== 'world'}
-              allowRelays={tab !== 'masters'}
+              allowRelays={!personalOnly}
               ageGroups={tab === 'masters' ? ageGroups : undefined}
             />
 
@@ -202,6 +219,26 @@ function RecordsProject() {
                   <>
                     <RkFilterBar filters={filters} className="rk-fb" />
                     <RkMastersTable israel={israelMasters.data} world={worldMasters.data} filters={filters} />
+                  </>
+                )}
+              </>
+            )}
+
+            {tab === 'junior' && (
+              <>
+                {juniorLoading && <div className="rk-state">Loading…</div>}
+                {juniorError && (
+                  <div className="rk-state rk-state--error">Could not load junior records ({juniorError}).</div>
+                )}
+                {!juniorLoading && !juniorError && israelAge.data && worldJunior.data && (
+                  <>
+                    {/* Возраст здесь не фильтр, а полоса самого WJR — чип показывает её. */}
+                    <RkFilterBar
+                      filters={{ ...filters, ageGroup: null }}
+                      ageBand={juniorBand}
+                      className="rk-fb"
+                    />
+                    <RkJuniorTable israel={israelAge.data} world={worldJunior.data} filters={filters} />
                   </>
                 )}
               </>

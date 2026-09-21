@@ -1,8 +1,8 @@
 # Мировые юниорские рекорды (WJR) — правая сторона карточки у юношеских рекордов (J1–J7)
 
 **Статус: J0–J3 СДЕЛАНЫ (21.09.2026), ветка `world-junior-records`; WJR залиты в локальную базу
-(70 строк, `--records-refresh --source wa-junior`, архив — `!records-sources/`).** Дальше — J4
-(вопрос Владу про `/records`), J7 доки. Продолжение
+(70 строк, `--records-refresh --source wa-junior`, архив — `!records-sources/`).** J4 тоже
+сделан (таб World Junior на `/records`). J5 проверен. Дальше — J6 (тесты: сделаны по ходу J1–J2) и J7 доки. Продолжение
 [records-world-compare-plan.md](records-world-compare-plan.md) (Р1–Р7, в master, PR #83) —
 читать его §1–§4 первым: карточка, `worldRecord`, варианты `UI_H2H*` уже есть.
 
@@ -112,9 +112,16 @@ Aquatics их не ведёт. Официальные есть только **Wo
   - `title` правой ячейки: «World Junior record · women 14–17 · 100 Freestyle LCM»;
   - ⚠ признать §3 «одно время на несколько ступеней»: полосу WJR показать явно (в `title`
     и/или мелкой строкой под держателем), чтобы 14-летняя не читала его как «рекорд 14 лет».
-- **J4. `/records`.** Решить, нужен ли таб/режим World Junior рядом с Masters WR (вне
+- **J4. `/records` — СДЕЛАН 21.09.2026 (решение Влада: добавлять).** Четвёртый таб «World
+  Junior» (`?tab=junior`, `RkJuniorTable`): возрастные рекорды Израиля против WJR, строки —
+  возрасты внутри полосы, одно время справа. Полоса — чип «Age band» и строка-пояснение.
+  Эстафеты на табе недоступны (как у Masters). Проверено в превью: ж 100 спина 25м
+  (14–17, 4 из 4), м 200 в/с 50м (15–18), телефон 375 px; Masters не задет. Было в плане: Решить, нужен ли таб/режим World Junior рядом с Masters WR (вне
   исходной просьбы — спросить Влада, не делать молча).
-- **J5. Кэш.** `GetRecordsHeldAsync` кэша не имеет; справочные страницы `/records` — через
+- **J5. Кэш — ПРОВЕРЕНО 21.09.2026, правок не нужно.** Таб World Junior ходит в
+  `/api/records?region=WORLD&category=junior` — ключ `http:records:WORLD:junior` той же
+  семьи, что у Masters; `/Admin/Cache` описывает `RecordsController` целиком (`WhereOnSite`),
+  нового кэш-ключа нет. Было в плане: `GetRecordsHeldAsync` кэша не имеет; справочные страницы `/records` — через
   `GetOrCreateAsync`, метки ставятся сами (К3). Если появится новый кэш-ключ — правило 1
   pre-push-rules (`/Admin/Cache`, `cache.md`).
 - **J6. Тесты.** По образцу `HeldRecordWorldMatchTests`: возраст в полосе / вне полосы
