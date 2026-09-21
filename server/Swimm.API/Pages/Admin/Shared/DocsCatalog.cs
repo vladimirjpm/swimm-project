@@ -45,6 +45,8 @@ public static class DocsCatalog
             new("docs/plans/cache-row-precision-plan.md", "Кэш: точность до строки", "метки строк и служебных колонок, правило сужения"),
             new("docs/plans/club-subscribers-plan.md", "Клуб — не группа", "почему у клуба нет подписчиков"),
             new("docs/plans/records-world-compare-plan.md", "Рекорды против мирового", "карточки вместо строк; у немастерских правая часть пока пуста"),
+            new("docs/plans/world-junior-records-plan.md", "Мировые юниорские (WJR)", "World Junior в карточку рекорда; матч по полосе, источник не подтверждён"),
+            new("docs/plans/records-freshness-plan.md", "Свежесть рекордов", "проверка обновлений всех источников и дата «checked» на витрине"),
         ]),
     ];
 

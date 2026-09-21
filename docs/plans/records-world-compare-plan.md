@@ -101,6 +101,10 @@ from "Records" where "RegionType"='world' and "Category"='masters' group by 1;
 
 Пока ни одного — развилка «что делать с немастерскими» закрыта решением §2-1.
 
+**Продолжение (21.09.2026):** правую сторону у юношеских рекордов заполняют мировые
+юниорские (World Junior) — [world-junior-records-plan.md](world-junior-records-plan.md),
+этапы J0–J7, не начато.
+
 ## 6. Как поднять и посмотреть
 
 ```
