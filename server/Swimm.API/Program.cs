@@ -744,19 +744,22 @@ if (args.Contains("--repull"))
 // isrorg-masters добавлен 2026-09-16: с 2026-08-24 его в списке не было, и команда не
 // трогала 726 из 1 683 строк справочника вообще (пробел числился в plans/azure-deploy-plan.md).
 // `--source <ключ>` — один источник (21.09.2026, для wa-junior; см. предупреждение ниже).
-if (args.Contains("--records-refresh"))
+// `--records-check` — то же без Apply (= `--records-refresh --dry-run`): проверка свежести.
+// Обе команды пишут журнал Sys_RecordSourceChecks (records-freshness-plan U2): сходили в
+// источник — значит проверили, откуда бы ни нажали.
+if (args.Contains("--records-refresh") || args.Contains("--records-check"))
 {
-    var dryRun = args.Contains("--dry-run");
+    var dryRun = args.Contains("--dry-run") || args.Contains("--records-check");
     using var scope = app.Services.CreateScope();
     var providers = scope.ServiceProvider.GetServices<IRecordSourceProvider>()
         .ToDictionary(p => p.Source, StringComparer.OrdinalIgnoreCase);
-    var diffService = scope.ServiceProvider.GetRequiredService<IRecordDiffService>();
+    var checkService = scope.ServiceProvider.GetRequiredService<IRecordSourceCheckService>();
 
     // wa-masters стоит рядом с worldrecords: это тоже World Aquatics, и он единственный
     // владелец world/masters — ни с кем ключами упсерта не спорит, поэтому его место в списке
     // определяется только здравым смыслом «сначала мир, потом федерация».
     // wa-junior — туда же и по той же причине: единственный владелец world/junior.
-    string[] order = ["worldrecords", "wa-masters", "wa-junior", "isrorg-age", "isrorg-masters"];
+    string[] order = [.. Swimm.Application.Constants.RecordSources.Order];
 
     // --source <ключ> — один источник из списка. Безопасно только для однохозяйной оси
     // (wa-masters, wa-junior): у country/ISR/open два владельца (И-13), и прогон одного
@@ -778,27 +781,21 @@ if (args.Contains("--records-refresh"))
 
     foreach (var sourceKey in order)
     {
-        if (!providers.TryGetValue(sourceKey, out var provider))
+        if (!providers.ContainsKey(sourceKey))
         {
             Console.Error.WriteLine($"Источник '{sourceKey}' не зарегистрирован — пропуск");
             continue;
         }
 
         Console.WriteLine($"\n=== {sourceKey} ===");
-        IReadOnlyList<Swimm.Application.Dtos.ParsedRecordDto> parsed;
-        try
+        var check = await checkService.CheckAsync(sourceKey);
+        if (check.Diff is not { } diff)
         {
-            parsed = await provider.FetchAsync(
-                new Swimm.Application.Dtos.RecordSourceRequest(sourceKey, null, null, null, null, null));
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"  не скачалось: {ex.Message}");
+            Console.Error.WriteLine($"  не скачалось: {check.Error}  (журнал: failed, #{check.CheckId})");
             continue;
         }
 
-        var diff = await diffService.BuildDiffAsync(sourceKey, parsed);
-        Console.WriteLine($"  строк из источника: {parsed.Count}; без изменений {diff.UnchangedCount}, "
+        Console.WriteLine($"  проверка #{check.CheckId}: {check.Outcome}; без изменений {diff.UnchangedCount}, "
             + $"изменится {diff.ChangedCount}, новых {diff.AddedCount}, нет в источнике {diff.MissingInSourceCount}");
         foreach (var e in diff.Changed.Take(30))
             Console.WriteLine($"    {e.RegionType,-7} {e.RegionCode,-3} {e.AgeKey,-6} {e.Gender,-6} {e.PoolType,-4} "
@@ -831,7 +828,7 @@ if (args.Contains("--records-refresh"))
 
         if (dryRun) { Console.WriteLine("  --dry-run: не применяю"); continue; }
 
-        var applied = await diffService.ApplyAsync(
+        var applied = await checkService.ApplyAsync(
             new Swimm.Application.Dtos.RecordDiffApplyRequest(diff.DiffId, ApplyAdded: true, ApplyChanged: true));
         Console.WriteLine(applied.Success
             ? $"  применено: {applied.AppliedCount}"

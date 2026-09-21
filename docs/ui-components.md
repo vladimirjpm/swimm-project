@@ -63,6 +63,7 @@
 | `UI_NormativeLevelIcon` | значок разряда | `levelName`, `styleName`, `styleLen`, `poolType`, `normativeAgeGroup` |
 | `UI_LevelProgress` | прогресс до следующего разряда | `currentTime`, `nextTime`, `progressPercent` |
 | `UI_RecordCount` | счётчик рекордов пловца (открывает попап) | `swimmerName` |
+| `UI_RecordsChecked` | подпись «Records checked: World Aquatics 3 days ago · Israel Swimming Association yesterday» — когда справочник рекордов сверяли с источниками | `sources` (ключи источников, которые питают экран, в порядке показа), `subject` (слово перед «checked»), `className`. Данные — хук `useRecordsFreshness` (`GET /api/records/freshness`, один запрос на страницу). **Строка на КАЖДЫЙ источник, без свёртки в минимум** даже внутри одного издателя (решение Влада 21.09.2026); ни разу не сверенный — не подписывается. «checked», а не «updated»: мировой рекорд может не биться годами. Порогов и тревоги нет — это дело админки. Где: `/records` под заголовком (у таба свои источники), легенда «Official records» страницы пловца (источники по карточкам). План — `docs/plans/records-freshness-plan.md` §9 |
 | `UI_GenderAgeTable` | таблицу «пол × возраст» (возрастные рекорды, High Point) | `rows`, `showMale/showFemale`, `ageColWidth`, `ageColWidthMobile` |
 
 ## 4. Тренировки, управление, служебное

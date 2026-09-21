@@ -17,6 +17,7 @@ import RkWorldList from './components/rk-world-list';
 import RkMastersTable, { mastersBands } from './components/rk-masters-table';
 import RkJuniorTable from './components/rk-junior-table';
 import RkFilterBar from './components/rk-filter-bar';
+import UI_RecordsChecked from '../components/mix/records-checked/records-checked';
 import {
   HOME_REGION, RK_DEFAULT, disciplineLabel, isRelay, strokeByKey, type RkFilters,
 } from './rk-disciplines';
@@ -43,6 +44,19 @@ import {
  * ключ `ISR→NR` рассчитан на одну страну, и рейтинг стран в него не ложится. Попапы
  * нормативов и возрастные карточки продолжают жить на нём — их мы не трогаем.
  */
+
+/**
+ * Какие источники питают таб — для подписи «checked …» под заголовком (records-freshness-plan
+ * U6): у каждого таба своя свежесть. NR — это WA плюс федерация (у Израиля два хозяина,
+ * И-13); рекорды остальных стран приходят прогоном по странам, который журнала проверок пока
+ * не пишет, — их дата не показывается.
+ */
+const TAB_SOURCES: Record<RecordsTab, string[]> = {
+  countries: ['worldrecords', 'isrorg-age'],
+  world: ['worldrecords'],
+  masters: ['wa-masters', 'isrorg-masters'],
+  junior: ['wa-junior', 'isrorg-age'],
+};
 
 function RecordsProject() {
   useTheme();
@@ -178,6 +192,7 @@ function RecordsProject() {
                 poolType: filters.poolType, gender: filters.gender,
               })}>compare two countries</a>
             </div>
+            <UI_RecordsChecked sources={TAB_SOURCES[tab]} className="rk-head__checked" />
           </div>
           <UI_ModeToggle />
         </div>

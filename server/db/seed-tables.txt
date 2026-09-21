@@ -73,5 +73,10 @@ Sys_StartListPulls           # журнал заборов стартового 
 # Восстанавливается первым запуском реестра на /Admin/Health:
 #   Sys_DataCheckRuns, Sys_DataCheckFindings, Sys_DataCheckStates
 #
+# Журнал проверок источников рекордов — по той же причине: «checked» на витрине обязан
+# значить «сверились из прода». Заполняется первой кнопкой «Проверить все источники» на
+# /Admin/Import (records-freshness-plan U1):
+#   Sys_RecordSourceChecks
+#
 # Временные хвосты ручных операций — дропнуть перед снятием дампа:
 #   tmp_*

@@ -69,6 +69,7 @@ public class SwimmDbContext : DbContext
     /* === Качество рекордов (Sys_): реестр спорных записей + сверка с протоколами === */
     public DbSet<RecordIssue> RecordIssues => Set<RecordIssue>();
     public DbSet<RecordVerification> RecordVerifications => Set<RecordVerification>();
+    public DbSet<RecordSourceCheck> RecordSourceChecks => Set<RecordSourceCheck>();
 
     /// <summary>Отладочные подробности витрин (двухуровневый выключатель, см. DebugOption).</summary>
     public DbSet<DebugOption> DebugOptions => Set<DebugOption>();
@@ -476,6 +477,21 @@ public class SwimmDbContext : DbContext
             entity.HasIndex(e => e.Found);
             entity.Property(e => e.AgeAxisMatch).HasMaxLength(10);
             entity.HasIndex(e => e.AgeAxisMatch);
+        });
+
+        // Журнал проверок источников рекордов (records-freshness-plan U1). Служебный: витрине
+        // отдаются только даты через сервис, в гранты swimm_ro таблица не входит.
+        modelBuilder.Entity<RecordSourceCheck>(entity =>
+        {
+            entity.ToTable("Sys_RecordSourceChecks");
+            entity.Property(e => e.Source).HasMaxLength(40);
+            entity.Property(e => e.Outcome).HasMaxLength(20);
+            entity.Property(e => e.ContentHash).HasMaxLength(64);
+            entity.Property(e => e.DiffId).HasMaxLength(32);
+            entity.Property(e => e.Error).HasMaxLength(2000);
+            // «Последняя проверка источника» — главный запрос журнала.
+            entity.HasIndex(e => new { e.Source, e.CheckedAt });
+            entity.HasIndex(e => e.DiffId);
         });
 
         modelBuilder.Entity<DebugOption>(entity =>

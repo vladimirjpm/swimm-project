@@ -23,6 +23,7 @@ public class RecordsImportController : ControllerBase
     private readonly IReadOnlyList<IRecordSourceLinksProvider> _links;
     private readonly IRecordCountriesProvider _countries;
     private readonly IRecordCountryRunQueue _runs;
+    private readonly IRecordSourceCheckService _checks;
 
     public RecordsImportController(
         IEnumerable<IRecordSourceProvider> providers,
@@ -30,7 +31,8 @@ public class RecordsImportController : ControllerBase
         IRecordQualityService quality,
         IEnumerable<IRecordSourceLinksProvider> links,
         IRecordCountriesProvider countries,
-        IRecordCountryRunQueue runs)
+        IRecordCountryRunQueue runs,
+        IRecordSourceCheckService checks)
     {
         _providers = providers.ToDictionary(p => p.Source, StringComparer.OrdinalIgnoreCase);
         _diffService = diffService;
@@ -38,6 +40,7 @@ public class RecordsImportController : ControllerBase
         _links = links.ToList();
         _countries = countries;
         _runs = runs;
+        _checks = checks;
     }
 
     [HttpGet("source-status")]
@@ -87,7 +90,7 @@ public class RecordsImportController : ControllerBase
         [FromForm] IFormFile? secondaryFile = null,
         [FromForm] string? poolType = null)
     {
-        if (!_providers.TryGetValue(source, out var provider))
+        if (!_providers.ContainsKey(source))
             return BadRequest(new { error = $"Неизвестный источник '{source}'. Доступны: {string.Join(", ", _providers.Keys)}" });
 
         var request = new RecordSourceRequest(
@@ -98,26 +101,35 @@ public class RecordsImportController : ControllerBase
             secondaryFile?.FileName,
             poolType);
 
-        IReadOnlyList<ParsedRecordDto> parsed;
-        try
-        {
-            parsed = await provider.FetchAsync(request, HttpContext.RequestAborted);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (HttpRequestException ex)
-        {
-            return StatusCode(502, new { error = $"Не удалось скачать источник: {ex.Message}" });
-        }
+        // Fetch — это проверка источника: пишет строку журнала (records-freshness-plan U2),
+        // и файл, загруженный руками, тоже — это то, что источник сказал.
+        var check = await _checks.CheckAsync(source, request, HttpContext.RequestAborted);
+        if (check.Diff is null)
+            return StatusCode(502, new { error = $"Источник не отдал данные: {check.Error}" });
 
-        if (parsed.Count == 0)
-            return BadRequest(new { error = "Источник разобран, но не дал ни одной строки — проверьте файл/URL." });
-
-        var diff = await _diffService.BuildDiffAsync(source, parsed, ct: HttpContext.RequestAborted);
-        return Ok(diff);
+        return Ok(check.Diff);
     }
+
+    /// <summary>
+    /// «Проверить все источники» (U2): по очереди fetch + dry-run дифф каждого, в журнал.
+    /// Ничего не применяет. Долгий запрос — World Aquatics отвечает до полутора минут на отчёт.
+    /// </summary>
+    [HttpPost("check-all")]
+    public async Task<IActionResult> CheckAll()
+    {
+        var results = await _checks.CheckAllAsync(HttpContext.RequestAborted);
+        return Ok(results.Select(r => new
+        {
+            r.Source, r.CheckId, r.Outcome, r.CheckedAt, r.Error,
+            added = r.Diff?.AddedCount, changed = r.Diff?.ChangedCount,
+            missing = r.Diff?.MissingInSourceCount, diffId = r.Diff?.DiffId,
+        }));
+    }
+
+    /// <summary>Свежесть по каждому источнику: проверено / исход / ждёт Apply / пора проверить.</summary>
+    [HttpGet("freshness")]
+    public async Task<IActionResult> GetFreshness()
+        => Ok(await _checks.GetFreshnessAsync(HttpContext.RequestAborted));
 
     /// <summary>
     /// Страны источника для выбора в админке (11.1.1): 235 реальных, псевдо-сборные отсеяны.
@@ -160,7 +172,8 @@ public class RecordsImportController : ControllerBase
     [HttpPost("apply")]
     public async Task<IActionResult> Apply([FromBody] RecordDiffApplyRequest request)
     {
-        var result = await _diffService.ApplyAsync(request, HttpContext.RequestAborted);
+        // Через журнал: отмечает применённую проверку и не даёт применить устаревший дифф (U3).
+        var result = await _checks.ApplyAsync(request, HttpContext.RequestAborted);
         if (!result.Success) return BadRequest(new { error = result.Error });
 
         // Подозрительные значения записаны как в источнике, но заведены в реестр кандидатами —

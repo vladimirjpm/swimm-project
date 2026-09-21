@@ -23,6 +23,7 @@ import type {
   SwimmerPersonalBest, SwimmerProgress, SwimmerSearchHit, SwimmerSeasonRanks, SwimmerSummary,
 } from '../use-swimmer-page';
 import type { SwimmerHeldRecord } from '../use-swimmer-profile';
+import UI_RecordsChecked from '../../components/mix/records-checked/records-checked';
 
 /**
  * Панели табов страницы спортсмена (BLOCKS.md §5–9). Каждая — независимый блок: свои данные,
@@ -574,6 +575,24 @@ function groupHeldRecords(records: SwimmerHeldRecord[]): RecordAgeGroup[] {
   return groups.sort((a, b) => a.minAge - b.minAge);
 }
 
+/**
+ * Источники, которые питают секцию рекордов пловца, — для подписи «checked …» под карточками
+ * (records-freshness-plan U6): дата по КАЖДОМУ источнику, реально попавшему в карточки.
+ * Рекорд страны open у Израиля пишут двое (WA и федерация, И-13) — показываем оба.
+ */
+const RECORD_SOURCE_ORDER = ['worldrecords', 'wa-masters', 'wa-junior', 'isrorg-age', 'isrorg-masters'];
+
+function heldRecordSources(records: SwimmerHeldRecord[]): string[] {
+  const used = new Set<string>();
+  for (const r of records) {
+    if (r.category === 'age') used.add('isrorg-age');
+    else if (r.category === 'masters') used.add('isrorg-masters');
+    else if (r.category === 'open') { used.add('worldrecords'); used.add('isrorg-age'); }
+    if (r.worldRecord) used.add(r.worldRecord.kind === 'junior' ? 'wa-junior' : 'wa-masters');
+  }
+  return RECORD_SOURCE_ORDER.filter((s) => used.has(s));
+}
+
 /** «14-17» → «14–17»: в подписи полоса читается диапазоном, а не вычитанием. */
 const bandLabel = (band: string): string => band.replace('-', '–');
 
@@ -711,6 +730,7 @@ function HeldRecordsSection({
       <div className="deep-legend deep-legend--block">
         The register stores the holder as a name, not as a swimmer id, so a namesake can show
         up here.
+        <UI_RecordsChecked sources={heldRecordSources(records)} className="mt-1" />
       </div>
     </div>
   );

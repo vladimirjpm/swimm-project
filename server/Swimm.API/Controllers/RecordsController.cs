@@ -43,6 +43,24 @@ public class RecordsController : ControllerBase
     }
 
     /// <summary>
+    /// Когда справочник сверяли с каждым источником — подпись «checked …» на витрине
+    /// (docs/plans/records-freshness-plan.md, U5). Дата ПО КАЖДОМУ источнику, не свёрнутый
+    /// минимум: сворачивать (по табу `/records`, по карточкам пловца) — дело клиента.
+    ///
+    /// Наружу — только даты: текст сбоев и «ждёт Apply» остаются админке. Журнал — Sys_-таблица
+    /// вне грантов swimm_ro, поэтому читает его сервис, а не публичный read-контекст.
+    /// Серверного кэша нет (пять источников — три лёгких запроса на каждый), браузер
+    /// ревалидирует каждый раз: дата должна сдвинуться сразу после «Проверить все».
+    /// </summary>
+    [HttpGet("/api/records/freshness")]
+    public async Task<IActionResult> GetFreshness([FromServices] IRecordSourceCheckService checks)
+    {
+        var all = await checks.GetFreshnessAsync(HttpContext.RequestAborted);
+        Response.Headers.CacheControl = "public, no-cache";
+        return Ok(all.Select(f => new { source = f.Source, checkedAt = f.CheckedAt, changedAt = f.ChangedAt }));
+    }
+
+    /// <summary>
     /// Рекорды региона. region обязателен (world | код континента | код страны),
     /// category: open/age/junior/masters (опционально).
     /// </summary>

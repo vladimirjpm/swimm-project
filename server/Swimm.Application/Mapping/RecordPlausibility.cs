@@ -159,7 +159,9 @@ public static class RecordPlausibility
     /// <c>age</c> — только <c>isrorg-age</c>, <c>country/masters</c> — только <c>isrorg-masters</c>
     /// (<c>RecordDiffService.SourceScopes</c>), и там замедление означает дефект источника.
     /// </summary>
-    private static bool IsContestedSlot(RecordDiffEntry e) =>
+    /// Публичный — им же журнал проверок (records-freshness-plan) не считает такие строки
+    /// «изменениями, ждущими Apply»: у worldrecords их десятки при КАЖДОЙ проверке.
+    public static bool IsContestedSlot(RecordDiffEntry e) =>
         e.RegionType.Equals("country", StringComparison.OrdinalIgnoreCase)
         && e.Category.Equals("open", StringComparison.OrdinalIgnoreCase);
 

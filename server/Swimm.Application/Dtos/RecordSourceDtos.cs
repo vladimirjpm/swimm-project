@@ -165,3 +165,39 @@ public sealed record RecordCountryMismatchDto(
     string Distance,
     string Gender,
     string Time);
+
+/// <summary>
+/// Итог одной проверки источника. <paramref name="Diff"/> есть у успешной проверки (его
+/// <c>DiffId</c> — вход Apply), у <c>failed</c> — null и текст в <paramref name="Error"/>.
+/// </summary>
+public sealed record RecordSourceCheckResultDto(
+    string Source,
+    long CheckId,
+    string Outcome,
+    DateTime CheckedAt,
+    string? Error,
+    RecordDiffResult? Diff);
+
+/// <summary>
+/// Свежесть одного источника (records-freshness-plan §2: три даты не смешивать).
+/// </summary>
+/// <param name="CheckedAt">Последняя УСПЕШНАЯ проверка — это «checked» витрины. Сбой её не сдвигает.</param>
+/// <param name="LastAttemptAt">Последняя попытка, включая упавшие.</param>
+/// <param name="LastOutcome">Исход последней попытки: unchanged / changes-found / failed.</param>
+/// <param name="LastError">Текст сбоя, если последняя попытка упала.</param>
+/// <param name="PendingAdded">Новых строк в последней успешной проверке, которую ещё не применили.</param>
+/// <param name="PendingChanged">Изменённых — там же.</param>
+/// <param name="AppliedAt">Когда последний раз применяли дифф этого источника.</param>
+/// <param name="ChangedAt">Когда справочник этого источника реально менялся (max UpdatedAt по его оси).</param>
+/// <param name="NeedsCheck">Пора проверить: не проверялся, старше <c>RecordSources.StaleAfter</c> или последняя попытка упала.</param>
+public sealed record RecordSourceFreshnessDto(
+    string Source,
+    DateTime? CheckedAt,
+    DateTime? LastAttemptAt,
+    string? LastOutcome,
+    string? LastError,
+    int PendingAdded,
+    int PendingChanged,
+    DateTime? AppliedAt,
+    DateTime? ChangedAt,
+    bool NeedsCheck);
