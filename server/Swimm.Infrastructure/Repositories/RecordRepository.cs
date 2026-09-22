@@ -214,6 +214,15 @@ public class RecordRepository : IRecordRepository
                 .OrderBy(x => x.Code)
                 .ToListAsync();
 
+            // Мировые рекорды open по стране держателя — ~90 строк, второй GROUP BY.
+            var world = await _db.Records.AsNoTracking()
+                .Where(r => r.RegionType == "world" && r.Category == "open" && r.HolderCountry != null)
+                .GroupBy(r => r.HolderCountry!)
+                .Select(g => new { Code = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Code, x => x.Count);
+            foreach (var row in rows)
+                row.WorldRecords = world.GetValueOrDefault(row.Code);
+
             return (IReadOnlyList<RecordCountryOptionDto>)rows;
         }, CacheTtl);
 

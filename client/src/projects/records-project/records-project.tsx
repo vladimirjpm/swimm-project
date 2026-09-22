@@ -252,8 +252,12 @@ function RecordsProject() {
                       {region && !countries.some((c) => c.code === region) && (
                         <option value={region}>{region}</option>
                       )}
+                      {/* В скобках — сколько мировых рекордов держит страна; нет ни одного — скобок нет
+                          (решение Влада 22.09.2026). */}
                       {countries.map((c) => (
-                        <option key={c.code} value={c.code}>{c.code} ({c.records})</option>
+                        <option key={c.code} value={c.code}>
+                          {c.world_records ? `${c.code} (${c.world_records})` : c.code}
+                        </option>
                       ))}
                     </select>
                   </span>

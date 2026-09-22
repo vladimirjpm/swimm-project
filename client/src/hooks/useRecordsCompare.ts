@@ -55,6 +55,8 @@ export interface RecordCompareResponse {
 export interface RecordCountryOption {
   code: string;
   records: number;
+  /** Мировые рекорды open у страны (по стране держателя); 0 — скобок у выбора региона нет. */
+  world_records?: number;
 }
 
 export interface RecordsCompareState {
