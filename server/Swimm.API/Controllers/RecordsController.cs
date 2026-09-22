@@ -156,6 +156,14 @@ public class RecordsController : ControllerBase
             () => _records.GetRecordCountriesAsync(), PayloadTtl, CacheControlValue);
 
     /// <summary>
+    /// Число мировых рекордов по категориям — подписи табов /records (WR, World Junior, Masters).
+    /// </summary>
+    [HttpGet("/api/records/world-counts")]
+    public Task<IActionResult> GetWorldCounts()
+        => this.CachedJson(_cache, "http:records:world-counts",
+            () => _records.GetWorldCountsAsync(), PayloadTtl, CacheControlValue);
+
+    /// <summary>
     /// Сравнение двух стран по рекордам (этап 11.3.1): общая ось дисциплин, время каждой
     /// стороны, дельта и сводный счёт.
     ///

@@ -47,6 +47,9 @@ public interface IRecordRepository
     /// </summary>
     Task<IReadOnlyList<RecordCountryOptionDto>> GetRecordCountriesAsync();
 
+    /// <summary>Число мировых рекордов по категориям (open / junior / masters) — подписи табов.</summary>
+    Task<RecordWorldCountsDto> GetWorldCountsAsync();
+
     /// <summary>
     /// Нормативы. kind: regular/masters; null — все.
     /// country: alpha-3 код системы нормативов (RUS/ISR/…); null — без фильтра (легаси).

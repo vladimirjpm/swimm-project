@@ -9,7 +9,7 @@ import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { parseRecordsQuery, routes, type RecordsTab } from '../../utils/routes';
 import { useRecordsRanking } from '../../hooks/useRecordsRanking';
 import { useRegionRecords } from '../../hooks/useRegionRecords';
-import { useRecordCountries } from '../../hooks/useRecordsCompare';
+import { useRecordCountries, useRecordWorldCounts } from '../../hooks/useRecordsCompare';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import DeepTabs, { type DeepTabItem } from '../components/deep/tabs';
 import RkDisciplinePicker from './components/rk-discipline-picker';
@@ -155,8 +155,9 @@ function RecordsProject() {
   const home = data?.rows.find((r) => r.region_code === HOME_REGION) ?? null;
 
   const worldList = region ? nationalOpen : worldOpen;
-  const worldCount = worldList.data
-    ?.filter((r) => r.pool_type === filters.poolType && r.gender === filters.gender).length;
+  // Числа на табах — ВСЕГО мировых рекордов категории (оба бассейна, все полы), не срез
+  // фильтров: подпись таба не должна прыгать от кнопок внутри панели (решение Влада 22.09.2026).
+  const worldCounts = useRecordWorldCounts();
 
   // Подписи — живые данные, как требует хендофф табов: где числа ещё нет, стоит слово.
   const tabs: DeepTabItem<RecordsTab>[] = [
@@ -166,15 +167,15 @@ function RecordsProject() {
     },
     {
       id: 'world', icon: '🏆', label: 'World records', shortLabel: 'WR',
-      sub: worldCount != null ? `${worldCount} records${region ? ` · ${region}` : ''}` : 'every event',
+      sub: worldCounts ? `${worldCounts.open} world records` : 'every event',
     },
     {
       id: 'masters', icon: '⏱', label: 'Masters WR',
-      sub: 'Israel vs world · by age band',
+      sub: worldCounts ? `${worldCounts.masters} world records` : 'Israel vs world · by age band',
     },
     {
       id: 'junior', icon: '🌱', label: 'World Junior',
-      sub: 'Israel ages vs world junior',
+      sub: worldCounts ? `${worldCounts.junior} world junior records` : 'Israel ages vs world junior',
     },
   ];
 
