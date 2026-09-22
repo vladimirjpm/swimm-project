@@ -125,6 +125,11 @@ export const routes = {
     tab?: RecordsTab | null;
     /** Возрастная группа мастерсов («35-39»), только для таба `masters`. */
     ageGroup?: string | null;
+    /**
+     * Регион таба `world` (9.9): alpha-3 страны — её национальные рекорды против мировых;
+     * пусто — сами мировые рекорды.
+     */
+    region?: string | null;
   } = {}) => {
     const params = new URLSearchParams();
     if (q.tab && q.tab !== 'countries') params.set('tab', q.tab);
@@ -134,6 +139,7 @@ export const routes = {
     if (q.poolType) params.set('pool', q.poolType);
     if (q.highlight) params.set('country', q.highlight);
     if (q.ageGroup) params.set('age', q.ageGroup);
+    if (q.region) params.set('region', q.region);
     const query = params.toString();
     return query ? `/records?${query}` : '/records';
   },
@@ -344,6 +350,8 @@ export interface RecordsQuery {
   highlight: string | null;
   /** Возрастная группа мастерсов «35-39» (`?age=`); незнакомая форма — null. */
   ageGroup: string | null;
+  /** Регион таба `world` (`?region=`, alpha-3); null — мировые рекорды. */
+  region: string | null;
 }
 
 export function parseRecordsQuery(search: string = window.location.search): RecordsQuery {
@@ -364,6 +372,8 @@ export function parseRecordsQuery(search: string = window.location.search): Reco
     poolType: pool === '25m' || pool === '50m' ? pool : null,
     highlight: (p.get('country') || '').trim().toUpperCase() || null,
     ageGroup: /^\d{2,3}-\d{2,3}$/.test((p.get('age') ?? '').trim()) ? p.get('age')!.trim() : null,
+    // Только форма alpha-3: «world» и прочее — это и есть мировые рекорды (дефолт).
+    region: /^[A-Za-z]{3}$/.test((p.get('region') ?? '').trim()) ? p.get('region')!.trim().toUpperCase() : null,
   };
 }
 

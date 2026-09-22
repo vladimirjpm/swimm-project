@@ -109,10 +109,12 @@ export function useRecordsCompare(p: RecordsCompareParams): RecordsCompareState 
 }
 
 /** Страны, у которых в справочнике есть рекорды, — для выбора сторон. */
-export function useRecordCountries(): RecordCountryOption[] {
+export function useRecordCountries(enabled = true): RecordCountryOption[] {
   const [countries, setCountries] = useState<RecordCountryOption[]>([]);
 
   useEffect(() => {
+    // Страница рекордов держит хук всегда, а список нужен только табу WR.
+    if (!enabled) return;
     let alive = true;
     fetch('/api/records/countries', { credentials: 'same-origin' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
@@ -120,7 +122,7 @@ export function useRecordCountries(): RecordCountryOption[] {
       // Список не критичен: без него страница всё равно работает по адресу с парой.
       .catch(() => { if (alive) setCountries([]); });
     return () => { alive = false; };
-  }, []);
+  }, [enabled]);
 
   return countries;
 }

@@ -159,6 +159,8 @@ try {
     'dv-swimm-icon',
     iconValue ? 'dv-swimm-icon--sized' : '',
     plateOn ? 'dv-swimm-icon--len-plate' : '',
+    // Дистанция справа: ширину держит картинка, а не корень, — иначе число уезжает за край.
+    styleType === 'icon-len' && lenPlacement === 'right' ? 'dv-swimm-icon--len-right' : '',
     className,
   ]
     .filter(Boolean)
