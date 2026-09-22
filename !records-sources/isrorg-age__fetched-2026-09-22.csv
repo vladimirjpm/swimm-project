@@ -1,0 +1,986 @@
+RegionType,RegionCode,Category,AgeKey,Gender,PoolType,Style,Distance,Time,HolderName,Club,HolderCountry,RecordDate
+country,ISR,age,10,female,25m,backstroke,100m,01:15.71,איה גליל,מכבי כפר המכבייה,ISR,29/10/2021
+country,ISR,age,10,female,25m,backstroke,200m,02:45.46,עדי כהן,מכבי אשדוד,ISR,30/12/1995
+country,ISR,age,10,female,25m,backstroke,50m,35.64,עדי כהן,מכבי אשדוד,ISR,30/12/1995
+country,ISR,age,10,female,25m,breaststroke,100m,01:26.21,עדי ביכמן,הפועל גבעתיים,ISR,24/12/1993
+country,ISR,age,10,female,25m,breaststroke,200m,03:07.98,קרינה סוקולוב,הפועל באר שבע,ISR,14/12/2009
+country,ISR,age,10,female,25m,breaststroke,50m,39.85,ענת זימין,הפועל בת ים,ISR,22/12/2003
+country,ISR,age,10,female,25m,butterfly,100m,01:14.61,ענת זימין,הפועל בת ים,ISR,27/12/2003
+country,ISR,age,10,female,25m,butterfly,200m,02:43.84,אנג׳לה זאבורויב,הפועל דולפין נתניה,ISR,26/11/2022
+country,ISR,age,10,female,25m,butterfly,50m,32.88,ענת זימין,הפועל בת ים,ISR,24/05/2003
+country,ISR,age,10,female,25m,freestyle,100m,01:04.79,ענת זימין,הפועל בת ים,ISR,26/12/2003
+country,ISR,age,10,female,25m,freestyle,200m,02:22.81,אנג׳לה זאבורויב,הפועל דולפין נתניה,ISR,26/11/2022
+country,ISR,age,10,female,25m,freestyle,400m,05:22.16,דריה גולובטי,הפועל בת ים,ISR,09/12/2015
+country,ISR,age,10,female,25m,freestyle,4X50m,02:20.20,מכבי,קרית-ביאליק,ISR,24/12/1995
+country,ISR,age,10,female,25m,freestyle,50m,29.76,ענת זימין,הפועל בת ים,ISR,26/12/2003
+country,ISR,age,10,female,25m,individual_medley,100m,01:16.70,ענת זימין,הפועל בת ים,ISR,24/12/2003
+country,ISR,age,10,female,25m,individual_medley,200m,02:40.29,ענת זימין,הפועל בת ים,ISR,27/12/2003
+country,ISR,age,10,female,25m,individual_medley,400m,05:52.24,עדן פסקרה,מכבי פ.מ. רעות,ISR,23/12/2010
+country,ISR,age,10,female,25m,individual_medley,4X50m,02:33.30,מכבי,קרית ביאליק,ISR,24/12/1995
+country,ISR,age,10,female,50m,backstroke,100m,01:21.65,מיקה שלזינגר,בני-הרצליה,ISR,28/07/2000
+country,ISR,age,10,female,50m,backstroke,200m,02:51.15,איה גליל,מכבי כפר המכביה,ISR,02/08/2021
+country,ISR,age,10,female,50m,backstroke,50m,34.08,מירה מירוסלבה אושקובה,הפועל דולפין נתניה,ISR,20/07/2025
+country,ISR,age,10,female,50m,breaststroke,100m,01:28.05,יעל נרודיצקי,הפועל דולפין נהריה,ISR,31/07/2006
+country,ISR,age,10,female,50m,breaststroke,200m,03:10.73,יעל נרודיצקי,הפועל דולפין נהריה,ISR,01/08/2006
+country,ISR,age,10,female,50m,breaststroke,50m,41.13,מרסי אן נגירה,בני הרצליה,ISR,05/06/2015
+country,ISR,age,10,female,50m,butterfly,100m,01:16.05,ענת זימין,הפועל בת-ים,ISR,30/07/2003
+country,ISR,age,10,female,50m,butterfly,200m,03:06.52,לי ראובני,,ISR,03/08/1999
+country,ISR,age,10,female,50m,butterfly,50m,34.27,ענת זימין,הפועל בת-ים,ISR,25/04/2003
+country,ISR,age,10,female,50m,freestyle,100m,01:07.83,ענת זימין,הפועל בת ים,ISR,30/07/2003
+country,ISR,age,10,female,50m,freestyle,200m,02:28.90,ענת זימין,הפועל בת-ים,ISR,26/04/2003
+country,ISR,age,10,female,50m,freestyle,400m,05:08.32,ענת זימין,הפועל בת-ים,ISR,31/07/2003
+country,ISR,age,10,female,50m,freestyle,4X50m,02:24.26,,מכבי קרית אונו,ISR,
+country,ISR,age,10,female,50m,freestyle,50m,31.18,ענת זימין,הפועל בת-ים,ISR,29/07/2003
+country,ISR,age,10,female,50m,individual_medley,200m,02:45.00,ענת זימין,הפועל בת-ים,ISR,31/07/2003
+country,ISR,age,10,female,50m,individual_medley,400m,06:08.01,לי ראובני,"הפועל ק.ג. ת""א",ISR,02/08/1999
+country,ISR,age,10,female,50m,individual_medley,4X50m,02:38.29,,מכבי קרית -אונו,ISR,
+country,ISR,age,10,male,25m,backstroke,100m,01:14.51,רון מורגוליס,מכבי וייסגל רחובות,ISR,26/12/2016
+country,ISR,age,10,male,25m,backstroke,200m,02:37.93,רון מורגוליס,מכבי וייסגל רחובות,ISR,26/12/2016
+country,ISR,age,10,male,25m,backstroke,50m,34.67,רון מורגוליס,מכבי וייסגל רחובות,ISR,25/12/2016
+country,ISR,age,10,male,25m,breaststroke,100m,01:24.33,מיכאל מגרלישוילי,מכבי אשדוד,ISR,23/12/2003
+country,ISR,age,10,male,25m,breaststroke,200m,03:03.41,לביא גפן משיח,מכבי פ.מ. רעות,ISR,19/11/2021
+country,ISR,age,10,male,25m,breaststroke,50m,39.06,לביא גפן משיח,מכבי פ.מ. רעות,ISR,15/10/2021
+country,ISR,age,10,male,25m,butterfly,100m,01:16.20,דניאל רבינוביץ׳,הפועל בת ים,ISR,25/12/2015
+country,ISR,age,10,male,25m,butterfly,50m,33.02,יונתן חייטוב,הפועל פתח תקוה,ISR,26/12/2003
+country,ISR,age,10,male,25m,freestyle,100m,01:06.93,יונתן חייטוב,הפועל פתח תקוה,ISR,26/12/2003
+country,ISR,age,10,male,25m,freestyle,200m,02:23.16,דניאל רבינוביץ׳,הפועל בת ים,ISR,25/12/2016
+country,ISR,age,10,male,25m,freestyle,400m,05:15.43,יהב חלג׳,מכבי קרית אונו,ISR,09/12/2015
+country,ISR,age,10,male,25m,freestyle,4X50m,02:10.06,,הפועל ירושלים,ISR,28/12/2005
+country,ISR,age,10,male,25m,freestyle,50m,29.81,מיכאל סמירנוב,הפועל בית שמש,ISR,21/12/2011
+country,ISR,age,10,male,25m,individual_medley,100m,01:19.03,יעקב טומרקין,מכבי אשדוד,ISR,05/12/2002
+country,ISR,age,10,male,25m,individual_medley,200m,02:40.97,יונתן חייטוב,הפועל פתח תקוה,ISR,26/12/2003
+country,ISR,age,10,male,25m,individual_medley,4X50m,02:28.27,,הפועל ירושלים,ISR,27/12/2005
+country,ISR,age,10,male,50m,backstroke,100m,01:16.07,רון מורגוליס,מכבי וייסגל רחובות,ISR,28/07/2016
+country,ISR,age,10,male,50m,backstroke,200m,02:39.84,רון מורגוליס,מכבי וייסגל רחובות,ISR,06/07/2016
+country,ISR,age,10,male,50m,backstroke,50m,36.61,דניאל רבינוביץ,הפועל בת-ים,ISR,02/07/2016
+country,ISR,age,10,male,50m,breaststroke,100m,01:26.67,לביא גפן משיח,מכבי פ.מ. רעות,ISR,03/08/2021
+country,ISR,age,10,male,50m,breaststroke,200m,03:07.53,לביא גפן משיח,מכבי פ.מ. רעות,ISR,02/08/2021
+country,ISR,age,10,male,50m,breaststroke,50m,41.04,מיכאל מגרלישוילי,מכבי אשדוד,ISR,30/07/2003
+country,ISR,age,10,male,50m,butterfly,100m,01:16.13,אלון מרושצנקו,הפועל שחייני הנגב,ISR,21/07/2015
+country,ISR,age,10,male,50m,butterfly,200m,02:57.82,נמרוד חייט,מכבי פ.מ. רעות,ISR,08/08/2001
+country,ISR,age,10,male,50m,butterfly,50m,34.60,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,22/06/2012
+country,ISR,age,10,male,50m,freestyle,100m,01:06.67,נתניאל פושקה,הפועל בת-ים,ISR,25/07/2017
+country,ISR,age,10,male,50m,freestyle,200m,02:24.92,דניאל רבינוביץ,הפועל בת-ים,ISR,27/07/2016
+country,ISR,age,10,male,50m,freestyle,400m,05:06.69,דניאל רבינוביץ,הפועל בת-ים,ISR,25/07/2016
+country,ISR,age,10,male,50m,freestyle,4X50m,02:14.90,"דוד רשקובן, בנימין צ׳רנובסקי, דניאל סטשבסקי, יונתן קאירי גורל",מכבי אשדוד,ISR,01/08/2022
+country,ISR,age,10,male,50m,freestyle,50m,30.25,נתניאל פושקה,הפועל בת-ים,ISR,24/07/2017
+country,ISR,age,10,male,50m,individual_medley,200m,02:44.67,דניאל רבינוביץ,הפועל בת-ים,ISR,28/07/2016
+country,ISR,age,10,male,50m,individual_medley,400m,06:22.90,אביטל מיטב,,ISR,02/08/1999
+country,ISR,age,10,male,50m,individual_medley,4X50m,02:42.67,"אלון אברמוביץ, ינאי נבו, יונתן מוקוליצקי, ינאי סופר",מכבי וייסגל רחובות,ISR,20/07/2024
+country,ISR,age,11,female,25m,backstroke,100m,01:12.53,טל קדרון,הפועל מ.א. משגב,ISR,29/12/2006
+country,ISR,age,11,female,25m,backstroke,200m,02:33.12,טל קדרון,הפועל מ.א. משגב,ISR,28/12/2006
+country,ISR,age,11,female,25m,backstroke,50m,33.27,עדי כהן,מכבי אשדוד,ISR,21/12/1996
+country,ISR,age,11,female,25m,breaststroke,100m,01:20.66,שירה גמליי,מכבי וייסגל רחובות,ISR,18/12/2017
+country,ISR,age,11,female,25m,breaststroke,200m,02:50.67,עדי ביכמן,הפועל גבעתיים,ISR,15/12/1994
+country,ISR,age,11,female,25m,breaststroke,50m,37.38,עדי ביכמן,הפועל גבעתיים,ISR,16/12/1994
+country,ISR,age,11,female,25m,butterfly,100m,01:06.44,ענת זימין,הפועל בת ים,ISR,24/12/2004
+country,ISR,age,11,female,25m,butterfly,200m,02:39.66,שרון שטיימן,הפועל פליפר חדרה,ISR,03/12/2016
+country,ISR,age,11,female,25m,butterfly,50m,29.59,ענת זימין,הפועל בת ים,ISR,15/12/2004
+country,ISR,age,11,female,25m,freestyle,100m,01:00.92,ענת זימין,הפועל בת ים,ISR,03/12/2004
+country,ISR,age,11,female,25m,freestyle,200m,02:17.10,ענת זימין,הפועל בת ים,ISR,22/05/2004
+country,ISR,age,11,female,25m,freestyle,400m,04:48.22,שרון שטיימן,הפועל פליפר חדרה,ISR,01/12/2016
+country,ISR,age,11,female,25m,freestyle,4X50m,02:20.20,מכבי,קרית-ביאליק,ISR,24/12/1995
+country,ISR,age,11,female,25m,freestyle,50m,27.89,ענת זימין,הפועל בת ים,ISR,13/12/2004
+country,ISR,age,11,female,25m,freestyle,800m,09:56.36,ענת זימין,הפועל בת ים,ISR,21/05/2004
+country,ISR,age,11,female,25m,individual_medley,100m,01:09.60,ענת זימין,הפועל בת ים,ISR,03/12/2004
+country,ISR,age,11,female,25m,individual_medley,200m,02:27.97,ענת זימין,הפועל בת ים,ISR,24/12/2004
+country,ISR,age,11,female,25m,individual_medley,400m,05:14.12,ענת זימין,הפועל בת ים,ISR,25/12/2004
+country,ISR,age,11,female,25m,individual_medley,4X50m,02:33.30,מכבי,קרית ביאליק,ISR,24/12/1995
+country,ISR,age,11,female,50m,backstroke,100m,01:13.21,עופרי קמר,הפועל חולון,ISR,16/07/2018
+country,ISR,age,11,female,50m,backstroke,200m,02:35.78,עופרי קמר,הפועל חולון,ISR,15/07/2018
+country,ISR,age,11,female,50m,backstroke,50m,34.08,מירה מירוסלבה אושקובה,הפועל דולפין נתניה,ISR,20/07/2025
+country,ISR,age,11,female,50m,breaststroke,100m,01:22.47,מיה גרינברג,מכבי ראשון לציון,ISR,19/06/2026
+country,ISR,age,11,female,50m,breaststroke,200m,02:58.31,קרינה סוקולוב,הפועל באר-שבע,ISR,28/07/2010
+country,ISR,age,11,female,50m,breaststroke,50m,37.10,ענת זימין,הפועל בת ים,ISR,01/05/2004
+country,ISR,age,11,female,50m,butterfly,100m,01:07.13,ענת זימין,הפועל בת-ים,ISR,04/08/2004
+country,ISR,age,11,female,50m,butterfly,200m,02:47.06,ענבר רשף,הפועל ירושלים,ISR,29/07/2005
+country,ISR,age,11,female,50m,butterfly,50m,30.65,ענת זימין,הפועל בת-ים,ISR,01/05/2004
+country,ISR,age,11,female,50m,freestyle,100m,01:03.53,שרון שטיימן,הפועל פליפר חדרה,ISR,26/07/2016
+country,ISR,age,11,female,50m,freestyle,200m,02:17.68,ענת זימין,הפועל בת-ים,ISR,18/06/2004
+country,ISR,age,11,female,50m,freestyle,400m,04:50.01,ענת זימין,הפועל בת-ים,ISR,05/08/2004
+country,ISR,age,11,female,50m,freestyle,4X50m,02:15.73,"ג׳וליה דטנו, אוליביה ימפולסקי׳, זוהר קופליאנסקי, מאיה זגדון",בני הרצליה,ISR,20/07/2024
+country,ISR,age,11,female,50m,freestyle,50m,29.11,ענת זימין,הפועל בת-ים,ISR,03/08/2004
+country,ISR,age,11,female,50m,freestyle,800m,10:08.59,הדר קלינמן,מכבי קרית -אונו,ISR,01/01/1981
+country,ISR,age,11,female,50m,individual_medley,200m,02:35.37,ענת זימין,הפועל בת-ים,ISR,05/08/2004
+country,ISR,age,11,female,50m,individual_medley,400m,05:52.66,לי ראובני,"הפועל ק.ג. ת""א",ISR,27/07/2000
+country,ISR,age,11,female,50m,individual_medley,4X50m,02:36.85,"ג׳וליה דטנו, שירה גוטהילף, מאיה זגדון, אוליביה ימפולסקי",בני הרצליה,ISR,20/07/2024
+country,ISR,age,11,male,25m,backstroke,100m,01:09.43,דניאל רבינוביץ׳,הפועל בת ים,ISR,19/12/2017
+country,ISR,age,11,male,25m,backstroke,200m,02:29.32,דניס לוקטב,מכבי אשדוד,ISR,21/12/2011
+country,ISR,age,11,male,25m,backstroke,50m,32.20,איליה איזנשטוק,מכבי קרית ביאליק,ISR,09/12/1999
+country,ISR,age,11,male,25m,breaststroke,100m,01:17.10,דוד מנשר,מכבי פ.מ. רעות,ISR,28/12/2013
+country,ISR,age,11,male,25m,breaststroke,200m,02:47.44,דוד מנשר,מכבי פ.מ. רעות,ISR,27/12/2013
+country,ISR,age,11,male,25m,breaststroke,50m,36.39,דוד מנשר,מכבי פ.מ. רעות,ISR,28/12/2013
+country,ISR,age,11,male,25m,butterfly,100m,01:08.92,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,27/12/2013
+country,ISR,age,11,male,25m,butterfly,200m,02:38.66,נמרוד חייט,מכבי פ.מ. רעות,ISR,27/12/2002
+country,ISR,age,11,male,25m,butterfly,50m,30.11,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,28/12/2013
+country,ISR,age,11,male,25m,freestyle,100m,01:01.25,יונתן חייטוב,הפועל פתח תקוה,ISR,13/12/2004
+country,ISR,age,11,male,25m,freestyle,200m,02:13.06,נתניאל פושקה,הפועל בת ים,ISR,06/12/2018
+country,ISR,age,11,male,25m,freestyle,400m,04:46.48,עידן ז׳ורבסקי,הפועל בת ים,ISR,18/02/2018
+country,ISR,age,11,male,25m,freestyle,4X50m,02:07.25,"דניאל סטשבסקי, יונתן קאירי גורל, בנימין צ׳רנובסקי, דוד רשקוב",מכבי אשדוד,ISR,05/05/2023
+country,ISR,age,11,male,25m,freestyle,50m,28.01,יונתן חייטוב,הפועל פתח תקוה,ISR,24/12/2004
+country,ISR,age,11,male,25m,freestyle,800m,10:10.48,עומר הופמן,הפועל שחייני הנגב,ISR,25/12/2004
+country,ISR,age,11,male,25m,individual_medley,100m,01:08.65,יונתן חייטוב,הפועל פתח תקוה,ISR,15/12/2004
+country,ISR,age,11,male,25m,individual_medley,200m,02:30.24,יונתן חייטוב,הפועל פתח תקוה,ISR,15/12/2004
+country,ISR,age,11,male,25m,individual_medley,400m,05:27.70,נמרוד חייט,מכבי פ.מ. רעות,ISR,28/12/2002
+country,ISR,age,11,male,25m,individual_medley,4X50m,02:28.24,"דניאל סטשבסקי, בנימין צ׳רנובסקי, דוד רשקוב, יונתן קאירי גורל",מכבי אשדוד,ISR,05/05/2023
+country,ISR,age,11,male,50m,backstroke,100m,01:12.50,נתניאל פושקה,הפועל בת-ים,ISR,16/07/2018
+country,ISR,age,11,male,50m,backstroke,200m,02:33.73,דניאל רבינוביץ,הפועל בת-ים,ISR,23/07/2017
+country,ISR,age,11,male,50m,backstroke,50m,33.98,יונתן חייטוב,הפועל פתח-תקוה,ISR,05/08/2004
+country,ISR,age,11,male,50m,breaststroke,100m,01:22.41,מיכאל מגרלישוילי,מכבי אשדוד,ISR,04/08/2004
+country,ISR,age,11,male,50m,breaststroke,200m,02:58.23,דוד מנשר,מכבי פ.מ. רעות,ISR,31/07/2013
+country,ISR,age,11,male,50m,breaststroke,50m,38.65,לביא גפן משיח,מכבי פ.מ. רעות,ISR,01/08/2022
+country,ISR,age,11,male,50m,butterfly,100m,01:12.50,אלון מרושצנקו,הפועל שחייני הנגב,ISR,26/07/2016
+country,ISR,age,11,male,50m,butterfly,200m,02:44.01,אביטל מיטב,"הפועל ק.ג. ת""א",ISR,29/07/2000
+country,ISR,age,11,male,50m,butterfly,50m,31.58,יונתן חייטוב,הפועל פתח-תקוה,ISR,05/08/2004
+country,ISR,age,11,male,50m,freestyle,100m,01:02.71,יונתן חייטוב,הפועל פתח-תקוה,ISR,04/08/2004
+country,ISR,age,11,male,50m,freestyle,200m,02:15.50,נתניאל פושקה,הפועל בת-ים,ISR,30/06/2018
+country,ISR,age,11,male,50m,freestyle,400m,04:43.14,עידן ז׳ורבסקי,הפועל בת-ים,ISR,15/07/2018
+country,ISR,age,11,male,50m,freestyle,4X50m,02:06.58,"דניאל סטשבסקי, יונתן קאירי גורל, בנימין צ׳רנובסקי, דוד רשקוב",מכבי אשדוד,ISR,23/07/2023
+country,ISR,age,11,male,50m,freestyle,50m,28.66,יונתן חייטוב,הפועל פתח-תקוה,ISR,05/08/2004
+country,ISR,age,11,male,50m,freestyle,800m,10:32.75,אריה קרני,הפועל חולון,ISR,02/09/1977
+country,ISR,age,11,male,50m,individual_medley,200m,02:29.93,יונתן חייטוב,הפועל פתח-תקוה,ISR,05/08/2004
+country,ISR,age,11,male,50m,individual_medley,400m,05:52.98,יורי בוגייב,מכבי תל-אביב/מכביה,ISR,24/07/1995
+country,ISR,age,11,male,50m,individual_medley,4X50m,02:25.89,"יוסף רודה, דניאל סטשבסקי, יונתן קאירי גורל, בנימין צ׳רנובסקי",מכבי אשדוד,ISR,23/07/2023
+country,ISR,age,12,female,25m,backstroke,100m,01:07.68,נועה שוהם,הפועל עמק חפר,ISR,27/12/2014
+country,ISR,age,12,female,25m,backstroke,200m,02:23.60,ניצן כץ-ליכטנשטיין,מר׳ כוכב יאיר,ISR,29/12/2011
+country,ISR,age,12,female,25m,backstroke,50m,31.23,ענת זימין,הפועל בת ים,ISR,02/04/2005
+country,ISR,age,12,female,25m,breaststroke,100m,01:13.83,שירה גמליי,מכבי וייסגל רחובות,ISR,29/12/2018
+country,ISR,age,12,female,25m,breaststroke,200m,02:42.74,עדי ביכמן,הפועל גבעתיים,ISR,28/12/1995
+country,ISR,age,12,female,25m,breaststroke,50m,34.15,שירה גמליי,מכבי וייסגל רחובות,ISR,29/12/2018
+country,ISR,age,12,female,25m,butterfly,100m,01:02.92,ענת זימין,הפועל בת ים,ISR,28/12/2005
+country,ISR,age,12,female,25m,butterfly,200m,02:17.73,שרון שטיימן,הפועל פליפר חדרה,ISR,28/12/2017
+country,ISR,age,12,female,25m,butterfly,50m,28.70,ענת זימין,הפועל בת ים,ISR,29/12/2005
+country,ISR,age,12,female,25m,freestyle,100m,58.38,ענת זימין,הפועל בת ים,ISR,23/12/2005
+country,ISR,age,12,female,25m,freestyle,200m,02:08.68,בקי פוזדנר,הפועל בת ים,ISR,30/12/2016
+country,ISR,age,12,female,25m,freestyle,400m,04:25.36,ענת זימין,הפועל בת ים,ISR,22/12/2005
+country,ISR,age,12,female,25m,freestyle,4X100m,04:21.38,,הפועל חולון,ISR,31/12/2011
+country,ISR,age,12,female,25m,freestyle,4X200m,09:15.62,,הפועל חולון,ISR,30/12/2011
+country,ISR,age,12,female,25m,freestyle,4X50m,01:59.63,"דריה גולובטי, רומי חבחב, גטלמן אליס, סבשצ׳ינסקי אלכסיה",הפועל בת ים,ISR,19/12/2017
+country,ISR,age,12,female,25m,freestyle,50m,27.31,ענת זימין,הפועל בת ים,ISR,20/12/2005
+country,ISR,age,12,female,25m,freestyle,800m,09:09.63,דריה גולובטי,הפועל בת ים,ISR,29/12/2017
+country,ISR,age,12,female,25m,individual_medley,100m,01:06.48,ענת זימין,הפועל בת ים,ISR,29/12/2005
+country,ISR,age,12,female,25m,individual_medley,200m,02:23.35,ענת זימין,הפועל בת ים,ISR,24/12/2005
+country,ISR,age,12,female,25m,individual_medley,400m,05:03.03,דריה גולובטי,הפועל בת ים,ISR,30/12/2017
+country,ISR,age,12,female,25m,individual_medley,4X100m,04:46.42,,הפועל דולפין נתניה,ISR,30/12/2011
+country,ISR,age,12,female,25m,individual_medley,4X50m,02:02.55,"גלי קוקס-מעגן, שירה גמליי, ליליה אפשטיין, מיטל שרגין",מכבי חיפה,ISR,22/01/2016
+country,ISR,age,12,female,50m,backstroke,100m,01:09.81,שני סיילוב,מר׳ כוכב יאיר,ISR,29/06/1995
+country,ISR,age,12,female,50m,backstroke,200m,02:27.45,שני סיילוב,מר׳ כוכב יאיר,ISR,29/06/1995
+country,ISR,age,12,female,50m,backstroke,50m,32.23,ענת זימין,הפועל בת-ים,ISR,21/05/2005
+country,ISR,age,12,female,50m,breaststroke,100m,01:18.00,עדי ביכמן,הפועל גבעתיים,ISR,04/08/1995
+country,ISR,age,12,female,50m,breaststroke,200m,02:47.48,עדי ביכמן,הפועל גבעתיים,ISR,29/06/1995
+country,ISR,age,12,female,50m,breaststroke,50m,36.16,מרסי אן נגירה,בני הרצליה,ISR,04/08/2017
+country,ISR,age,12,female,50m,butterfly,100m,01:04.34,ענת זימין,הפועל בת-ים,ISR,29/07/2005
+country,ISR,age,12,female,50m,butterfly,200m,02:26.61,ניצן כץ-ליכטנשטיין,הפועל ירושלים,ISR,04/08/2011
+country,ISR,age,12,female,50m,butterfly,50m,28.98,ענת זימין,הפועל בת-ים,ISR,20/05/2005
+country,ISR,age,12,female,50m,freestyle,100m,01:01.21,ענת זימין,מכבי קרית ביאליק,ISR,21/05/2005
+country,ISR,age,12,female,50m,freestyle,200m,02:11.83,ענת זימין,מכבי קרית ביאליק,ISR,06/05/2005
+country,ISR,age,12,female,50m,freestyle,400m,04:40.37,ענת זימין,הפועל בת-ים,ISR,04/06/2005
+country,ISR,age,12,female,50m,freestyle,4X200m,09:55.22,"גוני שלום יופת, ליה גונן, יובל גד, דנה מאיטלס",בני הרצליה,ISR,16/07/2016
+country,ISR,age,12,female,50m,freestyle,4X50m,01:58.55,"בקי פוזדנר, אלכסיה סבשצ׳ינסקי, רוני עוז, דריה גולובטי",הפועל בת-ים,ISR,23/07/2017
+country,ISR,age,12,female,50m,freestyle,50m,28.07,ענת זימין,הפועל בת-ים,ISR,20/05/2005
+country,ISR,age,12,female,50m,freestyle,800m,09:45.38,ויטה זיגלבוים,מכבי קרית אונו,ISR,05/06/2015
+country,ISR,age,12,female,50m,individual_medley,200m,02:29.91,ענת זימין,הפועל בת-ים,ISR,07/05/2005
+country,ISR,age,12,female,50m,individual_medley,400m,05:21.18,דריה גולובטי,הפועל בת-ים,ISR,24/07/2017
+country,ISR,age,12,female,50m,individual_medley,4X100m,05:12.00,"גוני שלום ידפת, מרסי אן נגירה, ליה גונן, דנה מאיטלס",בני הרצליה,ISR,03/06/2016
+country,ISR,age,12,female,50m,individual_medley,4X50m,02:13.25,"גלי קוקס-מעגן, שירה גמליי, ליליה אפשטיין, מיטל שרגין",מכבי וייסגל רחובות,ISR,24/07/2019
+country,ISR,age,12,male,25m,backstroke,100m,01:05.15,ערן גרובמן,מכבי וייסגל רחובות,ISR,09/11/2019
+country,ISR,age,12,male,25m,backstroke,200m,02:20.20,ערן גרובמן,מכבי וייסגל רחובות,ISR,09/11/2019
+country,ISR,age,12,male,25m,backstroke,50m,29.93,איליה איזנשטוק,מכבי קרית ביאליק,ISR,30/12/2000
+country,ISR,age,12,male,25m,breaststroke,100m,01:10.52,מרק טלר,מכבי כפר המכבייה,ISR,18/08/2020
+country,ISR,age,12,male,25m,breaststroke,200m,02:35.21,יבגני רדצ׳נקו,הפועל בת ים,ISR,28/12/2012
+country,ISR,age,12,male,25m,breaststroke,50m,32.65,טלר מרק,מכבי תל אביב,ISR,17/08/2020
+country,ISR,age,12,male,25m,butterfly,100m,01:01.63,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,05/12/2014
+country,ISR,age,12,male,25m,butterfly,200m,02:22.36,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,06/12/2014
+country,ISR,age,12,male,25m,butterfly,50m,27.81,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,06/12/2014
+country,ISR,age,12,male,25m,freestyle,100m,57.45,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,06/12/2014
+country,ISR,age,12,male,25m,freestyle,1500m,18:17.49,נמרוד שפירא בר-אור,ירושלים רבתי,ISR,29/12/2001
+country,ISR,age,12,male,25m,freestyle,200m,02:05.67,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,06/12/2014
+country,ISR,age,12,male,25m,freestyle,400m,04:28.91,דניס לוקטב,הפועל בת ים,ISR,25/11/2021
+country,ISR,age,12,male,25m,freestyle,4X100m,04:10.65,"סטיבן פרידמן, מתן טוצ׳ילובסקי, בר סולוביצ׳יק, רודוב למר",מכבי קרית-ביאליק,ISR,29/12/2012
+country,ISR,age,12,male,25m,freestyle,4X200m,09:02.86,מכבי,קרית ביאליק,ISR,28/12/2012
+country,ISR,age,12,male,25m,freestyle,4X50m,01:52.92,"אלכס וולקוב, דניאל וולקוב, דוד לוין, אחמד דיאב",מכבי קרית ביאליק,ISR,05/12/2014
+country,ISR,age,12,male,25m,freestyle,50m,26.29,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,06/12/2014
+country,ISR,age,12,male,25m,freestyle,800m,09:30.14,נתן נמרוד,מכ. פ.מ. רעות,ISR,06/12/1997
+country,ISR,age,12,male,25m,individual_medley,100m,01:04.04,יונתן חייטוב,הפועל פתח תקווה,ISR,29/12/2005
+country,ISR,age,12,male,25m,individual_medley,200m,02:19.84,יונתן חייטוב,הפועל פתח תקוה,ISR,29/12/2005
+country,ISR,age,12,male,25m,individual_medley,400m,04:56.45,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,05/12/2014
+country,ISR,age,12,male,25m,individual_medley,4X100m,04:41.58,מכבי,אשדוד,ISR,23/12/2005
+country,ISR,age,12,male,25m,individual_medley,4X50m,02:12.83,"רון מרגוליס, נתאי רוזנברג, פלג ליין, יואב רותם",מכבי וייסגל רחובות,ISR,20/02/2018
+country,ISR,age,12,male,50m,backstroke,100m,01:07.54,ערן גרובמן,מכבי וייסגל רחובות,ISR,23/07/2019
+country,ISR,age,12,male,50m,backstroke,200m,02:23.11,ערן גרובמן,מכבי וייסגל רחובות,ISR,22/07/2019
+country,ISR,age,12,male,50m,backstroke,50m,31.32,יונתן חייטוב,הפועל פתח-תקוה,ISR,21/05/2005
+country,ISR,age,12,male,50m,breaststroke,100m,01:16.59,דוד מנשר,מכבי פ.מ. רעות,ISR,23/07/2014
+country,ISR,age,12,male,50m,breaststroke,200m,02:43.46,דוד מנשר,מכבי פ.מ. רעות,ISR,22/07/2014
+country,ISR,age,12,male,50m,breaststroke,50m,34.78,דוד מנשר,מכבי פ.מ. רעות,ISR,14/06/2014
+country,ISR,age,12,male,50m,butterfly,100m,01:04.12,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,22/07/2014
+country,ISR,age,12,male,50m,butterfly,200m,02:23.71,יואב שמיר,בני הרצליה,ISR,15/06/2024
+country,ISR,age,12,male,50m,butterfly,50m,28.70,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,04/07/2014
+country,ISR,age,12,male,50m,freestyle,100m,59.93,יונתן חייטוב,הפועל פתח-תקוה,ISR,21/05/2005
+country,ISR,age,12,male,50m,freestyle,1500m,19:05.33,מודי זוהר,מכבי תל-אביב,ISR,24/09/1977
+country,ISR,age,12,male,50m,freestyle,200m,02:09.26,נתניאל פושקה,הפועל בת-ים,ISR,23/07/2019
+country,ISR,age,12,male,50m,freestyle,400m,04:35.22,בנימין זלצמן,הפועל ירושלים,ISR,20/07/2015
+country,ISR,age,12,male,50m,freestyle,4X100m,04:29.94,,מכבי נהריה,ISR,31/07/2006
+country,ISR,age,12,male,50m,freestyle,4X200m,09:43.88,"עילי רבינוביץ, ליאם גיאולי, אלכס דולגיך, רוסלן גבריאלוב",הפועל דולפין נתניה,ISR,24/07/2017
+country,ISR,age,12,male,50m,freestyle,4X50m,01:54.76,,מכבי אשדוד,ISR,07/08/2001
+country,ISR,age,12,male,50m,freestyle,50m,27.13,יונתן חייטוב,הפועל פתח-תקוה,ISR,30/07/2005
+country,ISR,age,12,male,50m,freestyle,800m,09:56.37,מרק חינאוי,הפועל בת-ים,ISR,04/08/2009
+country,ISR,age,12,male,50m,individual_medley,200m,02:25.50,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,24/07/2014
+country,ISR,age,12,male,50m,individual_medley,400m,05:19.16,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,02/05/2014
+country,ISR,age,12,male,50m,individual_medley,4X100m,04:57.45,"קוצי מיכאל, רון פולונסקי, קורובוב אריאל, גרצ׳יק דוד",מכבי חיפה,ISR,01/08/2013
+country,ISR,age,12,male,50m,individual_medley,4X50m,02:08.81,"ערן גרובמן, דניאל סובטוב, פלג קליין, אלן טרייבוך",מכבי וייסגל רחובות,ISR,24/07/2019
+country,ISR,age,12,mixed,25m,freestyle,4X100m,04:16.02,"איזבקוב תומר, ליאור איליאגויב, עומר כשריאל, עדן שץ",הפועל דולפין נתניה,ISR,06/12/2025
+country,ISR,age,12,mixed,25m,freestyle,4X50m,01:56.02,"תומר איזבקוב, עומר כשריאל, עדן שץ, ליאור איליאגויב",הפועל דולפין נתניה,ISR,06/12/2025
+country,ISR,age,12,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,12,mixed,25m,individual_medley,4X50m,02:13.76,"ליאור אליאגויב, תומר איזבקוב, עומר כשריאן, עדן שץ",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,12,mixed,50m,freestyle,4X100m,04:24.79,"טומי גלימן, יקטרינה יז׳וב, מאיה דור, נעם קינסברונר",הפועל דולפין נתניה,ISR,25/07/2023
+country,ISR,age,12,mixed,50m,freestyle,4X50m,01:58.95,"איתן שץ, דב שטונובקי, אלה רג׳יניאנו, אנג׳לה זאבורויב",הפועל דולפין נתניה,ISR,25/07/2024
+country,ISR,age,12,mixed,50m,individual_medley,4X50m,02:12.66,"ליאור איליאגויב, עדן שץ, תומר איזבקוב, מילנה יודולוביץ",הפועל דולפין נתניה,ISR,31/07/2025
+country,ISR,age,13,female,25m,backstroke,100m,01:03.34,מרסי אן נגירה,בני הרצליה,ISR,28/12/2018
+country,ISR,age,13,female,25m,backstroke,200m,02:16.92,אילנית דימשיץ,מכבי קרית ביאליק,ISR,26/12/2024
+country,ISR,age,13,female,25m,backstroke,50m,30.04,שירה אשכנזי,מכבי קרית אונו,ISR,29/12/2016
+country,ISR,age,13,female,25m,breaststroke,100m,01:10.30,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,30/12/2016
+country,ISR,age,13,female,25m,breaststroke,200m,02:30.32,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/12/2016
+country,ISR,age,13,female,25m,breaststroke,50m,32.58,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,28/12/2016
+country,ISR,age,13,female,25m,butterfly,100m,01:02.92,ענת זימין,הפועל בת ים,ISR,28/12/2005
+country,ISR,age,13,female,25m,butterfly,200m,02:17.40,שרון שטיימן,הפועל פליפר חדרה,ISR,27/12/2018
+country,ISR,age,13,female,25m,butterfly,50m,28.25,ענת זימין,הפועל בת ים,ISR,29/12/2006
+country,ISR,age,13,female,25m,freestyle,100m,55.94,מיכל אוגינץ,הפועל בית שמש,ISR,24/12/2025
+country,ISR,age,13,female,25m,freestyle,1500m,18:13.20,רבקה אנדרוביץ׳,הפועל אולימפ נתניה,ISR,21/12/2022
+country,ISR,age,13,female,25m,freestyle,200m,02:03.01,בקי פוזדנר,הפועל בת ים,ISR,30/12/2017
+country,ISR,age,13,female,25m,freestyle,400m,04:16.61,בקי פוזדנר,הפועל בת ים,ISR,27/12/2017
+country,ISR,age,13,female,25m,freestyle,4X100m,04:19.36,"דנה ווזנבסקי נח, סופי נחמני, דניאל יהודיאן, מרי פלייטמן",הפועל אולימפ נתניה,ISR,25/12/2025
+country,ISR,age,13,female,25m,freestyle,4X200m,09:15.62,,הפועל חולון,ISR,30/12/2011
+country,ISR,age,13,female,25m,freestyle,4X50m,01:57.32,"דנה ווזנבסקי נח, סופי נחמני, דניאל יהודיאן, מרי פלייטמן",הפועל אולימפ נתניה,ISR,26/12/2025
+country,ISR,age,13,female,25m,freestyle,50m,25.70,מיכל אוגינץ,הפועל בית שמש,ISR,26/12/2025
+country,ISR,age,13,female,25m,freestyle,800m,08:44.53,בקי פוזדנר,הפועל בת ים,ISR,29/12/2017
+country,ISR,age,13,female,25m,individual_medley,100m,01:04.47,מעיין גראור,מכבי חיפה,ISR,24/12/2025
+country,ISR,age,13,female,25m,individual_medley,200m,02:18.66,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,31/12/2016
+country,ISR,age,13,female,25m,individual_medley,400m,04:54.83,דריה גולובטי,הפועל בת ים,ISR,29/12/2018
+country,ISR,age,13,female,25m,individual_medley,4X100m,04:46.42,,הפועל דולפין נתניה,ISR,30/12/2011
+country,ISR,age,13,female,25m,individual_medley,4X50m,02:02.55,"גלי קוקס-מעגן, שירה גמליי, ליליה אפשטיין, מיטל שרגין",מכבי חיפה,ISR,22/01/2016
+country,ISR,age,13,female,50m,backstroke,100m,01:07.15,עדי מעוז,מכבי ראשון לציון,ISR,19/07/2026
+country,ISR,age,13,female,50m,backstroke,200m,02:24.26,עדי מעוז,מכבי ראשון לציון,ISR,27/05/2026
+country,ISR,age,13,female,50m,backstroke,50m,31.10,שירה אשכנזי,מכבי קרית אונו,ISR,16/07/2016
+country,ISR,age,13,female,50m,breaststroke,100m,01:14.33,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,25/06/2016
+country,ISR,age,13,female,50m,breaststroke,200m,02:38.80,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/06/2016
+country,ISR,age,13,female,50m,breaststroke,50m,34.55,מרסי אן נגירה,בני הרצליה,ISR,27/05/2026
+country,ISR,age,13,female,50m,butterfly,100m,01:03.09,ענת זימין,הפועל בת-ים,ISR,30/06/2006
+country,ISR,age,13,female,50m,butterfly,200m,02:17.99,שרון שטיימן,הפועל פליפר חדרה,ISR,26/07/2018
+country,ISR,age,13,female,50m,butterfly,50m,28.43,ענת זימין,הפועל בת-ים,ISR,11/08/2006
+country,ISR,age,13,female,50m,freestyle,100m,59.82,ענת זימין,מכבי קרית ביאליק,ISR,10/08/2006
+country,ISR,age,13,female,50m,freestyle,1500m,18:25.38,יעל דניאלי,מכבי פ.מ. רעות,ISR,21/07/2010
+country,ISR,age,13,female,50m,freestyle,200m,02:07.41,בקי פוזדנר,הפועל בת-ים,ISR,10/07/2017
+country,ISR,age,13,female,50m,freestyle,400m,04:24.34,בקי פוזדנר,הפועל בת-ים,ISR,24/06/2017
+country,ISR,age,13,female,50m,freestyle,4X200m,09:55.22,"גוני שלום יופת, ליה גונן, יובל גד, דנה מאיטלס",בני הרצליה,ISR,16/07/2016
+country,ISR,age,13,female,50m,freestyle,4X50m,01:58.55,"בקי פוזדנר, אלכסיה סבשצ׳ינסקי, רוני עוז, דריה גולובטי",הפועל בת-ים,ISR,23/07/2017
+country,ISR,age,13,female,50m,freestyle,50m,27.44,מיכל אוגינץ,הפועל בית שמש,ISR,26/07/2025
+country,ISR,age,13,female,50m,freestyle,800m,09:06.58,בקי פוזדנר,הפועל בת-ים,ISR,25/06/2017
+country,ISR,age,13,female,50m,individual_medley,200m,02:23.88,ענת זימין,הפועל בת-ים,ISR,20/05/2006
+country,ISR,age,13,female,50m,individual_medley,400m,05:07.05,דריה גולובטי,הפועל בת-ים,ISR,25/07/2018
+country,ISR,age,13,female,50m,individual_medley,4X100m,05:12.00,"גוני שלום ידפת, מרסי אן נגירה, ליה גונן, דנה מאיטלס",בני הרצליה,ISR,03/06/2016
+country,ISR,age,13,female,50m,individual_medley,4X50m,02:13.25,"גלי קוקס-מעגן, שירה גמליי, ליליה אפשטיין, מיטל שרגין",מכבי וייסגל רחובות,ISR,24/07/2019
+country,ISR,age,13,male,25m,backstroke,100m,01:00.03,גילי רותם,מכבי ראשון לציון,ISR,21/12/2022
+country,ISR,age,13,male,25m,backstroke,200m,02:11.88,תומר פרנקל,הפועל ירושלים,ISR,27/12/2013
+country,ISR,age,13,male,25m,backstroke,50m,27.93,איליה איזנשטוק,מכבי קרית ביאליק,ISR,29/12/2001
+country,ISR,age,13,male,25m,breaststroke,100m,01:07.48,גילי רותם,מכבי ראשון לציון,ISR,22/12/2022
+country,ISR,age,13,male,25m,breaststroke,200m,02:21.40,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,28/12/2017
+country,ISR,age,13,male,25m,breaststroke,50m,30.87,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,27/12/2017
+country,ISR,age,13,male,25m,butterfly,100m,58.94,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,13/11/2015
+country,ISR,age,13,male,25m,butterfly,200m,02:14.80,בנימין זלצמן,הפועל ירושלים,ISR,26/12/2016
+country,ISR,age,13,male,25m,butterfly,50m,26.43,דניאל דרבצוב,הפועל עירוני הוד השרון,ISR,28/12/2019
+country,ISR,age,13,male,25m,freestyle,100m,54.93,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,14/11/2015
+country,ISR,age,13,male,25m,freestyle,1500m,16:58.32,טום קיצ׳ב,הפועל בת ים,ISR,27/12/2019
+country,ISR,age,13,male,25m,freestyle,200m,01:59.85,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,14/11/2015
+country,ISR,age,13,male,25m,freestyle,400m,04:13.34,איליה איזנשטוק,מכבי קרית ביאליק,ISR,27/12/2001
+country,ISR,age,13,male,25m,freestyle,4X100m,04:10.65,"סטיבן פרידמן, מתן טוצ׳ילובסקי, בר סולוביצ׳יק, רודוב למר",מכבי קרית-ביאליק,ISR,29/12/2012
+country,ISR,age,13,male,25m,freestyle,4X200m,09:02.86,מכבי,קרית ביאליק,ISR,28/12/2012
+country,ISR,age,13,male,25m,freestyle,4X50m,01:42.17,"למר רודוב, מתו תוצ׳ילובסקי, בר סולובייצ׳יק, סטיבן שיימן",מכבי קרית ביאליק,ISR,05/12/2014
+country,ISR,age,13,male,25m,freestyle,50m,25.11,מיכאל בכר,הפועל עמק חפר,ISR,28/12/2024
+country,ISR,age,13,male,25m,freestyle,800m,09:01.59,ניר חי,הפועל פתח תקוה,ISR,28/12/2018
+country,ISR,age,13,male,25m,individual_medley,100m,01:01.29,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,17/10/2015
+country,ISR,age,13,male,25m,individual_medley,200m,02:08.02,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,19/12/2015
+country,ISR,age,13,male,25m,individual_medley,400m,04:48.77,גל הדר,קרית אונו/גבעתיים,ISR,27/12/2012
+country,ISR,age,13,male,25m,individual_medley,4X100m,04:41.58,מכבי,אשדוד,ISR,23/12/2005
+country,ISR,age,13,male,25m,individual_medley,4X50m,02:00.71,"איתן שץ, גל אבדייאב, ניתי ארי, דב שטונובסקי",הפועל דולפין נתניה,ISR,05/12/2025
+country,ISR,age,13,male,50m,backstroke,100m,01:04.04,אלעד סומינסקי,מכבי חיפה,ISR,30/07/2025
+country,ISR,age,13,male,50m,backstroke,200m,02:20.92,אדם מראענה,מכבי חיפה,ISR,26/07/2016
+country,ISR,age,13,male,50m,backstroke,50m,29.35,איליה איזנשטוק,מכבי קרית ביאליק,ISR,09/08/2001
+country,ISR,age,13,male,50m,breaststroke,100m,01:11.19,מרק טלר,מכבי כפר המכבייה,ISR,03/08/2021
+country,ISR,age,13,male,50m,breaststroke,200m,02:31.58,יבגני רדצ׳נקו,הפועל בת-ים,ISR,31/07/2013
+country,ISR,age,13,male,50m,breaststroke,50m,31.50,מרק טלר,מכבי כפר המכביה,ISR,23/07/2021
+country,ISR,age,13,male,50m,butterfly,100m,59.65,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,21/07/2015
+country,ISR,age,13,male,50m,butterfly,200m,02:16.93,בנימין זלצמן,הפועל ירושלים,ISR,28/07/2016
+country,ISR,age,13,male,50m,butterfly,50m,27.44,דניאל דרבצוב,הפועל עירוני הוד השרון,ISR,28/06/2019
+country,ISR,age,13,male,50m,freestyle,100m,56.87,מיכאל סמירנוב,הפועל בית שמש,ISR,24/07/2014
+country,ISR,age,13,male,50m,freestyle,1500m,17:30.00,אמיר גניאל,מכבי תל-אביב,ISR,02/09/1976
+country,ISR,age,13,male,50m,freestyle,200m,02:04.65,מיכאל סמירנוב,הפועל בית שמש,ISR,23/07/2014
+country,ISR,age,13,male,50m,freestyle,400m,04:21.92,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,20/07/2015
+country,ISR,age,13,male,50m,freestyle,4X100m,04:29.94,,מכבי נהריה,ISR,31/07/2006
+country,ISR,age,13,male,50m,freestyle,4X200m,09:43.88,"עילי רבינוביץ, ליאם גיאולי, אלכס דולגיך, רוסלן גבריאלוב",הפועל דולפין נתניה,ISR,24/07/2017
+country,ISR,age,13,male,50m,freestyle,4X50m,01:54.76,,מכבי אשדוד,ISR,07/08/2001
+country,ISR,age,13,male,50m,freestyle,50m,25.71,מיכאל סמירנוב,הפועל בית שמש,ISR,23/07/2014
+country,ISR,age,13,male,50m,freestyle,800m,09:10.30,אמיר גניאל,מכבי תל-אביב,ISR,01/01/1976
+country,ISR,age,13,male,50m,individual_medley,200m,02:17.49,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,22/07/2015
+country,ISR,age,13,male,50m,individual_medley,400m,04:55.70,תומר פרנקל,הפועל ירושלים,ISR,01/08/2013
+country,ISR,age,13,male,50m,individual_medley,4X100m,04:57.45,"קוצי מיכאל, רון פולונסקי, קורובוב אריאל, גרצ׳יק דוד",מכבי חיפה,ISR,01/08/2013
+country,ISR,age,13,male,50m,individual_medley,4X50m,02:06.84,"דניאל סטשבסקי, בנימין צ׳רנובסקי, דוד רשקובן, יונתן קאירי גורל",הפועל באר טוביה,ISR,07/08/2025
+country,ISR,age,13,mixed,25m,freestyle,4X100m,04:16.02,"איזבקוב תומר, ליאור איליאגויב, עומר כשריאל, עדן שץ",הפועל דולפין נתניה,ISR,06/12/2025
+country,ISR,age,13,mixed,25m,freestyle,4X50m,01:56.02,"תומר איזבקוב, עומר כשריאל, עדן שץ, ליאור איליאגויב",הפועל דולפין נתניה,ISR,06/12/2025
+country,ISR,age,13,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,13,mixed,25m,individual_medley,4X50m,01:55.78,"אלעד סומינסקי, מוניר אבו ח׳ליס, מעיין גראות, תהל רוט",מכבי חיפה,ISR,04/12/2025
+country,ISR,age,13,mixed,50m,freestyle,4X100m,04:21.24,"אחמד אבועקלין, דניס דמידנקו, אמה יולזרי, רנטה אגלאוטין",הפועל בת ים,ISR,24/07/2024
+country,ISR,age,13,mixed,50m,freestyle,4X50m,01:58.95,"איתן שץ, דב שטונובקי, אלה רג׳יניאנו, אנג׳לה זאבורויב",הפועל דולפין נתניה,ISR,25/07/2024
+country,ISR,age,13,mixed,50m,individual_medley,4X50m,02:12.66,"ליאור איליאגויב, עדן שץ, תומר איזבקוב, מילנה יודולוביץ",הפועל דולפין נתניה,ISR,31/07/2025
+country,ISR,age,14,female,25m,backstroke,100m,01:01.35,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,11/11/2017
+country,ISR,age,14,female,25m,backstroke,200m,02:11.82,אביב ברזילי,הפועל מ.א. משגב,ISR,28/12/2016
+country,ISR,age,14,female,25m,backstroke,50m,29.09,אור מלצר,הפועל ה.ה.ב.ב,ISR,13/02/2002
+country,ISR,age,14,female,25m,breaststroke,100m,01:09.63,לאה פולונסקי,מכבי חיפה,ISR,30/12/2016
+country,ISR,age,14,female,25m,breaststroke,200m,02:30.25,לאה פולונסקי,מכבי חיפה,ISR,29/12/2016
+country,ISR,age,14,female,25m,breaststroke,50m,32.58,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,28/12/2016
+country,ISR,age,14,female,25m,butterfly,100m,01:01.76,לאה פולונסקי,מכבי חיפה,ISR,28/12/2016
+country,ISR,age,14,female,25m,butterfly,200m,02:14.71,שרון שטיימן,הפועל פליפר חדרה,ISR,26/12/2019
+country,ISR,age,14,female,25m,butterfly,50m,28.25,ענת זימין,הפועל בת ים,ISR,29/12/2006
+country,ISR,age,14,female,25m,freestyle,100m,55.94,מיכל אוגינץ,הפועל בית שמש,ISR,24/12/2025
+country,ISR,age,14,female,25m,freestyle,1500m,17:40.19,איילה לוי,מכבי קרית ביאליק,ISR,23/12/2025
+country,ISR,age,14,female,25m,freestyle,200m,02:01.35,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,02/12/2017
+country,ISR,age,14,female,25m,freestyle,400m,04:13.39,בקי פוזדנר,הפועל בת ים,ISR,26/12/2018
+country,ISR,age,14,female,25m,freestyle,4X100m,03:59.94,"אלכסיה סבשצינסקי, רומי חביב, אופיר רכאח, דריה גולובטי",הפועל בת ים,ISR,30/11/2019
+country,ISR,age,14,female,25m,freestyle,4X200m,08:52.41,"אילנית דימשיץ, איילה לוי, אנה גורבנקו, מיקה שטיפט",מכבי קרית ביאליק,ISR,04/12/2025
+country,ISR,age,14,female,25m,freestyle,4X50m,01:49.33,"דריה גולובטי, רומי חבחב, אופיר רכאח, אלכסיה סבשצ׳נסקי",הפועל בת ים,ISR,26/12/2019
+country,ISR,age,14,female,25m,freestyle,50m,25.70,מיכל אוגינץ,הפועל בית שמש,ISR,26/12/2025
+country,ISR,age,14,female,25m,freestyle,800m,08:43.60,בקי פוזדנר,הפועל בת ים,ISR,28/12/2018
+country,ISR,age,14,female,25m,individual_medley,100m,01:04.47,מעיין גראור,מכבי חיפה,ISR,24/12/2025
+country,ISR,age,14,female,25m,individual_medley,200m,02:13.57,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,30/11/2017
+country,ISR,age,14,female,25m,individual_medley,400m,04:49.57,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,28/10/2017
+country,ISR,age,14,female,25m,individual_medley,4X100m,04:27.95,"אלכסיה סבשצינסקי, רומי חביב, אופיר רכאח, דריה גולובטי",הפועל בת ים,ISR,29/11/2019
+country,ISR,age,14,female,25m,individual_medley,4X50m,02:00.00,"ליזה קרסיוב, אילי בן דוד, איה גליל, רות רייס",מכבי מרום רמת גן,ISR,26/12/2024
+country,ISR,age,14,female,50m,backstroke,100m,01:04.05,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,24/07/2017
+country,ISR,age,14,female,50m,backstroke,200m,02:19.94,גיא שילון,מכבי פ.מ. רעות,ISR,27/07/2011
+country,ISR,age,14,female,50m,backstroke,50m,30.17,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/04/2017
+country,ISR,age,14,female,50m,breaststroke,100m,01:12.29,לאה פולונסקי,מכבי חיפה,ISR,25/06/2016
+country,ISR,age,14,female,50m,breaststroke,200m,02:35.94,אנסטסיה גורבנקו,קרית ביאליק,ISR,25/06/2017
+country,ISR,age,14,female,50m,breaststroke,50m,32.95,עומר שני,מכבי וייסגל רחובות,ISR,20/07/2026
+country,ISR,age,14,female,50m,butterfly,100m,01:01.74,ענת זימין,הפועל בת-ים,ISR,10/08/2007
+country,ISR,age,14,female,50m,butterfly,200m,02:14.45,שרון שטיימן,הפועל פליפר חדרה,ISR,24/07/2019
+country,ISR,age,14,female,50m,butterfly,50m,27.43,ענת זימין,הפועל בת-ים,ISR,07/08/2007
+country,ISR,age,14,female,50m,freestyle,100m,57.08,מיכל אוגניץ,הפועל בית שמש,ISR,18/07/2026
+country,ISR,age,14,female,50m,freestyle,1500m,17:08.77,בקי פוזדנר,הפועל בת-ים,ISR,26/04/2018
+country,ISR,age,14,female,50m,freestyle,200m,02:03.38,דריה גולובטי,הפועל בת-ים,ISR,25/07/2019
+country,ISR,age,14,female,50m,freestyle,400m,04:20.03,מור פליישמן,מכבי וייסגל רחובות,ISR,25/06/2004
+country,ISR,age,14,female,50m,freestyle,4X100m,04:15.51,"רומי סבו, רומי גוטליב, ליאה ארד, איילה חודי",הפועל כפר סבא ב. ב.,ISR,23/07/2021
+country,ISR,age,14,female,50m,freestyle,4X200m,09:01.94,"רוני עוז, הילה שובל, רומי חביב, מיקה ביבטקו",הפועל בת-ים,ISR,26/07/2018
+country,ISR,age,14,female,50m,freestyle,4X50m,01:56.67,"אלינה ז׳וקובסקי, ליאל מושקוביץ, נטע פרופס, מאיה הסל",מכבי ראשון לציון,ISR,27/07/2025
+country,ISR,age,14,female,50m,freestyle,50m,26.42,מיכל אוגינץ,הפועל בית שמש,ISR,20/06/2026
+country,ISR,age,14,female,50m,freestyle,800m,08:57.00,בקי פוזדנר,הפועל בת-ים,ISR,28/04/2018
+country,ISR,age,14,female,50m,individual_medley,200m,02:18.91,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,05/08/2017
+country,ISR,age,14,female,50m,individual_medley,400m,05:00.02,לאה פולונסקי,מכבי חיפה,ISR,17/07/2016
+country,ISR,age,14,female,50m,individual_medley,4X100m,04:45.59,,הפועל גבעתיים,ISR,05/08/1996
+country,ISR,age,14,female,50m,individual_medley,4X50m,02:07.51,"מאי לווי, שחר ירדן, שירה פייגין, אור אלגד",מכבי קרית אונו,ISR,15/08/2015
+country,ISR,age,14,male,25m,backstroke,100m,55.06,מיכאל בכר,הפועל עמק חפר,ISR,26/12/2025
+country,ISR,age,14,male,25m,backstroke,200m,02:01.83,אוקאן גולדין,מכבי נהריה,ISR,22/12/2021
+country,ISR,age,14,male,25m,backstroke,50m,25.62,מיכאל בכר,הפועל עמק חפר,ISR,24/12/2025
+country,ISR,age,14,male,25m,breaststroke,100m,01:03.93,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,29/12/2018
+country,ISR,age,14,male,25m,breaststroke,200m,02:18.65,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,27/12/2018
+country,ISR,age,14,male,25m,breaststroke,50m,29.20,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,26/12/2018
+country,ISR,age,14,male,25m,butterfly,100m,54.90,תומר פרנקל,הפועל ירושלים,ISR,24/12/2014
+country,ISR,age,14,male,25m,butterfly,200m,02:03.37,בנימין זלצמן,הפועל ירושלים,ISR,02/12/2017
+country,ISR,age,14,male,25m,butterfly,50m,25.51,דניאל דרבצוב,הפועל עירוני הוד השרון,ISR,17/08/2020
+country,ISR,age,14,male,25m,freestyle,100m,51.59,תומר פרנקל,הפועל ירושלים,ISR,25/12/2014
+country,ISR,age,14,male,25m,freestyle,1500m,15:39.12,שון פומברג,מכבי קרית ביאליק,ISR,24/12/2024
+country,ISR,age,14,male,25m,freestyle,200m,01:52.81,דניס לוקטב,מכבי אשדוד,ISR,26/12/2014
+country,ISR,age,14,male,25m,freestyle,400m,03:55.40,שון פומברג,מכבי קרית ביאליק,ISR,26/12/2024
+country,ISR,age,14,male,25m,freestyle,4X100m,03:39.66,"עידו שפירא, נתנאל נובוסד, עידו ז׳ורבסקי, נתניאל פושקה",הפועל בת ים,ISR,27/11/2021
+country,ISR,age,14,male,25m,freestyle,4X200m,08:04.76,"לירן סימנדייב, מרטין קרטאבי, חן מולר, דניאל יוסיפוב",הפועל אולימפ נתניה,ISR,29/12/2018
+country,ISR,age,14,male,25m,freestyle,4X50m,01:39.79,"נתניאל פושקה, עידו שפירא, נתנאל נובוסד, עידן ז׳ורבסקי",הפועל בת ים,ISR,23/12/2021
+country,ISR,age,14,male,25m,freestyle,50m,23.59,קווין סיזיי,הפועל שחייני הנגב,ISR,27/12/2019
+country,ISR,age,14,male,25m,freestyle,800m,08:05.90,שון פומברג,מכבי קרית ביאליק,ISR,28/12/2024
+country,ISR,age,14,male,25m,individual_medley,100m,58.86,מייקל לוזין,מכבי ראשון לציון,ISR,24/12/2025
+country,ISR,age,14,male,25m,individual_medley,200m,02:06.54,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,31/12/2016
+country,ISR,age,14,male,25m,individual_medley,400m,04:30.51,תומר פרנקל,הפועל ירושלים,ISR,26/12/2014
+country,ISR,age,14,male,25m,individual_medley,4X100m,04:04.55,"מרטין קרטאבי, דניאל יוסיפוב, בנימין פיקרסקי, חן מולר",הפועל אולימפ נתניה,ISR,28/12/2018
+country,ISR,age,14,male,25m,individual_medley,4X50m,01:49.75,"מרטין קרטאבי, דניאל יוסיפוב, בנימין פיקרסקי, לירן סימנדייב",הפועל אולימפ נתניה,ISR,28/12/2018
+country,ISR,age,14,male,50m,backstroke,100m,59.62,מיכאל בכר,בפועל עמק חפר,ISR,26/07/2025
+country,ISR,age,14,male,50m,backstroke,200m,02:08.94,דניס לוקטב,מכבי אשדוד,ISR,22/07/2014
+country,ISR,age,14,male,50m,backstroke,50m,27.40,מיכאל בכר,הפועל עמק חפר,ISR,25/07/2025
+country,ISR,age,14,male,50m,breaststroke,100m,01:07.39,מרק טלר,מכבי כפר המכביה,ISR,29/07/2022
+country,ISR,age,14,male,50m,breaststroke,200m,02:26.49,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,26/07/2018
+country,ISR,age,14,male,50m,breaststroke,50m,30.42,מרק טלר,מכבי כפר המכביה,ISR,27/07/2022
+country,ISR,age,14,male,50m,butterfly,100m,57.15,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,17/07/2016
+country,ISR,age,14,male,50m,butterfly,200m,02:10.77,אלון שמי,הפועל עירוני הוד השרון,ISR,01/08/2013
+country,ISR,age,14,male,50m,butterfly,50m,26.61,אורי נסים,הפועל באר שבע,ISR,09/08/2024
+country,ISR,age,14,male,50m,freestyle,100m,53.83,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,26/07/2016
+country,ISR,age,14,male,50m,freestyle,1500m,16:12.25,שון פומברג,מכבי ביאליק,ISR,06/08/2024
+country,ISR,age,14,male,50m,freestyle,200m,01:57.85,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,27/07/2016
+country,ISR,age,14,male,50m,freestyle,400m,04:05.56,דניס לוקטב,מכבי אשדוד,ISR,30/07/2014
+country,ISR,age,14,male,50m,freestyle,4X100m,03:50.31,"דניאל יוסיפוב, חן מולר, מרטין קרטאבי, רון שמילוב",הפועל אולימפ נתניה,ISR,27/07/2018
+country,ISR,age,14,male,50m,freestyle,4X200m,08:27.54,"מרטין קרטאבי, חן מולר, רון שמילוב, דניאל יוסיפוב",הפועל אולימפ נתניה,ISR,26/07/2018
+country,ISR,age,14,male,50m,freestyle,4X50m,01:42.21,"דניאל יוסיפוב, לירן סימנדייב, מרטין קרטאבי, רון שמילוב",הפועל אולימפ נתניה,ISR,24/07/2018
+country,ISR,age,14,male,50m,freestyle,50m,24.50,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,28/07/2016
+country,ISR,age,14,male,50m,freestyle,800m,08:32.78,שון פומברג,מכבי קרית ביאליק,ISR,06/08/2024
+country,ISR,age,14,male,50m,individual_medley,200m,02:12.72,גילי רותם,מכבי ראשון לציון,ISR,08/06/2023
+country,ISR,age,14,male,50m,individual_medley,400m,04:45.37,גל הדר,קרית אונו,ISR,22/07/2013
+country,ISR,age,14,male,50m,individual_medley,4X100m,04:11.79,"לירן סימנדייב, דניאל יוסיפוב, מרטין קרטאבי, רון שמילוב",הפועל אולימפ נתניה,ISR,25/07/2018
+country,ISR,age,14,male,50m,individual_medley,4X50m,01:55.04,"ערן גרובמן, דניאל סובטוב, פלג קליין, אלן טרייבוך",מכבי וייסגל רחובות,ISR,04/08/2021
+country,ISR,age,14,mixed,25m,freestyle,4X100m,04:03.20,"דוד דמיטרייב, איילה לוי, אילנית דימשיץ, שון פומברג",מכבי קרית ביאליק,ISR,07/03/2024
+country,ISR,age,14,mixed,25m,freestyle,4X50m,01:43.24,"שגיא כהן, ירין שמאי, דוריה גורלסקי, שי וקסמן נעמן",מכבי ראשון לציון,ISR,23/12/2022
+country,ISR,age,14,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,14,mixed,25m,individual_medley,4X50m,01:55.78,"אלעד סומינסקי, מוניר אבו ח׳ליס, מעיין גראות, תהל רוט",מכבי חיפה,ISR,04/12/2025
+country,ISR,age,14,mixed,50m,freestyle,4X100m,04:05.51,"אילנית דימשיץ, שון פומברג, איילה לוי, דוד דמיטרייב",מכבי קרית ביאליק,ISR,24/07/2024
+country,ISR,age,14,mixed,50m,freestyle,4X50m,01:50.64,"עמית ורסולקר, לינוי בקר, נוע קמינסקי, שגיב קוטרו",מכבי ראשון לציון,ISR,01/08/2025
+country,ISR,age,14,mixed,50m,individual_medley,4X100m,04:11.73,"קרן אייזברוך, דוריה גורלסקי, דותן אלון, דניאל סובטוב",מכבי ראשון לציון,ISR,29/07/2022
+country,ISR,age,14,mixed,50m,individual_medley,4X50m,02:02.54,"אלעד סומינסקי, מוניר אבו ח׳ליס, מעיין גראור",מכבי חיפה,ISR,31/07/2025
+country,ISR,age,15,female,25m,backstroke,100m,01:00.15,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,21/12/2018
+country,ISR,age,15,female,25m,backstroke,200m,02:10.65,אביב ברזילי,הפועל מ.א. משגב,ISR,27/12/2017
+country,ISR,age,15,female,25m,backstroke,50m,27.96,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/12/2018
+country,ISR,age,15,female,25m,breaststroke,100m,01:07.44,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/12/2018
+country,ISR,age,15,female,25m,breaststroke,200m,02:24.91,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,27/12/2018
+country,ISR,age,15,female,25m,breaststroke,50m,32.04,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/12/2018
+country,ISR,age,15,female,25m,butterfly,100m,59.61,לאה פולונסקי,מכבי חיפה,ISR,27/12/2017
+country,ISR,age,15,female,25m,butterfly,200m,02:14.57,לאה פולונסקי,מכבי חיפה,ISR,02/12/2017
+country,ISR,age,15,female,25m,butterfly,50m,27.51,ורד בורוכובסקי,מכבי אשדוד,ISR,10/12/1999
+country,ISR,age,15,female,25m,freestyle,100m,54.29,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/11/2018
+country,ISR,age,15,female,25m,freestyle,1500m,16:59.75,עומר שוורץ,מכבי קרית ביאליק,ISR,21/12/2021
+country,ISR,age,15,female,25m,freestyle,200m,02:00.19,בקי פוזדנר,הפועל בת ים,ISR,28/12/2019
+country,ISR,age,15,female,25m,freestyle,400m,04:13.07,בקי פוזדנר,הפועל בת ים,ISR,25/12/2019
+country,ISR,age,15,female,25m,freestyle,4X100m,03:59.94,"אלכסיה סבשצינסקי, רומי חביב, אופיר רכאח, דריה גולובטי",הפועל בת ים,ISR,30/11/2019
+country,ISR,age,15,female,25m,freestyle,4X200m,08:52.41,"אילנית דימשיץ, איילה לוי, אנה גורבנקו, מיקה שטיפט",מכבי קרית ביאליק,ISR,04/12/2025
+country,ISR,age,15,female,25m,freestyle,4X200m,08:52.41,"אילנית דימשיץ, איילה לוי, אנה גורבנקו, מיקה שטיפט",מכבי קרית ביאליק,ISR,04/12/2025
+country,ISR,age,15,female,25m,freestyle,4X50m,01:49.33,"דריה גולובטי, רומי חבחב, אופיר רכאח, אלכסיה סבשצ׳נסקי",הפועל בת ים,ISR,26/12/2019
+country,ISR,age,15,female,25m,freestyle,50m,25.21,שאין גולנד,הפועל מ. א. משגב,ISR,19/12/2022
+country,ISR,age,15,female,25m,freestyle,800m,08:38.94,בקי פוזדנר,הפועל בת ים,ISR,27/12/2019
+country,ISR,age,15,female,25m,individual_medley,100m,01:01.67,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,21/12/2018
+country,ISR,age,15,female,25m,individual_medley,200m,02:09.04,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,28/12/2018
+country,ISR,age,15,female,25m,individual_medley,400m,04:48.50,ורד בורוכובסקי,מכבי אשדוד,ISR,24/12/1999
+country,ISR,age,15,female,25m,individual_medley,4X100m,04:27.95,"אלכסיה סבשצינסקי, רומי חביב, אופיר רכאח, דריה גולובטי",הפועל בת ים,ISR,29/11/2019
+country,ISR,age,15,female,25m,individual_medley,4X50m,02:00.00,"ליזה קרסיוב, אילי בן דוד, איה גליל, רות רייס",מכבי מרום רמת גן,ISR,26/12/2024
+country,ISR,age,15,female,50m,backstroke,100m,01:03.44,אופיר שמחה,מכבי קרית ביאליק,ISR,10/08/2024
+country,ISR,age,15,female,50m,backstroke,200m,02:14.24,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/10/2018
+country,ISR,age,15,female,50m,backstroke,50m,29.80,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,10/02/2018
+country,ISR,age,15,female,50m,breaststroke,100m,01:09.44,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,04/08/2018
+country,ISR,age,15,female,50m,breaststroke,200m,02:29.17,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,05/07/2018
+country,ISR,age,15,female,50m,breaststroke,50m,32.95,עומר שני,מכבי וייסגל רחובות,ISR,20/07/2026
+country,ISR,age,15,female,50m,butterfly,100m,01:01.08,ורד בורוכובסקי,מכבי אשדוד,ISR,17/07/1999
+country,ISR,age,15,female,50m,butterfly,200m,02:14.45,שרון שטיימן,הפועל פליפר חדרה,ISR,24/07/2019
+country,ISR,age,15,female,50m,butterfly,50m,27.43,ענת זימין,הפועל בת-ים,ISR,07/08/2007
+country,ISR,age,15,female,50m,freestyle,100m,55.88,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,09/10/2018
+country,ISR,age,15,female,50m,freestyle,1500m,17:04.67,בקי פוזדנר,הפועל בת-ים,ISR,30/07/2019
+country,ISR,age,15,female,50m,freestyle,200m,02:03.04,בקי פוזדנר,הפועל בת-ים,ISR,03/08/2019
+country,ISR,age,15,female,50m,freestyle,400m,04:17.74,בקי פוזדנר,הפועל בת-ים,ISR,24/07/2019
+country,ISR,age,15,female,50m,freestyle,4X100m,04:05.05,"תמר ארואטי, מייה סיטי, בר סטחי, ספיר קשושינסקי",מכבי וייסגל רחובות,ISR,19/07/2026
+country,ISR,age,15,female,50m,freestyle,4X200m,08:56.20,"נורית מקליס, אורי כהן, ליאורה קליטצ׳וק, אילנית דימשיץ",נבחרת ישראל,ISR,12/04/2025
+country,ISR,age,15,female,50m,freestyle,4X200m,08:56.94,"ויקטוריה דוליניו, נועה היבל, ענבל מקליסת קיילה רייטר",א.ס.רמת השרון,ISR,18/07/2026
+country,ISR,age,15,female,50m,freestyle,4X50m,01:50.28,"מיקה שטיפט, אילנית דימשיץ, אנה גורבנקו, איילה לוי",מכבי קרית ביאליק,ISR,20/07/2026
+country,ISR,age,15,female,50m,freestyle,50m,25.92,דריה גולובטי,הפועל בת-ים,ISR,18/12/2020
+country,ISR,age,15,female,50m,freestyle,800m,08:51.89,בקי פוזדנר,הפועל בת-ים,ISR,26/07/2019
+country,ISR,age,15,female,50m,individual_medley,200m,02:12.88,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,07/10/2018
+country,ISR,age,15,female,50m,individual_medley,400m,04:53.81,לאה פולונסקי,מכבי חיפה,ISR,04/08/2017
+country,ISR,age,15,female,50m,individual_medley,4X100m,04:29.26,"ליהי לב, גולצוב אוה, תהל אלבז, זהר כהן הרפניסט","מכבי מרום ר""ג",ISR,10/08/2024
+country,ISR,age,15,female,50m,individual_medley,4X50m,02:01.31,"אלינה דימשיץ, מיקה שטיפט, אנה גורבנקו, איילה לוי",מכבי קרית ביאליק,ISR,18/07/2026
+country,ISR,age,15,male,25m,backstroke,100m,53.94,אוקאן גולדין,מכבי נהריה,ISR,21/12/2022
+country,ISR,age,15,male,25m,backstroke,200m,01:56.03,אוקאן גולדין,מכבי נהריה,ISR,19/12/2022
+country,ISR,age,15,male,25m,backstroke,50m,25.31,אוקאן גולדין,מכבי נהריה,ISR,20/12/2022
+country,ISR,age,15,male,25m,breaststroke,100m,01:02.48,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,28/12/2019
+country,ISR,age,15,male,25m,breaststroke,200m,02:13.87,גילי רותם,מכבי ראשון לציון,ISR,25/12/2024
+country,ISR,age,15,male,25m,breaststroke,50m,28.53,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,25/12/2019
+country,ISR,age,15,male,25m,butterfly,100m,53.76,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,27/12/2017
+country,ISR,age,15,male,25m,butterfly,200m,01:58.19,תומר פרנקל,הפועל ירושלים,ISR,17/12/2015
+country,ISR,age,15,male,25m,butterfly,50m,24.69,דניאל דרבצוב,הפועל עירוני הוד השרון,ISR,24/12/2021
+country,ISR,age,15,male,25m,freestyle,100m,50.40,מיכאל סמירנוב,הפועל בית שמש,ISR,29/12/2016
+country,ISR,age,15,male,25m,freestyle,1500m,15:32.09,מרק חינאוי,הפועל בת ים,ISR,29/12/2012
+country,ISR,age,15,male,25m,freestyle,200m,01:48.82,דניס לוקטב,מכבי אשדוד,ISR,18/12/2015
+country,ISR,age,15,male,25m,freestyle,400m,03:50.08,דניס לוקטב,מכבי אשדוד,ISR,16/12/2015
+country,ISR,age,15,male,25m,freestyle,4X100m,03:33.86,"עמית קסטן מגורי, דרור אברהם אבישי, תומר רוזנר, ענבר מסילתי",מכבי א.ס. רמת השרון,ISR,26/12/2024
+country,ISR,age,15,male,25m,freestyle,4X100m,03:33.86,"עמית קסטן מגורי, דרור אברהם אבישי, תומר רוזנר, ענבר מסילתי",מכבי א.ס. רמת השרון,ISR,26/12/2024
+country,ISR,age,15,male,25m,freestyle,4X200m,08:04.76,"לירן סימנדייב, מרטין קרטאבי, חן מולר, דניאל יוסיפוב",הפועל אולימפ נתניה,ISR,29/12/2018
+country,ISR,age,15,male,25m,freestyle,4X200m,08:04.76,"לירן סימנדייב, מרטין קרטאבי, חן מולר, דניאל יוסיפוב",הפועל אולימפ נתניה,ISR,29/12/2018
+country,ISR,age,15,male,25m,freestyle,4X50m,01:36.68,"דרור אברהם אבישי, אורי אבישי, ענבר רפאל יוסקוביץ-לב ארי, תומר רוזנר",מכבי א.ס. רמת השרון,ISR,26/12/2025
+country,ISR,age,15,male,25m,freestyle,50m,22.80,מיכאל סמירנוב,הפועל בית שמש,ISR,31/12/2016
+country,ISR,age,15,male,25m,freestyle,800m,08:05.90,שון פומברג,מכבי קרית ביאליק,ISR,28/12/2024
+country,ISR,age,15,male,25m,individual_medley,100m,57.29,מרק סגלוביץ,הפועל בת ים,ISR,24/12/2025
+country,ISR,age,15,male,25m,individual_medley,200m,02:00.93,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,29/12/2017
+country,ISR,age,15,male,25m,individual_medley,400m,04:19.57,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,30/12/2017
+country,ISR,age,15,male,25m,individual_medley,4X100m,04:04.55,"מרטין קרטאבי, דניאל יוסיפוב, בנימין פיקרסקי, חן מולר",הפועל אולימפ נתניה,ISR,28/12/2018
+country,ISR,age,15,male,25m,individual_medley,4X100m,04:04.55,"מרטין קרטאבי, דניאל יוסיפוב, בנימין פיקרסקי, חן מולר",הפועל אולימפ נתניה,ISR,28/12/2018
+country,ISR,age,15,male,25m,individual_medley,4X50m,01:46.37,"עידן טל, אורן ברכה, מיכאל לוית איתי רבינזון",מכבי מרום רמת גן,ISR,24/12/2025
+country,ISR,age,15,male,50m,backstroke,100m,56.66,אוקאן גולדין,מכבי נהריה,ISR,25/07/2022
+country,ISR,age,15,male,50m,backstroke,200m,02:03.16,אוקאן גולדין,מכבי נהריה,ISR,13/05/2022
+country,ISR,age,15,male,50m,backstroke,50m,26.79,מיכאל בכר,הפועל עמק חפר,ISR,18/07/2026
+country,ISR,age,15,male,50m,breaststroke,100m,01:04.95,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,26/07/2019
+country,ISR,age,15,male,50m,breaststroke,200m,02:19.83,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,23/07/2019
+country,ISR,age,15,male,50m,breaststroke,50m,29.68,דניאל יוסיפוב,הפועל אולימפ נתניה,ISR,17/05/2019
+country,ISR,age,15,male,50m,butterfly,100m,54.26,תומר פרנקל,הפועל ירושלים,ISR,14/08/2015
+country,ISR,age,15,male,50m,butterfly,200m,02:04.44,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,09/04/2017
+country,ISR,age,15,male,50m,butterfly,50m,24.74,דניאל דרבצוב,הפועל עירוני הוד השרון,ISR,13/06/2021
+country,ISR,age,15,male,50m,freestyle,100m,51.72,גל כהן גרומי,עירוני הוד השרון,ISR,24/06/2017
+country,ISR,age,15,male,50m,freestyle,1500m,15:48.19,דוד וייס,"ת""א סווים",ISR,17/07/2026
+country,ISR,age,15,male,50m,freestyle,200m,01:52.44,תומר פרנקל,הפועל ירושלים,ISR,05/07/2015
+country,ISR,age,15,male,50m,freestyle,400m,03:58.73,דניס לוקטב,מכבי אשדוד,ISR,04/07/2015
+country,ISR,age,15,male,50m,freestyle,4X100m,03:39.70,"ייגור קוסטין, תומר רוזנר, שון פומברג, יוני דגן",נבחרת ישראל,ISR,13/04/2025
+country,ISR,age,15,male,50m,freestyle,4X100m,03:50.31,"דניאל יוסיפוב, חן מולר, מרטין קרטאבי, רון שמילוב",הפועל אולימפ נתניה,ISR,27/07/2018
+country,ISR,age,15,male,50m,freestyle,4X200m,07:59.29,"שון פומברג, יוני דגן, ייגור קוסטין, תומר רוזנר",נבחרת ישראל,ISR,12/04/2025
+country,ISR,age,15,male,50m,freestyle,4X200m,08:15.59,"אדם פרדקין הרלב, יותם רייזנר, בן קישינסקי, רון עזרא",מכבי וייסגל רחובות,ISR,18/07/2026
+country,ISR,age,15,male,50m,freestyle,4X50m,01:42.21,"דניאל יוסיפוב, לירן סימנדייב, מרטין קרטאבי, רון שמילוב",הפועל אולימפ נתניה,ISR,24/07/2018
+country,ISR,age,15,male,50m,freestyle,50m,23.86,בן פחאט,הפועל ירושלים,ISR,27/07/2023
+country,ISR,age,15,male,50m,freestyle,800m,08:17.18,שון פומברג,מכבי קרית ביאליק,ISR,14/05/2025
+country,ISR,age,15,male,50m,individual_medley,200m,02:07.02,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,05/08/2017
+country,ISR,age,15,male,50m,individual_medley,400m,04:31.74,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,04/08/2017
+country,ISR,age,15,male,50m,individual_medley,4X100m,04:04.55,"אורי נסים, רון זילברברג, יואב זהר, יוני דגן",נבחרת ישראל,ISR,12/04/2025
+country,ISR,age,15,male,50m,individual_medley,4X100m,04:11.79,"לירן סימנדייב, דניאל יוסיפוב, מרטין קרטאבי, רון שמילוב",הפועל אולימפ נתניה,ISR,25/07/2018
+country,ISR,age,15,male,50m,individual_medley,4X50m,01:55.04,"ערן גרובמן, דניאל סובטוב, פלג קליין, אלן טרייבוך",מכבי וייסגל רחובות,ISR,04/08/2021
+country,ISR,age,15,mixed,25m,freestyle,4X100m,04:03.20,"דוד דמיטרייב, איילה לוי, אילנית דימשיץ, שון פומברג",מכבי קרית ביאליק,ISR,07/03/2024
+country,ISR,age,15,mixed,25m,freestyle,4X50m,01:43.24,"שגיא כהן, ירין שמאי, דוריה גורלסקי, שי וקסמן נעמן",מכבי ראשון לציון,ISR,23/12/2022
+country,ISR,age,15,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,15,mixed,25m,individual_medley,4X50m,01:50.96,"ענבר רפאל יוסקוביץ-לב ארי, שחר קשריאן, תומר רוזנר, נורית מקליס",מכבי א.ס. רמת השרון,ISR,27/12/2025
+country,ISR,age,15,mixed,50m,freestyle,4X100m,04:05.51,"אילנית דימשיץ, שון פומברג, איילה לוי, דוד דמיטרייב",מכבי קרית ביאליק,ISR,24/07/2024
+country,ISR,age,15,mixed,50m,freestyle,4X50m,01:47.16,"שון וורונקוב, אופיר שמחה, זואי ולפיש, שון פומברג",מכבי קרית ביאליק,ISR,20/04/2024
+country,ISR,age,15,mixed,50m,individual_medley,4X100m,04:11.73,"קרן אייזברוך, דוריה גורלסקי, דותן אלון, דניאל סובטוב",מכבי ראשון לציון,ISR,29/07/2022
+country,ISR,age,15,mixed,50m,individual_medley,4X50m,02:02.54,"אלעד סומינסקי, מוניר אבו ח׳ליס, מעיין גראור",מכבי חיפה,ISR,31/07/2025
+country,ISR,age,16,female,25m,backstroke,100m,59.88,אופיר שמחה,מכבי קרית ביאליק,ISR,26/12/2025
+country,ISR,age,16,female,25m,backstroke,200m,02:08.71,אופיר שמחה,מכבי קרית ביאליק,ISR,25/12/2025
+country,ISR,age,16,female,25m,backstroke,50m,27.96,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/12/2018
+country,ISR,age,16,female,25m,breaststroke,100m,01:07.44,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/12/2018
+country,ISR,age,16,female,25m,breaststroke,200m,02:24.91,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,27/12/2018
+country,ISR,age,16,female,25m,breaststroke,50m,31.01,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,28/11/2019
+country,ISR,age,16,female,25m,butterfly,100m,59.37,לאה פולונסקי,מכבי חיפה,ISR,26/12/2018
+country,ISR,age,16,female,25m,butterfly,200m,02:10.00,לאה פולונסקי,מכבי חיפה,ISR,27/12/2018
+country,ISR,age,16,female,25m,butterfly,50m,27.00,דריה גולובטי,הפועל בת ים,ISR,24/12/2021
+country,ISR,age,16,female,25m,freestyle,100m,52.87,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/10/2019
+country,ISR,age,16,female,25m,freestyle,1500m,16:50.28,עומר שוורץ,מכבי קרית ביאליק,ISR,23/12/2022
+country,ISR,age,16,female,25m,freestyle,200m,01:57.03,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/10/2019
+country,ISR,age,16,female,25m,freestyle,400m,04:12.88,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,27/10/2019
+country,ISR,age,16,female,25m,freestyle,4X100m,03:50.48,"דריה גולובטי, בקי פוזדנר, אופק אדיר, יובל סגל",הפועל בת ים,ISR,25/12/2020
+country,ISR,age,16,female,25m,freestyle,4X200m,08:23.48,"רומי חביב, בקי פוזדנר, דריה גולובטי, יובל סגל",הפועל בת ים,ISR,26/12/2020
+country,ISR,age,16,female,25m,freestyle,4X50m,01:45.22,"דריה גולובטי, אופק אדיר, אלכסיה סבשצ׳נסקי, יובל סגל",הפועל בת ים,ISR,26/11/2021
+country,ISR,age,16,female,25m,freestyle,50m,24.79,דריה גולובטי,הפועל בת ים,ISR,02/11/2021
+country,ISR,age,16,female,25m,freestyle,800m,08:38.94,בקי פוזדנר,הפועל בת ים,ISR,27/12/2019
+country,ISR,age,16,female,25m,individual_medley,100m,01:00.07,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,05/12/2019
+country,ISR,age,16,female,25m,individual_medley,200m,02:07.64,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,27/10/2019
+country,ISR,age,16,female,25m,individual_medley,400m,04:35.82,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,30/11/2019
+country,ISR,age,16,female,25m,individual_medley,4X100m,04:17.65,"דריה גולובטי, רומי חביב, נועה יעיש, יובל סגל",הפועל בת ים,ISR,26/11/2021
+country,ISR,age,16,female,25m,individual_medley,4X50m,01:56.72,"דריה גולובטי, רומי חביב, נועה יעיש, יובל סגל",הפועל בת ים,ISR,25/12/2021
+country,ISR,age,16,female,50m,backstroke,100m,01:00.58,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,24/08/2019
+country,ISR,age,16,female,50m,backstroke,200m,02:13.50,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,16/03/2019
+country,ISR,age,16,female,50m,backstroke,50m,28.21,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,03/07/2019
+country,ISR,age,16,female,50m,breaststroke,100m,01:09.28,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,31/07/2019
+country,ISR,age,16,female,50m,breaststroke,200m,02:28.78,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,24/05/2019
+country,ISR,age,16,female,50m,breaststroke,50m,31.73,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,03/08/2019
+country,ISR,age,16,female,50m,butterfly,100m,59.67,ורד בורוכובסקי,מכבי אשדוד,ISR,06/08/2000
+country,ISR,age,16,female,50m,butterfly,200m,02:14.45,שרון שטיימן,הפועל פליפר חדרה,ISR,24/07/2019
+country,ISR,age,16,female,50m,butterfly,50m,26.70,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/07/2019
+country,ISR,age,16,female,50m,freestyle,100m,55.60,דריה גולובטי,הפועל בת ים,ISR,06/07/2021
+country,ISR,age,16,female,50m,freestyle,1500m,17:04.67,בקי פוזדנר,הפועל בת-ים,ISR,30/07/2019
+country,ISR,age,16,female,50m,freestyle,200m,02:00.83,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/05/2019
+country,ISR,age,16,female,50m,freestyle,400m,04:17.74,בקי פוזדנר,הפועל בת-ים,ISR,24/07/2019
+country,ISR,age,16,female,50m,freestyle,4X100m,03:58.45,"שאין גולנד, אלמה גלקסמן, מיטל פליקשטיין, אביגיל סטרוגצקי",הפועל מ. א. משגב,ISR,09/06/2023
+country,ISR,age,16,female,50m,freestyle,4X200m,08:43.76,"אלמה גלסמן, שאין גולנד, מיטל פליקשטיין, איילה שהם",הפועל מ. א. משגב,ISR,10/06/2023
+country,ISR,age,16,female,50m,freestyle,4X50m,01:49.68,"שאין גולנד, אלמה גלסמן, מיטל פליקשטיין, אביגיל סטרוגצקי",הפועל מ.א. משגב,ISR,25/03/2023
+country,ISR,age,16,female,50m,freestyle,50m,25.76,שאין גולנד,הפועל מ. א. משגב,ISR,08/09/2023
+country,ISR,age,16,female,50m,freestyle,800m,08:49.72,עדי ביכמן,מכבי קרית-אונו,ISR,15/07/1999
+country,ISR,age,16,female,50m,individual_medley,200m,02:11.92,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,21/07/2019
+country,ISR,age,16,female,50m,individual_medley,400m,04:47.58,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,23/03/2019
+country,ISR,age,16,female,50m,individual_medley,4X100m,04:28.19,"מיטל פליקשטיין, אלמה גלסמן, שאין גולנד, אביגיל סטרוגצקי",הפועל מ.א משגב,ISR,21/07/2023
+country,ISR,age,16,female,50m,individual_medley,4X50m,01:59.80,"דריה גולובטי, רומי חביב, אופיר רכאח, יובל סגל",הפועל בת-ים,ISR,20/07/2021
+country,ISR,age,16,male,25m,backstroke,100m,53.94,אוקאן גולדין,מכבי נהריה,ISR,21/12/2022
+country,ISR,age,16,male,25m,backstroke,200m,01:56.03,אוקאן גולדין,מכבי נהריה,ISR,19/12/2022
+country,ISR,age,16,male,25m,backstroke,50m,25.12,אוקאן גולדין,מכבי נהריה,ISR,22/12/2023
+country,ISR,age,16,male,25m,breaststroke,100m,01:00.20,מרק טלר,מכבי מרום רמת גן,ISR,26/12/2024
+country,ISR,age,16,male,25m,breaststroke,200m,02:11.65,רון פולונסקי,מכבי חיפה,ISR,28/12/2017
+country,ISR,age,16,male,25m,breaststroke,50m,27.85,מרק טלר,מכבי מרום רמת גן,ISR,26/12/2024
+country,ISR,age,16,male,25m,butterfly,100m,53.41,שון וורונקוב,מכבי קרית ביאליק,ISR,25/12/2025
+country,ISR,age,16,male,25m,butterfly,200m,01:57.80,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,27/12/2018
+country,ISR,age,16,male,25m,butterfly,50m,24.19,שון וורונקוב,מכבי קרית ביאליק,ISR,27/12/2025
+country,ISR,age,16,male,25m,freestyle,100m,49.20,עמית קסטן מגורי,מכבי א.ס. רמת השרון,ISR,24/12/2025
+country,ISR,age,16,male,25m,freestyle,1500m,15:18.57,מרק חינאוי,הפועל בת ים,ISR,16/02/2013
+country,ISR,age,16,male,25m,freestyle,200m,01:47.18,דניס לוקטב,מכבי אשדוד,ISR,30/12/2016
+country,ISR,age,16,male,25m,freestyle,400m,03:47.25,דניס לוקטב,מכבי אשדוד,ISR,28/12/2016
+country,ISR,age,16,male,25m,freestyle,4X100m,03:27.82,"ארז דרור, מריאל בר און, לאו פיאסטרו, אחמד פדיליה",הפועל כפר סבא ב. ב.,ISR,23/12/2023
+country,ISR,age,16,male,25m,freestyle,4X100m,03:27.82,"ארז דרור, מריאל בר און, לאו פיאסטרו, אחמד פדיליה",הפועל כפר סבא ב. ב.,ISR,23/12/2023
+country,ISR,age,16,male,25m,freestyle,4X200m,07:35.32,"אחמד פדיליה, ארז דרור, יוחי ברוש, אשכול מזור",הפועל כפר סבא ב. ב.,ISR,23/12/2023
+country,ISR,age,16,male,25m,freestyle,4X200m,07:35.32,"אחמד פדיליה, ארז דרור, יוחי ברוש, אשכול מזור",הפועל כפר סבא ב. ב.,ISR,23/12/2023
+country,ISR,age,16,male,25m,freestyle,4X50m,01:33.78,"עמית קסטן מגורי, ענבר מסילתי, ענבר רפאל יוסקוביץ-לב ארי, תומר רוזנר",מכבי א.ס. רמת השרון,ISR,26/12/2025
+country,ISR,age,16,male,25m,freestyle,50m,22.16,בן פאחט,הפועל ירושלים,ISR,27/12/2024
+country,ISR,age,16,male,25m,freestyle,800m,08:02.42,מאור גורלניק,הפועל בת ים,ISR,25/12/2021
+country,ISR,age,16,male,25m,individual_medley,100m,56.60,בן פאחט,הפועל ירושלים,ISR,25/12/2024
+country,ISR,age,16,male,25m,individual_medley,200m,01:59.50,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,28/12/2018
+country,ISR,age,16,male,25m,individual_medley,400m,04:17.48,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,29/12/2018
+country,ISR,age,16,male,25m,individual_medley,4X100m,03:51.18,"דניאל נג׳אר, עידו כאמון, יהונתן שילר, אסף סקל",מכבי מרום רמת גן,ISR,23/12/2023
+country,ISR,age,16,male,25m,individual_medley,4X100m,03:51.18,"דניאל נג׳אר, עידו כאמון, יהונתן שילר, אסף סקל",מכבי מרום רמת גן,ISR,23/12/2023
+country,ISR,age,16,male,25m,individual_medley,4X50m,01:41.30,"דניאל נג׳אר, מרק טלר, יהלי כהן, אסף סקל",מכבי מרום רמת גן,ISR,27/12/2024
+country,ISR,age,16,male,50m,backstroke,100m,55.39,אוקאן גולדין,מכבי נהריה,ISR,25/07/2023
+country,ISR,age,16,male,50m,backstroke,200m,02:00.20,אוקאן גולדין,מכבי נהריה,ISR,06/07/2023
+country,ISR,age,16,male,50m,backstroke,50m,25.89,אוקאן גולדין,מכבי נהריה,ISR,06/09/2023
+country,ISR,age,16,male,50m,breaststroke,100m,01:02.17,מרק טלר,"מכבי מרום ר""ג",ISR,09/08/2024
+country,ISR,age,16,male,50m,breaststroke,200m,02:18.16,רון פולונסקי,מכבי חיפה,ISR,03/08/2017
+country,ISR,age,16,male,50m,breaststroke,50m,28.34,מרק טלר,"מכבי מרום ר""ג",ISR,02/07/2024
+country,ISR,age,16,male,50m,butterfly,100m,53.76,תומר פרנקל,הפועל ירושלים,ISR,07/04/2016
+country,ISR,age,16,male,50m,butterfly,200m,02:01.66,תום קרמר,מכבי קרית ביאליק,ISR,23/07/2010
+country,ISR,age,16,male,50m,butterfly,50m,24.50,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,27/07/2018
+country,ISR,age,16,male,50m,freestyle,100m,50.95,זיו קלונטרוב,הפועל עומר,ISR,08/08/2013
+country,ISR,age,16,male,50m,freestyle,1500m,15:33.72,מרק חינאוי,בת-ים,ISR,18/07/2013
+country,ISR,age,16,male,50m,freestyle,200m,01:50.27,דניס לוקטב,מכבי אשדוד,ISR,17/07/2016
+country,ISR,age,16,male,50m,freestyle,400m,03:53.89,דניס לוקטב,מכבי אשדוד,ISR,15/07/2016
+country,ISR,age,16,male,50m,freestyle,4X100m,03:35.32,"בן פאחט, לב שטיינברג, אוקאן גולדין, רון מקדונסקי",נבחרת ישראל,ISR,26/07/2023
+country,ISR,age,16,male,50m,freestyle,4X100m,03:37.90,"קאן ולדיסלב, וולקוב דניאל, יוסף תמיר, וולקוב אלכס",מכבי נהריה,ISR,27/07/2018
+country,ISR,age,16,male,50m,freestyle,4X200m,07:33.46,"ענבר יוסקוביץ לב ארי, יוני דגן, שון פומברג, תומר רוזנר",נבחרת ישראל,ISR,20/06/2026
+country,ISR,age,16,male,50m,freestyle,4X200m,07:53.01,"עידו הבר, גיא מוסקוביץ, איתי פילר, יגר דניאל",מכבי קרית ביאליק,ISR,04/08/2011
+country,ISR,age,16,male,50m,freestyle,4X50m,01:36.13,"אסף סקל, דניאל נג׳ראר, מרק טלר, יהלי כהן","מכבי מרום ר""ג",ISR,08/08/2024
+country,ISR,age,16,male,50m,freestyle,50m,22.67,דיויד ריבינסקי,הפועל דולפין נתניה,ISR,18/07/2016
+country,ISR,age,16,male,50m,freestyle,800m,08:12.33,דניס לוקטב,מכבי אשדוד,ISR,14/07/2016
+country,ISR,age,16,male,50m,individual_medley,200m,02:02.41,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,08/10/2018
+country,ISR,age,16,male,50m,individual_medley,400m,04:27.16,רון פולונסקי,מכבי חיפה,ISR,04/08/2017
+country,ISR,age,16,male,50m,individual_medley,4X100m,03:47.79,"מיכאל בכר, מרק סגלוביץ, תומר רוזנר, יוני דגן",נבחרת ישראל,ISR,21/06/2026
+country,ISR,age,16,male,50m,individual_medley,4X100m,04:04.97,"דרור חסידי, גלעד הולנר, יותם רייזנר, בן קישינבסקי",מכבי וייסגל רחובות,ISR,21/07/2026
+country,ISR,age,16,male,50m,individual_medley,4X50m,01:45.17,"דניאל נג׳אר, מרק טלר, אסף סקל, יהלי כהן","מכבי מרום ר""ג",ISR,10/08/2024
+country,ISR,age,16,mixed,25m,freestyle,4X100m,04:03.20,"דוד דמיטרייב, איילה לוי, אילנית דימשיץ, שון פומברג",מכבי קרית ביאליק,ISR,07/03/2024
+country,ISR,age,16,mixed,25m,freestyle,4X50m,01:43.24,"שגיא כהן, ירין שמאי, דוריה גורלסקי, שי וקסמן נעמן",מכבי ראשון לציון,ISR,23/12/2022
+country,ISR,age,16,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,16,mixed,25m,individual_medley,4X50m,01:50.96,"ענבר רפאל יוסקוביץ-לב ארי, שחר קשריאן, תומר רוזנר, נורית מקליס",מכבי א.ס. רמת השרון,ISR,27/12/2025
+country,ISR,age,16,mixed,50m,freestyle,4X100m,04:05.51,"אילנית דימשיץ, שון פומברג, איילה לוי, דוד דמיטרייב",מכבי קרית ביאליק,ISR,24/07/2024
+country,ISR,age,16,mixed,50m,freestyle,4X50m,01:42.97,"דניאל ברנדינר, שאין גולנד, יואב אופק, אלמה גלסמן",הפועל מ.א משגב,ISR,19/07/2023
+country,ISR,age,16,mixed,50m,individual_medley,4X100m,04:09.15,"דניאל נג׳אר, מרק טלר, זהר כהן הרפניסט, אוה גולצוב","מכבי מרום ר""ג",ISR,09/08/2024
+country,ISR,age,16,mixed,50m,individual_medley,4X50m,01:53.10,"עופרי קמר, עידן כאמון, יהונתן שילר, ליהי לב",מכבי כפר המכביה,ISR,18/07/2023
+country,ISR,age,17,female,25m,backstroke,100m,58.37,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,22/08/2020
+country,ISR,age,17,female,25m,backstroke,200m,02:08.15,אביב ברזילי,מכבי חיפה,ISR,25/12/2019
+country,ISR,age,17,female,25m,backstroke,50m,27.88,מרסי אן נגירה,בני הרצליה,ISR,20/12/2022
+country,ISR,age,17,female,25m,breaststroke,100m,01:05.28,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,16/11/2020
+country,ISR,age,17,female,25m,breaststroke,200m,02:22.70,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,19/08/2020
+country,ISR,age,17,female,25m,breaststroke,50m,30.20,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,31/10/2020
+country,ISR,age,17,female,25m,butterfly,100m,58.34,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,19/08/2020
+country,ISR,age,17,female,25m,butterfly,200m,02:10.00,לאה פולונסקי,מכבי חיפה,ISR,27/12/2018
+country,ISR,age,17,female,25m,butterfly,50m,27.00,דריה גולובטי,הפועל בת ים,ISR,24/12/2021
+country,ISR,age,17,female,25m,freestyle,100m,52.36,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,24/10/2020
+country,ISR,age,17,female,25m,freestyle,1500m,16:31.53,אמילי גולוס,"ת""א סווים",ISR,23/12/2025
+country,ISR,age,17,female,25m,freestyle,200m,01:57.03,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/10/2019
+country,ISR,age,17,female,25m,freestyle,400m,04:12.61,גלי זילברברג,מכבי פ.מ. רעות,ISR,26/12/2018
+country,ISR,age,17,female,25m,freestyle,4X100m,03:47.64,"שאין גולנד, אלמה גלסמן, רויטל ברנוט, מיטל פליקשטיין",מכבי חיפה,ISR,26/12/2024
+country,ISR,age,17,female,25m,freestyle,4X200m,08:23.48,"רומי חביב, בקי פוזדנר, דריה גולובטי, יובל סגל",הפועל בת ים,ISR,26/12/2020
+country,ISR,age,17,female,25m,freestyle,4X50m,01:43.59,"שאין גולנד, אלמה גלסמן, רויטל ברנוט, מיטל פליקשטיין",מכבי חיפה,ISR,27/12/2024
+country,ISR,age,17,female,25m,freestyle,50m,24.53,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,22/08/2020
+country,ISR,age,17,female,25m,freestyle,800m,08:38.94,בקי פוזדנר,הפועל בת ים,ISR,27/12/2019
+country,ISR,age,17,female,25m,individual_medley,100m,57.90,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,10/11/2020
+country,ISR,age,17,female,25m,individual_medley,200m,02:05.98,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,09/11/2020
+country,ISR,age,17,female,25m,individual_medley,400m,04:32.67,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,25/10/2020
+country,ISR,age,17,female,25m,individual_medley,4X100m,04:17.65,"דריה גולובטי, רומי חביב, נועה יעיש, יובל סגל",הפועל בת ים,ISR,26/11/2021
+country,ISR,age,17,female,25m,individual_medley,4X100m,04:17.65,"דריה גולובטי, רומי חביב, נועה יעיש, יובל סגל",הפועל בת ים,ISR,26/11/2021
+country,ISR,age,17,female,25m,individual_medley,4X50m,01:55.06,"מיטל פליקשטיין, אלמה גלסמן, רויטל ברנוט, שאין גולנד",מכבי חיפה,ISR,25/12/2024
+country,ISR,age,17,female,50m,backstroke,100m,01:00.58,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,24/08/2019
+country,ISR,age,17,female,50m,backstroke,200m,02:11.91,אביב ברזילי,מכבי חיפה,ISR,27/08/2019
+country,ISR,age,17,female,50m,backstroke,50m,28.21,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,03/07/2019
+country,ISR,age,17,female,50m,breaststroke,100m,01:08.93,יוליה בנך,הפועל אילת,ISR,27/02/2009
+country,ISR,age,17,female,50m,breaststroke,200m,02:28.78,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,24/05/2019
+country,ISR,age,17,female,50m,breaststroke,50m,31.73,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,03/08/2019
+country,ISR,age,17,female,50m,butterfly,100m,59.63,ורד בורוכובסקי,מכבי אשדוד,ISR,27/02/2001
+country,ISR,age,17,female,50m,butterfly,200m,02:14.22,מאי לווי,מכבי קרית אונו,ISR,04/05/2018
+country,ISR,age,17,female,50m,butterfly,50m,26.70,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/07/2019
+country,ISR,age,17,female,50m,freestyle,100m,54.38,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,18/12/2020
+country,ISR,age,17,female,50m,freestyle,1500m,16:44.61,גלי זילברברג,מכבי פ.מ. רעות,ISR,06/07/2018
+country,ISR,age,17,female,50m,freestyle,200m,01:59.38,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,18/12/2020
+country,ISR,age,17,female,50m,freestyle,400m,04:17.74,בקי פוזדנר,הפועל בת-ים,ISR,24/07/2019
+country,ISR,age,17,female,50m,freestyle,4X100m,03:58.45,"שאין גולנד, אלמה גלקסמן, מיטל פליקשטיין, אביגיל סטרוגצקי",הפועל מ. א. משגב,ISR,09/06/2023
+country,ISR,age,17,female,50m,freestyle,4X200m,08:43.76,"אלמה גלסמן, שאין גולנד, מיטל פליקשטיין, איילה שהם",הפועל מ. א. משגב,ISR,10/06/2023
+country,ISR,age,17,female,50m,freestyle,4X50m,01:49.68,"שאין גולנד, אלמה גלסמן, מיטל פליקשטיין, אביגיל סטרוגצקי",הפועל מ.א. משגב,ISR,25/03/2023
+country,ISR,age,17,female,50m,freestyle,50m,25.23,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,18/12/2020
+country,ISR,age,17,female,50m,freestyle,800m,08:47.98,עדי ביכמן,מכבי קרית-אונו,ISR,06/07/2000
+country,ISR,age,17,female,50m,individual_medley,200m,02:11.92,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,21/07/2019
+country,ISR,age,17,female,50m,individual_medley,400m,04:41.48,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,08/02/2020
+country,ISR,age,17,female,50m,individual_medley,4X100m,04:15.56,"אביב ברזילי, לאה פולונסקי, מאי לווי, אנסטסיה גורבנקו",נבחרת ישראל,ISR,06/07/2018
+country,ISR,age,17,female,50m,individual_medley,4X100m,04:25.27,"ליאם טלפינסקי, שחר כשריאל, תהל אלבז, נורית מקליס",א.ס.רמת השרון,ISR,21/07/2026
+country,ISR,age,17,female,50m,individual_medley,4X50m,01:59.80,"דריה גולובטי, רומי חביב, אופיר רכאח, יובל סגל",הפועל בת-ים,ISR,20/07/2021
+country,ISR,age,17,male,25m,backstroke,100m,52.43,אוקאן גולדין,מכבי נהריה,ISR,28/12/2024
+country,ISR,age,17,male,25m,backstroke,200m,01:52.54,אוקאן גולדין,מכבי נהריה,ISR,26/12/2024
+country,ISR,age,17,male,25m,backstroke,50m,24.34,אוקאן גולדין,מכבי נהריה,ISR,25/12/2024
+country,ISR,age,17,male,25m,breaststroke,100m,01:00.10,מרק טלר,מכבי מרום רמת גן,ISR,27/12/2025
+country,ISR,age,17,male,25m,breaststroke,200m,02:09.57,איליה גלדישב,מכבי אשדוד,ISR,25/12/2014
+country,ISR,age,17,male,25m,breaststroke,50m,27.60,מרק טלר,מכבי מרום רמת גן,ISR,25/12/2025
+country,ISR,age,17,male,25m,butterfly,100m,51.82,תומר פרנקל,הפועל ירושלים,ISR,27/12/2017
+country,ISR,age,17,male,25m,butterfly,200m,01:55.62,תומר פרנקל,הפועל ירושלים,ISR,28/12/2017
+country,ISR,age,17,male,25m,butterfly,50m,24.19,שון וורונקוב,מכבי קרית ביאליק,ISR,27/12/2025
+country,ISR,age,17,male,25m,freestyle,100m,48.28,יהלי כהן,מכבי מרום רמת גן,ISR,24/12/2025
+country,ISR,age,17,male,25m,freestyle,1500m,15:05.14,מרק חינאוי,הפועל בת ים,ISR,27/12/2014
+country,ISR,age,17,male,25m,freestyle,200m,01:44.71,דניס לוקטב,מכבי אשדוד,ISR,30/12/2017
+country,ISR,age,17,male,25m,freestyle,400m,03:45.13,דניס לוקטב,מכבי אשדוד,ISR,27/12/2017
+country,ISR,age,17,male,25m,freestyle,4X100m,03:23.91,"עמית קסטן מגורי, סתיו שנער, ענבר מסילתי, ענבר רפאל יוסקוביץ-לב ארי",מכבי א.ס. רמת השרון,ISR,25/12/2025
+country,ISR,age,17,male,25m,freestyle,4X100m,03:23.91,"עמית קסטן מגורי, סתיו שנער, ענבר מסילתי, ענבר רפאל יוסקוביץ-לב ארי",מכבי א.ס. רמת השרון,ISR,25/12/2025
+country,ISR,age,17,male,25m,freestyle,4X200m,07:35.32,"אחמד פדיליה, ארז דרור, יוחי ברוש, אשכול מזור",הפועל כפר סבא ב. ב.,ISR,23/12/2023
+country,ISR,age,17,male,25m,freestyle,4X200m,07:35.32,"אחמד פדיליה, ארז דרור, יוחי ברוש, אשכול מזור",הפועל כפר סבא ב. ב.,ISR,23/12/2023
+country,ISR,age,17,male,25m,freestyle,4X50m,01:32.44,"שגיא כהן, ניל כרמלי, ירין שמאי, יהונתן שילר",מכבי ראשון לציון,ISR,27/12/2024
+country,ISR,age,17,male,25m,freestyle,50m,21.99,מרטין קרטאבי,הפועל דולפין נתניה,ISR,25/12/2021
+country,ISR,age,17,male,25m,freestyle,800m,07:56.84,יואב רומנו,מכבי שהם,ISR,25/12/2021
+country,ISR,age,17,male,25m,individual_medley,100m,55.59,דניאל אייכל,מכבי קירת ביאליק,ISR,23/12/2021
+country,ISR,age,17,male,25m,individual_medley,200m,01:56.98,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,27/12/2019
+country,ISR,age,17,male,25m,individual_medley,400m,04:15.80,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,28/12/2019
+country,ISR,age,17,male,25m,individual_medley,4X100m,03:51.18,"דניאל נג׳אר, עידו כאמון, יהונתן שילר, אסף סקל",מכבי מרום רמת גן,ISR,23/12/2023
+country,ISR,age,17,male,25m,individual_medley,4X100m,03:51.18,"דניאל נג׳אר, עידו כאמון, יהונתן שילר, אסף סקל",מכבי מרום רמת גן,ISR,23/12/2023
+country,ISR,age,17,male,25m,individual_medley,4X50m,01:38.51,"דניאל נג׳אר, מרק טלר, יהלי כהן, אסף סקל",מכבי מרום רמת גן,ISR,24/12/2025
+country,ISR,age,17,male,50m,backstroke,100m,55.10,אוקאן גולדין,מכבי נהריה,ISR,10/08/2024
+country,ISR,age,17,male,50m,backstroke,200m,02:00.20,אוקאן גולדין,מכבי נהריה,ISR,06/07/2023
+country,ISR,age,17,male,50m,backstroke,50m,25.84,אוקאן גולדין,מכבי נהריה,ISR,03/07/2024
+country,ISR,age,17,male,50m,breaststroke,100m,01:01.51,מרק טלר,"מכבי מרום ר""ג",ISR,06/07/2025
+country,ISR,age,17,male,50m,breaststroke,200m,02:15.20,איליה פובר,הפועל רמת הנגב,ISR,17/04/2026
+country,ISR,age,17,male,50m,breaststroke,50m,27.76,מרק טלר,"מכבי מרום ר""ג",ISR,01/07/2024
+country,ISR,age,17,male,50m,butterfly,100m,52.93,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,21/06/2019
+country,ISR,age,17,male,50m,butterfly,200m,02:00.52,תום קרמר,מכבי קרית ביאליק,ISR,08/07/2011
+country,ISR,age,17,male,50m,butterfly,50m,23.98,תומר פרנקל,הפועל ירושלים,ISR,02/08/2017
+country,ISR,age,17,male,50m,freestyle,100m,49.57,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,01/08/2019
+country,ISR,age,17,male,50m,freestyle,1500m,15:29.48,מרק חינאוי,הפועל בת-ים,ISR,10/07/2014
+country,ISR,age,17,male,50m,freestyle,200m,01:48.69,תומר פרנקל,הפועל ירושלים,ISR,02/07/2017
+country,ISR,age,17,male,50m,freestyle,400m,03:53.89,דניס לוקטב,מכבי אשדוד,ISR,15/07/2016
+country,ISR,age,17,male,50m,freestyle,4X100m,03:26.39,"ענבר רפאל יוסקוביץ-לב ארי, ענבר מסילתי, תומר רוזנר, עמית קסטן מגורי",א.ס. רמת השרון,ISR,19/07/2026
+country,ISR,age,17,male,50m,freestyle,4X100m,03:26.39,"ענבר רפאל יוסקוביץ-לב ארי, ענבר מסילתי, תומר רוזנר, עמית קסטן מגורי",א.ס. רמת השרון,ISR,19/07/2026
+country,ISR,age,17,male,50m,freestyle,4X200m,07:33.46,"ענבר יוסקוביץ לב ארי, יוני דגן, שון פומברג, תומר רוזנר",נבחרת ישראל,ISR,20/06/2026
+country,ISR,age,17,male,50m,freestyle,4X200m,07:41.12,"ענבר רפאל יוסקוביץ-לב ארי, עמית קסטן מגורי, ענבר מסילתי, תומר רוזנר",א.ס.רמת השרון,ISR,18/07/2026
+country,ISR,age,17,male,50m,freestyle,4X50m,01:36.13,"אסף סקל, דניאל נג׳ראר, מרק טלר, יהלי כהן","מכבי מרום ר""ג",ISR,08/08/2024
+country,ISR,age,17,male,50m,freestyle,50m,22.59,מיכאל פולבייאב,הפועל דולפין נתניה,ISR,07/09/2023
+country,ISR,age,17,male,50m,freestyle,800m,08:11.72,מרק חינאוי,הפועל בת-ים,ISR,17/05/2014
+country,ISR,age,17,male,50m,individual_medley,200m,02:00.48,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,05/07/2019
+country,ISR,age,17,male,50m,individual_medley,400m,04:27.16,רון פולונסקי,מכבי חיפה,ISR,04/08/2017
+country,ISR,age,17,male,50m,individual_medley,4X100m,03:47.79,"מיכאל בכר, מרק סגלוביץ, תומר רוזנר, יוני דגן",נבחרת ישראל,ISR,21/06/2026
+country,ISR,age,17,male,50m,individual_medley,4X100m,03:59.50,"ענבר מסילתי, ענבר רפאל יוסקוביץ-לב ארי, תומר רוזנר, עמית קסטן מגורי",מ.ס.רמת השרון,ISR,21/07/2026
+country,ISR,age,17,male,50m,individual_medley,4X50m,01:45.17,"דניאל נג׳אר, מרק טלר, אסף סקל, יהלי כהן","מכבי מרום ר""ג",ISR,10/08/2024
+country,ISR,age,17,mixed,25m,freestyle,4X100m,04:03.20,"דוד דמיטרייב, איילה לוי, אילנית דימשיץ, שון פומברג",מכבי קרית ביאליק,ISR,07/03/2024
+country,ISR,age,17,mixed,25m,freestyle,4X50m,01:43.24,"שגיא כהן, ירין שמאי, דוריה גורלסקי, שי וקסמן נעמן",מכבי ראשון לציון,ISR,23/12/2022
+country,ISR,age,17,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,17,mixed,25m,individual_medley,4X50m,01:50.96,"ענבר רפאל יוסקוביץ-לב ארי, שחר קשריאן, תומר רוזנר, נורית מקליס",מכבי א.ס. רמת השרון,ISR,27/12/2025
+country,ISR,age,17,mixed,50m,freestyle,4X100m,04:05.51,"אילנית דימשיץ, שון פומברג, איילה לוי, דוד דמיטרייב",מכבי קרית ביאליק,ISR,24/07/2024
+country,ISR,age,17,mixed,50m,freestyle,4X50m,01:42.97,"דניאל ברנדינר, שאין גולנד, יואב אופק, אלמה גלסמן",הפועל מ.א משגב,ISR,19/07/2023
+country,ISR,age,17,mixed,50m,individual_medley,4X100m,04:06.52,"דניאל נג׳אר, מרק טלר, טומי ליטאי, אוה גולצוב","מכבי מרום ר""ג",ISR,27/07/2025
+country,ISR,age,17,mixed,50m,individual_medley,4X50m,01:53.10,"עופרי קמר, עידן כאמון, יהונתן שילר, ליהי לב",מכבי כפר המכביה,ISR,18/07/2023
+country,ISR,age,18,female,25m,backstroke,100m,57.45,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,16/12/2021
+country,ISR,age,18,female,25m,backstroke,200m,02:05.36,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/11/2021
+country,ISR,age,18,female,25m,backstroke,50m,26.63,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,01/10/2021
+country,ISR,age,18,female,25m,breaststroke,100m,01:04.44,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,02/10/2021
+country,ISR,age,18,female,25m,breaststroke,200m,02:19.22,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,09/09/2021
+country,ISR,age,18,female,25m,breaststroke,50m,29.34,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,17/12/2021
+country,ISR,age,18,female,25m,butterfly,100m,58.34,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,19/08/2020
+country,ISR,age,18,female,25m,butterfly,200m,02:10.00,לאה פולונסקי,מכבי חיפה,ISR,27/12/2018
+country,ISR,age,18,female,25m,butterfly,50m,26.38,ורד בורוכובסקי,מכבי אשדוד,ISR,05/04/2002
+country,ISR,age,18,female,25m,freestyle,100m,52.36,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,24/10/2020
+country,ISR,age,18,female,25m,freestyle,1500m,16:31.53,אמילי גולוס,"ת""א סווים",ISR,23/12/2025
+country,ISR,age,18,female,25m,freestyle,200m,01:56.21,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,19/09/2021
+country,ISR,age,18,female,25m,freestyle,400m,04:12.61,גלי זילברברג,מכבי פ.מ. רעות,ISR,26/12/2018
+country,ISR,age,18,female,25m,freestyle,4X100m,03:47.43,"בקי פוזדנר, יובל סגל, אופק אדיר, דריה גולובטי",הפועל בת ים,ISR,27/11/2021
+country,ISR,age,18,female,25m,freestyle,4X100m,03:47.43,"בקי פוזדנר, יובל סגל, אופק אדיר, דריה גולובטי",הפועל בת ים,ISR,27/11/2021
+country,ISR,age,18,female,25m,freestyle,4X200m,08:23.48,"רומי חביב, בקי פוזדנר, דריה גולובטי, יובל סגל",הפועל בת ים,ISR,26/12/2020
+country,ISR,age,18,female,25m,freestyle,4X50m,01:43.59,"שאין גולנד, אלמה גלסמן, רויטל ברנוט, מיטל פליקשטיין",מכבי חיפה,ISR,27/12/2024
+country,ISR,age,18,female,25m,freestyle,50m,24.53,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,22/08/2020
+country,ISR,age,18,female,25m,freestyle,800m,08:38.94,בקי פוזדנר,הפועל בת ים,ISR,27/12/2019
+country,ISR,age,18,female,25m,individual_medley,100m,57.80,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,19/12/2021
+country,ISR,age,18,female,25m,individual_medley,200m,02:05.04,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,04/09/2021
+country,ISR,age,18,female,25m,individual_medley,400m,04:32.67,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,25/10/2020
+country,ISR,age,18,female,25m,individual_medley,4X100m,04:15.71,"תום מיניס, קרן אייזברוך, אליסיה מושקוביץ, לוריין לונגו-קליבלנד",מכבי ראשון לציון,ISR,23/12/2023
+country,ISR,age,18,female,25m,individual_medley,4X100m,04:15.71,"תום מיניס, קרן אייזברוך, אליסיה מושקוביץ, לוריין לונגו-קליבלנד",מכבי ראשון לציון,ISR,23/12/2023
+country,ISR,age,18,female,25m,individual_medley,4X50m,01:53.93,"אביב ברזילי, לאה פולונסקי, רז הראל, רוני קלט",מכבי חיפה,ISR,28/12/2019
+country,ISR,age,18,female,50m,backstroke,100m,59.30,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/07/2021
+country,ISR,age,18,female,50m,backstroke,200m,02:10.86,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,10/04/2021
+country,ISR,age,18,female,50m,backstroke,50m,28.21,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,03/07/2019
+country,ISR,age,18,female,50m,breaststroke,100m,01:06.74,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,18/05/2021
+country,ISR,age,18,female,50m,breaststroke,200m,02:25.20,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,13/06/2021
+country,ISR,age,18,female,50m,breaststroke,50m,31.33,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,18/05/2021
+country,ISR,age,18,female,50m,butterfly,100m,58.23,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,24/07/2021
+country,ISR,age,18,female,50m,butterfly,200m,02:12.82,לאה פולונסקי,מכבי חיפה,ISR,09/02/2020
+country,ISR,age,18,female,50m,butterfly,50m,26.70,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/07/2019
+country,ISR,age,18,female,50m,freestyle,100m,54.38,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,18/12/2020
+country,ISR,age,18,female,50m,freestyle,1500m,16:44.61,גלי זילברברג,מכבי פ.מ. רעות,ISR,06/07/2018
+country,ISR,age,18,female,50m,freestyle,200m,01:58.24,דריה גולובטי,הפועל בת-ים,ISR,09/06/2023
+country,ISR,age,18,female,50m,freestyle,400m,04:11.40,דריה גולובטי,הפועל בת-ים,ISR,07/06/2023
+country,ISR,age,18,female,50m,freestyle,4X100m,03:51.99,"שאין גולנד, רויטל ברנוט, אלמה גלסמן, טטיאנה מחמוד",מכבי חיפה,ISR,26/07/2025
+country,ISR,age,18,female,50m,freestyle,4X100m,03:51.99,"שאין גולנד, רויטל ברנוט, אלמה גלסמן, טטיאנה מחמוד",מכבי חיפה,ISR,26/07/2025
+country,ISR,age,18,female,50m,freestyle,4X200m,08:24.20,"דריה גולובטי, יובל סגל, אדיר אופק, בקי פוזנר",הפועל בת-ים,ISR,29/07/2022
+country,ISR,age,18,female,50m,freestyle,4X50m,01:47.93,"יובל סגל, בקי פוזדנר, אלכסיה סבשצ׳ינסקי, דריה גולובטי",הפועל בת ים,ISR,17/04/2021
+country,ISR,age,18,female,50m,freestyle,50m,25.03,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,11/06/2021
+country,ISR,age,18,female,50m,freestyle,800m,08:47.98,עדי ביכמן,מכבי קרית-אונו,ISR,06/07/2000
+country,ISR,age,18,female,50m,individual_medley,200m,02:09.99,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,22/05/2021
+country,ISR,age,18,female,50m,individual_medley,400m,04:41.48,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,08/02/2020
+country,ISR,age,18,female,50m,individual_medley,4X100m,04:15.56,"אביב ברזילי, לאה פולונסקי, מאי לווי, אנסטסיה גורבנקו",נבחרת ישראל,ISR,06/07/2018
+country,ISR,age,18,female,50m,individual_medley,4X100m,04:19.09,"מיטל פליקשטיין, אלמה כלסמן, רויטל ברנוט, שאין גולנד",מכבי חיפה,ISR,28/07/2025
+country,ISR,age,18,female,50m,individual_medley,4X50m,01:59.80,"דריה גולובטי, רומי חביב, אופיר רכאח, יובל סגל",הפועל בת-ים,ISR,20/07/2021
+country,ISR,age,18,male,25m,backstroke,100m,51.91,אוקאן גולדין,מכבי נהריה,ISR,04/12/2025
+country,ISR,age,18,male,25m,backstroke,200m,01:51.77,אוקאן גולדין,מכבי נהריה,ISR,02/12/2025
+country,ISR,age,18,male,25m,backstroke,50m,24.20,וינר עומר,הפועל עמק חפר,ISR,23/12/2021
+country,ISR,age,18,male,25m,breaststroke,100m,59.95,איתי גולדפדן,הפועל עמק חפר,ISR,26/12/2014
+country,ISR,age,18,male,25m,breaststroke,200m,02:09.57,איליה גלדישב,מכבי אשדוד,ISR,25/12/2014
+country,ISR,age,18,male,25m,breaststroke,50m,27.42,כריס פיצ׳וגין,ירושלים רבתי,ISR,25/12/2019
+country,ISR,age,18,male,25m,butterfly,100m,51.82,תומר פרנקל,הפועל ירושלים,ISR,27/12/2017
+country,ISR,age,18,male,25m,butterfly,200m,01:53.72,תומר פרנקל,הפועל ירושלים,ISR,27/12/2018
+country,ISR,age,18,male,25m,butterfly,50m,23.45,מירון חרותי,מכבי חיפה,ISR,18/12/2015
+country,ISR,age,18,male,25m,freestyle,100m,48.28,יהלי כהן,מכבי מרום רמת גן,ISR,24/12/2025
+country,ISR,age,18,male,25m,freestyle,1500m,15:00.71,גל נבו,הפועל ירושלים,ISR,10/12/2005
+country,ISR,age,18,male,25m,freestyle,200m,01:43.50,תומר פרנקל,הפועל ירושלים,ISR,29/12/2018
+country,ISR,age,18,male,25m,freestyle,400m,03:42.86,תומר פרנקל,הפועל ירושלים,ISR,26/12/2018
+country,ISR,age,18,male,25m,freestyle,4X100m,03:21.41,"סלאח אבו עמשה, אחמד פדידה, יואב גל, ארז דרור",הפועל כפר סבא ב. ב.,ISR,26/12/2024
+country,ISR,age,18,male,25m,freestyle,4X100m,03:21.41,"סלאח אבו עמשה, אחמד פדידה, יואב גל, ארז דרור",הפועל כפר סבא ב. ב.,ISR,26/12/2024
+country,ISR,age,18,male,25m,freestyle,4X200m,07:32.30,"מאור גורלניק, נתניאל פושקה, אלן טרייבוך, דניאל רבינוביץ׳",הפועל בת ים,ISR,30/12/2011
+country,ISR,age,18,male,25m,freestyle,4X200m,07:32.30,"מאור גורלניק, נתניאל פושקה, אלן טרייבוך, דניאל רבינוביץ׳",הפועל בת ים,ISR,30/12/2011
+country,ISR,age,18,male,25m,freestyle,4X50m,01:31.90,"זיו קלונטרוב, עומר מטלון, איתי קרול, טל רבינוביץ׳ בץ",הפועל עומר,ISR,16/12/2015
+country,ISR,age,18,male,25m,freestyle,50m,21.68,מרטין קרטאבי,הפועל דולפין נתניה,ISR,21/12/2022
+country,ISR,age,18,male,25m,freestyle,800m,07:52.79,יואב רומנו,מכבי שוהם,ISR,21/12/2022
+country,ISR,age,18,male,25m,individual_medley,100m,54.11,רון פולונסקי,מכבי חיפה,ISR,26/12/2019
+country,ISR,age,18,male,25m,individual_medley,200m,01:56.36,איתן בן שטרית,ירושלים רבתי,ISR,05/11/2021
+country,ISR,age,18,male,25m,individual_medley,400m,04:07.55,איתן בן שטרית,ירושלים רבתי,ISR,20/12/2021
+country,ISR,age,18,male,25m,individual_medley,4X100m,03:42.44,,הפועל ירושלים,ISR,19/02/2011
+country,ISR,age,18,male,25m,individual_medley,4X100m,03:42.44,,הפועל ירושלים,ISR,19/02/2011
+country,ISR,age,18,male,25m,individual_medley,4X50m,01:39.62,"עידן דותן, אמיר חביב, אורי טרלצקי, גלב איאונצ׳ב",הפועל עירוני הוד השרון,ISR,31/12/2018
+country,ISR,age,18,male,50m,backstroke,100m,54.44,אוקאן גולדין,מכבי נהריה,ISR,19/08/2025
+country,ISR,age,18,male,50m,backstroke,200m,01:58.64,אוקאן גולדין,מכבי נהריה,ISR,24/08/2025
+country,ISR,age,18,male,50m,backstroke,50m,25.32,ענבר דנציגר,מכבי קרית אונו,ISR,05/07/2022
+country,ISR,age,18,male,50m,breaststroke,100m,01:00.80,מרק טלר,"מכבי מרום ר""ג",ISR,10/08/2026
+country,ISR,age,18,male,50m,breaststroke,200m,02:14.22,רון פולונסקי,מכבי חיפה,ISR,13/12/2019
+country,ISR,age,18,male,50m,breaststroke,50m,27.72,מרק טלר,"מכבי מרום ר""ג",ISR,07/07/2026
+country,ISR,age,18,male,50m,butterfly,100m,52.25,תומר פרנקל,הפועל ירושלים,ISR,26/04/2018
+country,ISR,age,18,male,50m,butterfly,200m,01:57.97,נמרוד חייט,מכבי פ.מ. רעות,ISR,10/07/2009
+country,ISR,age,18,male,50m,butterfly,50m,23.79,תומר פרנקל,הפועל ירושלים,ISR,04/07/2018
+country,ISR,age,18,male,50m,freestyle,100m,49.23,תומר פרנקל,הפועל ירושלים,ISR,06/07/2018
+country,ISR,age,18,male,50m,freestyle,1500m,15:22.04,יואב רומנו,מכבי שוהם,ISR,07/07/2022
+country,ISR,age,18,male,50m,freestyle,200m,01:47.16,תומר פרנקל,הפועל ירושלים,ISR,27/04/2018
+country,ISR,age,18,male,50m,freestyle,400m,03:52.04,דניס לוקטב,מכבי אשדוד,ISR,07/10/2018
+country,ISR,age,18,male,50m,freestyle,4X100m,03:21.27,"תומר פרנקל, דניס לוקטב, מיכאל סמירנוב, גל כהן גרומי",נבחרת ישראל,ISR,04/07/2018
+country,ISR,age,18,male,50m,freestyle,4X100m,03:26.39,"ענבר רפאל יוסקוביץ-לב ארי, ענבר מסילתי, תומר רוזנר, עמית קסטן מגורי",א.ס. רמת השרון,ISR,19/07/2026
+country,ISR,age,18,male,50m,freestyle,4X200m,07:16.28,"דניס לוקטב, גל כהן גרומי, מיכאל סמירנוב, תומר פרנקל",נבחרת ישראל,ISR,06/07/2018
+country,ISR,age,18,male,50m,freestyle,4X200m,07:38.11,"ארז דרור, יואב גל, יותם ורשבסקי, אשכול מזור",הפועל כפר סבא ב. ב.,ISR,25/07/2025
+country,ISR,age,18,male,50m,freestyle,4X50m,01:36.13,"אסף סקל, דניאל נג׳ראר, מרק טלר, יהלי כהן","מכבי מרום ר""ג",ISR,08/08/2024
+country,ISR,age,18,male,50m,freestyle,50m,22.16,זיו קלונטרוב,הפועל עומר,ISR,27/06/2015
+country,ISR,age,18,male,50m,freestyle,800m,08:07.06,יואב רומנו,מכבי שוהם,ISR,09/07/2022
+country,ISR,age,18,male,50m,individual_medley,200m,01:59.45,רון פולונסקי,מכבי חיפה,ISR,13/12/2019
+country,ISR,age,18,male,50m,individual_medley,400m,04:21.57,איתן בן שטרית,ירושלים רבתי,ISR,08/07/2021
+country,ISR,age,18,male,50m,individual_medley,4X100m,03:40.63,"אוקאן גולדין, מרק טלר, לב שטיינברג, ארז דרור",נבחרת ישראל,ISR,06/07/2025
+country,ISR,age,18,male,50m,individual_medley,4X100m,03:45.97,"דניאל נג׳אר, מרק טלר, אביב חזן, יהלי כהן","מכבי מרום ר""ג",ISR,21/07/2026
+country,ISR,age,18,male,50m,individual_medley,4X50m,01:45.17,"דניאל נג׳אר, מרק טלר, אסף סקל, יהלי כהן","מכבי מרום ר""ג",ISR,10/08/2024
+country,ISR,age,18,mixed,25m,freestyle,4X100m,04:03.20,"דוד דמיטרייב, איילה לוי, אילנית דימשיץ, שון פומברג",מכבי קרית ביאליק,ISR,07/03/2024
+country,ISR,age,18,mixed,25m,freestyle,4X100m,04:03.20,"דוד דמיטרייב, איילה לוי, אילנית דימשיץ, שון פומברג",מכבי קרית ביאליק,ISR,07/03/2024
+country,ISR,age,18,mixed,25m,freestyle,4X50m,01:39.58,"דניאל רבינוביץ׳, גל סחרוב, אופק אדיר, יובל בגל",הפועל בת ים,ISR,23/12/2022
+country,ISR,age,18,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,18,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,18,mixed,25m,individual_medley,4X50m,01:48.48,"אלמה גלסמן, יונתם גרציוב, דניאל ברנדינר, שאין גולנד",מכבי חיפה,ISR,28/12/2024
+country,ISR,age,18,mixed,50m,freestyle,4X100m,03:31.74,"דניס לוקטב, תומר פרנקל, פולונסקי לאה, אנסטסיה גורבנקו",נבחרת ישראל,ISR,05/07/2018
+country,ISR,age,18,mixed,50m,freestyle,4X100m,03:54.14,"דניאל יוסיפוב, אדם מושקוביץ, מאי דניאלוב, מילנה ליאפוסטין",הפועל אולימפ נתניה,ISR,13/06/2021
+country,ISR,age,18,mixed,50m,freestyle,4X50m,01:39.64,"מרטין קרטאבי, דביר קינן, לוריין לונגו קליבלנד, שרון אגם",הפועל דולפין נתניה,ISR,19/07/2021
+country,ISR,age,18,mixed,50m,individual_medley,4X100m,03:55.40,"עופרי קמר, מרק טלר, לב שטיינברג, שאין גולנד",נבחרת ישראל,ISR,04/07/2025
+country,ISR,age,18,mixed,50m,individual_medley,4X100m,04:06.29,"דניאל רבינוביץ, גל סחרוב, אופיר רכאח, דריה גולובטי",הפועל בת-ים,ISR,07/06/2023
+country,ISR,age,18,mixed,50m,individual_medley,4X50m,01:50.68,"סטפן אומלצינקו, יואב רותם, אליסה משקוביץ, קרן אייזנברוך",מכבי ראשון לציון,ISR,18/07/2023
+country,ISR,age,adults,female,25m,freestyle,4X100m,03:44.35,"דריה גולובטי, יובל סגל, אופק אדיר, בקי פוזדנר",הפועל בת ים,ISR,26/12/2024
+country,ISR,age,adults,female,25m,freestyle,4X200m,08:23.48,"רומי חביב, בקי פוזדנר, דריה גולובטי, יובל סגל",הפועל בת ים,ISR,26/12/2020
+country,ISR,age,adults,female,25m,freestyle,4X50m,01:43.12,"קרן זיבנר, אניה גוסטמלסקי, חיה זלבלודוף, זהר שיקלר",הפועל דולפין נתניה,ISR,16/12/2015
+country,ISR,age,adults,female,25m,individual_medley,4X100m,04:09.21,"אנאל וולפמן, אנסטסיה קורוטקוב, קרן זיבנר, אניה גוסטמלסקי",הפועל דולפין נתניה,ISR,15/02/2014
+country,ISR,age,adults,female,25m,individual_medley,4X50m,01:53.73,"אניה גוסטמלסקי, זהר שיקלר, קרן זיבנר, חיה זבלודוף",הפועל דולפין נתניה,ISR,19/12/2015
+country,ISR,age,adults,female,50m,freestyle,4X100m,03:48.28,"שאין גולנד, אלמה גלסמן, אביב ברזלי, לאה פולונסקי",מכבי חיפה,ISR,19/07/2026
+country,ISR,age,adults,female,50m,freestyle,4X200m,08:21.11,"שאין גולנד, אביב ברזלי, אלמה גלסמן, לאה פולונסקי",מכבי חיפה,ISR,18/07/2026
+country,ISR,age,adults,female,50m,freestyle,4X50m,01:45.43,"זוהר שיקלר, ג׳סיקה שפילקו, לוריין לונגו קליבלנד, שרון אגם",הפועל דולפין נתניה,ISR,16/04/2021
+country,ISR,age,adults,female,50m,individual_medley,4X100m,04:10.32,"אופיר שמחה, אנסטסיה גורבנקו, אופיר רקאח, עומר שורץ",מכבי קרית ביאליק,ISR,21/07/2026
+country,ISR,age,adults,female,50m,individual_medley,4X50m,01:57.36,"תום מיניס, קרן אייזנברוך, אליסה משקוביץ, דוריה גורלסקי",מכבי ראשון לציון,ISR,22/02/2024
+country,ISR,age,adults,male,25m,freestyle,4X100m,03:16.26,"דוד גרצ׳יק, אדם מראענה, דניאל ברוך, גרג ליצ׳ינסקי",מכבי חיפה,ISR,20/12/2022
+country,ISR,age,adults,male,25m,freestyle,4X200m,07:28.94,"דניאל אייכל, שון וורונקוב, שון פומברג, איתי רוזנפלד",מכבי קרית ביאליק,ISR,07/12/2024
+country,ISR,age,adults,male,25m,freestyle,4X50m,01:27.61,"דיויד ריבינסקי, מרקוס ג׳ון שלזינגר, סטיבן פרידמן, אהרון גרינברג",הפועל דולפין נתניה,ISR,26/12/2018
+country,ISR,age,adults,male,25m,individual_medley,4X100m,03:33.07,"מייק מרדר, כריס פיצ׳וגין, ליור מזרחי, איתן בן שטרית",ירושלים רבתי,ISR,22/12/2023
+country,ISR,age,adults,male,25m,individual_medley,4X50m,01:34.50,"דוד גרצ׳יק, רון פולונסקי, גרג ליצ׳ינסקי, מירון חרותי",מכבי חיפה,ISR,21/12/2022
+country,ISR,age,adults,male,50m,freestyle,4X100m,03:19.48,"אלכסיי גליבינסקי, תומר פרנקל, מארק שפרקין, גל כהן גרומי",הפועל ירושלים,ISR,07/08/2024
+country,ISR,age,adults,male,50m,freestyle,4X200m,07:27.78,"תומר פרנקל, גל כהן גרומי, אלכסיי גליבינסקי, סמיון גריונטל",הפועל ירושלים,ISR,10/06/2023
+country,ISR,age,adults,male,50m,freestyle,4X50m,01:30.81,"מרטין קרטאבי, מיכאל פובלייב, גל שלגל, תום סלע",הפועל דולפין נתניה,ISR,21/02/2024
+country,ISR,age,adults,male,50m,individual_medley,4X100m,03:32.04,"ברנע גיא, מלניק דנית, נבו גל, גייבורונסקי דניס",הפועל ירושלים,ISR,08/08/2009
+country,ISR,age,adults,male,50m,individual_medley,4X50m,01:39.55,"איליה אייזנשטוק, מיכאל מלול, אלון מנדל, גלעד זילברמן",מכבי קרית ביאליק,ISR,07/08/2009
+country,ISR,age,adults,mixed,25m,freestyle,4X100m,04:03.20,"דוד דמיטרייב, איילה לוי, אילנית דימשיץ, שון פומברג",מכבי קרית ביאליק,ISR,07/03/2024
+country,ISR,age,adults,mixed,25m,freestyle,4X50m,01:33.69,"מרקוס ג׳ון שלזינגר, זהר שיקלר, קרן זיבנר, אהרון גרינברג",הפועל דולפין נתניה,ISR,12/06/2021
+country,ISR,age,adults,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,age,adults,mixed,25m,individual_medley,4X50m,01:43.16,"אופיר שמחה, אנסטסיה גורבנקו, איתי רוזנפלד, אופק פרץ",מכבי קרית ביאליק,ISR,27/12/2025
+country,ISR,age,adults,mixed,50m,freestyle,4X100m,03:34.98,"מירון חרותי, רון פולונסקי, לאה פולונסקי, אביב ברזילי",מכבי חיפה,ISR,13/06/2021
+country,ISR,age,adults,mixed,50m,freestyle,4X50m,01:37.07,"מירון חרותי, גאי גרופר, אביב ברזילי, לאה פולונסקי",מכבי חיפה,ISR,12/06/2021
+country,ISR,age,adults,mixed,50m,individual_medley,4X100m,03:52.68,"אדם מראענה, רום יהונתן, לאה פולונסקי, איילה שפיץ",מכבי חיפה,ISR,07/06/2023
+country,ISR,age,adults,mixed,50m,individual_medley,4X50m,01:46.03,"מיכאל לייטרובסקי, תומר גולדפדן, ג׳סיקה שפילקו, זוהר שיקלר",הפועל דולפין נתניה,ISR,13/06/2021
+country,ISR,open,,female,25m,backstroke,100m,56.73,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,26/12/2025
+country,ISR,open,,female,25m,backstroke,200m,02:04.40,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,19/12/2022
+country,ISR,open,,female,25m,backstroke,50m,26.63,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,01/10/2021
+country,ISR,open,,female,25m,breaststroke,100m,01:03.90,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,03/12/2025
+country,ISR,open,,female,25m,breaststroke,200m,02:19.22,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,09/09/2021
+country,ISR,open,,female,25m,breaststroke,50m,29.34,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,17/12/2021
+country,ISR,open,,female,25m,butterfly,100m,56.75,עמית עברי,הפועל עמק חפר,ISR,24/12/2014
+country,ISR,open,,female,25m,butterfly,200m,02:09.69,קרן זיבנר,הפועל דולפין נתניה,ISR,17/12/2015
+country,ISR,open,,female,25m,butterfly,50m,25.74,אניה גוסטומלסקי,מכבי קרית ביאליק,ISR,11/04/2008
+country,ISR,open,,female,25m,freestyle,100m,52.16,אנדראה מורז,הפועל ירושלים,ISR,09/11/2020
+country,ISR,open,,female,25m,freestyle,1500m,16:31.53,אמילי גולוס,"ת""א סווים",ISR,23/12/2025
+country,ISR,open,,female,25m,freestyle,200m,01:53.50,אנדראה מורז,הפועל ירושלים,ISR,16/11/2020
+country,ISR,open,,female,25m,freestyle,400m,04:07.21,אנדראה מורז,הפועל ירושלים,ISR,07/11/2015
+country,ISR,open,,female,25m,freestyle,4X100m,03:44.35,"דריה גולובטי, יובל סגל, אופק אדיר, בקי פוזדנר",הפועל בת ים,ISR,26/12/2024
+country,ISR,open,,female,25m,freestyle,4X200m,08:23.48,"רומי חביב, בקי פוזדנר, דריה גולובטי, יובל סגל",הפועל בת ים,ISR,26/12/2020
+country,ISR,open,,female,25m,freestyle,4X50m,01:38.53,"זהר שיקלר, עמית עברי, קרן זיבנר, אנדראה מורז",נבחרת ישראל,ISR,04/12/2015
+country,ISR,open,,female,25m,freestyle,50m,24.46,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,19/12/2022
+country,ISR,open,,female,25m,freestyle,800m,08:28.29,אולגה ברסנייבה,הפועל ירושלים,ISR,22/01/2005
+country,ISR,open,,female,25m,individual_medley,100m,57.17,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,04/12/2025
+country,ISR,open,,female,25m,individual_medley,200m,02:04.93,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,19/10/2025
+country,ISR,open,,female,25m,individual_medley,400m,04:32.67,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,25/10/2020
+country,ISR,open,,female,25m,individual_medley,4X100m,04:09.21,"אנאל וולפמן, אנסטסיה קורוטקוב, קרן זיבנר, אניה גוסטמלסקי",הפועל דולפין נתניה,ISR,15/02/2014
+country,ISR,open,,female,25m,individual_medley,4X50m,01:50.51,"אנדראה מורז, עמית עברי, קרן זיבנר, זהר שיקלר",נבחרת ישראל,ISR,06/12/2015
+country,ISR,open,,female,50m,backstroke,100m,59.25,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,22/05/2025
+country,ISR,open,,female,50m,backstroke,200m,02:08.54,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/05/2024
+country,ISR,open,,female,50m,backstroke,50m,27.55,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,18/05/2025
+country,ISR,open,,female,50m,breaststroke,100m,01:06.15,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,18/06/2024
+country,ISR,open,,female,50m,breaststroke,200m,02:25.20,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,13/06/2021
+country,ISR,open,,female,50m,breaststroke,50m,30.30,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,02/08/2025
+country,ISR,open,,female,50m,butterfly,100m,58.21,עמית עברי,הפועל עמק-חפר,ISR,08/08/2009
+country,ISR,open,,female,50m,butterfly,200m,02:10.80,לאה פולונסקי,מכבי חיפה,ISR,02/12/2023
+country,ISR,open,,female,50m,butterfly,50m,26.13,עמית עברי,הפועל עמק-חפר,ISR,18/08/2014
+country,ISR,open,,female,50m,freestyle,100m,54.06,אנדראה מורז,הפועל ירושלים,ISR,28/07/2021
+country,ISR,open,,female,50m,freestyle,1500m,16:44.61,גלי זילברברג,מכבי פ.מ. רעות,ISR,06/07/2018
+country,ISR,open,,female,50m,freestyle,200m,01:56.74,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,17/06/2024
+country,ISR,open,,female,50m,freestyle,400m,04:11.40,דריה גולובטי,הפועל בת-ים,ISR,07/06/2023
+country,ISR,open,,female,50m,freestyle,4X100m,03:41.13,"לאה פולונסקי, איילה שפיץ, דריה גולובטי, אנדראה מורז",נבחרת ישראל,ISR,19/06/2024
+country,ISR,open,,female,50m,freestyle,4X200m,07:51.83,"אנסטסיה גורבנקו, דריה גולובטי, איילה שפיץ, לאה פולונסקי",נבחרת ישראל,ISR,18/06/2024
+country,ISR,open,,female,50m,freestyle,4X50m,01:45.43,"זוהר שיקלר, ג׳סיקה שפילקו, לוריין לונגו קליבלנד, שרון אגם",הפועל דולפין נתניה,ISR,16/04/2021
+country,ISR,open,,female,50m,freestyle,50m,25.03,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,11/06/2021
+country,ISR,open,,female,50m,freestyle,800m,08:41.55,מרדית בודנר,הפועל ירושלים,ISR,14/08/2011
+country,ISR,open,,female,50m,individual_medley,200m,02:08.55,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,29/05/2024
+country,ISR,open,,female,50m,individual_medley,400m,04:34.87,אנסטסיה גורבנקו,מכבי קרית ביאליק,ISR,01/06/2024
+country,ISR,open,,female,50m,individual_medley,4X100m,04:02.19,"תום מיניס, אנסטסיה גורבנקו, לאה פולונסקי, דריה גולובטי",נבחרת ישראל,ISR,16/08/2026
+country,ISR,open,,female,50m,individual_medley,4X50m,01:57.36,"תום מיניס, קרן אייזנברוך, אליסה משקוביץ, דוריה גורלסקי",מכבי ראשון לציון,ISR,22/02/2024
+country,ISR,open,,male,25m,backstroke,100m,50.64,דוד גמבורג,הפועל ירושלים,ISR,03/12/2014
+country,ISR,open,,male,25m,backstroke,200m,01:49.84,יעקב טומרקין,מכבי אשדוד,ISR,04/12/2015
+country,ISR,open,,male,25m,backstroke,50m,23.27,גיא ברנע,הפועל ירושלים,ISR,06/12/2015
+country,ISR,open,,male,25m,breaststroke,100m,57.56,יהונתן יצחקי,מכבי מרום רמת גן,ISR,27/12/2024
+country,ISR,open,,male,25m,breaststroke,200m,02:05.87,יעקב טומרקין,מכבי אשדוד,ISR,26/12/2019
+country,ISR,open,,male,25m,breaststroke,50m,26.21,כריס פיצ׳וגין,ירושלים רבתי,ISR,06/11/2021
+country,ISR,open,,male,25m,butterfly,100m,50.57,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,22/12/2021
+country,ISR,open,,male,25m,butterfly,200m,01:53.07,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,23/12/2021
+country,ISR,open,,male,25m,butterfly,50m,22.59,מירון חרותי,מכבי חיפה,ISR,02/12/2025
+country,ISR,open,,male,25m,freestyle,100m,46.90,דניאל קריצ׳בסקי,הפועל עירוני הוד השרון,ISR,26/12/2024
+country,ISR,open,,male,25m,freestyle,1500m,14:52.83,גיל קיזלר,בני הרצליה,ISR,31/12/2016
+country,ISR,open,,male,25m,freestyle,200m,01:43.24,דניאל קריצ׳בסקי,הפועל עירוני הוד השרון,ISR,27/12/2024
+country,ISR,open,,male,25m,freestyle,400m,03:42.86,תומר פרנקל,הפועל ירושלים,ISR,26/12/2018
+country,ISR,open,,male,25m,freestyle,4X100m,03:16.26,"דוד גרצ׳יק, אדם מראענה, דניאל ברוך, גרג ליצ׳ינסקי",מכבי חיפה,ISR,20/12/2022
+country,ISR,open,,male,25m,freestyle,4X200m,07:28.94,"דניאל אייכל, שון וורונקוב, שון פומברג, איתי רוזנפלד",מכבי קרית ביאליק,ISR,07/12/2024
+country,ISR,open,,male,25m,freestyle,4X50m,01:26.90,"מירון חירותי, מרקוס ג׳ון שלזינגר, תומר פרנקל, גל כהן גרומי",נבחרת ישראל,ISR,04/12/2019
+country,ISR,open,,male,25m,freestyle,50m,21.08,מירון חרותי,מכבי חיפה,ISR,27/12/2019
+country,ISR,open,,male,25m,freestyle,800m,07:49.29,מתן רודיטי,בני הרצליה,ISR,21/12/2022
+country,ISR,open,,male,25m,individual_medley,100m,52.17,יעקב טומרקין,מכבי אשדוד,ISR,28/10/2021
+country,ISR,open,,male,25m,individual_medley,200m,01:53.17,יעקב טומרקין,מכבי אשדוד,ISR,15/11/2020
+country,ISR,open,,male,25m,individual_medley,400m,04:03.50,גל נבו,הפועל ירושלים,ISR,13/12/2013
+country,ISR,open,,male,25m,individual_medley,4X100m,03:30.75,"יעקב טומרקין, כריס פיצ׳וגין, איתן בן שטרית, דיס לוקטב",נבחרת ישראל,ISR,21/12/2021
+country,ISR,open,,male,25m,individual_medley,4X50m,01:34.50,"דוד גרצ׳יק, רון פולונסקי, גרג ליצ׳ינסקי, מירון חרותי",מכבי חיפה,ISR,21/12/2022
+country,ISR,open,,male,50m,backstroke,100m,53.39,תומר שוסטר,מכבי ראשון לציון,ISR,15/08/2026
+country,ISR,open,,male,50m,backstroke,200m,01:55.96,יעקב טומרקין,מכבי אשדוד,ISR,12/08/2015
+country,ISR,open,,male,50m,backstroke,50m,24.36,תומר שוסטר,מכבי ראשון לציון,ISR,13/08/2026
+country,ISR,open,,male,50m,breaststroke,100m,59.63,רון פולונסקי,מכבי חיפה,ISR,09/08/2024
+country,ISR,open,,male,50m,breaststroke,200m,02:11.44,תום בארי,מכבי קרית-אונו,ISR,12/08/2008
+country,ISR,open,,male,50m,breaststroke,50m,27.02,כריסטיאן פיצ׳וגין,ירושלים רבתי,ISR,22/06/2024
+country,ISR,open,,male,50m,butterfly,100m,50.98,גל כהן גרומי,הפועל עירוני הוד השרון,ISR,28/07/2023
+country,ISR,open,,male,50m,butterfly,200m,01:57.02,גל נבו,הפועל ירושלים,ISR,28/07/2009
+country,ISR,open,,male,50m,butterfly,50m,23.01,מירון חרותי,מכבי חיפה,ISR,14/04/2024
+country,ISR,open,,male,50m,freestyle,100m,48.18,תומר פרנקל,הפועל ירושלים,ISR,10/06/2023
+country,ISR,open,,male,50m,freestyle,1500m,15:04.99,מתן רודיטי,בני הרצליה,ISR,08/06/2022
+country,ISR,open,,male,50m,freestyle,200m,01:45.59,דניס לוקטב,מכבי אשדוד,ISR,10/08/2026
+country,ISR,open,,male,50m,freestyle,400m,03:47.32,בר סולובייצ׳יק,מכבי קרית ביאליק,ISR,06/06/2024
+country,ISR,open,,male,50m,freestyle,4X100m,03:13.39,"אלכסיי גליבינסקי, דניס לוקטב, דניאל קריציבסקי, מרטין קרטאבי",נבחרת ישראל,ISR,27/07/2025
+country,ISR,open,,male,50m,freestyle,4X200m,07:06.29,"דניס לוקטב, יואב רומנו, אלכסיי גליבינסקי, דניאל קריציבסקי",נבחרת ישראל,ISR,01/08/2025
+country,ISR,open,,male,50m,freestyle,4X50m,01:30.81,"מרטין קרטאבי, מיכאל פובלייב, גל שלגל, תום סלע",הפועל דולפין נתניה,ISR,21/02/2024
+country,ISR,open,,male,50m,freestyle,50m,21.60,מירון חרותי,מכבי חיפה,ISR,17/05/2025
+country,ISR,open,,male,50m,freestyle,800m,07:55.48,בר סולובייצ׳יק,מכבי קרית ביאליק,ISR,12/06/2021
+country,ISR,open,,male,50m,individual_medley,200m,01:57.01,רון פולונסקי,מכבי חיפה,ISR,22/06/2024
+country,ISR,open,,male,50m,individual_medley,400m,04:11.51,גל נבו,הפועל ירושלים,ISR,02/08/2009
+country,ISR,open,,male,50m,individual_medley,4X100m,03:32.04,"ברנע גיא, מלניק דנית, נבו גל, גייבורונסקי דניס",הפועל ירושלים,ISR,08/08/2009
+country,ISR,open,,male,50m,individual_medley,4X50m,01:39.55,"איליה אייזנשטוק, מיכאל מלול, אלון מנדל, גלעד זילברמן",מכבי קרית ביאליק,ISR,07/08/2009
+country,ISR,open,,mixed,25m,freestyle,4X100m,04:03.20,"דוד דמיטרייב, איילה לוי, אילנית דימשיץ, שון פומברג",מכבי קרית ביאליק,ISR,07/03/2024
+country,ISR,open,,mixed,25m,freestyle,4X50m,01:32.55,"זיו קולונטרוב, אור סבטייה, זהר שיקלר, אנדראה מורז",נבחרת ישראל,ISR,05/12/2015
+country,ISR,open,,mixed,25m,individual_medley,4X100m,04:43.23,"עומר כשריאן, עדן שץ, תומר איזבקוב, ליאור איליאגויב",הפועל דולפין נתניה,ISR,04/12/2025
+country,ISR,open,,mixed,25m,individual_medley,4X50m,01:40.48,"גיא ברנע, שחף יהב, עמית עברי, אנדראה מורז",נבחרת ישראל,ISR,03/12/2015
+country,ISR,open,,mixed,50m,freestyle,4X100m,03:27.02,"יואב רומנו, אלקסיי גליבינסקי, אנסטסיה גורבנקו, אנדראה מורז",נבחרת ישראל,ISR,21/06/2024
+country,ISR,open,,mixed,50m,freestyle,4X200m,07:32.96,"דניס לוקטב, רון פולונסקי, אנדראה מורז, אנסטסיה גורבנקו",נבחרת ישראל,ISR,18/05/2021
+country,ISR,open,,mixed,50m,freestyle,4X50m,01:37.07,"מירון חרותי, גאי גרופר, אביב ברזילי, לאה פולונסקי",מכבי חיפה,ISR,12/06/2021
+country,ISR,open,,mixed,50m,individual_medley,4X100m,03:43.94,"אנסטסיה גורבנקו, איתי גולדפדן, גל כהן גרומי, אנדראה מורז",נבחרת ישראל,ISR,29/07/2021
+country,ISR,open,,mixed,50m,individual_medley,4X50m,01:46.03,"מיכאל לייטרובסקי, תומר גולדפדן, ג׳סיקה שפילקו, זוהר שיקלר",הפועל דולפין נתניה,ISR,13/06/2021
