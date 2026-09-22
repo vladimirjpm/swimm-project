@@ -9,6 +9,8 @@ import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { parseRecordsQuery, routes, type RecordsTab } from '../../utils/routes';
 import { useRecordsRanking } from '../../hooks/useRecordsRanking';
 import { useRegionRecords } from '../../hooks/useRegionRecords';
+import { useRecordCountries } from '../../hooks/useRecordsCompare';
+import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import DeepTabs, { type DeepTabItem } from '../components/deep/tabs';
 import RkDisciplinePicker from './components/rk-discipline-picker';
 import RkWorldCard from './components/rk-world-card';
@@ -69,6 +71,10 @@ function RecordsProject() {
   // в адресе рядом с дисциплиной: ссылка на «мастерсы 50 вольным» обязана открывать именно их.
   const [tab, setTab] = useState<RecordsTab>(query.tab);
 
+  // Регион таба WR (9.9): null — мировые рекорды, alpha-3 — национальные рекорды страны против
+  // мировых. Только open: возрастные и мастерские рекорды есть лишь у Израиля, и у них свои табы.
+  const [region, setRegion] = useState<string | null>(query.region);
+
   // Дефолт подставляем ЗДЕСЬ, а не в parseRecordsQuery: разбор адреса обязан отличать
   // «пользователь выбрал 50 вольным» от «мы показали 50 вольным, потому что надо же
   // что-то показать». Иначе первая же смена дефолта перепишет смысл чужих ссылок.
@@ -109,8 +115,9 @@ function RecordsProject() {
     set('pool', filters.poolType);
     set('country', filters.highlight);
     set('age', tab === 'masters' ? filters.ageGroup : null);
+    set('region', tab === 'world' ? region : null);
     window.history.replaceState(null, '', url.toString());
-  }, [filters, tab]);
+  }, [filters, tab, region]);
 
   // У мастерсов эстафет нет ни в одной оси (решение 3 docs/plans/records-relays-plan.md);
   // юниорские эстафеты есть с Э1/Э3 того же плана. Пришли на таб Masters с «4×100m» — берём
@@ -135,6 +142,9 @@ function RecordsProject() {
 
   // Справочники табов грузятся, только когда таб открыт: смотрят обычно один из трёх.
   const worldOpen = useRegionRecords('WORLD', 'open', tab === 'world');
+  const nationalOpen = useRegionRecords(region ?? 'WORLD', 'open', tab === 'world' && region != null);
+  // Список стран — только когда таб WR открыт: выбор страны живёт там.
+  const countries = useRecordCountries(tab === 'world');
   const israelMasters = useRegionRecords(HOME_REGION, 'masters', tab === 'masters');
   const worldMasters = useRegionRecords('WORLD', 'masters', tab === 'masters');
   const israelAge = useRegionRecords(HOME_REGION, 'age', tab === 'junior');
@@ -144,7 +154,8 @@ function RecordsProject() {
   const title = disciplineLabel(filters);
   const home = data?.rows.find((r) => r.region_code === HOME_REGION) ?? null;
 
-  const worldCount = worldOpen.data
+  const worldList = region ? nationalOpen : worldOpen;
+  const worldCount = worldList.data
     ?.filter((r) => r.pool_type === filters.poolType && r.gender === filters.gender).length;
 
   // Подписи — живые данные, как требует хендофф табов: где числа ещё нет, стоит слово.
@@ -155,7 +166,7 @@ function RecordsProject() {
     },
     {
       id: 'world', icon: '🏆', label: 'World records', shortLabel: 'WR',
-      sub: worldCount != null ? `${worldCount} records` : 'every event',
+      sub: worldCount != null ? `${worldCount} records${region ? ` · ${region}` : ''}` : 'every event',
     },
     {
       id: 'masters', icon: '⏱', label: 'Masters WR',
@@ -193,7 +204,7 @@ function RecordsProject() {
             <h1 className="rk-head__title">Records</h1>
             <div className="rk-head__sub">
               {tab === 'world'
-                ? `${filters.poolType} pool · ${genderLabel(filters.gender)}`
+                ? `${region ? `${region} national records · ` : ''}${filters.poolType} pool · ${genderLabel(filters.gender)}`
                 : title}
               {tab !== 'world' && isRelay(filters.distance) && <span className="rk-head__tag">relay</span>}
               {' · '}
@@ -225,11 +236,42 @@ function RecordsProject() {
 
             {tab === 'world' && (
               <>
-                {worldOpen.loading && <div className="rk-state">Loading…</div>}
-                {worldOpen.error && (
-                  <div className="rk-state rk-state--error">Could not load world records ({worldOpen.error}).</div>
+                {/* Регион таба (9.9): мир или одна страна. Тот же выбор, что у сравнения стран. */}
+                <label className="rc-picker rk-region">
+                  <span className="rc-picker__label">Region</span>
+                  <span className="rc-picker__control">
+                    {region && <UI_FlagEmoji countryCode={region} size="24x18" className="src-records-project" />}
+                    <select
+                      className="rc-select"
+                      value={region ?? ''}
+                      onChange={(e) => setRegion(e.target.value || null)}
+                    >
+                      <option value="">World</option>
+                      {/* Страна из адреса, которой нет в списке (или список ещё грузится), — не
+                          пропадает из селекта, иначе он молча показал бы «World». */}
+                      {region && !countries.some((c) => c.code === region) && (
+                        <option value={region}>{region}</option>
+                      )}
+                      {countries.map((c) => (
+                        <option key={c.code} value={c.code}>{c.code} ({c.records})</option>
+                      ))}
+                    </select>
+                  </span>
+                </label>
+
+                {worldList.loading && <div className="rk-state">Loading…</div>}
+                {worldList.error && (
+                  <div className="rk-state rk-state--error">
+                    Could not load {region ? `${region} national` : 'world'} records ({worldList.error}).
+                  </div>
                 )}
-                {worldOpen.data && <RkWorldList records={worldOpen.data} filters={filters} />}
+                {worldList.data && (!region || worldOpen.data) && (
+                  <RkWorldList
+                    records={worldList.data}
+                    filters={filters}
+                    world={region ? worldOpen.data : null}
+                  />
+                )}
               </>
             )}
 

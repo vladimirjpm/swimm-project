@@ -422,6 +422,15 @@
   .rk-row--wr .rk-cell--date { grid-area: date; }
   /* Страна на мобайле уходит: флаг и код дублируют имя, а места в строке нет. */
   .rk-row--wr .rk-cell--country { display: none; }
+  /* Национальные рекорды страны (9.9): страна одна на весь список, а вот отставание от
+     мирового — главное, поэтому на мобайле оно встаёт на место даты. */
+  .rk-row--nr {
+    grid-template-areas:
+      'event time'
+      'holder gap';
+  }
+  .rk-row--nr .rk-cell--gap { display: block; grid-area: gap; text-align: right; }
+  .rk-row--nr .rk-cell--date { display: none; }
 
   /* Мастерсы: полоса слева во всю высоту, две стороны друг под другом, разрыв справа. */
   .rk-row--masters {
@@ -452,6 +461,8 @@
 }
 
 .rc-picker { display: flex; flex-direction: column; gap: 5px; min-width: 190px; }
+/* Выбор региона таба WR (9.9) — над списком, отдельной строкой. */
+.rk-region { margin: 4px 0 14px; max-width: 260px; }
 
 .rc-picker__label {
   font-size: 11px;
