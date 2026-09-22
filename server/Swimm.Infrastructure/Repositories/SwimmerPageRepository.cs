@@ -161,6 +161,29 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                 r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, r.IsRelayLeadOff, r.TimeMs,
             })
             .ToListAsync();
+
+        // Эстафетные рекорды (Э5 плана records-relays-plan, решение Влада 22.09.2026): держатель
+        // — команда, четыре имени через запятую, и точное совпадение строки их не находит.
+        // Имя пловца должно совпасть с ОДНОЙ ЧАСТЬЮ целиком — не подстрокой, иначе «דניאל כהן»
+        // собрал бы рекорды всех Даниэлей Коэнов в составе. Эстафетных строк с держателем —
+        // сотни, фильтр по частям в памяти.
+        var relayRecords = (await _read.Records.AsNoTracking()
+                .Where(r => r.HolderName != null && r.HolderName.Contains(",")
+                            && (r.Distance.StartsWith("4X") || r.Distance.StartsWith("4x")))
+                .Select(r => new
+                {
+                    r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
+                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, r.IsRelayLeadOff, r.TimeMs,
+                    r.HolderName,
+                })
+                .ToListAsync())
+            .Where(r => r.HolderName!.Split(',').Select(p => p.Trim()).Any(names.Contains))
+            .Select(r => new
+            {
+                r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
+                r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, r.IsRelayLeadOff, r.TimeMs,
+            });
+        records = records.Concat(relayRecords).Distinct().ToList();
         if (records.Count == 0) return [];
 
         // Первые этапы эстафет пловца с промежуточным: рекорд, совпавший с таким этапом,
@@ -185,6 +208,17 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                     x.Competition.PoolType,
                     new RecordMeet(x.CompetitionId, x.Competition.EventId, x.Competition.Name, x.Competition.IsChampionship, x.Id)))
                 .ToListAsync();
+        // Эстафеты, где пловец в составе (RelayMembers, индекс по SwimmerId), — «где проплыт»
+        // эстафетный рекорд его команды (Э5).
+        if (recordMs.Count > 0 && records.Any(r => r.Distance.StartsWith("4X", StringComparison.OrdinalIgnoreCase)))
+            swims.AddRange(await _read.RelayMembers.AsNoTracking()
+                .Where(m => m.SwimmerId == swimmerId)
+                .Join(_read.Results.AsNoTracking(), m => m.RelayId, x => x.RelayId, (m, x) => x)
+                .Where(x => x.TimeMillisecond != null && recordMs.Contains(x.TimeMillisecond.Value))
+                .Select(x => new RecordMeetSwim(x.TimeMillisecond!.Value, x.CompetitionDate, x.Distance, x.Style.Name,
+                    x.Competition.PoolType,
+                    new RecordMeet(x.CompetitionId, x.Competition.EventId, x.Competition.Name, x.Competition.IsChampionship, x.Id)))
+                .ToListAsync());
 
         // Правая сторона карточки «рекорд против мирового»: мировые рекорды мастерс тех же
         // ступеней, что у найденных рекордов пловца. Ступени мировые и израильские совпадают

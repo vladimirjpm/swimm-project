@@ -85,7 +85,7 @@ internal static class RelayBandReconstructor
     /// <summary>Эстафетная дисциплина, у которой в заголовке не было ни пола, ни возраста.</summary>
     private static bool IsCandidate(IsrOrgCompetitionResult comp) =>
         comp.Competition.Contains(MaccabiTitleMarker, StringComparison.Ordinal)
-        && comp.EventStyleGender == "none"
+        && comp.EventStyleGender is "none" or "mixed"
         && string.IsNullOrEmpty(comp.EventStyleAge)
         && comp.Results.Count > 0
         && comp.Results.All(r => r.IsRelay == true && r.RelaySwimmers is { Count: > 0 });

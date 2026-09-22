@@ -13,6 +13,12 @@ export type RecordStepSource = {
   event_style_age: string | number;
 };
 
+/**
+ * «Взрослый» ключ эстафеты с неизвестным составом: больше детской лестницы (18), поэтому
+ * `findRecordSteps` сверяет только с открытым рекордом, а возрастной ступени с таким ключом нет.
+ */
+const RELAY_UNKNOWN_STEP_AGE = 99;
+
 export default class HelperResults {
   /**
    * Заплывы, которые НЕ дают официального места и по умолчанию скрыты:
@@ -85,6 +91,27 @@ export default class HelperResults {
 
     const age = date.getFullYear() - res.birth_year;
     return age > 0 ? age : res.event_style_age;
+  }
+
+  /**
+   * Ступень справочника для ЭСТАФЕТЫ (Э4б, records-relays-plan) — зеркало серверного
+   * `CompetitionRecordsDetector.RelayCandidateKeys`: по САМОМУ СТАРШЕМУ участнику (рекорд
+   * возраста N — команда, где никому не больше N), а не по владельцу строки (первая нога).
+   * Состав неполный — возраст не угадываем и отдаём «взрослый» ключ: сверка только с
+   * открытым рекордом, как на сервере.
+   */
+  static relayRecordStepAge(res: {
+    date?: string;
+    relay_swimmers?: { birth_year?: number | null }[] | null;
+  }): number {
+    const years = (res.relay_swimmers ?? []).map((l) => l.birth_year ?? 0);
+    const date = parseCompetitionDate(res.date);
+    if (years.length < 4 || years.some((y) => !y) || !date) return RELAY_UNKNOWN_STEP_AGE;
+
+    const oldest = Math.min(...years);
+    return recordAgeAxisNow() === 'season'
+      ? ageInSeason(oldest, date) ?? RELAY_UNKNOWN_STEP_AGE
+      : date.getFullYear() - oldest;
   }
 
   static ageLabel(res: RecordStepSource): string | number {

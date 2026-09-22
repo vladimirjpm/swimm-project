@@ -108,7 +108,7 @@ public static class RelayMastersBuilder
         row["event"] = ev.EventName;
         row["event_style_name"] = ev.Style;
         row["event_style_len"] = ev.Len;
-        row["event_style_gender"] = mixed ? "none" : ev.Gender;
+        row["event_style_gender"] = mixed ? "mixed" : ev.Gender; // Э4: смешанная — не «неизвестен»
         row["age_group"] = band;
         row["event_style_age"] = band.Split('-')[0];
         row["event_category"] = mixed ? $"mix-{band}" : band;

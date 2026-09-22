@@ -46,7 +46,8 @@ public static class DocsCatalog
             new("docs/plans/club-subscribers-plan.md", "Клуб — не группа", "почему у клуба нет подписчиков"),
             new("docs/plans/records-world-compare-plan.md", "Рекорды против мирового", "карточки вместо строк; у немастерских правая часть пока пуста"),
             new("docs/plans/world-junior-records-plan.md", "Мировые юниорские (WJR)", "World Junior: источник wa-junior (JSON WA), матч по полосе, таб на /records — сделано"),
-            new("docs/plans/records-freshness-plan.md", "Свежесть рекордов", "проверка обновлений всех источников и дата «checked» на витрине"),
+            new("docs/plans/records-freshness-plan.md", "Свежесть рекордов", "журнал проверок источников и дата «checked» на витрине — сделано"),
+            new("docs/plans/records-relays-plan.md", "Эстафеты в рекордах", "пол mixed ≠ none, WJR-эстафеты, метки рекордов у эстафет, Mixed на /records — сделано"),
         ]),
     ];
 

@@ -84,13 +84,17 @@ public class ImportRecordPreviewService(SwimmDbContext db, ISettingsService? set
 
         foreach (var (item, index) in items.Select((x, i) => (x, i)))
         {
-            if (item.IsRelay == true || item.TimeFail == true) continue;
+            if (item.TimeFail == true) continue;
+            var isRelay = item.IsRelay == true;
 
             var ms = CompetitionRecordsDetector.ParseTimeToMs(item.Time);
             if (ms is null) continue;
 
             var gender = (item.EventStyleGender ?? "").Trim().ToLowerInvariant();
-            if (gender is not ("male" or "female")) continue;   // смешанный заплыв рекордов не даёт
+            // Личный заплыв — только male/female; эстафета — ещё и mixed (Э4б). «none» — пол
+            // неизвестен: сверять не с чем. Смешанную по СОСТАВУ импорт выведет позже, по
+            // карточкам из базы, — превью файла её пока не видит (честно недосчитает).
+            if (gender is not ("male" or "female") && !(isRelay && gender == "mixed")) continue;
 
             var style = (item.EventStyleName ?? "").Trim();
             var distance = (item.EventStyleLen ?? "").Trim();
@@ -113,7 +117,12 @@ public class ImportRecordPreviewService(SwimmDbContext db, ISettingsService? set
                 TimeOriginal: item.Time ?? "",
                 DayNumber: null,
                 IsMasters: item.IsMasters == true,
-                AgeGroup: item.AgeGroup ?? ""));
+                AgeGroup: item.AgeGroup ?? "",
+                IsRelay: isRelay,
+                MemberBirthYears: isRelay
+                    ? item.RelaySwimmers?.Select(l => l.BirthYear ?? 0).ToList()
+                    : null,
+                TeamName: isRelay ? item.RelayTeamName : null));
         }
 
         return rows;

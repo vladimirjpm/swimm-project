@@ -213,4 +213,70 @@ public class CompetitionRecordsDetectorTests
     [InlineData("1:2:3:4")]
     public void ParseTimeToMs_Garbage_ReturnsNull(string? time)
         => Assert.Null(CompetitionRecordsDetector.ParseTimeToMs(time));
+
+    // ── Э4б: эстафеты (records-relays-plan, 22.09.2026) ──────────────────────────────
+
+    private static RecordCandidateRow Relay(int timeMs, string gender, params int[] birthYears) =>
+        Row(timeMs, birthYear: 2012, time: "01:50.00", style: "freestyle", distance: "4X50",
+            gender: gender, pool: "25m") with
+        {
+            IsRelay = true, MemberBirthYears = birthYears, TeamName = "Maccabi Haifa A",
+        };
+
+    /// <summary>
+    /// Возрастная ступень эстафеты — по САМОМУ СТАРШЕМУ участнику (2026 − 2011 = 15), а не по
+    /// владельцу строки (первая нога, 2012 → 14). Держатель в карточке — команда.
+    /// </summary>
+    [Fact]
+    public void Relay_AgeStepByOldestMember_HolderIsTeam()
+    {
+        var records = new[]
+        {
+            Rec("age", "14", "01:40.00", style: "freestyle", distance: "4X50m", gender: "mixed", pool: "25m"),
+            Rec("age", "15", "01:55.00", style: "freestyle", distance: "4X50m", gender: "mixed", pool: "25m"),
+        };
+
+        var hit = Assert.Single(CompetitionRecordsDetector.Detect(records, [Relay(110_000, "mixed", 2012, 2012, 2011, 2012)]));
+
+        Assert.Equal("Age 15 record", hit.Kind);
+        Assert.Equal("Maccabi Haifa A", hit.HolderName);
+    }
+
+    /// <summary>Смешанная сверяется со смешанным рекордом, не с мужским.</summary>
+    [Fact]
+    public void Relay_MixedMatchesMixedOnly()
+    {
+        var records = new[]
+        {
+            Rec("open", "", "01:55.00", style: "freestyle", distance: "4X50m", gender: "male", pool: "25m"),
+        };
+        Assert.Empty(CompetitionRecordsDetector.Detect(records, [Relay(110_000, "mixed", 2000, 2000, 2000, 2000)]));
+    }
+
+    /// <summary>«none» — пол неизвестен: никакой метки, даже если время быстрее всего.</summary>
+    [Fact]
+    public void Relay_UnknownGender_NoRecord()
+    {
+        var records = new[]
+        {
+            Rec("open", "", "01:55.00", style: "freestyle", distance: "4X50m", gender: "male", pool: "25m"),
+            Rec("open", "", "01:55.00", style: "freestyle", distance: "4X50m", gender: "mixed", pool: "25m"),
+        };
+        Assert.Empty(CompetitionRecordsDetector.Detect(records, [Relay(100_000, "none", 2000, 2000, 2000, 2000)]));
+    }
+
+    /// <summary>Год рождения хоть одной ноги неизвестен — возрастную ступень не угадываем, только open.</summary>
+    [Fact]
+    public void Relay_IncompleteRoster_OpenOnly()
+    {
+        var records = new[]
+        {
+            Rec("age", "14", "01:55.00", style: "freestyle", distance: "4X50m", gender: "female", pool: "25m"),
+            Rec("open", "", "01:45.00", style: "freestyle", distance: "4X50m", gender: "female", pool: "25m"),
+        };
+        Assert.Empty(CompetitionRecordsDetector.Detect(records, [Relay(110_000, "female", 2012, 2012, 0, 2012)]));
+
+        var open = Assert.Single(CompetitionRecordsDetector.Detect(records, [Relay(104_000, "female", 2012, 2012, 0, 2012)]));
+        Assert.Equal("Open record", open.Kind);
+    }
 }

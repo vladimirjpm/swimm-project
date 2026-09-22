@@ -114,7 +114,10 @@ public class IsrOrgAgeRecordsSourceProvider : IRecordSourceProvider
             var parsed = new List<ParsedRecordDto>();
             foreach (var r in results)
             {
-                if (r.EventStyleGender != "male" && r.EventStyleGender != "female")
+                // «מיקס» парсер пишет как «mix»; справочник — «mixed», только у эстафеты (Э3).
+                var gender = WorldAquaticsSource.RecordGender(r.EventStyleGender,
+                    r.EventStyleLen.EndsWith('m') ? r.EventStyleLen : r.EventStyleLen + "m");
+                if (gender is null)
                     continue;
 
                 string category, ageKey;
@@ -141,7 +144,7 @@ public class IsrOrgAgeRecordsSourceProvider : IRecordSourceProvider
                     RegionCode: "ISR",
                     Category: category,
                     AgeKey: ageKey,
-                    Gender: r.EventStyleGender,
+                    Gender: gender,
                     PoolType: r.PoolType,
                     Style: r.EventStyleName,
                     Distance: distance,

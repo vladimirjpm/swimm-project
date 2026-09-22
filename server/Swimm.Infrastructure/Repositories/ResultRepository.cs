@@ -853,13 +853,17 @@ public class ResultRepository : IResultRepository
         // не берём: иначе они «бьют» национальный рекорд. Из результатов соревнования
         // при этом НЕ убираются — заплыв был, время в протоколе есть.
         var candidateRows = await query
-            .Where(r => r.RelayId == null && !r.TimeFail && r.TimeMillisecond != null
-                        && r.SuspectReason == null)
+            // Эстафеты — с Э4б (records-relays-plan): состав и команда едут вместе со строкой,
+            // пол «none» детектор сам пропустит.
+            .Where(r => !r.TimeFail && r.TimeMillisecond != null && r.SuspectReason == null)
             .Select(r => new RecordCandidateRow(
                 r.Id, r.SwimmerId, r.Swimmer.FirstName, r.Swimmer.LastName, r.Club.Name,
                 r.Style.Name, r.Distance, r.Gender, r.Competition.PoolType,
                 r.Swimmer.BirthYear, r.CompetitionDate, r.TimeMillisecond!.Value,
-                r.TimeOriginal, r.Competition.DayNumber, r.Competition.IsMasters, r.AgeGroup))
+                r.TimeOriginal, r.Competition.DayNumber, r.Competition.IsMasters, r.AgeGroup,
+                r.RelayId != null,
+                r.RelayId != null ? r.Relay!.Members.Select(m => m.Swimmer.BirthYear).ToList() : null,
+                r.RelayId != null ? r.Relay!.TeamName : null))
             .ToListAsync();
         // Ось возраста для сверки со справочником — глобальная настройка RecordAgeAxis
         // (дефолт calendar = как ведёт справочник федерация), см. docs/data-integrity.md §13.

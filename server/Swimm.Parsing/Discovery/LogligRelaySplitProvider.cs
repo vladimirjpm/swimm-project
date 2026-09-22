@@ -89,6 +89,8 @@ public sealed class LogligRelaySplitProvider : IRelaySplitProvider
         {
             var g = Swimm.Parsing.Helpers.HebrewTextHelper.NormalizeGenderHE(token);
             if (g is "female" or "male") return g;
+            // «מיקס» — смешанная эстафета, а не «пол неизвестен» (Э4).
+            if (Swimm.Parsing.Helpers.HebrewTextHelper.IsMixToken(token)) return "mixed";
         }
         return gridGender;
     }

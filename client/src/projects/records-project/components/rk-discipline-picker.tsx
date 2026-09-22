@@ -1,7 +1,8 @@
 import React from 'react';
 import {
-  RK_STROKES, distanceLabel, strokeByKey, type RkFilters,
+  RK_STROKES, distanceLabel, isRelay, strokeByKey, type RkFilters,
 } from '../rk-disciplines';
+import type { RecordGender } from '../../../utils/routes';
 
 /**
  * Выбор дисциплины: бассейн, пол, стиль, дистанция.
@@ -34,9 +35,10 @@ const POOLS: Array<{ key: '25m' | '50m'; label: string }> = [
   { key: '25m', label: '25m pool' },
 ];
 
-const GENDERS: Array<{ key: 'male' | 'female'; label: string }> = [
+const GENDERS: Array<{ key: RecordGender; label: string }> = [
   { key: 'male', label: 'Men' },
   { key: 'female', label: 'Women' },
+  { key: 'mixed', label: 'Mixed' },
 ];
 
 const RkDisciplinePicker: React.FC<Props> = ({
@@ -82,7 +84,9 @@ const RkDisciplinePicker: React.FC<Props> = ({
       <div className="rk-picker__row">
         <span className="rk-picker__label">Gender</span>
         <div className="rk-chips">
-          {GENDERS.map((g) => (
+          {/* «Mixed» — только там, где он что-то значит: у эстафетной дистанции или на табе
+              World без выбора дисциплины (Э5, records-relays-plan). */}
+          {GENDERS.filter((g) => g.key !== 'mixed' || !showEvent || (allowRelays && isRelay(filters.distance))).map((g) => (
             <button
               key={g.key}
               type="button"

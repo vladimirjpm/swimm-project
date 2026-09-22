@@ -96,15 +96,17 @@ public sealed class WorldBestReference
     };
 
     /// <summary>
-    /// Пол смешанных и неизвестных заплывов считаем мужским: мужской рекорд быстрее, то есть
+    /// Пол НЕИЗВЕСТНЫХ заплывов (<c>none</c>) считаем мужским: мужской рекорд быстрее, то есть
     /// порог мягче. Лучше пропустить, чем пометить корректную строку с неопределённым полом.
+    /// <c>mixed</c> (смешанная эстафета) — свой ключ: сверяется со смешанным рекордом, а не
+    /// с мужским (Э2 плана records-relays-plan, 22.09.2026).
     /// </summary>
     private static string? Key(string? gender, string? style, string? distance, string? pool)
     {
         if (string.IsNullOrWhiteSpace(style) || string.IsNullOrWhiteSpace(distance) || pool is null)
             return null;
 
-        var g = gender is "male" or "female" ? gender : "male";
+        var g = gender is "male" or "female" or "mixed" ? gender : "male";
         var d = distance.EndsWith('m') ? distance[..^1] : distance;
         return $"{g}|{style}|{d}|{pool}";
     }

@@ -37,6 +37,7 @@ export default class Helper {
   // === Results ===
   static ageLabel = HelperResults.ageLabel;
   static recordStepAge = HelperResults.recordStepAge;
+  static relayRecordStepAge = HelperResults.relayRecordStepAge;
   static sortByTime = HelperResults.sortByTime;
   static showTrainingTable = HelperResults.showTrainingTable;
   static groupTrainingByName = HelperResults.groupTrainingByName;

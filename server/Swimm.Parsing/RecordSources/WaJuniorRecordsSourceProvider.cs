@@ -23,10 +23,12 @@ namespace Swimm.Parsing.RecordSources;
 /// в выдаче, хотя <c>current=true</c>). Провайдер отдаёт их все: лучшее время выбирает
 /// <c>RecordDiffService.DeduplicateByAxes</c>, как и для WR.
 ///
-/// Эстафеты решено БРАТЬ (21.09.2026), но <c>Record</c> их пока не умеет — нет эстафетных
-/// стилей и пола mixed (СРОЧНЫЙ пункт ROADMAP «Эстафеты в справочнике рекордов»). До него
-/// эстафетные строки разбираются и отбрасываются с предупреждением в лог — не молча.
-/// Смешанные (<c>gender=X</c>) до того и не запрашиваются: лишний медленный запрос впустую.
+/// Эстафеты (Э1 плана docs/plans/records-relays-plan.md, 22.09.2026): однополые пишутся в той
+/// же форме, что у WR — <c>Distance=4X100m</c>, стиль <c>freestyle</c> / <c>individual_medley</c>.
+/// Имён участников источник для эстафет не отдаёт, держатель — команда (<c>fullName</c>).
+/// Смешанные (<c>gender=X</c>, <c>disciplineGender=2</c>) пишутся с полом <c>mixed</c> (Э3) и
+/// полосой <see cref="MixedBand"/> — объединение женской и мужской: в четвёрке есть обе.
+/// Эстафетная строка, не легшая в оси, считается и уходит в лог — не молча.
 /// </summary>
 public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
 {
@@ -34,10 +36,12 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
 
     public const string FemaleBand = "14-17";
     public const string MaleBand = "15-18";
+    /// <summary>Полоса смешанной эстафеты: девушки 14–17 + юноши 15–18 (решение 22.09.2026, Э3).</summary>
+    public const string MixedBand = "14-18";
 
-    /// <summary>Пол × бассейн — по запросу на пару; смешанных пока нет (см. выше).</summary>
+    /// <summary>Пол × бассейн — по запросу на пару; X — смешанные эстафеты (Э3).</summary>
     private static readonly (string Gender, string Pool)[] Queries =
-        [("F", "LCM"), ("F", "SCM"), ("M", "LCM"), ("M", "SCM")];
+        [("F", "LCM"), ("F", "SCM"), ("M", "LCM"), ("M", "SCM"), ("X", "LCM"), ("X", "SCM")];
 
     /// <summary>Индивидуальные стили; «Medley» без «Relay» — всегда комплекс.</summary>
     private static readonly Dictionary<string, string> Styles = new(StringComparer.OrdinalIgnoreCase)
@@ -83,7 +87,7 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
         }
         else
         {
-            // 30–90 с на запрос (J0) — таймаут вдвое; четыре запроса параллельно, иначе
+            // 30–90 с на запрос (J0) — таймаут вдвое; все запросы параллельно, иначе
             // Fetch в админке идёт до шести минут.
             var client = WorldAquaticsSource.CreateClient(_httpClientFactory, TimeSpan.FromSeconds(180));
             var bodies = await Task.WhenAll(Queries.Select(q => FetchJsonAsync(client, q.Gender, q.Pool, ct)));
@@ -95,8 +99,7 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
 
         if (relays > 0)
             _logger.LogWarning(
-                "wa-junior: пропущено {Count} эстафетных строк — Records эстафет пока не умеет " +
-                "(ROADMAP, «СРОЧНО: эстафеты в справочнике рекордов»)", relays);
+                "wa-junior: пропущено {Count} эстафетных строк, не легших в оси Record — см. docs/plans/records-relays-plan.md", relays);
 
         return parsed;
     }
@@ -127,14 +130,11 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
         foreach (var row in records.EnumerateArray())
         {
             var group = Str(row, "disciplineGroup");
-            if (group.Contains("Relay", StringComparison.OrdinalIgnoreCase))
-            {
-                relays++;
-                continue;
-            }
+            var isRelay = group.Contains("Relay", StringComparison.OrdinalIgnoreCase);
 
-            var dto = ToRecord(row, group);
+            var dto = ToRecord(row, group, isRelay);
             if (dto != null) result.Add(dto);
+            else if (isRelay) relays++;
         }
 
         return new ParseResult(result, relays);
@@ -144,15 +144,20 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
     /// null — строка не ложится в оси <c>Record</c> (незнакомый стиль, пол, бассейн): как у
     /// остальных источников, расхождение числа строк видно в диффе.
     /// </summary>
-    private static ParsedRecordDto? ToRecord(JsonElement row, string group)
+    private static ParsedRecordDto? ToRecord(JsonElement row, string group, bool isRelay)
     {
-        if (!Styles.TryGetValue(group, out var style)) return null;
+        // «Freestyle Relay» / «Medley Relay» → стиль без слова Relay; эстафету несёт дистанция.
+        var styleKey = isRelay ? group.Replace("Relay", "", StringComparison.OrdinalIgnoreCase).Trim() : group;
+        if (!Styles.TryGetValue(styleKey, out var style)) return null;
+        if (isRelay && style is not ("freestyle" or "individual_medley")) return null;
 
-        // Коды источника (J0): disciplineGender 0 — мужчины, 1 — женщины; pool 0 — LCM, 1 — SCM.
+        // Коды источника (J0, Э3): disciplineGender 0 — мужчины, 1 — женщины, 2 — смешанные;
+        // pool 0 — LCM, 1 — SCM.
         var (gender, band) = Int(row, "disciplineGender") switch
         {
             0 => ("male", MaleBand),
             1 => ("female", FemaleBand),
+            2 when isRelay => ("mixed", MixedBand),
             _ => (null, null),
         };
         if (gender is null) return null;
@@ -172,7 +177,9 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
         var time = Str(row, "timeFormatted");
         if (time.Length == 0) return null;
 
-        var holder = HolderName(Str(row, "preferredFirstName"), Str(row, "preferredLastName"));
+        var holder = isRelay
+            ? Str(row, "fullName")
+            : HolderName(Str(row, "preferredFirstName"), Str(row, "preferredLastName"));
         var country = Str(row, "nationalityCode");
 
         return new ParsedRecordDto(
@@ -183,7 +190,7 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
             Gender: gender,
             PoolType: pool,
             Style: style,
-            Distance: distance + "m",
+            Distance: (isRelay ? "4X" : "") + distance + "m",
             Time: time,
             HolderName: holder.Length == 0 ? null : holder,
             Club: null,

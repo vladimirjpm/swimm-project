@@ -6,6 +6,7 @@
  * Ответы кэшируются на сервере сутки и отдаются с ETag, поэтому своего кэша тут нет.
  */
 import { useEffect, useState } from 'react';
+import type { RecordGender } from '../utils/routes';
 
 export interface RecordCompareSide {
   time: string;
@@ -66,7 +67,7 @@ export interface RecordsCompareParams {
   a: string | null;
   b: string | null;
   poolType: '25m' | '50m' | null;
-  gender: 'male' | 'female' | null;
+  gender: RecordGender | null;
 }
 
 /** Сравнение. Пока не выбраны обе стороны — запроса нет: у сервера они обязательны. */

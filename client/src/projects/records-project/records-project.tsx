@@ -19,7 +19,7 @@ import RkJuniorTable from './components/rk-junior-table';
 import RkFilterBar from './components/rk-filter-bar';
 import UI_RecordsChecked from '../components/mix/records-checked/records-checked';
 import {
-  HOME_REGION, RK_DEFAULT, disciplineLabel, isRelay, strokeByKey, type RkFilters,
+  HOME_REGION, RK_DEFAULT, disciplineLabel, genderLabel, isRelay, strokeByKey, type RkFilters,
 } from './rk-disciplines';
 
 /**
@@ -72,7 +72,7 @@ function RecordsProject() {
   // Дефолт подставляем ЗДЕСЬ, а не в parseRecordsQuery: разбор адреса обязан отличать
   // «пользователь выбрал 50 вольным» от «мы показали 50 вольным, потому что надо же
   // что-то показать». Иначе первая же смена дефолта перепишет смысл чужих ссылок.
-  const [filters, setFilters] = useState<RkFilters>(() => ({
+  const [rawFilters, setFilters] = useState<RkFilters>(() => ({
     stroke: query.stroke ?? RK_DEFAULT.stroke,
     distance: query.distance ?? RK_DEFAULT.distance,
     gender: query.gender ?? RK_DEFAULT.gender,
@@ -80,6 +80,19 @@ function RecordsProject() {
     highlight: query.highlight,
     ageGroup: query.ageGroup,
   }));
+
+  // Пол «mixed» бывает только у эстафеты (Э5, records-relays-plan). Правило — ВЫВОДОМ, а не
+  // эффектом после отрисовки: иначе успевает уйти запрос ?gender=mixed&distance=100m (400).
+  // Выбор пользователя в состоянии не теряется: вернулся на эстафету — снова mixed. Таб World
+  // дистанцию не выбирает и показывает все дисциплины пола — там mixed законен всегда.
+  const personalOnly = tab === 'masters';
+  const filters = useMemo<RkFilters>(
+    () => (rawFilters.gender === 'mixed' && tab !== 'world'
+      && (!isRelay(rawFilters.distance) || personalOnly)
+      ? { ...rawFilters, gender: 'male' }
+      : rawFilters),
+    [rawFilters, tab, personalOnly],
+  );
 
   // Адрес — единственный носитель состояния: перезагрузка и «поделиться ссылкой» обязаны
   // давать тот же экран.
@@ -99,10 +112,9 @@ function RecordsProject() {
     window.history.replaceState(null, '', url.toString());
   }, [filters, tab]);
 
-  // У мастерсов эстафет нет ни в одной оси, у юниорских — пока тоже (Records их не умеет,
-  // СРОЧНЫЙ пункт ROADMAP). Пришли на таб с «4×100m» — берём первую личную дистанцию стиля:
-  // пустая таблица без объяснения читается как «данных нет».
-  const personalOnly = tab === 'masters' || tab === 'junior';
+  // У мастерсов эстафет нет ни в одной оси (решение 3 docs/plans/records-relays-plan.md);
+  // юниорские эстафеты есть с Э1/Э3 того же плана. Пришли на таб Masters с «4×100m» — берём
+  // первую личную дистанцию стиля: пустая таблица без объяснения читается как «данных нет».
   useEffect(() => {
     if (!personalOnly || !isRelay(filters.distance)) return;
     const first = strokeByKey(filters.stroke)?.distances[0] ?? RK_DEFAULT.distance;
@@ -181,7 +193,7 @@ function RecordsProject() {
             <h1 className="rk-head__title">Records</h1>
             <div className="rk-head__sub">
               {tab === 'world'
-                ? `${filters.poolType} pool · ${filters.gender === 'female' ? 'women' : 'men'}`
+                ? `${filters.poolType} pool · ${genderLabel(filters.gender)}`
                 : title}
               {tab !== 'world' && isRelay(filters.distance) && <span className="rk-head__tag">relay</span>}
               {' · '}

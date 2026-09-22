@@ -4,7 +4,7 @@ import UI_RecordBadge from '../../components/mix/record-badge/record-badge';
 import UI_H2HPoolRow from '../../components/mix/h2h/h2h-pool-row';
 import type { RegionRecord } from '../../../hooks/useRegionRecords';
 import HelperTime from '../../../utils/helpers/helper-time';
-import { HOME_REGION, holderLabel, type RkFilters } from '../rk-disciplines';
+import { genderLabel, HOME_REGION, holderLabel, type RkFilters } from '../rk-disciplines';
 
 /**
  * Таб «World Junior»: возрастной рекорд Израиля против мирового ЮНИОРСКОГО рекорда (WJR) той же
@@ -79,7 +79,7 @@ const RkJuniorTable: React.FC<Props> = ({ israel, world, filters }) => {
     return <div className="rk-state">No World Junior record for this event.</div>;
   }
 
-  const who = filters.gender === 'female' ? 'Women' : 'Men';
+  const who = genderLabel(filters.gender, true);
   const qWorld = wjr.issue_reason ? { kind: 'record' as const, reason: wjr.issue_reason } : null;
   const held = rows.filter((r) => r.israel).length;
 

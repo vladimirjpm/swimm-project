@@ -119,7 +119,8 @@ public class WorldAquaticsCountryFetcher : IRecordCountryFetcher
             var world = new List<ParsedRecordDto>();
             foreach (var r in rows)
             {
-                if (r.EventStyleGender != "male" && r.EventStyleGender != "female")
+                var distance = r.EventStyleLen.EndsWith('m') ? r.EventStyleLen : r.EventStyleLen + "m";
+                if (WorldAquaticsSource.RecordGender(r.EventStyleGender, distance) is not { } gender)
                     continue;
 
                 // Тип рекорда «WR» парсер ставит и повторённому «=WR» (И-19). Всё, что им не
@@ -132,10 +133,10 @@ public class WorldAquaticsCountryFetcher : IRecordCountryFetcher
                     RegionCode: "",
                     Category: "open",
                     AgeKey: "",
-                    Gender: r.EventStyleGender,
+                    Gender: gender,
                     PoolType: r.PoolType,
                     Style: r.EventStyleName,
-                    Distance: r.EventStyleLen.EndsWith('m') ? r.EventStyleLen : r.EventStyleLen + "m",
+                    Distance: distance,
                     Time: r.Time,
                     HolderName: $"{r.FirstName} {r.LastName}".Trim(),
                     Club: null,
@@ -164,11 +165,10 @@ public class WorldAquaticsCountryFetcher : IRecordCountryFetcher
 
         foreach (var r in rows)
         {
-            // Микст-эстафеты вне модели осей Record (open male/female) — как и у WR-провайдера.
-            if (r.EventStyleGender != "male" && r.EventStyleGender != "female")
-                continue;
-
+            // Смешанные эстафеты идут с полом mixed (Э3); прочее вне осей Record — мимо.
             var distance = r.EventStyleLen.EndsWith('m') ? r.EventStyleLen : r.EventStyleLen + "m";
+            if (WorldAquaticsSource.RecordGender(r.EventStyleGender, distance) is not { } gender)
+                continue;
 
             // r.Country — это NF Code строки (а если он пуст, парсер подставил туда страну
             // места соревнования). Тип рекорда (r.Note) здесь не спрашиваем сознательно: у
@@ -183,7 +183,7 @@ public class WorldAquaticsCountryFetcher : IRecordCountryFetcher
                     PoolType: r.PoolType,
                     Style: r.EventStyleName,
                     Distance: distance,
-                    Gender: r.EventStyleGender,
+                    Gender: gender,
                     Time: r.Time));
                 continue;
             }
@@ -193,7 +193,7 @@ public class WorldAquaticsCountryFetcher : IRecordCountryFetcher
                 RegionCode: requestedCode,
                 Category: "open",
                 AgeKey: "",
-                Gender: r.EventStyleGender,
+                Gender: gender,
                 PoolType: r.PoolType,
                 Style: r.EventStyleName,
                 Distance: distance,

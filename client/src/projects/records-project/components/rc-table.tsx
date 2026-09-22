@@ -1,7 +1,7 @@
 import React from 'react';
 import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
 import type { RecordCompareRow, RecordCompareSide } from '../../../hooks/useRecordsCompare';
-import { distanceLabel, strokeLabel } from '../rk-disciplines';
+import { distanceLabel, genderLabel, strokeLabel } from '../rk-disciplines';
 
 /**
  * Таблица сравнения: дисциплина, время каждой стороны с датой, разница.
@@ -78,7 +78,7 @@ const RcTable: React.FC<Props> = ({ rows, a, b }) => (
               {distanceLabel(row.distance)} {strokeLabel(row.style).toLowerCase()}
             </span>
             <span className="rc-event__sub">
-              {row.gender === 'female' ? 'women' : 'men'} · {row.pool_type}
+              {genderLabel(row.gender)} · {row.pool_type}
             </span>
           </span>
 

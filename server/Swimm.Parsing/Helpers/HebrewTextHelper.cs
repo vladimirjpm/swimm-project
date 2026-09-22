@@ -69,6 +69,16 @@ public static class HebrewTextHelper
         return string.Join(' ', tokens);
     }
 
+    /// <summary>
+    /// «מיקס» (в любом направлении) — смешанный. <see cref="NormalizeGenderHE"/> отдаёт на него
+    /// «none» (так живут индивидуальные совместные заплывы и loglig-сетки), а эстафетным
+    /// читателям нужен именно признак «смешанная» (Э4, records-relays-plan).
+    /// </summary>
+    public static bool IsMixToken(string token) =>
+        token.Trim() is HebrewMix or HebrewMixReversed
+        || token.Trim().Equals("mix", StringComparison.OrdinalIgnoreCase)
+        || token.Trim().Equals("mixed", StringComparison.OrdinalIgnoreCase);
+
     public static string NormalizeGenderHE(string gender)
     {
         if (string.IsNullOrWhiteSpace(gender)) return "none";

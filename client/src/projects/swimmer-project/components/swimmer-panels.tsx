@@ -16,6 +16,7 @@ import UI_RecordBadge from '../../components/mix/record-badge/record-badge';
 import type { RecordKind } from '../../components/mix/record-badge/record-badge';
 import type { H2HSlot } from '../../components/mix/h2h/h2h.types';
 import { routes } from '../../../utils/routes';
+import { genderLabel } from '../../../utils/helpers/helper-gender';
 import { peerGroupLabel, seasonLabel } from '../../../utils/helpers/season-helper';
 import { timeToMs } from '../../../utils/helpers/recalculate-positions';
 import type {
@@ -605,7 +606,7 @@ const worldRecordTitle = (r: SwimmerHeldRecord): string => {
   const event = `${r.distance} ${swimRowStrokeLabel(r.stroke ?? '')} ${r.poolType === '25m' ? 'SCM' : 'LCM'}`;
   const wr = r.worldRecord;
   if (wr?.kind === 'junior') {
-    const who = r.gender === 'female' ? 'women' : 'men';
+    const who = genderLabel(r.gender); // mixed — смешанная эстафета (Э5), не «men»
     return `World Junior record · ${who} ${wr.band ? bandLabel(wr.band) : ''} · ${event}`;
   }
   return `Masters world record · ${r.ageKey} · ${event}`;

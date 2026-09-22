@@ -189,13 +189,21 @@ public static class ResultMatcher
 
     /// <summary>Ключ для строки результата, уже сохранённой в БД (RelayId — надёжный источник IsRelay).</summary>
     public static ResultMatchKey KeyOfPersisted(ResultRecord r) =>
-        new(r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.Heat, r.Lane, r.RelayId != null,
-            r.Round ?? string.Empty);
+        new(r.CompetitionId, r.StyleId, r.Distance, KeyGender(r.Gender, r.RelayId != null), r.Heat, r.Lane,
+            r.RelayId != null, r.Round ?? string.Empty);
 
     /// <summary>Ключ для ещё не сохранённой строки результата (Relay — навигация, RelayId ещё не проставлен).</summary>
     public static ResultMatchKey KeyOfTransient(ResultRecord r) =>
-        new(r.CompetitionId, r.StyleId, r.Distance, r.Gender, r.Heat, r.Lane,
-            r.Relay != null || r.RelayId != null, r.Round ?? string.Empty);
+        new(r.CompetitionId, r.StyleId, r.Distance, KeyGender(r.Gender, r.Relay != null || r.RelayId != null),
+            r.Heat, r.Lane, r.Relay != null || r.RelayId != null, r.Round ?? string.Empty);
+
+    /// <summary>
+    /// Пол в ключе: у эстафеты «none» (неизвестен) и «mixed» (смешанная) — одно значение. Строку
+    /// в базе могли перевести в mixed (Э4, по полу участников), а парсер переимпорта снова
+    /// отдаёт none — без этого переимпорт не узнал бы свою строку и плодил бы дубль.
+    /// </summary>
+    public static string KeyGender(string? gender, bool isRelay) =>
+        isRelay && gender is null or "" or "none" or "mixed" ? "none|mixed" : gender ?? string.Empty;
 
     /// <summary>Дискриминатор старой строки — Relay подгружен через Include (см. JsonImportService).</summary>
     public static ResultDiscriminator DiscriminatorOfPersisted(ResultRecord r) =>

@@ -23,7 +23,8 @@ public enum RecordAgeAxis
 
 /// <summary>
 /// Кандидат-строка результата для детекции рекордов (минимальная проекция заплыва).
-/// Личные заплывы: эстафеты вне скоупа v1 (маппинг стилей 'medley'/'free_relay' неоднозначен).
+/// Эстафеты — с Э4б плана records-relays-plan (22.09.2026): <see cref="IsRelay"/>, годы
+/// рождения ног (<see cref="MemberBirthYears"/>) и название команды (держатель рекорда — команда).
 /// </summary>
 public sealed record RecordCandidateRow(
     long ResultId,
@@ -41,7 +42,10 @@ public sealed record RecordCandidateRow(
     string TimeOriginal,
     int? DayNumber,
     bool IsMasters,
-    string AgeGroup);
+    string AgeGroup,
+    bool IsRelay = false,
+    IReadOnlyList<int>? MemberBirthYears = null,
+    string? TeamName = null);
 
 /// <summary>
 /// Детекция «новых рекордов» соревнования: результат быстрее (или равен) действующему
@@ -64,7 +68,9 @@ public static class CompetitionRecordsDetector
                 Distance = b.Row.Distance,
                 Gender = b.Row.Gender,
                 Time = b.Row.TimeOriginal,
-                HolderName = $"{b.Row.FirstName} {b.Row.LastName}".Trim(),
+                HolderName = b.Row.IsRelay
+                    ? b.Row.TeamName ?? b.Row.Club
+                    : $"{b.Row.FirstName} {b.Row.LastName}".Trim(),
                 SwimmerId = b.Row.SwimmerId,
                 AgeGroup = b.Row.AgeGroup,
                 Club = b.Row.Club,
@@ -125,6 +131,12 @@ public static class CompetitionRecordsDetector
     private static IEnumerable<(string Category, string AgeKey)> CandidateKeys(
         RecordCandidateRow row, RecordAgeAxis axis)
     {
+        if (row.IsRelay)
+        {
+            foreach (var k in RelayCandidateKeys(row, axis)) yield return k;
+            yield break;
+        }
+
         // Национальный рекорд живёт ровно в одном месте — category="open" (туда его кладёт
         // IsrOrgAgeRecordsSourceProvider для строк с Note="National Record").
         // Ось ("age","ISR") была у legacy-RecordsSeeder и импортом НЕ обновлялась: набор
@@ -157,6 +169,40 @@ public static class CompetitionRecordsDetector
         {
             yield return ("age", age.ToString(CultureInfo.InvariantCulture));
         }
+    }
+
+    /// <summary>
+    /// Эстафета (Э4б). Пол — только известный (male/female/mixed): «none» значит «не знаем», и
+    /// сверять такую строку не с чем — ни с мужским рекордом, ни со смешанным. Возрастная
+    /// ступень — по САМОМУ СТАРШЕМУ участнику (рекорд возраста N — команда, где никому не
+    /// больше N), и только если известны годы рождения всех четырёх ног; иначе — только
+    /// открытый рекорд. Взрослой команде (старшему больше 18) — открытый. Мастерс-эстафет в справочнике нет (решение 3 плана) — их не сверяем.
+    /// </summary>
+    private const int TopChildStepAge = 18;
+
+    private static IEnumerable<(string Category, string AgeKey)> RelayCandidateKeys(
+        RecordCandidateRow row, RecordAgeAxis axis)
+    {
+        if (row.Gender is not ("male" or "female" or "mixed") || row.IsMasters) yield break;
+
+        var years = row.MemberBirthYears;
+        if (years is not { Count: >= 4 } || years.Any(y => y <= 0))
+        {
+            // Состав неизвестен — возраст не угадываем; открытый рекорд остаётся (сборная).
+            yield return ("open", "");
+            yield break;
+        }
+
+        var oldest = years.Min();
+        var age = axis == RecordAgeAxis.Season
+            ? SeasonMath.AgeInSeason(SeasonMath.StartYearOf(row.CompetitionDate), oldest)
+            : row.CompetitionDate.Year - oldest;
+        if (age is not int a) yield break;
+
+        // Открытый — эталон взрослой команды; детская лестница кончается на 18. То же правило
+        // у бейджа строки на клиенте (HelperNormative.findRecordSteps, relay), иначе разъедутся.
+        if (a > TopChildStepAge) yield return ("open", "");
+        else if (a >= 5) yield return ("age", a.ToString(CultureInfo.InvariantCulture));
     }
 
     private static string KindLabel(Record rec) => rec.Category switch

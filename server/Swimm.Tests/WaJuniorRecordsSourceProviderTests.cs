@@ -38,17 +38,54 @@ public class WaJuniorRecordsSourceProviderTests
     }
 
     /// <summary>
-    /// Эстафеты решено брать, но Records их пока не умеет: провайдер их СЧИТАЕТ и отбрасывает,
-    /// а не молча теряет. В файле пять эстафетных строк (4×100 и 4×200 в/с, 4×100 комплекс).
+    /// Э1: однополые эстафеты пишутся в форме WR — «4X100m», стиль без слова Relay, полоса
+    /// юниоров, держатель — команда. В файле пять эстафет (3 × 4×100 в/с, 4×200 в/с, 4×100 комплекс).
     /// </summary>
     [Fact]
-    public void Parse_Relays_AreCountedAndSkipped()
+    public void Parse_Relays_WrittenInWrShape()
     {
         var result = WaJuniorRecordsSourceProvider.Parse(Fixture("wa-junior-m-lcm.json"));
 
-        Assert.Equal(5, result.SkippedRelays);
-        Assert.DoesNotContain(result.Records, r => r.Distance.StartsWith("4", StringComparison.Ordinal)
-                                                   && r.Distance.Contains('x', StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(0, result.SkippedRelays);
+        var relays = result.Records.Where(r => r.Distance.StartsWith("4X", StringComparison.Ordinal)).ToList();
+        Assert.Equal(5, relays.Count);
+        Assert.All(relays, r =>
+        {
+            Assert.Equal("male", r.Gender);
+            Assert.Equal(WaJuniorRecordsSourceProvider.MaleBand, r.AgeKey);
+            Assert.Equal("50m", r.PoolType);
+        });
+        Assert.Equal(3, relays.Count(r => r is { Style: "freestyle", Distance: "4X100m" }));
+        var fr200 = Assert.Single(relays, r => r is { Style: "freestyle", Distance: "4X200m" });
+        Assert.Equal("07:08.37", fr200.Time);
+        Assert.Equal("USA", fr200.HolderCountry);
+        var medley = Assert.Single(relays, r => r.Style == "individual_medley");
+        Assert.Equal("4X100m", medley.Distance);
+        Assert.Equal("03:33.19", medley.Time);
+        Assert.False(string.IsNullOrEmpty(medley.HolderName));
+    }
+
+    /// <summary>
+    /// Э3: смешанные эстафеты (запрос gender=X, disciplineGender=2) — пол mixed, полоса 14-18.
+    /// Ответы источника 22.09.2026: LCM — три строки (два 4×100 в/с, 4×100 комплекс), SCM — одна.
+    /// </summary>
+    [Fact]
+    public void Parse_MixedRelays_GenderMixedBandUnion()
+    {
+        var lcm = WaJuniorRecordsSourceProvider.Parse(Fixture("wa-junior-x-lcm.json"));
+        var scm = WaJuniorRecordsSourceProvider.Parse(Fixture("wa-junior-x-scm.json"));
+
+        Assert.Equal(0, lcm.SkippedRelays + scm.SkippedRelays);
+        Assert.Equal(3, lcm.Records.Count);
+        Assert.All(lcm.Records.Concat(scm.Records), r =>
+        {
+            Assert.Equal("mixed", r.Gender);
+            Assert.Equal(WaJuniorRecordsSourceProvider.MixedBand, r.AgeKey);
+            Assert.StartsWith("4X", r.Distance);
+        });
+        var medley50 = Assert.Single(scm.Records);
+        Assert.Equal(("25m", "individual_medley", "4X50m", "01:41.21"),
+            (medley50.PoolType, medley50.Style, medley50.Distance, medley50.Time));
     }
 
     /// <summary>
@@ -68,8 +105,10 @@ public class WaJuniorRecordsSourceProviderTests
         Assert.Equal("01:54.87", best.Time);
         Assert.Equal("11/08/2026", best.RecordDate);
 
-        // 17 личных дисциплин длинной воды — по одной строке на каждую.
-        Assert.Equal(17, deduped.Count);
+        // 17 личных дисциплин длинной воды + 3 эстафеты (4×100 в/с — три строки → одна) —
+        // по одной строке на каждую.
+        Assert.Equal(20, deduped.Count);
+        Assert.Equal("03:12.75", Assert.Single(deduped, r => r is { Style: "freestyle", Distance: "4X100m" }).Time);
     }
 
     /// <summary>Совместный рекорд: держатели склеиваются, один и тот же человек — один раз.</summary>
@@ -141,7 +180,7 @@ public class WaJuniorRecordsSourceProviderTests
     /// один 504 переживает повтором.
     /// </summary>
     [Fact]
-    public async Task Fetch_FourQueries_RetriesOnce504()
+    public async Task Fetch_SixQueries_RetriesOnce504()
     {
         var handler = new StubHandler();
         var provider = new WaJuniorRecordsSourceProvider(new StubFactory(handler));
@@ -150,14 +189,14 @@ public class WaJuniorRecordsSourceProviderTests
 
         Assert.NotEmpty(records);
         var distinct = handler.Requests.Distinct().ToList();
-        Assert.Equal(4, distinct.Count);
+        Assert.Equal(6, distinct.Count); // F, M, X (Э3) × LCM, SCM
         Assert.All(distinct, u =>
         {
             Assert.StartsWith($"https://{WorldAquaticsSource.ApiHost}/fina/records/SW?", u);
             Assert.Contains("recordCode=WJ", u);
         });
         // Первый запрос F LCM получил 504 и был повторён.
-        Assert.Equal(5, handler.Requests.Count);
+        Assert.Equal(7, handler.Requests.Count);
     }
 
     private sealed class StubHandler : HttpMessageHandler

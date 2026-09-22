@@ -114,8 +114,8 @@ public class RecordsController : ControllerBase
             return BadRequest("style and distance are required, e.g. ?style=freestyle&distance=50m");
 
         var genderKey = (gender ?? "").Trim().ToLowerInvariant();
-        if (genderKey is not ("male" or "female"))
-            return BadRequest("gender is required and must be 'male' or 'female'");
+        if (genderKey.Length == 0 || Record.ValidateGender(genderKey, distance) is not null)
+            return BadRequest("gender is required: 'male', 'female', or 'mixed' (relay distances only)");
 
         var poolKey = (pool ?? "").Trim().ToLowerInvariant();
         if (poolKey is not ("25m" or "50m"))
@@ -179,8 +179,8 @@ public class RecordsController : ControllerBase
         if (pool != null && pool.Trim().ToLowerInvariant() is not ("25m" or "50m" or ""))
             return BadRequest("pool must be '25m' or '50m' when given");
 
-        if (gender != null && gender.Trim().ToLowerInvariant() is not ("male" or "female" or ""))
-            return BadRequest("gender must be 'male' or 'female' when given");
+        if (gender != null && gender.Trim().ToLowerInvariant() is not ("male" or "female" or "mixed" or ""))
+            return BadRequest("gender must be 'male', 'female' or 'mixed' when given");
 
         var query = RecordCompareQuery.Create(a, b, pool, gender);
 

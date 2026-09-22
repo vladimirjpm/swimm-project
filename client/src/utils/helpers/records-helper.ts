@@ -16,7 +16,7 @@
 
 import { HOME_REGION, NORMATIVE_COUNTRY } from '../constants/home-region';
 
-type Gender = 'male' | 'female';
+type Gender = 'male' | 'female' | 'mixed';
 type PoolKey = '25m_pool' | '50m_pool';
 
 /** WR — мировой рекорд; NR — национальный рекорд домашнего региона (HOME_REGION). */

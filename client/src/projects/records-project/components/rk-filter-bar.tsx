@@ -2,7 +2,7 @@ import React from 'react';
 import FilterBar, { type FilterBarChip } from '../../components/filter-section/filter-bar';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
-import { strokeByKey, type RkFilters } from '../rk-disciplines';
+import { genderLabel, strokeByKey, type RkFilters } from '../rk-disciplines';
 
 /**
  * Полоса выбранного на `/records` — ТОТ ЖЕ общий `FilterBar`, что на results, `/season-best`
@@ -63,12 +63,12 @@ const RkFilterBar: React.FC<{ filters: RkFilters; className?: string; ageBand?: 
       active: true,
       value: (
         <span className="text-2xl font-extrabold leading-none text-[var(--deep-text)]">
-          {filters.gender === 'female' ? 'Women' : 'Men'}
+          {genderLabel(filters.gender, true)}
         </span>
       ),
       valueCompact: (
         <span className="text-[16px] font-extrabold leading-[1.2] text-[var(--deep-accent)]">
-          {filters.gender === 'female' ? 'Women' : 'Men'}
+          {genderLabel(filters.gender, true)}
         </span>
       ),
     },

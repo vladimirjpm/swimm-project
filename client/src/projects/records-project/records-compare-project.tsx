@@ -7,7 +7,7 @@ import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
-import { parseRecordsCompareQuery, routes } from '../../utils/routes';
+import { parseRecordsCompareQuery, routes, type RecordGender } from '../../utils/routes';
 import { useRecordCountries, useRecordsCompare } from '../../hooks/useRecordsCompare';
 import RcScoreCard from './components/rc-score-card';
 import RcTable from './components/rc-table';
@@ -31,17 +31,19 @@ const POOLS: Array<{ key: '25m' | '50m' | null; label: string }> = [
   { key: '25m', label: '25m' },
 ];
 
-const GENDERS: Array<{ key: 'male' | 'female' | null; label: string }> = [
+const GENDERS: Array<{ key: RecordGender | null; label: string }> = [
   { key: null, label: 'All' },
   { key: 'male', label: 'Men' },
   { key: 'female', label: 'Women' },
+  // Смешанные эстафеты (Э5, records-relays-plan): при нём в сравнении остаются только они.
+  { key: 'mixed', label: 'Mixed' },
 ];
 
 interface CompareFilters {
   a: string | null;
   b: string | null;
   poolType: '25m' | '50m' | null;
-  gender: 'male' | 'female' | null;
+  gender: RecordGender | null;
 }
 
 function RecordsCompareProject() {

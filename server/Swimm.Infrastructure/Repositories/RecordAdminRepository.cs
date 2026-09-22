@@ -48,7 +48,7 @@ public class RecordAdminRepository : IRecordAdminRepository
 
     public async Task<RecordSaveResult> CreateRecordAsync(RecordInputDto input)
     {
-        var error = ValidateRecordAxes(input.RegionType, input.Category, input.Gender, input.PoolType, input.Time);
+        var error = ValidateRecordAxes(input.RegionType, input.Category, input.Gender, input.PoolType, input.Distance, input.Time);
         if (error != null) return RecordSaveResult.Fail(error);
 
         var record = new Record();
@@ -156,14 +156,14 @@ public class RecordAdminRepository : IRecordAdminRepository
 
     private static string? Norm(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static string? ValidateRecordAxes(string regionType, string category, string gender, string poolType, string time)
+    private static string? ValidateRecordAxes(string regionType, string category, string gender, string poolType, string distance, string time)
     {
         if (!Record.RegionTypes.Contains(regionType))
             return $"region_type должен быть одним из: {string.Join(", ", Record.RegionTypes)}";
         if (!Record.Categories.Contains(category))
             return $"category должен быть одним из: {string.Join(", ", Record.Categories)}";
-        if (gender != "male" && gender != "female")
-            return "gender должен быть male или female";
+        if (Record.ValidateGender(gender, distance) is { } genderError)
+            return genderError;
         if (poolType != "25m" && poolType != "50m")
             return "pool_type должен быть 25m или 50m";
         if (string.IsNullOrWhiteSpace(time))

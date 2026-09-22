@@ -111,9 +111,15 @@ public static class LogligRelayBandMatcher
             // не должен видеть там места вовсе: TimeFail — не единственная защита.
             var position = src.TimeMs is null ? null : src.Position;
 
+            // Известный пол (male/female/mixed) на «none» источника не меняем: none — это «не
+            // знаем», а не поправка (Э4). Смешанную, выведенную по составу, иначе стёрло бы.
+            var genderAfter = src.Gender is null or "" or "none" && ours.Gender is "male" or "female" or "mixed"
+                ? ours.Gender
+                : src.Gender;
+
             changes.Add(new RelayBandChange(
                 ours.ResultId, ours.Club, ours.StyleName, ours.Distance,
-                ours.Gender, src.Gender,
+                ours.Gender, genderAfter,
                 ours.EventStyleAge, src.Band,
                 ours.Position, position,
                 ours.OfficialClubPoints, src.OfficialClubPoints));

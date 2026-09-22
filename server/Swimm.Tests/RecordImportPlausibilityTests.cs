@@ -428,6 +428,26 @@ public class RecordImportPlausibilityTests
         Assert.Contains("23.61", found.Note);
     }
 
+    /// <summary>
+    /// Э1 эстафет: WJR-эстафета сверяется с WR-эстафетой той же дисциплины (ключ — дистанция
+    /// «4X100m»), а не с личной 100 в/с.
+    /// </summary>
+    [Fact]
+    public void JuniorRelay_FasterThanWorldRelay_IsFound()
+    {
+        var reference = RecordPlausibility.WorldReference([
+            new RecordPlausibility.WorldRow("open", "", "male", "50m", "freestyle", "4X100m", "03:08.24"),
+            new RecordPlausibility.WorldRow("open", "", "male", "50m", "freestyle", "100m", "46.40"),
+        ]);
+        RecordDiffEntry Relay(string time) =>
+            new("world", "", "junior", "15-18", "male", "50m", "freestyle", "4X100m",
+                null, null, null, time, null, null);
+
+        Assert.Empty(RecordPlausibility.Check([Relay("03:12.75")], reference));
+        var found = Assert.Single(RecordPlausibility.Check([Relay("03:07.00")], reference));
+        Assert.Equal(RecordIssueReasons.FasterThanWorldRecord, found.Reason);
+    }
+
     /// <summary>Строка диффа мирового юниорского рекорда.</summary>
     private static RecordDiffEntry JuniorEntry(string newTime, string? oldTime = null) =>
         new("world", "", "junior", "14-17", "female", "25m", "freestyle", "50m",

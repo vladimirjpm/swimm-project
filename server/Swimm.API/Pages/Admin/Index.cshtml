@@ -530,7 +530,7 @@
             <div class="py-1 border-t border-admin-border/60">
                 <div class="text-[12px] text-admin-text">
                     <span class="font-semibold">${esc(i.style)} ${esc(i.distance)}</span>
-                    · ${esc(i.poolType)} · ${esc(i.gender === 'female' ? '♀' : '♂')}
+                    · ${esc(i.poolType)} · ${esc(i.gender === 'female' ? '♀' : i.gender === 'mixed' ? '⚥' : '♂')}
                     · ${esc(i.regionType === 'world' ? 'WR' : i.regionCode)}
                     · ${esc(i.category)}${i.ageKey ? ' ' + esc(i.ageKey) : ''}
                     <span class="text-admin-warning font-semibold ml-1">${esc(i.flaggedTime)}</span>
