@@ -193,7 +193,8 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     /// <summary>
     /// Что предложить проставить соревнованию: медали и чемпионат — из регламента (его мы
     /// теперь качаем сами), чемпионат ещё и по названию, мастерс — из разобранного файла,
-    /// «зачёт не ведётся» — из пробы loglig, бассейн — из парсера.
+    /// «зачёт не ведётся» — из пробы loglig, бассейн — из регламента (И-30: протокол loglig длину
+    /// бассейна не пишет, а «25m» парсера — умолчание, а не распознавание).
     ///
     /// Раньше всё это ставилось руками ПОСЛЕ импорта, в панели строки, и про половину
     /// забывали. Сбой любого источника не роняет превью — флаг просто останется снятым.
@@ -241,8 +242,10 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         var clubPointsDisabled = standing is { HasStanding: false };
         if (clubPointsDisabled) reasons["clubPointsDisabled"] = "на loglig клубного зачёта нет";
 
-        var poolType = parsed.Competitions.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.PoolType))?.PoolType;
-        if (!string.IsNullOrWhiteSpace(poolType)) reasons["poolType"] = "распознано парсером";
+        var poolType = analysis?.PoolType;
+        reasons["poolType"] = poolType != null
+            ? Quote(analysis!, "pool", "из регламента")
+            : "протокол бассейна не указывает, в регламенте не нашлось — выбери вручную";
 
         // Категории — по названию соревнования словами из самой таблицы категорий.
         var categories = (await _categories.GetCategoriesAsync())

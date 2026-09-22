@@ -49,6 +49,12 @@ public static class BulkPullClassifier
         if (standing is { HasStanding: true, MatchedRuleId: null })
             reasons.Add("официальный клубный зачёт есть, а правила под его шкалу нет");
 
+        // Бассейн: протокол его не пишет, «25m» парсера — умолчание (И-30: летний чемпионат лёг
+        // 25-метровым). У чемпионата это вопрос к человеку; у лиг умолчание 25 м честно.
+        var isChampionship = isChampionshipByName || regulation?.Analysis?.IsChampionship == true;
+        if (isChampionship && regulation?.Analysis?.PoolType is null)
+            reasons.Add("чемпионат, а длины бассейна в регламенте нет — выбери 25/50 вручную");
+
         var warnings = preview.Parsed?.Warnings ?? [];
         foreach (var w in warnings.Take(3))
             reasons.Add($"предупреждение парсера: {w}");
@@ -58,7 +64,7 @@ public static class BulkPullClassifier
 
         // Чемпионат в пачку попадает только по явной галочке «включая чемпионаты», но
         // отметить его стоит: у чемпионатов медали и зачёт решаются штучно.
-        if (isChampionshipByName || regulation?.Analysis?.IsChampionship == true)
+        if (isChampionship)
             reasons.Add("чемпионат Израиля");
 
         if (regulation is null || !regulation.Found)

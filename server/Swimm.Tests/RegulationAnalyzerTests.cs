@@ -174,4 +174,29 @@ public class RegulationAnalyzerTests
 
         Assert.Equal(2, findings.Count(f => f.Flag == RegulationFlags.Medals));
     }
+
+    // ── длина бассейна (И-30) ─────────────────────────────────────────────────
+
+    [Theory]
+    // «טריילז» 2026 (takanon-3124) и Маккабия мастерс (takanon-3317) — сырой текст PdfPig:
+    // слова задом наперёд, цифры в нормальном порядке.
+    [InlineData("בב םייקתת תורחתה תכירב50 , רטמ10 םילולסמ םיכיראתה ןיב 23-27", "50m")]
+    [InlineData("ןוכמב לש הכירבב ,טייגניו50 ,רטמ10 .םילולסמ לע תלהנתמו היב", "50m")]
+    // Зимний мастерс 2026 (takanon-2758) — та же фраза с 25.
+    [InlineData("ןוכמב לש הכירבב ,טייגניו25 ,רטמ10 .םילולסמ יהת תופילאה םיי", "25m")]
+    // Лига Маккаби Хайфа (takanon-3333) — текст лёг нормально.
+    [InlineData("ות: 03.07.2026 מקום התחרות: בריכת מכבי - 25 מ', 8 מסלולים אגו", "25m")]
+    public void PoolLength_FromLanesPhrase(string line, string expected)
+    {
+        var findings = RegulationAnalyzer.Find(line);
+        Assert.Equal(expected, RegulationAnalyzer.PoolTypeOf(findings));
+        Assert.Contains("מסלולים", Assert.Single(findings, f => f.Flag == RegulationFlags.Pool).Quote);
+    }
+
+    [Theory]
+    [InlineData("מקצים: 50 מטר חופשי, 100 מטר גב")]          // дистанции программы, не бассейн
+    [InlineData("150 מטר, 10 מסלולים")]                       // не 50: перед числом цифра
+    [InlineData("בריכה 25 מ', 8 מסלולים; בריכה 50 מ', 10 מסלולים")] // обе длины — не угадываем
+    public void PoolLength_NotGuessed(string line) =>
+        Assert.Null(RegulationAnalyzer.PoolTypeOf(RegulationAnalyzer.Find(line)));
 }

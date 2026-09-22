@@ -38,9 +38,9 @@ public class BulkPullClassifierTests
     }
 
     private static RegulationFetchDto Regulation(
-        bool medals = true, bool clubStanding = false, bool championship = false) =>
+        bool medals = true, bool clubStanding = false, bool championship = false, string? pool = null) =>
         new(true, "https://loglig.com:2053/LeagueTable/ShowLeagueDoc/3185",
-            new RegulationAnalysisDto(medals, clubStanding, championship, []));
+            new RegulationAnalysisDto(medals, clubStanding, championship, [], PoolType: pool));
 
     [Fact]
     public void Clean_WhenNothingNeedsADecision()
@@ -148,6 +148,23 @@ public class BulkPullClassifierTests
             Regulation(), isChampionshipByName: false);
 
         Assert.Equal(BulkPullVerdict.Failed, verdict);
+    }
+
+    /// <summary>
+    /// И-30: протокол длину бассейна не пишет, летний чемпионат лёг 25-метровым. Чемпионат без
+    /// бассейна в регламенте — вопрос к человеку; лиге умолчание 25 м не мешает.
+    /// </summary>
+    [Fact]
+    public void Championship_WithoutPoolInRegulation_NeedsReview()
+    {
+        var (verdict, reasons) = BulkPullClassifier.Classify(Preview(), Regulation(), isChampionshipByName: true);
+        Assert.Equal(BulkPullVerdict.NeedsReview, verdict);
+        Assert.Contains(reasons, r => r.Contains("бассейн"));
+
+        Assert.NotEqual(BulkPullVerdict.NeedsReview,
+            BulkPullClassifier.Classify(Preview(), Regulation(pool: "50m"), isChampionshipByName: true).Verdict);
+        Assert.Equal(BulkPullVerdict.Clean,
+            BulkPullClassifier.Classify(Preview(), Regulation(), isChampionshipByName: false).Verdict);
     }
 
     [Fact]

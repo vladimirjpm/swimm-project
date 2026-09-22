@@ -23,12 +23,17 @@ public sealed record RegulationFindingDto(string Flag, string Matched, string Qu
 /// <param name="IsChampionship">Регламент чемпионата Израиля (אליפות ישראל) → 🏆.</param>
 /// <param name="Findings">Находки с цитатами — по одной на каждое сработавшее слово.</param>
 /// <param name="Error">Файл не удалось прочитать; остальные поля тогда пустые.</param>
+/// <param name="PoolType">
+/// Длина бассейна из регламента («בריכה … 50 מטר, 10 מסלולים») — <c>25m</c>/<c>50m</c>; null —
+/// регламент её не называет или называет обе. Протокол loglig бассейна не пишет вовсе (И-30).
+/// </param>
 public sealed record RegulationAnalysisDto(
     bool HasMedals,
     bool HasClubStanding,
     bool IsChampionship,
     IReadOnlyList<RegulationFindingDto> Findings,
-    string? Error = null);
+    string? Error = null,
+    string? PoolType = null);
 
 /// <summary>
 /// Итог САМОСТОЯТЕЛЬНОГО забора регламента с loglig (в отличие от разбора файла, который

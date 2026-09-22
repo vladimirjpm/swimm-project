@@ -2399,6 +2399,14 @@ else
 
             document.getElementById('btn-import').addEventListener('click', async () => {
                 if (!preview) return;
+                // Бассейн протокол не пишет, а у парсера умолчание 25 м (И-30: летний чемпионат
+                // лёг 25-метровым). Новое соревнование без явного выбора не импортируем; у
+                // существующего пустое поле ничего не меняет.
+                if (!preview.existingCompetitionId && !document.getElementById('flag-pool').value) {
+                    alert('Выбери длину бассейна (25 / 50 м): протокол её не указывает, регламент тоже.');
+                    document.getElementById('flag-pool').focus();
+                    return;
+                }
                 const categoryKeys = [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value);
                 const eventChoice = document.getElementById('event-select').value;
                 try {
