@@ -159,6 +159,8 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             {
                 r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
                 r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, r.IsRelayLeadOff, r.TimeMs,
+                // Команда и состав — только у эстафеты: слева в карточке команда, а не пловец.
+                RelayTeam = (string?)null, RelayHolders = (string?)null,
             })
             .ToListAsync();
 
@@ -174,7 +176,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                 {
                     r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
                     r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, r.IsRelayLeadOff, r.TimeMs,
-                    r.HolderName,
+                    r.HolderName, r.Club,
                 })
                 .ToListAsync())
             .Where(r => r.HolderName!.Split(',').Select(p => p.Trim()).Any(names.Contains))
@@ -182,6 +184,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             {
                 r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
                 r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, r.IsRelayLeadOff, r.TimeMs,
+                RelayTeam = r.Club, RelayHolders = r.HolderName,
             });
         records = records.Concat(relayRecords).Distinct().ToList();
         if (records.Count == 0) return [];
@@ -298,7 +301,8 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                 }
                 return new HeldRecordRow(
                     r.RegionType, r.RegionCode, r.Category, r.AgeKey, r.Gender,
-                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, issue, leadOff, meet, world);
+                    r.PoolType, r.Style, r.Distance, r.Time, r.RecordDate, issue, leadOff, meet, world,
+                    r.RelayTeam, r.RelayHolders);
             })
             .ToList();
     }

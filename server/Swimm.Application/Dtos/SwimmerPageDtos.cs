@@ -276,6 +276,17 @@ public sealed class SwimmerHeldRecordDto
     public bool RelayLeadOff { get; set; }
 
     /// <summary>
+    /// Эстафетный рекорд (Э5): держатель — КОМАНДА (клуб из справочника), а не пловец. Витрина
+    /// ставит её слева вместо имени пловца; null — рекорд личный.
+    /// </summary>
+    [JsonPropertyName("relayTeam")]
+    public string? RelayTeam { get; set; }
+
+    /// <summary>Состав эстафетного рекорда, как в справочнике («имя, имя, имя, имя»).</summary>
+    [JsonPropertyName("relayHolders")]
+    public string? RelayHolders { get; set; }
+
+    /// <summary>
     /// Где проплыт рекорд — найден среди заплывов пловца (`RecordMeetMatcher`: время, дисциплина,
     /// бассейн, дата ±1 день). В справочнике этого поля нет; null — рекорд до наших данных
     /// или заграничный.
