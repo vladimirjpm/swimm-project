@@ -47,7 +47,7 @@ severity — 20 битых строк и 3 клуба без страны выг
 | `results.fk-anomaly` | Error | ссылка на несуществующего пловца/клуб |
 | `import.reconciliation-mismatch` | Error | последняя сверка Д1 не сошлась |
 | `results.upsert-key-collision` | Warning | две строки одного пловца неразличимы для переимпорта (И8) |
-| `relays.gender-conflict` | Warning | заплыв помечен полом, а состав смешанный (И3) |
+| `relays.gender-conflict` | Warning | заплыв помечен полом, а у кого-то из состава пол в карточке противоположный — смешанный состав или вся команда другого пола; `M`/`F` учитываются (И3, И-32) |
 | `competitions.duplicate-day` | Warning | два дня одного события на одну дату (след И-3) |
 | `results.no-gender` | Warning | личный результат без пола (И2) |
 | `results.gender-vs-card` | Warning | пол личных строк расходится с полом в карточке пловца (И14) |

@@ -91,44 +91,50 @@ public sealed class UpsertKeyCollisionCheck(SwimmDbContext db) : IDataCheck
 }
 
 /// <summary>
-/// Инвариант И3: у эстафетной строки пол — это пол ЗАПЛЫВА (в миксе <c>none</c>), а не пол
-/// первой ноги. Признак нарушения: в составе есть и мужчины, и женщины, а строка помечена
-/// male/female. Именно так выглядел бы возврат бага, из-за которого переимпорт однажды
-/// наплодил дубликаты эстафет (инцидент И-4).
+/// Инвариант И3: у эстафетной строки пол — это пол ЗАПЛЫВА (в миксе <c>mixed</c>), а не пол
+/// первой ноги. Нарушение — в составе есть нога, чей пол в карточке ПРОТИВОПОЛОЖЕН полу
+/// заплыва: либо состав смешанный (так выглядел бы возврат бага, из-за которого переимпорт
+/// наплодил дубликаты эстафет, инцидент И-4), либо вся команда другого пола (22.09.2026: четверо
+/// мальчиков «מעלה אדומים» в женской 4×50 — ошибка организатора, в PDF loglig так и стоит).
+/// Старые <c>M</c>/<c>F</c> в карточках — тот же пол.
 /// </summary>
 public sealed class RelayGenderFromLegCheck(SwimmDbContext db) : IDataCheck
 {
     public string Id => "relays.gender-conflict";
     public string Title => "Состав эстафеты противоречит полу заплыва";
     public string Description =>
-        "Заплыв помечен конкретным полом, а в составе есть и мужчины, и женщины. Две причины: " +
-        "ноги привязались к однофамильцам другого пола (частое при разборе EN-протоколов) или " +
-        "пол взят с первой ноги вместо пола заплыва — а Gender входит в ключ upsert, и такая " +
-        "подмена однажды превратила переимпорт в генератор дубликатов (инцидент И-4).";
+        "Заплыв помечен конкретным полом, а у кого-то из состава в карточке противоположный. " +
+        "Причины: ноги привязались к однофамильцам другого пола (частое при разборе EN-протоколов), " +
+        "пол взят с первой ноги вместо пола заплыва (Gender входит в ключ upsert — инцидент И-4), " +
+        "неверный пол в карточке или команда стоит не в своём событии у самого организатора.";
     public DataCheckSeverity Severity => DataCheckSeverity.Warning;
 
     public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
     {
-        var suspicious = await db.Results.AsNoTracking()
+        var query = db.Results.AsNoTracking()
             .Where(r => r.RelayId != null && (r.Gender == "male" || r.Gender == "female"))
-            .Where(r => db.RelayMembers
-                .Where(m => m.RelayId == r.RelayId)
-                .Select(m => m.Swimmer!.Gender)
-                .Distinct()
-                .Count(g => g == "male" || g == "female") > 1)
             .Select(r => new
             {
                 r.Id, r.Gender, r.Distance, r.CompetitionId,
                 CompetitionName = r.Competition != null ? r.Competition.Name : "",
-                ClubName = r.Club != null ? r.Club.Name : ""
+                ClubName = r.Club != null ? r.Club.Name : "",
+                Legs = db.RelayMembers.Count(m => m.RelayId == r.RelayId),
+                Opposite = db.RelayMembers.Count(m => m.RelayId == r.RelayId
+                    && (r.Gender == "male"
+                        ? m.Swimmer!.Gender == "female" || m.Swimmer!.Gender == "F"
+                        : m.Swimmer!.Gender == "male" || m.Swimmer!.Gender == "M")),
             })
-            .Take(50)
-            .ToListAsync(ct);
+            .Where(x => x.Opposite > 0);
 
-        return new DataCheckOutcome(suspicious.Count, suspicious
+        var total = await query.CountAsync(ct);
+        var suspicious = await query.OrderBy(x => x.Id).Take(50).ToListAsync(ct);
+
+        return new DataCheckOutcome(total, suspicious
             .Select(r => new DataCheckItem(
                 "Result", (int)r.Id,
-                $"{r.ClubName} · {r.Distance} — помечена {r.Gender}, состав смешанный",
+                r.Opposite == r.Legs
+                    ? $"{r.ClubName} · {r.Distance} — помечена {r.Gender}, а весь состав другого пола"
+                    : $"{r.ClubName} · {r.Distance} — помечена {r.Gender}, состав смешанный",
                 $"{r.CompetitionName} (#{r.CompetitionId})",
                 $"/Admin/Results/Edit?id={r.Id}",
                 PublicRoutes.Competition(r.CompetitionId)))

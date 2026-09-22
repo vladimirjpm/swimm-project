@@ -312,6 +312,35 @@ public class InvariantDataChecksTests
     }
 
     [Fact]
+    public async Task RelayGenderFromLeg_FlagsWholeTeamOfOppositeGender_IncludingLegacyM()
+    {
+        // 22.09.2026: четверо мальчиков в женской эстафете (ошибка организатора) — состав не
+        // смешанный, но противоречит полу заплыва. Старое «M» в карточке — тоже мальчик.
+        await using var db = CreateDb(nameof(RelayGenderFromLeg_FlagsWholeTeamOfOppositeGender_IncludingLegacyM));
+        var (comp, style, club, male) = await SeedAsync(db);
+        var legacy = new Swimmer { LastName = "Бар", FirstName = "Дор", BirthYear = 2014, Gender = "M" };
+        db.Swimmers.Add(legacy);
+        var relay = new Relay { TeamName = "Мальчики" };
+        db.Relays.Add(relay);
+        await db.SaveChangesAsync();
+        db.RelayMembers.AddRange(
+            new RelayMember { RelayId = relay.Id, SwimmerId = male.Id, LegOrder = 1 },
+            new RelayMember { RelayId = relay.Id, SwimmerId = legacy.Id, LegOrder = 2 });
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = male.Id, ClubId = club.Id, StyleId = style.Id,
+            RelayId = relay.Id, Distance = "4X50", Gender = "female", Heat = 1, Lane = 1,
+            CompetitionDate = new DateTime(2026, 6, 1)
+        });
+        await db.SaveChangesAsync();
+
+        var outcome = await new RelayGenderFromLegCheck(db).RunAsync();
+
+        Assert.Equal(1, outcome.Total);
+        Assert.Contains("весь состав другого пола", Assert.Single(outcome.Items).Message);
+    }
+
+    [Fact]
     public async Task RelayGenderNone_NotFlagged()
     {
         // Правильно оформленная микс-эстафета находкой быть не должна.
