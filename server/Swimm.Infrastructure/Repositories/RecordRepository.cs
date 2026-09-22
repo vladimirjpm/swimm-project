@@ -218,27 +218,6 @@ public class RecordRepository : IRecordRepository
         }, CacheTtl);
 
     /// <summary>
-    /// Мировые рекорды по категориям — числа на табах /records. Один GROUP BY по оси `world`
-    /// (≈1300 строк), кэш тот же, что у справочника.
-    /// </summary>
-    public Task<RecordWorldCountsDto> GetWorldCountsAsync()
-        => _cache.GetOrCreateAsync("records:world-counts", async () =>
-        {
-            var counts = await _db.Records.AsNoTracking()
-                .Where(r => r.RegionType == "world")
-                .GroupBy(r => r.Category)
-                .Select(g => new { Category = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Category, x => x.Count);
-
-            return new RecordWorldCountsDto
-            {
-                Open = counts.GetValueOrDefault("open"),
-                Junior = counts.GetValueOrDefault("junior"),
-                Masters = counts.GetValueOrDefault("masters"),
-            };
-        }, CacheTtl);
-
-    /// <summary>
     /// Сравнение двух стран (11.3.1). Кэш — по паре кодов и разрезу; пара НЕ сортируется:
     /// «A против B» и «B против A» дают зеркальный ответ (слева своя сторона), и один ключ
     /// на оба означал бы, что второй запрос получит чужую раскладку.
