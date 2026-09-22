@@ -103,7 +103,7 @@ public sealed record HeldRecordRow(
     string RegionType, string RegionCode, string Category, string AgeKey, string Gender,
     string PoolType, string Style, string Distance, string Time, string? RecordDate,
     string? IssueReason, bool RelayLeadOff = false, RecordMeet? Meet = null,
-    WorldRecordRow? WorldRecord = null);
+    WorldRecordRow? WorldRecord = null, string? RelayTeam = null, string? RelayHolders = null);
 
 /// <summary>
 /// Мировой эталон рекорда пловца — правая сторона карточки «рекорд против мирового».

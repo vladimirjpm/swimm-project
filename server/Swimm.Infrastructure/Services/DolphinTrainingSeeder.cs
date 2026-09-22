@@ -74,7 +74,7 @@ public class DolphinTrainingSeeder : IDolphinTrainingSeeder
                 FirstNameEn = entry.FirstNameEn,
                 LastNameEn = entry.LastNameEn,
                 BirthYear = entry.BirthYear,
-                Gender = entry.Gender == "female" ? "F" : "M",
+                Gender = entry.Gender == "female" ? "female" : "male", // формат карточки — male/female (CK_Swimmers_Gender)
                 Origin = "local",
                 ClubId = await ResolveDolphinClubIdAsync(),
             };

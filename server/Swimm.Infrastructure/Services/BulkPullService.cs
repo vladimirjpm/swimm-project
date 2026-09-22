@@ -188,7 +188,11 @@ public sealed class BulkPullService : IBulkPullService
             IsChampionship: CompetitionAdminRepository.IsChampionship(
                 row.Name, analysis?.IsChampionship ?? false),
             PointRuleClubsId: preview?.ClubStanding?.MatchedRuleId,
-            PoolType: preview?.Parsed?.Competitions.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.PoolType))?.PoolType);
+            // Бассейн — из регламента; без него у НЕ-чемпионата честное умолчание 25 м (лиги),
+            // у чемпионата — null: импорт пачкой такую строку пропустит (И-30).
+            PoolType: analysis?.PoolType
+                      ?? (CompetitionAdminRepository.IsChampionship(row.Name, analysis?.IsChampionship ?? false)
+                          ? null : "25m"));
     }
 
     public async Task<BulkImportResultDto> ImportAsync(
@@ -220,6 +224,12 @@ public sealed class BulkPullService : IBulkPullService
             if (entry is null)
             {
                 skipped.Add($"{row.Name}: разбор истёк — затяните заново");
+                continue;
+            }
+
+            if (row.PoolType is null)
+            {
+                skipped.Add($"{row.Name}: длина бассейна не определена — импортируйте по одной, выбрав 25/50");
                 continue;
             }
 

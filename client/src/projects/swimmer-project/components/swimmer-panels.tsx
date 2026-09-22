@@ -679,7 +679,9 @@ function HeldRecordsSection({
                         time: r.time,
                         date: r.date,
                         quality: r.quality,
-                        who: { name: swimmerName, countryCode: swimmerCountry },
+                        // Эстафетный рекорд держит КОМАНДА (Э5): слева клуб, а не сам пловец —
+                        // иначе строка читается как его личный рекорд. Состав — в подсказке.
+                        who: { name: r.relayTeam || swimmerName, countryCode: swimmerCountry },
                         // Плашка ВСЕГДА у пловца: это его рекорд, а не победа в сравнении.
                         // Без заливки и рамки: время и так золотое, а колонку очерчивают
                         // разделители строк (решение Влада 20.09.2026).
@@ -691,7 +693,14 @@ function HeldRecordsSection({
                           : undefined,
                         // Время первого этапа эстафеты засчитывается личным: без подписи
                         // рекорд «не находится» среди личных заплывов (30.25, И-28).
-                        extras: r.relayLeadOff ? (
+                        extras: r.relayTeam ? (
+                          <span
+                            className="h2h-badge h2h-badge--relay"
+                            title={r.relayHolders ? `Relay team: ${r.relayHolders}` : 'Relay team record'}
+                          >
+                            Relay team
+                          </span>
+                        ) : r.relayLeadOff ? (
                           <span
                             className="h2h-badge h2h-badge--relay"
                             title="Set as the first leg of a relay — a lead-off time counts as an individual record"

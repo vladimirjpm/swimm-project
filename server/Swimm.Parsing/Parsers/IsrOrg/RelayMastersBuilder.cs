@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Swimm.Parsing.Models;
 
 namespace Swimm.Parsing.Parsers.IsrOrg;
 
@@ -37,6 +38,12 @@ public sealed record RelayBuildEvent(string Style, string Len, string Gender, st
 ///
 /// Всё или ничего: у хоть одной команды нет полосы или четырёх ног — <c>null</c>, и вызывающий
 /// остаётся на доклейке к основному разбору (этап 1).
+///
+/// Исключение — команда, у которой источник не печатает НИ ОДНОЙ ноги (22.09.2026, Маккабия
+/// мастерс, loglig 15155: 3 такие команды из 188, и из-за них сборка отказывала целиком).
+/// Состав такой команды берём из строки основного протокола с тем же стилем, дистанцией,
+/// клубом и временем (<see cref="BorrowLegs"/>); нет строки и нет времени (NS) — команду не
+/// строим: заплыва не было, а владельца строки взять неоткуда.
 /// </summary>
 public static class RelayMastersBuilder
 {
@@ -49,19 +56,21 @@ public static class RelayMastersBuilder
     public static bool CanBuild(IReadOnlyList<RelayBuildEvent> events) =>
         events.Count > 0
         && events.All(e => e.Teams.Count > 0)
-        && events.SelectMany(e => e.Teams).All(t => t.Band != null && t.Legs.Count == 4
+        && events.SelectMany(e => e.Teams).All(t => t.Band != null
+                                                    && (t.Legs.Count == 4 || t.LegsBorrowed)
                                                     && (t.Time != null || t.Status != null));
 
     /// <returns>Новый JSON и число эстафет; null — источник не годится (см. <see cref="CanBuild"/>).</returns>
     public static (string Json, int Relays, int Replaced)? Build(string resultsJson, IReadOnlyList<RelayBuildEvent> events)
     {
-        if (!CanBuild(events)) return null;
-
         var root = JsonNode.Parse(resultsJson) as JsonArray
                    ?? throw new InvalidOperationException("Ожидался JSON-массив результатов.");
 
         var rows = root.OfType<JsonObject>().ToList();
         var oldRelays = rows.Where(IsRelay).ToList();
+
+        events = BorrowLegs(events, oldRelays);
+        if (!CanBuild(events)) return null;
         // Поля соревнования (название, дата, страна, бассейн, мастерс) — из строки этого же
         // файла: эстафетная надёжнее (у неё та же дата, что у эстафет), иначе любая.
         var template = oldRelays.FirstOrDefault() ?? rows.FirstOrDefault()
@@ -80,6 +89,43 @@ public static class RelayMastersBuilder
         foreach (var row in built) root.Add(row);
 
         return (root.ToJsonString(WriteOptions), built.Count, oldRelays.Count);
+    }
+
+    /// <summary>
+    /// Команды без ног в источнике: состав — из строки основного протокола (стиль × дистанция ×
+    /// клуб × время), неявившиеся без строки — выбрасываются. Остальные команды не трогаем.
+    /// </summary>
+    internal static IReadOnlyList<RelayBuildEvent> BorrowLegs(
+        IReadOnlyList<RelayBuildEvent> events, IReadOnlyList<JsonObject> oldRelays) =>
+        events.Select(ev => ev with
+        {
+            Teams = ev.Teams
+                .Select(t => t.Legs.Count > 0 ? t : Borrow(ev, t, oldRelays))
+                .Where(t => t != null)
+                .Select(t => t!)
+                .ToList(),
+        }).ToList();
+
+    private static SplitRelayTeam? Borrow(RelayBuildEvent ev, SplitRelayTeam team, IReadOnlyList<JsonObject> oldRelays)
+    {
+        if (team.Time == null) return null; // NS/DQ без состава — строить не из чего
+
+        var ms = ToMs(team.Time);
+        var match = oldRelays.FirstOrDefault(o =>
+            (string?)o["event_style_name"] == ev.Style
+            && (string?)o["event_style_len"] == ev.Len
+            && (string?)o["club"] == team.Club
+            && o["time"] is JsonValue tv && tv.TryGetValue<string>(out var time) && ToMs(time) == ms);
+
+        var legs = (match?["relay_swimmers"] as JsonArray)?
+            .OfType<JsonObject>()
+            .Select(l => new RelaySwimmer(
+                (int?)l["order"] ?? 0, (string?)l["last_name"] ?? "", (string?)l["first_name"] ?? "",
+                (int?)l["birth_year"], (string?)l["club"], (string?)l["split_time"]))
+            .ToList();
+
+        // Не нашлось — оставляем пустой: CanBuild откажет, и соревнование останется на этапе 1.
+        return legs is { Count: > 0 } ? team with { Legs = legs, LegsBorrowed = true } : team;
     }
 
     private static Dictionary<SplitRelayTeam, int> Places(List<SplitRelayTeam> teams)

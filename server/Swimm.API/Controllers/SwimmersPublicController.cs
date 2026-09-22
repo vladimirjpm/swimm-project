@@ -112,6 +112,8 @@ public class SwimmersPublicController : ControllerBase
                 ? null
                 : new SwimQualityDto { Kind = "record", Reason = r.IssueReason },
             RelayLeadOff = r.RelayLeadOff,
+            RelayTeam = r.RelayTeam,
+            RelayHolders = r.RelayHolders,
             Meet = r.Meet is null
                 ? null
                 : new SwimmerHeldRecordMeetDto
