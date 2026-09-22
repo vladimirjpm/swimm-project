@@ -140,26 +140,13 @@ public sealed class RecordCountryOptionDto
     /// <summary>Сколько строк `open` у страны — по нему видно, с кем сравнение осмысленно.</summary>
     [JsonPropertyName("records")]
     public int Records { get; set; }
-}
 
-/// <summary>
-/// Сколько мировых рекордов в справочнике по категориям — числа на табах <c>/records</c>
-/// (<c>GET /api/records/world-counts</c>): всего, по обоим бассейнам и всем полам. Отдельным
-/// крошечным ответом, чтобы подпись таба не тянула его данные до открытия таба.
-/// </summary>
-public sealed class RecordWorldCountsDto
-{
-    /// <summary>Мировые рекорды open (таб WR).</summary>
-    [JsonPropertyName("open")]
-    public int Open { get; set; }
-
-    /// <summary>World Junior Records (таб World Junior).</summary>
-    [JsonPropertyName("junior")]
-    public int Junior { get; set; }
-
-    /// <summary>Мировые рекорды мастерс (таб Masters WR).</summary>
-    [JsonPropertyName("masters")]
-    public int Masters { get; set; }
+    /// <summary>
+    /// Сколько действующих мировых рекордов open держат пловцы страны (по стране держателя) —
+    /// число в скобках у выбора региона на табе WR /records; 0 — скобок нет (решение Влада 22.09.2026).
+    /// </summary>
+    [JsonPropertyName("world_records")]
+    public int WorldRecords { get; set; }
 }
 
 /// <summary>Ответ <c>GET /api/records/compare</c>.</summary>

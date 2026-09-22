@@ -214,28 +214,16 @@ public class RecordRepository : IRecordRepository
                 .OrderBy(x => x.Code)
                 .ToListAsync();
 
+            // Мировые рекорды open по стране держателя — ~90 строк, второй GROUP BY.
+            var world = await _db.Records.AsNoTracking()
+                .Where(r => r.RegionType == "world" && r.Category == "open" && r.HolderCountry != null)
+                .GroupBy(r => r.HolderCountry!)
+                .Select(g => new { Code = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Code, x => x.Count);
+            foreach (var row in rows)
+                row.WorldRecords = world.GetValueOrDefault(row.Code);
+
             return (IReadOnlyList<RecordCountryOptionDto>)rows;
-        }, CacheTtl);
-
-    /// <summary>
-    /// Мировые рекорды по категориям — числа на табах /records. Один GROUP BY по оси `world`
-    /// (≈1300 строк), кэш тот же, что у справочника.
-    /// </summary>
-    public Task<RecordWorldCountsDto> GetWorldCountsAsync()
-        => _cache.GetOrCreateAsync("records:world-counts", async () =>
-        {
-            var counts = await _db.Records.AsNoTracking()
-                .Where(r => r.RegionType == "world")
-                .GroupBy(r => r.Category)
-                .Select(g => new { Category = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Category, x => x.Count);
-
-            return new RecordWorldCountsDto
-            {
-                Open = counts.GetValueOrDefault("open"),
-                Junior = counts.GetValueOrDefault("junior"),
-                Masters = counts.GetValueOrDefault("masters"),
-            };
         }, CacheTtl);
 
     /// <summary>

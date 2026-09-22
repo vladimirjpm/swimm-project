@@ -55,6 +55,8 @@ export interface RecordCompareResponse {
 export interface RecordCountryOption {
   code: string;
   records: number;
+  /** Мировые рекорды open у страны (по стране держателя); 0 — скобок у выбора региона нет. */
+  world_records?: number;
 }
 
 export interface RecordsCompareState {
@@ -125,32 +127,4 @@ export function useRecordCountries(enabled = true): RecordCountryOption[] {
   }, [enabled]);
 
   return countries;
-}
-
-/** Число мировых рекордов по категориям — `GET /api/records/world-counts`. */
-export interface RecordWorldCounts {
-  open: number;
-  junior: number;
-  masters: number;
-}
-
-/**
- * Числа на табах `/records` (WR, World Junior, Masters WR): сколько мировых рекордов каждой
- * категории всего. Отдельный крошечный запрос вместо самих справочников: табы грузят данные,
- * только когда их открыли, и подпись не должна это ломать. null — ещё не пришло или сбой:
- * подпись тогда остаётся словами.
- */
-export function useRecordWorldCounts(): RecordWorldCounts | null {
-  const [counts, setCounts] = useState<RecordWorldCounts | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    fetch('/api/records/world-counts', { credentials: 'same-origin' })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((data: RecordWorldCounts) => { if (alive) setCounts(data); })
-      .catch(() => { if (alive) setCounts(null); });
-    return () => { alive = false; };
-  }, []);
-
-  return counts;
 }

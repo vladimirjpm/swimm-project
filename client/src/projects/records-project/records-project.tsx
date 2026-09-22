@@ -9,7 +9,7 @@ import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { parseRecordsQuery, routes, type RecordsTab } from '../../utils/routes';
 import { useRecordsRanking } from '../../hooks/useRecordsRanking';
 import { useRegionRecords } from '../../hooks/useRegionRecords';
-import { useRecordCountries, useRecordWorldCounts } from '../../hooks/useRecordsCompare';
+import { useRecordCountries } from '../../hooks/useRecordsCompare';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import DeepTabs, { type DeepTabItem } from '../components/deep/tabs';
 import RkDisciplinePicker from './components/rk-discipline-picker';
@@ -155,9 +155,8 @@ function RecordsProject() {
   const home = data?.rows.find((r) => r.region_code === HOME_REGION) ?? null;
 
   const worldList = region ? nationalOpen : worldOpen;
-  // Числа на табах — ВСЕГО мировых рекордов категории (оба бассейна, все полы), не срез
-  // фильтров: подпись таба не должна прыгать от кнопок внутри панели (решение Влада 22.09.2026).
-  const worldCounts = useRecordWorldCounts();
+  const worldCount = worldList.data
+    ?.filter((r) => r.pool_type === filters.poolType && r.gender === filters.gender).length;
 
   // Подписи — живые данные, как требует хендофф табов: где числа ещё нет, стоит слово.
   const tabs: DeepTabItem<RecordsTab>[] = [
@@ -167,15 +166,15 @@ function RecordsProject() {
     },
     {
       id: 'world', icon: '🏆', label: 'World records', shortLabel: 'WR',
-      sub: worldCounts ? `${worldCounts.open} world records` : 'every event',
+      sub: worldCount != null ? `${worldCount} records${region ? ` · ${region}` : ''}` : 'every event',
     },
     {
       id: 'masters', icon: '⏱', label: 'Masters WR',
-      sub: worldCounts ? `${worldCounts.masters} world records` : 'Israel vs world · by age band',
+      sub: 'Israel vs world · by age band',
     },
     {
       id: 'junior', icon: '🌱', label: 'World Junior',
-      sub: worldCounts ? `${worldCounts.junior} world junior records` : 'Israel ages vs world junior',
+      sub: 'Israel ages vs world junior',
     },
   ];
 
@@ -253,8 +252,12 @@ function RecordsProject() {
                       {region && !countries.some((c) => c.code === region) && (
                         <option value={region}>{region}</option>
                       )}
+                      {/* В скобках — сколько мировых рекордов держит страна; нет ни одного — скобок нет
+                          (решение Влада 22.09.2026). */}
                       {countries.map((c) => (
-                        <option key={c.code} value={c.code}>{c.code} ({c.records})</option>
+                        <option key={c.code} value={c.code}>
+                          {c.world_records ? `${c.code} (${c.world_records})` : c.code}
+                        </option>
                       ))}
                     </select>
                   </span>
