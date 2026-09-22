@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
 import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
 import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
+import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import type { RegionRecord } from '../../../hooks/useRegionRecords';
 import { routes } from '../../../utils/routes';
 import { timeToMs } from '../../../utils/helpers/recalculate-positions';
 import {
-  RK_STROKES, behindLabel, distanceLabel, holderLabel, isRelay, strokeLabel, type RkFilters,
+  RK_STROKES, behindLabel, distanceLabel, holderLabel, strokeLabel, type RkFilters,
 } from '../rk-disciplines';
 
 /**
@@ -81,7 +82,6 @@ const RkWorldList: React.FC<Props> = ({ records, filters, world = null }) => {
       {rows.map((r) => {
         const quality = r.issue_reason ? { kind: 'record' as const, reason: r.issue_reason } : null;
         const flagged = swimFlaggedRowProps(quality);
-        const relay = isRelay(r.distance);
         const wr = worldByKey?.get(disciplineKey(r)) ?? null;
         // Разрыв на клиенте, как в карточке рекорда пловца: у справочника миллисекунд нет.
         const gapMs = wr ? timeToMs(r.time) - timeToMs(wr.time) : null;
@@ -103,11 +103,25 @@ const RkWorldList: React.FC<Props> = ({ records, filters, world = null }) => {
                   // Из списка страны — в рейтинг с её строкой подсвеченной: «а она где?».
                   highlight: national ? r.region_code : null,
                 })}
-                title="Rank the countries in this event"
+                title={`${strokeLabel(r.style)} ${distanceLabel(r.distance)} — rank the countries in this event`}
+                aria-label={`${strokeLabel(r.style)} ${distanceLabel(r.distance)}`}
               >
-                {strokeLabel(r.style)} {distanceLabel(r.distance)}
+                {/* Дисциплина — общим значком стиля с дистанцией справа, как в строке заплыва и
+                    карточках рекордов; текст — в подсказке и aria-label. Белая плита под
+                    иконкой обязательна: PNG стилей нарисованы под светлый фон. */}
+                <span className="rk-event-plate">
+                  <UI_SwimmStyleIcon
+                    styleName={r.style}
+                    styleLen={r.distance.replace(/m$/i, '')}
+                    styleType="icon-len"
+                    lenPlacement="right"
+                    size={48}
+                    lenSize={16}
+                  />
+                </span>
               </a>
-              {relay && <span className="rk-head__tag">relay</span>}
+              {/* Бейджа «relay» нет: «4X100» на значке уже говорит, что это эстафета, а на
+                  телефоне бейдж наезжал на время. */}
             </span>
 
             <span className="rk-cell rk-cell--time" role="cell">

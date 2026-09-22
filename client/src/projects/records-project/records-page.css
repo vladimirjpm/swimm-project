@@ -461,6 +461,17 @@
 }
 
 .rc-picker { display: flex; flex-direction: column; gap: 5px; min-width: 190px; }
+/* Дисциплина в списке WR/NR — значок стиля с дистанцией справа на белой плите: PNG стилей
+   нарисованы под светлый фон и в тёмной теме без плиты пропадают (как swim-row__plate). */
+.rk-event-plate {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px 2px 4px;
+  border-radius: 8px;
+  background: #fff;
+}
+.rk-event-plate .style-len { font-weight: 700; }
+
 /* Выбор региона таба WR (9.9) — над списком, отдельной строкой. */
 .rk-region { margin: 4px 0 14px; max-width: 260px; }
 
