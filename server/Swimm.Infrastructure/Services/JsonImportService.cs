@@ -1616,8 +1616,10 @@ public class JsonImportService : IImportService
     {
         // «none»/«mix» — это отсутствие пола в шапке, а не пол пловца: записав его в Swimmer,
         // мы бы навсегда испортили карточку человека из-за одного смешанного заплыва.
-        if (string.IsNullOrEmpty(swimmer.Gender) && !IsUnknownGender(gender))
-            swimmer.Gender = gender;
+        // В карточку — только male/female (CK_Swimmers_Gender): «M»/«F» и прочие написания
+        // из протокола сводим, неизвестное не пишем.
+        if (string.IsNullOrEmpty(swimmer.Gender) && RelayGender.Normalize(gender) is { } personGender)
+            swimmer.Gender = personGender;
 
         // Псевдоклуб (страна/сборная) — не «клуб пловца»; страна уходит в CountryId ниже.
         if (swimmer.ClubId == null && club != null && !club.IsPseudo)

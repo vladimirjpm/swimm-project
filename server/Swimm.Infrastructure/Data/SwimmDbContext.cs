@@ -200,6 +200,12 @@ public class SwimmDbContext : DbContext
             // Существующие/новые isr-пловцы = 'isr' по умолчанию; local проставляет сидер явно.
             entity.Property(e => e.Origin).HasDefaultValue("isr");
 
+            // Пол человека — только male/female или неизвестен (NULL). Старые «M»/«F» от сидера
+            // тренировок (хвост §5 records-relays-plan, 22.09.2026) переведены миграцией
+            // SwimmerGenderMaleFemale; ограничение не даёт им вернуться.
+            entity.ToTable(t => t.HasCheckConstraint("CK_Swimmers_Gender",
+                "\"Gender\" IS NULL OR \"Gender\" IN ('male', 'female')"));
+
             entity.HasOne(e => e.Club)
                 .WithMany()
                 .HasForeignKey(e => e.ClubId)

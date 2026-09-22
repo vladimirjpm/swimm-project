@@ -436,6 +436,26 @@ public class ImportUpsertIntegrationTests
     }
 
     /// <summary>
+    /// В карточку пловца пол попадает только как male/female (CK_Swimmers_Gender, 22.09.2026):
+    /// «M»/«F» из протокола сводятся, «none» не пишется вовсе.
+    /// </summary>
+    [Theory]
+    [InlineData("M", "male")]
+    [InlineData("F", "female")]
+    [InlineData("none", null)]
+    public async Task NewSwimmerCard_GetsNormalizedGender(string rowGender, string? expected)
+    {
+        await using var db = CreateDb(nameof(NewSwimmerCard_GetsNormalizedGender) + rowGender);
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        var item = System.Text.Json.JsonSerializer.SerializeToNode(Item("Cohen", "Dan", 2010))!.AsObject();
+        item["event_style_gender"] = rowGender;
+        Assert.Empty((await svc.ImportAsync(ToStream(new[] { item }))).ErrorMessages);
+
+        Assert.Equal(expected, (await db.Swimmers.SingleAsync()).Gender);
+    }
+
+    /// <summary>
     /// Ключ upsert эстафет склеивает none и mixed — строка матчится, но пол обязан обновиться:
     /// иначе старое none («пол неизвестен») не лечится переимпортом (22.09.2026).
     /// </summary>
