@@ -32,6 +32,7 @@ public class RecordDiffService : IRecordDiffService
         ("isrorg-age", "age", ""),
         ("isrorg-masters", "masters", "country"),
         ("wa-masters", "masters", "world"),
+        ("wa-junior", "junior", "world"),
     };
 
     /// <summary>Сколько живёт дифф превью в админке, если вызывающий не попросил другого.</summary>

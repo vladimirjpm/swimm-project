@@ -1,0 +1,185 @@
+RegionType,RegionCode,Category,AgeKey,Gender,PoolType,Style,Distance,Time,HolderName,Club,HolderCountry,RecordDate
+country,ISR,open,,female,25m,backstroke,100m,56.73,Anastasia Gorbenko,,ISR,26/12/2025
+country,ISR,open,,female,25m,backstroke,200m,02:05.36,Anastasia Gorbenko,,ISR,25/11/2021
+country,ISR,open,,female,25m,backstroke,50m,26.63,Anastasia Gorbenko,,ISR,01/10/2021
+country,ISR,open,,female,25m,breaststroke,100m,01:03.90,Anastasia Gorbenko,,ISR,03/12/2025
+country,ISR,open,,female,25m,breaststroke,200m,02:19.22,Anastasia Gorbenko,,ISR,09/09/2021
+country,ISR,open,,female,25m,breaststroke,50m,29.34,Anastasia Gorbenko,,ISR,17/12/2021
+country,ISR,open,,female,25m,butterfly,100m,56.75,Amit Ivry,,ISR,24/12/2014
+country,ISR,open,,female,25m,butterfly,200m,02:09.69,Keren Michaela Siebner,,ISR,16/12/2015
+country,ISR,open,,female,25m,butterfly,50m,25.69,Amit Ivry,,ISR,11/12/2009
+country,ISR,open,,female,25m,freestyle,100m,52.16,Andrea Murez,,ISR,09/11/2020
+country,ISR,open,,female,25m,freestyle,1500m,16:31.53,Emily Golos,,ISR,23/12/2025
+country,ISR,open,,female,25m,freestyle,200m,01:53.50,Andrea Murez,,ISR,16/11/2020
+country,ISR,open,,female,25m,freestyle,400m,04:07.21,Andrea Murez,,ISR,07/11/2015
+country,ISR,open,,female,25m,freestyle,4X100m,03:49.59,"Keren Michaela Siebner, Maya Bachar, Tali Lemcoff, Zohar Shikler",,ISR,06/12/2014
+country,ISR,open,,female,25m,freestyle,4X200m,08:40.35,,,ISR,05/03/1999
+country,ISR,open,,female,25m,freestyle,4X50m,01:38.53,"Amit Ivry, Andrea Murez, Keren Michaela Siebner, Zohar Shikler",,ISR,04/12/2015
+country,ISR,open,,female,25m,freestyle,50m,24.53,Anastasia Gorbenko,,ISR,21/08/2020
+country,ISR,open,,female,25m,freestyle,800m,08:28.29,Olga Beresnyeva,,ISR,22/01/2005
+country,ISR,open,,female,25m,individual_medley,100m,57.17,Anastasia Gorbenko,,ISR,04/12/2025
+country,ISR,open,,female,25m,individual_medley,200m,02:04.93,Anastasia Gorbenko,,ISR,19/10/2025
+country,ISR,open,,female,25m,individual_medley,400m,04:32.67,Anastasia Gorbenko,,ISR,25/10/2020
+country,ISR,open,,female,25m,individual_medley,4X100m,04:09.21,"Anastasia Korotkov, Anna Gostomelsky, Annaelle Wolfman, Keren Michaela Siebner",,ISR,15/02/2014
+country,ISR,open,,female,25m,individual_medley,4X50m,01:50.51,"Amit Ivry, Andrea Murez, Keren Michaela Siebner, Zohar Shikler",,ISR,06/12/2015
+country,ISR,open,,female,50m,backstroke,100m,59.25,Anastasia Gorbenko,,ISR,22/05/2025
+country,ISR,open,,female,50m,backstroke,200m,02:08.54,Anastasia Gorbenko,,ISR,29/05/2024
+country,ISR,open,,female,50m,backstroke,50m,27.55,Anastasia Gorbenko,,ISR,18/05/2025
+country,ISR,open,,female,50m,breaststroke,100m,01:06.15,Anastasia Gorbenko,,ISR,18/06/2024
+country,ISR,open,,female,50m,breaststroke,200m,02:25.20,Anastasia Gorbenko,,ISR,11/06/2021
+country,ISR,open,,female,50m,breaststroke,50m,30.30,Anastasia Gorbenko,,ISR,02/08/2025
+country,ISR,open,,female,50m,butterfly,100m,58.21,Amit Ivry,,ISR,08/08/2009
+country,ISR,open,,female,50m,butterfly,200m,02:10.80,Lea Polonsky,,ISR,02/12/2023
+country,ISR,open,,female,50m,butterfly,50m,26.13,Amit Ivry,,ISR,18/08/2014
+country,ISR,open,,female,50m,freestyle,100m,54.06,Andrea Murez,,ISR,28/07/2021
+country,ISR,open,,female,50m,freestyle,1500m,16:44.61,Gali Zilberberg,,ISR,06/07/2018
+country,ISR,open,,female,50m,freestyle,200m,01:56.74,Anastasia Gorbenko,,ISR,17/06/2024
+country,ISR,open,,female,50m,freestyle,400m,04:11.40,Daria Golovaty,,ISR,07/06/2023
+country,ISR,open,,female,50m,freestyle,4X100m,03:41.13,"Andrea Murez, Ayla Spitz, Daria Golovaty, Lea Polonsky",,ISR,19/06/2024
+country,ISR,open,,female,50m,freestyle,4X200m,07:51.83,"Anastasia Gorbenko, Ayla Spitz, Daria Golovaty, Lea Polonsky",,ISR,17/06/2024
+country,ISR,open,,female,50m,freestyle,50m,25.03,Anastasia Gorbenko,,ISR,11/06/2021
+country,ISR,open,,female,50m,freestyle,800m,08:41.55,Meredith Budner,,ISR,14/08/2011
+country,ISR,open,,female,50m,individual_medley,200m,02:08.55,Anastasia Gorbenko,,ISR,29/05/2024
+country,ISR,open,,female,50m,individual_medley,400m,04:34.87,Anastasia Gorbenko,,ISR,01/06/2024
+country,ISR,open,,female,50m,individual_medley,4X100m,04:02.19,"Anastasia Gorbenko, Daria Golovaty, Lea Polonsky, Tom Mienis",,ISR,16/08/2026
+country,ISR,open,,male,25m,backstroke,100m,50.64,David Gamburg,,ISR,03/12/2014
+country,ISR,open,,male,25m,backstroke,200m,01:49.84,Yakov Toumarkin,,ISR,02/12/2015
+country,ISR,open,,male,25m,backstroke,50m,23.27,Guy Barnea,,ISR,06/12/2015
+country,ISR,open,,male,25m,breaststroke,100m,58.11,Kristian Pitshugin,,ISR,03/11/2021
+country,ISR,open,,male,25m,breaststroke,200m,02:05.87,Yakov Toumarkin,,ISR,26/12/2019
+country,ISR,open,,male,25m,breaststroke,50m,26.21,Kristian Pitshugin,,ISR,06/11/2021
+country,ISR,open,,male,25m,butterfly,100m,50.57,Gal Cohen Groumi,,ISR,22/12/2021
+country,ISR,open,,male,25m,butterfly,200m,01:51.84,Gal Nevo,,ISR,12/12/2009
+country,ISR,open,,male,25m,butterfly,50m,22.59,Meiron Amir Cheruti,,ISR,02/12/2025
+country,ISR,open,,male,25m,butterfly,50m,22.59,Meiron Amir Cheruti,,ISR,02/12/2025
+country,ISR,open,,male,25m,freestyle,100m,47.08,Meiron Amir Cheruti,,ISR,26/12/2019
+country,ISR,open,,male,25m,freestyle,1500m,14:52.83,Gil Kiesler,,ISR,31/12/2016
+country,ISR,open,,male,25m,freestyle,200m,01:43.45,Gal Cohen Groumi,,ISR,24/12/2021
+country,ISR,open,,male,25m,freestyle,400m,03:42.86,Tomer Frankel,,ISR,26/12/2018
+country,ISR,open,,male,25m,freestyle,4X100m,03:23.51,"Almog Olshtein, David Gamburg, Guy Barnea, Yahav Shahaff",,ISR,19/02/2010
+country,ISR,open,,male,25m,freestyle,4X200m,07:33.69,"Alon Mandel, Elad Landman, Igal Oren, Pavel Pessin",,ISR,30/12/2011
+country,ISR,open,,male,25m,freestyle,4X50m,01:26.90,"Gal Cohen Groumi, Marcus John Schlesinger, Meiron Amir Cheruti, Tomer Frankel",,ISR,04/12/2019
+country,ISR,open,,male,25m,freestyle,50m,21.08,Meiron Amir Cheruti,,ISR,27/12/2019
+country,ISR,open,,male,25m,freestyle,800m,07:56.61,Guy Moskovich,,ISR,19/12/2015
+country,ISR,open,,male,25m,individual_medley,100m,52.17,Yakov Toumarkin,,ISR,28/10/2021
+country,ISR,open,,male,25m,individual_medley,200m,01:53.17,Yakov Toumarkin,,ISR,15/11/2020
+country,ISR,open,,male,25m,individual_medley,400m,04:00.55,Gal Nevo,,ISR,11/12/2009
+country,ISR,open,,male,25m,individual_medley,4X100m,03:30.75,"Denis Loktev, Eitan Ben Shitrit, Kristian Pitshugin, Yakov Toumarkin",,ISR,21/12/2021
+country,ISR,open,,male,25m,individual_medley,4X50m,01:35.50,"Adam Maraana, David Gerchik, Eitan Ben Shitrit, Kristian Pitshugin",,ISR,03/11/2021
+country,ISR,open,,male,50m,backstroke,100m,53.39,Tomer Shuster,,ISR,15/08/2026
+country,ISR,open,,male,50m,backstroke,200m,01:55.96,Yakov Toumarkin,,ISR,12/08/2015
+country,ISR,open,,male,50m,backstroke,50m,24.36,Tomer Shuster,,ISR,13/08/2026
+country,ISR,open,,male,50m,breaststroke,100m,01:00.00,Ron Polonsky,,ISR,27/07/2024
+country,ISR,open,,male,50m,breaststroke,200m,02:11.44,Tom Beeri,,ISR,12/08/2008
+country,ISR,open,,male,50m,breaststroke,50m,27.02,Kristian Pitshugin,,ISR,22/06/2024
+country,ISR,open,,male,50m,butterfly,100m,50.98,Gal Cohen Groumi,,ISR,28/07/2023
+country,ISR,open,,male,50m,butterfly,200m,01:57.02,Gal Nevo,,ISR,28/07/2009
+country,ISR,open,,male,50m,butterfly,50m,23.12,Meiron Amir Cheruti,,ISR,14/05/2025
+country,ISR,open,,male,50m,freestyle,100m,48.18,Tomer Frankel,,ISR,10/06/2023
+country,ISR,open,,male,50m,freestyle,1500m,15:04.99,Matan Roditi,,ISR,08/06/2024
+country,ISR,open,,male,50m,freestyle,200m,01:45.59,Denis Loktev,,ISR,10/08/2026
+country,ISR,open,,male,50m,freestyle,400m,03:47.32,Bar Soloveychik,,ISR,06/06/2024
+country,ISR,open,,male,50m,freestyle,4X100m,03:13.39,"Alexey Glivinskiy, Daniel Krichevsky, Denis Loktev, Martin Kartavi",,ISR,27/07/2025
+country,ISR,open,,male,50m,freestyle,4X200m,07:06.29,"Alexey Glivinskiy, Daniel Krichevsky, Denis Loktev, Yoav Romano",,ISR,01/08/2025
+country,ISR,open,,male,50m,freestyle,50m,21.60,Meiron Amir Cheruti,,ISR,17/05/2025
+country,ISR,open,,male,50m,freestyle,800m,07:55.48,Bar Soloveychik,,ISR,12/06/2021
+country,ISR,open,,male,50m,individual_medley,200m,01:57.01,Ron Polonsky,,ISR,22/06/2024
+country,ISR,open,,male,50m,individual_medley,400m,04:11.51,Gal Nevo,,ISR,02/08/2009
+country,ISR,open,,male,50m,individual_medley,4X100m,03:34.91,"Daniel Krichevsky, Gal Cohen Groumi, Inbar Ono Danziger, Jonathan Itzhaki",,ISR,03/08/2025
+country,ISR,open,,mixed,25m,freestyle,4X50m,01:32.55,"Andrea Murez, Or Sabatier, Ziv Kalontarov, Zohar Shikler",,ISR,05/12/2015
+country,ISR,open,,mixed,25m,individual_medley,4X50m,01:40.48,"Amit Ivry, Andrea Murez, Guy Barnea, Yahav Shahaff",,ISR,03/12/2015
+country,ISR,open,,mixed,50m,freestyle,4X100m,03:27.02,"Alexey Glivinskiy, Anastasia Gorbenko, Andrea Murez, Yoav Romano",,ISR,21/06/2024
+country,ISR,open,,mixed,50m,individual_medley,4X100m,03:43.94,"Anastasia Gorbenko, Andrea Murez, Gal Cohen Groumi, Itay Goldfaden",,ISR,29/07/2021
+world,,open,,female,25m,backstroke,100m,54.02,Regan Smith,,USA,15/12/2024
+world,,open,,female,25m,backstroke,100m,54.02,Regan Smith,,USA,18/10/2025
+world,,open,,female,25m,backstroke,200m,01:57.33,Kaylee Mckeown,,AUS,25/10/2025
+world,,open,,female,25m,backstroke,50m,25.23,Regan Smith,,USA,13/12/2024
+world,,open,,female,25m,breaststroke,100m,01:02.36,Ruta Meilutyte,,LTU,12/10/2013
+world,,open,,female,25m,breaststroke,100m,01:02.36,Alia Atkinson,,JAM,06/12/2014
+world,,open,,female,25m,breaststroke,100m,01:02.36,Alia Atkinson,,JAM,26/08/2016
+world,,open,,female,25m,breaststroke,200m,02:12.50,Kate Douglass,,USA,13/12/2024
+world,,open,,female,25m,breaststroke,50m,28.37,Ruta Meilutyte,,LTU,17/12/2022
+world,,open,,female,25m,butterfly,100m,52.71,Gretchen Walsh,,USA,14/12/2024
+world,,open,,female,25m,butterfly,200m,01:59.32,Summer Mcintosh,,CAN,12/12/2024
+world,,open,,female,25m,butterfly,50m,23.72,Gretchen Walsh,,USA,11/10/2025
+world,,open,,female,25m,freestyle,100m,49.93,Kate Douglass,,USA,25/10/2025
+world,,open,,female,25m,freestyle,1500m,15:08.24,Katie Ledecky,,USA,29/10/2022
+world,,open,,female,25m,freestyle,200m,01:49.36,Mollie O'callaghan,,AUS,24/10/2025
+world,,open,,female,25m,freestyle,400m,03:50.25,Summer Mcintosh,,CAN,10/12/2024
+world,,open,,female,25m,freestyle,4X100m,03:25.01,"Alex Shackell, Gretchen Walsh, Kate Douglass, Katharine Berkoff",,USA,10/12/2024
+world,,open,,female,25m,freestyle,4X200m,07:30.13,"Alex Walsh, Claire Weinstein, Katie Grimes, Paige Madden",,USA,12/12/2024
+world,,open,,female,25m,freestyle,4X50m,01:32.50,"Femke Heemskerk, Kim Busch, Maaike De Waard, Ranomi Kromowidjojo",,NED,12/12/2020
+world,,open,,female,25m,freestyle,50m,22.83,Gretchen Walsh,,USA,15/12/2024
+world,,open,,female,25m,freestyle,800m,07:54.00,Lani Pallister,,AUS,25/10/2025
+world,,open,,female,25m,individual_medley,100m,55.11,Gretchen Walsh,,USA,13/12/2024
+world,,open,,female,25m,individual_medley,200m,02:01.63,Kate Douglass,,USA,10/12/2024
+world,,open,,female,25m,individual_medley,400m,04:15.48,Summer Mcintosh,,CAN,14/12/2024
+world,,open,,female,25m,individual_medley,4X100m,03:40.41,"Gretchen Walsh, Kate Douglass, Lilly King, Regan Smith",,USA,15/12/2024
+world,,open,,female,25m,individual_medley,4X50m,01:42.35,"Chelsea Hodges, Emma Mckeon, Madison Wilson, Mollie O'callaghan",,AUS,17/12/2022
+world,,open,,female,50m,backstroke,100m,57.13,Regan Smith,,USA,18/06/2024
+world,,open,,female,50m,backstroke,200m,02:03.14,Kaylee Mckeown,,AUS,10/03/2023
+world,,open,,female,50m,backstroke,50m,26.56,Sara Curtis,,ITA,13/08/2026
+world,,open,,female,50m,breaststroke,100m,01:04.13,Lilly King,,USA,25/07/2017
+world,,open,,female,50m,breaststroke,200m,02:17.55,Evgeniia Chikunova,,RUS,21/04/2023
+world,,open,,female,50m,breaststroke,50m,29.16,Ruta Meilutyte,,LTU,30/07/2023
+world,,open,,female,50m,butterfly,100m,54.33,Gretchen Walsh,,USA,02/05/2026
+world,,open,,female,50m,butterfly,200m,02:01.65,Summer Mcintosh,,CAN,05/07/2026
+world,,open,,female,50m,butterfly,50m,24.43,Sarah Sjoestroem,,SWE,05/07/2014
+world,,open,,female,50m,freestyle,100m,51.68,Marrit Steenbergen,,NED,27/06/2026
+world,,open,,female,50m,freestyle,1500m,15:20.48,Katie Ledecky,,USA,16/05/2018
+world,,open,,female,50m,freestyle,200m,01:52.23,Ariarne Titmus,,AUS,12/06/2024
+world,,open,,female,50m,freestyle,400m,03:54.18,Summer Mcintosh,,CAN,07/06/2025
+world,,open,,female,50m,freestyle,4X100m,03:27.96,"Emma Mckeon, Meg Harris, Mollie O'callaghan, Shayna Jack",,AUS,23/07/2023
+world,,open,,female,50m,freestyle,4X200m,07:37.50,"Ariarne Titmus, Brianna Throssell, Mollie O'callaghan, Shayna Jack",,AUS,27/07/2023
+world,,open,,female,50m,freestyle,50m,23.19,Kate Douglass,,USA,15/08/2026
+world,,open,,female,50m,freestyle,800m,08:04.12,Katie Ledecky,,USA,03/05/2025
+world,,open,,female,50m,individual_medley,200m,02:05.70,Summer Mcintosh,,CAN,09/06/2025
+world,,open,,female,50m,individual_medley,400m,04:23.65,Summer Mcintosh,,CAN,11/06/2025
+world,,open,,female,50m,individual_medley,4X100m,03:49.34,"Gretchen Walsh, Kate Douglass, Regan Smith, Torri Huske",,USA,03/08/2025
+world,,open,,male,25m,backstroke,100m,48.16,Hubert Kos,,HUN,25/10/2025
+world,,open,,male,25m,backstroke,200m,01:45.12,Hubert Kos,,HUN,23/10/2025
+world,,open,,male,25m,backstroke,50m,22.11,Kliment Kolesnikov,,RUS,23/11/2022
+world,,open,,male,25m,breaststroke,100m,55.28,Ilya Shymanovich,,BLR,26/11/2021
+world,,open,,male,25m,breaststroke,200m,01:59.52,Caspar Corbeau,,NED,25/10/2025
+world,,open,,male,25m,breaststroke,50m,24.95,Emre Sakci,,TUR,27/12/2021
+world,,open,,male,25m,butterfly,100m,47.68,Josh Liendo,,CAN,23/10/2025
+world,,open,,male,25m,butterfly,200m,01:46.85,Tomoru Honda,,JPN,22/10/2022
+world,,open,,male,25m,butterfly,50m,21.32,Noe Ponti,,SUI,11/12/2024
+world,,open,,male,25m,freestyle,100m,44.84,Kyle Chalmers,,AUS,29/10/2021
+world,,open,,male,25m,freestyle,1500m,14:06.88,Florian Wellbrock,,GER,21/12/2021
+world,,open,,male,25m,freestyle,200m,01:38.61,Luke Hobson,,USA,15/12/2024
+world,,open,,male,25m,freestyle,400m,03:32.25,Yannick Agnel,,FRA,15/11/2012
+world,,open,,male,25m,freestyle,4X100m,03:01.66,"Chris Guiliano, Jack Alexy, Kieran Smith, Luke Hobson",,USA,10/12/2024
+world,,open,,male,25m,freestyle,4X200m,06:40.51,"Carson Foster, Kieran Smith, Luke Hobson, Shaine Casas",,USA,13/12/2024
+world,,open,,male,25m,freestyle,4X50m,01:21.80,"Caeleb Dressel, Jack Conger, Michael Chadwick, Ryan Held",,USA,14/12/2018
+world,,open,,male,25m,freestyle,50m,19.90,Jordan Crooks,,CAY,14/12/2024
+world,,open,,male,25m,freestyle,800m,07:20.46,Daniel Wiffen,,IRL,10/12/2023
+world,,open,,male,25m,individual_medley,100m,49.28,Caeleb Dressel,,USA,22/11/2020
+world,,open,,male,25m,individual_medley,200m,01:48.88,Leon Marchand,,FRA,01/11/2024
+world,,open,,male,25m,individual_medley,400m,03:54.81,Daiya Seto,,JPN,20/12/2019
+world,,open,,male,25m,individual_medley,4X100m,03:18.68,"Andrei Minakov, Egor Kornev, Kirill Prigoda, Miron Lifintsev",,NAB,15/12/2024
+world,,open,,male,25m,individual_medley,4X50m,01:29.72,"Leonardo Deplano, Lorenzo Mora, Matteo Rivolta, Nicolo Martinenghi",,ITA,17/12/2022
+world,,open,,male,50m,backstroke,100m,51.60,Thomas Ceccon,,ITA,20/06/2022
+world,,open,,male,50m,backstroke,200m,01:51.92,Aaron Peirsol,,USA,31/07/2009
+world,,open,,male,50m,backstroke,50m,23.55,Kliment Kolesnikov,,RUS,27/07/2023
+world,,open,,male,50m,breaststroke,100m,56.88,Adam Ramsay-peaty,,GBR,21/07/2019
+world,,open,,male,50m,breaststroke,200m,02:05.48,Haiyang Qin,,CHN,28/07/2023
+world,,open,,male,50m,breaststroke,50m,25.95,Adam Ramsay-peaty,,GBR,25/07/2017
+world,,open,,male,50m,butterfly,100m,49.45,Caeleb Dressel,,USA,31/07/2021
+world,,open,,male,50m,butterfly,200m,01:50.34,Kristof Milak,,HUN,21/06/2022
+world,,open,,male,50m,butterfly,50m,22.27,Andrii Govorov,,UKR,01/07/2018
+world,,open,,male,50m,freestyle,100m,46.40,Zhanle Pan,,CHN,31/07/2024
+world,,open,,male,50m,freestyle,1500m,14:26.79,Johannes Wilhel Liebmann,,GER,15/08/2026
+world,,open,,male,50m,freestyle,200m,01:42.00,Paul Biedermann,,GER,28/07/2009
+world,,open,,male,50m,freestyle,400m,03:39.96,Lukas Maertens,,GER,12/04/2025
+world,,open,,male,50m,freestyle,4X100m,03:08.24,"Cullen Jones, Garrett Weber-gale, Jason Lezak, Michael Phelps",,USA,11/08/2008
+world,,open,,male,50m,freestyle,4X200m,06:58.55,"David Walters, Michael Phelps, Richard Berens, Ryan Lochte",,USA,31/07/2009
+world,,open,,male,50m,freestyle,50m,20.88,Cameron Mcevoy,,AUS,20/03/2026
+world,,open,,male,50m,freestyle,800m,07:32.12,Lin Zhang,,CHN,29/07/2009
+world,,open,,male,50m,individual_medley,200m,01:52.69,Leon Marchand,,FRA,30/07/2025
+world,,open,,male,50m,individual_medley,400m,04:02.50,Leon Marchand,,FRA,23/07/2023
+world,,open,,male,50m,individual_medley,4X100m,03:26.78,"Caeleb Dressel, Michael Andrew, Ryan Murphy, Zach Apple",,USA,01/08/2021
+world,,open,,mixed,25m,freestyle,4X50m,01:27.26,"Leonardo Deplano, Lorenzo Zazzeri, Sara Curtis, Silvia Di Pietro",,ITA,04/12/2025
+world,,open,,mixed,25m,individual_medley,4X50m,01:35.15,"Kate Douglass, Nic Fink, Ryan Murphy, Torri Huske",,USA,14/12/2022
+world,,open,,mixed,50m,freestyle,4X100m,03:18.48,"Jack Alexy, Kate Douglass, Patrick Sammon, Torri Huske",,USA,02/08/2025
+world,,open,,mixed,50m,individual_medley,4X100m,03:36.70,"Gretchen Walsh, Kate Douglass, Van Mathias, Will Modglin",,USA,12/08/2026

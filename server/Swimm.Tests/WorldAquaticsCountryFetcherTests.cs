@@ -30,7 +30,7 @@ public class WorldAquaticsCountryFetcherTests(Xunit.Abstractions.ITestOutputHelp
             ("Men's 100m Backstroke", "NR", "55.02", "BROWN Bob", "", "M", "Great Britain"),
             // Чужая федерация в отчёте страны — тоже в отчёт, а не в базу.
             ("Women's 200m Butterfly", "NR", "2:10.44", "DOE Ann", "USA", "W", "Anguilla"),
-            // Микст-эстафета вне модели осей Record — молча мимо, это не находка.
+            // Смешанная эстафета — рекорд страны с полом mixed (Э3 плана records-relays-plan).
             ("Mixed 4x100m Freestyle Relay", "NR", "3:30.01", "", "AGU", "X", "Anguilla"))),
         Ok(Report("LCM",
             ("Men's 200m Breaststroke", "NR, WR", "2:05.48", "ROE Rob", "AGU", "M", "Anguilla"))));
@@ -43,7 +43,7 @@ public class WorldAquaticsCountryFetcherTests(Xunit.Abstractions.ITestOutputHelp
         var result = await Fetcher(handler).FetchAsync(Anguilla);
 
         Assert.Equal("AGU", result.Code);
-        Assert.Equal(2, result.Records.Count);
+        Assert.Equal(3, result.Records.Count);
         Assert.All(result.Records, r =>
         {
             Assert.Equal("country", r.RegionType);
@@ -55,7 +55,7 @@ public class WorldAquaticsCountryFetcherTests(Xunit.Abstractions.ITestOutputHelp
         });
 
         // Бассейн — из колонки Pool каждой строки: SCM = 25m, LCM = 50m.
-        var free = Assert.Single(result.Records, r => r.Style == "freestyle");
+        var free = Assert.Single(result.Records, r => r is { Style: "freestyle", Gender: "female" });
         Assert.Equal("25m", free.PoolType);
         Assert.Equal("50m", free.Distance);
         Assert.Equal("female", free.Gender);
@@ -67,6 +67,11 @@ public class WorldAquaticsCountryFetcherTests(Xunit.Abstractions.ITestOutputHelp
         Assert.Equal("50m", breast.PoolType);
         Assert.Equal("200m", breast.Distance);
         Assert.Equal("AGU", breast.RegionCode);
+
+        // Парсер пишет «mix», в справочник уходит «mixed» — и только у эстафеты.
+        var mixed = Assert.Single(result.Records, r => r.Gender == "mixed");
+        Assert.Equal(("25m", "freestyle", "4X100m", "3:30.01"),
+            (mixed.PoolType, mixed.Style, mixed.Distance, mixed.Time));
     }
 
     [Fact]
@@ -93,8 +98,8 @@ public class WorldAquaticsCountryFetcherTests(Xunit.Abstractions.ITestOutputHelp
 
         // Ни одна отброшенная строка не должна была просочиться под кодом AGU.
         Assert.DoesNotContain(result.Records, r => r.Style is "backstroke" or "butterfly");
-        // Микст-эстафета — не находка: она вне модели, а не «чужая страна».
-        Assert.DoesNotContain(result.Mismatches, m => m.Gender == "mix");
+        // Смешанная эстафета своей страны — не находка «чужая страна».
+        Assert.DoesNotContain(result.Mismatches, m => m.Gender is "mix" or "mixed");
     }
 
     [Fact]

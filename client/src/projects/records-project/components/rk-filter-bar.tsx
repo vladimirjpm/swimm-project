@@ -2,7 +2,7 @@ import React from 'react';
 import FilterBar, { type FilterBarChip } from '../../components/filter-section/filter-bar';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import UI_PoolIcon from '../../components/mix/pool-icon/pool-icon';
-import { strokeByKey, type RkFilters } from '../rk-disciplines';
+import { genderLabel, strokeByKey, type RkFilters } from '../rk-disciplines';
 
 /**
  * Полоса выбранного на `/records` — ТОТ ЖЕ общий `FilterBar`, что на results, `/season-best`
@@ -16,8 +16,15 @@ import { strokeByKey, type RkFilters } from '../rk-disciplines';
  *
  * Чипы здесь всегда выбраны, кроме Age group: у дисциплины пол, бассейн, стиль и дистанция
  * обязаны иметь значение — «все стили сразу» страница не показывает.
+ *
+ * `ageBand` — таб World Junior: там возраст не выбирают, он задан самим эталоном (WJR один
+ * на полосу ж 14–17 / м 15–18). Чип тогда называется «Age band» и всегда выбран — это
+ * главная оговорка экрана, а не фильтр.
  */
-const RkFilterBar: React.FC<{ filters: RkFilters; className?: string }> = ({ filters, className }) => {
+const RkFilterBar: React.FC<{ filters: RkFilters; className?: string; ageBand?: string | null }> = ({
+  filters, className, ageBand,
+}) => {
+  const age = ageBand ? ageBand.replace('-', '–') : filters.ageGroup;
   const strokeLabel = strokeByKey(filters.stroke)?.label ?? filters.stroke ?? '';
   // Иконка несёт дистанцию сама — подпись стиля рядом с ней была бы тем же самым словом
   // дважды. Ширины те же, что у чипа Event на results.
@@ -56,30 +63,30 @@ const RkFilterBar: React.FC<{ filters: RkFilters; className?: string }> = ({ fil
       active: true,
       value: (
         <span className="text-2xl font-extrabold leading-none text-[var(--deep-text)]">
-          {filters.gender === 'female' ? 'Women' : 'Men'}
+          {genderLabel(filters.gender, true)}
         </span>
       ),
       valueCompact: (
         <span className="text-[16px] font-extrabold leading-[1.2] text-[var(--deep-accent)]">
-          {filters.gender === 'female' ? 'Women' : 'Men'}
+          {genderLabel(filters.gender, true)}
         </span>
       ),
     },
     {
       key: 'age',
-      label: 'Age group',
+      label: ageBand ? 'Age band' : 'Age group',
       shortLabel: 'Age',
       // Единственный чип, который бывает невыбранным: «All» здесь осмысленно — показаны все
       // полосы сразу, и именно так таб открывается.
-      active: !!filters.ageGroup,
+      active: !!age,
       value: (
         <span className="text-2xl font-extrabold leading-none text-[var(--deep-text)]">
-          {filters.ageGroup}
+          {age}
         </span>
       ),
       valueCompact: (
         <span className="text-[16px] font-extrabold leading-[1.2] text-[var(--deep-accent)]">
-          {filters.ageGroup}
+          {age}
         </span>
       ),
     },

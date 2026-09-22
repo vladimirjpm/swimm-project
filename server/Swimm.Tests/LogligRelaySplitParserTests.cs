@@ -187,7 +187,7 @@ public class LogligRelaySplitParserTests
 
         // Микст: пол none, категория mix-<полоса>, 1-е место в mix-160-199.
         var mixed = rows.Single(r => (string?)r!["time"] == "01:58.43")!;
-        Assert.Equal(("none", "mix-160-199", 1),
+        Assert.Equal(("mixed", "mix-160-199", 1), // Э4: смешанная — mixed, не «неизвестен»
             ((string?)mixed["event_style_gender"], (string?)mixed["event_category"], (int?)mixed["position"]));
 
         // DQ — без места, статус в time_fail_note.
@@ -212,7 +212,7 @@ public class LogligRelaySplitParserTests
     [Theory]
     [InlineData("מאסטרס נ 21-99", "female")]
     [InlineData("מאסטרס ג 21-99", "male")]
-    [InlineData("מיקס מיקס 21-99", "none")]
+    [InlineData("מיקס מיקס 21-99", "mixed")] // Э4
     [InlineData("בנות 11-12", "female")]
     public void RelayGender_ReadsGenderWordAnywhereInCategory(string category, string expected)
     {

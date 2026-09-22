@@ -430,6 +430,12 @@ public class IsrOrgAgeRecordsParser : IFormatParser
         var dataRows = parsedRows.Where(p => p.HasTime).ToList();
         var blockOf = AssignBlocks(dataRows);
         var blockChannel = new Dictionary<int, (string dist, string style, bool isRelay)>();
+        // Пол — тоже ОДИН НА БЛОК, по его центру (22.09.2026, records-relays-plan Э3). Метка пола —
+        // объединённая ячейка по центру своей группы, и построчный «ближайший маркер» на краю
+        // ошибался так же, как дистанция выше: первая строка мужского блока 4×100 компл. (03:32.04,
+        // «ישראל») оказывалась ближе к метке «מיקס» из конца блока 4×50 и уезжала в смешанные.
+        // Половая группа таблицы — это и есть блок: возрастная лестница в ней начинается заново.
+        var blockGender = new Dictionary<int, string>();
 
         foreach (var grp in dataRows.Select((pr, i) => (pr, block: blockOf[i])).GroupBy(x => x.block))
         {
@@ -441,6 +447,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             var (d, dRelay) = ResolveChannel(centerY, fwdDist[mid.Index], bwdDist[mid.Index]);
             var (s, sRelay) = ResolveChannel(centerY, fwdStyle[mid.Index], bwdStyle[mid.Index]);
             blockChannel[grp.Key] = (d, s, dRelay || sRelay);
+            blockGender[grp.Key] = DetermineGender(centerY, genderMarkers);
 
             Log($"  BLOCK[{grp.Key}]: rows {rows.First().Index}..{rows.Last().Index}, " +
                 $"centerY={centerY:F0} -> dist={d}, style={s}, relay={dRelay || sRelay}");
@@ -457,8 +464,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             var ageCategory = ExtractAgeCategory(pr.AgeRaw);
             var (swimmerName, club) = SplitNameAndClub(pr.NameWords, pr.ClubWords, pr.RowLayout);
 
-            // Gender: nearest marker
-            string gender = DetermineGender(pr.YCenter, genderMarkers);
+            string gender = blockGender[blockOf[di]];
 
             var (distance, style, isRelay) = blockChannel[blockOf[di]];
 
@@ -488,9 +494,12 @@ public class IsrOrgAgeRecordsParser : IFormatParser
     /// <summary>
     /// Режет строки данных на блоки по возрастной последовательности: внутри блока
     /// возраст убывает (ISR/bogrim, затем 18, 17 … 10), поэтому блок начинается там,
-    /// где последовательность рестартует — встретился ISR/bogrim или возраст не меньше
-    /// предыдущего. Возвращает номер блока для каждой строки (по позиции в списке).
+    /// где последовательность рестартует — встретился ISR/bogrim или возраст вырос
+    /// (равный возраст — две подкатегории одной ступени, блок тот же). Возвращает номер блока для каждой строки (по позиции в списке).
     /// </summary>
+    /// <summary>Скачок Y больше этого — граница страницы (между страницами PageGap = 10000).</summary>
+    private const double PageBreakGap = 5000;
+
     private static int[] AssignBlocks(List<ParsedRow> dataRows)
     {
         var result = new int[dataRows.Count];
@@ -507,10 +516,21 @@ public class IsrOrgAgeRecordsParser : IFormatParser
             if (i > 0)
             {
                 bool restart =
+                    // Разрыв страницы — всегда новый блок (страницы разнесены по Y на PageGap).
+                    // Иначе последняя строка страницы «ישראל» (смешанная 4×200, 07:32.96) и
+                    // первая «ישראל» следующей шли как «две головы одного блока» и слипались с
+                    // мужским блоком 4×50 компл. — центр блока падал между страниц (22.09.2026).
+                    Math.Abs(dataRows[i].YCenter - dataRows[i - 1].YCenter) > PageBreakGap
                     // ISR/bogrim открывает блок — но не когда их несколько подряд в шапке блока
-                    (isHeadCategory && !prevWasHeadCategory)
-                    // возраст перестал убывать
-                    || (isNumeric && prevAge.HasValue && ageNum >= prevAge.Value);
+                    // («ישראל», за ним «בוגרים - אגודות»)
+                    || (isHeadCategory && !prevWasHeadCategory)
+                    // …а «ישראל» открывает блок ВСЕГДА: две «ישראל» подряд — это две группы
+                    // (одинокая смешанная 4×200 перед мужским блоком 4×50 компл., 22.09.2026)
+                    || (age == "israel" && prevWasHeadCategory)
+                    // возраст вырос. РАВНЫЙ возраст — не рестарт: у эстафет «גיל 15 - גילאים» и
+                    // «גיל 15 - אגודות» идут подряд в одной группе, и «>=» резал женский блок
+                    // надвое — хвост уезжал к метке пола соседней группы (22.09.2026).
+                    || (isNumeric && prevAge.HasValue && ageNum > prevAge.Value);
                 if (restart) block++;
             }
 

@@ -323,9 +323,14 @@ export function parseSeasonBestQuery(search: string = window.location.search): S
  * же состоянием, и первое же изменение дефолта переписало бы чужие ссылки.
  */
 /** Табы страницы `/records`. `countries` — рейтинг стран, он же вид по умолчанию. */
-export type RecordsTab = 'countries' | 'world' | 'masters';
+export type RecordsTab = 'countries' | 'world' | 'masters' | 'junior';
 
-const RECORDS_TABS: readonly RecordsTab[] = ['countries', 'world', 'masters'];
+const RECORDS_TABS: readonly RecordsTab[] = ['countries', 'world', 'masters', 'junior'];
+
+/** Пол дисциплины справочника рекордов: mixed — смешанная эстафета (Э2, records-relays-plan). */
+export type RecordGender = 'male' | 'female' | 'mixed';
+const isRecordGender = (g: string | null): g is RecordGender =>
+  g === 'male' || g === 'female' || g === 'mixed';
 
 export interface RecordsQuery {
   /** Незнакомое значение в адресе даёт `countries`, а не пустую страницу. */
@@ -333,7 +338,7 @@ export interface RecordsQuery {
   stroke: string | null;
   /** Как в справочнике: «50m», «4X100m» (заглавная X у эстафет — форма базы). */
   distance: string | null;
-  gender: 'male' | 'female' | null;
+  gender: RecordGender | null;
   poolType: '25m' | '50m' | null;
   /** Страна для подсветки строки (alpha-3). */
   highlight: string | null;
@@ -355,7 +360,7 @@ export function parseRecordsQuery(search: string = window.location.search): Reco
     // Форма справочника: «4x50m» из чужой ссылки обязан найтись как «4X50m» (то же
     // приведение, что в серверном RecordRankingQuery.Create).
     distance: distance ? distance.toLowerCase().replace(/x/g, 'X') : null,
-    gender: gender === 'male' || gender === 'female' ? gender : null,
+    gender: isRecordGender(gender) ? gender : null,
     poolType: pool === '25m' || pool === '50m' ? pool : null,
     highlight: (p.get('country') || '').trim().toUpperCase() || null,
     ageGroup: /^\d{2,3}-\d{2,3}$/.test((p.get('age') ?? '').trim()) ? p.get('age')!.trim() : null,
@@ -373,7 +378,7 @@ export interface RecordsCompareQuery {
   a: string | null;
   b: string | null;
   poolType: '25m' | '50m' | null;
-  gender: 'male' | 'female' | null;
+  gender: RecordGender | null;
 }
 
 export function parseRecordsCompareQuery(search: string = window.location.search): RecordsCompareQuery {
@@ -392,7 +397,7 @@ export function parseRecordsCompareQuery(search: string = window.location.search
     a,
     b: b != null && b === a ? null : b,
     poolType: pool === '25m' || pool === '50m' ? pool : null,
-    gender: gender === 'male' || gender === 'female' ? gender : null,
+    gender: isRecordGender(gender) ? gender : null,
   };
 }
 

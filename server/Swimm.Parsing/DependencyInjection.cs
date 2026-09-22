@@ -76,6 +76,7 @@ public static class DependencyInjection
         services.AddSingleton<IRecordSourceProvider, IsrOrgAgeRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, IsrOrgMastersRecordsSourceProvider>();
         services.AddSingleton<IRecordSourceProvider, WaMastersRecordsSourceProvider>();
+        services.AddSingleton<IRecordSourceProvider, WaJuniorRecordsSourceProvider>();
 
         return services;
     }

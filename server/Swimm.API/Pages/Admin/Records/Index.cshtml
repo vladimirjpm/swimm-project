@@ -101,6 +101,7 @@
                 <select id="ni-gender" class="admin-input">
                     <option value="male">male</option>
                     <option value="female">female</option>
+                    <option value="mixed">mixed (relay)</option>
                 </select>
             </label>
             <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Pool
@@ -249,6 +250,7 @@ else if (Model.Tab == "records")
                 <option value="">Все</option>
                 <option value="male" selected="@(Model.Gender == "male")">male</option>
                 <option value="female" selected="@(Model.Gender == "female")">female</option>
+                <option value="mixed" selected="@(Model.Gender == "mixed")">mixed</option>
             </select>
         </label>
         <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
@@ -296,6 +298,7 @@ else if (Model.Tab == "records")
                 <select id="nr-gender" class="admin-input">
                     <option value="male">male</option>
                     <option value="female">female</option>
+                    <option value="mixed">mixed (relay)</option>
                 </select>
             </label>
             <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">Pool

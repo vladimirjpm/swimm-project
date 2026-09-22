@@ -445,7 +445,10 @@
 .h2h-time--left .h2h-time__who { justify-content: flex-end; }
 .h2h-time__flag { width: 16px; height: 12px; border-radius: 2px; flex: none; object-fit: cover; }
 .h2h-time__extra { margin-top: 3px; }
-.h2h-badge--relay {
+/* Полоса World Junior («Ages 14–17») — тот же нейтральный вид, что у «Relay lead-off»:
+   это пояснение к времени, а не награда. */
+.h2h-badge--relay,
+.h2h-badge--band {
   color: var(--deep-text-mute); border: 1px solid var(--deep-card-border);
   border-radius: var(--deep-radius-pill); padding: 1px 7px;
   font-size: 9.5px; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap;

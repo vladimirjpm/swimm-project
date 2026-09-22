@@ -126,6 +126,8 @@ public class SwimmersPublicController : ControllerBase
                 ? null
                 : new SwimmerWorldRecordDto
                 {
+                    Kind = r.WorldRecord.Kind,
+                    Band = r.WorldRecord.Band,
                     Time = r.WorldRecord.Time,
                     Date = r.WorldRecord.Date,
                     Holder = r.WorldRecord.Holder,

@@ -70,6 +70,26 @@ public static class WorldAquaticsSource
     public static Uri ReportUrl(string query) =>
         EnsureWhitelisted($"https://{ApiHost}/fina/records/report?{query}");
 
+    /// <summary>
+    /// URL JSON-выдачи рекордов — той, что питает страницу worldaquatics.com/swimming/records
+    /// (<c>/fina/records/SW</c>, SW — плавание). Нужна для кодов, которые XLSX-отчёт не
+    /// собирает за таймаут шлюза: <c>WJ</c> там — 504 (WJR-план, J0).
+    /// </summary>
+    /// <summary>
+    /// Пол строки парсера рекордов → пол справочника; null — строка в справочник не идёт.
+    /// Парсеры пишут смешанные как «mix» (на эту форму завязаны сверки), справочник — «mixed», и
+    /// только у эстафеты (Э3 плана records-relays-plan, 22.09.2026). Одно место на всех
+    /// читателей: WR-провайдер, мировые и национальные строки фетчера, <c>isrorg-age</c>.
+    /// </summary>
+    public static string? RecordGender(string? parserGender, string distance)
+    {
+        var gender = parserGender == "mix" ? "mixed" : parserGender;
+        return Swimm.Domain.Entities.Record.ValidateGender(gender, distance) is null ? gender : null;
+    }
+
+    public static Uri RecordsJsonUrl(string query) =>
+        EnsureWhitelisted($"https://{ApiHost}/fina/records/SW?{query}");
+
     /// <summary>Список стран источника: GUID ↔ alpha-3 (11.1.1).</summary>
     public static Uri CountriesUrl => EnsureWhitelisted($"https://{ApiHost}/fina/countries");
 

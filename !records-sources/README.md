@@ -53,8 +53,9 @@ CSV — наша интерпретация, PDF — первоисточник.
 <источник>__fetched-<дата скачивания>.csv
 ```
 
-- **источник** — ключ `IRecordSourceProvider`: `wa-masters`, `isrorg-masters`, `isrorg-age`,
-  `worldrecords`.
+- **источник** — ключ `IRecordSourceProvider`: `wa-masters`, `wa-junior`, `isrorg-masters`,
+  `isrorg-age`, `worldrecords`. У `wa-junior` сырьё — JSON (`wa-junior-<пол>-<бассейн>`), даты
+  справочника у источника нет, поэтому `__source-` в имени нет.
 - **бассейн** — `lcm`/`50m` длинная, `scm`/`25m` короткая. У CSV его нет: провайдер тянет оба
   файла разом, и выгрузка у него одна на источник.
 - **source** — дата САМОГО справочника, как её объявляет источник: «as of 01.09.2026» в подписи
@@ -94,6 +95,7 @@ dotnet run --project server/Swimm.API -- --records-dump <источник> <пу
 | файл | URL |
 |---|---|
 | `wa-masters-lcm` / `wa-masters-scm` | страница-оглавление [worldaquatics.com/masters/records](https://www.worldaquatics.com/masters/records) → «Masters World Records - LCM/SCM». Прямой адрес содержит дату и GUID и протухает при каждом обновлении |
+| `wa-junior-{f,m}-{lcm,scm}` (`.json`) | JSON-эндпоинт страницы [worldaquatics.com/swimming/records](https://www.worldaquatics.com/swimming/records) (Record Type = World Junior): `api.worldaquatics.com/fina/records/SW?recordCode=WJ&gender=F\|M&pool=LCM\|SCM`. Сырые ответы, по файлу на пол×бассейн (J0, 21.09.2026). ⚠ XLSX-отчёт `/fina/records/report?recordCode=WJ` не годится — 504 |
 | `isrorg-age-25m` / `isrorg-age-50m` | страница [«שיאי ישראל»](https://isr.org.il/data.asp?id=1013), ссылки «שיאי ישראל בוגרים ונוער» |
 | `isrorg-masters-50m` | та же страница, ссылка «שיאי מאסטרס: בריכת 50 מטר» |
 | `isrorg-masters-25m` | **со страницы не резолвится**: ссылка «שיאי מאסטרס: בריכת 25 מטר» ведёт на файл длинной воды и не-мастерс (И-15). Адрес найден через архив Wayback и прописан вручную в `RecordsImport:IsrOrgMastersRecordsUrl25m` |
@@ -134,6 +136,12 @@ dotnet run --project server/Swimm.API -- --records-dump <источник> <пу
 | источник | строк | примечание |
 |---|---|---|
 | `worldrecords-countries` | 13 904 | 214 стран + мировые, 0 упавших, 50 минут. Изменившихся 1650 — **все до одной эстафеты и ни у одной не изменились время или дата**: это разовая нормализация состава, а не правка источника. Новых строк ноль, пропавших ноль |
+
+**Прогон 21.09.2026** (`--records-refresh --source wa-junior`):
+
+| источник | строк | примечание |
+|---|---|---|
+| `wa-junior` | 70 (74 в выдаче) | первый импорт оси `world/junior`, все строки новые, находок сторожа нет; 8 эстафетных пропущено. Сырьё — 4 JSON того же дня (J0), выгрузка — `wa-junior__fetched-2026-09-21.csv` |
 
 `worldrecords` PDF не имеет: у него источник — XLSX-отчёты API, а не публикуемый файл.
 Его выгрузку собирает тем же `--records-dump` (мировые + Израиль) либо, для прогона по странам,

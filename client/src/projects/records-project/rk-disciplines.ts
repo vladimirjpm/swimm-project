@@ -9,11 +9,14 @@
  * а не ошибку.
  */
 
+import type { RecordGender } from '../../utils/routes';
+import { genderLabel } from '../../utils/helpers/helper-gender';
+
 export interface RkFilters {
   stroke: string | null;
   /** Форма справочника: «50m», «4X100m» (заглавная X у эстафет). */
   distance: string | null;
-  gender: 'male' | 'female' | null;
+  gender: RecordGender | null;
   poolType: '25m' | '50m' | null;
   /** Какую страну подсветить; на состав рейтинга не влияет. */
   highlight: string | null;
@@ -66,6 +69,9 @@ export const strokeByKey = (key: string | null) =>
 /** «4X100m» → «4×100m»: латинская X в справочнике машинная, на витрине нужен знак умножения. */
 export const distanceLabel = (distance: string) => distance.replace(/X/g, '×');
 
+/** Подпись пола — общая для сайта, живёт в `helper-gender.ts` (нужна и странице пловца). */
+export { genderLabel } from '../../utils/helpers/helper-gender';
+
 export const isRelay = (distance: string | null) => Boolean(distance && /^4X/i.test(distance));
 
 /** «individual_medley» → «Medley»; неизвестный ключ печатаем как есть, без подчёркиваний. */
@@ -80,7 +86,7 @@ export function disciplineLabel(f: Pick<RkFilters, 'stroke' | 'distance' | 'gend
   const parts = [strokeLabel(f.stroke), f.distance ? distanceLabel(f.distance) : null]
     .filter(Boolean).join(' ');
   const pool = f.poolType ? `${f.poolType} pool` : null;
-  const who = f.gender === 'female' ? 'women' : f.gender === 'male' ? 'men' : null;
+  const who = f.gender ? genderLabel(f.gender) : null;
   return [parts, pool, who].filter(Boolean).join(' · ');
 }
 

@@ -284,16 +284,31 @@ public sealed class SwimmerHeldRecordDto
     public SwimmerHeldRecordMeetDto? Meet { get; set; }
 
     /// <summary>
-    /// Мировой рекорд мастерс той же ступени — правая сторона карточки. null у немастерских
-    /// рекордов: справочника мировых по юношеским возрастам нет, правая сторона пустая.
+    /// Мировой эталон — правая сторона карточки: мировой рекорд мастерс той же ступени или
+    /// World Junior Record, если возраст рекорда в полосе WJR (<c>kind</c>). null — эталона нет:
+    /// возраст вне полосы WJR (10–13, 18 у девушек, 14 у юношей) или абсолютный рекорд страны.
     /// </summary>
     [JsonPropertyName("worldRecord")]
     public SwimmerWorldRecordDto? WorldRecord { get; set; }
 }
 
-/// <summary>Мировой рекорд мастерс — см. <see cref="SwimmerHeldRecordDto.WorldRecord"/>.</summary>
+/// <summary>Мировой эталон рекорда — см. <see cref="SwimmerHeldRecordDto.WorldRecord"/>.</summary>
 public sealed class SwimmerWorldRecordDto
 {
+    /// <summary>
+    /// Вид эталона: <c>masters</c> | <c>junior</c>. От него подпись витрины: «Masters WR» или
+    /// «World Junior» — не «WR», иначе WJR читается как мировой рекорд возраста (его нет).
+    /// </summary>
+    [JsonPropertyName("kind")]
+    public string Kind { get; set; } = "masters";
+
+    /// <summary>
+    /// Полоса WJR («14-17» / «15-18»), только у <c>junior</c>: одно время стоит против
+    /// нескольких ступеней, и витрина обязана показать, против какой полосы сравнивали.
+    /// </summary>
+    [JsonPropertyName("band")]
+    public string? Band { get; set; }
+
     /// <summary>Время как напечатано в справочнике.</summary>
     [JsonPropertyName("time")]
     public string Time { get; set; } = string.Empty;

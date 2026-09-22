@@ -43,6 +43,24 @@ public class RecordsController : ControllerBase
     }
 
     /// <summary>
+    /// Когда справочник сверяли с каждым источником — подпись «checked …» на витрине
+    /// (docs/plans/records-freshness-plan.md, U5). Дата ПО КАЖДОМУ источнику, не свёрнутый
+    /// минимум: сворачивать (по табу `/records`, по карточкам пловца) — дело клиента.
+    ///
+    /// Наружу — только даты: текст сбоев и «ждёт Apply» остаются админке. Журнал — Sys_-таблица
+    /// вне грантов swimm_ro, поэтому читает его сервис, а не публичный read-контекст.
+    /// Серверного кэша нет (пять источников — три лёгких запроса на каждый), браузер
+    /// ревалидирует каждый раз: дата должна сдвинуться сразу после «Проверить все».
+    /// </summary>
+    [HttpGet("/api/records/freshness")]
+    public async Task<IActionResult> GetFreshness([FromServices] IRecordSourceCheckService checks)
+    {
+        var all = await checks.GetFreshnessAsync(HttpContext.RequestAborted);
+        Response.Headers.CacheControl = "public, no-cache";
+        return Ok(all.Select(f => new { source = f.Source, checkedAt = f.CheckedAt, changedAt = f.ChangedAt }));
+    }
+
+    /// <summary>
     /// Рекорды региона. region обязателен (world | код континента | код страны),
     /// category: open/age/junior/masters (опционально).
     /// </summary>
@@ -96,8 +114,8 @@ public class RecordsController : ControllerBase
             return BadRequest("style and distance are required, e.g. ?style=freestyle&distance=50m");
 
         var genderKey = (gender ?? "").Trim().ToLowerInvariant();
-        if (genderKey is not ("male" or "female"))
-            return BadRequest("gender is required and must be 'male' or 'female'");
+        if (genderKey.Length == 0 || Record.ValidateGender(genderKey, distance) is not null)
+            return BadRequest("gender is required: 'male', 'female', or 'mixed' (relay distances only)");
 
         var poolKey = (pool ?? "").Trim().ToLowerInvariant();
         if (poolKey is not ("25m" or "50m"))
@@ -161,8 +179,8 @@ public class RecordsController : ControllerBase
         if (pool != null && pool.Trim().ToLowerInvariant() is not ("25m" or "50m" or ""))
             return BadRequest("pool must be '25m' or '50m' when given");
 
-        if (gender != null && gender.Trim().ToLowerInvariant() is not ("male" or "female" or ""))
-            return BadRequest("gender must be 'male' or 'female' when given");
+        if (gender != null && gender.Trim().ToLowerInvariant() is not ("male" or "female" or "mixed" or ""))
+            return BadRequest("gender must be 'male', 'female' or 'mixed' when given");
 
         var query = RecordCompareQuery.Create(a, b, pool, gender);
 

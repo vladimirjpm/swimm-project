@@ -747,7 +747,12 @@ public class JsonImportService : IImportService
                     Gallery = gallery,  // EF Core inserts Gallery + GalleryItems and sets GalleryId
                     CompetitionDate = ParseDate(item.Date),
                     Distance = item.EventStyleLen ?? string.Empty,
-                    Gender = ResolveResultGender(item.EventStyleGender, swimmer, item.IsRelay == true),
+                    // Эстафета с неизвестным полом и смешанным составом — mixed (Э4); ключ
+                    // upsert это не ломает: ResultMatcher.KeyGender считает none и mixed одним.
+                    Gender = relay != null
+                        ? RelayGender.Resolve(item.EventStyleGender, relay.Members.Select(m =>
+                            swimmerCache.Values.FirstOrDefault(s => s.Id == m.SwimmerId)?.Gender))
+                        : ResolveResultGender(item.EventStyleGender, swimmer, false),
                     AgeGroup = item.AgeGroup ?? string.Empty,
                     EventStyleAge = item.EventStyleAge ?? string.Empty,
                     EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
@@ -1591,7 +1596,7 @@ public class JsonImportService : IImportService
     /// </summary>
     private static string ResolveResultGender(string? eventGender, Swimmer swimmer, bool isRelay)
     {
-        if (isRelay) return eventGender ?? string.Empty;
+        if (isRelay) return eventGender ?? string.Empty; // mixed по составу — RelayGender.Resolve выше по потоку
         if (!string.IsNullOrWhiteSpace(eventGender) && !IsUnknownGender(eventGender))
             return eventGender;
         return swimmer.Gender ?? string.Empty;
@@ -1600,7 +1605,8 @@ public class JsonImportService : IImportService
     private static bool IsUnknownGender(string? gender) =>
         string.IsNullOrWhiteSpace(gender)
         || gender.Equals("none", StringComparison.OrdinalIgnoreCase)
-        || gender.Equals("mix", StringComparison.OrdinalIgnoreCase);
+        || gender.Equals("mix", StringComparison.OrdinalIgnoreCase)
+        || gender.Equals("mixed", StringComparison.OrdinalIgnoreCase); // смешанная эстафета — не пол пловца (Э4)
 
     private static void EnrichSwimmerFromResult(Swimmer swimmer, string? gender, Club? club, Country? country)
     {
@@ -1759,7 +1765,9 @@ public class JsonImportService : IImportService
 
             var changed = false;
 
-            if (string.IsNullOrEmpty(swimmer.Gender) && !string.IsNullOrWhiteSpace(latest.Gender))
+            // Только настоящий пол: «none» (неизвестен) и «mixed» (смешанная эстафета) — пол
+            // дисциплины, а не человека; в карточку пловца они не идут (Э4, records-relays-plan).
+            if (string.IsNullOrEmpty(swimmer.Gender) && latest.Gender is "male" or "female")
             {
                 swimmer.Gender = latest.Gender;
                 changed = true;

@@ -324,12 +324,22 @@
             только для информации.
         </div>
 
+        <!-- Свежесть справочника (records-freshness-plan U2/U4): «Проверить все» — fetch + dry-run
+             дифф каждого источника по очереди, в журнал Sys_RecordSourceChecks. Ничего не применяет. -->
+        <div class="flex flex-wrap items-center gap-3 mb-4">
+            <button id="rs-check-all-btn" class="admin-btn admin-btn-primary text-sm">🔎 Проверить все источники</button>
+            <span id="rs-check-all-status" class="text-xs text-admin-text-muted">
+                сходит в каждый источник и покажет, что изменилось; до 5 минут, World Aquatics медленный
+            </span>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             <div class="admin-card p-4 records-source-card" data-source="worldrecords">
                 <div class="text-2xl mb-1">🌍</div>
                 <div class="font-semibold text-admin-text mb-1">World Records</div>
                 <div class="text-xs text-admin-text-muted mb-2">api.worldaquatics.com · XLSX, 4 файла, авто</div>
                 <div class="text-xs text-admin-text-muted mb-3">Обновлено: <span class="rs-status" data-source="worldrecords">—</span></div>
+                <div class="text-[11px] text-admin-text-muted mb-2">Проверено: <span class="rs-checked" data-source="worldrecords">—</span></div>
                 <button class="admin-btn admin-btn-primary w-full text-sm rs-fetch-btn" data-source="worldrecords" data-pool-primary="25m">
                     ⬇ Fetch from URL
                 </button>
@@ -340,6 +350,7 @@
                 <div class="font-semibold text-admin-text mb-1">Masters World Records</div>
                 <div class="text-xs text-admin-text-muted mb-2">worldaquatics.com · PDF, личные дистанции (25-29…)</div>
                 <div class="text-xs text-admin-text-muted mb-1">Обновлено: <span class="rs-status" data-source="wa-masters">—</span></div>
+                <div class="text-[11px] text-admin-text-muted mb-2">Проверено: <span class="rs-checked" data-source="wa-masters">—</span></div>
                 <div class="text-[11px] text-admin-text-muted mb-3">Файлы: <span class="rs-links" data-source="wa-masters">ищу на сайте…</span></div>
                 <div class="flex gap-2 mb-2">
                     <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="wa-masters" data-pool-primary="50m">⬇ Fetch</button>
@@ -360,11 +371,37 @@
                 </div>
             </div>
 
+            <div class="admin-card p-4 records-source-card" data-source="wa-junior">
+                <div class="text-2xl mb-1">🌍</div>
+                <div class="font-semibold text-admin-text mb-1">World Junior Records</div>
+                <div class="text-xs text-admin-text-muted mb-2">api.worldaquatics.com · JSON, 4 запроса (ж 14-17, м 15-18), авто · до 3 мин</div>
+                <div class="text-xs text-admin-text-muted mb-3">Обновлено: <span class="rs-status" data-source="wa-junior">—</span></div>
+                <div class="text-[11px] text-admin-text-muted mb-2">Проверено: <span class="rs-checked" data-source="wa-junior">—</span></div>
+                <div class="flex gap-2 mb-2">
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="wa-junior" data-pool-primary="50m">⬇ Fetch</button>
+                    <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-file-toggle" data-source="wa-junior">📁 Файл</button>
+                </div>
+                <div class="rs-file-panel hidden space-y-2 mt-2" data-source="wa-junior">
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">JSON-ответ (пол и бассейн — внутри файла)</label>
+                        <input type="file" accept=".json" class="admin-input w-full text-xs rs-file-primary">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-admin-text-muted mb-0.5">Второй JSON (опц.)</label>
+                        <input type="file" accept=".json" class="admin-input w-full text-xs rs-file-secondary">
+                    </div>
+                    <button class="admin-btn admin-btn-primary w-full text-xs rs-parse-files-btn" data-source="wa-junior" data-pool-primary="50m">
+                        Разобрать файл(ы)
+                    </button>
+                </div>
+            </div>
+
             <div class="admin-card p-4 records-source-card" data-source="isrorg-age">
                 <div class="text-2xl mb-1">🇮🇱</div>
                 <div class="font-semibold text-admin-text mb-1">Age Records</div>
                 <div class="text-xs text-admin-text-muted mb-2">isr.org.il · PDF-протокол (10–18, national)</div>
                 <div class="text-xs text-admin-text-muted mb-1">Обновлено: <span class="rs-status" data-source="isrorg-age">—</span></div>
+                <div class="text-[11px] text-admin-text-muted mb-2">Проверено: <span class="rs-checked" data-source="isrorg-age">—</span></div>
                 <div class="text-[11px] text-admin-text-muted mb-3">Файлы: <span class="rs-links" data-source="isrorg-age">ищу на сайте…</span></div>
                 <div class="flex gap-2 mb-2">
                     <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="isrorg-age" data-pool-primary="25m">⬇ Fetch</button>
@@ -390,6 +427,7 @@
                 <div class="font-semibold text-admin-text mb-1">Masters Records</div>
                 <div class="text-xs text-admin-text-muted mb-2">isr.org.il · PDF-протокол (25-29…)</div>
                 <div class="text-xs text-admin-text-muted mb-1">Обновлено: <span class="rs-status" data-source="isrorg-masters">—</span></div>
+                <div class="text-[11px] text-admin-text-muted mb-2">Проверено: <span class="rs-checked" data-source="isrorg-masters">—</span></div>
                 <div class="text-[11px] text-admin-text-muted mb-3">Файлы: <span class="rs-links" data-source="isrorg-masters">ищу на сайте…</span></div>
                 <div class="flex gap-2 mb-2">
                     <button class="admin-btn admin-btn-ghost flex-1 text-xs rs-fetch-btn" data-source="isrorg-masters" data-pool-primary="50m">⬇ Fetch</button>
@@ -565,6 +603,7 @@
         if (!isCompetitions && !recordsStatusLoaded) {
             recordsStatusLoaded = true;
             loadRecordSourceStatus();
+            loadRecordSourceFreshness();
             loadRecordSourceLinks();
             loadCountriesCount();
         }
@@ -1171,6 +1210,7 @@
     const SOURCE_LABELS = {
         worldrecords: 'World Records',
         'wa-masters': 'Masters World Records',
+        'wa-junior': 'World Junior Records',
         'isrorg-age': 'Age Records',
         'isrorg-masters': 'Masters Records',
         // Не источник, а прогон по странам: дифф у него такой же, показывается тем же блоком.
@@ -1240,6 +1280,58 @@
         return m ? `${m[3]}/${m[2]}/${m[1]}` : String(d || '');
     }
 
+    // «3 дн. назад»; полная дата — в title. Свежесть из журнала проверок (U4).
+    function agoRu(iso) {
+        if (!iso) return 'ни разу';
+        const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+        return days <= 0 ? 'сегодня' : days === 1 ? 'вчера' : `${days} дн. назад`;
+    }
+
+    function loadRecordSourceFreshness() {
+        fetch('/api/admin/records/freshness', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : [])
+            .then(list => {
+                (list || []).forEach(f => {
+                    document.querySelectorAll(`.rs-checked[data-source="${f.source}"]`).forEach(el => {
+                        const parts = [agoRu(f.checkedAt)];
+                        if (f.appliedAt) parts.push(`применено ${fmtDate(f.appliedAt)}`);
+                        if (f.pendingAdded + f.pendingChanged > 0) parts.push(`ждёт Apply +${f.pendingAdded} / ~${f.pendingChanged}`);
+                        if (f.lastOutcome === 'failed') parts.push(`⚠ последняя попытка упала`);
+                        el.textContent = parts.join(' · ');
+                        el.title = [f.checkedAt ? `Последняя успешная проверка: ${new Date(f.checkedAt).toLocaleString('ru-RU')}` : '',
+                            f.lastError || ''].filter(Boolean).join('
+');
+                        // Жёлтым — пора проверить: старше 7 дней, ни разу или последняя попытка упала.
+                        el.classList.toggle('text-admin-warning', !!f.needsCheck);
+                    });
+                });
+            })
+            .catch(() => {});
+    }
+
+    document.getElementById('rs-check-all-btn').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        const status = document.getElementById('rs-check-all-status');
+        btn.disabled = true;
+        status.textContent = 'Проверяю источники по очереди…';
+        try {
+            const res = await fetch('/api/admin/records/check-all', {
+                method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            status.textContent = data.map(r => r.outcome === 'failed'
+                ? `${r.source}: ✗ ${r.error}`
+                : `${r.source}: ${r.added + r.changed > 0 ? `+${r.added} / ~${r.changed} — нажмите Fetch у карточки` : 'без изменений'}`)
+                .join(' · ');
+        } catch (err) {
+            status.textContent = `Ошибка: ${err.message}`;
+        } finally {
+            btn.disabled = false;
+            loadRecordSourceFreshness();
+        }
+    });
+
     function loadRecordSourceStatus() {
         fetch('/api/admin/records/source-status', { credentials: 'same-origin' })
             .then(r => r.ok ? r.json() : [])
@@ -1302,6 +1394,8 @@
             toast(e.message, 5000);
         } finally {
             card.querySelectorAll('button').forEach(b => b.disabled = false);
+            // Fetch — это проверка: журнал сдвинулся даже при ошибке (строка failed).
+            loadRecordSourceFreshness();
         }
     }
 
@@ -1538,6 +1632,7 @@
             recordsDiff.classList.add('hidden');
             currentDiffId = null;
             loadRecordSourceStatus();
+            loadRecordSourceFreshness();
         } catch (e) {
             toast(e.message, 5000);
         } finally {

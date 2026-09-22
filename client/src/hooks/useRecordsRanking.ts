@@ -10,6 +10,7 @@
  * Ответ кэшируется на сервере сутки и отдаётся с ETag, поэтому своего кэша тут нет.
  */
 import { useEffect, useState } from 'react';
+import type { RecordGender } from '../utils/routes';
 
 export interface RecordsRankingRow {
   rank: number;
@@ -49,7 +50,7 @@ export interface RecordsRankingResponse {
 export interface RecordsRankingQuery {
   stroke: string | null;
   distance: string | null;
-  gender: 'male' | 'female' | null;
+  gender: RecordGender | null;
   poolType: '25m' | '50m' | null;
 }
 

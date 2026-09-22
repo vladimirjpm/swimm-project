@@ -508,14 +508,22 @@ function ResultsTable() {
               const swimmerName = `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}`;
               // Пол для рекордов/нормативов: явное поле → из названия события → 'male'
               const genderForRecord = resolvedGender !== 'none' ? resolvedGender : (rowGender !== 'none' ? rowGender : 'male');
+              // Эстафета (Э4б): пол — только известный (male/female/mixed), «none» = не знаем,
+              // и бейджа нет; ступень — по старшему участнику. Держатель — команда, поэтому
+              // «держатель рекорда» по имени пловца эстафете не ставим. Мастерс-эстафет в
+              // справочнике нет. Всё — зеркало сервера, иначе строка спорит с «New records».
+              const relayGender = res.is_relay && ['male', 'female', 'mixed'].includes(res.event_style_gender)
+                ? res.event_style_gender
+                : null;
+              const relayNoRecord = !!res.is_relay && (relayGender == null || isMaster);
               const recordParams = {
-                gender: genderForRecord,
+                gender: relayGender ?? genderForRecord,
                 poolType: res.pool_type,
                 styleName: res.event_style_name,
                 distance: `${res.event_style_len}m`,
                 // Ключ поиска в справочнике — по оси RecordAgeAxis, а не возраст пловца:
                 // иначе бейдж строки разойдётся с карточкой «New records» (её считает сервер).
-                age: Helper.recordStepAge(res),
+                age: res.is_relay ? Helper.relayRecordStepAge(res) : Helper.recordStepAge(res),
                 isMasters: isMaster,
               };
               // Заплыв, помеченный админом как ошибка протокола, НЕ носит бейдж рекорда:
@@ -527,10 +535,10 @@ function ResultsTable() {
               // полоса возраста, у ребёнка его ступень. Раньше класс задавался догадкой
               // «masters или age», и держатель национального рекорда выглядел в протоколе
               // обычным первым номером (поймано 02.09.2026 на 00:56.73 Горбенко).
-              const recordHolderMark = isSuspect
+              const recordHolderMark = isSuspect || res.is_relay
                 ? null
                 : Helper.recordMarkForHolder({ swimmerName, ...recordParams });
-              const recordTimeMark = isSuspect
+              const recordTimeMark = isSuspect || relayNoRecord
                 ? null
                 : Helper.recordMarkForTime({ time: res.time, ...recordParams });
               const isRecordHolder = recordHolderMark != null;

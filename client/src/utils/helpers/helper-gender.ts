@@ -3,6 +3,16 @@
  */
 export type Gender = 'male' | 'female' | 'none';
 
+/**
+ * «men» / «women» / «mixed» — одна подпись пола дисциплины на весь сайт. Раньше было
+ * «female ? Women : Men» по месту, и смешанная эстафета печаталась мужской (Э2/Э5,
+ * docs/plans/records-relays-plan.md). Неизвестный пол — «men»: так было и до шва.
+ */
+export function genderLabel(g: string | null | undefined, capital = false): string {
+  const w = g === 'female' ? 'women' : g === 'mixed' ? 'mixed' : 'men';
+  return capital ? w[0].toUpperCase() + w.slice(1) : w;
+}
+
 export default class HelperGender {
   /**
    * Нормализует значение пола к типу Gender

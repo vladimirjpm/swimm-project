@@ -93,20 +93,20 @@ public class WorldRecordsSourceProvider : IRecordSourceProvider
             var parsed = new List<ParsedRecordDto>();
             foreach (var r in results)
             {
-                if (r.EventStyleGender != "male" && r.EventStyleGender != "female")
-                    continue; // mixed-relay — вне модели осей Record (open male/female), пропускаем
+                var distance = r.EventStyleLen.EndsWith('m') ? r.EventStyleLen : r.EventStyleLen + "m";
+                if (WorldAquaticsSource.RecordGender(r.EventStyleGender, distance) is not { } gender)
+                    continue;
 
                 var isWorld = string.Equals(r.Note, "WR", StringComparison.OrdinalIgnoreCase);
                 var regionType = isWorld ? "world" : "country";
                 var regionCode = isWorld ? "" : (r.Note ?? "").Trim().ToUpperInvariant();
-                var distance = r.EventStyleLen.EndsWith('m') ? r.EventStyleLen : r.EventStyleLen + "m";
 
                 parsed.Add(new ParsedRecordDto(
                     RegionType: regionType,
                     RegionCode: regionCode,
                     Category: "open",
                     AgeKey: "",
-                    Gender: r.EventStyleGender,
+                    Gender: gender,
                     PoolType: r.PoolType,
                     Style: r.EventStyleName,
                     Distance: distance,

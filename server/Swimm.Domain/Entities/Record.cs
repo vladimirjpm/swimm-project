@@ -29,6 +29,28 @@ public class Record
         "open", "age", "junior", "masters"
     };
 
+    /// <summary>Пол дисциплины: male | female | mixed. <c>mixed</c> — смешанная эстафета (Э2 плана
+    /// docs/plans/records-relays-plan.md, 22.09.2026), бывает только при эстафетной дистанции.
+    /// ⚠ Не путать с <c>none</c> в <c>Results</c>: там это «пол НЕ ИЗВЕСТЕН», в справочник не пишется.</summary>
+    public static readonly IReadOnlySet<string> Genders = new HashSet<string>
+    {
+        "male", "female", "mixed"
+    };
+
+    /// <summary>Эстафету узнают по дистанции: «4X100m», «4x50» — отдельных эстафетных стилей нет.</summary>
+    public static bool IsRelayDistance(string? distance) =>
+        distance is { Length: > 2 } && distance[0] == '4' && distance[1] is 'X' or 'x';
+
+    /// <summary>null — пол годится для дисциплины; иначе текст ошибки (админка, API).</summary>
+    public static string? ValidateGender(string? gender, string? distance)
+    {
+        if (gender is null || !Genders.Contains(gender))
+            return "gender должен быть male, female или mixed";
+        if (gender == "mixed" && !IsRelayDistance(distance))
+            return "gender=mixed бывает только у эстафеты (дистанция 4X…)";
+        return null;
+    }
+
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }
@@ -57,7 +79,7 @@ public class Record
 
     // ── Ось 3: дисциплина ────────────────────────────────────────────────────
 
-    /// <summary>male | female — как в клиентских данных.</summary>
+    /// <summary>male | female | mixed (смешанная эстафета) — см. <see cref="Genders"/>.</summary>
     [Required, MaxLength(10)]
     public string Gender { get; set; } = string.Empty;
 

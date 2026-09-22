@@ -2336,6 +2336,60 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_RecordIssues", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.RecordSourceCheck", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("AddedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("AppliedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ChangedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("DiffId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int?>("MissingCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DiffId");
+
+                    b.HasIndex("Source", "CheckedAt");
+
+                    b.ToTable("Sys_RecordSourceChecks", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.RecordVerification", b =>
                 {
                     b.Property<int>("RecordId")

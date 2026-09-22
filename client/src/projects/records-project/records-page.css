@@ -28,6 +28,12 @@
   color: var(--t-text);
 }
 
+.rk-head__checked {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--t-text-3);
+}
+
 .rk-head__sub {
   margin-top: 4px;
   font-size: 13px;
