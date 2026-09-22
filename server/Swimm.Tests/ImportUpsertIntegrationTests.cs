@@ -435,6 +435,31 @@ public class ImportUpsertIntegrationTests
         Assert.DoesNotContain("כהן", legSwimmers);
     }
 
+    /// <summary>
+    /// Ключ upsert эстафет склеивает none и mixed — строка матчится, но пол обязан обновиться:
+    /// иначе старое none («пол неизвестен») не лечится переимпортом (22.09.2026).
+    /// </summary>
+    [Fact]
+    public async Task RelayGender_NoneToMixed_UpdatedOnReimport_PreservingId()
+    {
+        await using var db = CreateDb(nameof(RelayGender_NoneToMixed_UpdatedOnReimport_PreservingId));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        var none = System.Text.Json.JsonSerializer.SerializeToNode(AnonymousRelayItem(lane: 1))!.AsObject();
+        none["event_style_gender"] = "none";
+        await svc.ImportAsync(ToStream(new[] { none }));
+        var before = await db.Results.SingleAsync();
+        Assert.Equal("none", before.Gender);
+
+        var mixed = none.DeepClone().AsObject();
+        mixed["event_style_gender"] = "mixed";
+        var second = await svc.ImportAsync(ToStream(new[] { mixed }), eventOptions: Overwrite);
+
+        Assert.Equal((1, 0), (second.Updated, second.Inserted));
+        var after = await db.Results.SingleAsync();
+        Assert.Equal((before.Id, "mixed"), (after.Id, after.Gender));
+    }
+
     [Fact]
     public async Task AnonymousRelayLeg_ReplacedByNamedSwimmer_PreservesResultId_MaccabiahCase()
     {

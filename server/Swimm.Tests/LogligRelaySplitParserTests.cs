@@ -209,6 +209,57 @@ public class LogligRelaySplitParserTests
         Assert.Null(RelayMastersBuilder.Build("[]", events));
     }
 
+    // Маккабия мастерс 2026 (loglig 15155): мужские 4×50 комплекс и вольным. Здесь сборка
+    // отказывала целиком (22.09.2026): время «02:17.0» не читалось, и у двух команд источник
+    // не печатает ни одной ноги.
+    private static List<SplitRelayTeam> MaccabiahMenMedley => Parse("loglig-split-relay-15155-82535-men-medley.pdf");
+    private static List<SplitRelayTeam> MaccabiahMenFree => Parse("loglig-split-relay-15155-82534-men-free.pdf");
+
+    [Fact]
+    public void Time_WithOneFractionDigit_IsReadAndNotGluedToClub()
+    {
+        var team = Assert.Single(MaccabiahMenMedley, t => t.Time == "02:17.0");
+        Assert.Equal("הפועל בת ים", team.Club);
+        Assert.Equal("160-199", team.Band);
+        Assert.Equal(4, team.Legs.Count);
+    }
+
+    [Fact]
+    public void MastersBuilder_BorrowsLegsFromProtocol_ForTeamWithoutLegsInSource()
+    {
+        var events = new[] { new RelayBuildEvent("individual_medley", "4X50", "male", "4X50 מעורב שליחים", MaccabiahMenMedley) };
+        Assert.False(RelayMastersBuilder.CanBuild(events)); // «מכבי עולם המים» 01:52.53 — без ног
+
+        var protocol = Row("01:52.53", 6, 1, (1980, "הר-שי", "לירון"), (2000, "ישראלי", "עידו"), (2004, "אריאל", "אסף"));
+        protocol["club"] = "מכבי עולם המים";
+        var built = RelayMastersBuilder.Build(new JsonArray(protocol).ToJsonString(), events)!.Value;
+
+        Assert.Equal(MaccabiahMenMedley.Count, built.Relays);
+        var row = JsonNode.Parse(built.Json)!.AsArray().Single(r => (string?)r!["time"] == "01:52.53")!;
+        Assert.Equal(("male", "הר-שי", 3), ((string?)row["event_style_gender"], (string?)row["last_name"],
+            row["relay_swimmers"]!.AsArray().Count));
+    }
+
+    [Fact]
+    public void MastersBuilder_RefusesWhenLeglessTeamIsNotInProtocol()
+    {
+        var events = new[] { new RelayBuildEvent("individual_medley", "4X50", "male", "x", MaccabiahMenMedley) };
+        Assert.Null(RelayMastersBuilder.Build("[]", events));
+    }
+
+    [Fact]
+    public void MastersBuilder_DropsLeglessNoShowTeam()
+    {
+        // «MIX Maccabiah» — NS и ни одной ноги: заплыва не было, строить нечего.
+        var ns = Assert.Single(MaccabiahMenFree, t => t.Legs.Count == 0);
+        Assert.Equal("NS", ns.Status);
+
+        var events = new[] { new RelayBuildEvent("freestyle", "4X50", "male", "4X50 חופשי שליחים", MaccabiahMenFree) };
+        var personal = new JsonArray(new JsonObject { ["is_relay"] = false, ["time"] = "00:32.06" }).ToJsonString();
+        var built = RelayMastersBuilder.Build(personal, events)!.Value;
+        Assert.Equal(MaccabiahMenFree.Count - 1, built.Relays);
+    }
+
     [Theory]
     [InlineData("מאסטרס נ 21-99", "female")]
     [InlineData("מאסטרס ג 21-99", "male")]

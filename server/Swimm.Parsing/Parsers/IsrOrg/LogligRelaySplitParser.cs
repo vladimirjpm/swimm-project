@@ -19,7 +19,7 @@ namespace Swimm.Parsing.Parsers.IsrOrg;
 /// <param name="Status">Статус вместо времени («DQ», «NS», «DNF»); null — время есть.</param>
 public sealed record SplitRelayTeam(
     int Heat, int Lane, string? Time, string Club, IReadOnlyList<RelaySwimmer> Legs,
-    string? Band = null, string? Status = null);
+    string? Band = null, string? Status = null, bool LegsBorrowed = false);
 
 /// <summary>
 /// Разбор PDF промежуточных времён ОДНОЙ эстафетной дисциплины loglig
@@ -47,7 +47,9 @@ public sealed record SplitRelayTeam(
 /// </summary>
 public static class LogligRelaySplitParser
 {
-    private static readonly Regex TimeRx = new(@"^\d{1,2}:\d{2}\.\d{2}$", RegexOptions.Compiled);
+    // Дробная часть бывает и одной цифрой: «02:17.0» (Маккабия мастерс 2026) — без этого время уезжало
+    // в название клуба, а у команды не оставалось ни времени, ни статуса.
+    private static readonly Regex TimeRx = new(@"^\d{1,2}:\d{2}\.\d{1,2}$", RegexOptions.Compiled);
     private static readonly Regex YearRx = new(@"^(19|20)\d{2}$", RegexOptions.Compiled);
     private static readonly Regex IntRx = new(@"^\d{1,2}$", RegexOptions.Compiled);
     private static readonly Regex BandRx = new(@"^\d{2,3}-\d{2,3}$", RegexOptions.Compiled);

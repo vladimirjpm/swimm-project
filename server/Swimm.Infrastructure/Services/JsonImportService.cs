@@ -1296,9 +1296,13 @@ public class JsonImportService : IImportService
     /// (уже в БД, tracked). Identity-поля ключа матчинга (CompetitionId/StyleId/Distance/Gender/
     /// Heat/Lane) не трогаем — они и так совпали. SwimmerId/ClubId/CountryId — тоже payload:
     /// переимпорт может заменить анонимную заглушку именованным пловцом (Р5).
+    /// Исключение — Gender: у эстафет ключ склеивает none и mixed (<c>ResultMatcher.KeyGender</c>),
+    /// так что «совпал» не значит «равен», и без присваивания старое none переживало любой
+    /// переимпорт (5 строк Маккабии мастерс, 22.09.2026). Ключ совпал — присваивать безопасно.
     /// </summary>
     private static void ApplyPayloadUpdate(ResultRecord old, ResultRecord incoming)
     {
+        old.Gender = incoming.Gender;
         old.SwimmerId = incoming.SwimmerId;
         old.ClubId = incoming.ClubId;
         old.CountryId = incoming.CountryId;
