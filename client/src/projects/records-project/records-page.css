@@ -96,6 +96,13 @@
   background: var(--t-border);
 }
 
+/* Чип региона — не переключатель, а ВХОД в окно выбора: флаг, код и стрелка вниз.
+   Стрелка обязательна: без неё он выглядит как выбранный фильтр, по которому нечего
+   нажимать (стран больше двух сотен, списком в ряд они не встанут). */
+.rk-chip--region { display: inline-flex; align-items: center; gap: 7px; }
+.rk-chip--region img { border-radius: 3px; }
+.rk-chip__caret { font-size: 10px; opacity: .8; }
+
 .rk-chip {
   padding: 5px 11px;
   border-radius: 999px;
@@ -448,18 +455,6 @@
 
 /* ═══ /records/compare — сравнение двух стран ═══════════════════════════════ */
 
-.rc-controls {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--t-card);
-  border: 1px solid var(--t-border);
-  margin-bottom: 16px;
-}
-
 .rc-picker { display: flex; flex-direction: column; gap: 5px; min-width: 190px; }
 /* Дисциплина в списке WR/NR — значок стиля с дистанцией справа на белой плите: PNG стилей
    нарисованы под светлый фон и в тёмной теме без плиты пропадают (как swim-row__plate). */
@@ -505,149 +500,109 @@
    пункты были бы белым по белому. */
 .rc-select option { color: #111; background: #fff; }
 
-.rc-swap {
-  align-self: center;
-  margin-top: 16px;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--t-border);
-  background: var(--t-input-bg);
-  color: var(--t-text-2);
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.rc-swap:hover { color: var(--t-accent); border-color: var(--t-accent); }
-
-.rc-cuts { display: flex; flex-direction: column; gap: 6px; margin-left: auto; }
+.rc-cuts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 12px; }
 
 .rc-link { color: var(--t-accent); text-decoration: none; }
 .rc-link:hover { text-decoration: underline; }
 
-/* ── Счёт ───────────────────────────────────────────────────────────────── */
+/* Доска сравнения — контейнер ширины семьи H2H (`h2h-scope`) плюс ограничение колонки:
+   полезного в ряду две стороны и центр, дальше на широком мониторе шла пустота. Ровно то
+   же решение, что у страницы `/h2h` с её `content-box-xs`. */
+.rc-board { max-width: 780px; margin: 0 auto; }
 
-.rc-score {
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--t-surface-strong);
-  border: 1px solid var(--t-border);
-  margin-bottom: 14px;
+/* ── Липкая шапка сравнения ───────────────────────────────────────────────────
+
+   Прокручивая карточки дисциплин, человек теряет, чья колонка слева, — поэтому шапка
+   прилипает под топбаром сайта. Прилипнув, она СВОРАЧИВАЕТСЯ до флага, кода страны и
+   счёта: полный вид (покрытие, свежесть, ссылки, строки статов) в полосе высотой в одну
+   строку не нужен и мешает смотреть таблицу (просьба Влада 23.09.2026).
+
+   ⚠ `top` задаёт КОМПОНЕНТ инлайном — он меряет живую высоту `[data-app-topbar]`.
+   Константы тут нельзя: топбар на телефоне ниже, чем на десктопе, и прибитое число
+   оставляло бы щель или прятало первую строку под ним. */
+.rc-sticky {
+  position: sticky; z-index: 30;
+  background: var(--deep-page-bg);
+  /* Поля гасят просвет по бокам, когда под шапкой едут карточки. */
+  margin-inline: -8px; padding: 8px 8px 6px;
+  transition: padding 140ms ease;
 }
+/* Метка прилипания: нулевой высоты, видимой роли нет. */
+.rc-sticky__sentinel { height: 0; }
 
-.rc-score__line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
+/* Прилипшее состояние — только флаг, код и счёт. */
+.rc-sticky--on {
+  padding-top: 4px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--deep-card-border);
+  box-shadow: 0 6px 16px -12px rgba(0, 0, 0, .8);
 }
+.rc-sticky--on .h2h-compare { gap: 0; }
+/* Строки статов, подпись счёта, ⇄ и ссылки под карточками — всё это уезжает. */
+.rc-sticky--on .h2h-stats,
+.rc-sticky--on .h2h-score__cap,
+.rc-sticky--on .h2h-swap,
+.rc-sticky--on .h2h-side__link,
+.rc-sticky--on .h2h-mini__club,
+.rc-sticky--on .h2h-mini__age { display: none; }
+.rc-sticky--on .h2h-mini { padding: 6px 12px; gap: 10px; }
+.rc-sticky--on .rc-nation__flag { width: 32px; height: 24px; }
+.rc-sticky--on .h2h-score__value { font-size: 22px; }
+/* Пустой слот в прилипшем виде тоже ужимается — иначе полоса прыгает по высоте. */
+.rc-sticky--on .h2h-slot { padding: 8px; font-size: 11px; }
+/* ⚠ В узком контейнере карточка стороны встаёт СТОЛБИКОМ (правило `@container h2h`
+   в h2h.css) — прилипшей полосе это даёт лишние 30px высоты на пустом месте. Возвращаем
+   строку: два селектора против одного, поэтому правило выигрывает без `!important`. */
+.rc-sticky--on .h2h-mini { flex-direction: row; justify-content: center; }
+.rc-sticky--on .h2h-mini__text { align-items: center; }
 
-.rc-score__side { display: flex; align-items: center; gap: 10px; }
-.rc-score__side--right { flex-direction: row; }
+/* ⚠ Держатель эстафетного рекорда — ЧЕТЫРЕ имени в одной строке («Evgeny Rylov, Evgeny
+   Sedov, …»), и на телефоне они вылезали поверх соседней колонки: ячейка стоит в гриде,
+   а у грид-элемента `min-width` по умолчанию `auto`, то есть он не даёт себя ужать под
+   содержимое. Обрезку многоточием `.h2h-time__who-name` при этом уже несёт сам компонент —
+   ей просто нужна ширина, которую можно сузить. */
+.rc-board .h2h-time { min-width: 0; }
+/* Плашка победителя — `inline-block`, то есть ширина по содержимому: с четырьмя именами
+   она вырастала до 330px в колонке шириной 115 и наезжала на соседнюю сторону. Потолок в
+   100% возвращает её в колонку, а многоточие имени (оно уже есть у компонента) наконец
+   получает ширину, от которой считать. */
+.rc-board .h2h-time__box { max-width: 100%; box-sizing: border-box; }
+.rc-board .h2h-time__who { max-width: 100%; }
 
-.rc-score__code { font-size: 15px; font-weight: 600; color: var(--t-text-2); }
+/* Флаг занимает в строке выдачи место портрета пловца. */
+.rc-hit__flag { flex: none; border-radius: 3px; object-fit: cover; }
 
-.rc-score__num {
-  font-size: 30px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: var(--t-text-2);
+/* ── Шапка и карточки: вёрстка H2H ────────────────────────────────────────
+
+   Экран собран из семьи `UI_H2H*` (`components/mix/h2h/h2h.css`): сторона · счёт ·
+   сторона, ниже карточки дисциплин с полосой на бассейн. Здесь — только то, чем
+   СТРАНА отличается от пловца в той же геометрии.
+
+   Почему не свои блоки, как было: сравнение двух сторон у нас уже нарисовано один раз,
+   и вторая вёрстка того же смысла расходилась бы с первой при каждой правке — ровно
+   то, от чего бережёт реестр компонентов. */
+
+/* Карточка страны отличается от карточки пловца только содержимым, поэтому своих правил
+   у неё почти нет: фигуру, поля, наведение и строку-ссылку даёт общий `UI_H2HSideCard`. */
+.rc-nation__flag {
+  flex: none; border-radius: 6px; object-fit: cover;
+  border: 2px solid var(--deep-card-border);
 }
+/* Код страны — крупно и моноширинно: это подпись стороны, её читают как имя. */
+.rc-nation__code { font-family: var(--deep-font-display); letter-spacing: .04em; }
 
-.rc-score__side--lead .rc-score__num,
-.rc-score__side--lead .rc-score__code { color: var(--t-accent); }
-
-.rc-score__vs { font-size: 22px; color: var(--t-text-3); }
-
-.rc-score__note {
-  margin-top: 8px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--t-text-3);
+/* Пол под иконкой стиля — только когда он НЕ выбран фильтром (см. rc-h2h-events). */
+.rc-event__gender {
+  display: block; margin-top: 2px; text-align: center;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--deep-text-faint);
 }
-
-/* «Не сравнивались» — не сноска мелким шрифтом: без неё счёт выглядит разгромом,
-   хотя часть дисциплин просто не с чем сравнить (11.3.3). */
-.rc-score__uncompared { color: var(--t-warn); }
-.rc-score__uncompared-why { color: var(--t-text-3); }
-
-/* ── Таблица сравнения ──────────────────────────────────────────────────── */
-
-.rc-table {
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid var(--t-border);
-  background: var(--t-card);
-}
-
-.rc-row {
-  display: grid;
-  grid-template-columns: 1fr 160px 160px 84px;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--t-border);
-  font-size: 14px;
-}
-
-.rc-row:last-child { border-bottom: none; }
-
-.rc-row--head {
-  background: var(--t-list-head);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--t-text-3);
-}
-
-.rc-row--nodata { opacity: 0.62; }
-
-.rc-cell { min-width: 0; }
-
-.rc-cell--event { display: flex; flex-direction: column; gap: 1px; }
-.rc-event__main { color: var(--t-text); }
-.rc-event__sub { font-size: 11px; color: var(--t-text-3); }
-
-.rc-side { display: flex; flex-direction: column; gap: 1px; }
-
-.rc-side__time {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  color: var(--t-text-2);
-}
-
-.rc-side--won .rc-side__time { color: var(--t-accent); }
-
-.rc-side__date { font-size: 11px; color: var(--t-text-3); font-variant-numeric: tabular-nums; }
-
-.rc-cell--diff { text-align: right; }
-
-.rc-diff { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--t-text-2); }
-.rc-diff--tie { color: var(--t-text-3); }
-
-.rc-dash { color: var(--t-text-3); }
 
 @media (max-width: 720px) {
-  .rc-controls { flex-direction: column; align-items: stretch; }
   .rc-picker { min-width: 0; }
-  .rc-swap { align-self: center; margin: 0; }
-  .rc-cuts { margin-left: 0; }
 
-  .rc-row--head { display: none; }
-
-  .rc-row {
-    grid-template-columns: 1fr auto auto;
-    grid-template-areas:
-      'event event diff'
-      'a     a     b';
-    row-gap: 6px;
-  }
-
-  .rc-cell--event { grid-area: event; }
-  .rc-cell--diff { grid-area: diff; }
-  .rc-row > .rc-cell:nth-child(2) { grid-area: a; }
-  .rc-row > .rc-cell:nth-child(3) { grid-area: b; justify-self: end; text-align: right; }
-  .rc-row > .rc-cell:nth-child(3) .rc-side { align-items: flex-end; }
+  /* На телефоне поля у карточки страны уже. */
+  .rc-nation.h2h-mini--left,
+  .rc-nation.h2h-mini--right { padding-inline: 12px; }
 }
 
 /* ── Таб Masters: карточка «Израиль против мира» ───────────────────────────── */

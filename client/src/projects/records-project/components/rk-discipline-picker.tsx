@@ -28,6 +28,13 @@ interface Props {
   allowRelays?: boolean;
   /** Возрастные группы мастерсов для ряда «Age group»; не передан — ряда нет. */
   ageGroups?: string[];
+  /**
+   * Готовый ряд «Region» для таба World (9.9). Слотом, а не своими пропсами: регион это
+   * не ось дисциплины (он не сужает заплыв, а меняет ЧЬИ рекорды показаны), и знать про
+   * список стран пикеру дисциплины незачем. Стоит первым — сначала «чьи рекорды», потом
+   * «какой заплыв».
+   */
+  regionRow?: React.ReactNode;
 }
 
 const POOLS: Array<{ key: '25m' | '50m'; label: string }> = [
@@ -42,7 +49,7 @@ const GENDERS: Array<{ key: RecordGender; label: string }> = [
 ];
 
 const RkDisciplinePicker: React.FC<Props> = ({
-  filters, onChange, showEvent = true, allowRelays = true, ageGroups,
+  filters, onChange, showEvent = true, allowRelays = true, ageGroups, regionRow,
 }) => {
   // Группа из адреса, которой у текущей дисциплины нет, показывается как «All».
   const activeAge = filters.ageGroup && ageGroups?.includes(filters.ageGroup) ? filters.ageGroup : null;
@@ -64,23 +71,10 @@ const RkDisciplinePicker: React.FC<Props> = ({
 
   return (
     <div className="rk-picker">
-      <div className="rk-picker__row">
-        <span className="rk-picker__label">Pool</span>
-        <div className="rk-chips">
-          {POOLS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className={`rk-chip${filters.poolType === p.key ? ' rk-chip--on' : ''}`}
-              aria-pressed={filters.poolType === p.key}
-              onClick={() => onChange({ poolType: p.key })}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      {/* Порядок рядов один на все табы рекордов: кто · сколько лет · что плыл · где
+          (просьба Влада 23.09.2026). Тот же порядок держит полоса выбранного
+          `RkFilterBar` — иначе выбор и его сводка читаются в разной последовательности. */}
+      {regionRow}
       <div className="rk-picker__row">
         <span className="rk-picker__label">Gender</span>
         <div className="rk-chips">
@@ -99,6 +93,25 @@ const RkDisciplinePicker: React.FC<Props> = ({
           ))}
         </div>
       </div>
+
+      {ageGroups && ageGroups.length > 0 && (
+        <div className="rk-picker__row">
+          <span className="rk-picker__label">Age group</span>
+          <div className="rk-chips">
+            {[null, ...ageGroups].map((g) => (
+              <button
+                key={g ?? 'all'}
+                type="button"
+                className={`rk-chip${activeAge === g ? ' rk-chip--on' : ''}`}
+                aria-pressed={activeAge === g}
+                onClick={() => onChange({ ageGroup: g })}
+              >
+                {g ?? 'All'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showEvent && (
         <>
@@ -155,24 +168,22 @@ const RkDisciplinePicker: React.FC<Props> = ({
         </>
       )}
 
-      {ageGroups && ageGroups.length > 0 && (
-        <div className="rk-picker__row">
-          <span className="rk-picker__label">Age group</span>
-          <div className="rk-chips">
-            {[null, ...ageGroups].map((g) => (
-              <button
-                key={g ?? 'all'}
-                type="button"
-                className={`rk-chip${activeAge === g ? ' rk-chip--on' : ''}`}
-                aria-pressed={activeAge === g}
-                onClick={() => onChange({ ageGroup: g })}
-              >
-                {g ?? 'All'}
-              </button>
-            ))}
-          </div>
+      <div className="rk-picker__row">
+        <span className="rk-picker__label">Pool</span>
+        <div className="rk-chips">
+          {POOLS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              className={`rk-chip${filters.poolType === p.key ? ' rk-chip--on' : ''}`}
+              aria-pressed={filters.poolType === p.key}
+              onClick={() => onChange({ poolType: p.key })}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 };

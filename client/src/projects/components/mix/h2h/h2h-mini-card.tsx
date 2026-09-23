@@ -2,16 +2,21 @@ import React from 'react';
 import './h2h.css';
 import { routes } from '../../../../utils/routes';
 import UI_SwimmerAvatar from '../swimmer-avatar/swimmer-avatar';
+import UI_H2HSideCard from './h2h-side-card';
 import type { H2HSwimmer } from './h2h.types';
 
 /**
- * Мини-карточка спортсмена в шапке сравнения (макет 1b, §1 `H2H-COMPONENTS.md`).
+ * Мини-карточка спортсмена в шапке сравнения (макет 1b, §1 `H2H-COMPONENTS.md`) — пловец
+ * поверх общей стороны `UI_H2HSideCard`, той же, что несёт страну на `/records/compare`.
  *
- * Карточки ЗЕРКАЛЬНЫЕ: фото всегда смотрит в центр шапки (у левой — текст, потом фото),
- * а сердечко-фаворит уходит во внешний угол, чтобы не спорить с фото.
+ * ⚠ **Клик по карточке выбирает ДРУГОГО пловца, а не открывает профиль** (решение Влада
+ * 23.09.2026). Раньше карточка была ссылкой в профиль, а сменить сторону предлагал ✕ в
+ * углу — символ поверх фото, который плохо читался и требовал знать о нём заранее. Теперь
+ * главный жест экрана занят главным действием экрана, а профиль стоит строкой ПОД
+ * карточкой, где ссылка и выглядит ссылкой.
  *
- * Сама карточка — ссылка на страницу пловца; сердечко перехватывает клик и не даёт
- * переходу случиться (иначе «добавить в избранное» уводило бы со страницы).
+ * `onSelect: null` — сторону сменить нельзя (в табе левый это хозяин профиля): карточка
+ * тогда не кнопка. Сердечко-фаворит перехватывает клик и до карточки его не пускает.
  */
 interface Props {
   swimmer: H2HSwimmer;
@@ -26,20 +31,20 @@ interface Props {
    */
   favoriteBlockedHint?: string | null;
   /**
-   * Сброс стороны. Не задан — карточку сменить нельзя (в табе левый это хозяин профиля),
-   * и кнопки нет вовсе: в макете её тоже нет, она появилась вместе со страницей `/h2h`,
-   * где сменяемы обе стороны.
+   * Выбрать на эту сторону другого пловца. Не задан — сторона несменяема (в табе H2H это
+   * хозяин страницы), и карточка перестаёт быть кнопкой.
    */
-  onClear?: (() => void) | null;
+  onSelect?: (() => void) | null;
   /**
-   * Эту сторону сейчас заполнит выбор в пикере — тонкая акцентная рамка. У ЗАНЯТОЙ
-   * карточки это предупреждение: следующий выбор заменит стоящего здесь пловца.
+   * Эту сторону заполнит выбор в пикере — тонкая акцентная рамка. У ЗАНЯТОЙ карточки это
+   * предупреждение: следующий выбор заменит стоящего здесь пловца.
    */
   active?: boolean;
 }
 
 const UI_H2HMiniCard: React.FC<Props> = ({
-  swimmer, align, isFavorite = null, onToggleFavorite, favoriteBlockedHint = null, onClear = null, active = false,
+  swimmer, align, isFavorite = null, onToggleFavorite, favoriteBlockedHint = null,
+  onSelect = null, active = false,
 }) => {
   const favBlocked = !isFavorite && favoriteBlockedHint != null;
 
@@ -57,45 +62,37 @@ const UI_H2HMiniCard: React.FC<Props> = ({
     />
   );
 
-  const text = (
-    <span className="h2h-mini__text">
-      <span dir="auto" className="h2h-mini__name">{swimmer.name}</span>
-      {swimmer.club && <span dir="auto" className="h2h-mini__club">{swimmer.club}</span>}
-      {swimmer.ageLabel && <span className="h2h-mini__age">{swimmer.ageLabel}</span>}
-    </span>
-  );
+  const heart = isFavorite !== null ? (
+    <button
+      type="button"
+      className={`h2h-mini__fav${isFavorite ? ' h2h-mini__fav--on' : ''}`}
+      title={favBlocked ? favoriteBlockedHint! : isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+      aria-pressed={isFavorite}
+      // `aria-disabled`, а не `disabled`: у выключенной кнопки title не всплывает, а клик
+      // всё равно надо перехватить — иначе он уйдёт в карточку и сменит сторону.
+      aria-disabled={favBlocked || undefined}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (!favBlocked) onToggleFavorite?.(); }}
+    >
+      {isFavorite ? '♥' : '♡'}
+    </button>
+  ) : null;
 
   return (
-    <a
-      className={`h2h-mini h2h-mini--${align}${active ? ' h2h-mini--active' : ''}`}
-      href={routes.swimmer(swimmer.id)}
-    >
-      {isFavorite !== null && (
-        <button
-          type="button"
-          className={`h2h-mini__fav${isFavorite ? ' h2h-mini__fav--on' : ''}`}
-          title={favBlocked ? favoriteBlockedHint! : isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-          aria-pressed={isFavorite}
-          // `aria-disabled`, а не `disabled`: у выключенной кнопки title не всплывает, а клик
-          // всё равно надо перехватить — иначе он уйдёт в ссылку карточки.
-          aria-disabled={favBlocked || undefined}
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (!favBlocked) onToggleFavorite?.(); }}
-        >
-          {isFavorite ? '♥' : '♡'}
-        </button>
-      )}
-      {onClear && (
-        <button
-          type="button"
-          className="h2h-mini__clear"
-          title="Choose another swimmer"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClear(); }}
-        >
-          ✕
-        </button>
-      )}
-      {align === 'left' ? <>{text}{avatar}</> : <>{avatar}{text}</>}
-    </a>
+    <UI_H2HSideCard
+      align={align}
+      media={avatar}
+      name={swimmer.name}
+      sub={swimmer.club}
+      chip={swimmer.ageLabel}
+      corner={heart}
+      onSelect={onSelect}
+      selectHint={onSelect ? `${swimmer.name} — click to pick another swimmer` : undefined}
+      active={active}
+      // Профиль остаётся в одном клике, но уже своей строкой. Ссылка есть и у несменяемой
+      // стороны: в табе она ведёт на ту же страницу, где человек стоит, и это нормально —
+      // на `/h2h` та же карточка уводит в профиль хозяина сравнения.
+      link={{ href: routes.swimmer(swimmer.id), label: 'profile →' }}
+    />
   );
 };
 

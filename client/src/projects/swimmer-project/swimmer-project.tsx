@@ -21,6 +21,8 @@ import {
 } from './use-swimmer-page';
 import SwimmerHero from './components/swimmer-hero';
 import SwimmerMediaPanel from './components/swimmer-media-panel';
+import Popup from '../components/popup/popup';
+import { useAppSelector } from '../../store/store';
 import SwimmerUpcomingStarts from './components/swimmer-upcoming-starts';
 import {
   H2HPanel, holdsSeasonBest, PanelEmpty, PersonalBestsPanel, ProgressPanel, ResultsFilters,
@@ -200,7 +202,11 @@ function SwimmerProject() {
   // Сравнение и поиск живут в табе H2H: пока его не открыли, запросов нет.
   const onH2H = tab === 'h2h';
   const compare = useSwimmerCompare(swimmerId, rivalId, activeSeason, seasonReady && onH2H);
-  const rivalHits = useSwimmerSearch(onH2H && rivalId == null ? rivalQuery : '');
+  // ⚠ Поиск работает и когда соперник УЖЕ выбран: клик по его карточке открывает окно
+  // выбора, ничего не сбрасывая (23.09.2026). Прежнее условие `rivalId == null` осталось
+  // от крестика, который сперва освобождал сторону, — с ним окно молчало «type at least
+  // two letters» на любой запрос.
+  const rivalHits = useSwimmerSearch(onH2H ? rivalQuery : '');
   const bestTimes = useSwimmerBestTimes(swimmerId, activeSeason, seasonReady);
 
   const onResults = tab === 'results';
@@ -278,11 +284,13 @@ function SwimmerProject() {
    * Разряд определяет клиент (`NormativeStandard`), и второй реализации на сервере быть
    * не должно — иначе плитка и дуга в строке разъедутся.
    */
+  const isPopup = useAppSelector((state) => state.isPopup);
+
   const level = useMemo(() => {
     const rows = (allBest.data ?? []).filter((r) => !r.quality && r.time);
     if (rows.length === 0) return null;
     const top = rows.reduce((a, b) => ((b.points ?? 0) > (a.points ?? 0) ? b : a));
-    return Helper.getNormativeLevelInfo({
+    const info = Helper.getNormativeLevelInfo({
       gender,
       poolType: Helper.resolvePoolType(top.poolType),
       styleName: top.stroke ?? '',
@@ -292,6 +300,8 @@ function SwimmerProject() {
       // Возраст хелпер сам разложит в полосу мастерса («45» → «45-49»).
       ageGroup: top.ageInSeason != null ? String(top.ageInSeason) : null,
     });
+    // Заплыв, по которому считан разряд, — попапу норматива нужна его дисциплина.
+    return info && { ...info, swim: { stroke: top.stroke ?? '', distance: String(top.distance), poolType: top.poolType ?? undefined } };
   }, [allBest.data, gender]);
 
   /**
@@ -519,7 +529,6 @@ function SwimmerProject() {
             hits={rivalHits.data}
             hitsState={rivalHits}
             onPick={handleRival}
-            onClear={() => handleRival(null)}
             rivalId={rivalId}
             swimmerId={profile.id}
             profileName={profile.fullName}
@@ -537,6 +546,7 @@ function SwimmerProject() {
   ];
 
   return (
+    <>
     <DeepEntityPage<SwimmerTab>
       status={status}
       messages={{
@@ -575,6 +585,9 @@ function SwimmerProject() {
       activeTabId={tab}
       onTabChange={handleTab}
     />
+    {/* Попап норматива — по клику на разряд в шапке и в строках заплывов. */}
+    {isPopup && <Popup />}
+    </>
   );
 }
 

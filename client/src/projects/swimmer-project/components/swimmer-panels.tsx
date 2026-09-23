@@ -10,6 +10,7 @@ import { MIN_PEERS_FOR_RANK } from '../../components/mix/rank-of-peers/rank-of-p
 import { useFavoritesContext } from '../../../hooks/favorites-context';
 import UI_H2HCompare, { h2hScopeLabel } from '../../components/mix/h2h/h2h-compare';
 import UI_H2HRivalPicker from '../../components/mix/h2h/h2h-rival-picker';
+import UI_H2HPickerModal from '../../components/mix/h2h/h2h-picker-modal';
 import UI_H2HEventCard from '../../components/mix/h2h/h2h-event-card';
 import UI_H2HPoolRow from '../../components/mix/h2h/h2h-pool-row';
 import UI_RecordBadge from '../../components/mix/record-badge/record-badge';
@@ -1013,14 +1014,14 @@ export function ProgressPanel({
  *
  * Сам экран — общий `UI_H2HCompare` (`components/mix/h2h/`), тот же, что будет на странице
  * `/h2h` (план — `docs/plans/h2h-page-plan.md`). Здесь остаётся только то, что специфично
- * для ТАБА: левый слот занят хозяином страницы и несменяем (`onClear: null`), правый —
+ * для ТАБА: левый слот занят хозяином страницы и несменяем (`onSelect: null`), правый —
  * соперник из адреса, а выбор ищет именно соперника.
  *
  * Соперник выбирается ВРУЧНУЮ (решение Влада 2026-09-01): таб отвечает на вопрос «как я
  * против ВОТ ЭТОГО пловца», а не «кто мои соперники», — автосписка соседей по времени нет.
  */
 export function H2HPanel({
-  compare, query, onQuery, hits, hitsState, onPick, onClear, rivalId, swimmerId, profileName,
+  compare, query, onQuery, hits, hitsState, onPick, rivalId, swimmerId, profileName,
   owner, season, state,
 }: {
   compare: SwimmerCompare | null;
@@ -1030,7 +1031,6 @@ export function H2HPanel({
   hits: SwimmerSearchHit[] | null;
   hitsState: PanelLoad;
   onPick: (id: number) => void;
-  onClear: () => void;
   /** Выбранный соперник; null — показываем слот выбора. */
   rivalId: number | null;
   /** Хозяин страницы: его самого из избранного убираем — сравнивать с собой нечего. */
@@ -1051,8 +1051,9 @@ export function H2HPanel({
 }) {
   const { isAuthenticated, favorites, favoriteSwimmerIds, toggleFavoriteSwimmer, fullHint } =
     useFavoritesContext();
-  // Пустой слот — кнопка «выбрать»: попапа у него нет (выбор и так стоит под ним), поэтому
-  // клик просто уводит курсор в поиск. Иначе слот выглядел бы нажимаемым и не делал ничего.
+  // Выбор соперника живёт в ОКНЕ: в потоке он стоял под всеми карточками заплывов, и
+  // чтобы сменить соперника, приходилось сперва доскроллить до низа таба.
+  const [pickerOpen, setPickerOpen] = React.useState(false);
   const searchRef = React.useRef<HTMLInputElement>(null);
 
   const favoriteRivals = favorites
@@ -1066,16 +1067,22 @@ export function H2HPanel({
   const rivalHits = hits?.filter((h) => h.id !== swimmerId) ?? null;
 
   const picker = (
-    <UI_H2HRivalPicker
-      favorites={favoriteRivals}
-      query={query}
-      onQuery={onQuery}
-      hits={rivalHits}
-      loading={hitsState.loading}
-      error={hitsState.error}
-      onPick={onPick}
-      inputRef={searchRef}
-    />
+    <UI_H2HPickerModal
+      open={pickerOpen}
+      title="Choose a rival"
+      onClose={() => setPickerOpen(false)}
+    >
+      <UI_H2HRivalPicker
+        favorites={favoriteRivals}
+        query={query}
+        onQuery={onQuery}
+        hits={rivalHits}
+        loading={hitsState.loading}
+        error={hitsState.error}
+        onPick={(id) => { onPick(id); setPickerOpen(false); }}
+        inputRef={searchRef}
+      />
+    </UI_H2HPickerModal>
   );
 
   /** Чип макета: «9 y · 2017». Возраст без года рождения не показываем — его нечем проверить. */
@@ -1114,11 +1121,11 @@ export function H2HPanel({
       },
     ...favProps(swimmerId),
     // Хозяина страницы сменить нельзя — это его профиль.
-    onClear: null,
+    onSelect: null,
   };
 
   const right: H2HSlot = rivalId == null
-    ? { kind: 'empty', onPick: () => searchRef.current?.focus() }
+    ? { kind: 'empty', onPick: () => setPickerOpen(true) }
     : {
       kind: 'swimmer',
       swimmer: compare
@@ -1133,14 +1140,19 @@ export function H2HPanel({
         }
         : { id: rivalId, name: `#${rivalId}` },
       ...favProps(rivalId),
-      // Крестик — это «выбрать другого», а не «просто убрать»: сразу уводим курсор в поиск.
-      onClear: () => { onClear(); window.setTimeout(() => searchRef.current?.focus(), 0); },
+      // Клик по карточке соперника — «выбрать другого»: открывается окно выбора, а сам
+      // соперник ОСТАЁТСЯ на месте до того, как выбран новый. Убирать его сразу нельзя:
+      // экран терял бы сравнение на полпути, и человек, ткнувший из любопытства, оставался
+      // бы ни с чем (замечание Влада 23.09.2026).
+      onSelect: () => setPickerOpen(true),
     };
 
   return (
     <>
-      {/* Кнопки «Clear» в шапке нет: сбросить соперника можно крестиком на его карточке —
-          тем же жестом, что на странице `/h2h`. Два одинаковых действия рядом заставляли бы
+      {/* Кнопки «Clear» в шапке нет: соперник меняется выбором нового — кликом по его
+          карточке и поиском под ней, тем же жестом, что на странице `/h2h`. Отдельного
+          «убрать» на экране нет вовсе: пустая правая сторона это состояние ДО первого
+          выбора, а не то, в которое возвращаются. Два одинаковых действия рядом заставляли бы
           выбирать между ними на ровном месте.
 
           Справа — выход на полную страницу сравнения: тот же экран, но там сменяемы ОБЕ

@@ -6,6 +6,11 @@ import type { SwimmerProfile } from '../use-swimmer-profile';
 import type { SwimmerSummary } from '../use-swimmer-page';
 import type { NormativeLevelInfo } from '../../../utils/interfaces/normative-level-info';
 
+/** Разряд плитки + заплыв, по которому он считан (попапу норматива нужна дисциплина). */
+export type HeroLevel = NormativeLevelInfo & {
+  swim: { stroke: string; distance: string; poolType?: string };
+};
+
 /**
  * Шапка страницы спортсмена (BLOCKS.md §1–2, вариант 2a «Card DNA»).
  *
@@ -37,7 +42,7 @@ interface Props {
   profile: SwimmerProfile;
   summary: SwimmerSummary | null;
   /** Лучший достигнутый уровень — считает страница из лучших времён (нормативы клиентские). */
-  level: NormativeLevelInfo | null;
+  level: HeroLevel | null;
   achievements: HeroAchievements;
 }
 
@@ -101,7 +106,7 @@ function AchievementsTile({ a, summary }: { a: HeroAchievements; summary: Swimme
 
 function Kpi({ summary, level, achievements }: {
   summary: SwimmerSummary | null;
-  level: NormativeLevelInfo | null;
+  level: HeroLevel | null;
   achievements: HeroAchievements;
 }) {
   return (
@@ -143,7 +148,9 @@ function Kpi({ summary, level, achievements }: {
               progressPercent={level.progressToNextLevel}
               nextTime={level.nextTime}
               showProgress
-              disableClick
+              styleName={level.swim.stroke}
+              styleLen={level.swim.distance}
+              poolType={level.swim.poolType}
             />
           ) : (
             <span className="deep-kpi-value">—</span>

@@ -31,8 +31,12 @@ export interface H2HPoolSide {
   box?: 'fill' | 'outline' | 'none';
 }
 
+/** Подпись под прочерком у стороны без времени; общая на обе стороны строки. */
+
 interface Props {
   poolType: string;
+  /** Что написать под прочерком пустой стороны («no record»). */
+  emptyLabel?: string;
   left: H2HPoolSide | null;
   right: H2HPoolSide | null;
   /** «Левое минус правое», мс: отрицательное — быстрее левый. null — плавал только один. */
@@ -58,7 +62,7 @@ const deltaLabel = (ms: number): string =>
   ms === 0 ? '=' : `${ms < 0 ? '−' : '+'}${(Math.abs(ms) / 1000).toFixed(2)}`;
 
 const UI_H2HPoolRow: React.FC<Props> = ({
-  poolType, left, right, deltaMs = null, deltaTone = 'win', midLabel,
+  poolType, left, right, deltaMs = null, deltaTone = 'win', midLabel, emptyLabel,
 }) => {
   const leftWins = deltaMs != null && deltaMs < 0;
   const rightWins = deltaMs != null && deltaMs > 0;
@@ -80,6 +84,7 @@ const UI_H2HPoolRow: React.FC<Props> = ({
         extras={left?.extras}
         title={left?.title}
         box={left?.box}
+        emptyLabel={emptyLabel}
         isWinner={left?.isWinner ?? leftWins}
         side="left"
       />
@@ -107,6 +112,7 @@ const UI_H2HPoolRow: React.FC<Props> = ({
         extras={right?.extras}
         title={right?.title}
         box={right?.box}
+        emptyLabel={emptyLabel}
         isWinner={right?.isWinner ?? rightWins}
         side="right"
       />

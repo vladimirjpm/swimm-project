@@ -54,17 +54,25 @@ interface Props {
    * стороны разъезжаются на её ширину.
    */
   box?: 'fill' | 'outline' | 'none';
+  /**
+   * Подпись под прочерком, когда времени нет: «no record» на сравнении стран.
+   * Голый прочерк читается как «не загрузилось», а разница между «нет данных» и
+   * «медленнее» должна быть видна глазами, а не только в JSON (правило 11.3.3).
+   * Не задана — как было, один прочерк.
+   */
+  emptyLabel?: string;
   side: 'left' | 'right';
 }
 
 const UI_H2HTimeCell: React.FC<Props> = ({
   time, date, quality, isWinner = false, badge = null, href, who = null, extras, title,
-  box = 'fill', side,
+  box = 'fill', emptyLabel, side,
 }) => {
   if (!time) {
     return (
-      <div className={`h2h-time h2h-time--${side}`}>
+      <div className={`h2h-time h2h-time--${side}`} title={emptyLabel ? title : undefined}>
         <div className="h2h-time__empty">—</div>
+        {emptyLabel && <div className="h2h-time__date">{emptyLabel}</div>}
       </div>
     );
   }

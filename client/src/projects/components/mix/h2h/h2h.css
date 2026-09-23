@@ -72,25 +72,42 @@
 
 /* ── Мини-карточка спортсмена ─────────────────────────────────────────────── */
 
+/* Сторона шапки целиком: карточка-кнопка и строка-ссылка под ней. Обёртка нужна потому,
+   что ссылка НЕ МОЖЕТ жить внутри карточки — та сама кнопка, а вкладывать интерактивное
+   в интерактивное нельзя ни по разметке, ни по здравому смыслу (клик стал бы лотереей). */
+.h2h-side { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.h2h-side--left { align-items: flex-end; }
+.h2h-side--right { align-items: flex-start; }
+/* Карточка занимает всю колонку сетки, ссылка — ровно свою ширину под её внешним краем. */
+.h2h-side > .h2h-mini { width: 100%; box-sizing: border-box; }
+.h2h-side__link {
+  font-size: 11px; font-weight: 700; color: var(--deep-text-faint);
+  text-decoration: none; padding: 0 4px; white-space: nowrap;
+}
+.h2h-side__link:hover { color: var(--deep-accent); text-decoration: underline; }
+
 .h2h-mini {
   position: relative; display: flex; align-items: center; gap: 14px;
   padding: 12px 16px; border-radius: var(--deep-radius-tile);
   background: var(--deep-card-bg); border: 1px solid var(--deep-card-border);
   text-decoration: none; color: inherit; min-width: 0;
 }
-.h2h-mini:hover { background: var(--deep-card-bg-raised); }
+/* ⚠ Карточка — `<button>` (а у несменяемой стороны `<div>`), поэтому шрифт и выравнивание
+   сбрасываются явно: браузер даёт кнопке свой системный шрифт и `text-align: center`. */
+.h2h-mini { font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
+.h2h-mini:hover { background: var(--deep-card-bg-raised); border-color: var(--deep-accent-border); }
+/* Сменить сторону нельзя — карточка не кнопка и ведёт себя как плашка. */
+.h2h-mini--static { cursor: default; }
+.h2h-mini--static:hover { background: var(--deep-card-bg); border-color: var(--deep-card-border); }
 /* Занятая сторона может быть активной: следующий выбор ЗАМЕНИТ стоящего здесь пловца.
    Поэтому рамка тоньше по смыслу, чем у пустого слота, — это предупреждение, а не
    приглашение: заливки и свечения нет. */
 .h2h-mini--active { border-color: var(--deep-accent); }
 /* Фото всегда К ЦЕНТРУ шапки: у левой карточки текст идёт первым и жмётся вправо. */
 .h2h-mini--left { justify-content: flex-end; }
-/* ⚠ Внутренний край шире прочих: там стоит ✕, и портрет упирался в него вплотную —
-   кнопка выглядела приклеенной к лицу и мешала бы попасть по ней (замечено Владом
-   03.09.2026). Отступ разводит их по горизонтали: 44 = 28 кнопки + зазор. Двигать саму
-   кнопку нельзя — угол это единственная позиция, одинаковая для обеих сторон. */
-.h2h-mini--left { padding-right: 44px; }
-.h2h-mini--right { padding-left: 44px; }
+/* Поля симметричные: кнопка во внутреннем углу (✕) убрана — сторона меняется кликом по
+   самой карточке, а сердечко стоит во внешнем углу и места под себя не требует. */
+.h2h-mini--left, .h2h-mini--right { padding-inline: 16px; }
 /* Портрет рисует `UI_SwimmerAvatar` — здесь только то, чем этот экран от него отличается:
    рамка тоньше (2px против 3px), под цвет карточек шапки. Размер задан пропом. */
 .h2h-mini__avatar .swimmer-avatar__img { border-width: 2px; }
@@ -129,35 +146,41 @@
 .h2h-mini__fav--on { color: var(--deep-danger); text-shadow: 0 0 8px var(--deep-danger-soft); }
 /* Лимит избранного выбран: сердечко погашено, причина — в title. */
 .h2h-mini__fav[aria-disabled='true'] { opacity: 0.4; cursor: not-allowed; }
-/* «Сменить пловца» — во ВНУТРЕННЕМ углу (со стороны центра), чтобы не спорить с сердечком
-   во внешнем. Появляется только у сменяемой стороны: в табе её нет вовсе. */
-/* Размер — це́ль клика, а не украшение: символ ✕ 12px без подложки давал зону ~10×12,
-   в которую на телефоне не попасть (пойман Владом 03.09.2026). Кнопка стала круглой
-   подложкой 28px (в узком контейнере 34px — там палец, а не курсор), символ крупнее. */
-.h2h-mini__clear {
-  position: absolute; top: 6px; cursor: pointer;
-  /* ⚠ z-index ОБЯЗАТЕЛЕН, без него кнопки фактически не было. Аватар — `position: relative`
-     и стоит в разметке ПОЗЖЕ кнопки, поэтому при равном стеке (обе `auto`) он ложился
-     СВЕРХУ и съедал клик: `elementFromPoint` в центре ✕ возвращал аватар, клик всплывал
-     до карточки-ссылки и открывал профиль вместо сброса стороны. У левой карточки ✕
-     стоит во внутреннем углу — ровно под фото, поэтому там он не работал совсем
-     (пойман Владом 03.09.2026). */
-  z-index: 2;
-  width: 28px; height: 28px; border-radius: 50%;
+/* ── Окно выбора стороны (UI_H2HPickerModal) ──────────────────────────────── */
+
+.h2h-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: var(--t-scrim); backdrop-filter: blur(6px);
+}
+.h2h-modal__box {
+  width: 100%; max-width: 460px; max-height: min(80vh, 620px);
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 18px; border-radius: 20px;
+  background: var(--t-surface-strong); border: 1px solid var(--t-accent-border);
+  box-shadow: var(--t-shadow);
+  /* Скролл у САМОГО окна, а не у страницы: выдача поиска длинная, и у прежнего блока в
+     потоке она уезжала за нижний край (01.09.2026). */
+  overflow: auto;
+}
+.h2h-modal__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.h2h-modal__title {
+  margin: 0; font-size: 14px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--t-text);
+}
+.h2h-modal__close {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 15px; line-height: 1;
-  background: none; border: 0; padding: 0; color: var(--deep-text-ghost);
-  transition: background-color 120ms ease, color 120ms ease;
+  background: var(--t-input-bg); border: 1px solid var(--t-border); color: var(--t-text-2);
+  font: inherit; font-size: 14px;
 }
-.h2h-mini--left .h2h-mini__clear { right: 6px; }
-.h2h-mini--right .h2h-mini__clear { left: 6px; }
-/* Подложка появляется только при наведении/нажатии: в покое угол карточки должен
-   оставаться пустым, иначе крестик спорит с сердечком во внешнем углу. */
-.h2h-mini__clear:hover,
-.h2h-mini__clear:focus-visible {
-  color: var(--deep-text); background: var(--deep-card-border);
-}
-.h2h-mini__clear:active { transform: scale(0.92); }
+.h2h-modal__close:hover { color: var(--t-accent); border-color: var(--t-accent); }
+/* Внутри окна выбор занимает всю ширину и не держит своих внешних отступов. */
+.h2h-modal .h2h-picker { gap: 10px; }
+
+/* Пока окно открыто, плавающая кнопка темы (z-index 120, выше оверлеев) прячется —
+   иначе она висит поверх окна. Флаг на `body` ставит само окно. */
+body.h2h-modal-open .mode-toggle { display: none; }
 
 /* ── Пустой слот «выбери соперника» ───────────────────────────────────────── */
 
@@ -357,6 +380,12 @@
   color: var(--deep-text-mute); font-size: 12px; font-weight: 800; cursor: pointer;
 }
 .h2h-fav-chip:hover { color: var(--deep-text); }
+/* Выбранная быстрая кнопка (в выборе региона это текущий регион): акцентом, как у чипов
+   фильтров, — иначе непонятно, на чём экран стоит сейчас. */
+.h2h-fav-chip--on {
+  background: var(--deep-accent-soft); border-color: var(--deep-accent-border);
+  color: var(--deep-accent);
+}
 .h2h-fav-chip__heart { color: var(--deep-danger); }
 .h2h-search {
   width: 100%; min-height: 40px; padding: 10px 18px;
@@ -519,10 +548,9 @@
   .h2h-score__value { font-size: 44px; line-height: 1; }
 
   /* Карточка встаёт СТОЛБИКОМ: на 375px на строку остаётся ~120px, и «фото + текст» рядом
-     не помещаются — чип возраста (nowrap) вылезал за экран. Верхняя полоса отдана кнопкам
-     (♥ и ✕): в столбике первым идёт то текст, то фото, и крупный крестик ложился на имя.
-     Резервируем место, а не двигаем кнопку — угол единственная позиция, одинаковая
-     для обеих сторон. */
+     не помещаются — чип возраста (nowrap) вылезал за экран. Верхняя полоса отдана сердечку:
+     в столбике первым идёт то текст, то фото, и кнопка ложилась бы на имя. Резервируем
+     место, а не двигаем кнопку — угол единственная позиция, одинаковая для обеих сторон. */
   .h2h-mini { flex-direction: column; padding: 42px 8px 10px; gap: 6px; justify-content: center; }
   /* Столбиком портрет стоит по центру и кнопкам не мешает — боковой отступ снова
      симметричный (правило `--left/--right` выше по специфичности, поэтому не наследуется). */
@@ -537,14 +565,8 @@
   .h2h-mini--right .h2h-mini__text { text-align: center; align-items: center; width: 100%; }
   .h2h-mini__name { font-size: 13px; max-width: 100%; }
   .h2h-mini__club { font-size: 10.5px; max-width: 100%; }
-  /* Палец, а не курсор: 34px — минимальная удобная цель, и подложка видна всегда,
-     иначе на тач-экране непонятно, куда жать (наведения там нет). */
-  .h2h-mini__clear {
-    width: 34px; height: 34px; font-size: 17px; top: 4px;
-    background: var(--deep-card-border); color: var(--deep-text-mute);
-  }
-  .h2h-mini--left .h2h-mini__clear { right: 4px; }
-  .h2h-mini--right .h2h-mini__clear { left: 4px; }
+  /* Ссылка под карточкой в столбике стоит по центру — как и всё остальное в нём. */
+  .h2h-side--left, .h2h-side--right { align-items: center; }
   .h2h-mini--left .h2h-mini__age,
   .h2h-mini--right .h2h-mini__age { align-self: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 

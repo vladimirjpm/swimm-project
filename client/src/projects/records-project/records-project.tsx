@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../../index.css';
 import '../components/deep/deep-theme.css';
 import './records-page.css';
@@ -13,6 +13,8 @@ import { useRecordCountries } from '../../hooks/useRecordsCompare';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import DeepTabs, { type DeepTabItem } from '../components/deep/tabs';
 import RkDisciplinePicker from './components/rk-discipline-picker';
+import RcCountryPicker from './components/rc-country-picker';
+import UI_H2HPickerModal from '../components/mix/h2h/h2h-picker-modal';
 import RkWorldCard from './components/rk-world-card';
 import RkTable from './components/rk-table';
 import RkWorldList from './components/rk-world-list';
@@ -21,7 +23,8 @@ import RkJuniorTable from './components/rk-junior-table';
 import RkFilterBar from './components/rk-filter-bar';
 import UI_RecordsChecked from '../components/mix/records-checked/records-checked';
 import {
-  HOME_REGION, RK_DEFAULT, disciplineLabel, genderLabel, isRelay, strokeByKey, type RkFilters,
+  HOME_REGION, RK_DEFAULT, disciplineLabel, genderLabel, isRelay, strokeByKey,
+  strongestCountries, type RkFilters,
 } from './rk-disciplines';
 
 /**
@@ -74,6 +77,10 @@ function RecordsProject() {
   // Регион таба WR (9.9): null — мировые рекорды, alpha-3 — национальные рекорды страны против
   // мировых. Только open: возрастные и мастерские рекорды есть лишь у Израиля, и у них свои табы.
   const [region, setRegion] = useState<string | null>(query.region);
+  /** Регион выбирается в ОКНЕ — тем же, что выбор стороны на `/records/compare` (23.09.2026). */
+  const [regionOpen, setRegionOpen] = useState(false);
+  const [regionQuery, setRegionQuery] = useState('');
+  const regionSearchRef = useRef<HTMLInputElement>(null);
 
   // Дефолт подставляем ЗДЕСЬ, а не в parseRecordsQuery: разбор адреса обязан отличать
   // «пользователь выбрал 50 вольным» от «мы показали 50 вольным, потому что надо же
@@ -145,6 +152,10 @@ function RecordsProject() {
   const nationalOpen = useRegionRecords(region ?? 'WORLD', 'open', tab === 'world' && region != null);
   // Список стран — только когда таб WR открыт: выбор страны живёт там.
   const countries = useRecordCountries(tab === 'world');
+
+  /** Пять сильнейших — кнопками в окне выбора региона (сортировка общая, см. хелпер). */
+  const strongest = useMemo(() => strongestCountries(countries), [countries]);
+
   const israelMasters = useRegionRecords(HOME_REGION, 'masters', tab === 'masters');
   const worldMasters = useRegionRecords('WORLD', 'masters', tab === 'masters');
   const israelAge = useRegionRecords(HOME_REGION, 'age', tab === 'junior');
@@ -168,13 +179,15 @@ function RecordsProject() {
       id: 'world', icon: '🏆', label: 'World records', shortLabel: 'WR',
       sub: worldCount != null ? `${worldCount} records${region ? ` · ${region}` : ''}` : 'every event',
     },
-    {
-      id: 'masters', icon: '⏱', label: 'Masters WR',
-      sub: 'Israel vs world · by age band',
-    },
+    // Юниоры стоят ПЕРЕД мастерсами (просьба Влада 23.09.2026): порядок табов читается
+    // как возрастная лестница — страна, мир, юниоры, мастерсы.
     {
       id: 'junior', icon: '🌱', label: 'World Junior',
       sub: 'Israel ages vs world junior',
+    },
+    {
+      id: 'masters', icon: '⏱', label: 'Masters WR',
+      sub: 'Israel vs world · by age band',
     },
   ];
 
@@ -232,37 +245,55 @@ function RecordsProject() {
               showEvent={tab !== 'world'}
               allowRelays={!personalOnly}
               ageGroups={tab === 'masters' ? ageGroups : undefined}
+              // Регион — такой же ряд карточки фильтров, как пол и бассейн: он отвечает на
+              // вопрос «чьи рекорды», и стоять отдельным селектом под карточкой ему незачем
+              // (просьба Влада 23.09.2026). Сам выбор — в окне: стран больше двух сотен, и
+              // системный `<select>` на такой список неудобен ни на десктопе, ни на телефоне.
+              regionRow={tab === 'world' ? (
+                <div className="rk-picker__row">
+                  <span className="rk-picker__label">Region</span>
+                  <div className="rk-chips">
+                    <button
+                      type="button"
+                      className="rk-chip rk-chip--on rk-chip--region"
+                      onClick={() => setRegionOpen(true)}
+                    >
+                      {region
+                        ? <UI_FlagEmoji countryCode={region} size="20x15" className="src-records-project" />
+                        : <span aria-hidden="true">🌍</span>}
+                      <span>{region ?? 'World'}</span>
+                      <span className="rk-chip__caret" aria-hidden="true">▾</span>
+                    </button>
+                  </div>
+                </div>
+              ) : undefined}
             />
 
             {tab === 'world' && (
-              <>
-                {/* Регион таба (9.9): мир или одна страна. Тот же выбор, что у сравнения стран. */}
-                <label className="rc-picker rk-region">
-                  <span className="rc-picker__label">Region</span>
-                  <span className="rc-picker__control">
-                    {region && <UI_FlagEmoji countryCode={region} size="24x18" className="src-records-project" />}
-                    <select
-                      className="rc-select"
-                      value={region ?? ''}
-                      onChange={(e) => setRegion(e.target.value || null)}
-                    >
-                      <option value="">World</option>
-                      {/* Страна из адреса, которой нет в списке (или список ещё грузится), — не
-                          пропадает из селекта, иначе он молча показал бы «World». */}
-                      {region && !countries.some((c) => c.code === region) && (
-                        <option value={region}>{region}</option>
-                      )}
-                      {/* В скобках — сколько мировых рекордов держит страна; нет ни одного — скобок нет
-                          (решение Влада 22.09.2026). */}
-                      {countries.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.world_records ? `${c.code} (${c.world_records})` : c.code}
-                        </option>
-                      ))}
-                    </select>
-                  </span>
-                </label>
+              <UI_H2HPickerModal
+                open={regionOpen}
+                title="Choose a region"
+                onClose={() => setRegionOpen(false)}
+              >
+                <RcCountryPicker
+                  countries={countries}
+                  // Занятых сторон тут нет: регион один, и текущий из списка не убираем —
+                  // иначе непонятно, что именно сейчас выбрано.
+                  taken={[]}
+                  query={regionQuery}
+                  onQuery={setRegionQuery}
+                  onPick={(code) => { setRegion(code); setRegionOpen(false); setRegionQuery(''); }}
+                  quick={strongest}
+                  quickLabel="Most world records"
+                  placeholder="Search a country code (USA, GER, ISR…)"
+                  world={{ active: region == null, onPick: () => { setRegion(null); setRegionOpen(false); } }}
+                  inputRef={regionSearchRef}
+                />
+              </UI_H2HPickerModal>
+            )}
 
+            {tab === 'world' && (
+              <>
                 {worldList.loading && <div className="rk-state">Loading…</div>}
                 {worldList.error && (
                   <div className="rk-state rk-state--error">

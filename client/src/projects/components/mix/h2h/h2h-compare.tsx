@@ -17,7 +17,7 @@ import { routes } from '../../../../utils/routes';
  * страницы пловца и отдельная страница `/h2h` (план — `docs/plans/h2h-page-plan.md`).
  *
  * Компонент НЕ знает, откуда его позвали: он видит два слота (занятый или пустой), цифры
- * сравнения и готовый блок выбора. Поэтому «левого менять нельзя» — это `onClear: null` у
+ * сравнения и готовый блок выбора. Поэтому «левого менять нельзя» — это `onSelect: null` у
  * слота, а не флаг варианта, и favorites приходят пропсами, а не из контекста: таб и
  * страница живут в разных провайдерах, а компонент из `mix/` не должен требовать чужого.
  *
@@ -82,7 +82,7 @@ function Slot({ slot, align }: { slot: H2HSlot; align: 'left' | 'right' }) {
       isFavorite={slot.isFavorite ?? null}
       onToggleFavorite={slot.onToggleFavorite}
       favoriteBlockedHint={slot.favoriteBlockedHint ?? null}
-      onClear={slot.onClear ?? null}
+      onSelect={slot.onSelect ?? null}
       active={slot.active}
     />
   );
@@ -178,7 +178,8 @@ const UI_H2HCompare: React.FC<Props> = ({
           isFavorite: left.isFavorite ?? null,
           onToggleFavorite: left.onToggleFavorite,
           favoriteBlockedHint: left.favoriteBlockedHint ?? null,
-          onClear: left.onClear ?? null,
+          onSelect: left.onSelect ?? null,
+          active: left.active,
         }}
         right={{
           swimmer: right.swimmer,
@@ -189,7 +190,8 @@ const UI_H2HCompare: React.FC<Props> = ({
           isFavorite: right.isFavorite ?? null,
           onToggleFavorite: right.onToggleFavorite,
           favoriteBlockedHint: right.favoriteBlockedHint ?? null,
-          onClear: right.onClear ?? null,
+          onSelect: right.onSelect ?? null,
+          active: right.active,
         }}
         leftFaster={compare.mineFaster}
         rightFaster={compare.rivalFaster}
