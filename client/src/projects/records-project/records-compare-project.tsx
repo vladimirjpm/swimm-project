@@ -150,6 +150,35 @@ function RecordsCompareProject() {
   const data = compare.data;
   const bothPicked = Boolean(filters.a && filters.b);
 
+  /**
+   * Год самого свежего рекорда каждой стороны в этом разрезе.
+   *
+   * ⚠ Считается по ТЕМ ЖЕ строкам, что показаны ниже: цифра обязана отвечать за то, что
+   * человек видит, а не за весь справочник. Дата приходит строкой «дд/мм/гггг» — берём
+   * последние четыре цифры, чужой формат молча пропускаем (в справочнике их два, см.
+   * docs/data-integrity.md).
+   */
+  const latestYear = useMemo(() => {
+    const rows = data?.rows ?? [];
+    const maxYear = (side: 'a' | 'b') => {
+      let best: number | null = null;
+      for (const row of rows) {
+        const m = /(\d{4})\s*$/.exec(row[side]?.record_date ?? '');
+        const year = m ? Number(m[1]) : null;
+        if (year != null && (best == null || year > best)) best = year;
+      }
+      return best;
+    };
+    return { a: maxYear('a'), b: maxYear('b') };
+  }, [data]);
+
+  /** Мировые рекорды за страной — из общего списка стран, он на странице уже загружен. */
+  const worldRecords = useMemo(() => {
+    const of = (code: string | null) =>
+      (code ? countries.find((c) => c.code === code)?.world_records ?? null : null);
+    return { a: of(filters.a), b: of(filters.b) };
+  }, [countries, filters.a, filters.b]);
+
   return (
     <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
       <AppTopbar active="records" />
@@ -206,6 +235,8 @@ function RecordsCompareProject() {
               a: data ? data.rows.filter((r) => r.a).length : 0,
               b: data ? data.rows.filter((r) => r.b).length : 0,
             }}
+            latestYear={latestYear}
+            worldRecords={worldRecords}
             active={active}
             onSwap={swap}
             onFocus={focusSide}

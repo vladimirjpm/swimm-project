@@ -24,6 +24,10 @@ interface Props {
   score: RecordCompareScore | null;
   /** Сколько рекордов у каждой стороны в этом разрезе (включая несравненные). */
   totals: { a: number; b: number };
+  /** Год свежайшего рекорда стороны — показывает, не заморожен ли набор (см. RcNationCard). */
+  latestYear: { a: number | null; b: number | null };
+  /** Действующие мировые рекорды за страной. */
+  worldRecords: { a: number | null; b: number | null };
   /** Какую сторону заполнит следующий выбор в пикере. */
   active: 'a' | 'b';
   onSwap: () => void;
@@ -35,7 +39,7 @@ const winnerOf = (left: number, right: number) =>
   left === right ? null : (left > right ? 'left' as const : 'right' as const);
 
 const RcH2HHeader: React.FC<Props> = ({
-  a, b, score, totals, active, onSwap, onFocus,
+  a, b, score, totals, latestYear, worldRecords, active, onSwap, onFocus,
 }) => {
   /** Сторона шапки: выбранная страна — карточкой, пустая — слотом «choose a country». */
   const side = (which: 'a' | 'b', code: string | null, records: number) => (
@@ -44,6 +48,8 @@ const RcH2HHeader: React.FC<Props> = ({
         <RcNationCard
           code={code}
           records={records}
+          latestYear={latestYear[which]}
+          worldRecords={worldRecords[which]}
           align={which === 'a' ? 'left' : 'right'}
           active={active === which}
           onSelect={() => onFocus(which)}
