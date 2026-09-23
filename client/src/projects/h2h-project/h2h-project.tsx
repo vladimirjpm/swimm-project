@@ -236,7 +236,8 @@ function H2HProject() {
       // Профиль ещё едет — показываем слот с номером, чтобы шапка не прыгала при загрузке.
       swimmer: profile ? slotSwimmer(profile) : { id, name: `#${id}` },
       ...favProps(id),
-      onClear: () => clear(side),
+      // Клик по карточке — «выбрать другого»: освобождаем сторону и уводим курсор в поиск.
+      onSelect: () => clear(side),
       active: active === side,
     };
   };

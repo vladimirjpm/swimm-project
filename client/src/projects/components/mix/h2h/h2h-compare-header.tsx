@@ -26,8 +26,8 @@ export interface H2HSide {
   onToggleFavorite?: () => void;
   /** Лимит избранного выбран: пустое сердечко погашено, это подсказка к нему. */
   favoriteBlockedHint?: string | null;
-  /** Сброс стороны; не задан — сменить нельзя (в табе левый это хозяин профиля). */
-  onClear?: (() => void) | null;
+  /** Выбрать другого на эту сторону; не задан — сменить нельзя (в табе левый это хозяин профиля). */
+  onSelect?: (() => void) | null;
 }
 
 interface Props {
@@ -66,7 +66,7 @@ const UI_H2HCompareHeader: React.FC<Props> = ({
         isFavorite={left.isFavorite ?? null}
         onToggleFavorite={left.onToggleFavorite}
         favoriteBlockedHint={left.favoriteBlockedHint ?? null}
-        onClear={left.onClear ?? null}
+        onSelect={left.onSelect ?? null}
       />
       <div className="h2h-score">
         <div className="h2h-score__value">{leftFaster}–{rightFaster}</div>
@@ -79,7 +79,7 @@ const UI_H2HCompareHeader: React.FC<Props> = ({
         isFavorite={right.isFavorite ?? null}
         onToggleFavorite={right.onToggleFavorite}
         favoriteBlockedHint={right.favoriteBlockedHint ?? null}
-        onClear={right.onClear ?? null}
+        onSelect={right.onSelect ?? null}
       />
     </div>
 
