@@ -525,7 +525,6 @@ function SwimmerProject() {
             hits={rivalHits.data}
             hitsState={rivalHits}
             onPick={handleRival}
-            onClear={() => handleRival(null)}
             rivalId={rivalId}
             swimmerId={profile.id}
             profileName={profile.fullName}

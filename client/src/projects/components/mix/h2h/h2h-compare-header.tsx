@@ -28,6 +28,12 @@ export interface H2HSide {
   favoriteBlockedHint?: string | null;
   /** Выбрать другого на эту сторону; не задан — сменить нельзя (в табе левый это хозяин профиля). */
   onSelect?: (() => void) | null;
+  /**
+   * Эту сторону заменит следующий выбор в пикере. Рамка нужна и в ПОЛНОЙ шапке, а не
+   * только в ряду пустых слотов: когда выбраны оба, подпись «choosing the left swimmer»
+   * стоит отдельно от карточек, и без рамки связь приходилось вычитывать из текста.
+   */
+  active?: boolean;
 }
 
 interface Props {
@@ -67,6 +73,7 @@ const UI_H2HCompareHeader: React.FC<Props> = ({
         onToggleFavorite={left.onToggleFavorite}
         favoriteBlockedHint={left.favoriteBlockedHint ?? null}
         onSelect={left.onSelect ?? null}
+        active={left.active}
       />
       <div className="h2h-score">
         <div className="h2h-score__value">{leftFaster}–{rightFaster}</div>
@@ -80,6 +87,7 @@ const UI_H2HCompareHeader: React.FC<Props> = ({
         onToggleFavorite={right.onToggleFavorite}
         favoriteBlockedHint={right.favoriteBlockedHint ?? null}
         onSelect={right.onSelect ?? null}
+        active={right.active}
       />
     </div>
 

@@ -179,6 +179,7 @@ const UI_H2HCompare: React.FC<Props> = ({
           onToggleFavorite: left.onToggleFavorite,
           favoriteBlockedHint: left.favoriteBlockedHint ?? null,
           onSelect: left.onSelect ?? null,
+          active: left.active,
         }}
         right={{
           swimmer: right.swimmer,
@@ -190,6 +191,7 @@ const UI_H2HCompare: React.FC<Props> = ({
           onToggleFavorite: right.onToggleFavorite,
           favoriteBlockedHint: right.favoriteBlockedHint ?? null,
           onSelect: right.onSelect ?? null,
+          active: right.active,
         }}
         leftFaster={compare.mineFaster}
         rightFaster={compare.rivalFaster}

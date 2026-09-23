@@ -193,21 +193,15 @@ function H2HProject() {
     setSearch('');
   };
 
-  const clear = (side: ActiveSide) => {
-    autoLeftDoneRef.current = true;
-    if (side === 'a') { setAId(null); writeQuery({ a: null }); } else { setBId(null); writeQuery({ b: null }); }
-    setActive(side);
-    setSearch('');
-    // Фокус в поиск: крестик — это «выбрать другого», а не «просто убрать».
-    window.setTimeout(() => searchRef.current?.focus(), 0);
-  };
-
   const swap = () => {
     setAId(bId); setBId(aId);
     writeQuery({ a: bId, b: aId });
   };
 
   const focusSlot = (side: ActiveSide) => {
+    // Первое же действие человека отменяет одноразовую подстановку «ME» в левый слот:
+    // приехавший позже primary favorite не должен влезать в сторону задним числом.
+    autoLeftDoneRef.current = true;
     setActive(side);
     searchRef.current?.focus();
   };
@@ -236,8 +230,10 @@ function H2HProject() {
       // Профиль ещё едет — показываем слот с номером, чтобы шапка не прыгала при загрузке.
       swimmer: profile ? slotSwimmer(profile) : { id, name: `#${id}` },
       ...favProps(id),
-      // Клик по карточке — «выбрать другого»: освобождаем сторону и уводим курсор в поиск.
-      onSelect: () => clear(side),
+      // Клик по карточке — «выбрать другого»: сторона становится активной и курсор уходит
+      // в поиск, но стоящий здесь пловец ОСТАЁТСЯ, пока не выбран новый. Иначе один клик
+      // разбирал бы готовое сравнение, а вернуть его можно только поиском заново.
+      onSelect: () => focusSlot(side),
       active: active === side,
     };
   };
