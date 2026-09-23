@@ -24,6 +24,30 @@ export interface RkFilters {
   ageGroup: string | null;
 }
 
+/**
+ * Сильнейшие страны — кнопками в окнах выбора (регион на `/records`, сторона на
+ * `/records/compare`).
+ *
+ * ⚠ Ось — `world_records`, число ДЕЙСТВУЮЩИХ мировых рекордов за страной. Поле `records`
+ * для этого не годится: оно про ПОКРЫТИЕ справочника, у любой заметной страны там 91-92
+ * из сотни дисциплин, и по нему в «сильнейшие» попадал Парагвай (поймано 23.09.2026).
+ * Список от API приходит по алфавиту, поэтому сортировать нужно у себя.
+ *
+ * Хелпер общий на два экрана сознательно: две копии одной сортировки разъехались бы
+ * молча — и один экран показывал бы «сильнейших» иначе, чем соседний.
+ */
+export function strongestCountries(
+  countries: ReadonlyArray<{ code: string; records: number; world_records?: number }>,
+  limit = 5,
+): string[] {
+  return countries
+    .filter((c) => (c.world_records ?? 0) > 0)
+    .slice()
+    .sort((x, y) => (y.world_records ?? 0) - (x.world_records ?? 0) || y.records - x.records)
+    .slice(0, limit)
+    .map((c) => c.code);
+}
+
 /** Страна, чей рейтинг нам домашний, — её строка подсвечена всегда. */
 export const HOME_REGION = 'ISR';
 

@@ -23,7 +23,8 @@ import RkJuniorTable from './components/rk-junior-table';
 import RkFilterBar from './components/rk-filter-bar';
 import UI_RecordsChecked from '../components/mix/records-checked/records-checked';
 import {
-  HOME_REGION, RK_DEFAULT, disciplineLabel, genderLabel, isRelay, strokeByKey, type RkFilters,
+  HOME_REGION, RK_DEFAULT, disciplineLabel, genderLabel, isRelay, strokeByKey,
+  strongestCountries, type RkFilters,
 } from './rk-disciplines';
 
 /**
@@ -152,19 +153,8 @@ function RecordsProject() {
   // Список стран — только когда таб WR открыт: выбор страны живёт там.
   const countries = useRecordCountries(tab === 'world');
 
-  /** Пять сильнейших — кнопками в окне выбора региона. */
-  const strongest = useMemo(
-    () => countries
-      .filter((c) => (c.world_records ?? 0) > 0)
-      .slice()
-      // ⚠ Ось — мировые рекорды за страной, а НЕ поле `records`: второе это покрытие
-      // справочника (у любой заметной страны 91-92 из сотни дисциплин), и по нему в
-      // «сильнейших» попадал Парагвай (поймано 23.09.2026 на /records/compare).
-      .sort((x, y) => (y.world_records ?? 0) - (x.world_records ?? 0) || y.records - x.records)
-      .slice(0, 5)
-      .map((c) => c.code),
-    [countries],
-  );
+  /** Пять сильнейших — кнопками в окне выбора региона (сортировка общая, см. хелпер). */
+  const strongest = useMemo(() => strongestCountries(countries), [countries]);
 
   const israelMasters = useRegionRecords(HOME_REGION, 'masters', tab === 'masters');
   const worldMasters = useRegionRecords('WORLD', 'masters', tab === 'masters');
@@ -294,7 +284,7 @@ function RecordsProject() {
                   onQuery={setRegionQuery}
                   onPick={(code) => { setRegion(code); setRegionOpen(false); setRegionQuery(''); }}
                   quick={strongest}
-                  quickLabel="Top nations"
+                  quickLabel="Most world records"
                   placeholder="Search a country code (USA, GER, ISR…)"
                   world={{ active: region == null, onPick: () => { setRegion(null); setRegionOpen(false); } }}
                   inputRef={regionSearchRef}

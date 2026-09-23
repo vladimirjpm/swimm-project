@@ -12,7 +12,7 @@ import RcH2HHeader from './components/rc-h2h-header';
 import RcH2HEvents from './components/rc-h2h-events';
 import RcCountryPicker from './components/rc-country-picker';
 import UI_H2HPickerModal from '../components/mix/h2h/h2h-picker-modal';
-import { HOME_REGION } from './rk-disciplines';
+import { HOME_REGION, strongestCountries } from './rk-disciplines';
 
 /**
  * Страница `/records/compare` — сравнение двух стран по рекордам (этап 11.3.2).
@@ -44,9 +44,6 @@ const GENDERS: Array<{ key: RecordGender | null; label: string }> = [
   // Смешанные эстафеты (Э5, records-relays-plan): при нём в сравнении остаются только они.
   { key: 'mixed', label: 'Mixed' },
 ];
-
-/** Сколько богатых рекордами стран вынести кнопками над поиском. */
-const QUICK_COUNT = 6;
 
 interface CompareFilters {
   a: string | null;
@@ -151,27 +148,12 @@ function RecordsCompareProject() {
   }, []);
 
   /**
-   * Быстрые кнопки — домашняя страна и держатели наибольшего числа мировых рекордов.
-   *
-   * ⚠ Это НЕ рейтинг силы, и подпись полосы говорит это прямо: ось считает только
-   * действующие рекорды, поэтому историческая величина страны в ней не видна, а разрыв
-   * между четвёртым и пятым местом бывает в один рекорд (RUS 3 против GER 4).
-   *
-   * ⚠ Ось — `world_records` (сколько мировых рекордов держат пловцы страны), а НЕ
-   * `records`. Второе поле это ПОКРЫТИЕ справочника: у любой заметной страны там 91-92 из
-   * сотни дисциплин, и сортировка по нему ставила Парагвай впереди США — список выглядел
-   * случайным. Порядок списка от API алфавитный, поэтому сортировать нужно здесь.
+   * Быстрые кнопки окна: домашняя страна и ПЯТЬ сильнейших (просьба Влада 23.09.2026 —
+   * столько же, сколько в выборе региона на `/records`). Домашняя почти всегда занята
+   * левой стороной и из выдачи убирается, так что на экране их обычно ровно пять.
    */
   const quick = useMemo(
-    () => [
-      HOME_REGION,
-      ...countries
-        .filter((c) => c.code !== HOME_REGION && (c.world_records ?? 0) > 0)
-        .slice()
-        .sort((x, y) => (y.world_records ?? 0) - (x.world_records ?? 0) || y.records - x.records)
-        .slice(0, QUICK_COUNT)
-        .map((c) => c.code),
-    ],
+    () => [HOME_REGION, ...strongestCountries(countries.filter((c) => c.code !== HOME_REGION))],
     [countries],
   );
 
