@@ -9,8 +9,8 @@ import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import { parseRecordsCompareQuery, routes, type RecordGender } from '../../utils/routes';
 import { useRecordCountries, useRecordsCompare } from '../../hooks/useRecordsCompare';
-import RcScoreCard from './components/rc-score-card';
-import RcTable from './components/rc-table';
+import RcH2HHeader from './components/rc-h2h-header';
+import RcH2HEvents from './components/rc-h2h-events';
 import { HOME_REGION } from './rk-disciplines';
 
 /**
@@ -164,6 +164,7 @@ function RecordsCompareProject() {
           </div>
         </div>
 
+        {/* Разрез — та же полоса чипов, что была; сам экран ниже собран в вёрстке H2H. */}
         {!filters.a || !filters.b ? (
           <div className="rk-state">Pick two countries to compare.</div>
         ) : compare.loading ? (
@@ -178,8 +179,18 @@ function RecordsCompareProject() {
           </div>
         ) : data ? (
           <>
-            <RcScoreCard a={data.a} b={data.b} score={data.score} />
-            <RcTable rows={data.rows} a={data.a} b={data.b} />
+            <RcH2HHeader
+              a={data.a}
+              b={data.b}
+              score={data.score}
+              totals={{
+                a: data.rows.filter((r) => r.a).length,
+                b: data.rows.filter((r) => r.b).length,
+              }}
+              onSwap={swap}
+              onClear={(side) => patch({ [side]: null } as Partial<CompareFilters>)}
+            />
+            <RcH2HEvents rows={data.rows} genderFixed={filters.gender != null} />
           </>
         ) : null}
       </main>
