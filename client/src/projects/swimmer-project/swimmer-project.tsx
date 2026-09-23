@@ -202,7 +202,11 @@ function SwimmerProject() {
   // Сравнение и поиск живут в табе H2H: пока его не открыли, запросов нет.
   const onH2H = tab === 'h2h';
   const compare = useSwimmerCompare(swimmerId, rivalId, activeSeason, seasonReady && onH2H);
-  const rivalHits = useSwimmerSearch(onH2H && rivalId == null ? rivalQuery : '');
+  // ⚠ Поиск работает и когда соперник УЖЕ выбран: клик по его карточке открывает окно
+  // выбора, ничего не сбрасывая (23.09.2026). Прежнее условие `rivalId == null` осталось
+  // от крестика, который сперва освобождал сторону, — с ним окно молчало «type at least
+  // two letters» на любой запрос.
+  const rivalHits = useSwimmerSearch(onH2H ? rivalQuery : '');
   const bestTimes = useSwimmerBestTimes(swimmerId, activeSeason, seasonReady);
 
   const onResults = tab === 'results';

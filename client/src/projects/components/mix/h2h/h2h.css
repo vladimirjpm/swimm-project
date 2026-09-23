@@ -146,6 +146,42 @@
 .h2h-mini__fav--on { color: var(--deep-danger); text-shadow: 0 0 8px var(--deep-danger-soft); }
 /* Лимит избранного выбран: сердечко погашено, причина — в title. */
 .h2h-mini__fav[aria-disabled='true'] { opacity: 0.4; cursor: not-allowed; }
+/* ── Окно выбора стороны (UI_H2HPickerModal) ──────────────────────────────── */
+
+.h2h-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: var(--t-scrim); backdrop-filter: blur(6px);
+}
+.h2h-modal__box {
+  width: 100%; max-width: 460px; max-height: min(80vh, 620px);
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 18px; border-radius: 20px;
+  background: var(--t-surface-strong); border: 1px solid var(--t-accent-border);
+  box-shadow: var(--t-shadow);
+  /* Скролл у САМОГО окна, а не у страницы: выдача поиска длинная, и у прежнего блока в
+     потоке она уезжала за нижний край (01.09.2026). */
+  overflow: auto;
+}
+.h2h-modal__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.h2h-modal__title {
+  margin: 0; font-size: 14px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--t-text);
+}
+.h2h-modal__close {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--t-input-bg); border: 1px solid var(--t-border); color: var(--t-text-2);
+  font: inherit; font-size: 14px;
+}
+.h2h-modal__close:hover { color: var(--t-accent); border-color: var(--t-accent); }
+/* Внутри окна выбор занимает всю ширину и не держит своих внешних отступов. */
+.h2h-modal .h2h-picker { gap: 10px; }
+
+/* Пока окно открыто, плавающая кнопка темы (z-index 120, выше оверлеев) прячется —
+   иначе она висит поверх окна. Флаг на `body` ставит само окно. */
+body.h2h-modal-open .mode-toggle { display: none; }
+
 /* ── Пустой слот «выбери соперника» ───────────────────────────────────────── */
 
 .h2h-slot {

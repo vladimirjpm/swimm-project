@@ -503,13 +503,6 @@
    же решение, что у страницы `/h2h` с её `content-box-xs`. */
 .rc-board { max-width: 780px; margin: 0 auto; }
 
-/* Пикер в потоке под сторонами — как выбор соперника на `/h2h`. */
-.rc-picker-wrap { display: flex; flex-direction: column; gap: 6px; }
-.rc-picker-cap {
-  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--deep-text-faint);
-}
-.rc-picker-cap strong { color: var(--deep-accent); }
 /* Флаг занимает в строке выдачи место портрета пловца. */
 .rc-hit__flag { flex: none; border-radius: 3px; object-fit: cover; }
 

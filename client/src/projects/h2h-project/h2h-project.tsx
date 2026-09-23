@@ -9,6 +9,7 @@ import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import DeepSeasonCarousel from '../components/deep/season-carousel';
 import UI_H2HCompare, { h2hScopeLabel } from '../components/mix/h2h/h2h-compare';
 import UI_H2HRivalPicker from '../components/mix/h2h/h2h-rival-picker';
+import UI_H2HPickerModal from '../components/mix/h2h/h2h-picker-modal';
 import type { H2HSlot } from '../components/mix/h2h/h2h.types';
 import { parseH2HQuery, routes, H2H_PARAM } from '../../utils/routes';
 import { PAGE_CONTAINER } from '../../utils/layout';
@@ -87,6 +88,8 @@ function H2HProject() {
   const [bId, setBId] = useState<number | null>(query.b);
   const [active, setActive] = useState<ActiveSide>(query.a == null ? 'a' : 'b');
   const [search, setSearch] = useState('');
+  /** Выбор живёт в окне: на телефоне и в табе блок в потоке уезжал под сравнение. */
+  const [pickerOpen, setPickerOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // `undefined` — сезон ещё не выбран (ждём профили), `null` — режим ∞ (карьера).
@@ -191,6 +194,8 @@ function H2HProject() {
       setActive('a');
     }
     setSearch('');
+    // Выбрали — окно своё дело сделало.
+    setPickerOpen(false);
   };
 
   const swap = () => {
@@ -203,7 +208,7 @@ function H2HProject() {
     // приехавший позже primary favorite не должен влезать в сторону задним числом.
     autoLeftDoneRef.current = true;
     setActive(side);
-    searchRef.current?.focus();
+    setPickerOpen(true);
   };
 
   const favProps = (id: number) => ({
@@ -249,10 +254,11 @@ function H2HProject() {
     || (bId != null && bState.status === 'notfound');
 
   const picker = (
-    <div className="h2h-page__picker">
-      <div className="h2h-page__picker-cap">
-        Choosing the <strong>{active === 'a' ? 'left' : 'right'}</strong> swimmer
-      </div>
+    <UI_H2HPickerModal
+      open={pickerOpen}
+      title={`Choose the ${active === 'a' ? 'left' : 'right'} swimmer`}
+      onClose={() => setPickerOpen(false)}
+    >
       <UI_H2HRivalPicker
         favorites={favoriteChips}
         query={search}
@@ -265,7 +271,7 @@ function H2HProject() {
         // Нашли, но всех отфильтровали — значит найденный уже стоит в слоте.
         emptyText={(found.data?.length ?? 0) > 0 ? 'Already on the board.' : 'Nobody found.'}
       />
-    </div>
+    </UI_H2HPickerModal>
   );
 
   return (

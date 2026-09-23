@@ -17,14 +17,8 @@
   font-size: 12.5px; font-weight: 700; color: var(--deep-text-mute);
 }
 
-/* Пикер страницы: подпись «какую сторону заполняем» — без неё непонятно, куда попадёт
-   выбранный пловец (пикер один на оба слота). */
-.h2h-page__picker { display: flex; flex-direction: column; gap: 8px; }
-.h2h-page__picker-cap {
-  font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--deep-text-ghost);
-}
-.h2h-page__picker-cap strong { color: var(--deep-accent); }
+/* Какую сторону заполняет выбор, теперь говорит заголовок окна (`UI_H2HPickerModal`):
+   подпись при пикере в потоке жила здесь. */
 
 .h2h-page__profile-link {
   align-self: flex-start;

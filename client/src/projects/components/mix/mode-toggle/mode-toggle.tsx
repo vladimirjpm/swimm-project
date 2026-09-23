@@ -22,7 +22,7 @@ const UI_ModeToggle: React.FC = () => {
       onClick={toggleMode}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Light theme' : 'Dark theme'}
-      className="fixed right-4 z-[120] flex h-10 w-10 items-center justify-center rounded-full border text-lg shadow-lg backdrop-blur transition-colors bg-[var(--theme-mode-surface)] border-[var(--theme-mode-border)] text-[var(--theme-mode-text)] hover:brightness-95"
+      className="mode-toggle fixed right-4 z-[120] flex h-10 w-10 items-center justify-center rounded-full border text-lg shadow-lg backdrop-blur transition-colors bg-[var(--theme-mode-surface)] border-[var(--theme-mode-border)] text-[var(--theme-mode-text)] hover:brightness-95"
       style={{ bottom: 'var(--mode-toggle-bottom, 16px)' }}
     >
       {isDark ? '☀️' : '🌙'}

@@ -11,6 +11,7 @@ import { useRecordCountries, useRecordsCompare } from '../../hooks/useRecordsCom
 import RcH2HHeader from './components/rc-h2h-header';
 import RcH2HEvents from './components/rc-h2h-events';
 import RcCountryPicker from './components/rc-country-picker';
+import UI_H2HPickerModal from '../components/mix/h2h/h2h-picker-modal';
 import { HOME_REGION } from './rk-disciplines';
 
 /**
@@ -74,6 +75,8 @@ function RecordsCompareProject() {
   /** Какую сторону заполнит следующий выбор — как активный слот на `/h2h`. */
   const [active, setActive] = useState<'a' | 'b'>(() => (query.a == null ? 'a' : 'b'));
   const [search, setSearch] = useState('');
+  /** Выбор живёт в окне — одинаково на десктопе и на телефоне (решение Влада 23.09.2026). */
+  const [pickerOpen, setPickerOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -111,11 +114,12 @@ function RecordsCompareProject() {
       : { ...f, b: code, a: f.a === code ? f.b : f.a }));
     setActive((side) => (side === 'a' ? 'b' : 'a'));
     setSearch('');
+    setPickerOpen(false);
   }, [active]);
 
   const focusSide = useCallback((side: 'a' | 'b') => {
     setActive(side);
-    searchRef.current?.focus();
+    setPickerOpen(true);
   }, []);
 
   /**
@@ -207,12 +211,13 @@ function RecordsCompareProject() {
             onFocus={focusSide}
           />
 
-          {/* Пикер стоит в потоке под сторонами и остаётся видимым даже когда обе выбраны:
-              сменить страну — обычное действие экрана, а не исключение. */}
-          <div className="rc-picker-wrap">
-            <div className="rc-picker-cap">
-              Choosing the <strong>{active === 'a' ? 'left' : 'right'}</strong> country
-            </div>
+          {/* Выбор — в окне: в потоке он отодвигал само сравнение, а на табе пловца
+              оказывался и вовсе под всеми карточками заплывов. */}
+          <UI_H2HPickerModal
+            open={pickerOpen}
+            title={`Choose the ${active === 'a' ? 'left' : 'right'} country`}
+            onClose={() => setPickerOpen(false)}
+          >
             <RcCountryPicker
               countries={countries}
               taken={[filters.a, filters.b]}
@@ -222,7 +227,7 @@ function RecordsCompareProject() {
               quick={quick}
               inputRef={searchRef}
             />
-          </div>
+          </UI_H2HPickerModal>
 
           {!bothPicked ? (
             <div className="h2h-empty">Pick two countries to compare.</div>
