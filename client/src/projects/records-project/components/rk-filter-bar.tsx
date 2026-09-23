@@ -49,14 +49,9 @@ const RkFilterBar: React.FC<{ filters: RkFilters; className?: string; ageBand?: 
     </div>
   );
 
+  // Порядок чипов: кто · сколько лет · что плыл · где (просьба Влада 23.09.2026).
+  // Так полоса читается как фраза, а не как «сначала дисциплина, потом всё остальное».
   const chips: FilterBarChip[] = [
-    {
-      key: 'event',
-      label: 'Event',
-      active: true,
-      value: event('w-[96px]', 'text-base', 22),
-      valueCompact: event('w-[52px]', 'text-[13px]', 14),
-    },
     {
       key: 'gender',
       label: 'Gender',
@@ -89,6 +84,13 @@ const RkFilterBar: React.FC<{ filters: RkFilters; className?: string; ageBand?: 
           {age}
         </span>
       ),
+    },
+    {
+      key: 'event',
+      label: 'Event',
+      active: true,
+      value: event('w-[96px]', 'text-base', 22),
+      valueCompact: event('w-[52px]', 'text-[13px]', 14),
     },
     {
       key: 'pool',

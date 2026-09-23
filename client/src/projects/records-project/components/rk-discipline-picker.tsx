@@ -64,23 +64,9 @@ const RkDisciplinePicker: React.FC<Props> = ({
 
   return (
     <div className="rk-picker">
-      <div className="rk-picker__row">
-        <span className="rk-picker__label">Pool</span>
-        <div className="rk-chips">
-          {POOLS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className={`rk-chip${filters.poolType === p.key ? ' rk-chip--on' : ''}`}
-              aria-pressed={filters.poolType === p.key}
-              onClick={() => onChange({ poolType: p.key })}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      {/* Порядок рядов один на все табы рекордов: кто · сколько лет · что плыл · где
+          (просьба Влада 23.09.2026). Тот же порядок держит полоса выбранного
+          `RkFilterBar` — иначе выбор и его сводка читаются в разной последовательности. */}
       <div className="rk-picker__row">
         <span className="rk-picker__label">Gender</span>
         <div className="rk-chips">
@@ -99,6 +85,25 @@ const RkDisciplinePicker: React.FC<Props> = ({
           ))}
         </div>
       </div>
+
+      {ageGroups && ageGroups.length > 0 && (
+        <div className="rk-picker__row">
+          <span className="rk-picker__label">Age group</span>
+          <div className="rk-chips">
+            {[null, ...ageGroups].map((g) => (
+              <button
+                key={g ?? 'all'}
+                type="button"
+                className={`rk-chip${activeAge === g ? ' rk-chip--on' : ''}`}
+                aria-pressed={activeAge === g}
+                onClick={() => onChange({ ageGroup: g })}
+              >
+                {g ?? 'All'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showEvent && (
         <>
@@ -155,24 +160,22 @@ const RkDisciplinePicker: React.FC<Props> = ({
         </>
       )}
 
-      {ageGroups && ageGroups.length > 0 && (
-        <div className="rk-picker__row">
-          <span className="rk-picker__label">Age group</span>
-          <div className="rk-chips">
-            {[null, ...ageGroups].map((g) => (
-              <button
-                key={g ?? 'all'}
-                type="button"
-                className={`rk-chip${activeAge === g ? ' rk-chip--on' : ''}`}
-                aria-pressed={activeAge === g}
-                onClick={() => onChange({ ageGroup: g })}
-              >
-                {g ?? 'All'}
-              </button>
-            ))}
-          </div>
+      <div className="rk-picker__row">
+        <span className="rk-picker__label">Pool</span>
+        <div className="rk-chips">
+          {POOLS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              className={`rk-chip${filters.poolType === p.key ? ' rk-chip--on' : ''}`}
+              aria-pressed={filters.poolType === p.key}
+              onClick={() => onChange({ poolType: p.key })}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 };
