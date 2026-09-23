@@ -2,6 +2,7 @@ import React from 'react';
 import '../../components/mix/h2h/h2h.css';
 import UI_H2HStatRow from '../../components/mix/h2h/h2h-stat-row';
 import UI_H2HSwap from '../../components/mix/h2h/h2h-swap';
+import UI_H2HEmptySlot from '../../components/mix/h2h/h2h-empty-slot';
 import RcNationCard from './rc-nation-card';
 import type { RecordCompareScore } from '../../../hooks/useRecordsCompare';
 
@@ -16,53 +17,91 @@ import type { RecordCompareScore } from '../../../hooks/useRecordsCompare';
  * очные встречи.
  */
 interface Props {
-  a: string;
-  b: string;
-  score: RecordCompareScore;
+  /** Код страны либо null — сторона ещё не выбрана (это законное состояние экрана). */
+  a: string | null;
+  b: string | null;
+  /** Счёт есть только когда выбраны обе: сравнивать одну страну не с чем. */
+  score: RecordCompareScore | null;
   /** Сколько рекордов у каждой стороны в этом разрезе (включая несравненные). */
   totals: { a: number; b: number };
+  /** Какую сторону заполнит следующий выбор в пикере. */
+  active: 'a' | 'b';
   onSwap: () => void;
   onClear: (side: 'a' | 'b') => void;
+  onFocus: (side: 'a' | 'b') => void;
 }
 
 const winnerOf = (left: number, right: number) =>
   left === right ? null : (left > right ? 'left' as const : 'right' as const);
 
-const RcH2HHeader: React.FC<Props> = ({ a, b, score, totals, onSwap, onClear }) => (
-  <div className="h2h-compare">
-    <div className="h2h-row">
-      <RcNationCard code={a} records={totals.a} align="left" onClear={() => onClear('a')} />
+const RcH2HHeader: React.FC<Props> = ({
+  a, b, score, totals, active, onSwap, onClear, onFocus,
+}) => {
+  /** Сторона шапки: выбранная страна — карточкой, пустая — слотом «choose a country». */
+  const side = (which: 'a' | 'b', code: string | null, records: number) => (
+    code
+      ? (
+        <RcNationCard
+          code={code}
+          records={records}
+          align={which === 'a' ? 'left' : 'right'}
+          active={active === which}
+          onClear={() => onClear(which)}
+        />
+      )
+      : (
+        <UI_H2HEmptySlot
+          label="בחר מדינה · choose a country"
+          active={active === which}
+          onClick={() => onFocus(which)}
+        />
+      )
+  );
 
-      <div className="h2h-score">
-        <div className="h2h-score__value">{score.a}–{score.b}</div>
-        <div className="h2h-score__cap">
-          faster records{score.tie > 0 ? ` · ${score.tie} tied` : ''}
-        </div>
-        <UI_H2HSwap onSwap={onSwap} />
+  return (
+    <div className="h2h-compare">
+      <div className="h2h-row h2h-row--slots">
+        {side('a', a, totals.a)}
+
+        {/* Пока сторон меньше двух, в центре стоит «vs», а не счёт: ноль-ноль читался бы
+            как результат сравнения, которого ещё не было. */}
+        {score ? (
+          <div className="h2h-score">
+            <div className="h2h-score__value">{score.a}–{score.b}</div>
+            <div className="h2h-score__cap">
+              faster records{score.tie > 0 ? ` · ${score.tie} tied` : ''}
+            </div>
+            <UI_H2HSwap onSwap={onSwap} />
+          </div>
+        ) : (
+          <div className="h2h-vs">vs</div>
+        )}
+
+        {side('b', b, totals.b)}
       </div>
 
-      <RcNationCard code={b} records={totals.b} align="right" onClear={() => onClear('b')} />
-    </div>
-
-    <div className="h2h-stats">
-      <UI_H2HStatRow
-        label={`events compared · ${score.compared}`}
-        left={score.a}
-        right={score.b}
-        winner={winnerOf(score.a, score.b)}
-      />
-      {/* Победителя у этой строки НЕТ намеренно: «у соперника нет рекорда» — это про
-          покрытие справочника, а не про то, кто быстрее. Подсветить её значило бы
-          выдать пустоту за победу — ровно то, что запрещает 11.3.3. */}
-      {score.a_only + score.b_only > 0 && (
-        <UI_H2HStatRow
-          label="no rival record"
-          left={score.a_only}
-          right={score.b_only}
-        />
+      {score && (
+        <div className="h2h-stats">
+          <UI_H2HStatRow
+            label={`events compared · ${score.compared}`}
+            left={score.a}
+            right={score.b}
+            winner={winnerOf(score.a, score.b)}
+          />
+          {/* Победителя у этой строки НЕТ намеренно: «у соперника нет рекорда» — это про
+              покрытие справочника, а не про то, кто быстрее. Подсветить её значило бы
+              выдать пустоту за победу — ровно то, что запрещает 11.3.3. */}
+          {score.a_only + score.b_only > 0 && (
+            <UI_H2HStatRow
+              label="no rival record"
+              left={score.a_only}
+              right={score.b_only}
+            />
+          )}
+        </div>
       )}
     </div>
-  </div>
-);
+  );
+};
 
 export default RcH2HHeader;

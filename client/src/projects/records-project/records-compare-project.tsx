@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../../index.css';
 import '../components/deep/deep-theme.css';
 import './records-page.css';
@@ -6,11 +6,11 @@ import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
-import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
 import { parseRecordsCompareQuery, routes, type RecordGender } from '../../utils/routes';
 import { useRecordCountries, useRecordsCompare } from '../../hooks/useRecordsCompare';
 import RcH2HHeader from './components/rc-h2h-header';
 import RcH2HEvents from './components/rc-h2h-events';
+import RcCountryPicker from './components/rc-country-picker';
 import { HOME_REGION } from './rk-disciplines';
 
 /**
@@ -20,6 +20,11 @@ import { HOME_REGION } from './rk-disciplines';
  * держится тут в трёх местах сразу: дисциплина без рекорда у одной из сторон остаётся
  * ВИДИМОЙ строкой с прочерком и подписью «no record», в счёт не идёт ни в чью пользу, а
  * сколько таких дисциплин — написано прямо под счётом.
+ *
+ * Экран собран семьёй `UI_H2H*` — той же, что сравнение пловцов, включая сам способ
+ * выбора: слот · счёт · слот, а под ними ОДИН пикер на обе стороны. Два селекта, стоявшие
+ * здесь раньше, читались как два разных выбора, хотя выбирают одно и то же (просьба Влада
+ * 23.09.2026); теперь сторону называют подсвеченный слот и подпись над пикером.
  *
  * Пара сторон живёт в query (`?a=ISR&b=USA`), разрез — там же. Сегмент `compare` в пути, как
  * `/groups/{slug}/results`: это другой ЭКРАН тех же данных, а не идентичность ресурса.
@@ -38,6 +43,9 @@ const GENDERS: Array<{ key: RecordGender | null; label: string }> = [
   // Смешанные эстафеты (Э5, records-relays-plan): при нём в сравнении остаются только они.
   { key: 'mixed', label: 'Mixed' },
 ];
+
+/** Сколько богатых рекордами стран вынести кнопками над поиском. */
+const QUICK_COUNT = 6;
 
 interface CompareFilters {
   a: string | null;
@@ -62,6 +70,11 @@ function RecordsCompareProject() {
     poolType: query.poolType,
     gender: query.gender,
   }));
+
+  /** Какую сторону заполнит следующий выбор — как активный слот на `/h2h`. */
+  const [active, setActive] = useState<'a' | 'b'>(() => (query.a == null ? 'a' : 'b'));
+  const [search, setSearch] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -88,30 +101,54 @@ function RecordsCompareProject() {
     [],
   );
 
-  const data = compare.data;
+  /**
+   * Выбор страны в активную сторону. Та же страна с другой стороны — не сравнение, а
+   * зеркало: стороны меняются местами, как на `/h2h`, а не ставятся дважды.
+   */
+  const pick = useCallback((code: string) => {
+    setFilters((f) => (active === 'a'
+      ? { ...f, a: code, b: f.b === code ? f.a : f.b }
+      : { ...f, b: code, a: f.a === code ? f.b : f.a }));
+    setActive((side) => (side === 'a' ? 'b' : 'a'));
+    setSearch('');
+  }, [active]);
 
-  const picker = (side: 'a' | 'b') => (
-    <label className="rc-picker">
-      <span className="rc-picker__label">{side === 'a' ? 'Country A' : 'Country B'}</span>
-      <span className="rc-picker__control">
-        {filters[side] && (
-          <UI_FlagEmoji countryCode={filters[side]!} size="24x18" className="src-records-compare-project" />
-        )}
-        <select
-          className="rc-select"
-          value={filters[side] ?? ''}
-          onChange={(e) => patch({ [side]: e.target.value || null } as Partial<CompareFilters>)}
-        >
-          <option value="">— pick a country —</option>
-          {countries.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.code} ({c.records})
-            </option>
-          ))}
-        </select>
-      </span>
-    </label>
+  const clear = useCallback((side: 'a' | 'b') => {
+    patch({ [side]: null } as Partial<CompareFilters>);
+    setActive(side);
+    setSearch('');
+    // Фокус в поиск: крестик — это «выбрать другую», а не «просто убрать».
+    window.setTimeout(() => searchRef.current?.focus(), 0);
+  }, [patch]);
+
+  const focusSide = useCallback((side: 'a' | 'b') => {
+    setActive(side);
+    searchRef.current?.focus();
+  }, []);
+
+  /**
+   * Быстрые кнопки — домашняя страна и сильнейшие плавательные державы.
+   *
+   * ⚠ Ось — `world_records` (сколько мировых рекордов держат пловцы страны), а НЕ
+   * `records`. Второе поле это ПОКРЫТИЕ справочника: у любой заметной страны там 91-92 из
+   * сотни дисциплин, и сортировка по нему ставила Парагвай впереди США — список выглядел
+   * случайным. Порядок списка от API алфавитный, поэтому сортировать нужно здесь.
+   */
+  const quick = useMemo(
+    () => [
+      HOME_REGION,
+      ...countries
+        .filter((c) => c.code !== HOME_REGION && (c.world_records ?? 0) > 0)
+        .slice()
+        .sort((x, y) => (y.world_records ?? 0) - (x.world_records ?? 0) || y.records - x.records)
+        .slice(0, QUICK_COUNT)
+        .map((c) => c.code),
+    ],
+    [countries],
   );
+
+  const data = compare.data;
+  const bothPicked = Boolean(filters.a && filters.b);
 
   return (
     <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
@@ -129,70 +166,85 @@ function RecordsCompareProject() {
           <UI_ModeToggle />
         </div>
 
-        <div className="rc-controls">
-          {picker('a')}
-          <button type="button" className="rc-swap" onClick={swap} title="Swap sides">⇄</button>
-          {picker('b')}
-
-          <div className="rc-cuts">
-            <div className="rk-chips">
-              {POOLS.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  className={`rk-chip${filters.poolType === p.key ? ' rk-chip--on' : ''}`}
-                  aria-pressed={filters.poolType === p.key}
-                  onClick={() => patch({ poolType: p.key })}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-            <div className="rk-chips">
-              {GENDERS.map((g) => (
-                <button
-                  key={g.label}
-                  type="button"
-                  className={`rk-chip${filters.gender === g.key ? ' rk-chip--on' : ''}`}
-                  aria-pressed={filters.gender === g.key}
-                  onClick={() => patch({ gender: g.key })}
-                >
-                  {g.label}
-                </button>
-              ))}
-            </div>
+        {/* Разрез (бассейн и пол) — общий на весь экран, поэтому стоит НАД сторонами:
+            он описывает, что именно сравнивается, а не кого. */}
+        <div className="rc-cuts">
+          <div className="rk-chips">
+            {POOLS.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                className={`rk-chip${filters.poolType === p.key ? ' rk-chip--on' : ''}`}
+                aria-pressed={filters.poolType === p.key}
+                onClick={() => patch({ poolType: p.key })}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="rk-chips">
+            {GENDERS.map((g) => (
+              <button
+                key={g.label}
+                type="button"
+                className={`rk-chip${filters.gender === g.key ? ' rk-chip--on' : ''}`}
+                aria-pressed={filters.gender === g.key}
+                onClick={() => patch({ gender: g.key })}
+              >
+                {g.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Разрез — та же полоса чипов, что была; сам экран ниже собран в вёрстке H2H. */}
-        {!filters.a || !filters.b ? (
-          <div className="rk-state">Pick two countries to compare.</div>
-        ) : compare.loading ? (
-          <div className="rk-state">Loading…</div>
-        ) : compare.error ? (
-          <div className="rk-state rk-state--error">
-            Could not load the comparison ({compare.error}).
-          </div>
-        ) : data && data.rows.length === 0 ? (
-          <div className="rk-state">
-            Neither {data.a} nor {data.b} has records in this cut.
-          </div>
-        ) : data ? (
-          <>
-            <RcH2HHeader
-              a={data.a}
-              b={data.b}
-              score={data.score}
-              totals={{
-                a: data.rows.filter((r) => r.a).length,
-                b: data.rows.filter((r) => r.b).length,
-              }}
-              onSwap={swap}
-              onClear={(side) => patch({ [side]: null } as Partial<CompareFilters>)}
+        <div className="h2h-scope rc-board">
+          <RcH2HHeader
+            a={filters.a}
+            b={filters.b}
+            score={data && bothPicked ? data.score : null}
+            totals={{
+              a: data ? data.rows.filter((r) => r.a).length : 0,
+              b: data ? data.rows.filter((r) => r.b).length : 0,
+            }}
+            active={active}
+            onSwap={swap}
+            onClear={clear}
+            onFocus={focusSide}
+          />
+
+          {/* Пикер стоит в потоке под сторонами и остаётся видимым даже когда обе выбраны:
+              сменить страну — обычное действие экрана, а не исключение. */}
+          <div className="rc-picker-wrap">
+            <div className="rc-picker-cap">
+              Choosing the <strong>{active === 'a' ? 'left' : 'right'}</strong> country
+            </div>
+            <RcCountryPicker
+              countries={countries}
+              taken={[filters.a, filters.b]}
+              query={search}
+              onQuery={setSearch}
+              onPick={pick}
+              quick={quick}
+              inputRef={searchRef}
             />
+          </div>
+
+          {!bothPicked ? (
+            <div className="h2h-empty">Pick two countries to compare.</div>
+          ) : compare.loading ? (
+            <div className="h2h-empty">Loading…</div>
+          ) : compare.error ? (
+            <div className="rk-state rk-state--error">
+              Could not load the comparison ({compare.error}).
+            </div>
+          ) : data && data.rows.length === 0 ? (
+            <div className="h2h-empty">
+              Neither {data.a} nor {data.b} has records in this cut.
+            </div>
+          ) : data ? (
             <RcH2HEvents rows={data.rows} genderFixed={filters.gender != null} />
-          </>
-        ) : null}
+          ) : null}
+        </div>
       </main>
     </div>
   );

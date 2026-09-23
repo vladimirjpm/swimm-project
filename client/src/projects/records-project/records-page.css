@@ -448,18 +448,6 @@
 
 /* ═══ /records/compare — сравнение двух стран ═══════════════════════════════ */
 
-.rc-controls {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--t-card);
-  border: 1px solid var(--t-border);
-  margin-bottom: 16px;
-}
-
 .rc-picker { display: flex; flex-direction: column; gap: 5px; min-width: 190px; }
 /* Дисциплина в списке WR/NR — значок стиля с дистанцией справа на белой плите: PNG стилей
    нарисованы под светлый фон и в тёмной теме без плиты пропадают (как swim-row__plate). */
@@ -505,25 +493,25 @@
    пункты были бы белым по белому. */
 .rc-select option { color: #111; background: #fff; }
 
-.rc-swap {
-  align-self: center;
-  margin-top: 16px;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid var(--t-border);
-  background: var(--t-input-bg);
-  color: var(--t-text-2);
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.rc-swap:hover { color: var(--t-accent); border-color: var(--t-accent); }
-
-.rc-cuts { display: flex; flex-direction: column; gap: 6px; margin-left: auto; }
+.rc-cuts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 12px; }
 
 .rc-link { color: var(--t-accent); text-decoration: none; }
 .rc-link:hover { text-decoration: underline; }
+
+/* Доска сравнения — контейнер ширины семьи H2H (`h2h-scope`) плюс ограничение колонки:
+   полезного в ряду две стороны и центр, дальше на широком мониторе шла пустота. Ровно то
+   же решение, что у страницы `/h2h` с её `content-box-xs`. */
+.rc-board { max-width: 780px; margin: 0 auto; }
+
+/* Пикер в потоке под сторонами — как выбор соперника на `/h2h`. */
+.rc-picker-wrap { display: flex; flex-direction: column; gap: 6px; }
+.rc-picker-cap {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--deep-text-faint);
+}
+.rc-picker-cap strong { color: var(--deep-accent); }
+/* Флаг занимает в строке выдачи место портрета пловца. */
+.rc-hit__flag { flex: none; border-radius: 3px; object-fit: cover; }
 
 /* ── Шапка и карточки: вёрстка H2H ────────────────────────────────────────
 
@@ -558,10 +546,7 @@
 }
 
 @media (max-width: 720px) {
-  .rc-controls { flex-direction: column; align-items: stretch; }
   .rc-picker { min-width: 0; }
-  .rc-swap { align-self: center; margin: 0; }
-  .rc-cuts { margin-left: 0; }
 
   /* На телефоне у карточки страны нет места под боковые отступы кнопок. */
   .rc-nation.h2h-mini--left,

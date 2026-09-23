@@ -22,9 +22,11 @@ interface Props {
   align: 'left' | 'right';
   /** Сменить сторону: ✕ во внутреннем углу, как у сменяемой карточки пловца. */
   onClear?: (() => void) | null;
+  /** Эту сторону заполнит следующий выбор в пикере: рамка-предупреждение. */
+  active?: boolean;
 }
 
-const RcNationCard: React.FC<Props> = ({ code, records = null, align, onClear = null }) => {
+const RcNationCard: React.FC<Props> = ({ code, records = null, align, onClear = null, active = false }) => {
   const flag = (
     <UI_FlagEmoji countryCode={code} size="48x36" className="rc-nation__flag src-rc-nation-card" />
   );
@@ -42,7 +44,7 @@ const RcNationCard: React.FC<Props> = ({ code, records = null, align, onClear = 
 
   return (
     <a
-      className={`h2h-mini h2h-mini--${align} rc-nation`}
+      className={`h2h-mini h2h-mini--${align} rc-nation${active ? ' h2h-mini--active' : ''}`}
       href={routes.records({ tab: 'world', region: code })}
       title={`All records of ${code}`}
     >

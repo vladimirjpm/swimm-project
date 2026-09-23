@@ -145,8 +145,10 @@ const RcH2HEvents: React.FC<Props> = ({ rows, genderFixed }) => {
   const lonely = groups.filter((g) => g.oneSided);
   const showGender = !genderFixed;
 
+  // Контейнер ширины (`h2h-scope`) ставит СТРАНИЦА: шапка, пикер и карточки должны
+  // мериться одной и той же шириной, иначе ступени раскладки сработают вразнобой.
   return (
-    <div className="h2h-scope">
+    <>
       <div className="h2h-events">
         {compared.map((g) => <Card key={g.key} group={g} showGender={showGender} />)}
       </div>
@@ -164,7 +166,7 @@ const RcH2HEvents: React.FC<Props> = ({ rows, genderFixed }) => {
         25m and 50m are never compared with each other · the gap is left minus right ·
         events where only one country has a record count for neither side
       </span>
-    </div>
+    </>
   );
 };
 
