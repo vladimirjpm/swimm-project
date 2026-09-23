@@ -25,7 +25,13 @@ interface Props {
   query: string;
   onQuery: (q: string) => void;
   onPick: (code: string) => void;
-  /** Быстрые кнопки над поиском: домашняя страна и сильнейшие державы (см. вызывающего). */
+  /**
+   * Быстрые кнопки над поиском: домашняя страна и те, чьи пловцы держат больше всего
+   * ДЕЙСТВУЮЩИХ мировых рекордов (порядок считает вызывающий). Подпись называет ось
+   * прямо — «Top nations» читалась как оценка силы, и её опровергал первый же взгляд:
+   * Россия с тремя рекордами не влезала, Германия с четырьмя влезала (вопрос Влада
+   * 23.09.2026).
+   */
   quick: string[];
   inputRef?: React.Ref<HTMLInputElement>;
 }
@@ -45,7 +51,7 @@ const RcCountryPicker: React.FC<Props> = ({
     <div className="h2h-picker">
       {quickFree.length > 0 && (
         <div className="h2h-picker__favs">
-          <span className="h2h-picker__cap">Top nations</span>
+          <span className="h2h-picker__cap">Most world records</span>
           {quickFree.map((code) => (
             <button key={code} type="button" className="h2h-fav-chip" onClick={() => onPick(code)}>
               <UI_FlagEmoji countryCode={code} size="16x12" className="src-rc-country-picker" />
