@@ -27,7 +27,7 @@ interface Props {
   /** Какую сторону заполнит следующий выбор в пикере. */
   active: 'a' | 'b';
   onSwap: () => void;
-  onClear: (side: 'a' | 'b') => void;
+  /** Выбрать другую страну на эту сторону — и у занятой карточки, и у пустого слота. */
   onFocus: (side: 'a' | 'b') => void;
 }
 
@@ -35,7 +35,7 @@ const winnerOf = (left: number, right: number) =>
   left === right ? null : (left > right ? 'left' as const : 'right' as const);
 
 const RcH2HHeader: React.FC<Props> = ({
-  a, b, score, totals, active, onSwap, onClear, onFocus,
+  a, b, score, totals, active, onSwap, onFocus,
 }) => {
   /** Сторона шапки: выбранная страна — карточкой, пустая — слотом «choose a country». */
   const side = (which: 'a' | 'b', code: string | null, records: number) => (
@@ -46,7 +46,7 @@ const RcH2HHeader: React.FC<Props> = ({
           records={records}
           align={which === 'a' ? 'left' : 'right'}
           active={active === which}
-          onClear={() => onClear(which)}
+          onSelect={() => onFocus(which)}
         />
       )
       : (

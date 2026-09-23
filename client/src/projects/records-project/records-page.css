@@ -523,13 +523,16 @@
    и вторая вёрстка того же смысла расходилась бы с первой при каждой правке — ровно
    то, от чего бережёт реестр компонентов. */
 
-/* Карточка страны стоит в сетке `h2h-mini`, но кнопок у неё меньше: ✕ есть, сердечка
-   нет. Поэтому внешний угол не нужно освобождать — гасим отступ под него, иначе флаг
-   висит посреди пустоты. Внутренний (44px под ✕) остаётся. */
-.rc-nation.h2h-mini--left { padding-right: 16px; }
-.rc-nation.h2h-mini--right { padding-left: 16px; }
-.rc-nation.h2h-mini--left { padding-left: 44px; }
-.rc-nation.h2h-mini--right { padding-right: 44px; }
+/* Карточка страны — кнопка «выбрать другую», кнопок в углах у неё НЕТ (ни ✕, ни
+   сердечка), поэтому отступы под них, заложенные в `h2h-mini`, гасим: иначе флаг и код
+   висят посреди пустоты. Кнопка, а не ссылка — значит и сброс шрифта/выравнивания,
+   которые браузер даёт `<button>` по умолчанию. */
+.rc-nation.h2h-mini--left { padding-right: 16px; padding-left: 16px; }
+.rc-nation.h2h-mini--right { padding-left: 16px; padding-right: 16px; }
+.rc-nation { font: inherit; text-align: inherit; cursor: pointer; }
+/* Наведение говорит, что сторона сменяема: у неподсвеченной карточки это единственный
+   признак (у активной есть рамка). */
+.rc-nation:hover { border-color: var(--deep-accent-border); }
 /* Флаг занимает место портрета: та же рамка, что у аватара в H2H. */
 .rc-nation__flag {
   flex: none; border-radius: 6px; object-fit: cover;
@@ -548,7 +551,7 @@
 @media (max-width: 720px) {
   .rc-picker { min-width: 0; }
 
-  /* На телефоне у карточки страны нет места под боковые отступы кнопок. */
+  /* На телефоне поля у карточки страны уже. */
   .rc-nation.h2h-mini--left,
   .rc-nation.h2h-mini--right { padding-left: 12px; padding-right: 12px; }
 }

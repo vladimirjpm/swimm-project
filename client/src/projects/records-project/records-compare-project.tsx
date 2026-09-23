@@ -113,14 +113,6 @@ function RecordsCompareProject() {
     setSearch('');
   }, [active]);
 
-  const clear = useCallback((side: 'a' | 'b') => {
-    patch({ [side]: null } as Partial<CompareFilters>);
-    setActive(side);
-    setSearch('');
-    // Фокус в поиск: крестик — это «выбрать другую», а не «просто убрать».
-    window.setTimeout(() => searchRef.current?.focus(), 0);
-  }, [patch]);
-
   const focusSide = useCallback((side: 'a' | 'b') => {
     setActive(side);
     searchRef.current?.focus();
@@ -212,7 +204,6 @@ function RecordsCompareProject() {
             }}
             active={active}
             onSwap={swap}
-            onClear={clear}
             onFocus={focusSide}
           />
 
