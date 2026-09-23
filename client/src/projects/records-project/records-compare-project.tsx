@@ -79,6 +79,34 @@ function RecordsCompareProject() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Шапка сравнения липкая: прокручивая два десятка карточек, человек теряет из виду, ЧЬЁ
+   * время слева. В прилипшем виде она сворачивается до флага, кода страны и счёта —
+   * остальное (покрытие, свежесть, ссылки, строки статов) там только занимает высоту
+   * (просьба Влада 23.09.2026).
+   */
+  const [stuck, setStuck] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  /** Высота липкого топбара сайта: под ним и «приклеивается» шапка. */
+  const [topOffset, setTopOffset] = useState(0);
+
+  useEffect(() => {
+    const topbar = document.querySelector<HTMLElement>('[data-app-topbar]');
+    const top = topbar?.offsetHeight ?? 0;
+    setTopOffset(top);
+
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return undefined;
+    // Наблюдаем за меткой НАД шапкой: ушла вверх за топбар — шапка прилипла. Скролл-слушателя
+    // тут нет сознательно: он считал бы координаты на каждый кадр.
+    const io = new IntersectionObserver(
+      ([entry]) => setStuck(!entry.isIntersecting),
+      { rootMargin: `-${top + 1}px 0px 0px 0px`, threshold: 0 },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, []);
+
   useEffect(() => {
     const url = new URL(window.location.href);
     const set = (key: string, value: string | null) => {
@@ -227,6 +255,13 @@ function RecordsCompareProject() {
         </div>
 
         <div className="h2h-scope rc-board">
+          {/* Метка для наблюдателя: сама шапка прилипает, и по ней прилипание не поймать. */}
+          <div ref={sentinelRef} aria-hidden="true" className="rc-sticky__sentinel" />
+
+          <div
+            className={`rc-sticky${stuck ? ' rc-sticky--on' : ''}`}
+            style={{ top: topOffset }}
+          >
           <RcH2HHeader
             a={filters.a}
             b={filters.b}
@@ -241,6 +276,7 @@ function RecordsCompareProject() {
             onSwap={swap}
             onFocus={focusSide}
           />
+          </div>
 
           {/* Выбор — в окне: в потоке он отодвигал само сравнение, а на табе пловца
               оказывался и вовсе под всеми карточками заплывов. */}
