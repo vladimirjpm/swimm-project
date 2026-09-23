@@ -168,13 +168,15 @@ function RecordsProject() {
       id: 'world', icon: '🏆', label: 'World records', shortLabel: 'WR',
       sub: worldCount != null ? `${worldCount} records${region ? ` · ${region}` : ''}` : 'every event',
     },
-    {
-      id: 'masters', icon: '⏱', label: 'Masters WR',
-      sub: 'Israel vs world · by age band',
-    },
+    // Юниоры стоят ПЕРЕД мастерсами (просьба Влада 23.09.2026): порядок табов читается
+    // как возрастная лестница — страна, мир, юниоры, мастерсы.
     {
       id: 'junior', icon: '🌱', label: 'World Junior',
       sub: 'Israel ages vs world junior',
+    },
+    {
+      id: 'masters', icon: '⏱', label: 'Masters WR',
+      sub: 'Israel vs world · by age band',
     },
   ];
 
