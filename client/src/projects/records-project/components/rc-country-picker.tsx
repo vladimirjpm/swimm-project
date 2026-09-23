@@ -33,11 +33,21 @@ interface Props {
    * 23.09.2026).
    */
   quick: string[];
+  /**
+   * Кнопка «весь мир» — для таба World records на `/records`, где регион это либо страна,
+   * либо сами мировые рекорды. Не задана — выбор только из стран (сравнение двух стран).
+   */
+  world?: { active: boolean; onPick: () => void };
+  /** Подпись полосы быстрых кнопок: у сравнения и у региона разный смысл выборки. */
+  quickLabel?: string;
+  /** Подсказка в поле поиска: «с кем сравнить» и «чьи рекорды» — разные вопросы. */
+  placeholder?: string;
   inputRef?: React.Ref<HTMLInputElement>;
 }
 
 const RcCountryPicker: React.FC<Props> = ({
-  countries, taken, query, onQuery, onPick, quick, inputRef,
+  countries, taken, query, onQuery, onPick, quick, world, quickLabel = 'Most world records',
+  placeholder = 'Search a country code to compare with...', inputRef,
 }) => {
   const q = query.trim().toUpperCase();
   const free = countries.filter((c) => !taken.includes(c.code));
@@ -49,9 +59,19 @@ const RcCountryPicker: React.FC<Props> = ({
 
   return (
     <div className="h2h-picker">
-      {quickFree.length > 0 && (
+      {(quickFree.length > 0 || world) && (
         <div className="h2h-picker__favs">
-          <span className="h2h-picker__cap">Most world records</span>
+          <span className="h2h-picker__cap">{quickLabel}</span>
+          {world && (
+            <button
+              type="button"
+              className={`h2h-fav-chip${world.active ? ' h2h-fav-chip--on' : ''}`}
+              onClick={world.onPick}
+            >
+              <span aria-hidden="true">🌍</span>
+              <span>World</span>
+            </button>
+          )}
           {quickFree.map((code) => (
             <button key={code} type="button" className="h2h-fav-chip" onClick={() => onPick(code)}>
               <UI_FlagEmoji countryCode={code} size="16x12" className="src-rc-country-picker" />
@@ -67,8 +87,8 @@ const RcCountryPicker: React.FC<Props> = ({
         type="search"
         value={query}
         onChange={(e) => onQuery(e.target.value)}
-        placeholder="Search a country code to compare with..."
-        aria-label="Search a country to compare with"
+        placeholder={placeholder}
+        aria-label={placeholder}
       />
 
       {q && (
@@ -84,6 +104,7 @@ const RcCountryPicker: React.FC<Props> = ({
                 <span className="h2h-hit__name">{c.code}</span>
                 <span className="h2h-hit__meta">
                   {c.records} {c.records === 1 ? 'record' : 'records'}
+                  {(c.world_records ?? 0) > 0 && ` · ${c.world_records} WR`}
                 </span>
               </button>
             ))

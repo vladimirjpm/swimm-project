@@ -380,6 +380,12 @@ body.h2h-modal-open .mode-toggle { display: none; }
   color: var(--deep-text-mute); font-size: 12px; font-weight: 800; cursor: pointer;
 }
 .h2h-fav-chip:hover { color: var(--deep-text); }
+/* Выбранная быстрая кнопка (в выборе региона это текущий регион): акцентом, как у чипов
+   фильтров, — иначе непонятно, на чём экран стоит сейчас. */
+.h2h-fav-chip--on {
+  background: var(--deep-accent-soft); border-color: var(--deep-accent-border);
+  color: var(--deep-accent);
+}
 .h2h-fav-chip__heart { color: var(--deep-danger); }
 .h2h-search {
   width: 100%; min-height: 40px; padding: 10px 18px;

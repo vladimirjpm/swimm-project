@@ -96,6 +96,13 @@
   background: var(--t-border);
 }
 
+/* Чип региона — не переключатель, а ВХОД в окно выбора: флаг, код и стрелка вниз.
+   Стрелка обязательна: без неё он выглядит как выбранный фильтр, по которому нечего
+   нажимать (стран больше двух сотен, списком в ряд они не встанут). */
+.rk-chip--region { display: inline-flex; align-items: center; gap: 7px; }
+.rk-chip--region img { border-radius: 3px; }
+.rk-chip__caret { font-size: 10px; opacity: .8; }
+
 .rk-chip {
   padding: 5px 11px;
   border-radius: 999px;

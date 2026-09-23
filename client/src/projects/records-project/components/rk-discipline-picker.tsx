@@ -28,6 +28,13 @@ interface Props {
   allowRelays?: boolean;
   /** Возрастные группы мастерсов для ряда «Age group»; не передан — ряда нет. */
   ageGroups?: string[];
+  /**
+   * Готовый ряд «Region» для таба World (9.9). Слотом, а не своими пропсами: регион это
+   * не ось дисциплины (он не сужает заплыв, а меняет ЧЬИ рекорды показаны), и знать про
+   * список стран пикеру дисциплины незачем. Стоит первым — сначала «чьи рекорды», потом
+   * «какой заплыв».
+   */
+  regionRow?: React.ReactNode;
 }
 
 const POOLS: Array<{ key: '25m' | '50m'; label: string }> = [
@@ -42,7 +49,7 @@ const GENDERS: Array<{ key: RecordGender; label: string }> = [
 ];
 
 const RkDisciplinePicker: React.FC<Props> = ({
-  filters, onChange, showEvent = true, allowRelays = true, ageGroups,
+  filters, onChange, showEvent = true, allowRelays = true, ageGroups, regionRow,
 }) => {
   // Группа из адреса, которой у текущей дисциплины нет, показывается как «All».
   const activeAge = filters.ageGroup && ageGroups?.includes(filters.ageGroup) ? filters.ageGroup : null;
@@ -67,6 +74,7 @@ const RkDisciplinePicker: React.FC<Props> = ({
       {/* Порядок рядов один на все табы рекордов: кто · сколько лет · что плыл · где
           (просьба Влада 23.09.2026). Тот же порядок держит полоса выбранного
           `RkFilterBar` — иначе выбор и его сводка читаются в разной последовательности. */}
+      {regionRow}
       <div className="rk-picker__row">
         <span className="rk-picker__label">Gender</span>
         <div className="rk-chips">
