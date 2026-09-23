@@ -57,11 +57,28 @@ import {
  * не пишет, — их дата не показывается.
  */
 const TAB_SOURCES: Record<RecordsTab, string[]> = {
-  countries: ['worldrecords', 'isrorg-age'],
+  countries: ['worldrecords', 'worldrecords-countries', 'isrorg-age'],
   world: ['worldrecords'],
   masters: ['wa-masters', 'isrorg-masters'],
   junior: ['wa-junior', 'isrorg-age'],
 };
+
+/**
+ * Источники подписи «checked …» для таба.
+ *
+ * ⚠ У таба World они зависят от РЕГИОНА: мировые рекорды сверяет обычная проверка
+ * (`worldrecords`), а национальные рекорды страны приезжают прогоном по странам
+ * (`worldrecords-countries`) — это разные даты, и подписывать вторые первой значит врать о
+ * свежести (замечание Влада 23.09.2026). У Израиля сверх того федеральный источник: его
+ * open пишут ДВОЕ (И-13). Мировой эталон в колонке «vs WR» остаётся в списке всегда — он
+ * тоже на экране.
+ */
+function tabSources(tab: RecordsTab, region: string | null): string[] {
+  if (tab !== 'world' || region == null) return TAB_SOURCES[tab];
+  return region === HOME_REGION
+    ? ['worldrecords', 'isrorg-age']
+    : ['worldrecords', 'worldrecords-countries'];
+}
 
 function RecordsProject() {
   useTheme();
@@ -228,7 +245,7 @@ function RecordsProject() {
                 poolType: filters.poolType, gender: filters.gender,
               })}>compare two countries</a>
             </div>
-            <UI_RecordsChecked sources={TAB_SOURCES[tab]} className="rk-head__checked" />
+            <UI_RecordsChecked sources={tabSources(tab, region)} className="rk-head__checked" />
           </div>
           <UI_ModeToggle />
         </div>

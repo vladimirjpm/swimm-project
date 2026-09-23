@@ -100,6 +100,33 @@ public class RecordSourceCheckService : IRecordSourceCheckService
             check.Source, check.Id, check.Outcome, check.CheckedAt, check.Error, diff);
     }
 
+    public async Task LogRunAsync(
+        string source, RecordDiffResult? diff, string? error, CancellationToken ct = default)
+    {
+        var check = new RecordSourceCheck { Source = source, CheckedAt = _now() };
+
+        if (error != null)
+        {
+            check.Outcome = RecordSourceCheckOutcomes.Failed;
+            check.Error = Trim(error);
+        }
+        else if (diff != null)
+        {
+            check.DiffId = diff.DiffId;
+            // Счёт тот же, что у обычной проверки: клетка с двумя хозяевами не считается
+            // изменением (И-13), «нет в источнике» Apply не удаляет.
+            check.AddedCount = diff.Added.Count(e => !RecordPlausibility.IsContestedSlot(e));
+            check.ChangedCount = diff.Changed.Count(e => !RecordPlausibility.IsContestedSlot(e));
+            check.MissingCount = diff.MissingInSourceCount;
+            check.Outcome = check.AddedCount + check.ChangedCount > 0
+                ? RecordSourceCheckOutcomes.ChangesFound
+                : RecordSourceCheckOutcomes.Unchanged;
+        }
+
+        _db.RecordSourceChecks.Add(check);
+        await _db.SaveChangesAsync(ct);
+    }
+
     public async Task<IReadOnlyList<RecordSourceCheckResultDto>> CheckAllAsync(CancellationToken ct = default)
     {
         var results = new List<RecordSourceCheckResultDto>();
@@ -147,7 +174,7 @@ public class RecordSourceCheckService : IRecordSourceCheckService
             .ToDictionary(s => s.Source, s => s.LastUpdatedAt, StringComparer.OrdinalIgnoreCase);
 
         var result = new List<RecordSourceFreshnessDto>();
-        foreach (var source in RecordSources.Order)
+        foreach (var source in RecordSources.FreshnessKeys)
         {
             var last = await _db.RecordSourceChecks.AsNoTracking()
                 .Where(c => c.Source == source)

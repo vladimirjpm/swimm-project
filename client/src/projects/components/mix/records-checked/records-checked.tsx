@@ -18,6 +18,10 @@ import { useRecordsFreshness } from '../../../../hooks/useRecordsFreshness';
 /** Как источник подписан на витрине. */
 const LABEL: Record<string, string> = {
   worldrecords: 'World Aquatics',
+  // Прогон по странам — ОТДЕЛЬНЫЙ тип: страновые NR приезжают своим прогоном на час-два,
+  // а отчёт мировых сверяется обычной проверкой. Подписывать первые датой второго значит
+  // врать о свежести (замечание Влада 23.09.2026).
+  'worldrecords-countries': 'World Aquatics national records',
   'wa-masters': 'World Aquatics masters',
   'wa-junior': 'World Aquatics juniors',
   'isrorg-age': 'Israel Swimming Association',
@@ -42,6 +46,61 @@ export function checkedLines(
     const f = freshness.find((x) => x.source === source);
     return f?.checkedAt ? [{ source, label: LABEL[source] ?? source, checkedAt: f.checkedAt }] : [];
   });
+}
+
+/**
+ * Порядок источников в подписи — как в `RecordSources.Order` на сервере плюс прогон по
+ * странам. Экспортируется, потому что по нему строят список и другие экраны.
+ */
+export const RECORD_SOURCE_ORDER = [
+  'worldrecords', 'worldrecords-countries', 'wa-masters', 'wa-junior',
+  'isrorg-age', 'isrorg-masters',
+];
+
+/** Домашняя страна: её рекорды пишут ДВОЕ — World Aquatics и федерация (И-13). */
+const HOME = 'ISR';
+
+/**
+ * Какие источники питают показанные записи справочника — по региону и категории строки.
+ *
+ * Правила ровно те, по которым импорт раскладывает данные:
+ * • `world` + open → отчёт мировых рекордов; masters/junior → свои мировые источники;
+ * • `country` ИЗРАИЛЯ → федерация (возрастные, мастерские), а open у него двухозяйный (И-13);
+ * • `country` любой другой страны → прогон по странам, и только он.
+ *
+ * Общая, потому что список рекордов показывают четыре экрана (страница пловца, стена клуба,
+ * попапы, сравнение стран), и считать источники в каждом заново — это четыре шанса разойтись.
+ */
+export function recordSources(rows: Array<{
+  regionType?: string | null;
+  regionCode?: string | null;
+  category?: string | null;
+  /** Мировой эталон рядом со строкой (карточки «рекорд против мирового»). */
+  worldKind?: 'masters' | 'junior' | null;
+}>): string[] {
+  const used = new Set<string>();
+
+  for (const r of rows) {
+    const region = (r.regionType ?? 'country').toLowerCase();
+    const category = (r.category ?? 'open').toLowerCase();
+    const code = (r.regionCode ?? HOME).toUpperCase();
+
+    if (region === 'world') {
+      if (category === 'masters') used.add('wa-masters');
+      else if (category === 'junior' || category === 'age') used.add('wa-junior');
+      else used.add('worldrecords');
+    } else if (code === HOME) {
+      if (category === 'age') used.add('isrorg-age');
+      else if (category === 'masters') used.add('isrorg-masters');
+      else { used.add('worldrecords'); used.add('isrorg-age'); }
+    } else {
+      used.add('worldrecords-countries');
+    }
+
+    if (r.worldKind) used.add(r.worldKind === 'junior' ? 'wa-junior' : 'wa-masters');
+  }
+
+  return RECORD_SOURCE_ORDER.filter((s) => used.has(s));
 }
 
 interface Props {

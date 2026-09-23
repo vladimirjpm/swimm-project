@@ -12,6 +12,7 @@ import RcH2HHeader from './components/rc-h2h-header';
 import RcH2HEvents from './components/rc-h2h-events';
 import RcCountryPicker from './components/rc-country-picker';
 import UI_H2HPickerModal from '../components/mix/h2h/h2h-picker-modal';
+import UI_RecordsChecked, { recordSources } from '../components/mix/records-checked/records-checked';
 import { HOME_REGION, strongestCountries } from './rk-disciplines';
 
 /**
@@ -161,6 +162,18 @@ function RecordsCompareProject() {
   const bothPicked = Boolean(filters.a && filters.b);
 
   /**
+   * Чьей сверкой питается экран. Для Израиля это федерация плюс World Aquatics (его open
+   * пишут двое, И-13), для всех прочих — прогон по странам: он идёт час-два и отдельно от
+   * сверки мировых рекордов, поэтому и дата у него своя.
+   */
+  const checkedSources = useMemo(
+    () => recordSources([filters.a, filters.b]
+      .filter((c): c is string => !!c)
+      .map((code) => ({ regionType: 'country', regionCode: code, category: 'open' }))),
+    [filters.a, filters.b],
+  );
+
+  /**
    * Год самого свежего рекорда каждой стороны в этом разрезе.
    *
    * ⚠ Считается по ТЕМ ЖЕ строкам, что показаны ниже: цифра обязана отвечать за то, что
@@ -201,6 +214,9 @@ function RecordsCompareProject() {
               two countries across every event ·{' '}
               <a className="rc-link" href={routes.records()}>back to the ranking</a>
             </div>
+            {/* Когда справочник этих стран последний раз сверяли с источником. Без подписи
+                экран выглядит одинаково свежим и через день, и через полгода. */}
+            <UI_RecordsChecked sources={checkedSources} className="rk-head__checked" />
           </div>
           <UI_ModeToggle />
         </div>

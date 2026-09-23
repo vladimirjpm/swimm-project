@@ -31,6 +31,15 @@ public interface IRecordSourceCheckService
     /// </summary>
     Task<RecordDiffApplyResult> ApplyAsync(RecordDiffApplyRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Записать в журнал проверку, которую сделал НЕ провайдер, а собственный прогон —
+    /// сейчас это прогон по странам (<c>RecordSources.WorldRecordsCountries</c>). Дифф он
+    /// строит сам, и качать источник второй раз ради журнала незачем: сюда приходит уже
+    /// готовый результат.
+    /// </summary>
+    Task LogRunAsync(
+        string source, RecordDiffResult? diff, string? error, CancellationToken ct = default);
+
     /// <summary>Свежесть по каждому источнику — для админки (дашборд, /Admin/Import) и витрины.</summary>
     Task<IReadOnlyList<RecordSourceFreshnessDto>> GetFreshnessAsync(CancellationToken ct = default);
 }

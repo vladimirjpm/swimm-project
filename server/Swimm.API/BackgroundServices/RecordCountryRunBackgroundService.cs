@@ -1,4 +1,6 @@
 using Swimm.Application.Abstractions;
+using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Infrastructure.Services;
 
 namespace Swimm.API.BackgroundServices;
@@ -46,6 +48,21 @@ public sealed class RecordCountryRunBackgroundService : BackgroundService
                     var runner = scope.ServiceProvider.GetRequiredService<RecordCountryRunner>();
 
                     await runner.RunAsync(status, codes, stoppingToken);
+
+                    // Журнал свежести: прогон по странам — СВОЙ тип проверки
+                    // (`worldrecords-countries`), а не отчёт мировых рекордов. Без этой строки
+                    // витрина подписывала страновые NR датой сверки WR-отчёта, то есть врала о
+                    // свежести (замечание Влада 23.09.2026).
+                    //
+                    // ⚠ Только ПОЛНЫЙ прогон. Прогон подмножеством стран — отладка, он и в
+                    // архив не пишется (pre-push-rules §11-бис), и в журнале сдвинул бы дату
+                    // так, будто сверили все 215.
+                    if (codes is not { Count: > 0 })
+                    {
+                        var checks = scope.ServiceProvider.GetRequiredService<IRecordSourceCheckService>();
+                        await checks.LogRunAsync(
+                            RecordSources.WorldRecordsCountries, status.Diff, null, stoppingToken);
+                    }
 
                     _queue.SetCompleted(runId);
                     _logger.LogInformation(
