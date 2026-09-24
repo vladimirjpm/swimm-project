@@ -89,6 +89,17 @@ public interface ISwimmerPageRepository
     Task<IReadOnlyList<PeerSeasonBest>> GetAgeCohortSeasonBestsAsync(int seasonStartYear, int birthYear);
 
     /// <summary>
+    /// Лучшие времена сезона на МАСТЕРСКИХ стартах: строка на тройку
+    /// (пловец × дисциплина × группа протокола), группа — в <see cref="PeerSeasonBest.MastersAgeGroup"/>.
+    ///
+    /// Мастерский заплыв меряется не годом рождения, а группой протокола («45-49») — ровно
+    /// так, как его показывает мастерский срез <c>/season-best</c>. Возрастная когорта
+    /// (<see cref="GetAgeCohortSeasonBestsAsync"/>) мастерские старты не содержит: две
+    /// выборки не пересекаются, как и два среза списка.
+    /// </summary>
+    Task<IReadOnlyList<PeerSeasonBest>> GetMastersSeasonBestsAsync(int seasonStartYear);
+
+    /// <summary>
     /// Официальные рекорды страны по ВОЗРАСТНОЙ ступени (<c>Category = age</c>) для колонки
     /// «Δ Israel {age}»: ключ — тот же ключ дисциплины, значение — рекорд.
     /// <paramref name="regionCode"/> — alpha-3 страны пловца; сегодня заполнен только ISR.

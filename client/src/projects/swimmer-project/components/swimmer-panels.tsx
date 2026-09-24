@@ -395,11 +395,25 @@ export function SeasonBestPanel({
   const rankGender: 'male' | 'female' | 'none' =
     ranks.gender === 'male' || ranks.gender === 'female' ? ranks.gender : 'none';
 
+  // Круг у каждой строки свой: мастерский заплыв меряется группой протокола («women 45-49»),
+  // обычный — ровесниками того же года рождения. Шапка называет круг, только если он у всех
+  // строк один; иначе — возрастной круг, а подсказка говорит, что мастерские строки
+  // меряются группой протокола (ссылка строки всё равно ведёт в её собственный срез).
+  const circles = new Set(ranked.map((r) => r.groupLabel ?? ranks.groupLabel));
+  const oneCircle = circles.size === 1 ? [...circles][0] : null;
+  const anyMasters = ranked.some((r) => r.ageGroup);
+  const allMasters = ranked.length > 0 && ranked.every((r) => r.ageGroup);
+  const circleHint = allMasters
+    ? 'same masters age group of the meet protocol'
+    : anyMasters
+      ? 'swimmers born the same year; masters swims — their protocol age group'
+      : 'swimmers born the same year';
+
   return (
     <>
       <PanelHead
-        title={`Among ${ranks.groupLabel}`}
-        hint={`place by best time of season ${ranks.label}, swimmers born the same year`}
+        title={`Among ${oneCircle ?? ranks.groupLabel}`}
+        hint={`place by best time of season ${ranks.label}, ${circleHint}`}
         right={<span className="deep-legend">SB = fastest in the group</span>}
       />
 
@@ -431,7 +445,10 @@ export function SeasonBestPanel({
                 className="deep-swim-row"
                 href={routes.seasonBest({
                   season,
-                  age: ranks.age,
+                  // Мастерский заплыв ведёт в мастерский срез: место посчитано в группе
+                  // протокола, и список обязан показать ровно этот круг.
+                  age: rank.ageGroup ? null : ranks.age,
+                  ageGroup: rank.ageGroup ?? null,
                   gender: ranks.gender,
                   stroke: row.stroke,
                   distance: row.distance,
@@ -477,7 +494,7 @@ export function SeasonBestPanel({
         Open a row to see the full list for that event and age group. Places are counted among
         the meets we have imported, not from an official ranking. Equal times share a place;
         «alone» means nobody born the same year swam this event in our data, so there is no
-        place to award.
+        place to award. Masters swims are placed within their age group of the meet protocol.
       </div>
     </>
   );

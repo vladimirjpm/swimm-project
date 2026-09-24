@@ -127,6 +127,14 @@ export interface SwimmerDisciplineRank {
   timeMs: number;
   leaderTimeMs: number;
   gapToLeaderMs: number;
+  /**
+   * Группа протокола («45-49»), если лучший заплыв мастерский: место посчитано внутри неё,
+   * и ссылка строки ведёт в мастерский срез `/season-best?age_group=`. null — обычный
+   * старт, круг — ровесники того же года рождения.
+   */
+  ageGroup?: string | null;
+  /** Подпись круга ЭТОЙ строки: «women 45» либо «women 45-49» у мастерского заплыва. */
+  groupLabel?: string | null;
 }
 
 export interface SwimmerSeasonRanks {
