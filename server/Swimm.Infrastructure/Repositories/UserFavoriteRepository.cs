@@ -1,4 +1,4 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -185,6 +185,9 @@ public class UserFavoriteRepository : IUserFavoriteRepository
         }
 
         target.IsPrimary = true;
+        // Уровни исключают друг друга (My favorites 1b, решение Влада 24.09.2026): «Me» — не
+        // член семьи, и в лимит семьи не идёт. Ставший «Me» из семьи выходит.
+        target.IsFamily = false;
         try
         {
             await _db.SaveChangesAsync();
@@ -216,14 +219,19 @@ public class UserFavoriteRepository : IUserFavoriteRepository
             .FirstOrDefaultAsync(f => f.Id == favoriteId && f.UserId == userId
                                       && f.TargetType == FavoritesRules.TargetSwimmer);
         if (fav == null) return SetFamilyStatus.NotFound;
-        if (fav.IsFamily == isFamily) return SetFamilyStatus.Done;
+        // «Me + семья» из старых данных — это уровень Me, и постановка семьи тут не повтор.
+        if (fav.IsFamily == isFamily && !(isFamily && fav.IsPrimary)) return SetFamilyStatus.Done;
 
         // Лимит семьи — только на постановку: снять пометку можно всегда. Гонка двух вкладок
         // даст максимум пятого — это порядок и значок, не права, блокировка тут лишняя.
+        // «Me» в лимит не идёт: уровни исключают друг друга, а старые записи «Me + семья»
+        // (до 24.09.2026) считаются уровнем Me.
         if (isFamily)
         {
-            var family = await _db.UserFavorites.CountAsync(f => f.UserId == userId && f.IsFamily);
+            var family = await _db.UserFavorites.CountAsync(f => f.UserId == userId && f.IsFamily && !f.IsPrimary);
             if (family >= FavoritesRules.MaxFamily) return SetFamilyStatus.LimitReached;
+            // Ставший семьёй перестаёт быть «Me»: у пловца один уровень (My favorites 1b).
+            fav.IsPrimary = false;
         }
 
         fav.IsFamily = isFamily;

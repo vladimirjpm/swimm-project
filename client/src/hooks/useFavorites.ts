@@ -42,11 +42,20 @@ interface FavoritesState {
 /** Код отказа 422 «лимит избранного выбран» — `FavoritesRules.LimitErrorCode` на сервере. */
 const LIMIT_ERROR_CODE = 'favorites_limit';
 
-/** Пловцы с пометкой «семья» из списка избранного. */
+/**
+ * Уровень избранного пловца (My favorites, хендофф 1b): у пловца ровно один. Старая запись
+ * «Me + семья» (до 24.09.2026) — это Me: Me важнее, и в лимит семьи она не идёт.
+ */
+export type FavoriteLevel = 'me' | 'family' | 'fav';
+
+export const favoriteLevelOf = (f: Pick<FavoriteDto, 'is_primary' | 'is_family'>): FavoriteLevel =>
+  f.is_primary ? 'me' : f.is_family ? 'family' : 'fav';
+
+/** Пловцы уровня «семья» (без Me) из списка избранного. */
 function familyIdsOf(favorites: FavoriteDto[]): Set<number> {
   return new Set(
     favorites
-      .filter(f => f.target_type === 'swimmer' && f.is_family && f.swimmer_id != null)
+      .filter(f => f.target_type === 'swimmer' && favoriteLevelOf(f) === 'family' && f.swimmer_id != null)
       .map(f => f.swimmer_id as number)
   );
 }
@@ -297,11 +306,17 @@ export function useFavorites() {
 
       if (mountedRef.current) {
         setState(prev => {
+          // Ставший «Me» выходит из семьи — так же делает сервер (уровни исключают друг друга).
           const next = prev.favorites.map(f =>
-            f.target_type === 'swimmer' ? { ...f, is_primary: f.id === favoriteId } : f
+            f.target_type !== 'swimmer' ? f
+              : f.id === favoriteId ? { ...f, is_primary: true, is_family: false }
+                : { ...f, is_primary: false }
           );
           const primary = next.find(f => f.is_primary && f.target_type === 'swimmer');
-          return { ...prev, favorites: next, primarySwimmerId: primary?.swimmer_id ?? null };
+          return {
+            ...prev, favorites: next, primarySwimmerId: primary?.swimmer_id ?? null,
+            familySwimmerIds: familyIdsOf(next),
+          };
         });
       }
       return true;
@@ -340,8 +355,14 @@ export function useFavorites() {
 
       if (mountedRef.current) {
         setState(prev => {
-          const next = prev.favorites.map(f => (f.id === favoriteId ? { ...f, is_family: isFamily } : f));
-          return { ...prev, favorites: next, familySwimmerIds: familyIdsOf(next) };
+          // Ставший семьёй перестаёт быть «Me» — так же делает сервер.
+          const next = prev.favorites.map(f => (f.id !== favoriteId ? f
+            : isFamily ? { ...f, is_family: true, is_primary: false } : { ...f, is_family: false }));
+          const primary = next.find(f => f.is_primary && f.target_type === 'swimmer');
+          return {
+            ...prev, favorites: next, familySwimmerIds: familyIdsOf(next),
+            primarySwimmerId: primary?.swimmer_id ?? null,
+          };
         });
       }
       return true;
@@ -353,6 +374,47 @@ export function useFavorites() {
 
   /** Семья заполнена: пометить ещё одного нельзя, пока не снять кого-то. Пока лимит не приехал — false. */
   const familyFull = familyLimit != null && state.familySwimmerIds.size >= familyLimit.max;
+
+  /**
+   * Переключатель уровня Me / Family / Favorite (My favorites, хендофф 1b). Список меняется
+   * СРАЗУ (оптимистично), запрос догоняет; отказ — перечитываем список с сервера, это и есть
+   * откат (заодно подтягивает то, что поменяли в другой вкладке).
+   *
+   * Запрос один: сервер сам держит правило «один уровень» — «Me» снимает семью, семья
+   * снимает «Me». Два запроса нужны только старой записи «Me + семья» при переходе в Favorite.
+   */
+  const setLevel = useCallback(async (favoriteId: number, level: FavoriteLevel): Promise<boolean> => {
+    const current = state.favorites.find(f => f.id === favoriteId && f.target_type === 'swimmer');
+    if (!current || favoriteLevelOf(current) === level) return true;
+
+    if (mountedRef.current) {
+      setState(prev => {
+        const next = prev.favorites.map(f => {
+          if (f.target_type !== 'swimmer') return f;
+          if (f.id === favoriteId) return { ...f, is_primary: level === 'me', is_family: level === 'family' };
+          // Прежний «Me» опускается в обычное избранное.
+          return level === 'me' && f.is_primary ? { ...f, is_primary: false } : f;
+        });
+        const primary = next.find(f => f.is_primary && f.target_type === 'swimmer');
+        return {
+          ...prev, favorites: next, familySwimmerIds: familyIdsOf(next),
+          primarySwimmerId: primary?.swimmer_id ?? null,
+        };
+      });
+    }
+
+    let ok: boolean;
+    if (level === 'me') ok = await setPrimary(favoriteId);
+    else if (level === 'family') ok = await setFamily(favoriteId, true);
+    else {
+      ok = true;
+      if (current.is_primary) ok = await unsetPrimary(favoriteId);
+      if (ok && current.is_family) ok = await setFamily(favoriteId, false);
+    }
+
+    if (!ok) await reloadFavorites();
+    return ok;
+  }, [state.favorites, setPrimary, setFamily, unsetPrimary, reloadFavorites]);
 
   /**
    * Переключение: добавить → избранное / убрать из избранного. На пределе добавление не
@@ -442,6 +504,7 @@ export function useFavorites() {
     setPrimary,
     unsetPrimary,
     setFamily,
+    setLevel,
     familyLimit,
     familyFull,
     removeFavorite,
