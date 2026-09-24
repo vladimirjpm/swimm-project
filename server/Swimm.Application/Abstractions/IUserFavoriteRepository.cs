@@ -14,9 +14,10 @@ public interface IUserFavoriteRepository
     Task<bool> SetPrimaryAsync(int userId, int favoriteId);
     Task<bool> UnsetPrimaryAsync(int userId, int favoriteId);
     /// <summary>
-    /// Пометить/снять «семью» у своего избранного пловца. false — нет такой записи у этого
-    /// пользователя или это клуб (семья — только пловцы).
+    /// Пометить/снять «семью» у своего избранного пловца. NotFound — нет такой записи у этого
+    /// пользователя или это клуб (семья — только пловцы); LimitReached — в семье уже
+    /// <c>FavoritesRules.MaxFamily</c> (снимать можно всегда).
     /// </summary>
-    Task<bool> SetFamilyAsync(int userId, int favoriteId, bool isFamily);
+    Task<SetFamilyStatus> SetFamilyAsync(int userId, int favoriteId, bool isFamily);
     Task<bool> ReorderAsync(int userId, List<ReorderItem> items);
 }

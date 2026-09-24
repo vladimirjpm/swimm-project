@@ -106,8 +106,18 @@ public class FavoritesController : ControllerBase
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
 
-        var ok = await _favorites.SetFamilyAsync(userId.Value, id, isFamily: true);
-        return ok ? NoContent() : NotFound(new { error = "Favorite not found or not a swimmer" });
+        return await _favorites.SetFamilyAsync(userId.Value, id, isFamily: true) switch
+        {
+            SetFamilyStatus.Done => NoContent(),
+            // 422, как у лимита избранного: запрос верный, но место в семье кончилось.
+            SetFamilyStatus.LimitReached => UnprocessableEntity(new
+            {
+                error = FavoritesRules.FamilyFullHint,
+                code = FavoritesRules.FamilyLimitErrorCode,
+                limit = FavoritesRules.MaxFamily
+            }),
+            _ => NotFound(new { error = "Favorite not found or not a swimmer" }),
+        };
     }
 
     [HttpDelete("{id:int}/family")]
@@ -116,8 +126,8 @@ public class FavoritesController : ControllerBase
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
 
-        var ok = await _favorites.SetFamilyAsync(userId.Value, id, isFamily: false);
-        return ok ? NoContent() : NotFound(new { error = "Favorite not found or not a swimmer" });
+        var status = await _favorites.SetFamilyAsync(userId.Value, id, isFamily: false);
+        return status == SetFamilyStatus.Done ? NoContent() : NotFound(new { error = "Favorite not found or not a swimmer" });
     }
 
     [HttpPost("reorder")]

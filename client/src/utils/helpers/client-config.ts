@@ -23,6 +23,8 @@ export interface ClientConfig {
   recordAgeAxis?: string;
   hubGroupCreationPolicy?: string;
   favoritesLimits?: Partial<Record<FavoriteTarget, FavoritesLimit>>;
+  /** Сколько избранных можно пометить «семьёй» (FavoritesRules.MaxFamily на сервере). */
+  familyLimit?: FavoritesLimit;
   debug?: { ageRecordsDetails?: boolean };
 }
 

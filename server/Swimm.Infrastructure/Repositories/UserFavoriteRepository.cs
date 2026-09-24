@@ -43,6 +43,10 @@ public class UserFavoriteRepository : IUserFavoriteRepository
             : (f.Swimmer.LastName.Length > 0 || f.Swimmer.FirstName.Length > 0)
                 ? (f.Swimmer.LastName + " " + f.Swimmer.FirstName).Trim()
                 : (f.Swimmer.LastNameEn + " " + f.Swimmer.FirstNameEn).Trim(),
+        SwimmerClubId = f.Swimmer == null ? null : f.Swimmer.ClubId,
+        SwimmerClubName = f.Swimmer == null || f.Swimmer.Club == null
+            ? null
+            : (f.Swimmer.Club.Name.Length > 0 ? f.Swimmer.Club.Name : f.Swimmer.Club.NameEn),
         ClubId = f.ClubId,
         // Клуб — по тому же правилу, что имя: иврит по умолчанию, EN фоллбеком.
         ClubName = f.Club == null
@@ -205,20 +209,26 @@ public class UserFavoriteRepository : IUserFavoriteRepository
         return true;
     }
 
-    public async Task<bool> SetFamilyAsync(int userId, int favoriteId, bool isFamily)
+    public async Task<SetFamilyStatus> SetFamilyAsync(int userId, int favoriteId, bool isFamily)
     {
         // IDOR: только своё и только пловец — клуб семьёй не бывает.
         var fav = await _db.UserFavorites
             .FirstOrDefaultAsync(f => f.Id == favoriteId && f.UserId == userId
                                       && f.TargetType == FavoritesRules.TargetSwimmer);
-        if (fav == null) return false;
+        if (fav == null) return SetFamilyStatus.NotFound;
+        if (fav.IsFamily == isFamily) return SetFamilyStatus.Done;
 
-        if (fav.IsFamily != isFamily)
+        // Лимит семьи — только на постановку: снять пометку можно всегда. Гонка двух вкладок
+        // даст максимум пятого — это порядок и значок, не права, блокировка тут лишняя.
+        if (isFamily)
         {
-            fav.IsFamily = isFamily;
-            await _db.SaveChangesAsync();
+            var family = await _db.UserFavorites.CountAsync(f => f.UserId == userId && f.IsFamily);
+            if (family >= FavoritesRules.MaxFamily) return SetFamilyStatus.LimitReached;
         }
-        return true;
+
+        fav.IsFamily = isFamily;
+        await _db.SaveChangesAsync();
+        return SetFamilyStatus.Done;
     }
 
     public async Task<bool> ReorderAsync(int userId, List<ReorderItem> items)
