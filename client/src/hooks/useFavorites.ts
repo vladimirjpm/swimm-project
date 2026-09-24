@@ -10,6 +10,9 @@ export interface FavoriteDto {
   target_type: FavoriteTarget;
   swimmer_id?: number;
   swimmer_name?: string;
+  /** Клуб избранного пловца (исходное имя — по нему ищется эмблема); у записи-клуба нет. */
+  swimmer_club_id?: number | null;
+  swimmer_club_name?: string | null;
   club_id?: number;
   club_name?: string;
   is_primary: boolean;
@@ -72,6 +75,8 @@ export function useFavorites() {
    * снижённый в админке, пока страница была открыта.
    */
   const [limits, setLimits] = useState<Partial<Record<FavoriteTarget, FavoritesLimit>>>({});
+  /** Лимит «семьи» (4) — из того же client-config; до приезда кнопку не гасим, решает сервер. */
+  const [familyLimit, setFamilyLimit] = useState<FavoritesLimit | null>(null);
 
   // Флаг, чтобы не делать запросы после размонтирования компонента
   const mountedRef = useRef(true);
@@ -103,6 +108,7 @@ export function useFavorites() {
     if (!authIsAuthenticated) return;
     loadClientConfig().then((cfg) => {
       if (mountedRef.current && cfg?.favoritesLimits) setLimits(cfg.favoritesLimits);
+      if (mountedRef.current && cfg?.familyLimit) setFamilyLimit(cfg.familyLimit);
     });
   }, [authIsAuthenticated]);
 
@@ -320,6 +326,16 @@ export function useFavorites() {
         headers: { 'X-XSRF-TOKEN': token },
       });
 
+      if (r.status === 422) {
+        // Семья заполнена, а клиент не знал (другая вкладка): берём лимит из ответа и
+        // перечитываем список — кнопка погаснет с подсказкой.
+        const body = await r.json().catch(() => null);
+        if (typeof body?.limit === 'number' && mountedRef.current) {
+          setFamilyLimit({ max: body.limit, fullHint: body.error ?? '' });
+        }
+        await reloadFavorites();
+        return false;
+      }
       if (!r.ok) { invalidateTokenCache(); return false; }
 
       if (mountedRef.current) {
@@ -333,7 +349,10 @@ export function useFavorites() {
       invalidateTokenCache();
       return false;
     }
-  }, []);
+  }, [reloadFavorites]);
+
+  /** Семья заполнена: пометить ещё одного нельзя, пока не снять кого-то. Пока лимит не приехал — false. */
+  const familyFull = familyLimit != null && state.familySwimmerIds.size >= familyLimit.max;
 
   /**
    * Переключение: добавить → избранное / убрать из избранного. На пределе добавление не
@@ -423,6 +442,8 @@ export function useFavorites() {
     setPrimary,
     unsetPrimary,
     setFamily,
+    familyLimit,
+    familyFull,
     removeFavorite,
     addFavoriteSwimmer,
   };

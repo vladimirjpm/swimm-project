@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Repositories;
@@ -50,10 +51,10 @@ public class UserFavoriteFamilyTests
         var repo = Repo(db);
         Assert.False(fav.IsFamily); // новое избранное — не семья
 
-        Assert.True(await repo.SetFamilyAsync(owner.Id, fav.Id, isFamily: true));
+        Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, fav.Id, isFamily: true));
         Assert.True((await repo.GetForUserAsync(owner.Id)).Single(f => f.Id == fav.Id).IsFamily);
 
-        Assert.True(await repo.SetFamilyAsync(owner.Id, fav.Id, isFamily: false));
+        Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, fav.Id, isFamily: false));
         Assert.False((await repo.GetForUserAsync(owner.Id)).Single(f => f.Id == fav.Id).IsFamily);
     }
 
@@ -63,7 +64,7 @@ public class UserFavoriteFamilyTests
         await using var db = CreateDb(nameof(SetFamily_SomeoneElsesFavorite_Refused));
         var (_, other, fav, _) = await SeedAsync(db);
 
-        Assert.False(await Repo(db).SetFamilyAsync(other.Id, fav.Id, isFamily: true));
+        Assert.Equal(SetFamilyStatus.NotFound, await Repo(db).SetFamilyAsync(other.Id, fav.Id, isFamily: true));
         Assert.False((await db.UserFavorites.SingleAsync(f => f.Id == fav.Id)).IsFamily);
     }
 
@@ -73,7 +74,56 @@ public class UserFavoriteFamilyTests
         await using var db = CreateDb(nameof(SetFamily_Club_Refused));
         var (owner, _, _, clubFav) = await SeedAsync(db);
 
-        Assert.False(await Repo(db).SetFamilyAsync(owner.Id, clubFav.Id, isFamily: true));
+        Assert.Equal(SetFamilyStatus.NotFound, await Repo(db).SetFamilyAsync(owner.Id, clubFav.Id, isFamily: true));
         Assert.False((await db.UserFavorites.SingleAsync(f => f.Id == clubFav.Id)).IsFamily);
+    }
+
+    [Fact]
+    public async Task SetFamily_FifthRefused_UnmarkAlwaysAllowed()
+    {
+        await using var db = CreateDb(nameof(SetFamily_FifthRefused_UnmarkAlwaysAllowed));
+        var (owner, _, _, _) = await SeedAsync(db);
+        var repo = Repo(db);
+        var kids = Enumerable.Range(1, FavoritesRules.MaxFamily + 1)
+            .Select(i => new Swimmer { LastName = $"Kid{i}", FirstName = "K", BirthYear = 2014 }).ToList();
+        db.Swimmers.AddRange(kids);
+        await db.SaveChangesAsync();
+        var favs = new List<FavoriteDto>();
+        foreach (var k in kids)
+            favs.Add((await repo.AddAsync(owner.Id, new AddFavoriteRequest { TargetType = "swimmer", SwimmerId = k.Id })).Favorite!);
+
+        var last = favs[favs.Count - 1];
+        for (var i = 0; i < FavoritesRules.MaxFamily; i++)
+            Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, favs[i].Id, isFamily: true));
+
+        // Пятый — отказ, и пометка не встала.
+        Assert.Equal(SetFamilyStatus.LimitReached, await repo.SetFamilyAsync(owner.Id, last.Id, isFamily: true));
+        Assert.False((await db.UserFavorites.SingleAsync(f => f.Id == last.Id)).IsFamily);
+        // Повтор уже поставленной пометки на пределе — не отказ.
+        Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, favs[0].Id, isFamily: true));
+
+        // Сняли одного — место появилось.
+        Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, favs[0].Id, isFamily: false));
+        Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, last.Id, isFamily: true));
+    }
+
+    [Fact]
+    public async Task GetForUser_SwimmerFavorite_CarriesSwimmersClub()
+    {
+        await using var db = CreateDb(nameof(GetForUser_SwimmerFavorite_CarriesSwimmersClub));
+        var club = new Club { Name = "מכבי", NameEn = "Maccabi" };
+        db.Clubs.Add(club);
+        await db.SaveChangesAsync();
+        var (owner, _, fav, clubFav) = await SeedAsync(db);
+        var swimmer = await db.Swimmers.SingleAsync(s => s.Id == fav.SwimmerId);
+        swimmer.ClubId = club.Id;
+        await db.SaveChangesAsync();
+
+        var list = await Repo(db).GetForUserAsync(owner.Id);
+
+        var row = list.Single(f => f.Id == fav.Id);
+        Assert.Equal(club.Id, row.SwimmerClubId);
+        Assert.Equal("מכבי", row.SwimmerClubName); // исходное имя — по нему ищется эмблема
+        Assert.Null(list.Single(f => f.Id == clubFav.Id).SwimmerClubName);
     }
 }

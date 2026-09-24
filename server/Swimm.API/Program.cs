@@ -1497,6 +1497,9 @@ app.Map("/error", (HttpContext ctx) =>
 // (ключи — те же target_type, что в /api/me/favorites). Клиенту — чтобы сердечко на пределе
 // гасло с подсказкой ДО клика, а не отказом после; подсказка та же, что в тексте отказа 422
 // (FavoritesRules.FullHint), второй копии текста на клиенте нет.
+//
+// familyLimit: сколько избранных можно пометить «семьёй» (FavoritesRules.MaxFamily) и текст
+// отказа — страница My favorites гасит кнопку Family на пределе до клика.
 app.MapGet("/api/client-config",
     async (ISettingsService settings, IDebugOptionsService debug) => Results.Ok(new
     {
@@ -1511,6 +1514,7 @@ app.MapGet("/api/client-config",
                 var max = FavoritesRules.LimitFor(settings, t);
                 return new { max, fullHint = FavoritesRules.FullHint(t, max) };
             }),
+        familyLimit = new { max = FavoritesRules.MaxFamily, fullHint = FavoritesRules.FamilyFullHint },
         // Отладочные подробности витрин: только ДЕЙСТВУЮЩИЕ (общий тумблер × галочка опции),
         // клиенту знать про два уровня незачем. См. DebugOption.
         debug = new

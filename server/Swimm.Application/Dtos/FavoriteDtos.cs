@@ -16,6 +16,17 @@ public class FavoriteDto
     [JsonPropertyName("swimmer_name")]
     public string? SwimmerName { get; set; }
 
+    /// <summary>
+    /// Клуб избранного ПЛОВЦА (у записи-клуба — null): эмблема и название на странице My
+    /// favorites. Название — исходное (<c>Club.Name</c>, иврит): по нему ищется файл эмблемы;
+    /// нет ивритского — английское.
+    /// </summary>
+    [JsonPropertyName("swimmer_club_id")]
+    public int? SwimmerClubId { get; set; }
+
+    [JsonPropertyName("swimmer_club_name")]
+    public string? SwimmerClubName { get; set; }
+
     [JsonPropertyName("club_id")]
     public int? ClubId { get; set; }
 
@@ -72,6 +83,15 @@ public sealed record AddFavoriteResult(
     public static AddFavoriteResult Duplicate() => new(AddFavoriteStatus.Duplicate);
     public static AddFavoriteResult LimitReached(int limit, string message) =>
         new(AddFavoriteStatus.LimitReached, Limit: limit, Message: message);
+}
+
+/// <summary>Исход пометки «семья»: сделано, нет такой записи (чужая/клуб), семья заполнена.</summary>
+public enum SetFamilyStatus
+{
+    Done,
+    NotFound,
+    /// <summary>Уже <c>FavoritesRules.MaxFamily</c> в семье — 422 с кодом <c>FamilyLimitErrorCode</c>.</summary>
+    LimitReached,
 }
 
 public class ReorderItem

@@ -40,6 +40,20 @@ public static class FavoritesRules
     /// <summary>Машиночитаемый код отказа в ответе 422 — клиент узнаёт по нему лимит.</summary>
     public const string LimitErrorCode = "favorites_limit";
 
+    /// <summary>
+    /// Сколько избранных пловцов можно пометить «семьёй» (решение Влада 24.09.2026,
+    /// docs/plans/family-favorites-plan.md). Константа, не настройка: семья — это свои дети,
+    /// а не список, и поднимать всех наверх значит не поднимать никого. Снять пометку можно
+    /// всегда; кто уже выше лимита — ничего не теряет, только не добавляет.
+    /// </summary>
+    public const int MaxFamily = 4;
+
+    /// <summary>Код отказа 422 «семья заполнена» — отдельный от лимита избранного.</summary>
+    public const string FamilyLimitErrorCode = "family_limit";
+
+    /// <summary>Текст отказа и подсказки на погашенной кнопке Family — на витрину, по-английски.</summary>
+    public static string FamilyFullHint => $"Up to {MaxFamily} family members — unmark someone first.";
+
     public static bool IsValidLimit(int value) => value is >= MinLimit and <= MaxLimit;
 
     /// <summary>Действующий лимит для типа избранного (<see cref="TargetSwimmer"/> / <see cref="TargetClub"/>).</summary>
