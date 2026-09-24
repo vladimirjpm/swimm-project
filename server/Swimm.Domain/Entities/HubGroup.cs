@@ -103,6 +103,15 @@ public class HubGroup
     public bool IsOfficial { get; set; }
 
     /// <summary>
+    /// Тестовая группа (docs/plans/test-personas-plan.md, решение 24.09.2026): её видят только
+    /// site-админ и тестовые аккаунты (email с префиксом <c>utest</c>, правило —
+    /// <c>TestAccountRules</c>); всем остальным группы нет — 404, не заглушка. В каталоге её нет
+    /// никогда. Ставится только в админке. Официальной быть не может
+    /// (CK_HubGroups_TestNotOfficial): тестовая группа заняла бы место «лица клуба».
+    /// </summary>
+    public bool IsTest { get; set; }
+
+    /// <summary>
     /// Политика самозаписи: open (сразу active) | approval (заявка pending до одобрения).
     /// Гейт доступа к members-контенту (разборы/тренировки): при open любой залогиненный
     /// становится активным участником одним кликом — для групп с members-медиа ставь approval.

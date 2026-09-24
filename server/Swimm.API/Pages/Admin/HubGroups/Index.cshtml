@@ -58,6 +58,15 @@
     </div>
 }
 
+<div class="mb-3 flex flex-wrap items-center gap-2 text-sm">
+    <span class="text-admin-text-muted">Показать:</span>
+    @foreach (var (value, label) in new (string?, string)[] { (null, "Все"), ("real", "Без тестовых"), ("test", "Тестовые"), ("official", "Официальные") })
+    {
+        <a href="@Url.Page("Index", new { filter = value, tab = Model.Tab })"
+           class="admin-btn py-1 px-2.5 @(Model.Filter == value ? "admin-btn-primary" : "admin-btn-ghost")">@label</a>
+    }
+</div>
+
 @if (Model.Groups.Count == 0)
 {
     <div class="admin-card text-center text-admin-text-muted italic py-10">
@@ -99,6 +108,11 @@ else
                         </td>
                         <td>
                             <a href="@Url.Page("Edit", new { id = g.Id })" class="text-admin-accent hover:underline font-medium">@g.Name</a>
+                            @if (g.IsTest)
+                            {
+                                <span class="ml-1.5 admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning"
+                                      title="Тестовая группа: видят только site-админ и utest-аккаунты, в каталоге её нет">TEST</span>
+                            }
                         </td>
                         <td class="font-mono text-xs text-admin-text-muted">@g.Slug</td>
                         <td>@(g.ClubName ?? "—")</td>

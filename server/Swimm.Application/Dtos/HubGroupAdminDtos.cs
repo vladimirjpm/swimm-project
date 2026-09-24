@@ -11,6 +11,8 @@ public sealed class HubGroupAdminRowDto
     public int MemberCount { get; set; }
     public bool IsPublic { get; set; }
     public bool IsOfficial { get; set; }
+    /// <summary>Тестовая группа (HubGroup.IsTest) — метка TEST и фильтр в списке админки.</summary>
+    public bool IsTest { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
@@ -124,6 +126,8 @@ public sealed class HubGroupEditDto
     public bool IsPublic { get; set; }
     /// <summary>Официальная группа клуба — устанавливается только через одобрение заявки, не через форму.</summary>
     public bool IsOfficial { get; set; }
+    /// <summary>Тестовая группа (HubGroup.IsTest) — видят только site-админ и utest-аккаунты.</summary>
+    public bool IsTest { get; set; }
     /// <summary>open | approval — политика самозаписи (см. HubGroupJoinPolicy).</summary>
     public string JoinPolicy { get; set; } = "open";
     public List<HubGroupLinkDto> Links { get; set; } = [];
@@ -152,6 +156,12 @@ public sealed class HubGroupInputDto
     /// <summary>open | approval; null/отсутствует — не менять (старый клиент не сбросит политику).</summary>
     public string? JoinPolicy { get; set; }
     public List<HubGroupLinkDto> Links { get; set; } = [];
+    /// <summary>
+    /// Тестовая группа. Читает ТОЛЬКО админский путь (HubGroupAdminService): общий
+    /// <c>HubGroupCrudCore.Apply</c> поле не трогает, поэтому владелец из «My groups» пометить
+    /// группу тестовой или снять пометку не может.
+    /// </summary>
+    public bool IsTest { get; set; }
 }
 
 /// <summary>Опция клуба для select в форме.</summary>

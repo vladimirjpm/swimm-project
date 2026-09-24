@@ -59,6 +59,17 @@ const cleanUrlRewrite = () => ({
   },
 });
 
+// Переключатель тестового персонажа (docs/plans/test-personas-plan.md, этап 3): в dev вставляет
+// плашку в КАЖДУЮ страницу, не трогая двенадцать точек входа. apply: 'serve' — в сборку не
+// попадает вообще. Без dev-ручек API (/api/dev/personas) плашка просто не рисуется.
+const devPersonaSwitcher = () => ({
+  name: 'dev-persona-switcher',
+  apply: 'serve',
+  transformIndexHtml: () => [
+    { tag: 'script', attrs: { type: 'module', src: '/src/dev/persona-switcher/mount.tsx' }, injectTo: 'body' },
+  ],
+});
+
 export default defineConfig(({ command }) => ({
   // In dev we serve at '/', but we also accept '/swimm-project/*' via middleware.
   // Прод — ВСЕГДА '/': сборка раздаётся из wwwroot API с корня одного origin, и чистые URL
@@ -66,7 +77,7 @@ export default defineConfig(({ command }) => ({
   // /swimmers/swimmer.js и получил 404 — страница не грузилась бы вовсе. Прежнее './' было
   // ради GitHub Pages; тот деплой снесён в d3b25ab. Не откатывать (docs/plans/azure-deploy-plan.md Б2).
   base: '/',
-  plugins: [react(), tailwindcss(), swimmProjectPrefixRewrite(), cleanUrlRewrite()],
+  plugins: [react(), tailwindcss(), swimmProjectPrefixRewrite(), cleanUrlRewrite(), devPersonaSwitcher()],
   // Dev-прокси на API (Swimm.API, http://localhost:5078): относительные запросы клиента
   // (/api/*, /auth/*) уходят на бэкенд как same-origin — куки и antiforgery работают без CORS.
   // В проде клиент раздаётся самим API (wwwroot), поэтому те же относительные пути валидны.

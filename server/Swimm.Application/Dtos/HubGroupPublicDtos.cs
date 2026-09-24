@@ -5,8 +5,10 @@ namespace Swimm.Application.Dtos;
 /// <summary>
 /// Доступ зрителя к группе: приватна ли она и может ли он её смотреть (участник/управляющий).
 /// Не отдаётся наружу — по нему контроллеры выбирают страницу или заглушку.
+/// <paramref name="IsTest"/> — тестовая группа (её видят только site-админ и utest-аккаунты;
+/// остальным репозиторий отдаёт null): ответ, как у приватной, не должен уходить в общий HTTP-кэш.
 /// </summary>
-public sealed record HubGroupAccessDto(int Id, bool IsPrivate, bool CanView);
+public sealed record HubGroupAccessDto(int Id, bool IsPrivate, bool CanView, bool IsTest = false);
 
 /// <summary>Карточка группы в публичном списке /api/hub-groups.</summary>
 public sealed class HubGroupListItemDto

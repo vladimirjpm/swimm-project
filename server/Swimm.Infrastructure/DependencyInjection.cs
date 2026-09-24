@@ -222,6 +222,7 @@ public static class DependencyInjection
 
         // Одноразовый сид тренировок «Дельфин-мастерс» (dotnet run -- --seed-dolphin-training ...)
         services.AddScoped<IDolphinTrainingSeeder, DolphinTrainingSeeder>();
+        services.AddScoped<IPersonaSeeder, PersonaSeeder>();
 
         // Склейка пловцов-дублей (dry-run по умолчанию; см. docs/tasks/dedup-report.md)
         services.AddScoped<ISwimmerMergeService, SwimmerMergeService>();

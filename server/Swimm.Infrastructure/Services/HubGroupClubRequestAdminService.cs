@@ -137,6 +137,9 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
             return HubGroupMemberSaveResult.Fail("Заявка уже рассмотрена");
 
         var group = request.HubGroup!;
+        // Заявку могли подать до того, как админ пометил группу тестовой.
+        if (group.IsTest) return HubGroupMemberSaveResult.Fail(HubGroupClubRules.TestGroupCannotBeOfficialError);
+
         var clubTaken = await _db.HubGroups
             .AnyAsync(g => g.Id != group.Id && g.ClubId == request.ClubId && g.IsOfficial);
         if (clubTaken) return HubGroupMemberSaveResult.Fail("У этого клуба уже есть официальная группа");

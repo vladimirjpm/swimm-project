@@ -4,6 +4,7 @@ import { SwimmerRecord } from '../../../utils/helpers/helper-normative';
 import UI_SwimmStyleIcon from '../mix/swimm-style-icon/swimm-style-icon';
 import UI_PoolIcon from '../mix/pool-icon/pool-icon';
 import UI_SwimTime from '../mix/swim-time/swim-time';
+import UI_RecordsChecked, { recordSources } from '../mix/records-checked/records-checked';
 
 interface PopupData {
   swimmerName: string;
@@ -84,6 +85,11 @@ const PopupContentSwimmerRecords: React.FC = () => {
       <div className="text-xl font-bold mb-4">🏆 {swimmerName} — Records</div>
       {renderTable(mastersRecords, 'Masters Records', 'bg-yellow-50', 'bg-yellow-100')}
       {renderTable(ageRecords, 'Age Records', 'bg-orange-50', 'bg-orange-100')}
+      {/* Дата сверки — по каждому типу, что попал в попап: мастерские и возрастные
+          израильские рекорды приходят РАЗНЫМИ источниками и сверяются порознь. */}
+      <UI_RecordsChecked
+        sources={recordSources(records.map((r) => ({ category: r.isMasters ? 'masters' : 'age' })))}
+      />
     </div>
   );
 };

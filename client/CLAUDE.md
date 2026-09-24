@@ -47,6 +47,10 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
   состояние в адресе. Её сознательно НЕТ в `rollupOptions.input`: так она есть в гите, но не
   в прод-сборке. Не добавляй её во входы и не ставь ссылку из топбара. Новый компонент на
   витрину = одна запись в `src/dev/ui-kit/registry.tsx`.
+- **Dev-переключатель персонажа** (`src/dev/persona-switcher/`) — плашка «DEV · <кто>» внизу
+  слева: смотреть сайт глазами utest-персонажа без перезапуска API. Вставляет её плагин
+  `devPersonaSwitcher` в `vite.config.js` (`apply: 'serve'`) — в точки входа её не добавляй,
+  в прод-сборки её нет. Устройство — `docs/plans/test-personas-plan.md` «Переключатель».
 
 ## Карта `src/`
 

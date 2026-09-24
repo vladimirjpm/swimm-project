@@ -1036,6 +1036,12 @@ public class SwimmDbContext : DbContext
                 "CK_HubGroups_OfficialRequiresClub",
                 @"NOT ""IsOfficial"" OR ""ClubId"" IS NOT NULL");
 
+            // Тестовая группа не бывает официальной: иначе она стала бы «лицом клуба» и убрала
+            // из каталога настоящие группы, подписанные на этот клуб (П4).
+            entity.HasCheckConstraint(
+                "CK_HubGroups_TestNotOfficial",
+                @"NOT (""IsTest"" AND ""IsOfficial"")");
+
             entity.HasCheckConstraint(
                 "CK_HubGroups_JoinPolicy",
                 @"""JoinPolicy"" IN ('open', 'approval')");

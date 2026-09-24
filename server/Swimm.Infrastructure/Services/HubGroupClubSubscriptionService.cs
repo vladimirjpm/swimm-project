@@ -85,7 +85,8 @@ public class HubGroupClubSubscriptionService : IHubGroupClubSubscriptionService
             .FirstOrDefaultAsync();
 
         var following = await _db.HubGroups.AsNoTracking()
-            .Where(g => g.Id != hubGroupId && g.ClubSubscriptions.Any(s => s.ClubId == targetClubId))
+            // Тестовые группы в чужой подсказке «кто ещё следит за клубом» не показываем.
+            .Where(g => g.Id != hubGroupId && !g.IsTest && g.ClubSubscriptions.Any(s => s.ClubId == targetClubId))
             .OrderByDescending(g => g.Members.Count(m => !m.IsExcluded))
             .Select(g => new HubGroupRefDto
             {

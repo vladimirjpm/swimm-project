@@ -59,7 +59,10 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "page")]
     public int PageNumber { get; set; } = 1;
 
-    /// <summary>Фильтр статуса на вкладке «Спорные записи»; пусто — все.</summary>
+    /// <summary>
+    /// Фильтр статуса на вкладке «Спорные записи». Без параметра — <c>candidate</c>
+    /// (то, что ждёт разбора); все статусы — явное <c>all</c>.
+    /// </summary>
     [BindProperty(SupportsGet = true, Name = "status")]
     public string? IssueStatus { get; set; }
 
@@ -72,6 +75,10 @@ public class IndexModel : PageModel
     /// </summary>
     public PagedResult<RecordIssueDto> Issues { get; private set; } = new([], 0, 1, PageSize);
 
+    public const string AllIssueStatuses = "all";
+
+    /// <summary>Сколько претензий ждёт разбора (<c>candidate</c>) — цифра у вкладки «Спорные записи».</summary>
+    public int CandidateCount { get; private set; }
     public IReadOnlyList<string> IssueStatuses { get; } = RecordIssueStatuses.All;
     public IReadOnlyList<string> IssueReasons { get; } = RecordIssueReasons.All;
 
@@ -102,11 +109,19 @@ public class IndexModel : PageModel
         }
 
         if (Tab == "issues")
-            Issues = await _quality.ListIssuesAsync(IssueStatus, PageNumber, PageSize);
+        {
+            if (string.IsNullOrEmpty(IssueStatus)) IssueStatus = RecordIssueStatuses.Candidate;
+            Issues = await _quality.ListIssuesAsync(IssueStatus == AllIssueStatuses ? null : IssueStatus, PageNumber, PageSize);
+        }
         else if (Tab == "standards")
             Standards = await _repo.GetStandardsAsync(new StandardFilter(Kind, Gender, PoolType, Style), PageNumber, PageSize);
         else
             Records = await _repo.GetRecordsAsync(new RecordFilter(RegionType, RegionCode, Category, Gender, PoolType, Style), PageNumber, PageSize);
+
+        // На вкладке кандидатов число уже есть в выборке; иначе — отдельный COUNT (страница из 1 строки).
+        CandidateCount = Tab == "issues" && IssueStatus == RecordIssueStatuses.Candidate
+            ? Issues.TotalCount
+            : (await _quality.ListIssuesAsync(RecordIssueStatuses.Candidate, 1, 1)).TotalCount;
 
         return Page();
     }

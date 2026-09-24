@@ -94,6 +94,12 @@ public static class HubGroupClubRules
         $"This name belongs to {Isolate(clubName)}, which has an official group. " +
         $"Try “{Isolate(attemptedName.Trim() + CommunitySuffix)}”.";
 
+    /// <summary>
+    /// Отказ тестовой группе (HubGroup.IsTest) в официальном статусе: она стала бы «лицом клуба»
+    /// и убрала из каталога настоящие группы (CK_HubGroups_TestNotOfficial).
+    /// </summary>
+    public const string TestGroupCannotBeOfficialError = "A test group can't become an official club group.";
+
     /// <summary>Плашка в «My groups» у группы, которую официальная группа клуба убрала из каталога.</summary>
     public static string NotInCatalogNotice(string clubName, string officialGroupName) =>
         $"Not in the catalog: {Isolate(clubName)} has an official group — {Isolate(officialGroupName)}. " +

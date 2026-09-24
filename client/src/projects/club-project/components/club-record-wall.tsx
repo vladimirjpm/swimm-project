@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useClubRecordWall, type ClubOfficialRecord } from '../../../hooks/useClubRecordWall';
 import { ClubRecordCard, ClubRecordSection, ClubRecordTile, type PoolFilter } from './club-record-card';
 import { compareDiscipline, groupByAge } from './age-sections';
+import UI_RecordsChecked, { recordSources } from '../../components/mix/records-checked/records-checked';
 import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
 
 /**
@@ -108,6 +109,17 @@ function ClubRecordWall({ clubId }: Props) {
           </ClubRecordSection>
         ))}
       </div>
+
+      {/* Когда справочник сверяли с источником — по каждому типу рекордов, что попал на
+          стену: у возрастных и мастерских израильских один источник, у мировых другой. */}
+      <UI_RecordsChecked
+        sources={recordSources(data.map((r) => ({
+          regionType: r.region_type,
+          regionCode: r.region_code,
+          category: r.category,
+        })))}
+        className="mt-3"
+      />
     </ClubRecordCard>
   );
 }
