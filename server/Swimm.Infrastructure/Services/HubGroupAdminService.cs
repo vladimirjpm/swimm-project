@@ -41,6 +41,7 @@ public class HubGroupAdminService : IHubGroupAdminService
                 MemberCount = g.Members.Count(m => !m.IsExcluded),
                 IsPublic = g.IsPublic,
                 IsOfficial = g.IsOfficial,
+                IsTest = g.IsTest,
                 UpdatedAt = g.UpdatedAt,
                 OwnerUserId = g.OwnerUserId
             })
@@ -118,6 +119,7 @@ public class HubGroupAdminService : IHubGroupAdminService
             OwnerDisplayName = g.Owner?.DisplayName ?? $"#{g.OwnerUserId}",
             IsPublic = g.IsPublic,
             IsOfficial = g.IsOfficial,
+            IsTest = g.IsTest,
             JoinPolicy = g.JoinPolicy,
             Links = HubGroupCrudCore.ParseLinks(g.Links),
             Members = members,
@@ -145,7 +147,7 @@ public class HubGroupAdminService : IHubGroupAdminService
         var error = await _core.ValidateAsync(input, slug, excludeId: null);
         if (error != null) return HubGroupSaveResult.Fail(error);
 
-        var group = new HubGroup { OwnerUserId = resolvedOwnerId.Value };
+        var group = new HubGroup { OwnerUserId = resolvedOwnerId.Value, IsTest = input.IsTest };
         HubGroupCrudCore.Apply(group, input, slug);
         await _core.ApplyCountryAsync(group, input.Country);
         _db.HubGroups.Add(group);
@@ -160,8 +162,12 @@ public class HubGroupAdminService : IHubGroupAdminService
         var slug = await _core.ResolveSlugAsync(input, excludeId: id);
         var error = await _core.ValidateAsync(input, slug, excludeId: id);
         if (error != null) return HubGroupSaveResult.Fail(error);
+        // Иначе упрёмся в CK_HubGroups_TestNotOfficial исключением на сохранении.
+        if (input.IsTest && group.IsOfficial)
+            return HubGroupSaveResult.Fail("Официальную группу нельзя сделать тестовой — сначала снимите официальный статус.");
 
         HubGroupCrudCore.Apply(group, input, slug);
+        group.IsTest = input.IsTest;
         await _core.ApplyCountryAsync(group, input.Country);
         return await _core.SaveAsync(group);
     }

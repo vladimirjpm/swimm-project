@@ -143,6 +143,19 @@
             </div>
         </div>
 
+        <div class="mt-4">
+            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input asp-for="Input.IsTest" class="w-4 h-4 cursor-pointer" />
+                <span class="text-admin-text">Тестовая группа</span>
+            </label>
+            <div class="text-[11px] text-admin-text-muted mt-1">
+                Видят только админ сайта и тестовые аккаунты (email с префиксом
+                <code class="text-admin-accent">utest</code>); остальным группы нет — «не найдено», без
+                заглушки и кнопки «вступить». В каталоге её нет никогда. Официальной стать не может.
+                Для тестовых аккаунтов в остальном ведёт себя как обычная группа.
+            </div>
+        </div>
+
         <div class="mt-4 text-xs text-admin-text-muted">
             Владелец:
             @if (!Model.IsNew && Model.Existing != null)

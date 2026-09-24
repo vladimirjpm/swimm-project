@@ -252,9 +252,13 @@ public class HubGroupUserService : IHubGroupUserService
     {
         var group = await _db.HubGroups.AsNoTracking()
             .Where(g => g.Id == hubGroupId)
-            .Select(g => new { g.Id, g.IsPublic, g.JoinPolicy })
+            .Select(g => new { g.Id, g.IsPublic, g.JoinPolicy, g.IsTest })
             .FirstOrDefaultAsync();
         if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
+        // В тестовую группу вступает только тестовый аккаунт: для остальных её нет
+        // (test-personas-plan.md). Site-админу вступать незачем — он видит её и так.
+        if (group.IsTest && !await TestGroupAccess.CanSeeAsync(_db, userId, isSiteAdmin: false))
+            return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
 
         // В приватную группу вступают — иначе её страница «только для участников» вела бы в
         // тупик (§6-6, 11.09.2026). Но ТОЛЬКО заявкой, какой бы ни была политика: открытая
@@ -426,6 +430,7 @@ public class HubGroupUserService : IHubGroupUserService
         var group = await _db.HubGroups.FindAsync(hubGroupId);
         if (group == null) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
         if (group.IsOfficial) return HubGroupMemberSaveResult.Fail("Группа уже официальная");
+        if (group.IsTest) return HubGroupMemberSaveResult.Fail(HubGroupClubRules.TestGroupCannotBeOfficialError);
 
         var clubExists = await _db.Clubs.AnyAsync(c => c.Id == input.ClubId);
         if (!clubExists) return HubGroupMemberSaveResult.Fail("Клуб не найден");

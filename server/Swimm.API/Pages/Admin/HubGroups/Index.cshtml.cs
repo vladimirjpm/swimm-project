@@ -21,7 +21,10 @@ public class IndexModel : PageModel
 
     public IReadOnlyList<HubGroupAdminRowDto> Groups { get; private set; } = [];
 
-    /// <summary>Deep-link фильтр с дашборда: filter=official — только официальные группы.</summary>
+    /// <summary>
+    /// Фильтр списка: official — только официальные (deep-link с дашборда), test — только тестовые
+    /// (HubGroup.IsTest), real — без тестовых; пусто — все.
+    /// </summary>
     [BindProperty(SupportsGet = true, Name = "filter")]
     public string? Filter { get; set; }
 
@@ -34,7 +37,13 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         var all = await _service.GetAllAsync();
-        Groups = Filter == "official" ? all.Where(g => g.IsOfficial).ToList() : all;
+        Groups = Filter switch
+        {
+            "official" => all.Where(g => g.IsOfficial).ToList(),
+            "test" => all.Where(g => g.IsTest).ToList(),
+            "real" => all.Where(g => !g.IsTest).ToList(),
+            _ => all,
+        };
 
         if (Tab == "requests")
             PendingRequests = await _quality.GetPendingJoinRequestsAsync();

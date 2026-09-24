@@ -495,6 +495,26 @@ if (args.Contains("--seed-dolphin-training"))
     return;
 }
 
+// Тестовые персонажи utest-* и тестовые группы (docs/plans/test-personas-plan.md, этап 2):
+//   dotnet run -- --seed-personas [--reset]
+// Идемпотентно; --reset сначала удаляет всех utest-пользователей и их тест-группы.
+// Только Development: сидер заводит аккаунты, на живой базе им не место.
+if (args.Contains("--seed-personas"))
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        Console.Error.WriteLine("--seed-personas работает только в Development (ASPNETCORE_ENVIRONMENT=Development).");
+        Environment.Exit(1);
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<IPersonaSeeder>();
+    foreach (var line in await seeder.SeedAsync(args.Contains("--reset")))
+        Console.WriteLine(line);
+    return;
+}
+
 // Ретро-сверка загруженных протоколов с источником (docs/data-integrity.md, фаза Д1):
 //   dotnet run -- --audit-imports [--id <discoveredId>] [--limit N]
 // Качает протокол заново, парсит ТЕКУЩИМ парсером и сравнивает с БД. Диагноз, а не лечение:

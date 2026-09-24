@@ -74,6 +74,20 @@ public class HubGroupsController : ControllerBase
     private Task<HubGroupAccessDto?> AccessAsync(string slug) =>
         _groups.GetAccessAsync(slug, CurrentUserId(), User.IsInRole("Admin"));
 
+    /// <summary>
+    /// Id группы для ручек, которые сами решают про участников (тренировки, members-медиа): null —
+    /// группы нет ИЛИ это тестовая группа, а зритель не тестовый (для него её нет, 404).
+    /// Раньше эти ручки брали id прямо по slug — в обход <see cref="AccessAsync"/>.
+    /// </summary>
+    private async Task<int?> VisibleGroupIdAsync(string slug) => (await AccessAsync(slug))?.Id;
+
+    /// <summary>
+    /// Заголовок кэша ответа с данными группы: приватная и тестовая — только в браузере зрителя
+    /// (общий HTTP-кэш не должен унести их следующему), остальные — публичный.
+    /// </summary>
+    private static string CacheControlFor(HubGroupAccessDto access) =>
+        access.IsPrivate || access.IsTest ? PrivateCacheControlValue : CacheControlValue;
+
     /// <summary>Отказ не-участнику приватной группы — машиночитаемый код для клиента.</summary>
     private ObjectResult MembersOnly() =>
         StatusCode(StatusCodes.Status403Forbidden, new { error = "members_only" });
@@ -184,7 +198,7 @@ public class HubGroupsController : ControllerBase
                 // Лента хайлайтов шапки — строго после заполнения Gallery (video/photo берутся из неё).
                 dto.Highlights = HubGroupHighlightsBuilder.Build(dto);
                 return dto;
-            }, PayloadTtl, access.IsPrivate ? PrivateCacheControlValue : CacheControlValue);
+            }, PayloadTtl, CacheControlFor(access));
     }
 
     /// <summary>
@@ -218,7 +232,7 @@ public class HubGroupsController : ControllerBase
         var access = await AccessAsync(slug);
         if (access == null) return NotFound();
         if (!access.CanView) return MembersOnly();
-        if (access.IsPrivate) Response.Headers.CacheControl = PrivateCacheControlValue;
+        if (access.IsPrivate || access.IsTest) Response.Headers.CacheControl = PrivateCacheControlValue;
 
         var rosterIds = await _groups.GetRosterSwimmerIdsAsync(slug);
         if (rosterIds is null) return NotFound();
@@ -268,7 +282,7 @@ public class HubGroupsController : ControllerBase
         var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(raw, out var userId)) return Unauthorized();
 
-        var groupId = await _trainings.ResolveGroupIdBySlugAsync(slug);
+        var groupId = await VisibleGroupIdAsync(slug);
         if (groupId is null) return NotFound();
 
         // Тренировки видят ВСЕ участники группы: управляющие (владелец/админ/админ-группы = CanEdit)
@@ -295,7 +309,7 @@ public class HubGroupsController : ControllerBase
         var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(raw, out var userId)) return Unauthorized();
 
-        var groupId = await _trainings.ResolveGroupIdBySlugAsync(slug);
+        var groupId = await VisibleGroupIdAsync(slug);
         if (groupId is null) return NotFound();
 
         var perms = await _permissions.GetPermissionsAsync(groupId.Value, userId, User.IsInRole("Admin"));
@@ -396,15 +410,13 @@ public class HubGroupsController : ControllerBase
         if (level != "public" && level != "members")
             return BadRequest(new { error = "level must be 'public' or 'members'" });
 
-        var groupId = await _trainings.ResolveGroupIdBySlugAsync(slug);
-        if (groupId is null) return NotFound();
+        // Проверка доступа — и 404 тестовой группы для не-тестового зрителя.
+        var access = await AccessAsync(slug);
+        if (access is null) return NotFound();
+        var groupId = (int?)access.Id;
 
         // У приватной группы и public-публикации — её данные: не-участнику не отдаём (§6-6).
-        if (level == "public")
-        {
-            var access = await AccessAsync(slug);
-            if (access is { CanView: false }) return MembersOnly();
-        }
+        if (level == "public" && !access.CanView) return MembersOnly();
 
         if (level == "members")
         {

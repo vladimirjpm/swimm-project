@@ -55,6 +55,8 @@ public class EditModel : PageModel
         public string? Country { get; set; }
         public int? ClubId { get; set; }
         public bool IsPublic { get; set; } = true;
+        /// <summary>Тестовая группа — видят только site-админ и utest-аккаунты (test-personas-plan.md).</summary>
+        public bool IsTest { get; set; }
         public string? LinkWhatsapp { get; set; }
         public string? LinkTelegram { get; set; }
         public string? LinkInstagram { get; set; }
@@ -164,6 +166,7 @@ public class EditModel : PageModel
             Country = d.Country,
             ClubId = d.ClubId,
             IsPublic = d.IsPublic,
+            IsTest = d.IsTest,
             LinkWhatsapp = Find("whatsapp"),
             LinkTelegram = Find("telegram"),
             LinkInstagram = Find("instagram"),
@@ -196,6 +199,7 @@ public class EditModel : PageModel
             Country = f.Country ?? "",
             ClubId = f.ClubId,
             IsPublic = f.IsPublic,
+            IsTest = f.IsTest,
             Links = links,
         };
     }

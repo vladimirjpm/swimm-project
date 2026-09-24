@@ -508,7 +508,8 @@ public class DashboardStatusService(
         var active7d = await db.AppUsers.AsNoTracking().CountAsync(u => u.LastSeenAt != null && u.LastSeenAt >= since, ct);
         var deactivated = await db.AppUsers.AsNoTracking().CountAsync(u => !u.IsActive, ct);
 
-        var groupsTotal = await db.HubGroups.AsNoTracking().CountAsync(ct);
+        // Тестовые группы (IsTest) — не настоящие, в счётчик не идут (test-personas-plan.md).
+        var groupsTotal = await db.HubGroups.AsNoTracking().CountAsync(g => !g.IsTest, ct);
         var groupsOfficial = await db.HubGroups.AsNoTracking().CountAsync(g => g.IsOfficial, ct);
 
         var joinRequestsPending = await db.HubGroupUserMembers.AsNoTracking()

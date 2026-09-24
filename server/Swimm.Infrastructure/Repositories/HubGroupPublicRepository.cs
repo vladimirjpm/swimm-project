@@ -48,7 +48,11 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
 
         // Официальная группа — главная (П4): копии, подписанные на клуб с официальной группой,
         // в каталоге не показываем — по ссылке они работают (GetPageAsync их не фильтрует).
-        var query = _read.HubGroups.AsNoTracking().Where(HubGroupCatalog.ListedInCatalog(_read));
+        // Тестовых в каталоге нет НИКОГДА, даже для тестовых аккаунтов: каталог общий и кэшируется
+        // один на всех (test-personas-plan.md).
+        var query = _read.HubGroups.AsNoTracking()
+            .Where(g => !g.IsTest)
+            .Where(HubGroupCatalog.ListedInCatalog(_read));
         if (visibility == HubGroupVisibilityRules.PerGroup)
             query = query.Where(g => g.IsPublic);
 
@@ -261,13 +265,17 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         // Через rw-контекст: членство и админы групп — Sys_-таблицы, роли swimm_ro их не видно.
         var group = await _rw.HubGroups.AsNoTracking()
             .Where(g => g.Slug == slug)
-            .Select(g => new { g.Id, g.IsPublic, g.OwnerUserId })
+            .Select(g => new { g.Id, g.IsPublic, g.OwnerUserId, g.IsTest })
             .FirstOrDefaultAsync();
         if (group == null) return null;
 
+        // Тестовая группа для не-тестового зрителя не существует — 404, не заглушка
+        // (test-personas-plan.md). Для тестового дальше всё как у обычной группы.
+        if (group.IsTest && !await TestGroupAccess.CanSeeAsync(_rw, userId, isSiteAdmin)) return null;
+
         var isPrivate = HubGroupVisibilityRules.IsPrivate(Visibility, group.IsPublic);
-        if (!isPrivate || isSiteAdmin) return new HubGroupAccessDto(group.Id, isPrivate, CanView: true);
-        if (userId is not int uid) return new HubGroupAccessDto(group.Id, isPrivate, CanView: false);
+        if (!isPrivate || isSiteAdmin) return new HubGroupAccessDto(group.Id, isPrivate, CanView: true, group.IsTest);
+        if (userId is not int uid) return new HubGroupAccessDto(group.Id, isPrivate, CanView: false, group.IsTest);
 
         // Та же аудитория, что у тренировок и members-медиа: управляющий ИЛИ активный участник.
         // Заявка (pending) доступа не даёт — иначе «вступление по заявке» пускало бы до решения.
@@ -276,7 +284,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             || await _rw.HubGroupUserMembers.AnyAsync(m => m.HubGroupId == group.Id && m.UserId == uid
                 && m.Status == HubGroupUserMemberStatus.Active);
 
-        return new HubGroupAccessDto(group.Id, isPrivate, canView);
+        return new HubGroupAccessDto(group.Id, isPrivate, canView, group.IsTest);
     }
 
     public async Task<HubGroupDetailsDto?> GetMembersOnlyStubAsync(string slug)
