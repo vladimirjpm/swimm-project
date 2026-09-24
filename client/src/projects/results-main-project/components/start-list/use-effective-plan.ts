@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useFavoritesContext } from '../../../../hooks/favorites-context';
+import { sortByFavoriteRank } from '../../../../utils/helpers/favorites-order';
 import { useStartListClubs, useStartListSwimmers } from './use-start-list';
 import { defaultPlanFromFavorites, effectivePlan, isEmptyPlan } from './plan-model';
 import type { StartListPlan } from './use-start-list-plan';
@@ -32,11 +33,16 @@ export function useEffectivePlan(
    */
   alsoLoadSwimmerIds: readonly number[] = [],
 ) {
-  const { favorites, primarySwimmerId } = useFavoritesContext();
+  const { favorites, primarySwimmerId, familySwimmerIds } = useFavoritesContext();
 
+  // Me → семья → остальные (family-favorites-plan.md): в этом порядке идут строки пикера и
+  // состав плана по умолчанию — детей родитель видит сверху, не ищет среди избранных.
   const favSwimmerIds = useMemo(
-    () => favorites.filter((f) => f.swimmer_id != null).map((f) => f.swimmer_id as number),
-    [favorites],
+    () => sortByFavoriteRank(
+      favorites.filter((f) => f.swimmer_id != null).map((f) => f.swimmer_id as number),
+      (id) => id, primarySwimmerId, familySwimmerIds,
+    ),
+    [favorites, primarySwimmerId, familySwimmerIds],
   );
   const favClubIds = useMemo(
     () => favorites.filter((f) => f.club_id != null).map((f) => f.club_id as number),
@@ -64,6 +70,8 @@ export function useEffectivePlan(
   );
 
   return {
+    /** Пловцы «семья» — для порядка чипов состава на экране (Me → семья → остальные). */
+    familySwimmerIds,
     /** Состав, который надо показывать: сохранённый план либо дефолт из избранного. */
     plan,
     /** Пусто — показывать карточку нечем, вход ведёт в пикер. */

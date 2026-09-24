@@ -13,6 +13,7 @@
 //   /swimmers/{id}          → swimmer.html
 //   /clubs/{id}             → club.html
 //   /my-media               → media.html
+//   /my-favorites           → my-favorites.html (своё избранное, пометка «семья»)
 //   /about                  → about.html
 //   /season-best            → season-best.html (списки лучших в сезоне; всё в query)
 //   /records                → records.html (рейтинг рекордов стран; дисциплина в query)
@@ -50,6 +51,7 @@ export const routes = {
 
   club: (id: string | number) => `/clubs/${enc(String(id))}`,
   myMedia: () => '/my-media',
+  myFavorites: () => '/my-favorites',
 
   /**
    * Страница списков «лучшие в сезоне»: кто быстрее всех в связке возраст × пол ×

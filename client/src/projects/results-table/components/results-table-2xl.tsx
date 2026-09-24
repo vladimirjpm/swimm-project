@@ -37,6 +37,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   isSeasonBestTime,
   isPrimaryFavorite,
   isFavorite,
+  isFamily,
   onToggleFavorite,
   onTogglePrimary,
 }) => {
@@ -102,6 +103,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
             className="ml-1"
             swimmerId={res.swimmer_id}
             isFavorite={isFavorite}
+            isFamily={isFamily}
             isPrimaryFavorite={isPrimaryFavorite}
             onToggleFavorite={onToggleFavorite}
             onTogglePrimary={onTogglePrimary}

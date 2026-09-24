@@ -5,6 +5,7 @@ import './my-media.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useFavorites } from '../../hooks/useFavorites';
+import { sortByFavoriteRank } from '../../utils/helpers/favorites-order';
 import {
   parseTargetKey, targetKey, useMyMediaPublications, type PublishTargetRef,
 } from '../../hooks/useUserMedia';
@@ -393,10 +394,17 @@ function MyMediaContent({ deep }: { deep: string }) {
     return res.ok;
   };
 
+  // Пловцы профиля в порядке Me → семья → остальные (family-favorites-plan.md) — так их
+  // показывают и панель фильтра, и пикер Add link.
+  const orderedSwimmers = useMemo(
+    () => sortByFavoriteRank(data.swimmers, (s) => s.id, favorites.primarySwimmerId, favorites.familySwimmerIds),
+    [data.swimmers, favorites.primarySwimmerId, favorites.familySwimmerIds],
+  );
+
   // ── Add link: пловцы для пикера ───────────────────────────────────────────
   const addLinkSwimmers: AddLinkSwimmerOption[] = useMemo(() => {
     const byId = new Map<number, AddLinkSwimmerOption>();
-    for (const s of data.swimmers) {
+    for (const s of orderedSwimmers) {
       byId.set(s.id, { id: s.id, name: s.name, hint: s.is_primary ? 'primary swimmer' : 'favorite' });
     }
     for (const f of favorites.favorites) {
@@ -407,7 +415,7 @@ function MyMediaContent({ deep }: { deep: string }) {
       if (!byId.has(m.swimmer_id)) byId.set(m.swimmer_id, { id: m.swimmer_id, name: m.swimmer_name, hint: 'has media' });
     }
     return Array.from(byId.values());
-  }, [data.swimmers, favorites.favorites, allMedia]);
+  }, [orderedSwimmers, favorites.favorites, allMedia]);
 
   const totalCount = bySwimmer.length;
   const pendingModCount = moderation.rows.filter((r) => r.status === 'pending').length;
@@ -582,7 +590,7 @@ function MyMediaContent({ deep }: { deep: string }) {
       seasons={seasonOptions}
       season={carouselSeason}
       onSeason={pickSeason}
-      swimmers={data.swimmers.map((sw) => ({
+      swimmers={orderedSwimmers.map((sw) => ({
         id: sw.id,
         name: sw.name,
         count: swims.filter((x) => swimBelongsTo(x, sw.id)).length,

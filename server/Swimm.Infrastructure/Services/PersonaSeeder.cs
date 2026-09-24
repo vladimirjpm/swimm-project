@@ -51,9 +51,9 @@ public class PersonaSeeder : IPersonaSeeder
         await EnsureGroupAdminAsync(openGroup, users[TestPersonas.GroupAdmin], coach, log);
 
         // ── избранное: «дети» родителя и «это я» ─────────────────────────────────
-        await EnsureFavoriteAsync(users[TestPersonas.Parent], roster[0], isPrimary: false, sortOrder: 0, log);
-        await EnsureFavoriteAsync(users[TestPersonas.Parent], roster[1], isPrimary: false, sortOrder: 1, log);
-        await EnsureFavoriteAsync(users[TestPersonas.SwimmerMe], roster[2], isPrimary: true, sortOrder: 0, log);
+        await EnsureFavoriteAsync(users[TestPersonas.Parent], roster[0], isPrimary: false, isFamily: true, sortOrder: 0, log);
+        await EnsureFavoriteAsync(users[TestPersonas.Parent], roster[1], isPrimary: false, isFamily: true, sortOrder: 1, log);
+        await EnsureFavoriteAsync(users[TestPersonas.SwimmerMe], roster[2], isPrimary: true, isFamily: false, sortOrder: 0, log);
 
         await EnsureMediaAsync(users[TestPersonas.MediaAuthor], roster[0], openGroup, coach, log);
         await EnsureTrainingAsync(openGroup, roster, log);
@@ -230,15 +230,23 @@ public class PersonaSeeder : IPersonaSeeder
         log.Add($"админ группы: {user.DisplayName} → «{group.Slug}»");
     }
 
-    private async Task EnsureFavoriteAsync(AppUser user, int swimmerId, bool isPrimary, int sortOrder, List<string> log)
+    private async Task EnsureFavoriteAsync(AppUser user, int swimmerId, bool isPrimary, bool isFamily, int sortOrder, List<string> log)
     {
-        if (await _db.UserFavorites.AnyAsync(f => f.UserId == user.Id && f.SwimmerId == swimmerId)) return;
+        var fav = await _db.UserFavorites.FirstOrDefaultAsync(f => f.UserId == user.Id && f.SwimmerId == swimmerId);
+        if (fav != null)
+        {
+            // Пометку «семья» выравниваем, как остальное состояние персонажа: сняли руками на
+            // My favorites — следующий прогон вернёт.
+            if (fav.IsFamily != isFamily) { fav.IsFamily = isFamily; await _db.SaveChangesAsync(); }
+            return;
+        }
         _db.UserFavorites.Add(new UserFavorite
         {
-            UserId = user.Id, TargetType = "swimmer", SwimmerId = swimmerId, IsPrimary = isPrimary, SortOrder = sortOrder
+            UserId = user.Id, TargetType = "swimmer", SwimmerId = swimmerId,
+            IsPrimary = isPrimary, IsFamily = isFamily, SortOrder = sortOrder
         });
         await _db.SaveChangesAsync();
-        log.Add($"избранное: {user.DisplayName} → пловец #{swimmerId}{(isPrimary ? " (Me)" : "")}");
+        log.Add($"избранное: {user.DisplayName} → пловец #{swimmerId}{(isPrimary ? " (Me)" : "")}{(isFamily ? " (семья)" : "")}");
     }
 
     /// <summary>

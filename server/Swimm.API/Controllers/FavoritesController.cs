@@ -96,6 +96,30 @@ public class FavoritesController : ControllerBase
         return ok ? NoContent() : NotFound(new { error = "Favorite not found or not a swimmer" });
     }
 
+    /// <summary>
+    /// Пометить избранного пловца «семьёй» (золотое сердечко, family-favorites-plan.md). Прав не
+    /// даёт — только порядок и значок. Клиент ставит её лишь со страницы My favorites.
+    /// </summary>
+    [HttpPost("{id:int}/family")]
+    public async Task<IActionResult> SetFamily(int id)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var ok = await _favorites.SetFamilyAsync(userId.Value, id, isFamily: true);
+        return ok ? NoContent() : NotFound(new { error = "Favorite not found or not a swimmer" });
+    }
+
+    [HttpDelete("{id:int}/family")]
+    public async Task<IActionResult> UnsetFamily(int id)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var ok = await _favorites.SetFamilyAsync(userId.Value, id, isFamily: false);
+        return ok ? NoContent() : NotFound(new { error = "Favorite not found or not a swimmer" });
+    }
+
     [HttpPost("reorder")]
     public async Task<IActionResult> Reorder([FromBody] List<ReorderItem> items)
     {

@@ -4,6 +4,12 @@ interface UI_FavoriteControlsProps {
   swimmerId?: number | null;
   isFavorite?: boolean;
   isPrimaryFavorite?: boolean;
+  /**
+   * Избранный пловец с пометкой «семья» — сердечко ЗОЛОТОЕ (family-favorites-plan.md, решение
+   * Влада 24.09.2026). Пометка ставится только на странице My favorites; здесь клик, как и у
+   * красного, убирает из избранного.
+   */
+  isFamily?: boolean;
   onToggleFavorite?: (swimmerId: number) => void;
   onTogglePrimary?: (swimmerId: number) => void;
   /** Показывать звезду "это я" (в таблице — только сердечко; звезда живёт в попапе). */
@@ -21,11 +27,13 @@ interface UI_FavoriteControlsProps {
  * Иконки избранного: сердечко (favorite) + золотая звезда (primary = "это я").
  * SVG под дизайн-прототип. Красное сердце #e23b5a / контур #c2c8d2; звезда gold
  * #f5b800 / #d99a00. Звезда показывается только когда пловец уже в избранном.
+ * Семья — то же сердце в золоте звезды (#f5b800 / #d99a00): «свой», но не «это я».
  */
 const UI_FavoriteControls: React.FC<UI_FavoriteControlsProps> = ({
   swimmerId,
   isFavorite = false,
   isPrimaryFavorite = false,
+  isFamily = false,
   onToggleFavorite,
   onTogglePrimary,
   showPrimary = true,
@@ -36,6 +44,9 @@ const UI_FavoriteControls: React.FC<UI_FavoriteControlsProps> = ({
 
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   const blocked = !isFavorite && addBlockedHint != null;
+  const family = isFavorite && isFamily;
+  const heartFill = family ? '#f5b800' : isFavorite ? '#e23b5a' : 'none';
+  const heartStroke = family ? '#d99a00' : isFavorite ? '#e23b5a' : '#c2c8d2';
 
   // "Звезда отменяет сердечко": у primary (me) вместо сердечка — золотая звезда
   if (isPrimaryFavorite) {
@@ -61,12 +72,12 @@ const UI_FavoriteControls: React.FC<UI_FavoriteControlsProps> = ({
           а клик всё равно гасим сами (stop — чтобы строка под сердечком не раскрылась). */}
       <button
         type="button"
-        title={blocked ? addBlockedHint! : isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        title={blocked ? addBlockedHint! : isFavorite ? (family ? 'Family — remove from favorites' : 'Remove from favorites') : 'Add to favorites'}
         aria-disabled={blocked || undefined}
         onClick={(e) => { stop(e); if (!blocked) onToggleFavorite(swimmerId); }}
         className={blocked ? 'leading-none opacity-40 cursor-not-allowed' : 'leading-none hover:scale-110 transition-transform'}
       >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill={isFavorite ? '#e23b5a' : 'none'} stroke={isFavorite ? '#e23b5a' : '#c2c8d2'} strokeWidth="2">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill={heartFill} stroke={heartStroke} strokeWidth="2">
           <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
         </svg>
       </button>

@@ -39,6 +39,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   isSeasonBestTime,
   isPrimaryFavorite,
   isFavorite,
+  isFamily,
   onToggleFavorite,
   onTogglePrimary,
   favoriteBlockedHint,
@@ -74,6 +75,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
         <UI_FavoriteControls
           swimmerId={res.swimmer_id}
           isFavorite={isFavorite}
+            isFamily={isFamily}
           isPrimaryFavorite={isPrimaryFavorite}
           onToggleFavorite={onToggleFavorite}
           addBlockedHint={favoriteBlockedHint}

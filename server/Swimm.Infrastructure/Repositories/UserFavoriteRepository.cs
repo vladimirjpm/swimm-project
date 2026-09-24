@@ -49,6 +49,7 @@ public class UserFavoriteRepository : IUserFavoriteRepository
             ? null
             : (f.Club.Name.Length > 0 ? f.Club.Name : f.Club.NameEn),
         IsPrimary = f.IsPrimary,
+        IsFamily = f.IsFamily,
         SortOrder = f.SortOrder,
         CreatedAt = f.CreatedAt
     };
@@ -201,6 +202,22 @@ public class UserFavoriteRepository : IUserFavoriteRepository
 
         fav.IsPrimary = false;
         await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> SetFamilyAsync(int userId, int favoriteId, bool isFamily)
+    {
+        // IDOR: только своё и только пловец — клуб семьёй не бывает.
+        var fav = await _db.UserFavorites
+            .FirstOrDefaultAsync(f => f.Id == favoriteId && f.UserId == userId
+                                      && f.TargetType == FavoritesRules.TargetSwimmer);
+        if (fav == null) return false;
+
+        if (fav.IsFamily != isFamily)
+        {
+            fav.IsFamily = isFamily;
+            await _db.SaveChangesAsync();
+        }
         return true;
     }
 

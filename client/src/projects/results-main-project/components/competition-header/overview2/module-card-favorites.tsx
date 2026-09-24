@@ -2,6 +2,7 @@ import React from 'react';
 import type { CompetitionOverview } from '../types';
 import { useAppSelector } from '../../../../../store/store';
 import { useFavoritesContext } from '../../../../../hooks/favorites-context';
+import { sortByFavoriteRank } from '../../../../../utils/helpers/favorites-order';
 import HelperSwimmer from '../../../../../utils/helpers/helper-swimmer';
 import { initials } from './module-defs';
 import UI_SwimmerNameCell from '../../../../components/mix/swimmer-name-cell/swimmer-name-cell';
@@ -21,14 +22,18 @@ interface Props {
 }
 
 export default function ModuleCardFavorites({ onOpenSwimsScoped, onOpenClub }: Props) {
-  const { favorites, primarySwimmerId, favoriteSwimmerIds } = useFavoritesContext();
+  const { favorites, primarySwimmerId, favoriteSwimmerIds, familySwimmerIds } = useFavoritesContext();
   const results = useAppSelector((s) => s.dataSourceSelected)?.results ?? [];
 
   // Матчинг — только через HelperSwimmer.resultBelongsToSwimmer (эстафеты по составу ног).
   const matches = (r: any, id: number) => HelperSwimmer.resultBelongsToSwimmer(r, id);
 
-  // Избранные пловцы (без primary — у него своя карточка ⭐ в персональной полосе).
-  const favSwimmerIds = [...favoriteSwimmerIds].filter((id) => id !== primarySwimmerId);
+  // Избранные пловцы (без primary — у него своя карточка ⭐ в персональной полосе). Семья —
+  // первой (family-favorites-plan.md): порядок из общего хелпера, не своей сортировкой.
+  const favSwimmerIds = sortByFavoriteRank(
+    [...favoriteSwimmerIds].filter((id) => id !== primarySwimmerId),
+    (id) => id, primarySwimmerId, familySwimmerIds,
+  );
 
   const swimmerCards = favSwimmerIds
     .map((id) => {

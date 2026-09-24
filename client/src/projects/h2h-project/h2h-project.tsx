@@ -14,6 +14,7 @@ import type { H2HSlot } from '../components/mix/h2h/h2h.types';
 import { parseH2HQuery, routes, H2H_PARAM } from '../../utils/routes';
 import { PAGE_CONTAINER } from '../../utils/layout';
 import { useFavoritesContext } from '../../hooks/favorites-context';
+import { sortByFavoriteRank } from '../../utils/helpers/favorites-order';
 import {
   useSwimmerProfile, type SwimmerProfile, type SwimmerSeasonOption,
 } from '../swimmer-project/use-swimmer-profile';
@@ -79,7 +80,7 @@ function H2HProject() {
   const themeClass = mode === 'dark' ? 'theme-deep' : 'theme-deep-light';
 
   const {
-    isAuthenticated, favorites, primarySwimmerId, favoriteSwimmerIds, toggleFavoriteSwimmer, fullHint,
+    isAuthenticated, favorites, primarySwimmerId, favoriteSwimmerIds, familySwimmerIds, toggleFavoriteSwimmer, fullHint,
   } = useFavoritesContext();
 
   // Адрес читается ОДИН раз: дальше состояние ведёт страница, а в query пишется обратно.
@@ -243,11 +244,15 @@ function H2HProject() {
     };
   };
 
-  // Избранное как быстрый выбор: обе стороны, уже занятые, из списка убираем.
-  const favoriteChips = favorites
-    .filter((f) => f.target_type === 'swimmer' && f.swimmer_id != null
-      && f.swimmer_id !== aId && f.swimmer_id !== bId)
-    .sort((x, y) => Number(y.is_primary) - Number(x.is_primary) || x.sort_order - y.sort_order)
+  // Избранное как быстрый выбор: обе стороны, уже занятые, из списка убираем. Порядок —
+  // Me → семья → остальные (общий хелпер), внутри группы — порядок избранного.
+  const favoriteChips = sortByFavoriteRank(
+    favorites
+      .filter((f) => f.target_type === 'swimmer' && f.swimmer_id != null
+        && f.swimmer_id !== aId && f.swimmer_id !== bId)
+      .sort((x, y) => x.sort_order - y.sort_order),
+    (f) => f.swimmer_id, primarySwimmerId, familySwimmerIds,
+  )
     .map((f) => ({ id: f.swimmer_id!, name: f.swimmer_name ?? `#${f.swimmer_id}` }));
 
   const notFound = (aId != null && aState.status === 'notfound')

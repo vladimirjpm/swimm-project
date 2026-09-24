@@ -207,6 +207,10 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
           <a href={routes.groupsList()} className={dropdownItemClass}>
             My groups
           </a>
+          {/* Своё избранное и пометка «семья» (family-favorites-plan.md) — только здесь. */}
+          <a href={routes.myFavorites()} className={dropdownItemClass}>
+            My favorites
+          </a>
           {onLogout ? (
             <button type="button" className={dropdownItemClass} onClick={() => { setUserMenuOpen(false); onLogout(); }}>
               Sign out
@@ -291,6 +295,12 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
                 className="block rounded-[10px] px-4 py-[10px] text-[14px] font-extrabold text-[var(--theme-topbar-text)] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)]"
               >
                 My media
+              </a>
+              <a
+                href={routes.myFavorites()}
+                className="block rounded-[10px] px-4 py-[10px] text-[14px] font-extrabold text-[var(--theme-topbar-text)] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)]"
+              >
+                My favorites
               </a>
               {onLogout ? (
                 <button

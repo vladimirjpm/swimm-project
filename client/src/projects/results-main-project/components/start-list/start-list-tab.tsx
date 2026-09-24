@@ -13,6 +13,7 @@ import { useEffectivePlan } from './use-effective-plan';
 import { useDeepThemeClass } from '../../../components/deep/use-deep-theme-class';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useFavoritesContext } from '../../../../hooks/favorites-context';
+import { sortByFavoriteRank } from '../../../../utils/helpers/favorites-order';
 import {
   assemblePlanSwims, parsePlanParam, planRowsBySession, serializePlanParam,
 } from './plan-model';
@@ -224,12 +225,14 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     }));
   }, [sources, orgCompId, planRows]);
 
-  const { favorites, primarySwimmerId: favPrimaryId } = useFavoritesContext();
+  const { favorites, primarySwimmerId: favPrimaryId, familySwimmerIds } = useFavoritesContext();
   // Строка 3 в All — избранные: пловцы, заявленные на этом старте, и избранные клубы.
   // Показывать того, кого в протоколе нет, значит обещать заплывы, которых не будет.
-  const favSwimmers = useMemo(() => favorites
-    .filter((f) => f.swimmer_id != null && effective.swimmers[f.swimmer_id as number])
-    .sort((a, b) => Number(b.swimmer_id === favPrimaryId) - Number(a.swimmer_id === favPrimaryId))
+  // Порядок — Me → семья → остальные, общим хелпером (family-favorites-plan.md).
+  const favSwimmers = useMemo(() => sortByFavoriteRank(
+    favorites.filter((f) => f.swimmer_id != null && effective.swimmers[f.swimmer_id as number]),
+    (f) => f.swimmer_id, favPrimaryId, familySwimmerIds,
+  )
     .map((f) => ({
       id: f.swimmer_id as number,
       // Имя чипа — из карточки протокола, а не из избранного: в избранном оно могло быть
@@ -237,13 +240,13 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
       name: effective.swimmers[f.swimmer_id as number]?.swimmer_name ?? f.swimmer_name ?? `#${f.swimmer_id}`,
       favorite: true,
     })),
-    [favorites, effective.swimmers, favPrimaryId]);
+    [favorites, effective.swimmers, favPrimaryId, familySwimmerIds]);
   const favClubs = useMemo(() => effective.clubs
     .filter((c) => effective.favClubIds.includes(c.club_id))
     .map((c) => ({ id: c.club_id, name: c.club_name, swimmers: c.swimmers })),
     [effective.clubs, effective.favClubIds]);
 
-  const planSwimmerChips = shownPlan.swimmer_ids.map((id) => ({
+  const planSwimmerChips = sortByFavoriteRank(shownPlan.swimmer_ids, (id) => id, favPrimaryId, familySwimmerIds).map((id) => ({
     id,
     name: effective.swimmers[id]?.swimmer_name ?? `#${id}`,
   }));

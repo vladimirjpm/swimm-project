@@ -30,7 +30,7 @@ interface Props {
 
 /** ♡/★ карточки: белые круглые кнопки на градиенте шапки попапа. */
 function CardActions({ swimmerId }: { swimmerId: number }) {
-  const { canMark, isFavorite, isMe, addBlockedHint, showGuestCta, toggleFavorite, markAsMe, openLoginModal } =
+  const { canMark, isFavorite, isFamily, isMe, addBlockedHint, showGuestCta, toggleFavorite, markAsMe, openLoginModal } =
     useIdentityFavorites(swimmerId);
 
   if (showGuestCta) {
@@ -63,13 +63,13 @@ function CardActions({ swimmerId }: { swimmerId: number }) {
       <button
         type="button"
         onClick={blocked ? undefined : toggleFavorite}
-        title={addBlockedHint ?? (isFavorite ? 'Remove from favorites' : 'Add to favorites')}
+        title={addBlockedHint ?? (isFavorite ? (isFamily ? 'Family — remove from favorites' : 'Remove from favorites') : 'Add to favorites')}
         aria-pressed={isFavorite}
         aria-disabled={blocked || undefined}
         className={buttonClass}
         style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}
       >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill={isFavorite ? '#e23b5a' : 'none'} stroke={isFavorite ? '#e23b5a' : '#9aa3af'} strokeWidth="2">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill={isFamily ? '#f5b800' : isFavorite ? '#e23b5a' : 'none'} stroke={isFamily ? '#d99a00' : isFavorite ? '#e23b5a' : '#9aa3af'} strokeWidth="2">
           <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
         </svg>
       </button>

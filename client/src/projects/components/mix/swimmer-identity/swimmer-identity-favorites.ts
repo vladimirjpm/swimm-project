@@ -14,7 +14,7 @@ import { useLoginModal } from '../../login-modal/login-modal-context';
  */
 export function useIdentityFavorites(swimmerId?: number | null) {
   const {
-    isAuthenticated, primarySwimmerId, favoriteSwimmerIds, fullHint, setMeBySwimmer, toggleFavoriteSwimmer,
+    isAuthenticated, primarySwimmerId, favoriteSwimmerIds, familySwimmerIds, fullHint, setMeBySwimmer, toggleFavoriteSwimmer,
   } = useFavoritesContext();
   const { openLoginModal } = useLoginModal();
 
@@ -27,6 +27,8 @@ export function useIdentityFavorites(swimmerId?: number | null) {
     canMark,
     isFavorite,
     isMe: canMark && swimmerId === primarySwimmerId,
+    /** Избранный с пометкой «семья» — сердечко золотое. Ставится только на My favorites. */
+    isFamily: isFavorite && familySwimmerIds.has(swimmerId!),
     /** Добавить нельзя — лимит выбран: кнопки погашены, это текст подсказки. null — можно. */
     addBlockedHint: canMark && !isFavorite ? fullHint('swimmer') : null,
     /** Гость на пловце, которого МОЖНО было бы отметить, — ему показывают приглашение войти. */
