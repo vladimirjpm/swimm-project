@@ -40,7 +40,7 @@ public static class TestPersonas
         new(Newbie, "Signed in, nothing else: no groups, favorites or media"),
         new(Member, "Active member of both test groups"),
         new(Pending, "Join request to [TEST] Approval is waiting"),
-        new(Parent, "Not in any group; two kids in favorites"),
+        new(Parent, "Not in any group; two kids in favorites, marked family"),
         new(SwimmerMe, "Primary favorite «Me» set — must grant no rights"),
         new(GroupAdmin, "Admin of [TEST] Open, not the owner"),
         new(Coach, "Coach role, owns both test groups, group limit used up"),

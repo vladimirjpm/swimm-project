@@ -63,6 +63,8 @@
   cursor: pointer;
 }
 .deep-hero-action--fav { color: var(--deep-danger); border-color: var(--deep-danger-soft); }
+/* Семья (family-favorites-plan.md): то же сердце, но в золоте — роли «me», только без фона. */
+.deep-hero-action--family { color: var(--deep-gold); border-color: var(--deep-gold-border); }
 /* Лимит избранного выбран: кнопка видна, но погашена, причина — в title. */
 .deep-hero-action[aria-disabled='true'] { opacity: 0.4; cursor: not-allowed; }
 .deep-hero-action--me {

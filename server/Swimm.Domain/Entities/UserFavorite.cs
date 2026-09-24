@@ -30,6 +30,14 @@ public class UserFavorite
 
     public bool IsPrimary { get; set; }
 
+    /// <summary>
+    /// «Семья» — ребёнок/родственник среди избранного (docs/plans/family-favorites-plan.md,
+    /// решение Влада 24.09.2026). Только пловец. Прав НЕ даёт, как и <see cref="IsPrimary"/>:
+    /// меняет лишь порядок (Me → семья → остальные) и значок — золотое сердечко. Ставится только
+    /// на странице My favorites.
+    /// </summary>
+    public bool IsFamily { get; set; }
+
     public int SortOrder { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

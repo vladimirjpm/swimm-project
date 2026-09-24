@@ -10,6 +10,7 @@ Disallow: /swimmers/
 Disallow: /clubs/
 Disallow: /groups/
 Disallow: /my-media
+Disallow: /my-favorites
 Disallow: /season-best
 Disallow: /Admin/
 Disallow: /admin/

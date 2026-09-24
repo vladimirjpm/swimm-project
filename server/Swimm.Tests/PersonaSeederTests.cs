@@ -66,7 +66,7 @@ public class PersonaSeederTests
         Assert.False(await db.HubGroupUserMembers.AnyAsync(m => m.UserId == users[TestPersonas.Parent].Id));
         Assert.True(await db.HubGroupAdmins.AnyAsync(a => a.UserId == users[TestPersonas.GroupAdmin].Id));
 
-        Assert.Equal(2, await db.UserFavorites.CountAsync(f => f.UserId == users[TestPersonas.Parent].Id));
+        Assert.Equal(2, await db.UserFavorites.CountAsync(f => f.UserId == users[TestPersonas.Parent].Id && f.IsFamily));
         Assert.True((await db.UserFavorites.SingleAsync(f => f.UserId == users[TestPersonas.SwimmerMe].Id)).IsPrimary);
 
         Assert.Equal(4, await db.UserMedia.CountAsync(m => m.UserId == users[TestPersonas.MediaAuthor].Id));

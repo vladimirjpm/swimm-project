@@ -13,5 +13,10 @@ public interface IUserFavoriteRepository
     Task<bool> RemoveAsync(int userId, int favoriteId);
     Task<bool> SetPrimaryAsync(int userId, int favoriteId);
     Task<bool> UnsetPrimaryAsync(int userId, int favoriteId);
+    /// <summary>
+    /// Пометить/снять «семью» у своего избранного пловца. false — нет такой записи у этого
+    /// пользователя или это клуб (семья — только пловцы).
+    /// </summary>
+    Task<bool> SetFamilyAsync(int userId, int favoriteId, bool isFamily);
     Task<bool> ReorderAsync(int userId, List<ReorderItem> items);
 }

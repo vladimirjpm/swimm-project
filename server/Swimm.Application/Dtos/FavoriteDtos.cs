@@ -25,6 +25,10 @@ public class FavoriteDto
     [JsonPropertyName("is_primary")]
     public bool IsPrimary { get; set; }
 
+    /// <summary>Пометка «семья» (золотое сердечко) — только у пловцов, прав не даёт.</summary>
+    [JsonPropertyName("is_family")]
+    public bool IsFamily { get; set; }
+
     [JsonPropertyName("sort_order")]
     public int SortOrder { get; set; }
 

@@ -1374,6 +1374,7 @@ app.Use(async (context, next) =>
                 "swimmers" => "/results_main.html", // /swimmers без id — пусть падает штатно
                 "clubs" => "/results_main.html",     // /clubs без id — пусть падает штатно
                 "my-media" => "/media.html",
+                "my-favorites" => "/my-favorites.html", // своё избранное и пометка «семья»
                 "about" => "/about.html",
                 "season-best" => "/season-best.html",   // весь фильтр в query
                 "h2h" => "/h2h.html",                   // сравнение двух пловцов, пара в query

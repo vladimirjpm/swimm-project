@@ -13,6 +13,8 @@ export interface FavoriteDto {
   club_id?: number;
   club_name?: string;
   is_primary: boolean;
+  /** «Семья» — золотое сердечко; только у пловцов, прав не даёт (family-favorites-plan.md). */
+  is_family: boolean;
   sort_order: number;
   created_at: string;
 }
@@ -24,6 +26,11 @@ interface FavoritesState {
   primarySwimmerId: number | null;
   /** Множество ID пловцов в избранном */
   favoriteSwimmerIds: Set<number>;
+  /**
+   * Пловцы с пометкой «семья» (золотое сердечко). Подмножество favoriteSwimmerIds. Порядок
+   * «Me → семья → остальные» — хелпер `sortByFavoriteRank`, а не своя сортировка на экране.
+   */
+  familySwimmerIds: Set<number>;
   /** Множество ID клубов в избранном (кнопка «Follow club» в шапке клуба) */
   favoriteClubIds: Set<number>;
   loading: boolean;
@@ -31,6 +38,15 @@ interface FavoritesState {
 
 /** Код отказа 422 «лимит избранного выбран» — `FavoritesRules.LimitErrorCode` на сервере. */
 const LIMIT_ERROR_CODE = 'favorites_limit';
+
+/** Пловцы с пометкой «семья» из списка избранного. */
+function familyIdsOf(favorites: FavoriteDto[]): Set<number> {
+  return new Set(
+    favorites
+      .filter(f => f.target_type === 'swimmer' && f.is_family && f.swimmer_id != null)
+      .map(f => f.swimmer_id as number)
+  );
+}
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -44,6 +60,7 @@ export function useFavorites() {
     favorites: [],
     primarySwimmerId: null,
     favoriteSwimmerIds: new Set(),
+    familySwimmerIds: new Set(),
     favoriteClubIds: new Set(),
     loading: true,
   });
@@ -69,6 +86,7 @@ export function useFavorites() {
     const favoriteSwimmerIds = new Set(
       swimmerFavs.map(f => f.swimmer_id).filter((id): id is number => id != null)
     );
+    const familySwimmerIds = familyIdsOf(favorites);
     const favoriteClubIds = new Set(
       favorites
         .filter(f => f.target_type === 'club')
@@ -76,7 +94,7 @@ export function useFavorites() {
         .filter((id): id is number => id != null)
     );
     if (mountedRef.current) {
-      setState({ isAuthenticated, favorites, primarySwimmerId, favoriteSwimmerIds, favoriteClubIds, loading: false });
+      setState({ isAuthenticated, favorites, primarySwimmerId, favoriteSwimmerIds, familySwimmerIds, favoriteClubIds, loading: false });
     }
   }, []);
 
@@ -217,7 +235,10 @@ export function useFavorites() {
           if (removed?.swimmer_id) swimmerIds.delete(removed.swimmer_id);
           if (removed?.club_id) clubIds.delete(removed.club_id);
           const primarySwimmerId = next.find(f => f.is_primary && f.target_type === 'swimmer')?.swimmer_id ?? null;
-          return { ...prev, favorites: next, favoriteSwimmerIds: swimmerIds, favoriteClubIds: clubIds, primarySwimmerId };
+          return {
+            ...prev, favorites: next, favoriteSwimmerIds: swimmerIds, favoriteClubIds: clubIds, primarySwimmerId,
+            familySwimmerIds: familyIdsOf(next),
+          };
         });
       }
       return true;
@@ -275,6 +296,36 @@ export function useFavorites() {
           );
           const primary = next.find(f => f.is_primary && f.target_type === 'swimmer');
           return { ...prev, favorites: next, primarySwimmerId: primary?.swimmer_id ?? null };
+        });
+      }
+      return true;
+    } catch {
+      invalidateTokenCache();
+      return false;
+    }
+  }, []);
+
+  /**
+   * Пометка «семья» (золотое сердечко). Ставится только со страницы My favorites (решение Влада
+   * 24.09.2026) — на остальных экранах кнопки нет, там семья лишь поднимает пловца в списке.
+   */
+  const setFamily = useCallback(async (favoriteId: number, isFamily: boolean): Promise<boolean> => {
+    const token = await fetchAntiforgeryToken();
+    if (!token) return false;
+
+    try {
+      const r = await fetch(`/api/me/favorites/${favoriteId}/family`, {
+        method: isFamily ? 'POST' : 'DELETE',
+        credentials: 'include',
+        headers: { 'X-XSRF-TOKEN': token },
+      });
+
+      if (!r.ok) { invalidateTokenCache(); return false; }
+
+      if (mountedRef.current) {
+        setState(prev => {
+          const next = prev.favorites.map(f => (f.id === favoriteId ? { ...f, is_family: isFamily } : f));
+          return { ...prev, favorites: next, familySwimmerIds: familyIdsOf(next) };
         });
       }
       return true;
@@ -371,6 +422,7 @@ export function useFavorites() {
     setMeBySwimmer,
     setPrimary,
     unsetPrimary,
+    setFamily,
     removeFavorite,
     addFavoriteSwimmer,
   };

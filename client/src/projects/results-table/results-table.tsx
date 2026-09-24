@@ -46,6 +46,7 @@ function ResultsTable() {
   const {
     isAuthenticated,
     favoriteSwimmerIds,
+    familySwimmerIds,
     primarySwimmerId,
     toggleFavoriteSwimmer,
     togglePrimarySwimmer,
@@ -592,6 +593,7 @@ function ResultsTable() {
                 ? {
                     // "звезда отменяет сердечко": у primary (me) сердечко в таблице не горит
                     isFavorite: isFav && !isPrimary,
+                    isFamily: isFav && !isPrimary && familySwimmerIds.has(swimmerId!),
                     isPrimaryFavorite: isPrimary,
                     onToggleFavorite: swimmerId != null && !res.is_relay
                       ? () => toggleFavoriteSwimmer(swimmerId)

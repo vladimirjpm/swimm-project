@@ -39,6 +39,8 @@ export interface ResultsTableRowProps {
   isPrimaryFavorite?: boolean;
   /** Пловец в избранном (не обязательно primary) */
   isFavorite?: boolean;
+  /** Избранный пловец с пометкой «семья» — сердечко золотое (family-favorites-plan.md). */
+  isFamily?: boolean;
   /** Колбэк для переключения избранного/primary */
   onToggleFavorite?: (swimmerId: number) => void;
   onTogglePrimary?: (swimmerId: number) => void;

@@ -27,7 +27,7 @@ interface Props {
 
 /** ♡ избранное + ★ «это я». Гостю — приглашение войти вместо кнопок. */
 function Actions({ swimmerId }: { swimmerId: number }) {
-  const { isAuthenticated, isFavorite, isMe, addBlockedHint, toggleFavorite, markAsMe, openLoginModal } =
+  const { isAuthenticated, isFavorite, isFamily, isMe, addBlockedHint, toggleFavorite, markAsMe, openLoginModal } =
     useIdentityFavorites(swimmerId);
 
   if (!isAuthenticated) {
@@ -47,10 +47,10 @@ function Actions({ swimmerId }: { swimmerId: number }) {
       <button
         type="button"
         onClick={blocked ? undefined : toggleFavorite}
-        title={addBlockedHint ?? (isFavorite ? 'Remove from favorites' : 'Add to favorites')}
+        title={addBlockedHint ?? (isFavorite ? (isFamily ? 'Family — remove from favorites' : 'Remove from favorites') : 'Add to favorites')}
         aria-pressed={isFavorite}
         aria-disabled={blocked || undefined}
-        className={`deep-hero-action${isFavorite ? ' deep-hero-action--fav' : ''}`}
+        className={`deep-hero-action${isFamily ? ' deep-hero-action--family' : isFavorite ? ' deep-hero-action--fav' : ''}`}
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
           <path d="M12 21s-7.5-4.6-10-9.3C.4 8.3 2 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5 16.6 5 18.2 8.3 16.6 11.7 14.1 16.4 12 21 12 21z" />
