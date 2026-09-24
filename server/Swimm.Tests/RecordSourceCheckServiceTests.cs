@@ -228,7 +228,9 @@ public class RecordSourceCheckServiceTests
 
         var all = await service.GetFreshnessAsync();
 
-        Assert.Equal(RecordSources.Order, all.Select(f => f.Source));
+        // FreshnessKeys, а не Order: свежесть показывает и прогон по странам, у которого нет
+        // провайдера и потому места в порядке применения (RecordSources.WorldRecordsCountries).
+        Assert.Equal(RecordSources.FreshnessKeys, all.Select(f => f.Source));
         Assert.All(all, f =>
         {
             Assert.Null(f.CheckedAt);
