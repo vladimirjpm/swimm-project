@@ -447,10 +447,16 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             // Группировка в SQL: наружу выходит «лучшее сверстника в дисциплине», а не все его
             // заплывы (замер на живой базе: 81k строк → 2.3k групп, 16 мс). Отбор строк — те же
             // правила, что у SeasonAggregator.IsCountable.
+            //
+            // Мастерские старты сюда НЕ входят: у них свой круг — группа протокола, и он
+            // приходит отдельно (GetMastersSeasonBestsAsync). Иначе место «среди ровесников»
+            // считалось бы по выборке, которой нет ни в одном срезе /season-best, и ссылка
+            // со строки открывала пустой список (пойман 24.09.2026 на мастерсе 1981 г. р.).
             var grouped = await _read.Results.AsNoTracking()
                 .Where(r => r.CompetitionDate >= start
                             && r.CompetitionDate < endExclusive
                             && r.Swimmer.BirthYear == birthYear
+                            && !r.Competition.IsMasters
                             && r.RelayId == null
                             && !r.TimeFail
                             && r.SuspectReason == null
@@ -476,6 +482,56 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                 .ToList();
 
             return rows;
+        }
+    }
+
+    public async Task<IReadOnlyList<PeerSeasonBest>> GetMastersSeasonBestsAsync(int seasonStartYear)
+    {
+        // Ключ — сезон: мастерский круг один на всех, и за сезон это сотни строк, не тысячи.
+        var key = $"masters-season-bests:{seasonStartYear}";
+        return await _cache.GetOrCreateAsync(key, LoadAsync, Ttl);
+
+        async Task<List<PeerSeasonBest>> LoadAsync()
+        {
+            var (start, endExclusive) = SeasonMath.RangeOf(seasonStartYear);
+
+            // Отбор — зеркало мастерского среза списка /season-best
+            // (SeasonBestRepository.GetSeasonBestListAsync при Masters = true): те же
+            // соревнования, та же группа протокола, пловцы без года рождения выпадают там
+            // и должны выпадать здесь, иначе «of N» разойдётся со списком по клику.
+            var grouped = await _read.Results.AsNoTracking()
+                .Where(r => r.CompetitionDate >= start
+                            && r.CompetitionDate < endExclusive
+                            && r.Competition.IsMasters
+                            && r.Swimmer.BirthYear > 0
+                            && r.RelayId == null
+                            && !r.TimeFail
+                            && r.SuspectReason == null
+                            && r.TimeMillisecond > 0)
+                .GroupBy(r => new
+                {
+                    r.SwimmerId, r.StyleId, r.Distance, r.Competition.PoolType, r.Gender, r.AgeGroup,
+                })
+                .Select(g => new
+                {
+                    g.Key.SwimmerId,
+                    g.Key.StyleId,
+                    g.Key.Distance,
+                    g.Key.PoolType,
+                    g.Key.Gender,
+                    g.Key.AgeGroup,
+                    Ms = g.Min(x => x.TimeMillisecond),
+                })
+                .ToListAsync();
+
+            return grouped
+                .Where(g => g.Ms is > 0 && !string.IsNullOrWhiteSpace(g.AgeGroup))
+                .Select(g => new PeerSeasonBest(
+                    g.SwimmerId,
+                    SeasonAggregator.DisciplineKey(g.StyleId, g.Distance, g.PoolType, g.Gender),
+                    g.Ms!.Value,
+                    g.AgeGroup.Trim()))
+                .ToList();
         }
     }
 

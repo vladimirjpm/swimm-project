@@ -270,8 +270,9 @@ public static class SwimmerPageBuilder
 
     /// <summary>
     /// Фильтр «Season best»: место пловца среди СВЕРСТНИКОВ в каждой дисциплине, где он плавал
-    /// в выбранном сезоне. Сверстники — пловцы того же года рождения; пол разделяет сам ключ
-    /// дисциплины, поэтому отдельного фильтра по полу тут нет.
+    /// в выбранном сезоне. Сверстники — пловцы того же года рождения на обычных стартах, у
+    /// мастерского заплыва — его группа протокола (<see cref="RankAmongPeers"/>); пол разделяет
+    /// сам ключ дисциплины, поэтому отдельного фильтра по полу тут нет.
     ///
     /// Ранжир спортивный: равные времена делят место (двое по 41.23 — оба вторые, следующий
     /// четвёртый). Ровно поэтому место считается «сколько строго быстрее + 1», а не позицией
@@ -303,29 +304,29 @@ public static class SwimmerPageBuilder
         // сезона, потому что сравниваются лучшие времена ЭТОГО сезона.
         if (season is null || age is null) return dto;
 
-        var byDiscipline = cohort
-            .GroupBy(p => p.DisciplineKey)
-            .ToDictionary(g => g.Key, g => g.ToList());
+        var peersIndex = PeersIndex(cohort);
 
         foreach (var (key, mine) in BestPerDiscipline(InSeason(allRows, season)))
         {
-            var ms = mine.TimeMilliseconds!.Value;
-            if (!byDiscipline.TryGetValue(key, out var peers))
-            {
-                // Своей же строки в когорте нет — значит когорту собрали по другому году
-                // рождения (в справочнике он мог поменяться). Молча выдавать «первое место»
-                // нельзя: это ровно тот случай, когда цифра выглядит достижением, не будучи им.
-                continue;
-            }
+            // Своей же строки в круге нет — значит когорту собрали по другому году
+            // рождения (в справочнике он мог поменяться) или у мастерского заплыва нет
+            // группы. Молча выдавать «первое место» нельзя: это ровно тот случай, когда
+            // цифра выглядит достижением, не будучи им.
+            if (RankAmongPeers(key, mine, peersIndex) is not PeerRank place) continue;
 
+            var ms = mine.TimeMilliseconds!.Value;
             dto.Rows.Add(new SwimmerDisciplineRankDto
             {
                 DisciplineKey = key,
-                Rank = peers.Count(p => p.TimeMs < ms) + 1,
-                PeerCount = peers.Select(p => p.SwimmerId).Distinct().Count(),
+                Rank = place.Rank,
+                PeerCount = place.PeerCount,
                 TimeMs = ms,
-                LeaderTimeMs = peers.Min(p => p.TimeMs),
-                GapToLeaderMs = ms - peers.Min(p => p.TimeMs),
+                LeaderTimeMs = place.LeaderMs,
+                GapToLeaderMs = ms - place.LeaderMs,
+                AgeGroup = place.MastersAgeGroup,
+                GroupLabel = place.MastersAgeGroup is string group
+                    ? MastersGroupLabel(group, sex)
+                    : dto.GroupLabel,
             });
         }
 
@@ -348,6 +349,59 @@ public static class SwimmerPageBuilder
 
     /// <summary>С этого возраста группа называется «women/men», а не «girls/boys».</summary>
     private const int AdultAge = 18;
+
+    /// <summary>Подпись мастерского круга: «women 45-49». Без пола — просто группа.</summary>
+    private static string MastersGroupLabel(string ageGroup, string? gender) => gender switch
+    {
+        "female" => $"women {ageGroup}",
+        "male" => $"men {ageGroup}",
+        _ => ageGroup,
+    };
+
+    /// <summary>
+    /// Место одного заплыва в его круге: <see cref="MastersAgeGroup"/> задан — круг мастерский
+    /// (группа протокола), null — ровесники на обычных стартах.
+    /// </summary>
+    private readonly record struct PeerRank(int Rank, int PeerCount, int LeaderMs, string? MastersAgeGroup);
+
+    /// <summary>Круги по ключу (дисциплина × мастерская группа или null).</summary>
+    private static Dictionary<(string Key, string? Group), List<PeerSeasonBest>> PeersIndex(
+        IEnumerable<PeerSeasonBest> peers) =>
+        peers.GroupBy(p => (p.DisciplineKey, p.MastersAgeGroup))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+    /// <summary>
+    /// Место заплыва среди СВОЕГО круга — одно правило для панели Season best и бейджей H2H.
+    ///
+    /// Круг выбирается по заплыву, а не по пловцу, и повторяет срезы списка
+    /// <c>/season-best</c>, куда ведёт строка: мастерский старт — его группа протокола
+    /// («45-49», срез с <c>age_group</c>), обычный — ровесники того же года рождения на
+    /// обычных стартах (срез с <c>age</c>). Раньше мастерский заплыв ранжировался среди
+    /// ровесников по году рождения — такой выборки нет ни в одном срезе списка, и ссылка
+    /// «#1 of 3» открывала пустую страницу (24.09.2026).
+    ///
+    /// Ранжир спортивный: место — «сколько строго быстрее + 1». null — круга нет.
+    /// </summary>
+    private static PeerRank? RankAmongPeers(
+        string key, SeasonSwimRow mine,
+        Dictionary<(string Key, string? Group), List<PeerSeasonBest>> index)
+    {
+        string? group = null;
+        if (mine.IsMasters)
+        {
+            group = mine.AgeGroup?.Trim();
+            if (string.IsNullOrEmpty(group)) return null;
+        }
+
+        if (!index.TryGetValue((key, group), out var peers)) return null;
+
+        var ms = mine.TimeMilliseconds!.Value;
+        return new PeerRank(
+            peers.Count(p => p.TimeMs < ms) + 1,
+            peers.Select(p => p.SwimmerId).Distinct().Count(),
+            peers.Min(p => p.TimeMs),
+            group);
+    }
 
     /// <summary>Пол к виду ключа дисциплины. В базе он живёт и как «male», и как «M».</summary>
     private static string? NormalizeGender(string? gender) => gender?.Trim().ToLowerInvariant() switch
@@ -690,7 +744,8 @@ public static class SwimmerPageBuilder
     /// рекорд своей возрастной ступени (REC).
     ///
     /// SB считается ТОЙ ЖЕ арифметикой, что фильтр «Season best» (<see cref="SeasonRanks"/>):
-    /// место — «сколько строго быстрее + 1», группа — свой год рождения и пол. За карьеру
+    /// место — «сколько строго быстрее + 1», круг — <see cref="RankAmongPeers"/> (свой год
+    /// рождения и пол, у мастерского старта — его группа протокола). За карьеру
     /// бейджа нет вовсе: сравнение живёт внутри одного сезона.
     /// </summary>
     private static CompareFlags Flags(
@@ -705,19 +760,15 @@ public static class SwimmerPageBuilder
         // достаётся показанному заплыву только если это он и есть.
         if (sbSeason is int sb && input.Cohort.Count > 0)
         {
-            var byDiscipline = input.Cohort.GroupBy(p => p.DisciplineKey)
-                .ToDictionary(g => g.Key, g => g.ToList());
+            var peersIndex = PeersIndex(input.Cohort);
 
             foreach (var (key, row) in BestPerDiscipline(InSeason(input.Rows, sb)))
             {
-                if (!byDiscipline.TryGetValue(key, out var peers)) continue;
+                if (RankAmongPeers(key, row, peersIndex) is not PeerRank place) continue;
 
-                var ms = row.TimeMilliseconds!.Value;
-                var rank = peers.Count(p => p.TimeMs < ms) + 1;
-                var peerCount = peers.Select(p => p.SwimmerId).Distinct().Count();
                 // «Первый среди одного» — не достижение: тот же порог, что у остальных
                 // экранов (MIN_PEERS_FOR_RANK на клиенте).
-                if (rank != 1 || peerCount < MinPeersForSeasonBest) continue;
+                if (place.Rank != 1 || place.PeerCount < MinPeersForSeasonBest) continue;
 
                 seasonBests++;
                 seasonBestIds.Add(row.ResultId);

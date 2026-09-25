@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
@@ -105,6 +105,62 @@ public class UserFavoriteFamilyTests
         // Сняли одного — место появилось.
         Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, favs[0].Id, isFamily: false));
         Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, last.Id, isFamily: true));
+    }
+
+    // ── Уровни Me / Family / Favorite исключают друг друга (My favorites 1b, 24.09.2026) ──
+
+    [Fact]
+    public async Task SetPrimary_FromFamily_LeavesFamily()
+    {
+        await using var db = CreateDb(nameof(SetPrimary_FromFamily_LeavesFamily));
+        var (owner, _, fav, _) = await SeedAsync(db);
+        var repo = Repo(db);
+        await repo.SetFamilyAsync(owner.Id, fav.Id, isFamily: true);
+
+        Assert.True(await repo.SetPrimaryAsync(owner.Id, fav.Id));
+
+        var row = await db.UserFavorites.AsNoTracking().SingleAsync(f => f.Id == fav.Id);
+        Assert.True(row.IsPrimary);
+        Assert.False(row.IsFamily);
+    }
+
+    [Fact]
+    public async Task SetFamily_OnMe_ClearsMe()
+    {
+        await using var db = CreateDb(nameof(SetFamily_OnMe_ClearsMe));
+        var (owner, _, fav, _) = await SeedAsync(db);
+        var repo = Repo(db);
+        await repo.SetPrimaryAsync(owner.Id, fav.Id);
+
+        Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, fav.Id, isFamily: true));
+
+        var row = await db.UserFavorites.AsNoTracking().SingleAsync(f => f.Id == fav.Id);
+        Assert.False(row.IsPrimary);
+        Assert.True(row.IsFamily);
+    }
+
+    [Fact]
+    public async Task FamilyLimit_DoesNotCountLegacyMeWithFamilyMark()
+    {
+        // До 24.09.2026 «Me» мог нести и пометку семьи. Такая запись — уровень Me, и место в
+        // семье она не занимает: иначе на пределе нельзя было бы пометить четвёртого.
+        await using var db = CreateDb(nameof(FamilyLimit_DoesNotCountLegacyMeWithFamilyMark));
+        var (owner, _, me, _) = await SeedAsync(db);
+        var repo = Repo(db);
+        var legacy = await db.UserFavorites.SingleAsync(f => f.Id == me.Id);
+        legacy.IsPrimary = true;
+        legacy.IsFamily = true;
+        await db.SaveChangesAsync();
+
+        var kids = Enumerable.Range(1, FavoritesRules.MaxFamily)
+            .Select(i => new Swimmer { LastName = $"Kid{i}", FirstName = "K", BirthYear = 2014 }).ToList();
+        db.Swimmers.AddRange(kids);
+        await db.SaveChangesAsync();
+        foreach (var k in kids)
+        {
+            var f = (await repo.AddAsync(owner.Id, new AddFavoriteRequest { TargetType = "swimmer", SwimmerId = k.Id })).Favorite!;
+            Assert.Equal(SetFamilyStatus.Done, await repo.SetFamilyAsync(owner.Id, f.Id, isFamily: true));
+        }
     }
 
     [Fact]

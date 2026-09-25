@@ -194,6 +194,49 @@ public class SwimmerPageRepositoryTests
         Assert.Empty(await Repo(db).GetClubBestMsAsync(clubId, 0));
     }
 
+    /// <summary>
+    /// Две выборки кругов сравнения не пересекаются, как и два среза списка /season-best:
+    /// возрастная когорта — только обычные старты, мастерская — только мастерские, по группам
+    /// протокола. Регрессия 24.09.2026: мастерский заплыв попадал в когорту по году рождения,
+    /// и ссылка «#1 of 3» вела в пустой срез.
+    /// </summary>
+    [Fact]
+    public async Task Cohorts_SplitRegularAndMastersStarts()
+    {
+        await using var db = CreateDb(nameof(Cohorts_SplitRegularAndMastersStarts));
+        var style = new Style { Name = "backstroke" };
+        var regular = Comp("Open", "16/02/2026");
+        var masters = Comp("Masters", "10/01/2026");
+        masters.IsMasters = true;
+        var she = new Swimmer { FirstName = "Аня", LastName = "Мастерс", BirthYear = 1981, Gender = "female" };
+        var peer = new Swimmer { FirstName = "Вера", LastName = "Ровесница", BirthYear = 1981, Gender = "female" };
+        var noYear = new Swimmer { FirstName = "Гостья", LastName = "Без года", BirthYear = 0, Gender = "female" };
+        db.AddRange(style, regular, masters, she, peer, noYear);
+        await db.SaveChangesAsync();
+
+        var mastersSwim = Swim(masters, she, style, new DateTime(2026, 1, 10), 32000);
+        mastersSwim.AgeGroup = "45-49";
+        var otherGroup = Swim(masters, peer, style, new DateTime(2026, 1, 10), 31000);
+        otherGroup.AgeGroup = "40-44";
+        var guest = Swim(masters, noYear, style, new DateTime(2026, 1, 10), 30000);
+        guest.AgeGroup = "45-49";
+        db.AddRange(
+            mastersSwim, otherGroup, guest,
+            Swim(regular, peer, style, new DateTime(2026, 2, 16), 33000));
+        await db.SaveChangesAsync();
+
+        var cohort = await Repo(db).GetAgeCohortSeasonBestsAsync(2025, 1981);
+        var only = Assert.Single(cohort);                  // мастерские старты сюда не входят
+        Assert.Equal(peer.Id, only.SwimmerId);
+        Assert.Null(only.MastersAgeGroup);
+
+        var mastersPeers = await Repo(db).GetMastersSeasonBestsAsync(2025);
+        // Пловец без года рождения выпадает — как в мастерском срезе списка.
+        Assert.Equal(2, mastersPeers.Count);
+        Assert.Contains(mastersPeers, p => p.SwimmerId == she.Id && p.MastersAgeGroup == "45-49");
+        Assert.Contains(mastersPeers, p => p.SwimmerId == peer.Id && p.MastersAgeGroup == "40-44");
+    }
+
     [Fact]
     public async Task UnknownSwimmer_ReturnsEmpty_NotNull()
     {

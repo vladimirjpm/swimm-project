@@ -140,8 +140,13 @@ public static class WorldRecordKinds
 /// Когорта собирается по году рождения; пол в отдельное поле не выносится, потому что он уже
 /// внутри <paramref name="DisciplineKey"/>: девочки и мальчики одного года никогда не попадут
 /// в один ключ, и отдельный фильтр по полу был бы вторым способом задать то же самое.
+///
+/// <paramref name="MastersAgeGroup"/> — группа протокола («45-49») для мастерского старта,
+/// null — обычный старт. Мастерский заплыв сравнивается только со своей группой, обычный —
+/// только с обычными стартами ровесников: так же разделены срезы списка <c>/season-best</c>.
 /// </summary>
-public sealed record PeerSeasonBest(int SwimmerId, string DisciplineKey, int TimeMs);
+public sealed record PeerSeasonBest(
+    int SwimmerId, string DisciplineKey, int TimeMs, string? MastersAgeGroup = null);
 
 /// <summary>
 /// Общий сезонный шов страниц спортсмена и клуба (фаза 10.1): «результаты → сезоны»,

@@ -646,6 +646,18 @@ public sealed class SwimmerDisciplineRankDto
     /// <summary>Отставание от лидера группы, мс. 0 — он сам лидер.</summary>
     [JsonPropertyName("gapToLeaderMs")]
     public int GapToLeaderMs { get; set; }
+
+    /// <summary>
+    /// Группа протокола («45-49»), если лучший заплыв мастерский: место посчитано внутри неё,
+    /// и ссылка строки обязана вести в мастерский срез <c>/season-best?age_group=</c>.
+    /// null — обычный старт, круг — ровесники того же года рождения.
+    /// </summary>
+    [JsonPropertyName("ageGroup")]
+    public string? AgeGroup { get; set; }
+
+    /// <summary>Подпись круга ЭТОЙ строки: «women 45» либо «women 45-49» у мастерского заплыва.</summary>
+    [JsonPropertyName("groupLabel")]
+    public string? GroupLabel { get; set; }
 }
 
 /// <summary>

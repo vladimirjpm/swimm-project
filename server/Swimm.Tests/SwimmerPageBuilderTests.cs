@@ -525,4 +525,68 @@ public class SwimmerPageBuilderTests
 
         Assert.Equal("women 25", dto.GroupLabel);
     }
+
+    // ── Season best: мастерский заплыв меряется своей группой протокола ─────────
+
+    /// <summary>Лучшее время на мастерском старте — круг задан группой протокола.</summary>
+    private static PeerSeasonBest MastersPeer(int swimmerId, int ms, string ageGroup) =>
+        Peer(swimmerId, ms) with { MastersAgeGroup = ageGroup };
+
+    [Fact]
+    public void SeasonRanks_MastersSwim_RanksInsideProtocolGroup_NotBirthYear()
+    {
+        // Регрессия 24.09.2026: мастерс 1981 г. р. получал «#1 of 3» среди ровесников, а ссылка
+        // строки (срез /season-best с age=45) открывала пустой список — мастерских стартов в
+        // нём нет. Место обязано считаться там, куда ведёт ссылка: в группе протокола.
+        var rows = new[] { Row(1, "2026-02-16", ms: 60000) with { IsMasters = true, AgeGroup = "45-49" } };
+        var peers = new[]
+        {
+            Peer(8, 50000),                         // ровесник на ОБЫЧНОМ старте — не наш круг
+            MastersPeer(Swimmer, 60000, "45-49"),
+            MastersPeer(7, 59000, "45-49"),
+            MastersPeer(9, 61000, "45-49"),
+            MastersPeer(10, 40000, "40-44"),        // соседняя группа — не наш круг
+        };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 1981, "female", peers);
+
+        var rank = Assert.Single(dto.Rows);
+        Assert.Equal(2, rank.Rank);
+        Assert.Equal(3, rank.PeerCount);
+        Assert.Equal(59000, rank.LeaderTimeMs);
+        Assert.Equal("45-49", rank.AgeGroup);
+        Assert.Equal("women 45-49", rank.GroupLabel);
+    }
+
+    [Fact]
+    public void SeasonRanks_RegularSwim_IgnoresMastersPeers_AndHasNoAgeGroup()
+    {
+        var rows = new[] { Row(1, "2026-02-16", ms: 60000) };
+        var peers = new[]
+        {
+            Peer(Swimmer, 60000),
+            Peer(7, 61000),
+            MastersPeer(9, 50000, "25-29"),         // мастерский старт в обычный круг не входит
+        };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 2001, "female", peers);
+
+        var rank = Assert.Single(dto.Rows);
+        Assert.Equal(1, rank.Rank);
+        Assert.Equal(2, rank.PeerCount);
+        Assert.Null(rank.AgeGroup);
+        Assert.Equal("women 25", rank.GroupLabel);
+    }
+
+    [Fact]
+    public void SeasonRanks_MastersSwimWithoutGroup_IsSkipped()
+    {
+        // Без группы протокола мастерскому заплыву не с кем сравниваться — места нет.
+        var rows = new[] { Row(1, "2026-02-16", ms: 60000) with { IsMasters = true, AgeGroup = "" } };
+        var peers = new[] { Peer(Swimmer, 60000), Peer(7, 61000) };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 1981, "female", peers);
+
+        Assert.Empty(dto.Rows);
+    }
 }

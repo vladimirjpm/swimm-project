@@ -247,7 +247,7 @@ public class SwimmersPublicController : ControllerBase
         // Когорта тянется только под конкретный сезон: за карьеру сравнивать не с чем, а
         // выборка недешёвая (её ключ — сезон + год рождения, общий на всех сверстников).
         var cohort = selected is int year && profile is not null
-            ? await _swims.GetAgeCohortSeasonBestsAsync(year, profile.BirthYear)
+            ? await PeersAsync(rows, year, profile.BirthYear)
             : [];
 
         var dto = SwimmerPageBuilder.SeasonRanks(
@@ -257,6 +257,23 @@ public class SwimmersPublicController : ControllerBase
         // у пловца в сентябре ещё нет заплывов, и пустая панель иначе читается как поломка.
         dto.SeasonNotice = await _showcase.PendingNoticeAsync();
         return dto;
+    }
+
+    /// <summary>
+    /// Круги сравнения пловца за сезон: ровесники на обычных стартах плюс — если пловец
+    /// плавал мастерс в этом сезоне — мастерские группы протокола. Какой круг брать для
+    /// строки, решает сам заплыв (<c>SwimmerPageBuilder.RankAmongPeers</c>); мастерская
+    /// выборка не тянется тем, у кого мастерских стартов нет.
+    /// </summary>
+    private async Task<IReadOnlyList<PeerSeasonBest>> PeersAsync(
+        IReadOnlyList<SeasonSwimRow> rows, int seasonStartYear, int birthYear)
+    {
+        var cohort = await _swims.GetAgeCohortSeasonBestsAsync(seasonStartYear, birthYear);
+        var swamMasters = rows.Any(r => r.IsMasters && SeasonAggregator.SeasonOf(r) == seasonStartYear);
+        if (!swamMasters) return cohort;
+
+        var masters = await _swims.GetMastersSeasonBestsAsync(seasonStartYear);
+        return [.. cohort, .. masters];
     }
 
     /// <summary>
@@ -372,7 +389,7 @@ public class SwimmersPublicController : ControllerBase
     {
         // Когорта нужна под сезон, за который считаются места: в режиме ∞ это витринный.
         var cohort = seasonBestSeason is int year && profile is { BirthYear: > 0 }
-            ? await _swims.GetAgeCohortSeasonBestsAsync(year, profile.BirthYear)
+            ? await PeersAsync(rows, year, profile.BirthYear)
             : [];
 
         var records = await RecordStepsAsync(SwimmerPageBuilder.InSeason(rows, season), profile, axis);
