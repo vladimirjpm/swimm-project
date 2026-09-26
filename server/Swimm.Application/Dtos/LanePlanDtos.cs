@@ -191,6 +191,30 @@ public sealed class LanePlanDistributeInputDto
     public List<int>? SwimmerIds { get; set; }
 }
 
+/// <summary>
+/// «Auto lanes»: сколько дорожек и кто сегодня пришёл (<c>swimmer_ids</c> null — весь видимый
+/// состав). Сервер сам делит дорожки между уровнями (<c>LaneAllocation</c>). Ничего не сохраняет.
+/// </summary>
+public sealed class LanePlanAutoLanesInputDto
+{
+    [JsonPropertyName("lane_count")]
+    public int LaneCount { get; set; }
+
+    [JsonPropertyName("swimmer_ids")]
+    public List<int>? SwimmerIds { get; set; }
+}
+
+/// <summary>Итог «Auto lanes»: уровень каждой дорожки (1..lane_count) и раскладка людей.</summary>
+public sealed class LanePlanAutoLanesDto
+{
+    /// <summary>Только <c>lane_no</c> и <c>level_id</c>; задания не трогаются.</summary>
+    [JsonPropertyName("lanes")]
+    public List<LanePlanLaneInputDto> Lanes { get; set; } = [];
+
+    [JsonPropertyName("swimmers")]
+    public List<LanePlanSwimmerInputDto> Swimmers { get; set; } = [];
+}
+
 /// <summary>Раскладка «Distribute» — в том же виде, что <c>swimmers</c> входа плана.</summary>
 public sealed class LanePlanDistributionDto
 {

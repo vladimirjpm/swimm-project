@@ -86,6 +86,92 @@ public class LanePlanTests
         Assert.Equal([1, 1, 2, 2], first.Select(p => p.LaneNo!.Value));
     }
 
+    // ── LaneAllocation («Auto lanes») ───────────────────────────────────────
+
+    private static readonly LaneAllocation.Level[] FourLevels =
+        [new(1, 1), new(2, 2), new(3, 3), new(4, 4)];
+
+    private static IEnumerable<(int LaneNo, int? LevelId)> LanesOf(LaneAllocation.Result r) =>
+        r.Lanes.Select(l => (l.LaneNo, l.LevelId));
+
+    [Fact]
+    public void AutoLanes_DolphinExample_GivesTheCoachesSplit()
+    {
+        // Из обсуждения: 4 / 7 / 6 / 3 на 6 дорожек → 1, 2–3, 4–5, 6.
+        var result = LaneAllocation.AutoLanes(6, FourLevels, Swimmers((4, 1), (7, 2), (6, 3), (3, 4)));
+
+        Assert.Equal([(1, (int?)1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4)], LanesOf(result));
+        var perLane = result.Placements.GroupBy(p => p.LaneNo!.Value).ToDictionary(g => g.Key, g => g.Count());
+        Assert.Equal(new Dictionary<int, int> { [1] = 4, [2] = 4, [3] = 3, [4] = 3, [5] = 3, [6] = 3 }, perLane);
+    }
+
+    [Fact]
+    public void AutoLanes_FewerLanesThanLevels_MergesTheWeakerNeighbours()
+    {
+        // 5 / 5 / 5 на 2 дорожки: сильные отдельно, слабые вместе; на общей — сперва сильнейший уровень.
+        var levels = new LaneAllocation.Level[] { new(1, 1), new(2, 2), new(3, 3) };
+        var swimmers = Swimmers((5, 3), (5, 2), (5, 1));  // id 1–5 уровень 3, 6–10 уровень 2, 11–15 уровень 1
+
+        var result = LaneAllocation.AutoLanes(2, levels, swimmers);
+
+        Assert.Equal([(1, (int?)1), (2, 2)], LanesOf(result));
+        var lane2 = result.Placements.Where(p => p.LaneNo == 2).Select(p => p.SwimmerId).ToList();
+        Assert.Equal(10, lane2.Count);
+        var onLane2 = result.Placements.Where(p => p.LaneNo == 2).Select(p => p.SwimmerId).ToHashSet();
+        Assert.True(Enumerable.Range(1, 10).All(onLane2.Contains));
+    }
+
+    [Fact]
+    public void AutoLanes_Merge_MinimisesTheBusiestLane()
+    {
+        // 2 / 2 / 10 на 2 дорожки: [1,2] и [3] (макс. 10), а не [1] и [2,3] (макс. 12).
+        var result = LaneAllocation.AutoLanes(2, [new(1, 1), new(2, 2), new(3, 3)], Swimmers((2, 1), (2, 2), (10, 3)));
+
+        Assert.Equal([(1, (int?)1), (2, 3)], LanesOf(result));
+        Assert.Equal(4, result.Placements.Count(p => p.LaneNo == 1));
+    }
+
+    [Fact]
+    public void AutoLanes_OneLane_TakesEveryoneWithALevel()
+    {
+        var result = LaneAllocation.AutoLanes(1, FourLevels, Swimmers((2, 1), (1, 4), (1, null)));
+
+        Assert.Equal([(1, (int?)1)], LanesOf(result));
+        Assert.Equal([1, 1, 1, null], result.Placements.Select(p => p.LaneNo));
+    }
+
+    [Fact]
+    public void AutoLanes_NeverMoreLanesThanPeople_LeftoversStayEmpty()
+    {
+        // 1 и 2 человека на 6 дорожек: 1 + 2 дорожки, остальные три — без уровня.
+        var result = LaneAllocation.AutoLanes(6, FourLevels, Swimmers((1, 1), (2, 3)));
+
+        Assert.Equal([(1, (int?)1), (2, 3), (3, 3), (4, null), (5, null), (6, null)], LanesOf(result));
+    }
+
+    [Fact]
+    public void AutoLanes_SkipsLevelsNobodyHas_AndUnknownLevels()
+    {
+        // Уровня 9 у группы нет (удалён) — как без уровня; пустой уровень 2 дорожку не получает.
+        // Третья дорожка — лишняя: по 3 человека на дорожку у обоих, равенство — сильнейшему.
+        var result = LaneAllocation.AutoLanes(3, FourLevels, Swimmers((3, 1), (3, 4), (2, 9)));
+
+        Assert.Equal([(1, (int?)1), (2, 1), (3, 4)], LanesOf(result));
+        Assert.Equal(2, result.Placements.Count(p => p.LaneNo == null));
+    }
+
+    [Fact]
+    public void AutoLanes_IsDeterministic()
+    {
+        var swimmers = Swimmers((4, 1), (7, 2), (6, 3), (3, 4));
+
+        var first = LaneAllocation.AutoLanes(5, FourLevels, swimmers);
+        var second = LaneAllocation.AutoLanes(5, FourLevels.Reverse(), Enumerable.Reverse(swimmers));
+
+        Assert.Equal(LanesOf(first), LanesOf(second));
+        Assert.Equal(first.Placements, second.Placements);
+    }
+
     // ── LanePlanRules ───────────────────────────────────────────────────────
 
     [Theory]
@@ -365,6 +451,31 @@ public class LanePlanTests
             LaneCount = 3, Lanes = [new() { LaneNo = 3, LevelId = s.Slow }], SwimmerIds = [s.C, s.B],
         });
         Assert.Equal([(s.B, (int?)3), (s.C, null)], partial!.Swimmers.Select(p => (p.SwimmerId, p.LaneNo)));
+    }
+
+    [Fact]
+    public async Task AutoLanes_UsesCurrentLevels_AndNeedsSomeoneWithALevel()
+    {
+        await using var db = CreateDb(nameof(AutoLanes_UsesCurrentLevels_AndNeedsSomeoneWithALevel));
+        var s = await SeedAsync(db);
+        var service = new LanePlanService(db);
+
+        // A — Fast, B — Slow, C — без уровня; 3 дорожки: по одной уровням, третья пустая.
+        var (result, error) = await service.AutoLanesAsync(s.GroupId, new LanePlanAutoLanesInputDto { LaneCount = 3 });
+
+        Assert.Null(error);
+        Assert.Equal([(1, (int?)s.Fast), (2, s.Slow), (3, null)], result!.Lanes.Select(l => (l.LaneNo, l.LevelId)));
+        Assert.Equal([(s.A, (int?)1), (s.B, 2), (s.C, null)], result.Swimmers.Select(p => (p.SwimmerId, p.LaneNo)));
+        Assert.False(await db.LanePlans.AnyAsync());
+
+        // Пришёл только C — уровня нет ни у кого: подсказка, а не пустые дорожки.
+        var (none, why) = await service.AutoLanesAsync(s.GroupId,
+            new LanePlanAutoLanesInputDto { LaneCount = 3, SwimmerIds = [s.C] });
+        Assert.Null(none);
+        Assert.False(string.IsNullOrWhiteSpace(why));
+
+        var (bad, _) = await service.AutoLanesAsync(s.GroupId, new LanePlanAutoLanesInputDto { LaneCount = 0 });
+        Assert.Null(bad);
     }
 
     [Fact]

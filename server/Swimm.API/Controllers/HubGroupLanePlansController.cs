@@ -110,6 +110,16 @@ public class HubGroupLanePlansController : ControllerBase
         return result == null ? BadRequest(new { error }) : Ok(result);
     }
 
+    /// <summary>«Auto lanes»: дорожки между уровнями по числу пришедших + раскладка. Ничего не сохраняет.</summary>
+    [HttpPost("auto-lanes")]
+    public async Task<IActionResult> AutoLanes(int id, [FromBody] LanePlanAutoLanesInputDto input)
+    {
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var (result, error) = await _plans.AutoLanesAsync(id, input);
+        return result == null ? BadRequest(new { error }) : Ok(result);
+    }
+
     [HttpPost("{date}/publish")]
     public Task<IActionResult> Publish(int id, string date) => SetStatusAsync(id, date, LanePlanStatus.Published);
 

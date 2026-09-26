@@ -67,6 +67,10 @@ export const lanePlansApi = {
     groupId: number,
     input: { lane_count: number; lanes: LanePlanInput['lanes']; swimmer_ids: number[] | null },
   ) => request<{ swimmers: LanePlanInput['swimmers'] }>('POST', `${base(groupId)}/distribute`, input),
+  /** «Auto lanes»: сервер сам делит дорожки между уровнями и раскладывает людей. Ничего не сохраняет. */
+  autoLanes: (groupId: number, input: { lane_count: number; swimmer_ids: number[] | null }) =>
+    request<{ lanes: { lane_no: number; level_id: number | null }[]; swimmers: LanePlanInput['swimmers'] }>(
+      'POST', `${base(groupId)}/auto-lanes`, input),
   publish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/publish`),
   unpublish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/unpublish`),
   remove: (groupId: number, date: string) => request<void>('DELETE', `${base(groupId)}/${date}`),

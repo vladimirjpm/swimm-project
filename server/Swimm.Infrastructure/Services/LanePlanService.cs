@@ -276,6 +276,40 @@ public class LanePlanService : ILanePlanService
         }, null);
     }
 
+    public async Task<(LanePlanAutoLanesDto? Result, string? Error)> AutoLanesAsync(
+        int hubGroupId, LanePlanAutoLanesInputDto input)
+    {
+        if (input.LaneCount is < LanePlanRules.MinLanes or > LanePlanRules.MaxLanes)
+            return (null, $"Lanes: from {LanePlanRules.MinLanes} to {LanePlanRules.MaxLanes}.");
+
+        var roster = await LoadRosterAsync(hubGroupId);
+        var levels = await LoadSwimmerLevelsAsync(hubGroupId);
+        var groupLevels = await _db.HubGroupLevels.AsNoTracking()
+            .Where(l => l.HubGroupId == hubGroupId)
+            .Select(l => new LaneAllocation.Level(l.Id, l.Rank))
+            .ToListAsync();
+
+        // Кто пришёл — как в Distribute: весь состав или названные (ушедший, но стоявший в плане, — в конец).
+        var sortKeys = roster.ToDictionary(r => r.SwimmerId, r => r.SortKey);
+        var present = input.SwimmerIds == null
+            ? roster.Select(r => r.SwimmerId).ToList()
+            : input.SwimmerIds.Distinct().ToList();
+        var swimmers = present.Select(id => new LaneDistribution.Swimmer(
+            id,
+            levels.TryGetValue(id, out var levelId) ? levelId : null,
+            sortKeys.TryGetValue(id, out var key) ? key : int.MaxValue)).ToList();
+
+        if (!swimmers.Any(s => s.LevelId != null))
+            return (null, "Nobody coming today has a level yet — set levels in Admin → Levels first.");
+
+        var result = LaneAllocation.AutoLanes(input.LaneCount, groupLevels, swimmers);
+        return (new LanePlanAutoLanesDto
+        {
+            Lanes = result.Lanes.Select(l => new LanePlanLaneInputDto { LaneNo = l.LaneNo, LevelId = l.LevelId }).ToList(),
+            Swimmers = result.Placements.Select(p => new LanePlanSwimmerInputDto { SwimmerId = p.SwimmerId, LaneNo = p.LaneNo }).ToList(),
+        }, null);
+    }
+
     public async Task<bool> SetStatusAsync(int hubGroupId, DateOnly date, string status)
     {
         var plan = await _db.LanePlans.FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
