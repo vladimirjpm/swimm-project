@@ -12,7 +12,9 @@ import { levelColor } from './level-color';
  * «Not today» (снят). Перенос — перетаскиванием на компьютере и выпадашкой у каждого
  * пловца (на телефоне drag неудобен). Порядок внутри дорожки = кто ведёт; ↑ поднимает.
  * «Distribute» раскладывает пришедших по уровням дорожек на сервере и НЕ сохраняет —
- * сохраняет Save. Дорожки сверх числа не выбрасываются из черновика: уменьшил и вернул —
+ * сохраняет Save. «Auto lanes» — шаг раньше: тренер задал только число дорожек, сервер сам
+ * делит их между уровнями по числу пришедших (соседние уровни при нехватке дорожек — вместе) и
+ * раскладывает людей; задания дорожек остаются на своих номерах. Дорожки сверх числа не выбрасываются из черновика: уменьшил и вернул —
  * задания и люди на месте; пока дорожка убрана, её люди показываются и сохраняются как
  * Unassigned (считается на лету, а не переносом — иначе два быстрых «−» теряли шаг).
  *
@@ -124,7 +126,8 @@ function GroupLaneEditor({
   const [buckets, setBuckets] = useState<Buckets>(init.buckets);
   const [saving, setSaving] = useState(false);
   const [distributing, setDistributing] = useState(false);
-  const [confirmDistribute, setConfirmDistribute] = useState(false);
+  /** Что подтверждаем: повторный Distribute или Auto lanes поверх уже заданного. */
+  const [confirm, setConfirm] = useState<'distribute' | 'auto' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<Target | null>(null);
 
@@ -183,17 +186,45 @@ function GroupLaneEditor({
       lane_count: laneCount, lanes: lanesInput(), swimmer_ids: present(),
     });
     setDistributing(false);
-    setConfirmDistribute(false);
+    setConfirm(null);
     if (!result.ok || !result.data) {
       setError(result.error ?? 'Could not distribute. Try again.');
       return;
     }
+    place(result.data.swimmers);
+  };
+
+  /** Раскладка с сервера → корзины; «Not today» не трогаем. */
+  const place = (swimmers: LanePlanInput['swimmers']) => {
     const next: Buckets = { lanes: Array.from({ length: MAX_LANES }, () => []), unassigned: [], out: buckets.out };
-    result.data.swimmers.forEach((s) => {
+    swimmers.forEach((s) => {
       if (s.lane_no == null) next.unassigned.push(s.swimmer_id);
       else next.lanes[s.lane_no - 1].push(s.swimmer_id);
     });
     setBuckets(next);
+  };
+
+  const autoLanes = async () => {
+    setDistributing(true);
+    setError(null);
+    const result = await lanePlansApi.autoLanes(groupId, { lane_count: laneCount, swimmer_ids: present() });
+    setDistributing(false);
+    setConfirm(null);
+    if (!result.ok || !result.data) {
+      setError(result.error ?? 'Could not set up the lanes. Try again.');
+      return;
+    }
+    const levelOf = new Map(result.data.lanes.map((l) => [l.lane_no, l.level_id]));
+    // Уровни — на все видимые дорожки (лишним — «без уровня»), задания остаются на своих номерах.
+    setLanes((ls) => ls.map((l, i) => (i < laneCount ? { ...l, levelId: levelOf.get(i + 1) ?? null } : l)));
+    place(result.data.swimmers);
+  };
+
+  const askAutoLanes = () => {
+    // Уже заданы уровни дорожек или кто-то разложен — предупреждаем, что это заменится.
+    const touched = laneNos.some((no) => lanes[no - 1].levelId != null || buckets.lanes[no - 1].length > 0);
+    if (touched) setConfirm('auto');
+    else void autoLanes();
   };
 
   const askDistribute = () => {
@@ -202,7 +233,7 @@ function GroupLaneEditor({
       return;
     }
     // Уже кто-то разложен — предупреждаем, что ручные переносы пропадут.
-    if (buckets.lanes.slice(0, laneCount).some((l) => l.length > 0)) setConfirmDistribute(true);
+    if (buckets.lanes.slice(0, laneCount).some((l) => l.length > 0)) setConfirm('distribute');
     else void distribute();
   };
 
@@ -303,9 +334,20 @@ function GroupLaneEditor({
             className={`${inputCls} mt-1`}
           />
         </label>
-        <button type="button" className={ghostBtn} onClick={askDistribute} disabled={distributing || presentCount === 0}>
-          {distributing ? 'Distributing…' : 'Distribute by level'}
-        </button>
+        <span className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={ghostBtn}
+            onClick={askAutoLanes}
+            disabled={distributing || presentCount === 0}
+            title="Split the lanes between levels by how many are coming, then place everyone"
+          >
+            Auto lanes
+          </button>
+          <button type="button" className={ghostBtn} onClick={askDistribute} disabled={distributing || presentCount === 0}>
+            {distributing ? 'Working…' : 'Distribute by level'}
+          </button>
+        </span>
       </div>
 
       {/* Дорожки */}
@@ -391,17 +433,32 @@ function GroupLaneEditor({
         </button>
       </div>
 
-      {confirmDistribute && (
+      {confirm === 'distribute' && (
         <ConfirmDialog
           title="Re-distribute everyone?"
           confirmLabel="Distribute"
           busyLabel="Distributing…"
           onConfirm={async () => { await distribute(); return { success: true }; }}
-          onClose={() => setConfirmDistribute(false)}
+          onClose={() => setConfirm(null)}
         >
           <p className="m-0 mt-3 text-[13px] text-[var(--t-text-2)]">
             Everyone coming today is placed again by level. Manual moves will be lost.
             People in “Not today” stay there.
+          </p>
+        </ConfirmDialog>
+      )}
+      {confirm === 'auto' && (
+        <ConfirmDialog
+          title="Set up the lanes automatically?"
+          confirmLabel="Auto lanes"
+          busyLabel="Working…"
+          onConfirm={async () => { await autoLanes(); return { success: true }; }}
+          onClose={() => setConfirm(null)}
+        >
+          <p className="m-0 mt-3 text-[13px] text-[var(--t-text-2)]">
+            The level of every lane and who swims where are replaced: lanes are split between levels
+            by how many are coming, the strongest on the lowest numbers, neighbouring levels share a
+            lane when there are too few. Workouts stay on their lanes; “Not today” stays as is.
           </p>
         </ConfirmDialog>
       )}

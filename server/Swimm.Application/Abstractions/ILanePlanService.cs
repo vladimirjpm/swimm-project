@@ -31,6 +31,12 @@ public interface ILanePlanService
     /// <summary>Раскладка «Distribute» по текущим уровням и порядку состава. Ничего не пишет.</summary>
     Task<(LanePlanDistributionDto? Result, string? Error)> DistributeAsync(int hubGroupId, LanePlanDistributeInputDto input);
 
+    /// <summary>
+    /// «Auto lanes»: поделить дорожки между уровнями по числу пришедших и разложить людей
+    /// (<c>LaneAllocation</c>). Ничего не пишет. Ошибка — ни у кого из пришедших нет уровня.
+    /// </summary>
+    Task<(LanePlanAutoLanesDto? Result, string? Error)> AutoLanesAsync(int hubGroupId, LanePlanAutoLanesInputDto input);
+
     /// <summary>Опубликовать / вернуть в черновик. false — плана нет.</summary>
     Task<bool> SetStatusAsync(int hubGroupId, DateOnly date, string status);
 
