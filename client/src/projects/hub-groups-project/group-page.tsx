@@ -17,6 +17,8 @@ import {
 import PublicationsInbox from './components/group-admin';
 import GroupJoinPolicyCard from './components/group-join-policy';
 import GroupScheduleEditor from './components/group-schedule-editor';
+import GroupLevelsCard from './components/group-levels';
+import GroupLanes from './components/group-lanes';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
 import type { HubGroupDetails } from './types';
 
@@ -33,7 +35,7 @@ import type { HubGroupDetails } from './types';
  * а не страница сущности.
  */
 
-type GroupTab = 'overview' | 'season' | 'records' | 'swimmers' | 'media' | 'trainings' | 'admin';
+type GroupTab = 'overview' | 'season' | 'records' | 'swimmers' | 'media' | 'trainings' | 'lanes' | 'admin';
 
 function GroupPage({ slug }: { slug: string }) {
   const [group, setGroup] = useState<HubGroupDetails | null>(null);
@@ -202,13 +204,28 @@ function GroupPage({ slug }: { slug: string }) {
         ),
       }],
     },
+    // План дорожек на дату (docs/plans/lane-plans-plan.md): видят управляющие и активные
+    // участники — та же аудитория, что у тренировок; остальным замок, а не пропажа таба.
+    real && {
+      id: 'lanes' as const,
+      icon: '≡',
+      label: 'Lanes',
+      sub: '🔒 who swims where',
+      locked: !(manages || isMember),
+      lockNotice: (
+        <div className="deep-card text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+          Lane plans are visible to group members only.
+        </div>
+      ),
+      cards: () => [{ id: 'lanes', render: () => <GroupLanes groupId={group.id} manages={manages} /> }],
+    },
     // Управление — только управляющим, и не показывается вовсе остальным (план §3.8):
     // постороннему незачем знать, что у группы есть инбокс.
     real && manages && {
       id: 'admin' as const,
       icon: '⚙',
       label: 'Admin',
-      sub: 'display · schedule · joining',
+      sub: 'display · schedule · levels · joining',
       cards: () => [
         {
           id: 'display-settings',
@@ -235,6 +252,11 @@ function GroupPage({ slug }: { slug: string }) {
           render: () => (
             <GroupScheduleEditor groupId={group.id} schedule={group.training_schedule} />
           ),
+        },
+        {
+          // Уровни пловцов — оценка тренера, приватные (docs/plans/lane-plans-plan.md, L1).
+          id: 'levels',
+          render: () => <GroupLevelsCard groupId={group.id} />,
         },
         {
           id: 'join-policy',

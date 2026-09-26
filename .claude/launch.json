@@ -130,6 +130,16 @@
       "autoPort": false
     },
     {
+      "name": "stack-5183-api5082-personas",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "start /b dotnet run --project server/Swimm.API --no-build -- --urls http://localhost:5082 & set SWIMM_API_TARGET=http://localhost:5082&& npm --prefix client run dev -- --port 5183 --strictPort"
+      ],
+      "port": 5183,
+      "autoPort": false
+    },
+    {
       "name": "stack-5181-api5079",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [

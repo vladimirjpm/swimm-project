@@ -50,6 +50,7 @@ public static class DocsCatalog
             new("docs/plans/records-relays-plan.md", "Эстафеты в рекордах", "пол mixed ≠ none, WJR-эстафеты, метки рекордов у эстафет, Mixed на /records — сделано"),
             new("docs/plans/test-personas-plan.md", "Тестовые персонажи", "utest-аккаунты, тест-группы IsTest, сидер и dev-переключатель"),
             new("docs/plans/family-favorites-plan.md", "Семья в избранном", "родителю без прав; семья — пометка избранного, страница My favorites"),
+            new("docs/plans/lane-plans-plan.md", "Уровни и дорожки", "уровни пловцов группы и план дорожек на дату; видят только участники"),
         ]),
     ];
 

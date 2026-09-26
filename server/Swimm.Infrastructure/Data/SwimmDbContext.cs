@@ -113,6 +113,13 @@ public class SwimmDbContext : DbContext
     public DbSet<TrainingSession> TrainingSessions => Set<TrainingSession>();
     public DbSet<TrainingResult> TrainingResults => Set<TrainingResult>();
 
+    /* === Уровни пловцов группы (приватные, Sys_; docs/plans/lane-plans-plan.md) === */
+    public DbSet<HubGroupLevel> HubGroupLevels => Set<HubGroupLevel>();
+    public DbSet<HubGroupSwimmerLevel> HubGroupSwimmerLevels => Set<HubGroupSwimmerLevel>();
+    public DbSet<LanePlan> LanePlans => Set<LanePlan>();
+    public DbSet<LanePlanLane> LanePlanLanes => Set<LanePlanLane>();
+    public DbSet<LanePlanSwimmer> LanePlanSwimmers => Set<LanePlanSwimmer>();
+
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<AppRole> AppRoles => Set<AppRole>();
@@ -1293,6 +1300,109 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.StyleId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Уровни пловцов группы — оценка тренера, ПРИВАТНЫЕ данные, Sys_-таблица БЕЗ grant swimm_ro
+        // (docs/plans/lane-plans-plan.md). Rank НЕ уникален: список сохраняется целиком с новой
+        // нумерацией, и уникальный индекс падал бы на перестановке «1↔2» посреди UPDATE.
+        modelBuilder.Entity<HubGroupLevel>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupLevels");
+            entity.HasIndex(e => new { e.HubGroupId, e.Rank });
+            // Цель составного FK уровня пловца: уровень обязан быть из той же группы.
+            entity.HasAlternateKey(e => new { e.HubGroupId, e.Id });
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Уровень пловца: ключ (HubGroupId, SwimmerId), а не строка состава — клубная пересборка
+        // удаляет и заводит HubGroupMembers заново. Удаление уровня → пловец «без уровня» (cascade).
+        modelBuilder.Entity<HubGroupSwimmerLevel>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupSwimmerLevels");
+            entity.HasKey(e => new { e.HubGroupId, e.SwimmerId });
+            entity.HasIndex(e => new { e.HubGroupId, e.LevelId });
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Level)
+                .WithMany()
+                .HasForeignKey(e => new { e.HubGroupId, e.LevelId })
+                .HasPrincipalKey(l => new { l.HubGroupId, l.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // План дорожек на дату — ПРИВАТНЫЕ данные группы, Sys_-таблицы БЕЗ grant swimm_ro
+        // (docs/plans/lane-plans-plan.md, L2). План — снимок: удаление уровня только снимает
+        // подпись с дорожки (SET NULL), уход пловца из состава план не трогает.
+        modelBuilder.Entity<LanePlan>(entity =>
+        {
+            entity.ToTable("Sys_LanePlans");
+            entity.HasIndex(e => new { e.HubGroupId, e.Date }).IsUnique();
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CreatedBy)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasCheckConstraint("CK_LanePlans_Status", @"""Status"" IN ('draft', 'published')");
+            entity.HasCheckConstraint("CK_LanePlans_LaneCount", @"""LaneCount"" BETWEEN 1 AND 12");
+        });
+
+        modelBuilder.Entity<LanePlanLane>(entity =>
+        {
+            entity.ToTable("Sys_LanePlanLanes");
+            entity.HasKey(e => new { e.PlanId, e.LaneNo });
+            entity.HasIndex(e => e.LevelId);
+
+            entity.HasOne(e => e.Plan)
+                .WithMany(p => p.Lanes)
+                .HasForeignKey(e => e.PlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Level)
+                .WithMany()
+                .HasForeignKey(e => e.LevelId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasCheckConstraint("CK_LanePlanLanes_LaneNo", @"""LaneNo"" >= 1");
+        });
+
+        // Пловец плана. Нет FK (PlanId, LaneNo) → дорожка: при сокращении числа дорожек пловцов
+        // сначала переносят, и EF пришлось бы угадывать порядок команд; границы держит сервис.
+        modelBuilder.Entity<LanePlanSwimmer>(entity =>
+        {
+            entity.ToTable("Sys_LanePlanSwimmers");
+            entity.HasKey(e => new { e.PlanId, e.SwimmerId });
+            entity.HasIndex(e => e.SwimmerId);
+
+            entity.HasOne(e => e.Plan)
+                .WithMany(p => p.Swimmers)
+                .HasForeignKey(e => e.PlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasCheckConstraint("CK_LanePlanSwimmers_LaneNo", @"""LaneNo"" IS NULL OR ""LaneNo"" >= 1");
         });
     }
 }

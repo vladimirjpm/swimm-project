@@ -107,6 +107,36 @@ public class HubGroupDeleteTests
     }
 
     [Fact]
+    public async Task Impact_CountsLevelsAndLanePlans_AndThatAloneIsContent()
+    {
+        await using var db = CreateDb(nameof(Impact_CountsLevelsAndLanePlans_AndThatAloneIsContent));
+        var (owner, group) = await SeedGroupAsync(db);
+        var other = new HubGroup { Name = "Other", Slug = "other", OwnerUserId = owner.Id };
+        var swimmer = new Swimmer { FirstName = "A", LastName = "B" };
+        db.AddRange(other, swimmer);
+        await db.SaveChangesAsync();
+        var level = new HubGroupLevel { HubGroupId = group.Id, Rank = 1, Name = "Fast" };
+        var otherLevel = new HubGroupLevel { HubGroupId = other.Id, Rank = 1, Name = "Fast" };
+        db.AddRange(level, otherLevel);
+        db.LanePlans.AddRange(
+            new LanePlan { HubGroupId = group.Id, Date = new DateOnly(2026, 9, 27), LaneCount = 4 },
+            new LanePlan { HubGroupId = group.Id, Date = new DateOnly(2026, 9, 28), LaneCount = 4 },
+            new LanePlan { HubGroupId = other.Id, Date = new DateOnly(2026, 9, 27), LaneCount = 4 });  // чужой
+        await db.SaveChangesAsync();
+        db.HubGroupSwimmerLevels.AddRange(
+            new HubGroupSwimmerLevel { HubGroupId = group.Id, SwimmerId = swimmer.Id, LevelId = level.Id },
+            new HubGroupSwimmerLevel { HubGroupId = other.Id, SwimmerId = swimmer.Id, LevelId = otherLevel.Id });
+        await db.SaveChangesAsync();
+
+        var impact = (await Service(db).GetDeleteImpactAsync(group.Id))!;
+
+        Assert.Equal(1, impact.LeveledSwimmers);
+        Assert.Equal(2, impact.LanePlans);
+        Assert.Equal(0, impact.Swimmers);  // пловец в составе не стоит — терять есть что и без него
+        Assert.True(impact.HasContent);
+    }
+
+    [Fact]
     public async Task Impact_UnknownGroup_Null()
     {
         await using var db = CreateDb(nameof(Impact_UnknownGroup_Null));

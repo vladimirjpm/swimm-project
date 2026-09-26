@@ -236,6 +236,49 @@ public class SwimmerMergeServiceTests
         Assert.Equal("12345", merged.SwimmerOrgId);
     }
 
+    // ── Уровни и планы дорожек: ключ содержит SwimmerId — строки пересоздаются ──
+
+    [Fact]
+    public async Task Merge_MovesLevelsAndLanePlaces_CanonicalWinsOnConflict()
+    {
+        await using var db = CreateDb(nameof(Merge_MovesLevelsAndLanePlaces_CanonicalWinsOnConflict));
+        var canon = NewSwimmer("כהן", "דן");
+        var dup = NewSwimmer("כהן", "דן");
+        var g1 = new HubGroup { Name = "G1", Slug = "g1" };
+        var g2 = new HubGroup { Name = "G2", Slug = "g2" };
+        db.AddRange(canon, dup, g1, g2);
+        await db.SaveChangesAsync();
+
+        var fast1 = new HubGroupLevel { HubGroupId = g1.Id, Rank = 1, Name = "Fast" };
+        var slow1 = new HubGroupLevel { HubGroupId = g1.Id, Rank = 2, Name = "Slow" };
+        var fast2 = new HubGroupLevel { HubGroupId = g2.Id, Rank = 1, Name = "Fast" };
+        var plan1 = new LanePlan { HubGroupId = g1.Id, Date = new DateOnly(2026, 9, 27), LaneCount = 3 };
+        var plan2 = new LanePlan { HubGroupId = g1.Id, Date = new DateOnly(2026, 9, 28), LaneCount = 3 };
+        db.AddRange(fast1, slow1, fast2, plan1, plan2);
+        await db.SaveChangesAsync();
+
+        db.HubGroupSwimmerLevels.AddRange(
+            new HubGroupSwimmerLevel { HubGroupId = g1.Id, SwimmerId = canon.Id, LevelId = fast1.Id },
+            new HubGroupSwimmerLevel { HubGroupId = g1.Id, SwimmerId = dup.Id, LevelId = slow1.Id },   // конфликт
+            new HubGroupSwimmerLevel { HubGroupId = g2.Id, SwimmerId = dup.Id, LevelId = fast2.Id });  // переносится
+        db.LanePlanSwimmers.AddRange(
+            new LanePlanSwimmer { PlanId = plan1.Id, SwimmerId = canon.Id, LaneNo = 1, OrderNo = 0 },
+            new LanePlanSwimmer { PlanId = plan1.Id, SwimmerId = dup.Id, LaneNo = 2, OrderNo = 0 },     // конфликт
+            new LanePlanSwimmer { PlanId = plan2.Id, SwimmerId = dup.Id, LaneNo = 3, OrderNo = 1 });    // переносится
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db)
+            .MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("merged", report.Pairs.Single().Status);
+        var levels = await db.HubGroupSwimmerLevels.OrderBy(l => l.HubGroupId).ToListAsync();
+        Assert.Equal([(g1.Id, canon.Id, fast1.Id), (g2.Id, canon.Id, fast2.Id)],
+            levels.Select(l => (l.HubGroupId, l.SwimmerId, l.LevelId)));
+        var places = await db.LanePlanSwimmers.OrderBy(p => p.PlanId).ToListAsync();
+        Assert.Equal([(plan1.Id, canon.Id, (int?)1, 0), (plan2.Id, canon.Id, (int?)3, 1)],
+            places.Select(p => (p.PlanId, p.SwimmerId, p.LaneNo, p.OrderNo)));
+    }
+
     // ── A2: пересекающиеся пары отклоняются целиком, до любых изменений в БД ────
 
     [Fact]
