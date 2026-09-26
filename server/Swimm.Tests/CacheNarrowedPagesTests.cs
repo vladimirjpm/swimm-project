@@ -37,8 +37,15 @@ public class CacheNarrowedPagesTests
     /// <summary>Клуб, которого нет в базе: от его строки не зависит ни одна страница.</summary>
     private const int NoSuchClub = 900_000_001;
 
-    /// <summary>Группа из базы — то, что о ней нужно сценариям.</summary>
-    private sealed record LiveGroup(int Id, string Slug, int? ClubId, int? FollowedClubId, IReadOnlyList<int> PublishedMediaIds)
+    /// <summary>Пользователь, которого нет в базе: он не владелец и не админ ни одной группы.</summary>
+    private const int NoSuchUser = 900_000_002;
+
+    /// <summary>
+    /// Группа из базы — то, что о ней нужно сценариям. <paramref name="RunnerUserIds"/> — владелец и
+    /// админы: их строки <c>Sys_AppUsers</c> страница читает (порядок состава, HubGroupRosterOrder).
+    /// </summary>
+    private sealed record LiveGroup(int Id, string Slug, int? ClubId, int? FollowedClubId, IReadOnlyList<int> PublishedMediaIds,
+        int OwnerUserId, IReadOnlyList<int> RunnerUserIds)
     {
         public string Key => $"http:hub-groups:group:{Slug}";
     }
@@ -130,7 +137,10 @@ public class CacheNarrowedPagesTests
         {
             // Вне сборки записи кэша — эти запросы ничьих меток не ставят.
             var groups = await _rw.HubGroups.AsNoTracking().OrderBy(g => g.Id)
-                .Select(g => new { g.Id, g.Slug, g.ClubId })
+                .Select(g => new { g.Id, g.Slug, g.ClubId, g.OwnerUserId })
+                .ToListAsync();
+            var admins = await _rw.HubGroupAdmins.AsNoTracking()
+                .Select(a => new { a.HubGroupId, a.UserId })
                 .ToListAsync();
             var follows = await _rw.HubGroupClubSubscriptions.AsNoTracking()
                 .ToDictionaryAsync(s => s.HubGroupId, s => s.ClubId);
@@ -143,7 +153,9 @@ public class CacheNarrowedPagesTests
 
             Groups = groups
                 .Select(g => new LiveGroup(g.Id, g.Slug, g.ClubId, follows.TryGetValue(g.Id, out var club) ? club : null,
-                    published.Where(p => p.GroupId == g.Id).Select(p => p.UserMediaId).ToList()))
+                    published.Where(p => p.GroupId == g.Id).Select(p => p.UserMediaId).ToList(),
+                    g.OwnerUserId,
+                    admins.Where(a => a.HubGroupId == g.Id).Select(a => a.UserId).Append(g.OwnerUserId).Distinct().ToList()))
                 .ToList();
             _mediaSwimmers = published.DistinctBy(p => p.UserMediaId).ToDictionary(p => p.UserMediaId, p => p.SwimmerId);
             SpareMediaId = (published.Count > 0 ? published.Max(p => p.UserMediaId) : 0) + 1;
@@ -276,7 +288,7 @@ public class CacheNarrowedPagesTests
             {
                 db.HubGroups.AddRange(Groups.Select(g => new HubGroup
                 {
-                    Id = g.Id, Name = g.Slug, Slug = g.Slug, ClubId = g.ClubId, OwnerUserId = 1,
+                    Id = g.Id, Name = g.Slug, Slug = g.Slug, ClubId = g.ClubId, OwnerUserId = g.OwnerUserId,
                 }));
                 db.Swimmers.AddRange(Clubs.Select(c => new Swimmer { Id = c.SwimmerId, LastName = "S", ClubId = c.Id }));
                 db.UserMedia.AddRange(_mediaSwimmers.Select(m => Media(m.Key, m.Value)));
@@ -322,6 +334,8 @@ public class CacheNarrowedPagesTests
                          "Sys_UserMediaPublications", "Sys_UserMedia", "Sys_AppUsers",
                      })
                 Assert.DoesNotContain(CacheTags.Table(table), tags);
+            // Пользователи — только строки владельца и админов (корень только своей строки).
+            foreach (var user in g.RunnerUserIds) Assert.Contains(CacheTags.Row("Sys_AppUsers", user), tags);
             // Агрегаты по составу — таблицей: их пишут импорт и админ, эстафеты тянут чужих пловцов.
             Assert.Contains(CacheTags.Table("Swimmers"), tags);
             if (g.FollowedClubId is { } club) Assert.Contains(CacheTags.Row("Clubs", club), tags);
@@ -504,6 +518,42 @@ public class CacheNarrowedPagesTests
         await db.SaveChangesAsync();
 
         Assert.False(await world.Cached(follower));
+    }
+
+    // ── Пользователи: страница читает строки своих владельца и админов ────────────
+
+    [Fact]
+    public async Task EditOfAUserWhoRunsNoGroup_AndANewUser_KeepEveryPage()
+    {
+        await using var world = await World.OpenAsync();
+        if (world == null || world.Groups.Count == 0) return;
+        await using var db = world.Mirror(seed => seed.AppUsers.Add(
+            new AppUser { Id = NoSuchUser, Email = "nobody@example.test", DisplayName = "Nobody", SecurityStamp = "s" }));
+
+        // Как вход через Google с новым аватаром — и как регистрация нового пользователя.
+        (await db.AppUsers.SingleAsync(u => u.Id == NoSuchUser)).AvatarUrl = "https://example.test/new.png";
+        db.AppUsers.Add(new AppUser { Id = NoSuchUser + 1, Email = "new@example.test", DisplayName = "New", SecurityStamp = "s" });
+        await db.SaveChangesAsync();
+
+        Assert.Empty(world.Dropped());
+    }
+
+    [Fact]
+    public async Task EditOfAGroupOwner_DropsOnlyTheGroupsTheyRun()
+    {
+        await using var world = await World.OpenAsync();
+        if (world == null || world.Groups.Count == 0) return;
+        var owner = world.Groups[0].OwnerUserId;
+        var expected = world.Groups.Where(g => g.RunnerUserIds.Contains(owner)).Select(g => g.Key)
+            .Order(StringComparer.Ordinal).ToArray();
+        await using var db = world.Mirror(seed => seed.AppUsers.Add(
+            new AppUser { Id = owner, Email = "owner@example.test", DisplayName = "Owner", SecurityStamp = "s" }));
+
+        // Админ сайта привязал аккаунт владельца к пловцу — порядок состава его групп меняется.
+        (await db.AppUsers.SingleAsync(u => u.Id == owner)).SwimmerId = NoSuchUser;
+        await db.SaveChangesAsync();
+
+        Assert.Equal(expected, world.Dropped());
     }
 
     [Fact]

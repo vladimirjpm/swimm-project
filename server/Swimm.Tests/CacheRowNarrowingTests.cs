@@ -260,6 +260,16 @@ public class CacheRowNarrowingTests
     }
 
     [Fact]
+    public void CacheRows_ChildOfAnOwnRowOnlyRoot_Throws()
+    {
+        using var db = Model(nameof(CacheRows_ChildOfAnOwnRowOnlyRoot_Throws));
+
+        // FK на пользователя меток не дают — сужать под ним избранное значило бы недосброс.
+        Assert.Throws<InvalidOperationException>(() => db.CacheRows<AppUser>(1, typeof(UserFavorite)));
+        db.CacheRows<AppUser>([1, 2]).Dispose(); // только свои строки — можно
+    }
+
+    [Fact]
     public void CacheRows_Grandchild_Throws()
     {
         using var db = Model(nameof(CacheRows_Grandchild_Throws));

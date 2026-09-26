@@ -437,7 +437,9 @@ public sealed class CacheInvalidationInterceptor(ICacheService cache, ISettingsS
             var parents = new List<(IProperty, string)>();
             foreach (var fk in type.GetForeignKeys())
             {
-                if (!CacheRowRoots.IsRoot(fk.PrincipalEntityType)) continue;
+                // FK на корень «только своей строки» (пользователь) меток не даёт — потомков под
+                // ним никто не сужает (CacheRowRoots.OwnRowOnly).
+                if (!CacheRowRoots.IsParentRoot(fk.PrincipalEntityType)) continue;
                 if (fk.Properties is [var p] && fk.PrincipalKey.IsPrimaryKey() && IsWholeNumber(p)
                     && fk.PrincipalEntityType.GetTableName() is { } root)
                     parents.Add((p, root));

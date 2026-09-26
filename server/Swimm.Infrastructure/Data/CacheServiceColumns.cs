@@ -84,7 +84,7 @@ public static class CacheServiceColumns
 
             if (property.IsKey())
                 throw new InvalidOperationException($"{type.Name}.{name} — ключ: служебным он быть не может, на нём метки строк");
-            if (property.GetContainingForeignKeys().Any(fk => CacheRowRoots.IsRoot(fk.PrincipalEntityType)))
+            if (property.GetContainingForeignKeys().Any(fk => CacheRowRoots.IsParentRoot(fk.PrincipalEntityType)))
                 throw new InvalidOperationException(
                     $"{type.Name}.{name} — FK на корень сужения: служебной быть не может, по нему метки строк (§2.2 п. 2)");
             if (CacheRowRoots.IsRoot(entity) && entity.GetForeignKeys().Any(fk => fk.PrincipalEntityType == entity))
