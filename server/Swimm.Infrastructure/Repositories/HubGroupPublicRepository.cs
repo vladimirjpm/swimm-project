@@ -124,6 +124,20 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 .FirstOrDefaultAsync();
         }
 
+        // Тренер первым, за ним админы группы (HubGroupRosterOrder). Админы — Sys_*, их видит
+        // только контекст записи. Вне блока сужения: таблицы админов и пользователей метятся
+        // целиком, но меняются редко (LastSeenAt пишется ExecuteUpdate и кэш не роняет).
+        var adminUserIds = await _rw.HubGroupAdmins.AsNoTracking()
+            .Where(a => a.HubGroupId == groupId)
+            .Select(a => a.UserId)
+            .ToListAsync();
+        adminUserIds.Add(group.OwnerUserId);
+        var adminSwimmerIds = await _rw.AppUsers.AsNoTracking()
+            .Where(u => adminUserIds.Contains(u.Id) && u.IsActive && u.SwimmerId != null)
+            .Select(u => u.SwimmerId!.Value)
+            .ToListAsync();
+        members = HubGroupRosterOrder.Apply(members, adminSwimmerIds.ToHashSet());
+
         var dto = new HubGroupDetailsDto
         {
             Id = group.Id,
