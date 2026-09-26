@@ -4,7 +4,7 @@ import DeepDigestCard from '../../components/deep/digest-card';
 import SwimRow from '../../components/swim-row/swim-row';
 import { routes } from '../../../utils/routes';
 import HelperResults from '../../../utils/helpers/helper-results';
-import { GROUP_DISCLAIMER, ROLE_LABEL, swimmerDisplayName } from './group-bits';
+import { GROUP_DISCLAIMER, ROLE_LABEL, memberChips, swimmerDisplayName } from './group-bits';
 import type { HubGroupDetails, HubGroupRecentResult, HubGroupStanding } from '../types';
 
 /**
@@ -67,16 +67,21 @@ function GroupMembersCard({ group }: { group: HubGroupDetails }) {
                   {[m.birth_year > 0 ? m.birth_year : null, m.club_name].filter(Boolean).join(' · ')}
                 </div>
               </a>
-              {ROLE_LABEL[m.role] && (
-                <span
-                  className="hp-mono shrink-0 rounded-[7px] border px-2 py-[3px] text-[10.5px] font-extrabold uppercase"
-                  style={{
-                    borderColor: 'var(--deep-accent-border)',
-                    background: 'var(--deep-accent-chip)',
-                    color: 'var(--deep-accent)',
-                  }}
-                >
-                  {ROLE_LABEL[m.role]}
+              {memberChips(m).length > 0 && (
+                <span className="flex shrink-0 gap-1">
+                  {memberChips(m).map((label) => (
+                    <span
+                      key={label}
+                      className="hp-mono rounded-[7px] border px-2 py-[3px] text-[10.5px] font-extrabold uppercase"
+                      style={{
+                        borderColor: 'var(--deep-accent-border)',
+                        background: 'var(--deep-accent-chip)',
+                        color: 'var(--deep-accent)',
+                      }}
+                    >
+                      {label}
+                    </span>
+                  ))}
                 </span>
               )}
             </li>
@@ -388,12 +393,17 @@ function GroupMembersDigest({ group, onMore }: { group: HubGroupDetails; onMore:
             <a href={routes.swimmer(m.swimmer_id)} className="min-w-0 truncate text-[12.5px] font-extrabold no-underline" style={{ color: 'var(--deep-text)' }}>
               {m.name || m.name_en}
             </a>
-            {ROLE_LABEL[m.role] && (
-              <span
-                className="hp-mono shrink-0 rounded-[6px] px-1.5 py-[2px] text-[9.5px] font-extrabold uppercase"
-                style={{ background: 'var(--deep-accent-chip)', color: 'var(--deep-accent)' }}
-              >
-                {ROLE_LABEL[m.role]}
+            {memberChips(m).length > 0 && (
+              <span className="flex shrink-0 gap-1">
+                {memberChips(m).map((label) => (
+                  <span
+                    key={label}
+                    className="hp-mono rounded-[6px] px-1.5 py-[2px] text-[9.5px] font-extrabold uppercase"
+                    style={{ background: 'var(--deep-accent-chip)', color: 'var(--deep-accent)' }}
+                  >
+                    {label}
+                  </span>
+                ))}
               </span>
             )}
           </li>

@@ -27,6 +27,8 @@ export interface HubGroupMember {
   birth_year: number;
   club_name?: string | null;
   role: 'member' | 'captain' | 'coach';
+  /** Админ группы, чей аккаунт привязан к этому пловцу (сервер: HubGroupRosterOrder) — чип «admin». */
+  is_admin?: boolean;
 }
 
 export interface HubGroupBest {

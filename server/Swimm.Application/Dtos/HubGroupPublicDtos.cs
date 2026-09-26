@@ -77,6 +77,13 @@ public sealed class HubGroupPublicMemberDto
     /// <summary>member | captain | coach</summary>
     [JsonPropertyName("role")]
     public string Role { get; set; } = "member";
+
+    /// <summary>
+    /// Админ группы (владелец или HubGroupAdmin, чей аккаунт привязан к этому пловцу через
+    /// AppUser.SwimmerId) — чип «admin» и место сразу за тренером (HubGroupRosterOrder).
+    /// </summary>
+    [JsonPropertyName("is_admin")]
+    public bool IsAdmin { get; set; }
 }
 
 /// <summary>«Рекорд группы» — лучшее время участников по оси стиль+дистанция+бассейн.</summary>
