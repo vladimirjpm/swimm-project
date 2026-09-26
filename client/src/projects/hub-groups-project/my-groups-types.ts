@@ -184,6 +184,10 @@ export interface HubGroupDeleteImpact {
   media: number;
   /** Публикации личных медиа участников — сами медиа остаются у авторов. */
   mediaPublications: number;
+  /** Пловцы с уровнем (оценка тренера). */
+  leveledSwimmers: number;
+  /** Планы дорожек со всей расстановкой. */
+  lanePlans: number;
   hasPendingClubRequest: boolean;
   /** Есть что терять — тогда подтверждение просит ввести имя группы. */
   hasContent: boolean;

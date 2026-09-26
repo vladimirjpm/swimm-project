@@ -67,6 +67,12 @@ public sealed class HubGroupDeleteImpactDto
     /// <summary>Публикации личных медиа участников в группу. Сами медиа остаются у авторов.</summary>
     public int MediaPublications { get; set; }
 
+    /// <summary>Пловцы с уровнем (Sys_HubGroupSwimmerLevels) — оценка тренера уйдёт с группой.</summary>
+    public int LeveledSwimmers { get; set; }
+
+    /// <summary>Планы дорожек (Sys_LanePlans) со всеми дорожками и расстановкой.</summary>
+    public int LanePlans { get; set; }
+
     public bool HasPendingClubRequest { get; set; }
 
     /// <summary>
@@ -74,7 +80,8 @@ public sealed class HubGroupDeleteImpactDto
     /// остальных подтверждение просит ввести имя группы.
     /// </summary>
     public bool HasContent =>
-        Swimmers + AccountMembers + Admins + TrainingSessions + Media + MediaPublications > 0
+        Swimmers + AccountMembers + Admins + TrainingSessions + Media + MediaPublications
+            + LeveledSwimmers + LanePlans > 0
         || IsOfficial || HasPendingClubRequest;
 }
 

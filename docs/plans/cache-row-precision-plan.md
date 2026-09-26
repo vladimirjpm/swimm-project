@@ -83,9 +83,10 @@ PR #32; К4б.5 (клуб: официальная группа в обзоре, 
 задевает ни то, ни другое.
 
 **Корни сужения** — короткий реестр в одном месте (рядом с `CacheTags`): `HubGroups`, `Clubs`,
-`Swimmers`, `Sys_UserMedia`, `Relays`. Метки строк рождаются только для корней: остальные (свой id
-у `Results` никто не сужает) лишь раздували бы каждое сохранение. Сужение по корню вне реестра —
-исключение, а не метка, которую никто никогда не сбросит.
+`Swimmers`, `Sys_UserMedia`, `Relays`, с 26.09.2026 — `Sys_AppUsers` (см. «Корень только своей
+строки» в §10). Метки строк рождаются только для корней: остальные (свой id у `Results` никто не
+сужает) лишь раздували бы каждое сохранение. Сужение по корню вне реестра — исключение, а не
+метка, которую никто никогда не сбросит.
 
 ### 2.2 Запись: перехватчик сохранения (`CacheInvalidationInterceptor`)
 
@@ -658,6 +659,32 @@ using (_read.CacheRows<HubGroup>(groupId, typeof(HubGroupMember), typeof(HubGrou
 - Тесты — `CacheServiceColumnsTests`; в `CacheNarrowedPagesTests` у `World` — `seasonBest: true`
   (season-best страны), `columnPrecision`, `PageKeys`, `PagesWith(метка)`, `Dropped()` (что упало
   — одним списком по снимку кэша).
+
+### Корень только своей строки — пользователи (26.09.2026)
+
+PR #97 (порядок состава: тренер, админы, остальные — `HubGroupRosterOrder`) стал читать в сборке
+страницы группы `Sys_AppUsers` (к какому пловцу привязан аккаунт владельца и админов) — таблицей.
+К4б.0 откатился: страницы всех групп падали бы на каждую регистрацию и правку любого пользователя;
+поймали оба стража (`GroupPage_DoesNotDependOnAppUsers_ModerationInboxDoes`,
+`RealPage_DependsOnItsRows_NotOnTheGroupAndMediaTables`). Решение Влада — сузить.
+
+- `AppUser` — корень (`CacheRowRoots.Types`) и **корень только своей строки**
+  (`CacheRowRoots.OwnRowOnly`): метку `row:Sys_AppUsers:id` сбрасывает лишь запись самой строки,
+  FK на пользователя меток не дают (`IsParentRoot` — в перехватчике записи и в проверке служебных
+  колонок). Иначе правка группы (FK `OwnerUserId`), сердечко, медиа роняли бы страницы групп, где
+  этот человек управляет, хотя потомков пользователя ни одна страница не читает. `CacheRows<AppUser>`
+  с таблицами-потомками — исключение (`CacheRowsExtensions.Check`).
+- `HubGroupPublicRepository.GetPageAsync` читает владельца и админов в блоке
+  `_rw.CacheRows<AppUser>(adminUserIds)`: страница носит `row:Sys_AppUsers:{владелец, админы}` +
+  `anyrow:Sys_AppUsers`, таблицы нет. Вход админа с тем же именем (служебный `UpdatedAt`) роняет
+  его группы — метка своей строки корня, так по §2.6; отметка «был онлайн» (`LastSeenAt`,
+  `ExecuteUpdate`) кэш не трогает вовсе.
+- Тесты: `CacheRowTagsTests` (реестр — шесть корней, пять «родительских»; правка пользователя —
+  его строка и пловец по FK; избранное — без метки пользователя), `CacheRowNarrowingTests`
+  (потомок под пользователем — исключение), сценарии `CacheNarrowedPagesTests`
+  (`EditOfAUserWhoRunsNoGroup_AndANewUser_KeepEveryPage`, `EditOfAGroupOwner_DropsOnlyTheGroupsTheyRun`,
+  у настоящих страниц — метки строк владельца и админов; зеркало сеет настоящих владельцев групп),
+  PG-страж К4б.0 — с включённым сужением. Мутация «убрать блок» роняет все четыре.
 
 ### Грабли этой сессии
 

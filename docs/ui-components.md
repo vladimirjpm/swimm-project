@@ -123,6 +123,7 @@
 | Чип `PB` и бейдж видимости строки (`private / members of …`) в **My media** | `my-media-project/components/swim-list.tsx` | Готового чипа достижения в `mix/` нет: `SB` рисует общий `UI_SeasonBestBadge`, рекорды — `UI_RecordBadge`, а `PB` в продукте живёт только внутри `SwimRow` (`swim-row__chip`, своя CSS-мода). Здесь он повторён в той же геометрии — вытаскивать чип из `SwimRow` в `mix/` стоит, когда он понадобится третьему экрану. Бейдж видимости («кто это видит») — вообще свойство медиа, а не заплыва, аналога в реестре нет |
 
 ---
+| Доска и редактор дорожек группы, точка/чип уровня (`GroupLaneBoard`, `GroupLaneEditor`, `LevelChip`, `levelColor`) | `hub-groups-project/components/group-lane-*.tsx`, `level-color.ts` | Своё: сетки «карточка на дорожку» с цветной полосой уровня нигде больше нет. Цвет уровня — ТОЛЬКО `levelColor()` (карточка Levels, доска и редактор красят одним правилом). Имя пловца — `<bdi>` с фоллбеком на EN, как в карточках группы (`UI_SwimmerName` тянет попап и избранное, доске это не нужно). Docs: docs/plans/lane-plans-plan.md |
 
 ## Как этим пользоваться
 

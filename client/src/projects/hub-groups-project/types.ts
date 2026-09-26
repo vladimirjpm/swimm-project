@@ -268,3 +268,99 @@ export interface HubGroupDetails {
   /** Ближайшее занятие по расписанию (считает сервер). */
   next_training?: NextTraining | null;
 }
+
+// ── Уровни пловцов группы (docs/plans/lane-plans-plan.md, L1) ─────────────────
+// GET/PUT /api/me/hub-groups/{id}/levels — только управляющим; camelCase, как весь /api/me.
+
+export interface HubGroupLevel {
+  id: number;
+  /** 1 — сильнейший; сервер нумерует по порядку списка. */
+  rank: number;
+  name: string;
+  description?: string | null;
+  /** «#rrggbb»; null — цвет по рангу (`levelColor`). */
+  color?: string | null;
+  /** Пловцов состава на этом уровне. */
+  swimmerCount: number;
+}
+
+export interface HubGroupLevelSwimmer {
+  swimmerId: number;
+  /** Иврит по умолчанию, EN — фоллбек. */
+  name: string;
+  nameEn: string;
+  birthYear: number;
+  gender?: string | null;
+  clubName?: string | null;
+  levelId: number | null;
+}
+
+export interface HubGroupLevels {
+  levels: HubGroupLevel[];
+  swimmers: HubGroupLevelSwimmer[];
+}
+
+// ── План дорожек (docs/plans/lane-plans-plan.md, L2–L3) ──────────────────────
+// /api/hub-groups/{id}/lane-plans — snake_case (его читают и участники).
+
+export type LanePlanStatus = 'draft' | 'published';
+
+export interface LanePlanSummary {
+  /** yyyy-MM-dd */
+  date: string;
+  status: LanePlanStatus;
+  lane_count: number;
+}
+
+export interface LanePlanLevel {
+  id: number;
+  rank: number;
+  name: string;
+  color?: string | null;
+}
+
+export interface LanePlanSwimmer {
+  swimmer_id: number;
+  /** Иврит по умолчанию, EN — фоллбек. */
+  name: string;
+  name_en: string;
+  birth_year: number;
+  /** ТЕКУЩИЙ уровень пловца в группе (не снимок). */
+  level_id?: number | null;
+  /** Ушёл из состава — в плане остался (план — снимок). */
+  left_group?: boolean;
+}
+
+export interface LanePlanLane {
+  lane_no: number;
+  level?: LanePlanLevel | null;
+  workout?: string | null;
+  /** В порядке дорожки: первый ведёт. */
+  swimmers: LanePlanSwimmer[];
+}
+
+export interface LanePlan {
+  date: string;
+  status: LanePlanStatus;
+  lane_count: number;
+  note?: string | null;
+  updated_at: string;
+  lanes: LanePlanLane[];
+  unassigned: LanePlanSwimmer[];
+  /** Только управляющему; участнику — пустой. */
+  not_today: LanePlanSwimmer[];
+  can_edit: boolean;
+  /**
+   * «Мои» пловцы этого плана — карточка «Your lane». Только подсветка, прав не даёт:
+   * `me` — сам зритель, `family` — за кого он смотрит. Сперва `me`.
+   */
+  my_swimmers: { swimmer_id: number; kind: 'me' | 'family' }[];
+}
+
+export interface LanePlanInput {
+  lane_count: number;
+  note: string | null;
+  lanes: { lane_no: number; level_id: number | null; workout: string | null }[];
+  /** Порядок в массиве = порядок внутри дорожки; кого нет — «Not today». */
+  swimmers: { swimmer_id: number; lane_no: number | null }[];
+}

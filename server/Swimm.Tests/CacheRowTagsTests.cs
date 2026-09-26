@@ -210,14 +210,54 @@ public class CacheRowTagsTests
     }
 
     [Fact]
-    public void RootRegistry_IsExactlyThePlannedFive()
+    public void RootRegistry_IsExactlyThePlannedSix_OneOfThemOwnRowOnly()
     {
-        using var db = new SwimmDbContext(Options(nameof(RootRegistry_IsExactlyThePlannedFive)));
+        using var db = new SwimmDbContext(Options(nameof(RootRegistry_IsExactlyThePlannedSix_OneOfThemOwnRowOnly)));
         var roots = db.Model.GetEntityTypes().Where(CacheRowRoots.IsRoot).Select(t => t.GetTableName()).Order();
+        var parents = db.Model.GetEntityTypes().Where(CacheRowRoots.IsParentRoot).Select(t => t.GetTableName()).Order();
 
         // Новый корень — решение плана (§2.1), а не строчка по месту: вместе с ним приходят
-        // сужение (К4б.3) и сценарные тесты.
-        Assert.Equal(["Clubs", "HubGroups", "Relays", "Swimmers", "Sys_UserMedia"], roots);
+        // сужение (К4б.3) и сценарные тесты. Пользователь (26.09.2026) — корень только своей
+        // строки: страница группы читает строки владельца и админов, потомков под ним не сужают.
+        Assert.Equal(["Clubs", "HubGroups", "Relays", "Swimmers", "Sys_AppUsers", "Sys_UserMedia"], roots);
+        Assert.Equal(["Clubs", "HubGroups", "Relays", "Swimmers", "Sys_UserMedia"], parents);
+    }
+
+    [Fact]
+    public async Task OwnRowOnlyRoot_UserEdit_DropsItsRow_AndItsSwimmer()
+    {
+        var cache = new RecordingCache();
+        const string name = nameof(OwnRowOnlyRoot_UserEdit_DropsItsRow_AndItsSwimmer);
+        Seed(name);
+        using (var seed = new SwimmDbContext(Options(name)))
+        {
+            seed.AppUsers.Add(new AppUser { Id = 7, Email = "u7@example.test", DisplayName = "U", SecurityStamp = "s" });
+            seed.SaveChanges();
+        }
+        await using var db = new SwimmDbContext(Options(name, new CacheInvalidationInterceptor(cache)));
+
+        // Админ сайта привязывает аккаунт к пловцу: своя строка пользователя и новый пловец по FK
+        // (пользователь — потомок корня «пловец», а сам корень только своей строки).
+        (await db.AppUsers.SingleAsync(u => u.Id == 7)).SwimmerId = Swimmer5;
+        await db.SaveChangesAsync();
+
+        AssertTags(
+            [CacheTags.Table("Sys_AppUsers"), CacheTags.Row("Sys_AppUsers", 7), CacheTags.Row("Swimmers", Swimmer5)],
+            cache.Single);
+    }
+
+    [Fact]
+    public async Task ForeignKeyToOwnRowOnlyRoot_GivesNoUserRow()
+    {
+        var cache = new RecordingCache();
+        await using var db = Db(nameof(ForeignKeyToOwnRowOnlyRoot_GivesNoUserRow), cache);
+
+        // Избранное ссылается на пользователя и на пловца: метка — только пловца. Иначе каждое
+        // сердечко роняло бы страницы групп, которыми этот пользователь управляет.
+        db.UserFavorites.Add(new UserFavorite { UserId = 1, TargetType = "swimmer", SwimmerId = Swimmer5 });
+        await db.SaveChangesAsync();
+
+        AssertTags([CacheTags.Table("Sys_UserFavorites"), CacheTags.Row("Swimmers", Swimmer5)], cache.Single);
     }
 
     // ── Каскад и сжатие ───────────────────────────────────────────────────────────

@@ -27,6 +27,8 @@
             if (impact.trainingSessions) lines.push(`• тренировок: ${impact.trainingSessions}, результатов в них: ${impact.trainingResults}`);
             if (impact.media) lines.push(`• медиа группы: ${impact.media}`);
             if (impact.mediaPublications) lines.push(`• публикаций медиа участников: ${impact.mediaPublications} (сами медиа останутся у авторов)`);
+            if (impact.leveledSwimmers) lines.push(`• уровней пловцов: ${impact.leveledSwimmers}`);
+            if (impact.lanePlans) lines.push(`• планов дорожек: ${impact.lanePlans}`);
             if (impact.isOfficial) lines.push(`• официальный статус группы клуба «${iso(impact.clubName)}»`);
             if (impact.hasPendingClubRequest) lines.push('• заявка на официальный статус');
         }

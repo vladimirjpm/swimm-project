@@ -10,7 +10,8 @@ namespace Swimm.Infrastructure.Services;
 /// <summary>
 /// Склейка пловцов-дублей. Перевешивает на канонического: Results, Sys_UserFavorites,
 /// HubGroupMembers, Sys_HubGroupUserMembers, Sys_UserMedia, Sys_HubGroupMedia,
-/// Sys_TrainingResults, Sys_AppUsers.SwimmerId; пустые поля канонического дозаполняет
+/// Sys_TrainingResults, Sys_HubGroupSwimmerLevels, Sys_LanePlanSwimmers, Sys_AppUsers.SwimmerId;
+/// пустые поля канонического дозаполняет
 /// из дубля; дубль удаляет. Конфликты (общий заплыв, membership/favorite уже есть у
 /// канонического — последние решаются удалением строки дубля) — см. по месту.
 /// Все изменения — одним SaveChanges (одна транзакция); dry-run не пишет ничего.
@@ -163,6 +164,46 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
             var trainings = await db.TrainingResults.Where(t => t.SwimmerId == duplicate.Id).ToListAsync(ct);
             foreach (var t in trainings) t.SwimmerId = canonical.Id;
             Note(res, "Sys_TrainingResults", trainings.Count);
+
+            // Уровни и планы дорожек (docs/plans/lane-plans-plan.md): SwimmerId — часть первичного
+            // ключа, править его на месте EF не даёт, поэтому строка дубля пересоздаётся на
+            // канонического. У их FK каскад: без переноса удаление дубля молча унесло бы уровень
+            // и места в планах. Канонический уже есть в той же группе/плане — его строка главнее.
+            var dupLevels = await db.HubGroupSwimmerLevels.Where(l => l.SwimmerId == duplicate.Id).ToListAsync(ct);
+            var canonLevelGroups = await db.HubGroupSwimmerLevels
+                .Where(l => l.SwimmerId == canonical.Id).Select(l => l.HubGroupId).ToListAsync(ct);
+            foreach (var l in dupLevels)
+            {
+                db.HubGroupSwimmerLevels.Remove(l);
+                if (canonLevelGroups.Contains(l.HubGroupId))
+                {
+                    res.Actions.Add($"Sys_HubGroupSwimmerLevels: уровень в группе {l.HubGroupId} — остался канонического");
+                    continue;
+                }
+                db.HubGroupSwimmerLevels.Add(new HubGroupSwimmerLevel
+                {
+                    HubGroupId = l.HubGroupId, SwimmerId = canonical.Id, LevelId = l.LevelId,
+                });
+            }
+            Note(res, "Sys_HubGroupSwimmerLevels", dupLevels.Count);
+
+            var dupPlaces = await db.LanePlanSwimmers.Where(p => p.SwimmerId == duplicate.Id).ToListAsync(ct);
+            var canonPlans = await db.LanePlanSwimmers
+                .Where(p => p.SwimmerId == canonical.Id).Select(p => p.PlanId).ToListAsync(ct);
+            foreach (var p in dupPlaces)
+            {
+                db.LanePlanSwimmers.Remove(p);
+                if (canonPlans.Contains(p.PlanId))
+                {
+                    res.Actions.Add($"Sys_LanePlanSwimmers: место в плане {p.PlanId} — осталось канонического");
+                    continue;
+                }
+                db.LanePlanSwimmers.Add(new LanePlanSwimmer
+                {
+                    PlanId = p.PlanId, SwimmerId = canonical.Id, LaneNo = p.LaneNo, OrderNo = p.OrderNo,
+                });
+            }
+            Note(res, "Sys_LanePlanSwimmers", dupPlaces.Count);
 
             var appUsers = await db.AppUsers.Where(u => u.SwimmerId == duplicate.Id).ToListAsync(ct);
             foreach (var u in appUsers) u.SwimmerId = canonical.Id;

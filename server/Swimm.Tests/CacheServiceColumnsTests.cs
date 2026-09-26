@@ -162,10 +162,10 @@ public class CacheServiceColumnsTests
     }
 
     [Fact]
-    public async Task LoginWithTheSameNameAndAvatar_DropsOnlyTheColumn()
+    public async Task LoginWithTheSameNameAndAvatar_DropsOnlyTheColumnAndTheUsersRow()
     {
         var cache = new RecordingCache();
-        await using var db = Db(nameof(LoginWithTheSameNameAndAvatar_DropsOnlyTheColumn), cache);
+        await using var db = Db(nameof(LoginWithTheSameNameAndAvatar_DropsOnlyTheColumnAndTheUsersRow), cache);
 
         // Как AuthController: имя и аватар присваиваются теми же значениями — трекер их не отметит.
         var user = await db.AppUsers.SingleAsync(u => u.Id == User1);
@@ -173,7 +173,9 @@ public class CacheServiceColumnsTests
         user.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
 
-        AssertTags([CacheTags.Column("Sys_AppUsers", "UpdatedAt")], cache.Single);
+        // Пользователь — корень только своей строки (26.09.2026): служебная правка корня даёт и
+        // метку его строки. Падают лишь страницы групп, где он владелец или админ, — таблицы нет.
+        AssertTags([CacheTags.Column("Sys_AppUsers", "UpdatedAt"), CacheTags.Row("Sys_AppUsers", User1)], cache.Single);
     }
 
     // ── Запись: всё прочее — как обычно ──────────────────────────────────────────────────

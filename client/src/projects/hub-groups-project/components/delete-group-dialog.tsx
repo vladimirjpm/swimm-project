@@ -98,6 +98,8 @@ function ImpactList({ impact: i }: { impact: HubGroupDeleteImpact }) {
   if (i.mediaPublications) {
     lines.push(`${count(i.mediaPublications, 'media post')} shared to the group — the originals stay in their authors’ My media`);
   }
+  if (i.leveledSwimmers) lines.push(`Levels of ${count(i.leveledSwimmers, 'swimmer')}`);
+  if (i.lanePlans) lines.push(`${count(i.lanePlans, 'lane plan')} with workouts and who swims where`);
   if (i.isOfficial) lines.push(`Official group status of ${i.clubName ?? 'the club'}`);
   if (i.hasPendingClubRequest) lines.push('A pending request for official status');
 

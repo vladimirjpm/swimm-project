@@ -65,6 +65,8 @@ Sys_StartListPulls           # журнал заборов стартового 
 #
 # Приватные тренировки групп (привязаны к HubGroups и к пользователям):
 #   Sys_TrainingSessions, Sys_TrainingResults
+#   И уровни пловцов групп и планы дорожек (висят на HubGroups, docs/plans/lane-plans-plan.md):
+#   Sys_HubGroupLevels, Sys_HubGroupSwimmerLevels, Sys_LanePlans, Sys_LanePlanLanes, Sys_LanePlanSwimmers
 #
 # Заполняются кодом при старте — перенос дал бы конфликт первичных ключей:
 #   Sys_AppRoles, Sys_DebugOptions

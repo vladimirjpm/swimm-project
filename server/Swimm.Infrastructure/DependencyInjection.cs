@@ -145,6 +145,9 @@ public static class DependencyInjection
         // Подписка группы на клуб: зовут контроллер «My groups», импорт (после коммита) и
         // склейка клубов — оба последних через необязательный параметр конструктора.
         services.AddScoped<IHubGroupClubSubscriptionService, HubGroupClubSubscriptionService>();
+        // Уровни пловцов группы (docs/plans/lane-plans-plan.md) — приватные, без кэша.
+        services.AddScoped<IHubGroupLevelService, HubGroupLevelService>();
+        services.AddScoped<ILanePlanService, LanePlanService>();
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
         services.AddScoped<IClubStandingService, ClubStandingService>();
         services.AddScoped<ICompetitionRecalculationService, CompetitionRecalculationService>();

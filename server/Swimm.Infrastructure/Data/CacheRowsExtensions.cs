@@ -65,6 +65,10 @@ public static class CacheRowsExtensions
             throw new InvalidOperationException(
                 $"{root.Name} не корень сужения кэша (CacheRowRoots): метку его строки запись в базу не сбрасывает");
         var rootTable = TableOf(model, root);
+        if (CacheRowRoots.OwnRowOnly.Contains(root) && tables.Any(t => t != root))
+            throw new InvalidOperationException(
+                $"{root.Name} — корень только своей строки (CacheRowRoots.OwnRowOnly): FK на него меток не " +
+                "дают, сузить под ним потомков нельзя — их правка прошла бы мимо записи");
 
         var names = new HashSet<string>(StringComparer.Ordinal) { rootTable };
         foreach (var type in tables)

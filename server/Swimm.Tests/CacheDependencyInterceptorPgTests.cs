@@ -130,7 +130,9 @@ public class CacheDependencyInterceptorPgTests
         var group = await read.HubGroups.OrderBy(g => g.Id).Select(g => new { g.Id, g.Slug }).FirstOrDefaultAsync();
         if (group == null) return; // групп нет — нечего проверять
         await using var rw = Rw();
-        var cache = NewCache();
+        // Сужение включено (как по умолчанию на сайте): владельца и админов страница читает строками
+        // (корень AppUser), а не таблицей. С выключателем «грубо» таблица законна — там всё таблицей.
+        var cache = new MemoryCacheService(new MemoryCache(new MemoryCacheOptions()), new CacheSettingsStub(rowPrecision: true));
 
         var groups = new HubGroupPublicRepository(read, rw, new SettingsStub());
         var media = new HubGroupMediaService(rw);
@@ -148,6 +150,7 @@ public class CacheDependencyInterceptorPgTests
             () => publications.GetForGroupAsync(group.Id), TimeSpan.FromMinutes(5));
 
         Assert.DoesNotContain(CacheTags.Table("Sys_AppUsers"), TagsOf(cache, "group-page"));
+        Assert.Contains(CacheTags.AnyRow("Sys_AppUsers"), TagsOf(cache, "group-page"));
         Assert.Contains(CacheTags.Table("Sys_AppUsers"), TagsOf(cache, "moderation-inbox"));
     }
 }
