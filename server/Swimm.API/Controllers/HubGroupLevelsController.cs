@@ -72,4 +72,17 @@ public class HubGroupLevelsController : ControllerBase
         var result = await _levels.SetSwimmerLevelAsync(id, swimmerId, input.LevelId);
         return result.Success ? NoContent() : BadRequest(new { error = result.Error });
     }
+
+    /// <summary>
+    /// Поставить/снять уровень аккаунту-участнику (Ш3.1) — тому, кто стоит на дорожке без пловца
+    /// (<c>levelId: null</c> — снять).
+    /// </summary>
+    [HttpPut("account-levels/{userId:int}")]
+    public async Task<IActionResult> SetAccountLevel(int id, int userId, [FromBody] HubGroupSwimmerLevelInputDto input)
+    {
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var result = await _levels.SetAccountLevelAsync(id, userId, input.LevelId);
+        return result.Success ? NoContent() : BadRequest(new { error = result.Error });
+    }
 }

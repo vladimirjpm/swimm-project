@@ -101,22 +101,50 @@ public class TrainingRsvpService : ITrainingRsvpService
             row.SetByUserId = forOther ? actorUserId : null;
             row.UpdatedAt = DateTime.UtcNow;
         }
+
+        // «Going» на занятие внутри перерыва — человек вернулся (Ш3.1): перерыв закрывается,
+        // тренеру — пометка «back after …». Перерыв, который к этой дате и так кончится, не трогаем.
+        if (answer == TrainingRsvpAnswer.Yes) await EndBreaksByRsvpAsync(hubGroupId, targetUserId, date);
+
         await _db.SaveChangesAsync();
 
         return TrainingRsvpSaveResult.Ok(await BuildAsync(hubGroupId, schedule, date, start, actorUserId, isManager, now));
+    }
+
+    /// <summary>
+    /// Закрыть открытые перерывы человека на дату занятия: его аккаунта и пловца по метке тренера
+    /// (флаг один на человека — <see cref="HubGroupBreakQuery"/>).
+    /// </summary>
+    private async Task EndBreaksByRsvpAsync(int hubGroupId, int userId, DateOnly sessionDate)
+    {
+        var labelSwimmer = await _db.HubGroupUserMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId && m.UserId == userId)
+            .Select(m => m.SwimmerId)
+            .FirstOrDefaultAsync();
+
+        var open = await _db.HubGroupBreaks
+            .Where(b => b.HubGroupId == hubGroupId && b.EndedAt == null
+                        && (b.Until == null || b.Until >= sessionDate)
+                        && (b.UserId == userId || (labelSwimmer != null && b.SwimmerId == labelSwimmer)))
+            .ToListAsync();
+        foreach (var b in open)
+        {
+            b.EndedAt = DateTime.UtcNow;
+            b.EndedByRsvp = true;
+        }
     }
 
     private Task<bool> IsActiveMemberAsync(int hubGroupId, int userId) =>
         _db.HubGroupUserMembers.AnyAsync(m =>
             m.HubGroupId == hubGroupId && m.UserId == userId && m.Status == HubGroupUserMemberStatus.Active);
 
-    /// <summary>Порядок групп списка у управляющего: иду → не уверен → не приду → без ответа.</summary>
-    private static int AnswerOrder(string? answer) => answer switch
+    /// <summary>Порядок групп списка у управляющего: иду → не уверен → не приду → без ответа → на перерыве.</summary>
+    private static int AnswerOrder(string? answer, bool onBreak) => answer switch
     {
         TrainingRsvpAnswer.Yes => 0,
         TrainingRsvpAnswer.Maybe => 1,
         TrainingRsvpAnswer.No => 2,
-        _ => 3,
+        _ => onBreak ? 4 : 3,
     };
 
     private async Task<TrainingRsvpDto> BuildAsync(int hubGroupId, GroupTrainingSchedule schedule,
@@ -142,6 +170,29 @@ public class TrainingRsvpService : ITrainingRsvpService
             .Where(r => memberIds.Contains(r.UserId))
             .ToDictionary(r => r.UserId);
 
+        // На перерыве в день занятия (Ш3.1): не ответил — не в знаменателе и не в «нет ответа»;
+        // ответил — считается как все (сумма иду + не уверен + не приду + нет ответа = total).
+        var onBreak = await HubGroupBreakQuery.LoadAsync(_db, hubGroupId, date);
+        var counted = memberIds.Count(id => !onBreak.UserIds.Contains(id) || answers.ContainsKey(id));
+        var viewerBreakUntil = !onBreak.UserIds.Contains(viewerUserId) ? null : await _db.HubGroupBreaks.AsNoTracking()
+            .Where(b => b.HubGroupId == hubGroupId && b.UserId == viewerUserId && b.EndedAt == null)
+            .Select(b => b.Until)
+            .FirstOrDefaultAsync();
+
+        var backAfter = new Dictionary<int, int>();
+        if (isManager)
+        {
+            var nowUtc = DateTime.UtcNow;
+            var markerFrom = nowUtc.AddDays(-HubGroupBreakRules.BackMarkerDays);
+            var returns = await _db.HubGroupBreaks.AsNoTracking()
+                .Where(b => b.HubGroupId == hubGroupId && b.UserId != null && b.EndedByRsvp && b.EndedAt >= markerFrom)
+                .Select(b => new { UserId = b.UserId!.Value, b.Since, b.EndedAt, b.EndedByRsvp })
+                .ToListAsync();
+            foreach (var r in returns)
+                if (HubGroupBreakRules.BackAfterDays(r.Since, r.EndedAt, r.EndedByRsvp, nowUtc) is int days)
+                    backAfter[r.UserId] = Math.Max(backAfter.GetValueOrDefault(r.UserId), days);
+        }
+
         var slot = TrainingRsvpRules.FindSlot(schedule, date, start)!;
         var isMember = memberIds.Contains(viewerUserId);
         answers.TryGetValue(viewerUserId, out var mine);
@@ -155,7 +206,7 @@ public class TrainingRsvpService : ITrainingRsvpService
             Yes = answers.Values.Count(r => r.Answer == TrainingRsvpAnswer.Yes),
             Maybe = answers.Values.Count(r => r.Answer == TrainingRsvpAnswer.Maybe),
             No = answers.Values.Count(r => r.Answer == TrainingRsvpAnswer.No),
-            Total = memberIds.Count,
+            Total = counted,
             Mine = mine == null ? null : new TrainingRsvpMineDto
             {
                 Answer = mine.Answer, Note = mine.Note, SetByCoach = mine.SetByUserId != null,
@@ -164,6 +215,8 @@ public class TrainingRsvpService : ITrainingRsvpService
             CanManage = isManager,
             CanAnswer = (isMember || isManager)
                         && TrainingRsvpRules.EditBlockReason(schedule, date, start, now, isManager) == null,
+            OnBreak = onBreak.UserIds.Contains(viewerUserId),
+            BreakUntil = viewerBreakUntil?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             People = !isManager ? null : members
                 .Select(m =>
                 {
@@ -176,9 +229,11 @@ public class TrainingRsvpService : ITrainingRsvpService
                         Answer = a?.Answer,
                         Note = a?.Note,
                         SetByCoach = a?.SetByUserId != null,
+                        OnBreak = onBreak.UserIds.Contains(m.UserId),
+                        BackAfterDays = backAfter.TryGetValue(m.UserId, out var days) ? days : null,
                     };
                 })
-                .OrderBy(p => AnswerOrder(p.Answer))
+                .OrderBy(p => AnswerOrder(p.Answer, p.OnBreak))
                 .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToList(),
         };

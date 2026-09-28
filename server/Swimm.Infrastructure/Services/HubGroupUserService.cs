@@ -373,7 +373,15 @@ public class HubGroupUserService : IHubGroupUserService
             Place = Clean(schedule?.Place),
             PoolType = Clean(schedule?.PoolType),
             Note = Clean(schedule?.Note),
+            UsualLanes = schedule?.UsualLanes,
+            // auto — значение по умолчанию: храним только отличие от него.
+            LaneView = Clean(schedule?.LaneView)?.ToLowerInvariant() is { } view && view != GroupLaneView.Auto ? view : null,
         };
+
+        if (model.UsualLanes is int lanes && lanes is < LanePlanRules.MinLanes or > LanePlanRules.MaxLanes)
+            return HubGroupMemberSaveResult.Fail($"Usual lanes: from {LanePlanRules.MinLanes} to {LanePlanRules.MaxLanes}.");
+        if (model.LaneView != null && !GroupLaneView.All.Contains(model.LaneView))
+            return HubGroupMemberSaveResult.Fail("Lane view must be auto, plan or off.");
 
         // Битые слоты не сохраняем: расписание — витрина, и «Ср :» в шапке хуже пустоты.
         // Валидность считает сам домен (день 1..7 + разбор HH:mm), второго мнения тут нет.

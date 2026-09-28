@@ -38,6 +38,26 @@ public sealed class GroupTrainingSchedule
     [JsonPropertyName("note")]
     public string? Note { get; set; }
 
+    /// <summary>
+    /// Сколько дорожек обычно у группы — вид по дорожкам без плана на дату раскладывает людей
+    /// на столько (Ш3, решение Влада 28.09.2026). null — не задано: берём число из последнего
+    /// плана, иначе одна общая «вода».
+    /// </summary>
+    [JsonPropertyName("usual_lanes")]
+    public int? UsualLanes { get; set; }
+
+    /// <summary>
+    /// Вид по дорожкам: <see cref="GroupLaneView"/> (auto — план, иначе авто-раскладка; plan —
+    /// только опубликованный план; off — вида нет, только список «кто идёт»). null — auto.
+    /// </summary>
+    [JsonPropertyName("lane_view")]
+    public string? LaneView { get; set; }
+
+    /// <summary>Действующий режим вида по дорожкам: пусто или неизвестное — auto.</summary>
+    [JsonIgnore]
+    public string EffectiveLaneView =>
+        LaneView is GroupLaneView.Plan or GroupLaneView.Off ? LaneView! : GroupLaneView.Auto;
+
     private static readonly JsonSerializerOptions Options = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -104,6 +124,24 @@ public sealed class GroupTrainingSchedule
         (DayOfWeekIso)(date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek);
 
     private enum DayOfWeekIso { Monday = 1, Sunday = 7 }
+}
+
+/// <summary>
+/// Режим вида по дорожкам у группы (<see cref="GroupTrainingSchedule.LaneView"/>). Тренер может
+/// выключить вид, «чтобы никого не путать» (решение Влада 28.09.2026).
+/// </summary>
+public static class GroupLaneView
+{
+    /// <summary>Опубликованный план на дату, а без него — раскладка на лету по ответам.</summary>
+    public const string Auto = "auto";
+
+    /// <summary>Только опубликованный план; нет плана — вида нет.</summary>
+    public const string Plan = "plan";
+
+    /// <summary>Вида по дорожкам нет — только список «кто идёт».</summary>
+    public const string Off = "off";
+
+    public static readonly string[] All = [Auto, Plan, Off];
 }
 
 /// <summary>Одно регулярное занятие недели.</summary>

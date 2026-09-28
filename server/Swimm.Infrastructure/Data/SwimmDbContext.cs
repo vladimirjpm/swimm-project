@@ -120,6 +120,8 @@ public class SwimmDbContext : DbContext
     public DbSet<LanePlanLane> LanePlanLanes => Set<LanePlanLane>();
     public DbSet<LanePlanSwimmer> LanePlanSwimmers => Set<LanePlanSwimmer>();
     public DbSet<HubGroupTrainingRsvp> HubGroupTrainingRsvps => Set<HubGroupTrainingRsvp>();
+    public DbSet<HubGroupBreak> HubGroupBreaks => Set<HubGroupBreak>();
+    public DbSet<HubGroupAccountLevel> HubGroupAccountLevels => Set<HubGroupAccountLevel>();
 
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
@@ -1374,6 +1376,68 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Answer", @"""Answer"" IN ('yes', 'maybe', 'no')");
             entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Note",
                 @"""Note"" IS NULL OR ""Note"" IN ('late', 'first-hour', 'leaving-early')");
+        });
+
+        // «On break» (Ш3.1) — ПРИВАТНЫЕ данные, Sys_ БЕЗ grant swimm_ro. Субъект — ровно одно из
+        // двух (аккаунт или пловец); открытый перерыв у субъекта один — частичные UNIQUE.
+        modelBuilder.Entity<HubGroupBreak>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupBreaks");
+            entity.HasIndex(e => new { e.HubGroupId, e.UserId })
+                .IsUnique()
+                .HasFilter(@"""EndedAt"" IS NULL AND ""UserId"" IS NOT NULL");
+            entity.HasIndex(e => new { e.HubGroupId, e.SwimmerId })
+                .IsUnique()
+                .HasFilter(@"""EndedAt"" IS NULL AND ""SwimmerId"" IS NOT NULL");
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.SetBy)
+                .WithMany()
+                .HasForeignKey(e => e.SetByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasCheckConstraint("CK_HubGroupBreaks_Subject",
+                @"(""UserId"" IS NULL) <> (""SwimmerId"" IS NULL)");
+        });
+
+        // Уровень аккаунта без пловца (Ш3.1) — пара к Sys_HubGroupSwimmerLevels, тот же составной
+        // FK на уровень этой же группы; удаление уровня → «без уровня» (cascade).
+        modelBuilder.Entity<HubGroupAccountLevel>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupAccountLevels");
+            entity.HasKey(e => new { e.HubGroupId, e.UserId });
+            entity.HasIndex(e => new { e.HubGroupId, e.LevelId });
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Level)
+                .WithMany()
+                .HasForeignKey(e => new { e.HubGroupId, e.LevelId })
+                .HasPrincipalKey(l => new { l.HubGroupId, l.Id })
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<LanePlan>(entity =>

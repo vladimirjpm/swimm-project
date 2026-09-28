@@ -224,6 +224,8 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             Place = schedule.Place,
             PoolType = schedule.PoolType,
             Note = schedule.Note,
+            UsualLanes = schedule.UsualLanes,
+            LaneView = schedule.EffectiveLaneView,
         };
 
         var next = schedule.NextOccurrence(IsraelTime.ToLocal(DateTime.UtcNow));

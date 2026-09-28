@@ -522,6 +522,14 @@ public sealed class GroupTrainingScheduleDto
 
     [JsonPropertyName("note")]
     public string? Note { get; set; }
+
+    /// <summary>Сколько дорожек обычно (1..12) — вид по дорожкам без плана (Ш3); null — не задано.</summary>
+    [JsonPropertyName("usual_lanes")]
+    public int? UsualLanes { get; set; }
+
+    /// <summary>auto | plan | off — режим вида по дорожкам (<c>GroupLaneView</c>); null — auto.</summary>
+    [JsonPropertyName("lane_view")]
+    public string? LaneView { get; set; }
 }
 
 /// <summary>Занятие недели: день ISO (1 = Mon … 7 = Sun) и часы по стенным часам бассейна.</summary>

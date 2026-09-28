@@ -33,7 +33,10 @@ public sealed class TrainingRsvpDto
     [JsonPropertyName("no")]
     public int No { get; set; }
 
-    /// <summary>Активные участники-аккаунты — знаменатель полосы; остаток — «нет ответа».</summary>
+    /// <summary>
+    /// Знаменатель полосы: активные участники-аккаунты, кроме тех, кто на перерыве и не ответил
+    /// (Ш3.1 — «On break» не висит вечным «нет ответа»). Остаток — «нет ответа».
+    /// </summary>
     [JsonPropertyName("total")]
     public int Total { get; set; }
 
@@ -53,9 +56,17 @@ public sealed class TrainingRsvpDto
     [JsonPropertyName("can_answer")]
     public bool CanAnswer { get; set; }
 
+    /// <summary>Зритель на перерыве в день занятия (Ш3.1): ответ «Going» его снимет.</summary>
+    [JsonPropertyName("on_break")]
+    public bool OnBreak { get; set; }
+
+    /// <summary>Последний день перерыва зрителя yyyy-MM-dd; null — бессрочно или не на перерыве.</summary>
+    [JsonPropertyName("break_until")]
+    public string? BreakUntil { get; set; }
+
     /// <summary>
     /// Все активные участники с ответами — ТОЛЬКО управляющему (иначе null). Порядок: иду,
-    /// не уверен, не приду, без ответа; внутри — по имени.
+    /// не уверен, не приду, без ответа, на перерыве без ответа; внутри — по имени.
     /// </summary>
     [JsonPropertyName("people")]
     public List<TrainingRsvpPersonDto>? People { get; set; }
@@ -96,6 +107,14 @@ public sealed class TrainingRsvpPersonDto
 
     [JsonPropertyName("set_by_coach")]
     public bool SetByCoach { get; set; }
+
+    /// <summary>На перерыве в день занятия (Ш3.1).</summary>
+    [JsonPropertyName("on_break")]
+    public bool OnBreak { get; set; }
+
+    /// <summary>Сам вернулся с перерыва недавно — сколько дней был на нём («back after …»).</summary>
+    [JsonPropertyName("back_after_days")]
+    public int? BackAfterDays { get; set; }
 }
 
 /// <summary>Ответ на занятие. <c>answer = null</c> — снять ответ.</summary>
