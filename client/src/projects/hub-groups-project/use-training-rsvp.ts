@@ -23,6 +23,8 @@ export interface TrainingRsvpState {
   answer: (answer: RsvpAnswer | null, note?: RsvpNote | null) => Promise<void>;
   /** Управляющий ставит ответ за участника (попросил в WhatsApp). */
   answerFor: (userId: number, answer: RsvpAnswer | null) => Promise<void>;
+  /** Перечитать с сервера — после того, что меняет ответы со стороны (перерыв, Ш3.1). */
+  reload: () => void;
 }
 
 const COUNT_KEY: Record<RsvpAnswer, 'yes' | 'maybe' | 'no'> = { yes: 'yes', maybe: 'maybe', no: 'no' };
@@ -41,6 +43,8 @@ export function useTrainingRsvp(groupId: number | null, sessionId: string | null
   const [error, setError] = useState<string | null>(null);
   // Последнее подтверждённое сервером состояние — к нему откатываемся при отказе.
   const confirmed = useRef<TrainingRsvp | null>(null);
+  const [version, setVersion] = useState(0);
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   const url = groupId != null && sessionId ? `/api/hub-groups/${groupId}/rsvp/${encodeURIComponent(sessionId)}` : null;
 
@@ -58,7 +62,7 @@ export function useTrainingRsvp(groupId: number | null, sessionId: string | null
       .catch(() => { if (!cancelled) setRsvp(null); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [enabled, url]);
+  }, [enabled, url, version]);
 
   const send = useCallback(async (optimistic: TrainingRsvp, body: object) => {
     if (!url) return;
@@ -105,5 +109,5 @@ export function useTrainingRsvp(groupId: number | null, sessionId: string | null
     await send(optimistic, { answer: next, user_id: userId });
   }, [send]);
 
-  return { rsvp, loading, error, answer, answerFor };
+  return { rsvp, loading, error, answer, answerFor, reload };
 }

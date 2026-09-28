@@ -7,6 +7,7 @@ import HelperResults from '../../../utils/helpers/helper-results';
 import { GROUP_DISCLAIMER, ROLE_LABEL, memberChips, swimmerDisplayName } from './group-bits';
 import { levelColor } from './level-color';
 import { useGroupLevels } from './use-group-levels';
+import { useGroupBreaks } from './use-group-breaks';
 import type { HubGroupDetails, HubGroupRecentResult, HubGroupStanding } from '../types';
 
 /**
@@ -37,10 +38,22 @@ const poolOf = (value?: string | null): PoolFilter | null =>
  * `editLevels` — зритель управляет группой: у каждого пловца выпадашка уровня
  * (docs/plans/lane-plans-plan.md, «Уровень из таба Swimmers»). Тренер открывает состав и
  * правит уровни тут же, не уходя в Admin. Уровни приватные — остальным их не грузим вовсе.
+ * Там же — «⏸» перерыв пловца (Ш3.1): бессрочно, пока тренер не снимет или сам человек не
+ * ответит «Going». Перерывы тоже приватные и грузятся только управляющему.
  */
 function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetails; editLevels?: boolean }) {
   const levels = useGroupLevels(group.id, editLevels);
+  const breaks = useGroupBreaks(group.id, editLevels);
   const [levelError, setLevelError] = useState<string | null>(null);
+  const onBreakSwimmers = useMemo(
+    () => new Set((breaks.data?.breaks ?? []).filter((b) => b.swimmer_id != null).map((b) => b.swimmer_id!)),
+    [breaks.data],
+  );
+
+  const toggleBreak = async (swimmerId: number) => {
+    setLevelError(null);
+    setLevelError(await breaks.setBreak({ swimmer_id: swimmerId, on_break: !onBreakSwimmers.has(swimmerId) }));
+  };
 
   // Уровень ставится только пловцу видимого состава (сервер) — у кого строки в ответе
   // уровней нет, выпадашку не рисуем.
@@ -65,6 +78,7 @@ function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetail
       <div className="deep-card-sub mt-1">
         {group.members.length} in the roster
         {editLevels && levels.data && (noLevelCount > 0 ? ` · ${noLevelCount} without a level` : ' · levels set for everyone')}
+        {editLevels && onBreakSwimmers.size > 0 && ` · ${onBreakSwimmers.size} on break`}
       </div>
       {editLevels && levels.loadError && (
         <p className="m-0 mt-2 text-[12px] font-bold text-[var(--t-danger)]">Could not load levels.</p>
@@ -126,6 +140,21 @@ function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetail
               )}
               {editLevels && levels.data && hasLevelRow && (
                 <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={breaks.busy || !breaks.data}
+                    aria-pressed={onBreakSwimmers.has(m.swimmer_id)}
+                    onClick={() => { void toggleBreak(m.swimmer_id); }}
+                    title={onBreakSwimmers.has(m.swimmer_id)
+                      ? 'On break — tap to end'
+                      : 'Put on break: not placed in lanes until back'}
+                    className="hp-mono h-[26px] cursor-pointer rounded-[8px] border px-2 text-[11px] font-extrabold disabled:opacity-50"
+                    style={onBreakSwimmers.has(m.swimmer_id)
+                      ? { background: 'var(--deep-gold-bar)', borderColor: 'var(--deep-gold-bar)', color: 'var(--deep-accent-ink)' }
+                      : { background: 'transparent', borderColor: 'var(--t-border)', color: 'var(--deep-text-mute)' }}
+                  >
+                    {onBreakSwimmers.has(m.swimmer_id) ? '⏸ On break' : '⏸'}
+                  </button>
                   <span
                     className="inline-block h-[10px] w-[10px] shrink-0 rounded-full"
                     style={{ background: level ? levelColor(level) : 'var(--t-border)' }}

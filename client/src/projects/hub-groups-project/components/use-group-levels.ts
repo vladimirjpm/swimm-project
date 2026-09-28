@@ -15,6 +15,7 @@ export function useGroupLevels(groupId: number, enabled = true) {
   const [data, setData] = useState<HubGroupLevels | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [pendingSwimmer, setPendingSwimmer] = useState<number | null>(null);
+  const [pendingAccount, setPendingAccount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -40,7 +41,19 @@ export function useGroupLevels(groupId: number, enabled = true) {
     return result.error ?? 'Could not save the level. Try again.';
   }, [data, groupId]);
 
-  return { data, setData, loadError, pendingSwimmer, setSwimmerLevel };
+  /** Уровень аккаунта без пловца (Ш3.1); null — «без уровня». Возвращает текст ошибки или null. */
+  const setAccountLevel = useCallback(async (userId: number, levelId: number | null): Promise<string | null> => {
+    const previous = data?.accounts?.find((a) => a.userId === userId)?.levelId ?? null;
+    setData((d) => d && applyAccountLevel(d, userId, levelId));
+    setPendingAccount(userId);
+    const result = await lanePlansApi.setAccountLevel(groupId, userId, levelId);
+    setPendingAccount(null);
+    if (result.ok) return null;
+    setData((d) => d && applyAccountLevel(d, userId, previous));
+    return result.error ?? 'Could not save the level. Try again.';
+  }, [data, groupId]);
+
+  return { data, setData, loadError, pendingSwimmer, setSwimmerLevel, pendingAccount, setAccountLevel };
 }
 
 /** Уровень пловца + пересчёт счётчиков — локально, до ответа сервера. */
@@ -49,7 +62,20 @@ export function applySwimmerLevel(data: HubGroupLevels, swimmerId: number, level
   const counts = new Map<number, number>();
   swimmers.forEach((s) => { if (s.levelId != null) counts.set(s.levelId, (counts.get(s.levelId) ?? 0) + 1); });
   return {
+    ...data,
     levels: data.levels.map((l) => ({ ...l, swimmerCount: counts.get(l.id) ?? 0 })),
     swimmers,
+  };
+}
+
+/** Уровень аккаунта + пересчёт счётчиков аккаунтов — локально, до ответа сервера. */
+export function applyAccountLevel(data: HubGroupLevels, userId: number, levelId: number | null): HubGroupLevels {
+  const accounts = (data.accounts ?? []).map((a) => (a.userId === userId ? { ...a, levelId } : a));
+  const counts = new Map<number, number>();
+  accounts.forEach((a) => { if (a.levelId != null) counts.set(a.levelId, (counts.get(a.levelId) ?? 0) + 1); });
+  return {
+    ...data,
+    levels: data.levels.map((l) => ({ ...l, accountCount: counts.get(l.id) ?? 0 })),
+    accounts,
   };
 }

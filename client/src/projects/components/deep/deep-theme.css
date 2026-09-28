@@ -49,6 +49,12 @@
   --deep-live-border: rgba(56,239,143,.40);
   --deep-male: #60a5fa;  --deep-male-soft: rgba(59,130,246,.14);  --deep-male-border: rgba(59,130,246,.3);
   --deep-female: #f472b6; --deep-female-soft: rgba(236,72,153,.14); --deep-female-border: rgba(236,72,153,.3);
+  /* Бассейн вида по дорожкам (Ш3, хендофф group-club-changes §6, 3b): «вода», её рамка,
+     подпись дорожки и пунктир «каната» между дорожками. */
+  --deep-pool-water: linear-gradient(180deg, rgba(56,189,248,.10), rgba(56,189,248,.04));
+  --deep-pool-border: rgba(125,211,252,.28);
+  --deep-pool-label: #7dd3fc;
+  --deep-pool-rope: rgba(248,113,113,.35);
   --deep-seg-track: rgba(255,255,255,.08);         /* фон сегмент-контролов (25m/50m) */
   --deep-seg-active-bg: #fff;
   --deep-seg-active-fg: #04182b;
@@ -126,6 +132,10 @@
   --deep-live-border: rgba(15,122,82,.35);
   --deep-male: #1d4ed8;  --deep-male-soft: rgba(29,78,216,.05);  --deep-male-border: rgba(29,78,216,.2);
   --deep-female: #be185d; --deep-female-soft: rgba(190,24,93,.04); --deep-female-border: rgba(190,24,93,.18);
+  --deep-pool-water: linear-gradient(180deg, #e3f3fa, #d3ecf6);
+  --deep-pool-border: #b9dcea;
+  --deep-pool-label: #5b8aa0;
+  --deep-pool-rope: rgba(178,59,59,.35);
   --deep-seg-track: #eef4f8;
   --deep-seg-active-bg: #0e7490;
   --deep-seg-active-fg: #fff;

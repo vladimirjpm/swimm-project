@@ -168,7 +168,16 @@ export interface GroupTrainingSchedule {
   place?: string | null;
   pool_type?: string | null;
   note?: string | null;
+  /** Сколько дорожек обычно (1..12) — вид по дорожкам без плана (Ш3). */
+  usual_lanes?: number | null;
+  /** auto — план, иначе раскладка на лету; plan — только план; off — вида нет. */
+  lane_view?: LaneViewMode | null;
+  /** members — имена «кто идёт» видят все участники; coach — только управляющие. */
+  who_is_coming?: WhoIsComing | null;
 }
+
+export type LaneViewMode = 'auto' | 'plan' | 'off';
+export type WhoIsComing = 'members' | 'coach';
 
 /** Ближайшее занятие — СЧИТАЕТ СЕРВЕР в поясе Израиля, клиент только рисует. */
 export interface NextTraining {
@@ -316,6 +325,8 @@ export interface HubGroupLevel {
   color?: string | null;
   /** Пловцов состава на этом уровне. */
   swimmerCount: number;
+  /** Аккаунтов-участников на этом уровне (Ш3.1). */
+  accountCount?: number;
 }
 
 export interface HubGroupLevelSwimmer {
@@ -329,9 +340,19 @@ export interface HubGroupLevelSwimmer {
   levelId: number | null;
 }
 
+/** Активный участник-аккаунт со своим уровнем — действует, когда у него нет пловца на дорожке. */
+export interface HubGroupLevelAccount {
+  userId: number;
+  name: string;
+  /** Метка тренера (за какого пловца аккаунт); null — не привязан. */
+  swimmerId: number | null;
+  levelId: number | null;
+}
+
 export interface HubGroupLevels {
   levels: HubGroupLevel[];
   swimmers: HubGroupLevelSwimmer[];
+  accounts?: HubGroupLevelAccount[];
 }
 
 // ── План дорожек (docs/plans/lane-plans-plan.md, L2–L3) ──────────────────────
@@ -363,6 +384,8 @@ export interface LanePlanSwimmer {
   level_id?: number | null;
   /** Ушёл из состава — в плане остался (план — снимок). */
   left_group?: boolean;
+  /** На перерыве в день плана (Ш3.1): в Unassigned новой раскладки не кладётся. */
+  on_break?: boolean;
 }
 
 export interface LanePlanLane {
@@ -413,6 +436,40 @@ export interface TrainingRsvpPerson {
   answer: RsvpAnswer | null;
   note?: RsvpNote | null;
   set_by_coach: boolean;
+  /** На перерыве в день занятия (Ш3.1). */
+  on_break?: boolean;
+  /** Сам вернулся с перерыва недавно — сколько дней был на нём. */
+  back_after_days?: number | null;
+}
+
+/** Человек в бассейне вида по дорожкам (Ш3.2). Поля null — имя скрыто («Who's coming: coach»). */
+export interface TrainingLanePerson {
+  user_id: number | null;
+  swimmer_id: number | null;
+  name: string | null;
+  gender: 'male' | 'female' | null;
+  /** «не уверен» тоже занимает место — рисуется пунктиром. */
+  answer: 'yes' | 'maybe';
+  note?: RsvpNote | null;
+  is_me: boolean;
+  /** Сколько аккаунтов называют себя этим пловцом; 2+ — «2 claim». */
+  claims: number;
+}
+
+export interface TrainingLane {
+  lane_no: number;
+  level: LanePlanLevel | null;
+  workout?: string | null;
+  people: TrainingLanePerson[];
+}
+
+export interface TrainingLaneView {
+  /** plan — план тренера; auto — раскладка на лету; water — дорожек не знаем, одна «вода». */
+  source: 'plan' | 'auto' | 'water';
+  lane_count: number;
+  lanes: TrainingLane[];
+  no_lane: TrainingLanePerson[];
+  names_hidden: boolean;
 }
 
 export interface TrainingRsvp {
@@ -432,4 +489,32 @@ export interface TrainingRsvp {
   can_answer: boolean;
   /** Только управляющему. */
   people: TrainingRsvpPerson[] | null;
+  /** Зритель на перерыве в день занятия: «Going» его снимет. */
+  on_break?: boolean;
+  /** yyyy-MM-dd — последний день перерыва зрителя; null — бессрочно. */
+  break_until?: string | null;
+  /** Вид по дорожкам (Ш3.2); null — выключен у группы или «только план», а плана нет. */
+  lane_view?: TrainingLaneView | null;
+}
+
+// ── «On break» (Ш3.1) — GET/PUT /api/hub-groups/{id}/breaks, личное ──────────────
+
+export interface HubGroupBreak {
+  user_id: number | null;
+  swimmer_id: number | null;
+  name: string;
+  /** yyyy-MM-dd */
+  since: string;
+  /** yyyy-MM-dd — последний день; null — бессрочно. */
+  until: string | null;
+  set_by_coach: boolean;
+  back_after_days?: number | null;
+}
+
+export interface HubGroupBreaks {
+  mine: HubGroupBreak | null;
+  /** Только управляющему. */
+  breaks: HubGroupBreak[] | null;
+  returns: HubGroupBreak[] | null;
+  can_manage: boolean;
 }

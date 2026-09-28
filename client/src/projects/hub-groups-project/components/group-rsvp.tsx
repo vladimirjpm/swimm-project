@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatBreakLength } from './group-pool';
 import type { RsvpAnswer, RsvpNote, TrainingRsvp, TrainingRsvpPerson } from '../types';
 
 /**
@@ -168,24 +169,38 @@ function RsvpStaffRow({ rsvp, onOpen }: { rsvp: TrainingRsvp; onOpen: () => void
   );
 }
 
-const GROUP_TITLE: Record<RsvpAnswer | 'none', string> = {
-  yes: 'Going', maybe: 'Not sure', no: "Can't come", none: 'No answer',
+type PeopleGroup = RsvpAnswer | 'none' | 'break';
+
+const GROUP_TITLE: Record<PeopleGroup, string> = {
+  yes: 'Going', maybe: 'Not sure', no: "Can't come", none: 'No answer', break: 'On break',
 };
+
+/** В какой группе списка человек: ответ, иначе «на перерыве» (Ш3.1), иначе «нет ответа». */
+const groupOf = (p: TrainingRsvpPerson): PeopleGroup => p.answer ?? (p.on_break ? 'break' : 'none');
 
 /**
  * Список «кто идёт» для управляющего (таб Trainings → Sessions): группы Going / Not sure /
- * Can't come / No answer; у каждого — три маленькие кнопки, тренер ставит ответ за человека.
- * Ответ, поставленный тренером, помечен «by coach».
+ * Can't come / No answer / On break; у каждого — три маленькие кнопки, тренер ставит ответ за
+ * человека. Ответ, поставленный тренером, помечен «by coach»; вернувшийся с перерыва ответом
+ * «Going» — «back after …». `onToggleBreak` — тренер ставит/снимает перерыв (бессрочно).
  */
 function RsvpPeopleList({
-  rsvp, onAnswerFor, disabled,
+  rsvp, onAnswerFor, disabled, onToggleBreak, breakBusy,
 }: {
   rsvp: TrainingRsvp;
   onAnswerFor: (userId: number, next: RsvpAnswer | null) => void;
   disabled?: boolean;
+  onToggleBreak?: (userId: number, onBreak: boolean) => Promise<string | null>;
+  breakBusy?: boolean;
 }) {
+  const [breakError, setBreakError] = React.useState<string | null>(null);
   const people = rsvp.people ?? [];
-  const groups: Array<RsvpAnswer | 'none'> = ['yes', 'maybe', 'no', 'none'];
+  const groups: PeopleGroup[] = ['yes', 'maybe', 'no', 'none', 'break'];
+  const toggleBreak = async (p: TrainingRsvpPerson) => {
+    if (!onToggleBreak) return;
+    setBreakError(null);
+    setBreakError(await onToggleBreak(p.user_id, !p.on_break));
+  };
   if (people.length === 0) {
     return (
       <p className="m-0 text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
@@ -196,13 +211,13 @@ function RsvpPeopleList({
   return (
     <div className="flex flex-col gap-3">
       {groups.map((g) => {
-        const rows = people.filter((p) => (p.answer ?? 'none') === g);
+        const rows = people.filter((p) => groupOf(p) === g);
         if (rows.length === 0) return null;
         return (
           <div key={g}>
             <div
               className="mb-1.5 text-[10px] font-extrabold uppercase tracking-[.08em]"
-              style={{ color: g === 'none' ? 'var(--deep-text-mute)' : TONE[g].fg }}
+              style={{ color: g === 'none' || g === 'break' ? 'var(--deep-text-mute)' : TONE[g].fg }}
             >
               {GROUP_TITLE[g]} · {rows.length}
             </div>
@@ -218,12 +233,32 @@ function RsvpPeopleList({
                     <div dir="auto" className="truncate text-left text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
                       {p.name}
                     </div>
-                    {(p.note || p.set_by_coach) && (
+                    {(p.note || p.set_by_coach || p.on_break || p.back_after_days != null) && (
                       <div className="truncate text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-                        {[p.note ? NOTE_LABEL[p.note] : null, p.set_by_coach ? 'by coach' : null].filter(Boolean).join(' · ')}
+                        {[
+                          p.note ? NOTE_LABEL[p.note] : null,
+                          p.set_by_coach ? 'by coach' : null,
+                          p.on_break && p.answer ? 'on break' : null,
+                          p.back_after_days != null ? `back after ${formatBreakLength(p.back_after_days)}` : null,
+                        ].filter(Boolean).join(' · ')}
                       </div>
                     )}
                   </div>
+                  {onToggleBreak && (
+                    <button
+                      type="button"
+                      disabled={breakBusy}
+                      aria-pressed={!!p.on_break}
+                      onClick={() => { void toggleBreak(p); }}
+                      title={p.on_break ? 'End the break' : 'Put on break (not counted until back)'}
+                      className="hp-mono h-7 w-8 cursor-pointer rounded-[8px] border text-[12px] font-extrabold disabled:opacity-50"
+                      style={p.on_break
+                        ? { background: 'var(--deep-gold-bar)', borderColor: 'var(--deep-gold-bar)', color: 'var(--deep-accent-ink)' }
+                        : { background: 'var(--deep-card-bg)', borderColor: 'var(--deep-card-border)', color: 'var(--deep-text-mute)' }}
+                    >
+                      ⏸
+                    </button>
+                  )}
                   <RsvpButtons
                     size="compact"
                     current={p.answer}
@@ -236,6 +271,9 @@ function RsvpPeopleList({
           </div>
         );
       })}
+      {breakError && (
+        <p className="m-0 text-[12px] font-extrabold" style={{ color: 'var(--deep-danger)' }} role="alert">{breakError}</p>
+      )}
     </div>
   );
 }

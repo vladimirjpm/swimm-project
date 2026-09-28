@@ -74,8 +74,17 @@ function Dot({ color }: { color: string }) {
   return <span className="inline-block h-[10px] w-[10px] shrink-0 rounded-full" style={{ background: color }} />;
 }
 
+/** «3 swimmers · 1 member» — кто стоит на уровне (аккаунты без пловца — с Ш3.1). */
+function levelPeople(l: HubGroupLevel): string {
+  const parts = [`${l.swimmerCount} ${l.swimmerCount === 1 ? 'swimmer' : 'swimmers'}`];
+  if ((l.accountCount ?? 0) > 0) parts.push(`${l.accountCount} ${l.accountCount === 1 ? 'member' : 'members'}`);
+  return parts.join(' · ');
+}
+
 function GroupLevelsCard({ groupId }: { groupId: number }) {
-  const { data, setData, loadError, pendingSwimmer, setSwimmerLevel: saveSwimmerLevel } = useGroupLevels(groupId);
+  const {
+    data, setData, loadError, pendingSwimmer, setSwimmerLevel: saveSwimmerLevel, pendingAccount, setAccountLevel,
+  } = useGroupLevels(groupId);
   const [draft, setDraft] = useState<LevelDraft[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +156,7 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
   const save = () => {
     if (!draft) return;
     const kept = new Set(draft.map((d) => d.id));
-    const removedBusy = data.levels.filter((l) => !kept.has(l.id) && l.swimmerCount > 0);
+    const removedBusy = data.levels.filter((l) => !kept.has(l.id) && (l.swimmerCount > 0 || (l.accountCount ?? 0) > 0));
     if (removedBusy.length > 0) setConfirmRemoval(removedBusy);
     else void persist();
   };
@@ -205,7 +214,7 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
               <span className="font-black text-[var(--t-text)]">{l.name}</span>
               {l.description && <span className="min-w-0 truncate text-[var(--t-text-2)]">{l.description}</span>}
               <span className="hp-mono ml-auto shrink-0 text-[11.5px] text-[var(--t-text-3)]">
-                {l.swimmerCount} {l.swimmerCount === 1 ? 'swimmer' : 'swimmers'}
+                {levelPeople(l)}
               </span>
             </li>
           ))}
@@ -322,6 +331,44 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
         )}
       </div>
 
+      {/* Аккаунты без пловца (Ш3.1): стоят на дорожке сами, под своим именем, — уровень им
+          ставится здесь. У кого пловец по «Me» / «Family», тот стоит пловцом и берёт его уровень. */}
+      {(data.accounts ?? []).some((a) => a.swimmerId == null) && (
+        <div className="mt-4 border-t border-[var(--t-border-2)] pt-3">
+          <div className="text-[12px] font-black uppercase tracking-[0.06em] text-[var(--t-text-2)]">Members without a swimmer</div>
+          <p className="m-0 mt-1 text-[11.5px] text-[var(--t-text-3)]">
+            They stand in the lanes under their account name. If a member marked a swimmer of this group as “Me” or family,
+            that swimmer&apos;s level is used instead.
+          </p>
+          <ul className="m-0 mt-2 flex list-none flex-col p-0">
+            {(data.accounts ?? []).filter((a) => a.swimmerId == null).map((a) => {
+              const level = a.levelId != null ? levelById.get(a.levelId) : undefined;
+              return (
+                <li key={a.userId} className="flex flex-wrap items-center gap-2 border-b border-[var(--t-border-2)] py-[7px] last:border-b-0">
+                  <Dot color={level ? levelColor(level) : 'var(--t-border)'} />
+                  <bdi className="min-w-0 flex-1 truncate text-[13px] font-bold text-[var(--t-text)]">{a.name}</bdi>
+                  <select
+                    value={a.levelId ?? ''}
+                    onChange={async (e) => {
+                      setError(null);
+                      setError(await setAccountLevel(a.userId, e.target.value === '' ? null : Number(e.target.value)));
+                    }}
+                    disabled={pendingAccount === a.userId || draft != null}
+                    aria-label={`Level of ${a.name}`}
+                    className={`${inputCls} cursor-pointer disabled:opacity-60`}
+                  >
+                    <option value="">No level</option>
+                    {data.levels.map((l) => (
+                      <option key={l.id} value={l.id}>{l.rank} · {l.name}</option>
+                    ))}
+                  </select>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {confirmRemoval && (
         <ConfirmDialog
           title="Remove levels with swimmers?"
@@ -336,7 +383,7 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
                 <Dot color={levelColor(l)} />
                 <span className="font-bold">{l.name}</span>
                 <span className="text-[var(--t-text-2)]">
-                  — {l.swimmerCount} {l.swimmerCount === 1 ? 'swimmer' : 'swimmers'}
+                  — {levelPeople(l)}
                 </span>
               </li>
             ))}
