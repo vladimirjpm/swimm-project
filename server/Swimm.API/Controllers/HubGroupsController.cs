@@ -195,6 +195,13 @@ public class HubGroupsController : ControllerBase
                     if (heroItem is not null && heroItem.MediaType == "image")
                         dto.HeroImageUrl = heroItem.Url;
                 }
+                // То же для мобильного фото шапки — по тем же правилам (только картинка).
+                if (dto.HeroMobileMediaId is { } heroMobileMediaId)
+                {
+                    var mobileItem = dto.Gallery.FirstOrDefault(m => m.Id == heroMobileMediaId);
+                    if (mobileItem is not null && mobileItem.MediaType == "image")
+                        dto.HeroImageMobileUrl = mobileItem.Url;
+                }
                 // Лента хайлайтов шапки — строго после заполнения Gallery (video/photo берутся из неё).
                 dto.Highlights = HubGroupHighlightsBuilder.Build(dto);
                 return dto;

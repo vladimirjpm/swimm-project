@@ -148,6 +148,7 @@ public static class DependencyInjection
         // Уровни пловцов группы (docs/plans/lane-plans-plan.md) — приватные, без кэша.
         services.AddScoped<IHubGroupLevelService, HubGroupLevelService>();
         services.AddScoped<ILanePlanService, LanePlanService>();
+        services.AddScoped<ITrainingRsvpService, TrainingRsvpService>();
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
         services.AddScoped<IClubStandingService, ClubStandingService>();
         services.AddScoped<ICompetitionRecalculationService, CompetitionRecalculationService>();

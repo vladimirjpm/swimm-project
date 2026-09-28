@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
 import type { HubGroupLevel, HubGroupLevels, HubGroupLevelSwimmer } from '../types';
 import { levelColor, rankColor } from './level-color';
+import { useGroupLevels } from './use-group-levels';
 
 /**
  * Уровни пловцов группы — карточка таба `Admin` (docs/plans/lane-plans-plan.md, L1).
@@ -74,23 +75,12 @@ function Dot({ color }: { color: string }) {
 }
 
 function GroupLevelsCard({ groupId }: { groupId: number }) {
-  const [data, setData] = useState<HubGroupLevels | null>(null);
-  const [loadError, setLoadError] = useState(false);
+  const { data, setData, loadError, pendingSwimmer, setSwimmerLevel: saveSwimmerLevel } = useGroupLevels(groupId);
   const [draft, setDraft] = useState<LevelDraft[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmRemoval, setConfirmRemoval] = useState<HubGroupLevel[] | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
-  const [pendingSwimmer, setPendingSwimmer] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/me/hub-groups/${groupId}/levels`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((d: HubGroupLevels) => { if (!cancelled) setData(d); })
-      .catch(() => { if (!cancelled) setLoadError(true); });
-    return () => { cancelled = true; };
-  }, [groupId]);
 
   const levelById = useMemo(
     () => new Map((data?.levels ?? []).map((l) => [l.id, l])),
@@ -165,17 +155,8 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
   // ── Состав ────────────────────────────────────────────────────────────────
 
   const setSwimmerLevel = async (swimmer: HubGroupLevelSwimmer, levelId: number | null) => {
-    const before = data;
-    // Сразу показываем выбор; не сохранилось — откатываем с ошибкой.
-    setData(applySwimmerLevel(data, swimmer.swimmerId, levelId));
-    setPendingSwimmer(swimmer.swimmerId);
     setError(null);
-    const result = await apiPut(`/api/me/hub-groups/${groupId}/swimmer-levels/${swimmer.swimmerId}`, { levelId });
-    setPendingSwimmer(null);
-    if (!result.ok) {
-      setData(before);
-      setError(result.error ?? 'Could not save the level. Try again.');
-    }
+    setError(await saveSwimmerLevel(swimmer.swimmerId, levelId));
   };
 
   const noLevelCount = data.swimmers.filter((s) => s.levelId == null).length;
@@ -367,17 +348,6 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
       )}
     </div>
   );
-}
-
-/** Уровень пловца + пересчёт счётчиков — локально, до ответа сервера. */
-function applySwimmerLevel(data: HubGroupLevels, swimmerId: number, levelId: number | null): HubGroupLevels {
-  const swimmers = data.swimmers.map((s) => (s.swimmerId === swimmerId ? { ...s, levelId } : s));
-  const counts = new Map<number, number>();
-  swimmers.forEach((s) => { if (s.levelId != null) counts.set(s.levelId, (counts.get(s.levelId) ?? 0) + 1); });
-  return {
-    levels: data.levels.map((l) => ({ ...l, swimmerCount: counts.get(l.id) ?? 0 })),
-    swimmers,
-  };
 }
 
 export default GroupLevelsCard;

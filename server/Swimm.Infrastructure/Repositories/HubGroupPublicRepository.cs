@@ -194,6 +194,9 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         dto.ShowHeroImage = display.Hero.Show;
         dto.HeroMediaId = display.Hero.MediaId;
         dto.HeroImageUrl = group.CoverImageUrl;
+        dto.HeroMobileMediaId = display.Hero.MobileMediaId;
+        dto.CoverImageMobileUrl = group.CoverImageMobileUrl;
+        dto.HeroImageMobileUrl = group.CoverImageMobileUrl;
 
         FillTrainingSchedule(dto, group.TrainingSchedule);
 
@@ -228,6 +231,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
 
         dto.NextTraining = new NextTrainingDto
         {
+            Id = TrainingRsvpRules.SessionKey(next.Value.Date, next.Value.Slot.Start),
             Date = next.Value.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             Start = next.Value.Slot.Start,
             End = next.Value.Slot.End,
@@ -370,11 +374,29 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
 
         // «Рекорды группы»: лучшее время по каждой оси стиль+дистанция+бассейн+пол.
         // Эстафеты и незачтённые времена (DSQ/DNS) не участвуют.
-        dto.Bests = await db.Results.AsNoTracking()
+        dto.Bests = await LoadBestsAsync(db, swimmerIds, since: null);
+        // Лучшие за сезон (чип «Season bests» таба Results) — та же ось, тот же отбор, но
+        // только заплывы текущего сезона — того же, что у зачёта (`season_label`).
+        dto.SeasonBests = await LoadBestsAsync(db, swimmerIds, since: seasonStart);
+
+        dto.Competitions = await BuildCompetitionsAsync(db, swimmerIds, dto.Bests);
+
+        await FillStandingsAsync(db, dto, swimmerIds, seasonStart);
+    }
+
+    /// <summary>
+    /// Лучшее время ростера по каждой оси стиль+дистанция+бассейн+пол; <paramref name="since"/>
+    /// сужает до заплывов с этой даты (season bests). Эстафеты и незачтённые (DSQ/DNS) — мимо.
+    /// </summary>
+    private static async Task<List<HubGroupBestDto>> LoadBestsAsync(
+        SwimmDbContext db, List<int> swimmerIds, DateTime? since)
+    {
+        var bests = await db.Results.AsNoTracking()
             .Where(r => swimmerIds.Contains(r.SwimmerId)
                         && r.TimeMillisecond != null
                         && !r.TimeFail
-                        && r.RelayId == null)
+                        && r.RelayId == null
+                        && (since == null || r.CompetitionDate >= since))
             .GroupBy(r => new { StyleName = r.Style.Name, r.Distance, r.Competition.PoolType, r.Gender })
             .Select(g => g
                 .OrderBy(r => r.TimeMillisecond)
@@ -391,6 +413,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                     SwimmerId = r.SwimmerId,
                     SwimmerName = (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim(),
                     SwimmerNameEn = (r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn).Trim(),
+                    CompetitionId = r.CompetitionId,
                     CompetitionName = r.Competition.Name,
                     Date = r.Competition.Date,
                     Points = r.InternationalPoints
@@ -398,15 +421,76 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 .First())
             .ToListAsync();
 
-        dto.Bests = dto.Bests
+        return bests
             .OrderBy(b => b.StyleName)
             .ThenBy(b => b.Distance.Length)
             .ThenBy(b => b.Distance)
             .ThenBy(b => b.Gender)
             .ToList();
-
-        await FillStandingsAsync(db, dto, swimmerIds, seasonStart);
     }
+
+    /// <summary>
+    /// Все старты ростера для таба Results. Группировка и цифры строки — чистая функция
+    /// <see cref="HubGroupCompetitionsBuilder"/>; здесь только забор заплывов.
+    ///
+    /// Эстафеты — по членству (docs/relays.md), но БЕЗ подзапроса «RelayId в членствах» на
+    /// всей таблице: у <c>Results.RelayId</c> нет индекса, и OR с EXISTS уводил бы запрос
+    /// ростера мимо индекса по пловцу. Поэтому два узких шага: членства ростера → все ноги
+    /// этих эстафет → строки этих ног с этими RelayId (индекс по SwimmerId).
+    /// </summary>
+    private static async Task<List<HubGroupCompetitionDto>> BuildCompetitionsAsync(
+        SwimmDbContext db, List<int> swimmerIds, List<HubGroupBestDto> bests)
+    {
+        var rows = await db.Results.AsNoTracking()
+            .Where(r => swimmerIds.Contains(r.SwimmerId))
+            .Select(CompetitionSwimProjection)
+            .ToListAsync();
+
+        // Эстафеты, где плыл кто-то из ростера, и весь их состав.
+        var memberships = await db.RelayMembers.AsNoTracking()
+            .Where(m => swimmerIds.Contains(m.SwimmerId))
+            .Select(m => new { m.RelayId, m.SwimmerId })
+            .ToListAsync();
+        if (memberships.Count > 0)
+        {
+            var relayIds = memberships.Select(m => m.RelayId).Distinct().ToList();
+            var legIds = await db.RelayMembers.AsNoTracking()
+                .Where(m => relayIds.Contains(m.RelayId))
+                .Select(m => m.SwimmerId)
+                .Distinct()
+                .ToListAsync();
+            var known = rows.Select(r => r.Id).ToHashSet();
+            var relayRows = await db.Results.AsNoTracking()
+                .Where(r => legIds.Contains(r.SwimmerId) && r.RelayId != null && relayIds.Contains(r.RelayId.Value))
+                .Select(CompetitionSwimProjection)
+                .ToListAsync();
+            rows.AddRange(relayRows.Where(r => known.Add(r.Id)));
+        }
+        if (rows.Count == 0) return [];
+
+        var relayRosterLegs = memberships
+            .GroupBy(m => m.RelayId)
+            .ToDictionary(g => g.Key, g => g.Select(m => m.SwimmerId).ToList());
+        return HubGroupCompetitionsBuilder.Build(rows, swimmerIds.ToHashSet(), relayRosterLegs, bests);
+    }
+
+    /// <summary>Проекция заплыва для списка стартов.</summary>
+    private static readonly System.Linq.Expressions.Expression<Func<ResultRecord, HubGroupCompetitionSwim>> CompetitionSwimProjection =
+        r => new HubGroupCompetitionSwim
+        {
+            Id = r.Id,
+            CompetitionId = r.CompetitionId,
+            EventId = r.Competition.EventId,
+            Name = r.Competition.Event != null ? r.Competition.Event.Name : r.Competition.Name,
+            CompetitionDate = r.CompetitionDate,
+            SwimmerId = r.SwimmerId,
+            RelayId = r.RelayId,
+            Position = r.Position,
+            TimeFail = r.TimeFail,
+            HeatType = r.HeatType,
+            Round = r.Round,
+            IsAward = r.Competition.IsAward,
+        };
 
     /// <summary>
     /// «Последний старт» ростера целиком: турнир самого свежего заплыва ленты.

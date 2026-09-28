@@ -14,6 +14,11 @@ import { HelperMedia } from '../../../utils/helpers';
  *
  * Под полем URL — проверка ссылки глазами посетителя (`PhotoUrlCheck` внизу файла).
  *
+ * Слотов фото два (хендофф group-club-changes, HERO-PHOTO.md): десктопное (4:3, правая колонка
+ * шапки) и необязательное мобильное (4:3, над именем на телефоне; пусто — телефон режет
+ * десктопное в полосу 180px). У каждого своя ссылка и свой выбор «из медиа»; рядом —
+ * рекомендуемые размеры, а меньше минимума — предупреждение, не запрет.
+ *
  * ⚠ После сохранения страница ПЕРЕЗАГРУЖАЕТСЯ. Это не лень: настройки меняют корпус страницы
  * (правая колонка шапки появляется или исчезает), а серверный ответ кэшируется — сервер
  * сбрасывает кэш при записи, и честный способ увидеть результат целиком это перечитать
@@ -59,6 +64,9 @@ interface Props {
   coverImageUrl?: string | null;
   showHeroImage: boolean;
   heroMediaId?: number | null;
+  /** СЫРОЙ url мобильного фото (колонка). */
+  coverImageMobileUrl?: string | null;
+  heroMobileMediaId?: number | null;
   /**
    * Лента медиа сущности; пикер берёт из неё только КАРТИНКИ. Пусто (или одни видео) —
    * пикера нет вовсе: у клуба медиа-ленты не существует
@@ -68,7 +76,8 @@ interface Props {
 }
 
 function DeepDisplaySettingsCard({
-  entity, entityId, coverImageUrl, showHeroImage, heroMediaId, media = [],
+  entity, entityId, coverImageUrl, showHeroImage, heroMediaId,
+  coverImageMobileUrl, heroMobileMediaId, media = [],
 }: Props) {
   // Выбирать можно только КАРТИНКИ: ссылка на видео ушла бы в <img src> битой. Превью с
   // YouTube клиент считать умеет, но сервер — нет, а решает указатель именно он.
@@ -76,13 +85,17 @@ function DeepDisplaySettingsCard({
   const [show, setShow] = useState(showHeroImage);
   const [url, setUrl] = useState(coverImageUrl ?? '');
   const [mediaId, setMediaId] = useState<number | null>(heroMediaId ?? null);
+  const [mobileUrl, setMobileUrl] = useState(coverImageMobileUrl ?? '');
+  const [mobileMediaId, setMobileMediaId] = useState<number | null>(heroMobileMediaId ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const dirty =
     show !== showHeroImage
     || url.trim() !== (coverImageUrl ?? '').trim()
-    || mediaId !== (heroMediaId ?? null);
+    || mediaId !== (heroMediaId ?? null)
+    || mobileUrl.trim() !== (coverImageMobileUrl ?? '').trim()
+    || mobileMediaId !== (heroMobileMediaId ?? null);
 
   const save = async () => {
     setBusy(true);
@@ -91,6 +104,8 @@ function DeepDisplaySettingsCard({
       showHeroImage: show,
       heroMediaId: mediaId,
       coverImageUrl: url.trim() ? url.trim() : null,
+      heroMobileMediaId: mobileMediaId,
+      coverImageMobileUrl: mobileUrl.trim() ? mobileUrl.trim() : null,
     });
     setBusy(false);
     if (ok) window.location.reload();
@@ -118,30 +133,96 @@ function DeepDisplaySettingsCard({
         a placeholder is shown.
       </p>
 
-      <label className="mt-4 block">
-        <span className="text-[11.5px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--deep-text-mute)' }}>
-          Photo URL
-        </span>
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://…"
-          disabled={mediaId != null}
-          className="mt-1 w-full rounded-[10px] border px-3 py-2 text-[13px] font-bold disabled:opacity-40"
-          style={{
-            borderColor: 'var(--deep-card-border)',
-            background: 'var(--deep-card-bg-row)',
-            color: 'var(--deep-text)',
-          }}
-        />
-      </label>
+      <PhotoSlot
+        title="Hero photo (desktop)"
+        help="4:3 · recommended 1600×1200 · min 760×570"
+        min={DESKTOP_MIN}
+        preview={DESKTOP_PREVIEW}
+        url={url}
+        onUrl={setUrl}
+        mediaId={mediaId}
+        onMediaId={setMediaId}
+        photos={photos}
+      />
 
-      {mediaId == null && url.trim() !== '' && <PhotoUrlCheck url={url} />}
+      <PhotoSlot
+        title="Hero photo (mobile), optional"
+        help="4:3 · recommended 1200×900 · min 780×585 · if empty, the desktop photo is cropped to a 180px strip"
+        min={MOBILE_MIN}
+        preview={MOBILE_PREVIEW}
+        url={mobileUrl}
+        onUrl={setMobileUrl}
+        mediaId={mobileMediaId}
+        onMediaId={setMobileMediaId}
+        photos={photos}
+      />
+
+      {error && (
+        <p className="mt-3 text-[12px] font-extrabold" style={{ color: 'var(--deep-danger)' }}>{error}</p>
+      )}
+
+      <button
+        type="button"
+        disabled={busy || !dirty}
+        onClick={save}
+        className="deep-cta mt-4 px-4 py-2 text-[13px] disabled:opacity-40"
+      >
+        {busy ? 'Saving…' : 'Save'}
+      </button>
+    </section>
+  );
+}
+
+/** Минимумы из HERO-PHOTO.md: меньше — предупреждение, не запрет. */
+const DESKTOP_MIN = { w: 760, h: 570 };
+const MOBILE_MIN = { w: 780, h: 585 };
+/**
+ * Рамка превью — в пропорциях НАСТОЯЩЕГО места, чтобы админ видел обрезку: десктоп — колонка
+ * 380px × ~300px, телефон — 390px × 292px (полное мобильное фото).
+ */
+const DESKTOP_PREVIEW = { w: 152, h: 120 };
+const MOBILE_PREVIEW = { w: 130, h: 97 };
+
+/** Один слот фото: ссылка, проверка, выбор «из медиа». */
+function PhotoSlot({
+  title, help, min, preview, url, onUrl, mediaId, onMediaId, photos,
+}: {
+  title: string;
+  help: string;
+  min: { w: number; h: number };
+  preview: { w: number; h: number };
+  url: string;
+  onUrl: (v: string) => void;
+  mediaId: number | null;
+  onMediaId: (v: number | null) => void;
+  photos: DisplayMediaItem[];
+}) {
+  return (
+    <div className="mt-5">
+      <div className="text-[11.5px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--deep-text-mute)' }}>
+        {title}
+      </div>
+      <p className="mt-0.5 text-[11.5px] font-bold" style={{ color: 'var(--deep-text-ghost)' }}>{help}</p>
+      <input
+        type="url"
+        value={url}
+        onChange={(e) => onUrl(e.target.value)}
+        placeholder="https://…"
+        aria-label={`${title} — URL`}
+        disabled={mediaId != null}
+        className="mt-1.5 w-full rounded-[10px] border px-3 py-2 text-[13px] font-bold disabled:opacity-40"
+        style={{
+          borderColor: 'var(--deep-card-border)',
+          background: 'var(--deep-card-bg-row)',
+          color: 'var(--deep-text)',
+        }}
+      />
+
+      {mediaId == null && url.trim() !== '' && <PhotoUrlCheck url={url} min={min} preview={preview} />}
 
       {photos.length > 0 && (
-        <div className="mt-4">
-          <div className="text-[11.5px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--deep-text-mute)' }}>
+        <div className="mt-3">
+          <div className="text-[11px] font-extrabold uppercase tracking-wide" style={{ color: 'var(--deep-text-mute)' }}>
             …or take it from media
           </div>
           <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
@@ -152,7 +233,7 @@ function DeepDisplaySettingsCard({
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() => setMediaId(active ? null : m.id)}
+                  onClick={() => onMediaId(active ? null : m.id)}
                   title={m.caption ?? undefined}
                   className="aspect-square cursor-pointer overflow-hidden rounded-[10px] border p-0"
                   style={{
@@ -175,20 +256,7 @@ function DeepDisplaySettingsCard({
           </p>
         </div>
       )}
-
-      {error && (
-        <p className="mt-3 text-[12px] font-extrabold" style={{ color: 'var(--deep-danger)' }}>{error}</p>
-      )}
-
-      <button
-        type="button"
-        disabled={busy || !dirty}
-        onClick={save}
-        className="deep-cta mt-4 px-4 py-2 text-[13px] disabled:opacity-40"
-      >
-        {busy ? 'Saving…' : 'Save'}
-      </button>
-    </section>
+    </div>
   );
 }
 
@@ -207,8 +275,17 @@ function DeepDisplaySettingsCard({
  * Это предупреждение, а не запрет: сохранить можно и битую ссылку — хост мог прилечь на
  * минуту, а доступ в Drive человек откроет потом (для того и «Check again»).
  */
-function PhotoUrlCheck({ url }: { url: string }) {
+function PhotoUrlCheck({
+  url, min, preview,
+}: {
+  url: string;
+  /** Минимальный размер слота: меньше — предупреждение «будет мыльной». */
+  min: { w: number; h: number };
+  /** Рамка превью в пропорциях настоящего места. */
+  preview: { w: number; h: number };
+}) {
   const [attempt, setAttempt] = useState(0);
+  const [natural, setNatural] = useState<{ key: string; w: number; h: number } | null>(null);
   // Результат помнит, К ЧЕМУ он относится: сменилась ссылка или нажали «Check again» — старый
   // ответ не подходит, и состояние само становится «checking», без эффекта-сброса (эффект
   // гонялся бы с onLoad закэшированной картинки).
@@ -242,14 +319,21 @@ function PhotoUrlCheck({ url }: { url: string }) {
     hint = 'Paste a direct link to the image file (it usually ends in .jpg or .png), not a link to a page that shows it.';
   }
 
+  const small = state === 'ok' && natural?.key === key && (natural.w < min.w || natural.h < min.h)
+    ? natural
+    : null;
+
   const statusColor =
     state === 'ok' ? 'var(--deep-accent)' : state === 'broken' ? 'var(--deep-danger)' : 'var(--deep-text-mute)';
 
   return (
     <div className="mt-3 flex items-start gap-3" aria-live="polite">
       <div
-        className="relative h-[72px] w-[128px] shrink-0 overflow-hidden rounded-[10px] border"
-        style={{ borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg-row)' }}
+        className="relative shrink-0 overflow-hidden rounded-[10px] border"
+        style={{
+          width: preview.w, height: preview.h,
+          borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg-row)',
+        }}
       >
         <img
           key={key}
@@ -257,7 +341,10 @@ function PhotoUrlCheck({ url }: { url: string }) {
           crossOrigin={anonymous ? 'anonymous' : undefined}
           referrerPolicy="no-referrer"
           alt=""
-          onLoad={() => setChecked({ key, ok: true })}
+          onLoad={(e) => {
+            setChecked({ key, ok: true });
+            setNatural({ key, w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+          }}
           onError={() => setChecked({ key, ok: false })}
           className={`h-full w-full object-cover ${state === 'ok' ? '' : 'invisible'}`}
         />
@@ -278,6 +365,11 @@ function PhotoUrlCheck({ url }: { url: string }) {
           {state === 'ok' && '✓ Visitors will see this photo'}
           {state === 'broken' && "✕ Visitors won't see this photo — the link doesn't open as an image"}
         </div>
+        {small && (
+          <p className="mt-1 text-[11.5px] font-extrabold" style={{ color: 'var(--deep-gold)' }}>
+            The image is {small.w}×{small.h} — smaller than {min.w}×{min.h}, it may look blurry.
+          </p>
+        )}
         {hint && (
           <p
             className="mt-1 text-[11.5px] font-bold"

@@ -1,162 +1,162 @@
 import React from 'react';
 import DeepHeroBand from '../../components/deep/hero-band';
-import { DeepBadge, DeepKpi } from '../../components/deep/kpi';
-import UI_ClubIcon from '../../components/mix/club-icon/club-icon';
+import DeepHeroPhoto from '../../components/deep/hero-photo';
+import { DeepKpi, DeepKpiLink, DeepKpiRow } from '../../components/deep/kpi';
+import { DeepHeroSubline, DeepHeroTitle } from '../../components/deep/hero-identity';
 import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
 import { routes } from '../../../utils/routes';
-import { HelperMedia } from '../../../utils/helpers';
-import { GroupIcon, JoinButton, LinkChips } from './group-bits';
-import GroupTrainingSlots from './group-training-slots';
+import { GroupIcon, LinkChips } from './group-bits';
+import GroupMembershipChip, { type GroupMembershipState } from './group-membership';
+import GroupTrainingBlock from './group-training-slots';
+import type { TrainingRsvpState } from '../use-training-rsvp';
 import type { HubGroupDetails } from '../types';
 
 /**
- * Шапка группы — ВТОРОЙ вариант шапки сущности (первый — клуб, `club-hero.tsx`).
+ * Шапка группы — вариант шапки сущности (первый — клуб, `club-hero.tsx`). Раскладка —
+ * хендофф group-club-changes: телефон 2a, десктоп 4a (+5c).
  *
- * Корпус полосы и кирпичи общие (`deep/hero-band.tsx`, `deep/kpi.tsx`), своё здесь — состав:
- * аватар группы, имя, строка меты, чипы ссылок, кнопки действий и фото справа.
+ * Сверху вниз: фото → строка «кто это» (аватар, имя, подзаголовок, чип членства) → блок
+ * тренировок → KPI. Справа от имени НИЧЕГО нет: кнопки «Competitions →» и «Leave group»
+ * съедали ~330px строки имени; первая стала плиткой KPI, вторая — пунктом меню «✓ Member ⋯».
  *
- * Фото приходит уже разрешённым (`hero_image_url`): сервер сам решает, взять его из медиа
- * по указателю `hero.mediaId` или из колонки-обложки. Ссылки нет — рисуем ЗАГЛУШКУ, а не
- * схлопываем колонку (решение Влада 09.09.2026, план §3.9): так правая колонка не прыгает
- * между сущностями, и админу видно, куда класть картинку. Выключает блок настройка
- * `show_hero_image` из таба Admin.
+ * Фото приходит уже разрешённым (`hero_image_url`, для телефона — `hero_image_mobile_url`):
+ * указатель «взять из медиа» решает сервер. Ссылки нет — ЗАГЛУШКА, а не схлопнутая колонка
+ * (решение Влада 09.09.2026, подтверждено 28.09.2026). Выключает блок `show_hero_image`.
  *
- * KPI считаются из того, что уже пришло в ответе: участники, рекорды группы, золото сезона.
- * Ни одной цифры, которой нет в данных, тут не выдумывается.
+ * KPI — только из того, что уже пришло в ответе; нулевые не показываем (хендофф: «Gold 0»
+ * читался упрёком, поэтому плитки золота больше нет вовсе — медали видны в Season).
  */
 
 interface Props {
   group: HubGroupDetails;
+  membership: GroupMembershipState;
+  /** Участник или управляющий — видит строку NEXT, а не голое расписание. */
+  insider: boolean;
+  /** Ответы на ближайшее занятие (Ш2) — один экземпляр на страницу. */
+  rsvp?: TrainingRsvpState | null;
+  /** «Who's coming →» — переход в таб Trainings. */
+  onWhosComing?: () => void;
 }
 
-function GroupHero({ group }: Props) {
-  const golds = group.standings.reduce((sum, s) => sum + s.golds, 0);
+function GroupHero({ group, membership, insider, rsvp, onWhosComing }: Props) {
+  const real = !group.is_virtual && group.id > 0;
+  const competitions = group.competitions?.length ?? 0;
 
   return (
-    <DeepHeroBand aside={group.show_hero_image === false ? undefined : <GroupPhoto group={group} />}>
-      <div className="flex flex-wrap items-start gap-5">
-        <GroupIcon iconUrl={group.icon_url} name={group.name_en || group.name} size="lg" />
+    <DeepHeroBand
+      aside={group.show_hero_image === false
+        ? undefined
+        : (
+          <DeepHeroPhoto
+            url={group.hero_image_url}
+            mobileUrl={group.hero_image_mobile_url}
+            placeholder="No group photo yet"
+          />
+        )}
+    >
+      <div className="flex h-full flex-col gap-3 min-[960px]:gap-[18px]">
+        <div className="flex items-start gap-3.5 min-[960px]:gap-[18px]">
+          <GroupIcon iconUrl={group.icon_url} name={group.name_en || group.name} size="hero" />
 
-        <div className="min-w-0 flex-1">
-          <h1
-            className="truncate text-[34px] leading-tight"
-            style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}
-          >
-            {group.name}
-          </h1>
-          {group.name_en && group.name_en !== group.name && (
-            <div className="text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-              {group.name_en}
+          <div className="min-w-0 flex-1">
+            <DeepHeroTitle size="group">{group.name}</DeepHeroTitle>
+
+            {/* Телефон: подзаголовок, под ним чип; десктоп — одной строкой (4a). */}
+            <div className="mt-0.5 flex flex-col items-start gap-2 min-[960px]:mt-2 min-[960px]:flex-row min-[960px]:flex-wrap min-[960px]:items-center min-[960px]:gap-3">
+              <DeepHeroSubline
+                parts={[
+                  group.name_en && group.name_en !== group.name ? group.name_en : null,
+                  // Флаг и город — одним неразрывным куском: иначе флаг оставался строкой выше.
+                  group.country || group.location ? (
+                    <span className="whitespace-nowrap [&_img]:inline-block [&_img]:h-[12px] [&_img]:w-4 [&_img]:align-[-1px]">
+                      {group.country ? <UI_FlagEmoji countryCode={group.country} /> : '📍'}{' '}
+                      {group.location && <bdi>{group.location}</bdi>}
+                    </span>
+                  ) : null,
+                  clubRelation(group),
+                ]}
+              />
+              <GroupMembershipChip group={group} membership={membership} />
             </div>
-          )}
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {(group.country || group.location) && (
-              <DeepBadge>
-                {group.country ? <UI_FlagEmoji countryCode={group.country} /> : '📍'} {group.location}
-              </DeepBadge>
-            )}
-            {group.is_official && group.club_name && (
-              <DeepBadge accent>
-                <UI_ClubIcon clubName={group.club_name} iconWidth="6" styleType="icon-notext" />{' '}
-                Official group of {group.club_name}
-              </DeepBadge>
-            )}
-            {!group.is_official && group.club_name && <DeepBadge>Club: {group.club_name}</DeepBadge>}
-            {/* Состав из клуба (подписка). У официальной своего бейджа хватает — «Official group of». */}
-            {!group.is_official && group.followed_club_name && (
-              group.followed_club_id ? (
-                <a href={routes.club(group.followed_club_id)} className="no-underline">
-                  <DeepBadge>Follows <bdi>{group.followed_club_name}</bdi></DeepBadge>
-                </a>
-              ) : (
-                <DeepBadge>Follows <bdi>{group.followed_club_name}</bdi></DeepBadge>
-              )
-            )}
-            {/* Копию клуба открыли по ссылке мимо каталога — показываем, где «лицо клуба» (П4). */}
-            {group.official_group_slug && (
-              <a href={routes.group(group.official_group_slug)} className="no-underline">
-                <DeepBadge accent>Official group: <bdi>{group.official_group_name}</bdi> →</DeepBadge>
-              </a>
-            )}
           </div>
-
-          {group.description && (
-            <p
-              className="mt-3 max-w-[640px] text-[13.5px] leading-[1.55]"
-              style={{ color: 'var(--deep-text-mute)' }}
-            >
-              {group.description}
-            </p>
-          )}
-
-          {group.links.length > 0 && <div className="mt-3"><LinkChips links={group.links} /></div>}
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {/* Соревнования — ОТДЕЛЬНЫЙ экран (`/groups/{slug}/results`), а не срез этого,
-              поэтому кнопка шапки, а не таб (план §5.1). */}
-          {!group.is_virtual && group.id > 0 && (
-            <a
-              href={routes.groupResults(group.slug)}
-              className="hp-mono shrink-0 rounded-[10px] border px-4 py-2 text-[13px] font-extrabold no-underline"
-              style={{
-                borderColor: 'var(--deep-accent-border)',
-                background: 'var(--deep-accent-chip)',
-                color: 'var(--deep-accent)',
-              }}
-            >
-              Competitions →
-            </a>
-          )}
-          <JoinButton group={group} />
-        </div>
-      </div>
+        {/* Описание и ссылки — только от 960px: на телефоне шапка и так длинная (хендофф
+            мерил ~780px до табов), а ссылки группы дублирует таб Overview. */}
+        {(group.description || group.links.length > 0) && (
+          <div className="hidden min-[960px]:block">
+            {group.description && (
+              <p className="m-0 max-w-[640px] text-[13.5px] leading-[1.55]" style={{ color: 'var(--deep-text-mute)' }}>
+                {group.description}
+              </p>
+            )}
+            {group.links.length > 0 && <div className="mt-3"><LinkChips links={group.links} /></div>}
+          </div>
+        )}
 
-      <GroupTrainingSlots schedule={group.training_schedule} next={group.next_training} />
-
-      <div className="mt-6 flex flex-wrap gap-8">
-        <DeepKpi label="Swimmers" value={group.members.length} hint="in the roster" />
-        <DeepKpi label="Records" value={group.bests.length} hint="best in the group" />
-        <DeepKpi
-          label="Gold"
-          value={golds}
-          hint={group.season_label ? `season ${group.season_label}` : 'this season'}
-          gold={golds > 0}
+        <GroupTrainingBlock
+          schedule={group.training_schedule}
+          next={group.next_training}
+          mode={insider ? 'member' : 'guest'}
+          rsvp={rsvp}
+          onWhosComing={onWhosComing}
         />
+
+        <div className="min-[960px]:mt-auto">
+          <DeepKpiRow>
+            {group.members.length > 0 && (
+              <DeepKpi label="Swimmers" value={group.members.length} hint="in the roster" />
+            )}
+            {group.bests.length > 0 && (
+              <DeepKpi label="Records" value={group.bests.length} hint="best in the group" />
+            )}
+            {/* Соревнования — ОТДЕЛЬНЫЙ экран (`/groups/{slug}/results`), а не срез этого;
+                раньше туда вела кнопка у имени (план §5.1), теперь — плитка с числом. */}
+            {real && competitions > 0 && (
+              <DeepKpiLink
+                label="Competitions →"
+                value={competitions}
+                hint="all meets"
+                href={routes.groupResults(group.slug)}
+              />
+            )}
+          </DeepKpiRow>
+        </div>
       </div>
     </DeepHeroBand>
   );
 }
 
-/** Фото группы либо заглушка на её месте — колонка не схлопывается (план §3.9). */
-function GroupPhoto({ group }: Props) {
-  // Указатель «взять из медиа» разрешает сервер — здесь одно готовое поле.
-  // Ссылку Google Drive (страница просмотрщика) переводит в картинку HelperMedia.
-  if (group.hero_image_url) {
+/**
+ * Связь с клубом — частью подзаголовка, а не бейджами отдельной строкой (их было до
+ * трёх, и на телефоне они занимали собственный ряд). Где есть куда вести — ссылкой.
+ * Функция, а не компонент: подзаголовку нужно знать, есть ли часть, чтобы не ставить «·».
+ */
+function clubRelation(group: HubGroupDetails): React.ReactNode {
+  const link = 'no-underline font-extrabold';
+  const accent = { color: 'var(--deep-accent)' };
+
+  // Копию клуба открыли по ссылке мимо каталога — показываем, где «лицо клуба» (П4).
+  if (group.official_group_slug) {
     return (
-      <img
-        src={HelperMedia.directImageUrl(group.hero_image_url)}
-        referrerPolicy="no-referrer"
-        alt=""
-        className="h-full min-h-[200px] w-full rounded-2xl border object-cover"
-        style={{ borderColor: 'var(--deep-card-border)' }}
-      />
+      <a href={routes.group(group.official_group_slug)} className={link} style={accent}>
+        Official group: <bdi>{group.official_group_name}</bdi> →
+      </a>
     );
   }
-
-  return (
-    <div
-      className="flex h-full min-h-[200px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed"
-      style={{ borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg-row)' }}
-      aria-hidden="true"
-    >
-      <span className="text-[28px]">🏊</span>
-      <span className="text-[11.5px] font-extrabold" style={{ color: 'var(--deep-text-ghost)' }}>
-        No group photo yet
-      </span>
-    </div>
-  );
+  if (group.is_official && group.club_name) {
+    return <span style={accent}>Official group of <bdi>{group.club_name}</bdi></span>;
+  }
+  // Состав из клуба (подписка).
+  if (group.followed_club_name) {
+    return group.followed_club_id ? (
+      <a href={routes.club(group.followed_club_id)} className={link} style={accent}>
+        Follows <bdi>{group.followed_club_name}</bdi>
+      </a>
+    ) : <span>Follows <bdi>{group.followed_club_name}</bdi></span>;
+  }
+  if (group.club_name) return <span>Club: <bdi>{group.club_name}</bdi></span>;
+  return null;
 }
 
 export default GroupHero;

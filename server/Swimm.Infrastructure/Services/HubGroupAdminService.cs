@@ -209,6 +209,7 @@ public class HubGroupAdminService : IHubGroupAdminService
                 MediaPublications = _db.UserMediaPublications.Count(p => p.HubGroupId == g.Id),
                 LeveledSwimmers = _db.HubGroupSwimmerLevels.Count(l => l.HubGroupId == g.Id),
                 LanePlans = _db.LanePlans.Count(p => p.HubGroupId == g.Id),
+                TrainingRsvps = _db.HubGroupTrainingRsvps.Count(r => r.HubGroupId == g.Id),
                 HasPendingClubRequest = _db.HubGroupClubRequests.Any(r =>
                     r.HubGroupId == g.Id && r.Status == HubGroupClubRequestStatus.Pending)
             })
@@ -227,6 +228,7 @@ public class HubGroupAdminService : IHubGroupAdminService
         if (i.MediaPublications > 0) parts.Add($"публикаций медиа {i.MediaPublications}");
         if (i.LeveledSwimmers > 0) parts.Add($"уровней пловцов {i.LeveledSwimmers}");
         if (i.LanePlans > 0) parts.Add($"планов дорожек {i.LanePlans}");
+        if (i.TrainingRsvps > 0) parts.Add($"ответов на тренировки {i.TrainingRsvps}");
         if (i.IsOfficial) parts.Add($"официальная группа клуба «{i.ClubName}»");
         if (i.HasPendingClubRequest) parts.Add("заявка на официальный статус");
 

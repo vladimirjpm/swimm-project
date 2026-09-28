@@ -120,6 +120,11 @@ public sealed class HubGroupBestDto
     [JsonPropertyName("swimmer_name_en")]
     public string SwimmerNameEn { get; set; } = "";
 
+    /// <summary>День старта (<c>Competitions.Id</c>), где поставлен рекорд, — по нему список
+    /// соревнований таба Results считает «сколько рекордов группы с этого старта».</summary>
+    [JsonPropertyName("competition_id")]
+    public int CompetitionId { get; set; }
+
     [JsonPropertyName("competition_name")]
     public string CompetitionName { get; set; } = "";
 
@@ -129,6 +134,54 @@ public sealed class HubGroupBestDto
 
     [JsonPropertyName("points")]
     public int Points { get; set; }
+}
+
+/// <summary>
+/// Строка списка соревнований группы (таб Results, чип «Results»; плитка «Competitions →»
+/// шапки считает их число). Старт — турнир целиком: дни многодневки (один <c>EventId</c>)
+/// сложены в одну строку, как у «последнего старта». Эстафеты — по членству в
+/// <c>RelayMembers</c> (docs/relays.md).
+/// </summary>
+public sealed class HubGroupCompetitionDto
+{
+    /// <summary>Последний день старта, в который плыл ростер, — адрес дня.</summary>
+    [JsonPropertyName("competition_id")]
+    public int CompetitionId { get; set; }
+
+    /// <summary>Турнир многодневки; null — старт однодневный.</summary>
+    [JsonPropertyName("event_id")]
+    public int? EventId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    /// <summary>Первый и последний день, в которые плыл ростер (dd/MM/yyyy).</summary>
+    [JsonPropertyName("date_from")]
+    public string DateFrom { get; set; } = "";
+
+    [JsonPropertyName("date_to")]
+    public string DateTo { get; set; } = "";
+
+    /// <summary>Сколько пловцов ростера плыло (лично или в эстафете).</summary>
+    [JsonPropertyName("swimmers")]
+    public int Swimmers { get; set; }
+
+    [JsonPropertyName("swims")]
+    public int Swims { get; set; }
+
+    /// <summary>Медали — по единому правилу продукта (как у «последнего старта»).</summary>
+    [JsonPropertyName("golds")]
+    public int Golds { get; set; }
+
+    [JsonPropertyName("silvers")]
+    public int Silvers { get; set; }
+
+    [JsonPropertyName("bronzes")]
+    public int Bronzes { get; set; }
+
+    /// <summary>Сколько действующих рекордов группы (<c>bests</c>) поставлено на этом старте.</summary>
+    [JsonPropertyName("records")]
+    public int Records { get; set; }
 }
 
 /// <summary>Строка сезонного зачёта группы — рейтинг участника по клубным очкам.</summary>
@@ -324,6 +377,21 @@ public sealed class HubGroupDetailsDto
     [JsonPropertyName("hero_image_url")]
     public string? HeroImageUrl { get; set; }
 
+    /// <summary>СЫРОЙ URL мобильного фото (колонка) — его правит форма настроек.</summary>
+    [JsonPropertyName("cover_image_mobile_url")]
+    public string? CoverImageMobileUrl { get; set; }
+
+    /// <summary>
+    /// Мобильное фото шапки — УЖЕ РАЗРЕШЁННОЕ: hero.mobileMediaId → CoverImageMobileUrl → null.
+    /// null — телефон показывает полосу из <see cref="HeroImageUrl"/>.
+    /// </summary>
+    [JsonPropertyName("hero_image_mobile_url")]
+    public string? HeroImageMobileUrl { get; set; }
+
+    /// <summary>Какое медиа помечено мобильным фото шапки; null — берётся колонка.</summary>
+    [JsonPropertyName("hero_mobile_media_id")]
+    public int? HeroMobileMediaId { get; set; }
+
     /// <summary>Показывать блок фото шапки (настройка hero.show). false — колонка схлопнута.</summary>
     [JsonPropertyName("show_hero_image")]
     public bool ShowHeroImage { get; set; } = true;
@@ -401,6 +469,14 @@ public sealed class HubGroupDetailsDto
     [JsonPropertyName("bests")]
     public List<HubGroupBestDto> Bests { get; set; } = [];
 
+    /// <summary>Лучшее время по той же оси, но только за текущий сезон (<see cref="SeasonLabel"/>).</summary>
+    [JsonPropertyName("season_bests")]
+    public List<HubGroupBestDto> SeasonBests { get; set; } = [];
+
+    /// <summary>Все старты ростера, свежие сверху (таб Results). Пусто — заплывов нет.</summary>
+    [JsonPropertyName("competitions")]
+    public List<HubGroupCompetitionDto> Competitions { get; set; } = [];
+
     /// <summary>Метка сезона зачёта, напр. "2025/26".</summary>
     [JsonPropertyName("season_label")]
     public string SeasonLabel { get; set; } = "";
@@ -464,6 +540,14 @@ public sealed class GroupTrainingSlotDto
 /// <summary>Ближайшее занятие: дата ISO + часы; место дублируется, чтобы слот был самодостаточен.</summary>
 public sealed class NextTrainingDto
 {
+    /// <summary>
+    /// Ключ занятия <c>yyyy-MM-dd-HHmm</c> — адрес ответов «иду / не приду»
+    /// (<c>/api/hub-groups/{id}/rsvp/{id}</c>). Сами ответы в этот (общий, кэшируемый) ответ
+    /// не входят: они личные.
+    /// </summary>
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = "";
+
     /// <summary>yyyy-MM-dd в местном времени Израиля.</summary>
     [JsonPropertyName("date")]
     public string Date { get; set; } = "";

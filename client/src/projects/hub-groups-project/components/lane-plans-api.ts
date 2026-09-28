@@ -75,6 +75,9 @@ export const lanePlansApi = {
   unpublish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/unpublish`),
   remove: (groupId: number, date: string) => request<void>('DELETE', `${base(groupId)}/${date}`),
   levels: (groupId: number) => request<HubGroupLevels>('GET', `/api/me/hub-groups/${groupId}/levels`),
+  /** Уровень пловца: null — «без уровня». Тело camelCase, как у всей ручки уровней. */
+  setSwimmerLevel: (groupId: number, swimmerId: number, levelId: number | null) =>
+    request<void>('PUT', `/api/me/hub-groups/${groupId}/swimmer-levels/${swimmerId}`, { levelId }),
 };
 
 /** Сегодня по Израилю, yyyy-MM-dd: план — календарный день бассейна, не UTC. */

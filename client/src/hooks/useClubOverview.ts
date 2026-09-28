@@ -25,6 +25,10 @@ export interface ClubProfile {
   cover_image_url: string | null;
   /** Фото шапки, УЖЕ разрешённое сервером; null — рисуем заглушку. */
   hero_image_url: string | null;
+  /** Фото шапки для телефона (4:3), разрешённое сервером; null — полоса из десктопного. */
+  hero_image_mobile_url?: string | null;
+  /** Сырой url мобильного фото — его правит форма настроек. */
+  cover_image_mobile_url?: string | null;
   /** Показывать блок фото (настройка hero.show). */
   show_hero_image: boolean;
   swimmer_count: number;

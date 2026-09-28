@@ -58,6 +58,18 @@ export interface EntityTabSpec<T extends string = string> {
   locked?: boolean;
   lockNotice?: React.ReactNode;
   /**
+   * У зрителя есть правка в этом табе (хендофф group-club-changes §3): плитка фиолетовая с ✎,
+   * над панелью чип «✎ You can edit». Ставит страница по правам зрителя — не по табу вообще.
+   */
+  editable?: boolean;
+  /**
+   * Инструмент управляющего (Trainings, Admin): на десктопе — в конце ряда за пунктиром,
+   * на телефоне — закреплённой панелью у низа экрана. Всегда `editable`.
+   */
+  pinned?: boolean;
+  /** Метка инструмента («3 new»). Только у `pinned`. */
+  badge?: string;
+  /**
    * Карточки панели. Функция, а не готовый JSX: тело считается только у активного таба.
    * `nav` нужен дайджесту — карточке-витрине, которая уводит на «свой» таб.
    */
@@ -70,8 +82,11 @@ export interface DeepEntityPageProps<T extends string = string> {
   status: EntityPageStatus;
   /** Тексты плашек; у каждой страницы свои формулировки. */
   messages?: { loading?: string; notfound?: string; error?: string };
-  /** СЛОТ: вариант шапки. Каркас в неё не заглядывает. */
-  hero: React.ReactNode;
+  /**
+   * СЛОТ: вариант шапки. Каркас в неё не заглядывает. Функция — если шапке нужен переход на
+   * таб (плитка «28 Competitions →» у клуба ведёт в History).
+   */
+  hero: React.ReactNode | ((nav: EntityTabNav<T>) => React.ReactNode);
   /** СЛОТ между шапкой и табами: карусель сезонов, предстоящие старты, что угодно. */
   beforeTabs?: React.ReactNode;
   /** Название набора табов для скринридера («Club sections»). */
@@ -96,4 +111,22 @@ export interface DeepEntityPageProps<T extends string = string> {
    * рамка). Не задан — оболочка `.deep-card`, как на странице клуба.
    */
   noticeClassName?: string;
+  /** Подпись группы `pinned`-табов: «Coach tools» у группы, «Club admin» у клуба. */
+  toolsLabel?: string;
+  /**
+   * Липкая полоса сущности (хендофф §5): выезжает под топбаром после прокрутки шапки —
+   * аватар, имя одной строкой и статус справа. Не задана — полосы нет.
+   */
+  sticky?: EntityStickyBar;
+}
+
+export interface EntityStickyBar {
+  /** Аватар 28px (32px от 960px) — страница кладёт свой (иконка группы, логотип клуба). */
+  avatar: React.ReactNode;
+  /** Имя как в шапке (ивритское по умолчанию). */
+  name: string;
+  /** Латиница — только на десктопе, рядом с именем. */
+  nameEn?: string | null;
+  /** Чип справа: расписание, позже — ответ на тренировку. */
+  status?: React.ReactNode;
 }

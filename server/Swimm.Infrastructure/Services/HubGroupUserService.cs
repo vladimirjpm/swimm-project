@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Swimm.Application.Constants;
 using Npgsql;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -244,6 +245,12 @@ public class HubGroupUserService : IHubGroupUserService
         if (member == null) return HubGroupMemberSaveResult.Fail("Участник не найден");
 
         _db.HubGroupUserMembers.Remove(member);
+        // Ответы на ПРЕДСТОЯЩИЕ тренировки уходят вместе с участием: вернётся в группу — не
+        // должен оказаться «идущим» на то, от чего ушёл. Прошлые остаются — это история
+        // (в полосе их и так не видно: она считает только активных участников).
+        var today = DateOnly.FromDateTime(IsraelTime.ToLocal(DateTime.UtcNow));
+        _db.HubGroupTrainingRsvps.RemoveRange(_db.HubGroupTrainingRsvps
+            .Where(r => r.HubGroupId == hubGroupId && r.UserId == userId && r.SessionDate >= today));
         await _db.SaveChangesAsync();
         return HubGroupMemberSaveResult.Ok();
     }

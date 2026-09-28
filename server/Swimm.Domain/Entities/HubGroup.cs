@@ -49,6 +49,13 @@ public class HubGroup
     public string? CoverImageUrl { get; set; }
 
     /// <summary>
+    /// Фото шапки для ТЕЛЕФОНА (4:3). Необязательно: null — на телефоне полоса из
+    /// <see cref="CoverImageUrl"/>. Как у клуба (<see cref="Club.CoverImageMobileUrl"/>).
+    /// </summary>
+    [MaxLength(1000)]
+    public string? CoverImageMobileUrl { get; set; }
+
+    /// <summary>
     /// Настройки ОТОБРАЖЕНИЯ страницы (JSON) — разбирает <see cref="EntityDisplaySettings"/>,
     /// руками колонку не читать. Пусто = дефолты. Общие с клубом: группа и клуб — два вида
     /// одного (коллектив пловцов), и настройки страницы у них одинаковые.

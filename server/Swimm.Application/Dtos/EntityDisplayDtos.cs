@@ -24,4 +24,13 @@ public sealed class EntityDisplayInputDto
 
     /// <summary>URL обложки. null или пусто — очистить.</summary>
     public string? CoverImageUrl { get; set; }
+
+    /// <summary>
+    /// «Мобильное фото из медиа-ленты»: id строки ленты. null — брать
+    /// <see cref="CoverImageMobileUrl"/>.
+    /// </summary>
+    public int? HeroMobileMediaId { get; set; }
+
+    /// <summary>URL мобильного фото шапки (4:3). null или пусто — очистить.</summary>
+    public string? CoverImageMobileUrl { get; set; }
 }

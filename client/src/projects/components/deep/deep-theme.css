@@ -74,6 +74,13 @@
   --deep-wheel-d2: rgba(255,255,255,.42);
   --deep-wheel-d3: rgba(255,255,255,.28);
   --deep-wheel-off: rgba(255,255,255,.75);   /* центр, когда активен All */
+  /* Закреплённые поверхности страницы сущности (хендофф group-club-changes §3, §5):
+     нижняя панель инструментов управляющего и липкая полоса под топбаром. Почти
+     непрозрачные — под ними едет контент. */
+  --deep-dock-bg: rgba(4,24,43,.96);
+  --deep-dock-shadow: 0 -6px 20px rgba(0,0,0,.35);
+  --deep-sticky-bg: rgba(4,24,43,.97);
+  --deep-sticky-shadow: 0 4px 14px rgba(0,0,0,.3);
 }
 
 .theme-deep-light {
@@ -141,6 +148,10 @@
   --deep-wheel-d2: #8ea4b0;
   --deep-wheel-d3: #b0c1cb;
   --deep-wheel-off: #7b95a3;
+  --deep-dock-bg: rgba(255,255,255,.96);
+  --deep-dock-shadow: 0 -6px 20px rgba(76,29,149,.10);
+  --deep-sticky-bg: rgba(244,249,252,.97);
+  --deep-sticky-shadow: 0 4px 14px rgba(8,60,84,.08);
 }
 
 .theme-deep, .theme-deep-light {
@@ -420,25 +431,208 @@
   padding: 14px;
 }
 
+/* ── Ряд табов: плитки + инструменты управляющего (хендофф group-club-changes §3) ──
+   Ряд липнет под топбар, а когда выехала полоса сущности (sticky-bar.tsx) — под неё:
+   `--deep-sticky-top` публикует каркас. Подложка — цвет страницы: до прокрутки её не
+   видно, после — под рядом не просвечивает контент. */
+.deep-tabs-row {
+  position: sticky;
+  top: var(--deep-sticky-top, 46px);
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  background: var(--deep-page-bg);
+}
+.deep-tabs-row > .deep-tabs { flex: 1; min-width: 0; }
+
+/* Фиолетовый = «ты можешь это менять». Только у тех, у кого есть права, и всегда вместе
+   со знаком ✎ (`.deep-tab__mark`) или подписью — не одним цветом. Токены --deep-ow*
+   исторически «open water», здесь это роль правки: второй фиолетовой пары в теме нет. */
+.deep-tab__mark { flex: none; font-size: 10px; line-height: 1; color: var(--deep-ow); }
+.deep-tab--edit {
+  background: var(--deep-ow-soft);
+  border-color: color-mix(in srgb, var(--deep-ow) 25%, transparent);
+}
+.deep-tab--edit .deep-tab__icon { background: var(--deep-ow-chip); color: var(--deep-ow); }
+.deep-tab--edit .deep-tab__name { color: var(--deep-ow); }
+.deep-tab--edit.deep-tab--active { background: var(--deep-panel-bg); border-color: var(--deep-ow-border); }
+.deep-tab--edit.deep-tab--active .deep-tab__icon { background: var(--deep-ow); color: var(--deep-accent-ink); }
+.deep-tab--edit.deep-tab--active .deep-tab__name,
+.deep-tab--edit.deep-tab--active .deep-tab__sub { color: var(--deep-ow); }
+.deep-tabs-panel--edit { border-color: var(--deep-ow-border); }
+
+/* Инструменты управляющего на десктопе: в конце ряда, за пунктиром, с подписью сверху;
+   плитки — фиолетовые язычки той же папки. */
+.deep-tabs-tools {
+  flex: 0 0 clamp(240px, 28%, 330px);
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 2px dashed var(--deep-ow-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.deep-tabs-tools__label {
+  font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--deep-ow);
+}
+.deep-tabs-tools__row { display: flex; gap: 6px; }
+.deep-tool-tab {
+  flex: 1; min-width: 0;
+  height: 48px;
+  margin-bottom: -1px;
+  padding: 0 12px;
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--deep-ow-border);
+  border-radius: 13px 13px 0 0;
+  background: var(--deep-ow-chip);
+  color: var(--deep-ow);
+  font-size: 13px; font-weight: 800;
+  cursor: pointer;
+  position: relative; z-index: 1;
+}
+.deep-tool-tab--active { background: var(--deep-panel-bg); border-bottom: none; }
+.deep-tool-tab__icon { font-size: 15px; flex: none; }
+.deep-tool-tab__name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deep-tool-tab__badge { margin-left: auto; flex: none; font-size: 10.5px; font-weight: 800; opacity: .8; }
+
+/* Чип «✎ You can edit» над панелью редактируемого таба. */
+.deep-edit-chip {
+  height: 22px; display: inline-flex; align-items: center; padding: 0 8px;
+  border-radius: var(--deep-radius-pill);
+  border: 1px solid var(--deep-ow-border);
+  background: var(--deep-ow-chip);
+  color: var(--deep-ow);
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+}
+
+/* ── Чипы вида внутри таба (view-chips.tsx): Results пловца, клуба и группы ─── */
+/* flex-wrap, а не скролл: на 375px чипы переносятся на вторую строку, и ни один
+   не оказывается за краем экрана. */
+
+.deep-filters { margin-bottom: 12px; }
+.deep-filter-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.deep-filter-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: var(--deep-radius-pill);
+  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
+  color: var(--deep-text-mute); cursor: pointer;
+  font-size: 12px; font-weight: 800;
+  /* Тап-таргет мобайла — как у плиток-табов (deep-theme.css) */
+  min-height: 36px;
+}
+.deep-filter-chip:hover { color: var(--deep-text); }
+.deep-filter-chip--active {
+  background: var(--deep-accent-chip); border-color: var(--deep-accent-border);
+  color: var(--deep-accent); box-shadow: var(--deep-accent-glow);
+}
+.deep-filter-chip__badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  /* Кольцо по currentColor, а не своя заливка: бейдж наследует цвет чипа и потому
+     читается в обеих темах и в обоих состояниях — правило парных токенов. */
+  border: 1px solid currentColor; color: inherit;
+  font-size: 10px; font-weight: 900; font-variant-numeric: tabular-nums;
+}
+.deep-filter-caption {
+  margin-top: 8px;
+  font-size: 11px; font-weight: 700; color: var(--deep-text-faint);
+}
+
+/* ── Липкая полоса сущности (sticky-bar.tsx, хендофф §5) ─────────────────────── */
+.deep-sticky-bar {
+  position: fixed; left: 0; right: 0; z-index: 40;
+  height: 48px;
+  background: var(--deep-sticky-bg);
+  border-bottom: 1px solid var(--deep-card-border);
+  box-shadow: var(--deep-sticky-shadow);
+}
+.deep-sticky-bar__inner {
+  width: 100%; height: 100%; max-width: 1180px; margin: 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px;
+  border: 0; background: transparent; cursor: pointer; text-align: left;
+  color: var(--deep-text);
+}
+.deep-sticky-bar__avatar { flex: none; display: flex; }
+.deep-sticky-bar__name {
+  flex: 1; min-width: 0;
+  font-family: var(--deep-font-display); font-size: 15px; text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.deep-sticky-bar__name-en { display: none; flex: none; font-size: 12px; font-weight: 700; color: var(--deep-text-mute); white-space: nowrap; }
+.deep-sticky-bar__status { flex: none; display: flex; }
+@media (min-width: 960px) {
+  .deep-sticky-bar { height: 52px; }
+  .deep-sticky-bar__inner { gap: 12px; padding: 0 16px; }
+  .deep-sticky-bar__name { flex: 0 1 auto; font-size: 17px; }
+  .deep-sticky-bar__name-en { display: inline; }
+  .deep-sticky-bar__status { margin-left: auto; }
+}
+
 /* Мобайл: та же пятёрка колонок, но иконка над подписью и без счётчиков.
    Активная отбивается подчёркиванием, а не заливкой — заливка на 78px колонке
    съедает подпись. */
 @media (max-width: 639px) {
   .deep-tabs { padding: 0; gap: 4px; }
   .deep-tabs-panel { margin: 0; padding: 10px; }
+  /* Страница сущности на телефоне — от края до края (решение Влада 27.09.2026): отступ
+     страницы (16px) + отступ панели (10px) + паддинг карточки (22px) съедали почти 100px из
+     375. Внешние слои сняты, у края экрана нет скруглений и боковых рамок — иначе карточка
+     читается обрезанной. Внутренние паддинги карточек остаются: их достаточно.
+     Вложенную карточку в карточке не трогаем — она не у края.
+     Всё, что у края, держит ОДНУ боковую линию — `--deep-edge-pad`, равную горизонтальному
+     паддингу `.deep-card`: текст шапки, плитки табов, полоса сезонов и карточки начинаются
+     на одном отступе. Поднятое фото шапки выходит из него — во всю ширину, вплотную к верху. */
+  .deep-entity-main { --deep-edge-pad: 22px; }
+  .deep-entity-main .deep-tabs-panel { padding-left: 0; padding-right: 0; }
+  /* Строки панели ВНЕ карточек (чипы вида, сегмент Sessions | Lanes, чип «✎ You can edit»)
+     своих паддингов не имеют — держат ту же боковую линию, что текст карточек. Внутри
+     карточки (чипы у пловца) — не трогаем: там отступ уже дала карточка. */
+  .deep-entity-main .deep-tabs-panel .deep-panel-row,
+  .deep-entity-main .deep-tabs-panel .deep-filters:not(.deep-card .deep-filters) {
+    padding-left: var(--deep-edge-pad);
+    padding-right: var(--deep-edge-pad);
+  }
+  .deep-entity-main .deep-tabs,
+  .deep-entity-main .deep-hero,
+  .deep-entity-main .deep-season-strip {
+    padding-left: var(--deep-edge-pad);
+    padding-right: var(--deep-edge-pad);
+  }
+  .deep-entity-main .deep-hero-band { padding: var(--deep-edge-pad); }
+  /* Шапка первая под топбаром (у клуба и группы — полоса, у пловца — своя `.deep-hero`):
+     верхняя рамка там лишняя, фото встаёт вплотную. */
+  .deep-entity-main .deep-hero-band,
+  .deep-entity-main .deep-hero { border-top-width: 0; }
+  .deep-entity-main .deep-hero-band__lead {
+    margin: calc(-1 * var(--deep-edge-pad)) calc(-1 * var(--deep-edge-pad)) 0;
+  }
+  .deep-entity-main .deep-hero-band,
+  .deep-entity-main .deep-hero,
+  .deep-entity-main .deep-tabs-panel,
+  .deep-entity-main .deep-notice,
+  .deep-entity-main .deep-season-strip,
+  .deep-entity-main .deep-card:not(.deep-card .deep-card) {
+    border-left-width: 0;
+    border-right-width: 0;
+    border-radius: 0;
+  }
   .deep-tab {
     align-items: center;
     gap: 4px;
-    min-height: 48px;
+    min-height: 52px;
     padding: 7px 2px;
     border: none;
     background: transparent;
     border-bottom: 2.5px solid transparent;
     border-radius: 10px 10px 0 0;
   }
-  .deep-tab__head { flex-direction: column; gap: 2px; }
+  /* max-width у головы и имени: без него подпись ширится по тексту, и многоточие у длинного
+     имени («Swimmers» на 8 табах) не срабатывает — подпись налезает на соседнюю плитку. */
+  .deep-tab__head { flex-direction: column; gap: 2px; max-width: 100%; }
   .deep-tab__icon { width: auto; height: auto; background: none; font-size: 17px; }
-  .deep-tab__name { font-size: 9.5px; font-weight: 800; letter-spacing: 0; }
+  .deep-tab__name { font-size: 10px; font-weight: 800; letter-spacing: 0; max-width: 100%; }
   /* Язычок папки оставлен и в мобайле (решение Влада 09.09.2026, хендофф группы).
      Прежде здесь корпус снимался и активную отбивало подчёркивание — считалось, что на
      колонке ~70px язычок читается артефактом. Разворот сознательный; если на настоящем
@@ -455,6 +649,43 @@
   }
   .deep-tab--active .deep-tab__icon { background: none; color: var(--deep-accent); }
   .deep-tab--active .deep-tab__name { color: var(--deep-accent); text-shadow: var(--deep-tab-text-glow); }
+
+  /* Знак ✎ / 🔒 — в углу плитки, а не в строке: колонка узкая, строки под него нет. */
+  .deep-tab { position: relative; }
+  .deep-tab__mark { position: absolute; top: 4px; right: 5px; font-size: 9px; }
+  .deep-tab--edit .deep-tab__icon,
+  .deep-tab--edit.deep-tab--active .deep-tab__icon { background: none; color: var(--deep-ow); }
+  .deep-tab--edit.deep-tab--active .deep-tab__name { text-shadow: none; }
+
+  /* Инструменты управляющего на телефоне — панель у низа экрана: верхний ряд остаётся
+     из пяти колонок, а Trainings / Admin всегда под пальцем. Странице каркас даёт отступ
+     снизу (`.deep-entity-main--dock`), чтобы контент не уходил под панель. */
+  .deep-tabs-tools {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    margin: 0; border-left: 0;
+    border-top: 1px solid var(--deep-ow-border);
+    background: var(--deep-dock-bg);
+    box-shadow: var(--deep-dock-shadow);
+    padding: 8px 10px calc(14px + env(safe-area-inset-bottom));
+    gap: 6px;
+  }
+  .deep-tabs-tools__label { padding-left: 4px; }
+  .deep-tabs-tools__row { gap: 8px; }
+  .deep-tool-tab {
+    height: 46px; margin-bottom: 0; justify-content: center;
+    border-radius: 12px;
+  }
+  .deep-tool-tab--active {
+    background: var(--deep-ow); color: var(--deep-accent-ink);
+    border-bottom: 1px solid var(--deep-ow-border);
+  }
+  .deep-tool-tab__icon { font-size: 16px; }
+  .deep-tool-tab__badge { margin-left: 0; font-weight: 700; opacity: .75; }
+  .deep-tool-tab__badge::before { content: '· '; }
+  .deep-entity-main--dock { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  /* Открыт инструмент — у верхнего ряда нет активного язычка, и панель отбивает фиолетовая
+     линия сверху: видно, откуда пришёл контент. */
+  .deep-tabs-panel--tool { border-top: 3px solid var(--deep-ow); }
 }
 
 /* ── Контейнер списка заплывов ────────────────────────────────────────────────

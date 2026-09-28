@@ -100,6 +100,18 @@ const UI_SwimmerGallery: React.FC<UI_SwimmerGalleryProps> = ({
     }
   }, [controlled, openIndex]);
 
+  // Esc закрывает открытый попап — так же, как крестик и клик по подложке.
+  useEffect(() => {
+    if (!showPopup) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setShowPopup(false);
+      onClose?.();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showPopup, onClose]);
+
   if (!gallery || gallery.length === 0) {
     return null;
   }

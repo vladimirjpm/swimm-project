@@ -73,6 +73,12 @@ public sealed class HubGroupDeleteImpactDto
     /// <summary>Планы дорожек (Sys_LanePlans) со всеми дорожками и расстановкой.</summary>
     public int LanePlans { get; set; }
 
+    /// <summary>
+    /// Ответы на тренировки (Sys_HubGroupTrainingRsvps). В «есть что терять» не входят: без
+    /// участников они ничего не значат, а участники уже посчитаны.
+    /// </summary>
+    public int TrainingRsvps { get; set; }
+
     public bool HasPendingClubRequest { get; set; }
 
     /// <summary>

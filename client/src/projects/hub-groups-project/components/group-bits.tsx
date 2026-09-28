@@ -73,11 +73,20 @@ function groupInitial(name: string): string {
   return (name.trim()[0] ?? '?').toUpperCase();
 }
 
-function GroupIcon({ iconUrl, name, size }: { iconUrl?: string | null; name: string; size: 'sm' | 'lg' }) {
-  const cls =
-    size === 'lg'
-      ? 'h-16 w-16 rounded-[18px] text-[26px] lg:h-20 lg:w-20 lg:text-[32px]'
-      : 'h-11 w-11 rounded-[13px] text-[18px]';
+/**
+ * Размеры: `sm` — строка списка, `lg` — заглушка приватной группы, `hero` — шапка страницы
+ * (72px на телефоне, 80px от 960px — хендофф group-club-changes §1–2), `xs` — липкая полоса
+ * и мини-аватар ссылки «Official group →» (28px, 32px от 960px).
+ */
+const GROUP_ICON_SIZE: Record<'xs' | 'sm' | 'lg' | 'hero', string> = {
+  xs: 'h-7 w-7 rounded-[8px] text-[13px] min-[960px]:h-8 min-[960px]:w-8 min-[960px]:rounded-[9px] min-[960px]:text-[15px]',
+  sm: 'h-11 w-11 rounded-[13px] text-[18px]',
+  lg: 'h-16 w-16 rounded-[18px] text-[26px] lg:h-20 lg:w-20 lg:text-[32px]',
+  hero: 'h-[72px] w-[72px] rounded-[18px] text-[32px] min-[960px]:h-20 min-[960px]:w-20',
+};
+
+function GroupIcon({ iconUrl, name, size }: { iconUrl?: string | null; name: string; size: 'xs' | 'sm' | 'lg' | 'hero' }) {
+  const cls = GROUP_ICON_SIZE[size];
   if (iconUrl) {
     return <img src={HelperMedia.directImageUrl(iconUrl)} referrerPolicy="no-referrer" alt="" className={`${cls} shrink-0 object-cover`} />;
   }

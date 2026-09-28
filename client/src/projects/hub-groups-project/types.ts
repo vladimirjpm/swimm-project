@@ -43,6 +43,8 @@ export interface HubGroupBest {
   swimmer_id: number;
   swimmer_name: string;
   swimmer_name_en: string;
+  /** День старта, где поставлен рекорд (Competitions.Id). */
+  competition_id?: number;
   competition_name: string;
   date: string; // dd/MM/yyyy
   points: number;
@@ -99,6 +101,26 @@ export interface HubGroupLastStart {
 }
 
 /**
+ * Строка списка стартов группы (таб Results, чип «Results»): турнир целиком — дни
+ * многодневки сложены сервером, эстафеты по членству. Свежие сверху.
+ */
+export interface HubGroupCompetition {
+  /** Последний день старта, в который плыл ростер. */
+  competition_id: number;
+  event_id?: number | null;
+  name: string;
+  date_from: string; // dd/MM/yyyy
+  date_to: string;
+  swimmers: number;
+  swims: number;
+  golds: number;
+  silvers: number;
+  bronzes: number;
+  /** Действующие рекорды группы, поставленные на этом старте. */
+  records: number;
+}
+
+/**
  * Карточка ленты хайлайтов шапки группы (design_handoff_group_header).
  * Дискриминированный union по type; состав и порядок задаёт сервер
  * (HubGroupHighlightsBuilder) — клиент рендерит массив как есть.
@@ -150,6 +172,8 @@ export interface GroupTrainingSchedule {
 
 /** Ближайшее занятие — СЧИТАЕТ СЕРВЕР в поясе Израиля, клиент только рисует. */
 export interface NextTraining {
+  /** Ключ занятия `yyyy-MM-dd-HHmm` — адрес ответов (`/api/hub-groups/{id}/rsvp/{id}`). */
+  id?: string;
   /** yyyy-MM-dd */
   date: string;
   start: string;
@@ -222,6 +246,12 @@ export interface HubGroupDetails {
   cover_image_url?: string | null;
   /** Фото шапки, УЖЕ разрешённое сервером (указатель hero.mediaId → обложка). */
   hero_image_url?: string | null;
+  /** Фото шапки для телефона (4:3), УЖЕ разрешённое сервером; null — полоса из десктопного. */
+  hero_image_mobile_url?: string | null;
+  /** Сырой url мобильного фото (колонка) — его правит форма Admin. */
+  cover_image_mobile_url?: string | null;
+  /** Какое медиа помечено мобильным фото шапки; null — берётся колонка. */
+  hero_mobile_media_id?: number | null;
   /** Показывать блок фото (настройка hero.show). */
   show_hero_image?: boolean;
   /** Какое медиа помечено фото шапки; null — берётся обложка. */
@@ -257,6 +287,10 @@ export interface HubGroupDetails {
   /** Последний старт целиком; null — ростер ещё не плыл. */
   last_start?: HubGroupLastStart | null;
   bests: HubGroupBest[];
+  /** Лучшее по той же оси, но за текущий сезон (`season_label`). Старый сервер не шлёт. */
+  season_bests?: HubGroupBest[];
+  /** Все старты ростера, свежие сверху. Старый сервер поля не шлёт — отсюда `?`. */
+  competitions?: HubGroupCompetition[];
   season_label: string;
   standings: HubGroupStanding[];
   /** Публичная галерея группы (HubGroupMedia с TrainingId == null). */
@@ -363,4 +397,39 @@ export interface LanePlanInput {
   lanes: { lane_no: number; level_id: number | null; workout: string | null }[];
   /** Порядок в массиве = порядок внутри дорожки; кого нет — «Not today». */
   swimmers: { swimmer_id: number; lane_no: number | null }[];
+}
+
+// ── Ответы «иду / не приду» (docs/plans/entity-hero-roles-plan.md, Ш2) ──────────
+// GET/PUT /api/hub-groups/{id}/rsvp/{session} — личный ответ, только участникам и управляющим.
+
+export type RsvpAnswer = 'yes' | 'maybe' | 'no';
+export type RsvpNote = 'late' | 'first-hour' | 'leaving-early';
+
+export interface TrainingRsvpPerson {
+  user_id: number;
+  name: string;
+  gender?: 'male' | 'female' | null;
+  /** null — не ответил. */
+  answer: RsvpAnswer | null;
+  note?: RsvpNote | null;
+  set_by_coach: boolean;
+}
+
+export interface TrainingRsvp {
+  session_id: string;
+  /** yyyy-MM-dd */
+  date: string;
+  start: string;
+  end?: string | null;
+  yes: number;
+  maybe: number;
+  no: number;
+  /** Активные участники-аккаунты — знаменатель полосы. */
+  total: number;
+  mine: { answer: RsvpAnswer; note?: RsvpNote | null; set_by_coach: boolean } | null;
+  is_member: boolean;
+  can_manage: boolean;
+  can_answer: boolean;
+  /** Только управляющему. */
+  people: TrainingRsvpPerson[] | null;
 }

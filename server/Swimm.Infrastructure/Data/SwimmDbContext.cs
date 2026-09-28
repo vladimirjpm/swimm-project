@@ -119,6 +119,7 @@ public class SwimmDbContext : DbContext
     public DbSet<LanePlan> LanePlans => Set<LanePlan>();
     public DbSet<LanePlanLane> LanePlanLanes => Set<LanePlanLane>();
     public DbSet<LanePlanSwimmer> LanePlanSwimmers => Set<LanePlanSwimmer>();
+    public DbSet<HubGroupTrainingRsvp> HubGroupTrainingRsvps => Set<HubGroupTrainingRsvp>();
 
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
@@ -1346,6 +1347,35 @@ public class SwimmDbContext : DbContext
         // План дорожек на дату — ПРИВАТНЫЕ данные группы, Sys_-таблицы БЕЗ grant swimm_ro
         // (docs/plans/lane-plans-plan.md, L2). План — снимок: удаление уровня только снимает
         // подпись с дорожки (SET NULL), уход пловца из состава план не трогает.
+        // Ответы «иду / не приду» на занятие — ПРИВАТНЫЕ, Sys_ без grant swimm_ro
+        // (docs/plans/entity-hero-roles-plan.md, Ш2). Занятие — пара «дата + начало слота»:
+        // расписание регулярное, строк занятий нет. Один ответ человека на занятие.
+        modelBuilder.Entity<HubGroupTrainingRsvp>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupTrainingRsvps");
+            entity.HasIndex(e => new { e.HubGroupId, e.SessionDate, e.SessionStart, e.UserId }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.SetBy)
+                .WithMany()
+                .HasForeignKey(e => e.SetByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Answer", @"""Answer"" IN ('yes', 'maybe', 'no')");
+            entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Note",
+                @"""Note"" IS NULL OR ""Note"" IN ('late', 'first-hour', 'leaving-early')");
+        });
+
         modelBuilder.Entity<LanePlan>(entity =>
         {
             entity.ToTable("Sys_LanePlans");
