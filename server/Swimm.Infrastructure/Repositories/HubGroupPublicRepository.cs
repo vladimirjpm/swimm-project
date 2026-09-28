@@ -227,6 +227,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             UsualLanes = schedule.UsualLanes,
             LaneView = schedule.EffectiveLaneView,
             WhoIsComing = schedule.EffectiveWhoIsComing,
+            RsvpTop = schedule.RsvpTop == true,
         };
 
         var next = schedule.NextOccurrence(IsraelTime.ToLocal(DateTime.UtcNow));

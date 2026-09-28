@@ -65,6 +65,7 @@ function GroupScheduleEditor({
   const [usualLanes, setUsualLanes] = useState(schedule?.usual_lanes != null ? String(schedule.usual_lanes) : '');
   const [laneView, setLaneView] = useState<LaneViewMode>(schedule?.lane_view ?? 'auto');
   const [whoIsComing, setWhoIsComing] = useState<WhoIsComing>(schedule?.who_is_coming ?? 'members');
+  const [rsvpTop, setRsvpTop] = useState(!!schedule?.rsvp_top);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -100,6 +101,7 @@ function GroupScheduleEditor({
       usual_lanes: usualLanes === '' ? null : Number(usualLanes),
       lane_view: laneView,
       who_is_coming: whoIsComing,
+      rsvp_top: rsvpTop,
     });
     setSaving(false);
     if (result.ok) {
@@ -220,6 +222,20 @@ function GroupScheduleEditor({
               <option value="members">Members see names</option>
               <option value="coach">Only coaches see names</option>
             </select>
+          </label>
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={rsvpTop}
+              onChange={(e) => { setRsvpTop(e.target.checked); setSaved(false); }}
+              className="mt-[3px] cursor-pointer"
+            />
+            <span>
+              Ask at the top of the page
+              <span className="block text-[11px] text-[var(--t-text-3)]">
+                members who haven&apos;t answered see “Are you coming?” above the photo
+              </span>
+            </span>
           </label>
         </div>
       </div>

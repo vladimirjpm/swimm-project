@@ -174,6 +174,8 @@ export interface GroupTrainingSchedule {
   lane_view?: LaneViewMode | null;
   /** members — имена «кто идёт» видят все участники; coach — только управляющие. */
   who_is_coming?: WhoIsComing | null;
+  /** Режим «сверху» (Ш4): не ответившему участнику «Are you coming?» над фото. */
+  rsvp_top?: boolean | null;
 }
 
 export type LaneViewMode = 'auto' | 'plan' | 'off';

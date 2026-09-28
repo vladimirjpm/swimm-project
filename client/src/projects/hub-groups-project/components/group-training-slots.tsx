@@ -202,4 +202,4 @@ function ScheduleNote({ note }: { note: string }) {
 }
 
 export default GroupTrainingBlock;
-export { DAY_SHORT, formatNextDate, scheduleDaysLabel };
+export { DAY_SHORT, formatNextDate, relativeLabel, scheduleDaysLabel };

@@ -66,6 +66,14 @@ public sealed class GroupTrainingSchedule
     [JsonPropertyName("who_is_coming")]
     public string? WhoIsComing { get; set; }
 
+    /// <summary>
+    /// Режим «сверху» (Ш4, хендофф group-club-changes §4 «Mode top»): не ответившему участнику
+    /// карточка «Are you coming?» встаёт над фото. Галка тренера в расписании (решение Влада
+    /// 29.09.2026), по умолчанию выключено; хранится только true.
+    /// </summary>
+    [JsonPropertyName("rsvp_top")]
+    public bool? RsvpTop { get; set; }
+
     [JsonIgnore]
     public string EffectiveWhoIsComing =>
         WhoIsComing == GroupWhoIsComing.Coach ? GroupWhoIsComing.Coach : GroupWhoIsComing.Members;

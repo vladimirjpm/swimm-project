@@ -36,9 +36,11 @@ interface Props {
   rsvp?: TrainingRsvpState | null;
   /** «Who's coming →» — переход в таб Trainings. */
   onWhosComing?: () => void;
+  /** Над шапкой стоит баннер «Are you coming?» (Ш4) — блок NEXT на это время прячется. */
+  hideTraining?: boolean;
 }
 
-function GroupHero({ group, membership, insider, rsvp, onWhosComing }: Props) {
+function GroupHero({ group, membership, insider, rsvp, onWhosComing, hideTraining = false }: Props) {
   const real = !group.is_virtual && group.id > 0;
   const competitions = group.competitions?.length ?? 0;
 
@@ -94,13 +96,15 @@ function GroupHero({ group, membership, insider, rsvp, onWhosComing }: Props) {
           </div>
         )}
 
-        <GroupTrainingBlock
-          schedule={group.training_schedule}
-          next={group.next_training}
-          mode={insider ? 'member' : 'guest'}
-          rsvp={rsvp}
-          onWhosComing={onWhosComing}
-        />
+        {!hideTraining && (
+          <GroupTrainingBlock
+            schedule={group.training_schedule}
+            next={group.next_training}
+            mode={insider ? 'member' : 'guest'}
+            rsvp={rsvp}
+            onWhosComing={onWhosComing}
+          />
+        )}
 
         <div className="min-[960px]:mt-auto">
           <DeepKpiRow>

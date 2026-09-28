@@ -361,6 +361,14 @@ public class HubGroupBreakTests
         who.WhoIsComing = "members";
         Assert.True((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
         Assert.DoesNotContain("who_is_coming", (await db.HubGroups.SingleAsync()).TrainingSchedule);
+
+        // Режим «сверху» (Ш4): хранится только включённый.
+        who.RsvpTop = true;
+        Assert.True((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
+        Assert.True(GroupTrainingSchedule.Parse((await db.HubGroups.SingleAsync()).TrainingSchedule).RsvpTop);
+        who.RsvpTop = false;
+        Assert.True((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
+        Assert.DoesNotContain("rsvp_top", (await db.HubGroups.SingleAsync()).TrainingSchedule);
     }
 
     private sealed class StubSettings : ISettingsService

@@ -377,6 +377,8 @@ public class HubGroupUserService : IHubGroupUserService
             // auto — значение по умолчанию: храним только отличие от него.
             LaneView = Clean(schedule?.LaneView)?.ToLowerInvariant() is { } view && view != GroupLaneView.Auto ? view : null,
             WhoIsComing = Clean(schedule?.WhoIsComing)?.ToLowerInvariant() is { } who && who != GroupWhoIsComing.Members ? who : null,
+            // Выключено — по умолчанию: храним только включённое.
+            RsvpTop = schedule?.RsvpTop == true ? true : null,
         };
 
         if (model.UsualLanes is int lanes && lanes is < LanePlanRules.MinLanes or > LanePlanRules.MaxLanes)

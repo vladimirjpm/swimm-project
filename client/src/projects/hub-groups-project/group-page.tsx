@@ -12,6 +12,7 @@ import { formatNextDate, scheduleDaysLabel } from './components/group-training-s
 import { readViewParam, rewriteLegacyTab, writeViewParam } from '../components/deep/view-chips';
 import { useTrainingRsvp } from './use-training-rsvp';
 import { rsvpStickyChip } from './components/group-rsvp';
+import GroupRsvpBanner, { showRsvpBanner } from './components/group-rsvp-banner';
 import GroupMembersOnly from './components/group-members-only';
 import {
   GroupLastStartCard, GroupMembersCard, GroupMembersDigest, GroupRecentSwimsCard,
@@ -334,15 +335,23 @@ function GroupPage({ slug }: { slug: string }) {
       topbarActive="groups"
       status={status}
       messages={{ notfound: 'Group not found', error: 'Could not load this group' }}
-      hero={group ? (membersOnly ? <GroupMembersOnly group={group} /> : (nav: EntityTabNav<GroupTab>) => (
-        <GroupHero
-          group={group}
-          insider={manages || isMember}
-          membership={{ isAuthenticated, status: membershipStatus, join, leave }}
-          rsvp={rsvp}
-          onWhosComing={() => nav.go('trainings')}
-        />
-      )) : null}
+      hero={group ? (membersOnly ? <GroupMembersOnly group={group} /> : (nav: EntityTabNav<GroupTab>) => {
+        // Режим «сверху» (Ш4): не ответившему участнику — баннер над фото, NEXT в шапке прячется.
+        const banner = showRsvpBanner(group, rsvp);
+        return (
+          <>
+            {banner && <GroupRsvpBanner group={group} rsvp={rsvp} />}
+            <GroupHero
+              group={group}
+              insider={manages || isMember}
+              membership={{ isAuthenticated, status: membershipStatus, join, leave }}
+              rsvp={rsvp}
+              onWhosComing={() => nav.go('trainings')}
+              hideTraining={banner}
+            />
+          </>
+        );
+      }) : null}
       sticky={group && !membersOnly ? {
         avatar: <GroupIcon iconUrl={group.icon_url} name={group.name_en || group.name} size="xs" />,
         name: group.name,

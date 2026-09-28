@@ -534,6 +534,10 @@ public sealed class GroupTrainingScheduleDto
     /// <summary>members | coach — кто видит имена «кто идёт» (<c>GroupWhoIsComing</c>); null — members.</summary>
     [JsonPropertyName("who_is_coming")]
     public string? WhoIsComing { get; set; }
+
+    /// <summary>Режим «сверху» (Ш4): не ответившему участнику «Are you coming?» над фото.</summary>
+    [JsonPropertyName("rsvp_top")]
+    public bool? RsvpTop { get; set; }
 }
 
 /// <summary>Занятие недели: день ISO (1 = Mon … 7 = Sun) и часы по стенным часам бассейна.</summary>
