@@ -63,6 +63,22 @@ public class AdminSettingsService : ISettingsService
             new(FavoritesRules.MaxClubsKey, FavoritesRules.DefaultMaxClubs.ToString(), "int", "livesite",
                 "Сколько КЛУБОВ можно держать в избранном, 1..200. Избранный клуб в пловцов не " +
                 "разворачивается и в лимит пловцов не идёт"),
+            // Потолки групп (Ш3.0, 28.09.2026): аккаунты дешёвые — у каждой самообслуживаемой
+            // вставки есть потолок. Правило и тексты — HubGroupQuotaRules.
+            new(HubGroupQuotaRules.MaxAccountMembersKey, HubGroupQuotaRules.DefaultMaxAccountMembers.ToString(), "int", "livesite",
+                "Сколько АККАУНТОВ (участники + заявки) может быть в одной группе, 1..5000. Действует " +
+                "и на самозапись, и на добавление по email; на админа сайта тоже"),
+            new(HubGroupQuotaRules.MaxManualSwimmersKey, HubGroupQuotaRules.DefaultMaxManualSwimmers.ToString(), "int", "livesite",
+                "Сколько ПЛОВЦОВ владелец может добавить в состав группы руками, 1..5000. Пловцы из " +
+                "подписки на клуб не в счёт"),
+            new(HubGroupQuotaRules.MaxMembershipsPerUserKey, HubGroupQuotaRules.DefaultMaxMembershipsPerUser.ToString(), "int", "livesite",
+                "В скольких группах может СОСТОЯТЬ один аккаунт (участник + заявки), 1..5000. " +
+                "Группы, которыми он владеет или админит, не в счёт"),
+            new(HubGroupQuotaRules.MaxPendingPerUserKey, HubGroupQuotaRules.DefaultMaxPendingPerUser.ToString(), "int", "livesite",
+                "Сколько ЗАЯВОК на вступление аккаунт может держать одновременно, 1..5000"),
+            new(HubGroupQuotaRules.SelfJoinEnabledKey, "true", "bool", "livesite",
+                "Самозапись в группы: false — кнопка «Join» закрыта всем (рубильник на волну спама). " +
+                "Добавление участника админом группы по email работает"),
             // Дефолт perGroup (решение 11.09.2026, §6-6): иначе галочка «Public group» у группы
             // ни на что не влияла. Приватная = только для участников, остальным — заглушка.
             new(HubGroupVisibilityRules.SettingKey, HubGroupVisibilityRules.Default, "string", "livesite",
@@ -158,6 +174,9 @@ public class AdminSettingsService : ISettingsService
             return false;
         if (key is FavoritesRules.MaxSwimmersKey or FavoritesRules.MaxClubsKey
             && !FavoritesRules.IsValidLimit(int.Parse(newValue)))
+            return false;
+        if (HubGroupQuotaRules.LimitKeys.Contains(key)
+            && !HubGroupQuotaRules.IsValidLimit(int.Parse(newValue)))
             return false;
         if (key == CacheSettings.HitVerifyPercent && int.Parse(newValue) is < 0 or > 100)
             return false;

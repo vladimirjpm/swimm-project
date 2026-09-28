@@ -1,3 +1,4 @@
+using Moq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,7 +28,8 @@ public class HubGroupDeleteTests
     private static HubGroupAdminService Service(SwimmDbContext db, ICurrentActor? actor = null) =>
         new(db, new HubGroupCrudCore(db),
             new AdminAuditService(db, actor ?? new FakeActor(7, "owner@example.com", null),
-                NullLogger<AdminAuditService>.Instance));
+                NullLogger<AdminAuditService>.Instance),
+            Mock.Of<ISettingsService>());
 
     private static async Task<(AppUser owner, HubGroup group)> SeedGroupAsync(SwimmDbContext db, string name = "Dolphins")
     {

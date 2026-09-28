@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -18,12 +19,14 @@ public class HubGroupAdminService : IHubGroupAdminService
     private readonly SwimmDbContext _db;
     private readonly HubGroupCrudCore _core;
     private readonly IAdminAuditService _audit;
+    private readonly ISettingsService _settings;
 
-    public HubGroupAdminService(SwimmDbContext db, HubGroupCrudCore core, IAdminAuditService audit)
+    public HubGroupAdminService(SwimmDbContext db, HubGroupCrudCore core, IAdminAuditService audit, ISettingsService settings)
     {
         _db = db;
         _core = core;
         _audit = audit;
+        _settings = settings;
     }
 
     public async Task<IReadOnlyList<HubGroupAdminRowDto>> GetAllAsync()
@@ -296,7 +299,8 @@ public class HubGroupAdminService : IHubGroupAdminService
     }
 
     public Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role) =>
-        _core.AddMemberAsync(hubGroupId, swimmerId, role);
+        _core.AddMemberAsync(hubGroupId, swimmerId, role,
+            maxManual: HubGroupQuotaRules.Limit(_settings, HubGroupQuotaRules.MaxManualSwimmersKey));
 
     public Task<HubGroupMemberSaveResult> UpdateMemberAsync(int hubGroupId, int memberId, string role, int sortOrder) =>
         _core.UpdateMemberAsync(hubGroupId, memberId, role, sortOrder);

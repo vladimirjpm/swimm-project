@@ -7,6 +7,7 @@ using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Swimm.API.Controllers;
 
@@ -18,6 +19,7 @@ namespace Swimm.API.Controllers;
 /// Виртуальная группа «Моё избранное» — per-user, поэтому БЕЗ общего кэша.
 /// </summary>
 [ApiController]
+[EnableRateLimiting(HubGroupQuotaRules.RateLimitPolicy)]
 public class HubGroupsController : ControllerBase
 {
     private readonly IHubGroupPublicRepository _groups;

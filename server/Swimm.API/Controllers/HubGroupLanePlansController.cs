@@ -5,6 +5,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Swimm.API.Controllers;
 
@@ -18,6 +19,7 @@ namespace Swimm.API.Controllers;
 [Route("api/hub-groups/{id:int}/lane-plans")]
 [Authorize]
 [AutoValidateAntiforgeryToken]
+[EnableRateLimiting(HubGroupQuotaRules.RateLimitPolicy)]
 public class HubGroupLanePlansController : ControllerBase
 {
     private readonly ILanePlanService _plans;

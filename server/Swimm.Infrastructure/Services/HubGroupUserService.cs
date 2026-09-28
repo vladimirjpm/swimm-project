@@ -214,6 +214,9 @@ public class HubGroupUserService : IHubGroupUserService
         if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId))
             return HubGroupMemberSaveResult.Fail("Пловец не найден");
 
+        var quota = await CheckMembershipQuotasAsync(hubGroupId, user.Id, pending: false, selfJoin: false);
+        if (quota != null) return HubGroupMemberSaveResult.Fail(quota);
+
         return await InsertUserMemberAsync(hubGroupId, user.Id, addedByUserId, swimmerId: swimmerId, note: NormalizeNote(note));
     }
 
@@ -277,7 +280,47 @@ public class HubGroupUserService : IHubGroupUserService
         var status = isPrivate || group.JoinPolicy == HubGroupJoinPolicy.Approval
             ? HubGroupUserMemberStatus.Pending
             : HubGroupUserMemberStatus.Active;
+
+        var quota = await CheckMembershipQuotasAsync(
+            hubGroupId, userId, pending: status == HubGroupUserMemberStatus.Pending, selfJoin: true);
+        if (quota != null) return HubGroupMemberSaveResult.Fail(quota);
+
         return await InsertUserMemberAsync(hubGroupId, userId, addedByUserId: null, status);
+    }
+
+    /// <summary>
+    /// Потолки вставки участника-аккаунта (Ш3.0, <see cref="HubGroupQuotaRules"/>): рубильник
+    /// самозаписи, заполненность группы, число членств аккаунта и его висящих заявок. Уже
+    /// состоящему не отказываем по потолку — повтор получит свой отказ «уже участник» из
+    /// <see cref="InsertUserMemberAsync"/>. null — можно.
+    /// </summary>
+    private async Task<string?> CheckMembershipQuotasAsync(int hubGroupId, int userId, bool pending, bool selfJoin)
+    {
+        if (selfJoin && !HubGroupQuotaRules.SelfJoinEnabled(_settings))
+            return HubGroupQuotaRules.SelfJoinClosedError;
+
+        if (await _db.HubGroupUserMembers.AnyAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId))
+            return null;
+
+        var groupLimit = HubGroupQuotaRules.Limit(_settings, HubGroupQuotaRules.MaxAccountMembersKey);
+        if (await _db.HubGroupUserMembers.CountAsync(m => m.HubGroupId == hubGroupId) >= groupLimit)
+            return HubGroupQuotaRules.GroupFullError(groupLimit);
+
+        var membershipLimit = HubGroupQuotaRules.Limit(_settings, HubGroupQuotaRules.MaxMembershipsPerUserKey);
+        if (await _db.HubGroupUserMembers.CountAsync(m => m.UserId == userId) >= membershipLimit)
+            return selfJoin
+                ? HubGroupQuotaRules.TooManyMembershipsError(membershipLimit)
+                : HubGroupQuotaRules.UserTooManyMembershipsError(membershipLimit);
+
+        if (pending)
+        {
+            var pendingLimit = HubGroupQuotaRules.Limit(_settings, HubGroupQuotaRules.MaxPendingPerUserKey);
+            if (await _db.HubGroupUserMembers.CountAsync(m =>
+                    m.UserId == userId && m.Status == HubGroupUserMemberStatus.Pending) >= pendingLimit)
+                return HubGroupQuotaRules.TooManyPendingError(pendingLimit);
+        }
+
+        return null;
     }
 
     public async Task<HubGroupMemberSaveResult> ApproveUserMemberAsync(int hubGroupId, int userId)

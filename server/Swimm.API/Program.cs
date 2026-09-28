@@ -144,6 +144,26 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+    // Мутации групп (Ш3.0, 28.09.2026): вступление, RSVP, состав, уровни, планы дорожек, медиа
+    // группы. Вешается на весь контроллер группы, поэтому чтение (GET/HEAD) пропускаем без
+    // лимита: иначе поиск пловца «по мере набора» упирался бы в него. Ключ — userId.
+    options.AddPolicy(HubGroupQuotaRules.RateLimitPolicy, httpContext =>
+        HttpMethods.IsGet(httpContext.Request.Method) || HttpMethods.IsHead(httpContext.Request.Method)
+            ? RateLimitPartition.GetNoLimiter("read")
+            : RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                              ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = HubGroupQuotaRules.RateLimitPerMinute,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
+    // Тело отказа — { error }: так его читают клиентские обработчики (saveResultFrom, RSVP);
+    // вход (login-modal) смотрит только на статус 429, тело ему не мешает.
+    options.OnRejected = async (context, ct) =>
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { error = HubGroupQuotaRules.RateLimitedError }, ct);
 });
 // Antiforgery: header-based (double-submit) для защиты admin-мутаций.
 // Клиент читает токен из JS-переменной, генерируемой в _Layout.cshtml, и посылает в этом заголовке.

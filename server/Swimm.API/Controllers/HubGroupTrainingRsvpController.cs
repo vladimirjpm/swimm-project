@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Microsoft.AspNetCore.RateLimiting;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;
 
@@ -19,6 +21,7 @@ namespace Swimm.API.Controllers;
 [Route("api/hub-groups/{id:int}/rsvp")]
 [Authorize]
 [AutoValidateAntiforgeryToken]
+[EnableRateLimiting(HubGroupQuotaRules.RateLimitPolicy)]
 public class HubGroupTrainingRsvpController : ControllerBase
 {
     private readonly ITrainingRsvpService _rsvp;

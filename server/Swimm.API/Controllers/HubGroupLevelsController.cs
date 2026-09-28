@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Microsoft.AspNetCore.RateLimiting;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;
 
@@ -16,6 +18,7 @@ namespace Swimm.API.Controllers;
 [Route("api/me/hub-groups/{id:int}")]
 [Authorize]
 [AutoValidateAntiforgeryToken]
+[EnableRateLimiting(HubGroupQuotaRules.RateLimitPolicy)]
 public class HubGroupLevelsController : ControllerBase
 {
     private readonly IHubGroupLevelService _levels;

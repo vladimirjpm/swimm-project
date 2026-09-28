@@ -191,7 +191,9 @@ public partial class HubGroupCrudCore
         }
     }
 
-    public async Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role)
+    /// <param name="maxManual">Потолок ручных строк состава (<see cref="HubGroupQuotaRules"/>,
+    /// Ш3.0); null — без потолка. Клубные строки не в счёт; клубная, ставшая ручной, — в счёт.</param>
+    public async Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role, int? maxManual = null)
     {
         var groupExists = await _db.HubGroups.AnyAsync(g => g.Id == hubGroupId);
         if (!groupExists) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
@@ -203,10 +205,15 @@ public partial class HubGroupCrudCore
 
         var existing = await _db.HubGroupMembers
             .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId);
+        if (existing?.Source == HubGroupMemberSource.Manual)
+            return HubGroupMemberSaveResult.Fail("Этот пловец уже состоит в группе");
+
+        if (maxManual is int limit && await _db.HubGroupMembers.CountAsync(m =>
+                m.HubGroupId == hubGroupId && m.Source == HubGroupMemberSource.Manual) >= limit)
+            return HubGroupMemberSaveResult.Fail(HubGroupQuotaRules.RosterFullError(limit));
+
         if (existing != null)
         {
-            if (existing.Source == HubGroupMemberSource.Manual)
-                return HubGroupMemberSaveResult.Fail("Этот пловец уже состоит в группе");
 
             // Клубного (в т.ч. скрытого) владелец добавил руками — строка становится ручной:
             // ручной побеждает клубного (план §2), и ни уход из клуба, ни отписка его больше не

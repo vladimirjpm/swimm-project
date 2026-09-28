@@ -29,8 +29,9 @@ public class AdminSettingsServiceTests
         // + HubGroupMaxPerCoach (лимит групп для роли Coach, 2026-09-10)
         // + FavoritesMaxSwimmers/FavoritesMaxClubs (лимиты избранного, 2026-09-10)
         // + CacheRowPrecision/CacheHitVerifyPercent (точность сброса кэша, К4б.3, 2026-09-14)
-        // + CacheColumnPrecision (служебные колонки, К4б.6, 2026-09-14).
-        Assert.Equal(22, all.Count);
+        // + CacheColumnPrecision (служебные колонки, К4б.6, 2026-09-14)
+        // + 4 потолка групп и рубильник самозаписи (HubGroupQuotaRules, Ш3.0, 2026-09-28).
+        Assert.Equal(27, all.Count);
     }
 
     [Fact]
