@@ -65,6 +65,13 @@ public sealed class TrainingRsvpDto
     public string? BreakUntil { get; set; }
 
     /// <summary>
+    /// Вид по дорожкам (Ш3.2, вариант 3b): кто из идущих на какой дорожке. null — вида нет
+    /// (выключен у группы, или «только план», а плана на дату нет).
+    /// </summary>
+    [JsonPropertyName("lane_view")]
+    public TrainingLaneViewDto? LaneView { get; set; }
+
+    /// <summary>
     /// Все активные участники с ответами — ТОЛЬКО управляющему (иначе null). Порядок: иду,
     /// не уверен, не приду, без ответа, на перерыве без ответа; внутри — по имени.
     /// </summary>
@@ -115,6 +122,85 @@ public sealed class TrainingRsvpPersonDto
     /// <summary>Сам вернулся с перерыва недавно — сколько дней был на нём («back after …»).</summary>
     [JsonPropertyName("back_after_days")]
     public int? BackAfterDays { get; set; }
+}
+
+/// <summary>
+/// Вид по дорожкам на занятие (Ш3.2, <c>TrainingLaneView</c>). В бассейне — те, кто ответил
+/// «иду» или «не уверен» (оба занимают место, «не уверен» рисуется пунктиром).
+/// </summary>
+public sealed class TrainingLaneViewDto
+{
+    /// <summary>
+    /// plan — опубликованный план тренера на дату; auto — раскладка на лету по уровням
+    /// (подпись «Auto · by level», не решение тренера); water — дорожек не знаем, одна общая «вода».
+    /// </summary>
+    [JsonPropertyName("source")]
+    public string Source { get; set; } = "";
+
+    [JsonPropertyName("lane_count")]
+    public int LaneCount { get; set; }
+
+    [JsonPropertyName("lanes")]
+    public List<TrainingLaneDto> Lanes { get; set; } = [];
+
+    /// <summary>Идущие без дорожки: план их не разложил / у них нет уровня, когда уровни в ходу.</summary>
+    [JsonPropertyName("no_lane")]
+    public List<TrainingLanePersonDto> NoLane { get; set; } = [];
+
+    /// <summary>Имена других скрыты (у группы «Who's coming: coach only», зритель не тренер).</summary>
+    [JsonPropertyName("names_hidden")]
+    public bool NamesHidden { get; set; }
+}
+
+public sealed class TrainingLaneDto
+{
+    [JsonPropertyName("lane_no")]
+    public int LaneNo { get; set; }
+
+    /// <summary>Уровень дорожки — подпись «1 · fast»; null — без уровня.</summary>
+    [JsonPropertyName("level")]
+    public LanePlanLevelDto? Level { get; set; }
+
+    /// <summary>Задание дорожки — только у плана.</summary>
+    [JsonPropertyName("workout")]
+    public string? Workout { get; set; }
+
+    [JsonPropertyName("people")]
+    public List<TrainingLanePersonDto> People { get; set; } = [];
+}
+
+public sealed class TrainingLanePersonDto
+{
+    /// <summary>Аккаунт; null — имя скрыто (кружок без имени).</summary>
+    [JsonPropertyName("user_id")]
+    public int? UserId { get; set; }
+
+    /// <summary>Пловец, которым человек стоит на дорожке; null — стоит аккаунтом.</summary>
+    [JsonPropertyName("swimmer_id")]
+    public int? SwimmerId { get; set; }
+
+    /// <summary>Имя пловца (иврит по умолчанию) или аккаунта; null — скрыто.</summary>
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    /// <summary>male | female | null — цвет кружка.</summary>
+    [JsonPropertyName("gender")]
+    public string? Gender { get; set; }
+
+    /// <summary>yes | maybe.</summary>
+    [JsonPropertyName("answer")]
+    public string Answer { get; set; } = "";
+
+    [JsonPropertyName("note")]
+    public string? Note { get; set; }
+
+    /// <summary>Это зритель — кружок с кольцом.</summary>
+    [JsonPropertyName("is_me")]
+    public bool IsMe { get; set; }
+
+    /// <summary>Сколько аккаунтов группы называют себя этим пловцом; 2+ — метка «2 claim».</summary>
+    [JsonPropertyName("claims")]
+    public int Claims { get; set; }
 }
 
 /// <summary>Ответ на занятие. <c>answer = null</c> — снять ответ.</summary>

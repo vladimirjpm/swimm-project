@@ -530,6 +530,10 @@ public sealed class GroupTrainingScheduleDto
     /// <summary>auto | plan | off — режим вида по дорожкам (<c>GroupLaneView</c>); null — auto.</summary>
     [JsonPropertyName("lane_view")]
     public string? LaneView { get; set; }
+
+    /// <summary>members | coach — кто видит имена «кто идёт» (<c>GroupWhoIsComing</c>); null — members.</summary>
+    [JsonPropertyName("who_is_coming")]
+    public string? WhoIsComing { get; set; }
 }
 
 /// <summary>Занятие недели: день ISO (1 = Mon … 7 = Sun) и часы по стенным часам бассейна.</summary>

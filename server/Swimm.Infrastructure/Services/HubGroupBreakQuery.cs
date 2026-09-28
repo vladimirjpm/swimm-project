@@ -8,8 +8,8 @@ namespace Swimm.Infrastructure.Services;
 /// карточек: иначе «знаменатель полосы» и «кто не лезет в Unassigned» разъехались бы.
 ///
 /// Флаг один на человека (решение Влада 28.09.2026), а строк у человека может быть две —
-/// у аккаунта и у его пловца. Связка — метка членства от тренера (<c>HubGroupUserMember.SwimmerId</c>):
-/// перерыв аккаунта кладёт на перерыв его пловца и наоборот.
+/// у аккаунта и у его пловца. Связка — <see cref="HubGroupPersonResolver"/> (метка тренера,
+/// привязка админом, «Me», «Family»): перерыв аккаунта кладёт на перерыв его пловца и наоборот.
 /// </summary>
 internal static class HubGroupBreakQuery
 {
@@ -31,13 +31,17 @@ internal static class HubGroupBreakQuery
         var users = rows.Where(r => r.UserId != null).Select(r => r.UserId!.Value).ToHashSet();
         var swimmers = rows.Where(r => r.SwimmerId != null).Select(r => r.SwimmerId!.Value).ToHashSet();
 
-        var labels = await db.HubGroupUserMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == hubGroupId && m.SwimmerId != null)
-            .Select(m => new { m.UserId, SwimmerId = m.SwimmerId!.Value })
+        // Связка «аккаунт ↔ его пловец» — тот же резолвер, что у вида по дорожкам (метка тренера,
+        // привязка админом, «Me», «Family»): кто стоит на дорожке пловцом X, тот и на перерыве с X.
+        var memberIds = await db.HubGroupUserMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId)
+            .Select(m => m.UserId)
             .ToListAsync();
+        var resolved = await HubGroupPersonResolver.ResolveAsync(db, hubGroupId, memberIds);
 
-        var linkedUsers = labels.Where(l => swimmers.Contains(l.SwimmerId)).Select(l => l.UserId).ToList();
-        var linkedSwimmers = labels.Where(l => users.Contains(l.UserId)).Select(l => l.SwimmerId).ToList();
+        var links = resolved.Where(r => r.Value != null).Select(r => (UserId: r.Key, SwimmerId: r.Value!.Value)).ToList();
+        var linkedUsers = links.Where(l => swimmers.Contains(l.SwimmerId)).Select(l => l.UserId).ToList();
+        var linkedSwimmers = links.Where(l => users.Contains(l.UserId)).Select(l => l.SwimmerId).ToList();
         users.UnionWith(linkedUsers);
         swimmers.UnionWith(linkedSwimmers);
 

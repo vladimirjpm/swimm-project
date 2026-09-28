@@ -350,6 +350,17 @@ public class HubGroupBreakTests
         var auto = GroupTrainingSchedule.Parse((await db.HubGroups.SingleAsync()).TrainingSchedule);
         Assert.Equal(((int?)null, (string?)null, "auto"), (auto.UsualLanes, auto.LaneView, auto.EffectiveLaneView));
         Assert.DoesNotContain("lane_view", (await db.HubGroups.SingleAsync()).TrainingSchedule);
+
+        // «Who's coming» (Ш3.2): members — по умолчанию, хранится отсутствием; coach — хранится.
+        var who = Dto(null, null);
+        who.WhoIsComing = "nobody";
+        Assert.False((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
+        who.WhoIsComing = "Coach";
+        Assert.True((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
+        Assert.Equal("coach", GroupTrainingSchedule.Parse((await db.HubGroups.SingleAsync()).TrainingSchedule).EffectiveWhoIsComing);
+        who.WhoIsComing = "members";
+        Assert.True((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
+        Assert.DoesNotContain("who_is_coming", (await db.HubGroups.SingleAsync()).TrainingSchedule);
     }
 
     private sealed class StubSettings : ISettingsService

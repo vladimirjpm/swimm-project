@@ -112,15 +112,12 @@ public class TrainingRsvpService : ITrainingRsvpService
     }
 
     /// <summary>
-    /// Закрыть открытые перерывы человека на дату занятия: его аккаунта и пловца по метке тренера
-    /// (флаг один на человека — <see cref="HubGroupBreakQuery"/>).
+    /// Закрыть открытые перерывы человека на дату занятия: его аккаунта и пловца, которым он стоит
+    /// в группе (флаг один на человека — <see cref="HubGroupBreakQuery"/>, <see cref="HubGroupPersonResolver"/>).
     /// </summary>
     private async Task EndBreaksByRsvpAsync(int hubGroupId, int userId, DateOnly sessionDate)
     {
-        var labelSwimmer = await _db.HubGroupUserMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == hubGroupId && m.UserId == userId)
-            .Select(m => m.SwimmerId)
-            .FirstOrDefaultAsync();
+        var labelSwimmer = (await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, [userId]))[userId];
 
         var open = await _db.HubGroupBreaks
             .Where(b => b.HubGroupId == hubGroupId && b.EndedAt == null
@@ -132,6 +129,102 @@ public class TrainingRsvpService : ITrainingRsvpService
             b.EndedAt = DateTime.UtcNow;
             b.EndedByRsvp = true;
         }
+    }
+
+    /// <summary>
+    /// Вид по дорожкам (Ш3.2): кем каждый пришедший стоит (<see cref="HubGroupPersonResolver"/>),
+    /// его уровень (пловца, иначе аккаунта), порядок состава — и чистая раскладка
+    /// <see cref="TrainingLaneView"/>. Только в этом личном ответе: имена и ответы — приватные.
+    /// </summary>
+    private async Task<TrainingLaneViewDto?> BuildLaneViewAsync(int hubGroupId, GroupTrainingSchedule schedule,
+        DateOnly date, IReadOnlyDictionary<int, (string Name, string? Gender)> members,
+        IReadOnlyDictionary<int, HubGroupTrainingRsvp> answers, int viewerUserId, bool isManager)
+    {
+        var mode = schedule.EffectiveLaneView;
+        if (mode == GroupLaneView.Off) return null;
+
+        var plan = await _db.LanePlans.AsNoTracking()
+            .Include(p => p.Lanes)
+            .Include(p => p.Swimmers)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date && p.Status == LanePlanStatus.Published);
+        if (plan == null && mode == GroupLaneView.Plan) return null;
+        var lastPlanLanes = plan != null || schedule.UsualLanes != null ? null : await _db.LanePlans.AsNoTracking()
+            .Where(p => p.HubGroupId == hubGroupId)
+            .OrderByDescending(p => p.Date)
+            .Select(p => (int?)p.LaneCount)
+            .FirstOrDefaultAsync();
+
+        // Кем стоит каждый участник (не только пришедшие): «2 claim» считается по всей группе.
+        var resolved = await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, members.Keys.ToList());
+        var claims = resolved.Values.Where(v => v != null)
+            .GroupBy(v => v!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var roster = await _db.HubGroupMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId && !m.IsExcluded)
+            .OrderBy(m => m.SortOrder).ThenBy(m => m.Swimmer!.LastName).ThenBy(m => m.Swimmer!.FirstName)
+            .ThenBy(m => m.SwimmerId)
+            .Select(m => new
+            {
+                m.SwimmerId,
+                Name = (m.Swimmer!.LastName + " " + m.Swimmer.FirstName).Trim(),
+                NameEn = (m.Swimmer.LastNameEn + " " + m.Swimmer.FirstNameEn).Trim(),
+                m.Swimmer.Gender,
+            })
+            .ToListAsync();
+        var rosterAt = roster.Select((r, i) => (r, i)).ToDictionary(x => x.r.SwimmerId, x => x);
+
+        var swimmerLevels = await _db.HubGroupSwimmerLevels.AsNoTracking()
+            .Where(l => l.HubGroupId == hubGroupId)
+            .ToDictionaryAsync(l => l.SwimmerId, l => l.LevelId);
+        var accountLevels = await _db.HubGroupAccountLevels.AsNoTracking()
+            .Where(l => l.HubGroupId == hubGroupId)
+            .ToDictionaryAsync(l => l.UserId, l => l.LevelId);
+        var levels = await _db.HubGroupLevels.AsNoTracking()
+            .Where(l => l.HubGroupId == hubGroupId)
+            .OrderBy(l => l.Rank).ThenBy(l => l.Id)
+            .Select(l => new TrainingLaneView.LevelInfo(l.Id, l.Rank, l.Name, l.Color))
+            .ToListAsync();
+
+        // В бассейне — ответившие «иду» и «не уверен». Пловцы — в порядке состава; аккаунты без
+        // пловца — после состава, по имени (детерминированно, не «каждый раз по-разному»).
+        var coming = answers.Values
+            .Where(a => a.Answer is TrainingRsvpAnswer.Yes or TrainingRsvpAnswer.Maybe && members.ContainsKey(a.UserId))
+            .ToList();
+        var accountsOrder = coming
+            .Where(a => resolved[a.UserId] == null)
+            .OrderBy(a => members[a.UserId].Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(a => a.UserId)
+            .Select((a, i) => (a.UserId, i))
+            .ToDictionary(x => x.UserId, x => roster.Count + x.i);
+
+        var pool = coming.Select(a =>
+        {
+            var member = members[a.UserId];
+            if (resolved[a.UserId] is int sid && rosterAt.TryGetValue(sid, out var at))
+            {
+                return new TrainingLaneView.Person(
+                    a.UserId, sid,
+                    string.IsNullOrEmpty(at.r.Name) ? at.r.NameEn : at.r.Name,
+                    at.r.Gender ?? member.Gender,
+                    a.Answer, a.Note,
+                    swimmerLevels.TryGetValue(sid, out var sl) ? sl : accountLevels.TryGetValue(a.UserId, out var al) ? al : null,
+                    at.i, claims.GetValueOrDefault(sid, 1));
+            }
+            return new TrainingLaneView.Person(
+                a.UserId, null, member.Name, member.Gender, a.Answer, a.Note,
+                accountLevels.TryGetValue(a.UserId, out var level) ? level : null,
+                accountsOrder[a.UserId], 1);
+        }).ToList();
+
+        var planModel = plan == null ? null : new TrainingLaneView.Plan(
+            plan.LaneCount,
+            plan.Lanes.Select(l => new TrainingLaneView.PlanLane(l.LaneNo, l.LevelId, l.Workout)).ToList(),
+            plan.Swimmers.ToDictionary(s => s.SwimmerId, s => (s.LaneNo, s.OrderNo)));
+
+        var namesVisible = isManager || schedule.EffectiveWhoIsComing == GroupWhoIsComing.Members;
+        return TrainingLaneView.Build(mode, planModel, schedule.UsualLanes, lastPlanLanes, levels, pool,
+            viewerUserId, namesVisible);
     }
 
     private Task<bool> IsActiveMemberAsync(int hubGroupId, int userId) =>
@@ -197,6 +290,9 @@ public class TrainingRsvpService : ITrainingRsvpService
         var isMember = memberIds.Contains(viewerUserId);
         answers.TryGetValue(viewerUserId, out var mine);
 
+        var laneView = await BuildLaneViewAsync(hubGroupId, schedule, date,
+            members.ToDictionary(m => m.UserId, m => (m.Name, m.Gender)), answers, viewerUserId, isManager);
+
         return new TrainingRsvpDto
         {
             SessionId = TrainingRsvpRules.SessionKey(date, start),
@@ -217,6 +313,7 @@ public class TrainingRsvpService : ITrainingRsvpService
                         && TrainingRsvpRules.EditBlockReason(schedule, date, start, now, isManager) == null,
             OnBreak = onBreak.UserIds.Contains(viewerUserId),
             BreakUntil = viewerBreakUntil?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            LaneView = laneView,
             People = !isManager ? null : members
                 .Select(m =>
                 {

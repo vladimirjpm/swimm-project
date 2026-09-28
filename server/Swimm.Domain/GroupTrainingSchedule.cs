@@ -58,6 +58,18 @@ public sealed class GroupTrainingSchedule
     public string EffectiveLaneView =>
         LaneView is GroupLaneView.Plan or GroupLaneView.Off ? LaneView! : GroupLaneView.Auto;
 
+    /// <summary>
+    /// Кто видит имена «кто идёт» (<see cref="GroupWhoIsComing"/>): members — все участники (по
+    /// умолчанию, решение Влада 28.09.2026: как на опубликованном плане дорожек), coach — только
+    /// управляющие; участник тогда видит себя и безымянные кружки. null — members.
+    /// </summary>
+    [JsonPropertyName("who_is_coming")]
+    public string? WhoIsComing { get; set; }
+
+    [JsonIgnore]
+    public string EffectiveWhoIsComing =>
+        WhoIsComing == GroupWhoIsComing.Coach ? GroupWhoIsComing.Coach : GroupWhoIsComing.Members;
+
     private static readonly JsonSerializerOptions Options = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -142,6 +154,15 @@ public static class GroupLaneView
     public const string Off = "off";
 
     public static readonly string[] All = [Auto, Plan, Off];
+}
+
+/// <summary>Кто видит имена «кто идёт» (<see cref="GroupTrainingSchedule.WhoIsComing"/>).</summary>
+public static class GroupWhoIsComing
+{
+    public const string Members = "members";
+    public const string Coach = "coach";
+
+    public static readonly string[] All = [Members, Coach];
 }
 
 /// <summary>Одно регулярное занятие недели.</summary>
