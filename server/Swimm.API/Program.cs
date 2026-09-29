@@ -958,19 +958,22 @@ if (args.Contains("--records-dump"))
 // Прогон «Проверить качество» по событию без админки (пара к --repull: после переимпорта
 // автопометки сброшены, и вернуть актуальные может только скан):
 //   dotnet run -- --quality-scan <eventId>
+//   dotnet run -- --quality-scan <competitionId> --competition   (однодневка без события)
 if (args.Contains("--quality-scan"))
 {
     var qsIndex = Array.IndexOf(args, "--quality-scan") + 1;
     if (qsIndex >= args.Length || !int.TryParse(args[qsIndex], out var qsEventId))
     {
-        Console.Error.WriteLine("Usage: dotnet run -- --quality-scan <eventId>");
+        Console.Error.WriteLine("Usage: dotnet run -- --quality-scan <eventId> | --quality-scan <competitionId> --competition");
         Environment.Exit(1);
         return;
     }
 
     using var scope = app.Services.CreateScope();
     var suspects = scope.ServiceProvider.GetRequiredService<ISuspectResultService>();
-    var scan = await suspects.ScanAsync(qsEventId, null);
+    var scan = args.Contains("--competition")
+        ? await suspects.ScanAsync(null, qsEventId)
+        : await suspects.ScanAsync(qsEventId, null);
     Console.WriteLine($"Просмотрено {scan.Scanned}, помечено {scan.Flagged}, снято {scan.Cleared}, ручных сохранено {scan.ManualKept}");
     foreach (var g in scan.Rows.GroupBy(r => r.Reason))
         Console.WriteLine($"  {g.Key}: {g.Count()}");

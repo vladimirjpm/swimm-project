@@ -386,8 +386,10 @@ public class ResultRepository : IResultRepository
         // Лучший заплыв — максимум FINA-очков; тай-брейк по времени, затем Id (стабильность).
         // ♂/♀ (design_handoff вариант 4) — та же проекция с фильтром по полу. Пара-очки с FINA
         // не сравнимы (Р67): 931 за 1:22.76 на 100 в/с иначе забирал «лучший заплыв» чемпионата.
+        // Помеченные ошибки протокола тоже (Р69): отсечка 50 м вместо финиша на 400 в/с дала
+        // 117 333 очка — как и рекорды, помеченная строка в зачётных выборках не участвует.
         static IQueryable<OverviewBestSwimDto> BestSwimProjection(IQueryable<Domain.Entities.ResultRecord> q) =>
-            q.Where(r => !r.TimeFail && !r.IsParaPoints && r.InternationalPoints > 0)
+            q.Where(r => !r.TimeFail && !r.IsParaPoints && r.SuspectReason == null && r.InternationalPoints > 0)
              .OrderByDescending(r => r.InternationalPoints)
              .ThenBy(r => r.TimeMillisecond)
              .ThenBy(r => r.Id)
@@ -567,8 +569,10 @@ public class ResultRepository : IResultRepository
         // legacy-ветки (соревнование без правила), где эстафетные FINA-очки иначе попали бы
         // в сумму пловца. Флаг правила остаётся вторым рубежом в PointRulesSwimmersScoring.
         // NB: в медальном зачёте «Most decorated» эстафеты, наоборот, считаются.
+        // Помеченные ошибки протокола (SuspectReason) не участвуют ни очками, ни местом (Р69):
+        // у 1512 неверные времена переставили и места 1–7 заплыва.
         var hpRows = await query
-            .Where(r => r.RelayId == null && !r.TimeFail
+            .Where(r => r.RelayId == null && !r.TimeFail && r.SuspectReason == null
                         && (r.Gender == "male" || r.Gender == "female")
                         && r.Swimmer.BirthYear > 0
                         // combine-all: дисциплина зачитывается один раз — по лучшему заплыву,

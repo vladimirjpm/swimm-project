@@ -875,6 +875,51 @@ public class ResultRepositoryTests
         Assert.Equal(898, overview.BestSwim.Points);
     }
 
+    /// <summary>
+    /// Помеченная ошибка протокола (Р69) в зачётных выборках не участвует, как и в рекордах:
+    /// 1512 — отсечка 50 м вместо финиша на 400 в/с дала 117 333 очка и «лучший заплыв», а
+    /// Мошкович (32.59 на 100 батт.) — 4702 и «Best swim ♀» Маккабиады. То же с High Point.
+    /// </summary>
+    [Fact]
+    public async Task Overview_BestSwimAndHighPoint_SkipSuspectAndParaRows()
+    {
+        await using var db = CreateDb(nameof(Overview_BestSwimAndHighPoint_SkipSuspectAndParaRows));
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m"
+        };
+        var honest = new Swimmer { LastName = "Honest", FirstName = "H", LastNameEn = "Honest", FirstNameEn = "H", BirthYear = 2011 };
+        var broken = new Swimmer { LastName = "Broken", FirstName = "B", LastNameEn = "Broken", FirstNameEn = "B", BirthYear = 2011 };
+        var para = new Swimmer { LastName = "Para", FirstName = "P", LastNameEn = "Para", FirstNameEn = "P", BirthYear = 2011 };
+        db.AddRange(style, club, comp, honest, broken, para);
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        ResultRecord Row(int swimmer, int pts, string time, string? suspect = null, bool isPara = false) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer, ClubId = club.Id, StyleId = style.Id,
+            Distance = "400", Gender = "male", CompetitionDate = date, TimeOriginal = time,
+            AgeGroup = "13", EventStyleAge = "400 freestyle 13", InternationalPoints = pts, Position = 1,
+            SuspectReason = suspect, IsParaPoints = isPara
+        };
+        db.Results.AddRange(
+            Row(honest.Id, 526, "4:32.42"),
+            Row(broken.Id, 117333, "0:44.93", suspect: "time_vs_distance"),
+            Row(para.Id, 931, "6:10.00", isPara: true));
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
+
+        Assert.Equal(honest.Id, overview.BestSwim!.SwimmerId);
+        var hp = Assert.Single(overview.HighPointAwards);
+        Assert.Equal(honest.Id, hp.SwimmerId);
+        Assert.Equal(526, hp.Points);
+    }
+
     [Fact]
     public async Task Overview_BestSwim_NullWhenNoPoints()
     {
