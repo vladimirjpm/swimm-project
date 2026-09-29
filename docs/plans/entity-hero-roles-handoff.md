@@ -1,119 +1,102 @@
-# ПЕРЕДАЧА: шапка сущности, роли, «иду на тренировку» (фаза 8.15)
+# ПЕРЕДАЧА: шапка сущности, роли, «иду на тренировку», дорожки (фаза 8.15)
 
-Сессия 28.09.2026. **Читать первым, если продолжаешь.** План и решения целиком —
-[entity-hero-roles-plan.md](entity-hero-roles-plan.md) (§1 — решения Влада поверх хендоффа,
-§3 — что сделано в Ш1, §4 — Ш2). Хендофф — `!design_handoff/group-club-changes/`.
+Сессии 28–29.09.2026. **Читать первым, если продолжаешь.** План и решения целиком —
+[entity-hero-roles-plan.md](entity-hero-roles-plan.md): §1 — решения Влада поверх хендоффа,
+§3 — Ш1, §4 — Ш2, §5 — решения по Ш3 и что сделано в Ш3.0–Ш3.3, §6 — Ш4. Хендофф —
+`!design_handoff/group-club-changes/`. Правило доверия — [data-integrity.md](../data-integrity.md)
+И15–И16, Р54–Р58.
 
-## 1. Где мы
+## 1. Где мы — фаза 8.15 закрыта, всё закоммичено, НЕ запушено
 
-| Этап | Что | Статус |
+Ветка **`entity-hero-roles`**, 6 коммитов поверх master (`d6ec402c`), push не делался:
+
+| Этап | Что | Коммит |
 |---|---|---|
-| Ш1 | Шапка группы/клуба (2a/4a/7a/6b), табы по ролям, «Coach tools», липкая полоса, Results с чипами, список стартов, мобильное фото | ✅ сделан, **не закоммичен** |
-| Ш2 | Ответы «иду / не уверен / не приду»: полоса, счётчики, кнопки, тренер отвечает за участника, чип липкой полосы, список «кто идёт» в Trainings → Sessions | ✅ сделан, **не закоммичен** |
-| Ш3.0 | Квоты групп + rate limit `hubgroups` (план §5 «Квоты — сделаны») | ✅ 28.09, коммит f15f6795 (Ш1–Ш2 — 71491980) |
-| Ш3.1 | Сервер дорожек: «On break», уровень аккаунта, `usual_lanes` / `lane_view` (план §5 «Ш3.1 — сделано») | ✅ 28.09, коммит 68470683; миграция `AddHubGroupBreaksAndAccountLevels` применена к локальной базе |
-| Ш3.2 | Раскладка: резолвер «кем стоит аккаунт», `lane_view` в ответе RSVP, «Who's coming» (план §5 «Ш3.2 — сделано») | ✅ 28.09, коммит ad352cf9 |
-| Ш3.3 | Клиент: бассейн 3b, переключатель, заметки, «On break», уровень аккаунта, настройки дорожек (план §5 «Ш3.3 — сделано») | ✅ 28.09, коммит 1a51f477 |
-| Ш3 | Вид по дорожкам (3b) в Trainings → Sessions, быстрые заметки, позже — отметка посещения | **следующий**, не начат |
-| Ш4 | Баннер «Are you coming?» над фото для не ответившего участника — галка тренера `rsvp_top` в расписании (план §6) | ✅ 29.09, **не закоммичен** |
+| Ш1–Ш2 | Шапка группы/клуба (2a/4a/7a/6b), табы по ролям, «Coach tools», липкая полоса, Results с чипами, мобильное фото; ответы «иду / не уверен / не приду», тренер отвечает за участника | `71491980` |
+| Ш3.0 | Потолки групп (аккаунтов, ручного состава, членств, заявок) + рубильник самозаписи + rate limit `hubgroups` 60/мин | `f15f6795` |
+| Ш3.1 | Сервер: «On break» (`Sys_HubGroupBreaks`), уровень аккаунта (`Sys_HubGroupAccountLevels`), `usual_lanes` / `lane_view` в расписании | `68470683` |
+| Ш3.2 | Сервер: резолвер «кем стоит аккаунт», раскладка `TrainingLaneView`, `lane_view` в ответе RSVP, «Who's coming» | `ad352cf9` |
+| Ш3.3 | Клиент: бассейн 3b, переключатель ответа, быстрые заметки, «On break» участника и тренера, уровень аккаунта, настройки дорожек | `1a51f477` |
+| Ш4 | Баннер «Are you coming?» над фото — галка тренера `rsvp_top` в расписании | `a748e95f` |
 
-Проверено: серверные тесты 2483/2483, `tsc` клиента чистый, глазами — гость / участник /
-тренер, телефон и десктоп, светлая и тёмная тема. Миграции `AddHeroMobileImage` и
-`AddHubGroupTrainingRsvps` применены к ЛОКАЛЬНОЙ базе (прода нет).
+Проверено: серверные тесты 2525/2525 (после Ш4 гонялись тесты расписания), `tsc` клиента
+чистый, глазами — гость / участник / тренер, телефон и десктоп, светлая и тёмная тема.
+Миграции `AddHeroMobileImage`, `AddHubGroupTrainingRsvps`, `AddHubGroupBreaksAndAccountLevels`
+применены к ЛОКАЛЬНОЙ базе (прода нет). Все новые таблицы — `Sys_`, grant `swimm_ro` не нужен.
 
-## 2. Незакоммиченные файлы — чьи
+## 2. Что дальше (по приоритету)
 
-⚠ **Не `git add -A`.** В рабочей копии лежит и работа Влада, начатая ДО этой сессии.
+1. **Флаг «Trusted» для медиа** — ЕДИНСТВЕННАЯ реальная дыра: владелец любой группы сейчас
+   может вывести публичное видео на карточку чужого пловца (авто-одобрение публикации в свою
+   группу). Решено (Р56, Р58): «Trusted» у группы = право публиковать фото/видео для всех;
+   ставит админ сайта один раз; официальная группа клуба — доверенная автоматически; без флага
+   `public` видно всем только на странице группы, в протоколе и на карточке — только участникам;
+   жалоба «Report»; сообщение тренерам группы без «Trusted». Задание было чипом
+   «Add Trusted group flag for public media» — если чипа нет, всё нужное — здесь и в Р56/Р58.
+   ⚠ Репо публичный: в доках — правило, не цепочка атаки.
+2. **Перед push ветки** — пройти [pre-push-rules.md](../pre-push-rules.md) по диффу
+   `master..entity-hero-roles`. ROADMAP (правило 7), `important.md` (правило 10), реестр
+   компонентов (правило 5), `plans/README.md` — обновлены 29.09. Проверить остальное по списку.
+3. **Архитектурный тест приватности тренировок (И16)**: падает, если `TrainingResults` читают
+   вне разрешённых мест (репозиторий тренировок, сидеры, склейка пловцов, проверки «есть ли у
+   пловца данные») — по образцу `DirectMemoryCache_OnlyInTheAllowedPlaces`.
+4. **Открытый вопрос Владу:** подпись «Following» вместо «Swimmers» для пловцов, добавленных в
+   состав руками (сейчас публичный состав читается как «она у нас плавает»). Состав — watchlist
+   по решению 10.07.2026, запрещать добавление НЕ надо.
+5. Хвосты 8.15: отметка посещения после занятия (тренер уже правит ответы неделю после —
+   `TrainingRsvpRules.ManagerDaysBack`, экрана «кто пришёл» нет); `Remind N` (нет канала,
+   ждёт прод-SMTP); перерывы и уровни аккаунтов не в перечне потерь при удалении группы
+   (каскад их уносит).
 
-**Правки Влада до сессии (не мои, при коммите — спросить Влада):**
-`client/.../mix/swimmer-gallery/swimmer-gallery.tsx`, `hub-groups-project/components/group-levels.tsx`,
-`hub-groups-project/components/lane-plans-api.ts`, `hub-groups-project/components/use-group-levels.ts`,
-`components/deep/hero-band.tsx`, `docs/plans/lane-plans-plan.md`, `!design_handoff/*`.
-Смешанные (там и его, и мои правки): `components/deep/hero-photo.tsx` (файл его, я добавил
-`mobileUrl`), `components/deep/deep-theme.css`, `components/deep/entity-page.tsx`,
-`club-project/components/club-hero.tsx`, `club-project/club-project.tsx`,
-`hub-groups-project/components/group-hero.tsx`, `group-cards.tsx`, `group-page.tsx`,
-`group-training-slots.tsx`, `swimmer-project/swimmer-page.css`, `docs/plans/README.md`,
-`docs/ui-components.md`.
+## 3. Ключевые решения сессии (не переизобретать)
 
-**Мои (этой сессии) — полностью:**
-- клиент, общие: `components/deep/hero-identity.tsx`, `sticky-bar.tsx`, `view-chips.tsx`,
-  правки `tabs.tsx`, `kpi.tsx`, `entity-page-types.ts`, `display-settings-card.tsx`;
-  `hooks/useClubOverview.ts`; `swimmer-project/components/swimmer-panels.tsx` (чипы → общий компонент);
-- клиент, группа: `group-competitions.tsx`, `group-membership.tsx`, `group-rsvp.tsx`,
-  `group-trainings-tab.tsx`, `use-training-rsvp.ts`, правки `group-bits.tsx`, `types.ts`;
-- сервер: `HubGroupTrainingRsvp.cs`, `TrainingRsvpRules.cs`, `HubGroupCompetitionsBuilder.cs`,
-  `TrainingRsvpDtos.cs`, `ITrainingRsvpService.cs`, `TrainingRsvpService.cs`,
-  `HubGroupTrainingRsvpController.cs`, обе миграции + snapshot; правки DTO групп/клуба,
-  `HubGroupPublicRepository.cs`, `ClubOverviewRepository.cs`, `EntityDisplay*`,
-  `EntityDisplaySettings.cs`, `Club.cs`, `HubGroup.cs`, `SwimmDbContext.cs`,
-  `DependencyInjection.cs`, `HubGroupAdminService.cs`, `HubGroupUserService.cs`,
-  `HubGroupsController.cs`;
-- тесты: `HubGroupCompetitionsBuilderTests.cs`, `HubGroupCompetitionsTests.cs`, `TrainingRsvpTests.cs`;
-- доки: `entity-hero-roles-plan.md`, этот файл, строки в `ROADMAP.md` (8.15), `important.md`,
-  `plans/README.md`, `ui-components.md`.
+- **Своё свободно, чужое — через доверие, выданное источнику один раз** (И15). Админ сайта не
+  одобряет каждую запись — он ставит флаг источнику.
+- **Заявления «Me» / «Family» действуют только внутри группы** (Р55): по ним строятся дорожки,
+  RSVP и связка флага «On break»; наружу от имени пловца они ничего не показывают.
+- **«Создать себя пловцом» НЕ делаем** — правило «аккаунт ↔ пловец связи нет» остаётся; кого
+  нет в loglig, тот стоит на дорожке аккаунтом, уровень ставится на членство аккаунта.
+- **Тренировочные времена вносит только тренер/админ группы** (Р57) и видит только группа (И16).
+- Дорожки: опубликованный план → иначе авто по уровням на `usual_lanes` (или последнего плана)
+  → уровней нет — подряд идущие куски → дорожек не знаем — одна «вода». «Не уверен» занимает
+  место. Тренер выключает вид (`lane_view: off`). «Who's coming»: по умолчанию участники видят
+  имена, тренер может скрыть.
+- «On break»: один флаг на человека; тренер — любому и бессрочно, участник — себе и до даты;
+  «Going» на занятие внутри перерыва его снимает; автоподсказок «не ходит N недель» нет.
+- Квоты действуют и на админа сайта (поднимает настройку); настройки в памяти — после рестарта
+  дефолты.
 
-Перед push — [pre-push-rules.md](../pre-push-rules.md): совпадают правила 5 (реестр
-компонентов — сделано), 7 (ROADMAP — сделано), 10 (important.md — сделано). Новая таблица —
-`Sys_`, правило 6 (грант `swimm_ro`) НЕ применяется.
-
-## 3. Как поднять и посмотреть
+## 4. Как поднять и посмотреть
 
 1. `dotnet build server/Swimm.sln` (стенд запускает API из Debug с `--no-build`).
 2. Стенд `stack-5183-api5082-personas` (API :5082 + Vite :5183) — не трогает :5078 Влада.
-3. Персонаж: `http://localhost:5183/api/dev/persona?as=<ник>` — `utest-guest`, `utest-member`,
-   `utest-media-author` (участники `utest-open`), `utest-coach` (управляет `utest-open`),
-   `default` = живой аккаунт Влада (админ) — только смотреть, ничего не жать.
-4. Страницы: `/groups/utest-open` (тест-группа, без фото и расписания),
-   `/groups/dolphin-netanya-masters` (фото + расписание Tue/Sat/Sun), `/clubs/438` (клуб с
-   официальной группой).
-5. **Ответы (Ш2) на `utest-open` не видны — у неё нет расписания.** Для проверки ставил
-   временно прямо в базе и потом вернул NULL:
-   ```sql
-   update "HubGroups" set "TrainingSchedule" = '{"slots":[{"day":1,"start":"23:30"},{"day":2,"start":"23:30"},{"day":3,"start":"23:30"},{"day":4,"start":"23:30"},{"day":5,"start":"23:30"},{"day":6,"start":"23:30"},{"day":7,"start":"23:30"}],"place":"בריכת נתניה","pool_type":"25m"}' where "Slug"='utest-open';
-   -- после проверки:
-   delete from "Sys_HubGroupTrainingRsvps" where "HubGroupId"=(select "Id" from "HubGroups" where "Slug"='utest-open');
-   update "HubGroups" set "TrainingSchedule"=NULL where "Slug"='utest-open';
-   ```
-   (`docker exec swimm-postgres psql -U swimm -d swimm -c '…'`). Правка мимо API серверный
-   кэш страницы не сбрасывает — ставить ДО запуска стенда или перезапускать его.
+3. Персонаж: `http://localhost:5183/api/dev/persona?as=<ник>` — `utest-member`,
+   `utest-media-author` (участники `utest-open`, id 285), `utest-coach` (управляет `utest-open`),
+   `utest-newbie` (вошёл, ни в одной группе), `utest-guest` = аноним (тест-группу НЕ видит),
+   `default` = живой аккаунт Влада (админ) — только смотреть.
+4. У `utest-open` нет расписания — ставить через API тренером (curl с персонажем, antiforgery
+   `X-XSRF-TOKEN` из `/api/antiforgery/token`), место — ЛАТИНИЦЕЙ (иврит из bash уходит «?????»).
+   Пример сценария — ставил расписание «каждый день 23:30» + `usual_lanes`, ответы двумя
+   персонажами, смотрел `/groups/utest-open?tab=trainings`.
+5. **Уборка после проверки** (обязательно): `delete from "Sys_HubGroupBreaks" / "Sys_HubGroupTrainingRsvps"
+   / "Sys_HubGroupLevels" where "HubGroupId"=285;` и `update "HubGroups" set "TrainingSchedule"=NULL
+   where "Id"=285;` (`docker exec swimm-postgres psql -U swimm -d swimm -c '…'`). Открытие таба
+   Swimmers или Admin тренером ЗАВОДИТ группе 4 стандартных уровня — их тоже убрать. Уровни
+   группы 17 (`dolphin-netanya-masters`) — настоящие, Влада: не трогать.
 6. После проверки — остановить стенд (`preview_stop`), иначе Debug-сборка заблокирована.
 
-## 4. Что дальше — Ш3 (вид по дорожкам, вариант 3b)
-
-Хендофф §6: блок бассейна с «водой», дорожки 40px с пунктирными «канатами», подпись
-«1 · fast»; кружки 26px — сплошной = идёт, пунктир золотом = не уверен, свой — с кольцом
-`--deep-live`; «+N» при >5 на дорожке; счётчики «N in the water · N maybe · N out»;
-переключатель ответа на три положения со скользящим ползунком; после Going / Not sure —
-заметки «Late ~10 min · 1st hour only · Leaving early» (одна на выбор; сервер уже принимает
-`note`: `late | first-hour | leaving-early`). Место — Trainings → Sessions, карточка
-«Next training» (`group-trainings-tab.tsx`, `NextSessionCard`).
-
-**⇒ Вопрос обсуждён 28.09.2026 — решения и ответы Влада: план §5. Работу НЕ начинать без команды.** Ниже —
-исходная постановка.
-
-**Открытый вопрос Владу (задать ДО работы):** откуда дорожки. Предложение — из опубликованного
-плана дорожек на эту дату (фаза 8.14, `Sys_LanePlans`): там дорожки с уровнями и раскладка
-людей. Но план раскладывает ПЛОВЦОВ, а отвечают АККАУНТЫ — человек попадёт в дорожку, только
-если его аккаунт в группе привязан к пловцу (`HubGroupUserMember.SwimmerId`). Непривязанных
-показывать отдельной полосой «без дорожки»? Плана на дату нет — вид дорожек не показывать
-(только список)?
-
-Там же дальше: отметка посещения после занятия (тренер уже может править ответы неделю
-после — `TrainingRsvpRules.ManagerDaysBack`), `Remind N` (нет канала — отложено), список
-«кто идёт» участникам по настройке группы.
-
-## 5. Грабли сессии
+## 5. Грабли
 
 - **Vite HMR после правок многих модулей** может оставить две копии `login-modal-context` →
-  «useLoginModal must be used within <LoginModalProvider>» и белая страница. Лечится
-  перезапуском стенда, не кодом.
-- **Скриншот pane во время плавной прокрутки** приходит с пустой половиной или таймаутит —
-  проверять через `javascript_tool` (DOM, геометрия), а не картинкой.
-- **Тест `DirectMemoryCache_OnlyInTheAllowedPlaces`** падает, если `--artifacts-path` вне репо
-  (ищет `Swimm.sln` выше папки сборки) — это не баг кода.
-- **Флаг-картинка в подзаголовке** (`UI_FlagEmoji` — это `<img>`, preflight делает его block)
-  рвала строку; в подзаголовках обёртка `[&_img]:inline-block`.
-- **Имя сущности — `dir="auto"`, не `rtl`**: жёсткий rtl переставлял скобки в латинском имени.
-- **Ответы — только личным запросом.** В общий кэшируемый ответ страницы группы нельзя класть
-  ни `mine`, ни имена: он один на всех зрителей.
+  белая страница. Лечится перезапуском стенда. Ошибки `WebSocket … failed` в консоли — HMR
+  стучится в остановленный стенд, не баг.
+- **Скриншот pane** при эмуляции 1280px выходит мелким — геометрию десктопа проверять через
+  `javascript_tool` (`getBoundingClientRect`, `getComputedStyle`). Тема сайта — свой
+  переключатель 🌙 (`data-mode`), а не системная: `resize_window colorScheme` её не меняет.
+- **`innerText` отдаёт текст в верхнем регистре**, если CSS `uppercase` — поиск подписи по
+  тексту это учитывать.
+- **Частичные UNIQUE и CHECK** (перерывы) InMemory-тесты не ловят — проверять на Postgres.
+- **Тест `DirectMemoryCache_OnlyInTheAllowedPlaces`** падает, если `--artifacts-path` вне репо.
+- **Ответы, имена, дорожки — только личным запросом** (`/rsvp`, `/breaks`): общий ответ
+  страницы группы кэшируется один на всех.
+- Правки python-скриптом: сохранять CRLF/LF файла (`newline=''`), иначе дифф на весь файл.
