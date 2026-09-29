@@ -884,30 +884,38 @@ function TopResultsTabs({
     );
   }
 
-  const currentResults = activeTab === 'training' ? trainingResults : competitionRows;
-  const showCareerNote = competitionFromCareer && activeTab === 'competition';
+  // Тренировок нет — таба Training нет вовсе (Влад, 29.09.2026). Гостю и постороннему сервер
+  // тренировки не отдаёт (Р57), и пустой «Training (0)» читался как «тренировки есть, но скрыты».
+  // Один таб — полосы табов нет, сразу соревнования.
+  const hasTraining = trainingResults.length > 0;
+  const tabs = hasTraining ? (['training', 'competition'] as const) : (['competition'] as const);
+  const shownTab = hasTraining ? activeTab : 'competition';
+  const currentResults = shownTab === 'training' ? trainingResults : competitionRows;
+  const showCareerNote = competitionFromCareer && shownTab === 'competition';
 
   return (
     <div>
       {/* Табы — pill-группа */}
-      <div className="flex gap-1 w-fit rounded-[10px] p-[3px] mb-3" style={{ background: 'var(--theme-mode-surface-alt)' }}>
-        {(['training', 'competition'] as const).map((tab) => {
-          const active = activeTab === tab;
-          const count = tab === 'training' ? trainingResults.length : competitionRows.length;
-          return (
-            <button
-              key={tab}
-              className="text-xs font-bold px-3 py-[5px] rounded-lg capitalize transition-colors"
-              style={active
-                ? { background: 'var(--theme-primary)', color: '#fff' }
-                : { background: 'transparent', color: 'var(--theme-mode-text-secondary)' }}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab} ({count})
-            </button>
-          );
-        })}
-      </div>
+      {tabs.length > 1 && (
+        <div className="flex gap-1 w-fit rounded-[10px] p-[3px] mb-3" style={{ background: 'var(--theme-mode-surface-alt)' }}>
+          {tabs.map((tab) => {
+            const active = shownTab === tab;
+            const count = tab === 'training' ? trainingResults.length : competitionRows.length;
+            return (
+              <button
+                key={tab}
+                className="text-xs font-bold px-3 py-[5px] rounded-lg capitalize transition-colors"
+                style={active
+                  ? { background: 'var(--theme-primary)', color: '#fff' }
+                  : { background: 'transparent', color: 'var(--theme-mode-text-secondary)' }}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Подпись: строки не из этого источника, а карьерные (иначе непонятно, откуда они) */}
       {showCareerNote && (
@@ -927,7 +935,7 @@ function TopResultsTabs({
           showCompetition={showCareerNote}
         />
       ) : (
-        <div className="text-[var(--theme-mode-text-muted)] italic p-4">No {activeTab} results</div>
+        <div className="text-[var(--theme-mode-text-muted)] italic p-4">No {shownTab} results</div>
       )}
     </div>
   );
