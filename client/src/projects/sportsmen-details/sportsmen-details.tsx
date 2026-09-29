@@ -959,7 +959,9 @@ function ResultsTable({
   return (
     <ul className="flex flex-col gap-2.5">
       {results.map((res, index) => {
+        // Пара-очки (Р67) числом FINA не показываем — сервер отдаёт вместо них 0.
         const hasPoints =
+          !res.para_points &&
           res.international_points !== undefined &&
           res.international_points !== null &&
           !isNaN(Number(res.international_points));

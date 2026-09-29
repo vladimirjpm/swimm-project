@@ -67,6 +67,11 @@ export interface ResultWrap {
     time_fail: boolean;
     time_fail_note: string | null;
     international_points: number;
+    /**
+     * Очки источника — пара-шкала (Р67): `international_points` тогда 0, строка пишет «para»
+     * вместо числа (`HelperResults.pointsLabel`). С FINA такие очки не сравниваются.
+     */
+    para_points?: boolean;
     note?:string;
 
     /**

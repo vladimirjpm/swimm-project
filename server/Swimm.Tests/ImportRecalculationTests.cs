@@ -46,6 +46,7 @@ public class ImportRecalculationTests
         }
 
         public Task<int> RecalculateAllCombinedAsync(CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> RecalculateAllParaPointsAsync(CancellationToken ct = default) => Task.FromResult(0);
     }
 
     private static object Item(string lastName, int lane, string competition = "Combine Meet",

@@ -322,6 +322,18 @@ if (args.Contains("--recalc-combined"))
     return;
 }
 
+// Флаг пара-очков (Р67) во всех соревнованиях:
+//   dotnet run -- --para-points-scan
+// Разово после миграции AddResultIsParaPoints; штатно флаг ставит пересчёт соревнования.
+if (args.Contains("--para-points-scan"))
+{
+    using var scope = app.Services.CreateScope();
+    var svc = scope.ServiceProvider.GetRequiredService<ICompetitionRecalculationService>();
+    var changed = await svc.RecalculateAllParaPointsAsync();
+    Console.WriteLine($"Пара-очки: изменено строк — {changed}");
+    return;
+}
+
 // Пересчёт материализованного клубного зачёта во всех соревнованиях:
 //   dotnet run -- --rebuild-club-standings
 // Нужен разово после миграции (бэкфилл истории) и как аварийная кнопка, если зачёты

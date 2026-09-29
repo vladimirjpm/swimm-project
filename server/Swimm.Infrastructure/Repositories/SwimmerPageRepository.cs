@@ -690,7 +690,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             PositionAgeGroup = r.PositionAgeGroup,
             HeatType = r.HeatType,
             Round = r.Round,
-            InternationalPoints = r.InternationalPoints,
+            InternationalPoints = r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
             TimeOriginal = r.TimeOriginal,
             TimeSplit = r.TimeSplit,
             EventId = r.Competition.EventId,

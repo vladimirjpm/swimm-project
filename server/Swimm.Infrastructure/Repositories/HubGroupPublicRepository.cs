@@ -426,7 +426,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                     CompetitionId = r.CompetitionId,
                     CompetitionName = r.Competition.Name,
                     Date = r.Competition.Date,
-                    Points = r.InternationalPoints
+                    Points = r.IsParaPoints ? 0 : r.InternationalPoints  // пара-очки — не FINA (Р67)
                 })
                 .First())
             .ToListAsync();
@@ -620,7 +620,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 Position = r.HeatType == "prelim" || r.HeatType == "extra" || r.Round == ResultRounds.FinalOpen
                     ? null : r.Position,
                 TimeFail = r.TimeFail,
-                InternationalPoints = r.InternationalPoints,
+                InternationalPoints = r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
                 CompetitionDate = r.CompetitionDate,
                 IsMasters = r.Competition.IsMasters,
                 RuleId = r.Competition.PointRuleClubsId

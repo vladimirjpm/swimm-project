@@ -81,7 +81,7 @@ public class SeasonBestRepository : ISeasonBestRepository
                 r.Competition.PoolType,
                 r.Competition.Name,
                 r.CompetitionDate,
-                r.InternationalPoints))
+                r.IsParaPoints ? 0 : r.InternationalPoints))  // пара-очки — не FINA (Р67)
             .ToListAsync(ct);
 
         var meets = rows.Select(r => (r.Competition ?? "") + "|" + r.Date.ToString("yyyy-MM-dd")).Distinct().Count();
@@ -304,7 +304,7 @@ public class SeasonBestRepository : ISeasonBestRepository
                 r.Competition.Name,
                 r.Competition.PoolType,
                 r.CompetitionDate,
-                r.InternationalPoints,
+                r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
                 r.AgeGroup))
             .ToListAsync(ct);
 

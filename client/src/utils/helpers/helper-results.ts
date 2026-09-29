@@ -21,6 +21,15 @@ const RELAY_UNKNOWN_STEP_AGE = 99;
 
 export default class HelperResults {
   /**
+   * Что писать в колонке очков строки протокола. Пара-очки (Р67, флаг сервера `para_points`)
+   * числом не показываем: сервер отдаёт вместо них 0, и «0» читался бы как «заплыл без очков».
+   */
+  static pointsLabel(res: { international_points?: number | null; para_points?: boolean }): string | number {
+    if (res.para_points) return 'para';
+    return res.international_points ?? '';
+  }
+
+  /**
    * Заплывы, которые НЕ дают официального места и по умолчанию скрыты:
    * 'prelim' — предварительные, 'extra' — призовые серии после финала (skins, переплывы).
    *

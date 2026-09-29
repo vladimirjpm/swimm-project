@@ -830,6 +830,51 @@ public class ResultRepositoryTests
         Assert.Equal(800, overview.BestSwim.Points);
     }
 
+    /// <summary>
+    /// Пара-очки с FINA не сравнимы (Р67): бугрим-2026, 931 за 1:22.76 на 100 в/с забирал «лучший
+    /// заплыв» у 898 чемпиона. Сами очки источника в строке остаются — наружу как FINA их нет.
+    /// </summary>
+    [Fact]
+    public async Task Overview_BestSwim_SkipsParaPoints()
+    {
+        await using var db = CreateDb(nameof(Overview_BestSwim_SkipsParaPoints));
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = new Competition
+        {
+            Name = "Meet", Country = new Country { CountryCode = "ISR", CountryName = "ISR" },
+            Date = "01/01/2024", PoolType = "50m"
+        };
+        var champ = new Swimmer { LastName = "Champ", FirstName = "C", LastNameEn = "Champ", FirstNameEn = "C", BirthYear = 2004 };
+        var para = new Swimmer { LastName = "Para", FirstName = "P", LastNameEn = "Para", FirstNameEn = "P", BirthYear = 2000 };
+        db.AddRange(style, club, comp, champ, para);
+        await db.SaveChangesAsync();
+
+        var date = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        db.Results.AddRange(
+            new ResultRecord
+            {
+                CompetitionId = comp.Id, SwimmerId = champ.Id, ClubId = club.Id, StyleId = style.Id,
+                Distance = "400", Gender = "male", CompetitionDate = date, TimeOriginal = "3:50.00",
+                TimeMillisecond = 230000, InternationalPoints = 898, AgeGroup = "Open", EventStyleAge = "400 freestyle Open"
+            },
+            new ResultRecord
+            {
+                CompetitionId = comp.Id, SwimmerId = para.Id, ClubId = club.Id, StyleId = style.Id,
+                Distance = "100", Gender = "male", CompetitionDate = date, TimeOriginal = "1:22.76",
+                TimeMillisecond = 82760, InternationalPoints = 931, IsParaPoints = true, AgeGroup = "Open",
+                EventStyleAge = "100 freestyle Open"
+            });
+        await db.SaveChangesAsync();
+        var repo = new ResultRepository(db, NoCache());
+
+        var overview = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
+
+        Assert.Equal(champ.Id, overview.BestSwim!.SwimmerId);
+        Assert.Equal(champ.Id, overview.BestSwimMale!.SwimmerId);
+        Assert.Equal(898, overview.BestSwim.Points);
+    }
+
     [Fact]
     public async Task Overview_BestSwim_NullWhenNoPoints()
     {

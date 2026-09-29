@@ -384,9 +384,10 @@ public class ResultRepository : IResultRepository
         var hasAwards = await query.AnyAsync(r => r.Competition.IsAward);
 
         // Лучший заплыв — максимум FINA-очков; тай-брейк по времени, затем Id (стабильность).
-        // ♂/♀ (design_handoff вариант 4) — та же проекция с фильтром по полу.
+        // ♂/♀ (design_handoff вариант 4) — та же проекция с фильтром по полу. Пара-очки с FINA
+        // не сравнимы (Р67): 931 за 1:22.76 на 100 в/с иначе забирал «лучший заплыв» чемпионата.
         static IQueryable<OverviewBestSwimDto> BestSwimProjection(IQueryable<Domain.Entities.ResultRecord> q) =>
-            q.Where(r => !r.TimeFail && r.InternationalPoints > 0)
+            q.Where(r => !r.TimeFail && !r.IsParaPoints && r.InternationalPoints > 0)
              .OrderByDescending(r => r.InternationalPoints)
              .ThenBy(r => r.TimeMillisecond)
              .ThenBy(r => r.Id)
@@ -587,7 +588,8 @@ public class ResultRepository : IResultRepository
                 Year = r.CompetitionDate.Year,
                 r.AgeGroup,
                 IsMasters = r.Competition.IsMasters,
-                r.InternationalPoints,
+                // Пара-очки в сумму FINA не идут (Р67); очки за место правило считает по месту.
+                InternationalPoints = r.IsParaPoints ? 0 : r.InternationalPoints,
                 // Э2.5: поля для расчёта по правилу. Место берём объединённое, если
                 // соревнование его считает и тоггл включён — иначе место в заплыве.
                 Place = filter.Combined && r.Competition.ShowCombineAllResults && r.CombinedPlace != null
@@ -1482,7 +1484,7 @@ public class ResultRepository : IResultRepository
                 r.Competition.EventId,
                 r.CompetitionDate,
                 r.Position,
-                r.InternationalPoints,
+                r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
                 r.TimeMillisecond,
                 r.TimeOriginal,
                 r.TimeFail,

@@ -131,7 +131,7 @@ public class MySwimsRepository : IMySwimsRepository
                 HeatType = r.HeatType,
                 Round = r.Round,
                 IsAward = r.Competition.IsAward,
-                Points = r.InternationalPoints,
+                Points = r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
                 Time = r.TimeOriginal,
                 // Пол/год рождения/возраст события — ключи ступени рекорда и SB. Пол берём у
                 // ПЛОВЦА (Results.Gender — фоллбек): кривая шапка протокола уводит в чужую ступень.

@@ -312,7 +312,7 @@ public class ClubPublicRepository : IClubPublicRepository
                 r.Competition.Name,
                 r.Competition.Date,
                 r.CompetitionDate,
-                r.InternationalPoints,
+                r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
                 r.Swimmer.BirthYear))
             .ToListAsync();
 

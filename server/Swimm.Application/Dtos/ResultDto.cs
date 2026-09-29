@@ -205,6 +205,11 @@ public class ResultDto
     [JsonPropertyName("international_points")]
     public int InternationalPoints { get; set; }
 
+    /// <summary>Очки источника — пара-шкала (Р67): <see cref="InternationalPoints"/> тогда 0, строка
+    /// протокола показывает «para» вместо числа.</summary>
+    [JsonPropertyName("para_points")]
+    public bool ParaPoints { get; set; }
+
     [JsonPropertyName("note")]
     public string? Note { get; set; }
 
