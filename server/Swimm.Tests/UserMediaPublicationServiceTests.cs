@@ -60,9 +60,9 @@ public class UserMediaPublicationServiceTests
         db.Swimmers.AddRange(vladSwimmer, child1, child2);
         await db.SaveChangesAsync();
 
-        var g1 = new HubGroup { Name = "Мастерс", Slug = "masters", OwnerUserId = coach.Id, IsPublic = true };
-        var g2 = new HubGroup { Name = "G2", Slug = "g2", OwnerUserId = coach.Id, IsPublic = true };
-        var g3 = new HubGroup { Name = "G3", Slug = "g3", OwnerUserId = coach.Id, IsPublic = true };
+        var g1 = new HubGroup { Name = "Мастерс", Slug = "masters", OwnerUserId = coach.Id, IsPublic = true, IsTrusted = true };
+        var g2 = new HubGroup { Name = "G2", Slug = "g2", OwnerUserId = coach.Id, IsPublic = true, IsTrusted = true };
+        var g3 = new HubGroup { Name = "G3", Slug = "g3", OwnerUserId = coach.Id, IsPublic = true, IsTrusted = true };
         db.HubGroups.AddRange(g1, g2, g3);
         await db.SaveChangesAsync();
 
@@ -157,7 +157,7 @@ public class UserMediaPublicationServiceTests
         db.Swimmers.Add(swimmer);
         await db.SaveChangesAsync();
 
-        var group = new HubGroup { Name = "G", Slug = Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true };
+        var group = new HubGroup { Name = "G", Slug = Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true, IsTrusted = true };
         db.HubGroups.Add(group);
         await db.SaveChangesAsync();
 
@@ -393,7 +393,7 @@ public class UserMediaPublicationServiceTests
         var (owner, _, _, media) = await SeedBasicAsync(db);
         // Вторая группа: владелец — член, но пловца медиа в ростере нет (кейс «Дельфин мастерс
         // для видео Сабины») — предлагаться не должна.
-        var other = new HubGroup { Name = "Other", Slug = Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true };
+        var other = new HubGroup { Name = "Other", Slug = Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true, IsTrusted = true };
         db.HubGroups.Add(other);
         await db.SaveChangesAsync();
         db.HubGroupUserMembers.Add(new HubGroupUserMember { HubGroupId = other.Id, UserId = owner.Id, Status = HubGroupUserMemberStatus.Active });
@@ -439,6 +439,10 @@ public class UserMediaPublicationServiceTests
     {
         await using var db = CreateDb(nameof(GetVisibleForSwimmer_Anonymous_SeesApprovedPublicOnly));
         var (owner, swimmer, group, media) = await SeedBasicAsync(db);
+        // Гостю на карточке public виден только от доверенной группы (Р56); без флага —
+        // MediaPublicationAudienceTests.PublicVideo_UntrustedGroup_*.
+        group.IsTrusted = true;
+        await db.SaveChangesAsync();
         var service = new UserMediaPublicationService(db);
 
         var submit = await service.SubmitAsync(owner.Id, media.Id,
@@ -725,7 +729,7 @@ public class UserMediaPublicationServiceTests
         };
         db.Results.Add(result);
 
-        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id };
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsTrusted = true };
         db.HubGroups.Add(group);
         await db.SaveChangesAsync();
 

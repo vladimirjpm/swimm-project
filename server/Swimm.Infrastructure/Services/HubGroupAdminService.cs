@@ -45,6 +45,7 @@ public class HubGroupAdminService : IHubGroupAdminService
                 IsPublic = g.IsPublic,
                 IsOfficial = g.IsOfficial,
                 IsTest = g.IsTest,
+                IsTrusted = g.IsTrusted,
                 UpdatedAt = g.UpdatedAt,
                 OwnerUserId = g.OwnerUserId
             })
@@ -123,6 +124,7 @@ public class HubGroupAdminService : IHubGroupAdminService
             IsPublic = g.IsPublic,
             IsOfficial = g.IsOfficial,
             IsTest = g.IsTest,
+            IsTrusted = g.IsTrusted,
             JoinPolicy = g.JoinPolicy,
             Links = HubGroupCrudCore.ParseLinks(g.Links),
             Members = members,
@@ -150,11 +152,13 @@ public class HubGroupAdminService : IHubGroupAdminService
         var error = await _core.ValidateAsync(input, slug, excludeId: null);
         if (error != null) return HubGroupSaveResult.Fail(error);
 
-        var group = new HubGroup { OwnerUserId = resolvedOwnerId.Value, IsTest = input.IsTest };
+        var group = new HubGroup { OwnerUserId = resolvedOwnerId.Value, IsTest = input.IsTest, IsTrusted = input.IsTrusted };
         HubGroupCrudCore.Apply(group, input, slug);
         await _core.ApplyCountryAsync(group, input.Country);
         _db.HubGroups.Add(group);
-        return await _core.SaveAsync(group);
+        var created = await _core.SaveAsync(group);
+        if (created.Success && group.IsTrusted) await LogTrustAsync(group);
+        return created;
     }
 
     public async Task<HubGroupSaveResult> UpdateAsync(int id, HubGroupInputDto input)
@@ -171,9 +175,23 @@ public class HubGroupAdminService : IHubGroupAdminService
 
         HubGroupCrudCore.Apply(group, input, slug);
         group.IsTest = input.IsTest;
+        var trustChanged = group.IsTrusted != input.IsTrusted;
+        group.IsTrusted = input.IsTrusted;
         await _core.ApplyCountryAsync(group, input.Country);
-        return await _core.SaveAsync(group);
+        var saved = await _core.SaveAsync(group);
+        if (saved.Success && trustChanged) await LogTrustAsync(group);
+        return saved;
     }
+
+    /// <summary>
+    /// Доверие выдаётся источнику один раз (И15) — поэтому «кто и когда выдал/снял» обязано
+    /// остаться: от флага зависит, что группа выводит на чужие карточки пловцов.
+    /// </summary>
+    private Task LogTrustAsync(HubGroup group) =>
+        _audit.LogAsync(group.IsTrusted ? "hubgroup.trust" : "hubgroup.untrust", "HubGroup", group.Id.ToString(),
+            group.IsTrusted
+                ? $"Группе «{group.Name}» выдан флаг Trusted: её public-медиа видны всем в протоколе и на карточке пловца"
+                : $"С группы «{group.Name}» снят флаг Trusted: её public-медиа вне страницы группы видят только участники");
 
     public async Task<HubGroupSaveResult> DeleteAsync(int id)
     {

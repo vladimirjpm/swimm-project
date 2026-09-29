@@ -285,6 +285,7 @@ public class MySwimsRepository : IMySwimsRepository
                     : null,
                 CompetitionName = m.Competition != null ? m.Competition.Name : null,
                 CompetitionDate = m.Competition != null ? m.Competition.Date : null,
+                ModerationState = m.ModerationState,
             })
             .ToListAsync();
 

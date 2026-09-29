@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { GalleryItem } from '../../../../utils/interfaces/results';
 import { HelperMedia } from '../../../../utils/helpers';
+import { useAuth } from '../../../../hooks/useAuth';
+import MediaReportForm from './media-report-form';
 
 interface UI_SwimmerGalleryProps {
   gallery?: GalleryItem[];
@@ -86,6 +88,7 @@ const UI_SwimmerGallery: React.FC<UI_SwimmerGalleryProps> = ({
   onClose,
 }) => {
   const controlled = openIndex !== undefined;
+  const { isAuthenticated } = useAuth();
   const [showPopup, setShowPopup] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -207,6 +210,12 @@ const UI_SwimmerGallery: React.FC<UI_SwimmerGalleryProps> = ({
               <div className="mt-2 text-sm text-gray-500">
                 {currentIndex + 1} / {gallery.length}
               </div>
+            )}
+
+            {/* «Report» (Р62): у пользовательского медиа, не своего, залогиненному. key — сброс
+                формы при переходе к другому медиа. */}
+            {isAuthenticated && gallery[currentIndex]?.mediaId != null && !gallery[currentIndex]?.isMine && (
+              <MediaReportForm key={gallery[currentIndex].mediaId} mediaId={gallery[currentIndex].mediaId!} />
             )}
           </div>
         </div>

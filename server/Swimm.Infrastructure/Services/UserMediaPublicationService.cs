@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -27,9 +28,15 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         // Медиа существует и принадлежит подателю — публиковать чужое нельзя.
         var media = await _db.UserMedia.AsNoTracking()
             .Where(m => m.Id == mediaId && m.UserId == ownerUserId)
-            .Select(m => new { m.Id, m.SwimmerId })
+            .Select(m => new { m.Id, m.SwimmerId, m.ModerationState })
             .FirstOrDefaultAsync();
         if (media == null) return (false, "media not found", null);
+        // Спрятанное жалобами (Р62) заново не публикуется: иначе снятое админом вернулось бы
+        // авто-одобрением в свою группу, а спрятанное до решения — обошло бы порог.
+        if (media.ModerationState == MediaReportRules.StateRemoved)
+            return (false, "This media was removed by a moderator and can't be shared", null);
+        if (media.ModerationState == MediaReportRules.StateUnderReview)
+            return (false, "This media is under review after reports — it can't be shared until the review ends", null);
 
         var isClub = targetType == UserMediaPublicationTarget.Club;
 
@@ -60,9 +67,14 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         {
             var group = await _db.HubGroups.AsNoTracking()
                 .Where(g => g.Id == request.TargetId)
-                .Select(g => new { g.Id, g.Name })
+                .Select(g => new { g.Id, g.Name, Trusted = g.IsTrusted || g.IsOfficial }) // HubGroupTrustRules
                 .FirstOrDefaultAsync();
             if (group == null) return (false, "group not found", null);
+
+            // «Everyone 🌐» — только у доверенной группы (Р65: «группа только следит; публичное —
+            // только Trusted»). Середины «всем, но только на странице группы» больше нет.
+            if (level == UserMediaPublicationLevel.Public && !group.Trusted)
+                return (false, "“Everyone 🌐” is only for Trusted groups — share with group members instead", null);
 
             // Правило подачи 1: пловец из медиа — в ростере группы. Иначе член «Дельфин мастерс»
             // мог бы подать туда видео ребёнка, который там не плавает.
@@ -207,6 +219,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                 Type = UserMediaPublicationTarget.Group,
                 Id = g.Id,
                 Name = g.Name,
+                Trusted = g.IsTrusted || g.IsOfficial, // HubGroupTrustRules
             })
             .ToListAsync();
 
@@ -222,6 +235,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                 Type = UserMediaPublicationTarget.Club,
                 Id = sw.Club!.Id,
                 Name = sw.Club.Name,
+                // Клубные заявки решает админ сайта — источник доверенный по определению.
+                Trusted = true,
             })
             .FirstOrDefaultAsync();
 
@@ -252,11 +267,23 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         // а не от таблицы — публикация в чужую группу её не роняет (docs/plans/
         // cache-row-precision-plan.md §3.1, Q14). Вне сборки кэша блок пустой.
         using (_db.CacheRows<HubGroup>(hubGroupId, typeof(UserMediaPublication)))
+        {
+            // Доверие группы (Р65): её public виден всем только при «Trusted». Без него public —
+            // то же, что members (например, флаг сняли после публикации): уходит из ленты для всех
+            // и показывается в ленте участников. Строка группы — в метках блока, так что смена
+            // флага сбрасывает кэш страницы.
+            var trusted = await _db.HubGroups.AsNoTracking()
+                .Where(g => g.Id == hubGroupId)
+                .Select(g => g.IsTrusted || g.IsOfficial) // HubGroupTrustRules
+                .FirstOrDefaultAsync();
+            if (level == UserMediaPublicationLevel.Public && !trusted) return [];
+            var alsoUntrustedPublic = level == UserMediaPublicationLevel.Members && !trusted;
             return await PublishedItemsAsync(_db.UserMediaPublications.AsNoTracking()
                 .Where(p => p.HubGroupId == hubGroupId
                             && p.Status == UserMediaPublicationStatus.Approved
-                            && p.Level == level)
+                            && (p.Level == level || (alsoUntrustedPublic && p.Level == UserMediaPublicationLevel.Public)))
                 .OrderByDescending(p => p.Id));
+        }
     }
 
     public Task<List<PublishedMediaItemDto>> GetApprovedForClubAsync(int clubId)
@@ -288,7 +315,9 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         Dictionary<int, PublishedMediaRow> media;
         using (_db.CacheRows<UserMedia>(mediaIds))
             media = await _db.UserMedia.AsNoTracking()
-                .Where(m => mediaIds.Contains(m.Id))
+                // Спрятанное жалобами (Р62) — ни в одной ленте; флаг на строке медиа, и её
+                // правка сбрасывает кэш страницы группы (строки медиа — в метках блока).
+                .Where(m => mediaIds.Contains(m.Id) && m.ModerationState == null)
                 .Select(m => new PublishedMediaRow
                 {
                     Id = m.Id,
@@ -317,6 +346,7 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                 return new PublishedMediaItemDto
                 {
                     Id = p.Id,
+                    MediaId = p.UserMediaId,
                     MediaType = m.MediaType,
                     SourceType = m.SourceType,
                     Url = m.Url,
@@ -344,11 +374,14 @@ public class UserMediaPublicationService : IUserMediaPublicationService
         public int? CompetitionId { get; init; }
     }
 
-    private static Task<List<GroupPublicationInboxItemDto>> QueryGroupItems(IQueryable<UserMediaPublication> query)
-        => query
+    private async Task<List<GroupPublicationInboxItemDto>> QueryGroupItems(IQueryable<UserMediaPublication> query)
+    {
+        var items = await query
             .Select(p => new GroupPublicationInboxItemDto
             {
                 Id = p.Id,
+                MediaId = p.UserMediaId,
+                ModerationState = p.Media!.ModerationState,
                 TargetType = p.TargetType,
                 TargetId = p.HubGroupId ?? p.ClubId ?? 0,
                 TargetName = p.HubGroup != null ? p.HubGroup.Name : (p.Club != null ? p.Club.Name : ""),
@@ -373,6 +406,20 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                     : p.Media.CompetitionId,
             })
             .ToListAsync();
+        if (items.Count == 0) return items;
+
+        // Открытые жалобы: только причина и число — ни имён, ни текста (Р62).
+        var mediaIds = items.Select(i => i.MediaId).Distinct().ToList();
+        var reports = await _db.MediaReports.AsNoTracking()
+            .Where(r => mediaIds.Contains(r.UserMediaId) && r.Status == MediaReportRules.StatusOpen)
+            .GroupBy(r => new { r.UserMediaId, r.Reason })
+            .Select(g => new { g.Key.UserMediaId, g.Key.Reason, Count = g.Count() })
+            .ToListAsync();
+        foreach (var item in items)
+            item.OpenReports = reports.Where(r => r.UserMediaId == item.MediaId)
+                .ToDictionary(r => r.Reason, r => r.Count);
+        return items;
+    }
 
     public async Task<List<VisibleResultMediaDto>> GetVisibleForResultsAsync(
         int? competitionId, int? eventId, string? groupSlug, int? userId, bool isSiteAdmin)
@@ -400,6 +447,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                 .Where(m => m.UserId == userId)
                 .Select(m => new VisibleResultMediaDto
                 {
+                    MediaId = m.Id,
+                    IsMine = true,
                     ResultId = m.ResultId,
                     MediaType = m.MediaType,
                     SourceType = m.SourceType,
@@ -408,7 +457,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                 .ToListAsync();
 
         // 2. Одобренные публикации, которые зрителю положено видеть (MediaPublicationAudience):
-        // public — всем; members — участникам и управляющим группы публикации.
+        // public — всем, если источник доверенный (Р56/Р65); members и недоверенный public —
+        // участникам и управляющим группы публикации (на странице группы тоже).
         var published = await _db.UserMediaPublications.AsNoTracking()
             .Where(p => p.Status == UserMediaPublicationStatus.Approved
                         && (eventId != null
@@ -420,6 +470,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .Where(MediaPublicationAudience.CanSee(_db, userId, isSiteAdmin))
             .Select(p => new VisibleResultMediaDto
             {
+                MediaId = p.UserMediaId,
+                IsMine = userId != null && p.Media!.UserId == userId,
                 ResultId = p.Media!.ResultId,
                 MediaType = p.Media.MediaType,
                 SourceType = p.Media.SourceType,
@@ -449,6 +501,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
                 .Where(m => m.SwimmerId == swimmerId && m.UserId == userId)
                 .Select(m => new VisibleResultMediaDto
                 {
+                    MediaId = m.Id,
+                    IsMine = true,
                     ResultId = m.ResultId,
                     MediaType = m.MediaType,
                     SourceType = m.SourceType,
@@ -461,6 +515,8 @@ public class UserMediaPublicationService : IUserMediaPublicationService
             .Where(MediaPublicationAudience.CanSee(_db, userId, isSiteAdmin))
             .Select(p => new VisibleResultMediaDto
             {
+                MediaId = p.UserMediaId,
+                IsMine = userId != null && p.Media!.UserId == userId,
                 ResultId = p.Media!.ResultId,
                 MediaType = p.Media.MediaType,
                 SourceType = p.Media.SourceType,

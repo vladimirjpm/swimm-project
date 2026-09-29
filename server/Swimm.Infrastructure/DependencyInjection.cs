@@ -135,6 +135,7 @@ public static class DependencyInjection
         services.AddScoped<IMySwimsRepository, MySwimsRepository>();
         services.AddScoped<IReactionRepository, ReactionRepository>();
         services.AddScoped<IUserMediaPublicationService, UserMediaPublicationService>();
+        services.AddScoped<IMediaReportService, MediaReportService>();
         services.AddScoped<HubGroupCrudCore>();
         services.AddScoped<IHubGroupAdminService, HubGroupAdminService>();
         services.AddScoped<IHubGroupPublicRepository, HubGroupPublicRepository>();

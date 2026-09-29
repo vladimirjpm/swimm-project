@@ -109,7 +109,7 @@ function GroupHero({ group, membership, insider, rsvp, onWhosComing, hideTrainin
         <div className="min-[960px]:mt-auto">
           <DeepKpiRow>
             {group.members.length > 0 && (
-              <DeepKpi label="Swimmers" value={group.members.length} hint="in the roster" />
+              <DeepKpi label="Following" value={group.members.length} hint="swimmers" />
             )}
             {group.bests.length > 0 && (
               <DeepKpi label="Records" value={group.bests.length} hint="best in the group" />

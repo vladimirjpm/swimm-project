@@ -92,6 +92,7 @@ public class SwimmDbContext : DbContext
 
     /* === Реакции (лайки на медиа, поздравления на заплывы) === */
     public DbSet<UserReaction> UserReactions => Set<UserReaction>();
+    public DbSet<MediaReport> MediaReports => Set<MediaReport>();
 
     /* === Группы (SwimHub) === */
     public DbSet<HubGroup> HubGroups => Set<HubGroup>();
@@ -925,6 +926,11 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint(
                 "CK_UserMedia_Visibility",
                 @"""Visibility"" IN ('private', 'public')");
+
+            // Жалобы «Report» (Р62): null — обычное медиа; значения — MediaReportRules.
+            entity.HasCheckConstraint(
+                "CK_UserMedia_ModerationState",
+                @"""ModerationState"" IS NULL OR ""ModerationState"" IN ('under_review', 'removed')");
         });
 
         // Публикации личного медиа в группы (этап 2 media-visibility-model) — заявки/решения,
@@ -1015,6 +1021,38 @@ public class SwimmDbContext : DbContext
 
             // Partial unique indexes (одна реакция на юзера+цель) + счётные индексы по цели —
             // вручную в миграции через migrationBuilder.Sql (UX_UserReactions_Like/Congrats).
+        });
+
+        // Жалобы «Report» на медиа (Р62). Sys_: кто пожаловался, видит только админ сайта.
+        modelBuilder.Entity<MediaReport>(entity =>
+        {
+            entity.ToTable("Sys_MediaReports");
+
+            entity.HasOne(e => e.Media)
+                .WithMany()
+                .HasForeignKey(e => e.UserMediaId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Reporter)
+                .WithMany()
+                .HasForeignKey(e => e.ReporterUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Одна жалоба на медиа от аккаунта: иначе один человек добивал бы порог сам.
+            entity.HasIndex(e => new { e.UserMediaId, e.ReporterUserId }).IsUnique();
+            // Очередь админки и подсчёт порога: открытые жалобы медиа.
+            entity.HasIndex(e => new { e.Status, e.UserMediaId });
+
+            entity.HasCheckConstraint(
+                "CK_MediaReports_Reason",
+                @"""Reason"" IN ('wrong_swimmer', 'inappropriate', 'spam', 'privacy', 'other')");
+            entity.HasCheckConstraint(
+                "CK_MediaReports_Status",
+                @"""Status"" IN ('open', 'kept', 'removed')");
+            // «Other» без текста — не жалоба, а случайный клик.
+            entity.HasCheckConstraint(
+                "CK_MediaReports_OtherNeedsComment",
+                @"""Reason"" <> 'other' OR (""Comment"" IS NOT NULL AND length(btrim(""Comment"")) > 0)");
         });
 
         // --- Группы (SwimHub) ---

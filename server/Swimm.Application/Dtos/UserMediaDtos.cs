@@ -61,6 +61,13 @@ public class UserMediaDto
     /// <summary>Текущий пользователь уже лайкнул это медиа.</summary>
     [JsonPropertyName("my_like")]
     public bool MyLike { get; set; }
+
+    /// <summary>
+    /// Жалобы «Report» (Р62): null — обычное; under_review — спрятано со всех витрин до решения
+    /// админа сайта; removed — админ снял. Видит только владелец (это его медиа).
+    /// </summary>
+    [JsonPropertyName("moderation_state")]
+    public string? ModerationState { get; set; }
 }
 
 /// <summary>Соревнование пловца для пикера привязки (Add link, шаг 3).</summary>

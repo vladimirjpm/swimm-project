@@ -444,8 +444,12 @@ Razor + Tailwind, Competitions/Categories CRUD, фоновый импорт.)
   дорожкам 3b в Trainings → Sessions: опубликованный план, иначе раскладка по уровням на
   «Usual lanes»; флаг «On break», уровень аккаунта без пловца, «Who's coming», быстрые заметки.
   Ш4 — баннер «Are you coming?» над фото (галка тренера). Правило доверия «своё свободно, чужое
-  через доверие» — data-integrity И15. Хвосты — флаг «Trusted» для медиа, тест приватности
-  тренировок: [`plans/entity-hero-roles-handoff.md`](plans/entity-hero-roles-handoff.md) §2.
+  через доверие» — data-integrity И15. Ш5 (29.09) — флаг «Trusted» группы: public-медиа на чужой
+  карточке и в протоколе только от доверенного источника (Р56/Р58/Р59). Ш6 (29.09) — жалоба
+  «Report» на медиа: порог прячет везде, решает админ сайта на /Admin/MediaReports (Р62/Р64).
+  Ш7 (29.09) — «группа только следит; публичное — только Trusted» (Р65): состав везде «Following»,
+  роли наружу не отдаются, «Everyone 🌐» только у доверенной группы.
+  Тест приватности тренировок (И16) — `TrainingResultsPrivacyTests`. Хвосты — [`plans/entity-hero-roles-handoff.md`](plans/entity-hero-roles-handoff.md) §2.
   [`plans/entity-hero-roles-plan.md`](plans/entity-hero-roles-plan.md).
 
 **Критерий приёмки (8.1–8.10, выполнено):** группа создаётся в админке и пользователем по правам,

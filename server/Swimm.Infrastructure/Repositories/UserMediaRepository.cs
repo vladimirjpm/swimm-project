@@ -58,6 +58,7 @@ public class UserMediaRepository : IUserMediaRepository
                     : null,
                 // Денормализация для клиентских фильтров My media (сезон клиент выводит из даты).
                 CompetitionName = m.Competition != null ? m.Competition.Name : null,
+                ModerationState = m.ModerationState,
                 CompetitionDate = m.Competition != null ? m.Competition.Date : null,
                 ClubName = m.ResultRecord != null ? m.ResultRecord.Club.Name : null
             })

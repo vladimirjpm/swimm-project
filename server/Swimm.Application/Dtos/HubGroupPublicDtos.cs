@@ -415,6 +415,14 @@ public sealed class HubGroupDetailsDto
     [JsonPropertyName("is_official")]
     public bool IsOfficial { get; set; }
 
+    /// <summary>
+    /// Доверенная группа (Р56, HubGroupTrustRules: флаг «Trusted» или официальная): её public-медиа
+    /// видны всем и в протоколе, и на карточке пловца. false — таб Admin и модерация показывают
+    /// управляющим сообщение Р58. Свойство группы, не зрителя — общему кэшу страницы не мешает.
+    /// </summary>
+    [JsonPropertyName("is_trusted")]
+    public bool IsTrusted { get; set; }
+
     /// <summary>open | approval — чтобы кнопка вступления показывала «Подать заявку».</summary>
     [JsonPropertyName("join_policy")]
     public string JoinPolicy { get; set; } = "open";

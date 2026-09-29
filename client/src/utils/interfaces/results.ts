@@ -140,7 +140,15 @@ export interface GalleryItem {
 
   sourceType?: 'youtube' | 'vimeo' | 'other';
   url?: string;
-  code?: string;  
+  code?: string;
+  /**
+   * Id медиа пользователя (Sys_UserMedia) — есть только у пользовательских медиа, пришедших с
+   * сервера. Задан и не `isMine` — лайтбокс показывает «Report» (Р62). У медиа группы от тренера
+   * (HubGroupMedia) и статики его нет — жаловаться там не на что.
+   */
+  mediaId?: number;
+  /** Своё медиа зрителя — «Report» не показываем. Неизвестно (общие ленты) — решает сервер. */
+  isMine?: boolean;
 }
 
 // Канонический wire-контракт медиа группы/тренировки (HubGroupMediaDto, snake_case).

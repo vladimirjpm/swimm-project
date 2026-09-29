@@ -110,6 +110,16 @@ public class HubGroup
     public bool IsOfficial { get; set; }
 
     /// <summary>
+    /// Доверенная группа (Р56, docs/data-integrity.md): её одобренные <c>public</c>-медиа видны
+    /// всем и вне страниц группы — в протоколе и на карточке пловца. Без флага такое медиа видно
+    /// всем только на страницах самой группы, а в протоколе и на карточке — лишь её участникам
+    /// (как <c>members</c>). Ставит только админ сайта в Admin/HubGroups, один раз на группу, не
+    /// на каждое медиа. Официальная группа клуба доверенная и без флага — правило
+    /// <c>HubGroupTrustRules</c> (Swimm.Application), руками «IsTrusted || IsOfficial» не писать.
+    /// </summary>
+    public bool IsTrusted { get; set; }
+
+    /// <summary>
     /// Тестовая группа (docs/plans/test-personas-plan.md, решение 24.09.2026): её видят только
     /// site-админ и тестовые аккаунты (email с префиксом <c>utest</c>, правило —
     /// <c>TestAccountRules</c>); всем остальным группы нет — 404, не заглушка. В каталоге её нет

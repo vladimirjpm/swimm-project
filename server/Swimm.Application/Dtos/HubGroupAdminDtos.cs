@@ -13,6 +13,8 @@ public sealed class HubGroupAdminRowDto
     public bool IsOfficial { get; set; }
     /// <summary>Тестовая группа (HubGroup.IsTest) — метка TEST и фильтр в списке админки.</summary>
     public bool IsTest { get; set; }
+    /// <summary>Флаг «Trusted» (HubGroup.IsTrusted, Р56) — метка TRUSTED в списке админки.</summary>
+    public bool IsTrusted { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
@@ -141,6 +143,9 @@ public sealed class HubGroupEditDto
     public bool IsOfficial { get; set; }
     /// <summary>Тестовая группа (HubGroup.IsTest) — видят только site-админ и utest-аккаунты.</summary>
     public bool IsTest { get; set; }
+    /// <summary>Флаг «Trusted» (HubGroup.IsTrusted, Р56): public-медиа группы видны всем и в
+    /// протоколе, и на карточке пловца. Официальная доверенная и без флага.</summary>
+    public bool IsTrusted { get; set; }
     /// <summary>open | approval — политика самозаписи (см. HubGroupJoinPolicy).</summary>
     public string JoinPolicy { get; set; } = "open";
     public List<HubGroupLinkDto> Links { get; set; } = [];
@@ -175,6 +180,11 @@ public sealed class HubGroupInputDto
     /// группу тестовой или снять пометку не может.
     /// </summary>
     public bool IsTest { get; set; }
+    /// <summary>
+    /// Флаг «Trusted» (Р56). Как и <see cref="IsTest"/>, читает ТОЛЬКО админский путь: владелец из
+    /// «My groups» выдать доверие своей группе не может — в этом весь смысл флага (И15).
+    /// </summary>
+    public bool IsTrusted { get; set; }
 }
 
 /// <summary>Опция клуба для select в форме.</summary>

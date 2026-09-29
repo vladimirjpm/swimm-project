@@ -73,10 +73,10 @@ function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetail
   };
 
   return (
-    <section className="deep-card mb-4" aria-label="Members">
-      <div className="deep-card-title">Members</div>
+    <section className="deep-card mb-4" aria-label="Following">
+      <div className="deep-card-title">Following</div>
       <div className="deep-card-sub mt-1">
-        {group.members.length} in the roster
+        {group.members.length} {group.members.length === 1 ? 'swimmer' : 'swimmers'} the group follows
         {editLevels && levels.data && (noLevelCount > 0 ? ` · ${noLevelCount} without a level` : ' · levels set for everyone')}
         {editLevels && onBreakSwimmers.size > 0 && ` · ${onBreakSwimmers.size} on break`}
       </div>
@@ -91,7 +91,7 @@ function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetail
         <div className="mt-4 text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
           {group.is_virtual
             ? 'No swimmers in favorites yet — tap the hearts on results.'
-            : 'The roster is empty for now.'}
+            : 'The group doesn’t follow any swimmers yet.'}
         </div>
       ) : (
         <ul className="m-0 mt-4 flex list-none flex-col gap-1.5 p-0">
@@ -475,16 +475,16 @@ function GroupLastStartCard({ group, onMore }: { group: HubGroupDetails; onMore:
 function GroupMembersDigest({ group, onMore }: { group: HubGroupDetails; onMore: () => void }) {
   return (
     <DeepDigestCard
-      title="Members"
-      subtitle={group.is_virtual ? 'from your favorites' : 'roster kept by the group creator'}
+      title="Following"
+      subtitle={group.is_virtual ? 'from your favorites' : 'swimmers the group follows'}
       count={group.members.length}
-      countLabel="SWIMMERS"
+      countLabel="FOLLOWING"
       moreLabel={`All ${group.members.length} →`}
       onMore={onMore}
       isEmpty={group.members.length === 0}
       emptyText={group.is_virtual
         ? 'No swimmers in favorites yet — tap the hearts on results.'
-        : 'The roster is empty for now.'}
+        : 'The group doesn’t follow any swimmers yet.'}
     >
       <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
         {group.members.slice(0, DIGEST_MEMBERS).map((m) => (

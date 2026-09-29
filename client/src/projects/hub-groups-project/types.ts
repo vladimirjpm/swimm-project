@@ -208,6 +208,12 @@ export interface GroupPublicationItem {
   url: string;
   owner_user_id: number;
   owner_email: string;
+  /** Id медиа (Sys_UserMedia). */
+  media_id?: number;
+  /** Жалобы «Report» (Р62): null | under_review (спрятано до решения админа сайта) | removed. */
+  moderation_state?: 'under_review' | 'removed' | null;
+  /** Открытые жалобы: причина → сколько. Без имён и текста — их видит только админ сайта. */
+  open_reports?: Record<string, number>;
   swimmer_id?: number | null;
   swimmer_name?: string | null;
   result_id?: number | null;
@@ -221,7 +227,10 @@ export interface GroupPublicationItem {
  * (public и members). Без владельца медиа — кто подал, знают только модераторы.
  */
 export interface PublishedMediaItem {
+  /** Id ПУБЛИКАЦИИ (не медиа). */
   id: number;
+  /** Id медиа (Sys_UserMedia) — для жалобы «Report» (Р62). */
+  media_id?: number;
   media_type: HubGroupMediaItem['media_type'];
   source_type: HubGroupMediaItem['source_type'];
   url: string;
@@ -273,6 +282,11 @@ export interface HubGroupDetails {
   club_name?: string | null;
   /** Официальная группа клуба (одобрена админом) — не путать с составом-watchlist. */
   is_official: boolean;
+  /**
+   * Доверенная группа (Р56: флаг «Trusted» или официальная): её public-медиа видны всем и в
+   * протоколе, и на карточке пловца. false — таб Admin показывает управляющим сообщение Р58.
+   */
+  is_trusted?: boolean;
   /** open | approval — политика самозаписи (кнопка «Вступить» vs «Подать заявку»). */
   join_policy?: 'open' | 'approval';
   /** Группа только для участников (§6-6). Участник видит её целиком, с пометкой. */

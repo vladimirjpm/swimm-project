@@ -6,11 +6,11 @@ import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useAthleteCareer, AthleteCareer } from '../../hooks/useAthleteCareer';
 import {
   useUserMedia, useMyMediaPublications, UserMediaDto, parseTargetKey, targetKey,
-  type PublishTargetType,
+  canShareWithEveryone, EVERYONE_TRUSTED_ONLY, type PublishTargetType,
 } from '../../hooks/useUserMedia';
 
 /** Цель подачи из /publish-targets: группа или клуб пловца. */
-interface PublishTarget { type: PublishTargetType; id: number; name: string }
+interface PublishTarget { type: PublishTargetType; id: number; name: string; trusted?: boolean }
 import { useLogligStatus } from '../../hooks/useLogligStatus';
 import Helper from '../../utils/helpers/data-helper'
 import { HelperMedia } from '../../utils/helpers';
@@ -737,6 +737,9 @@ function MyMediaSection({
                 setPubGroupId(e.target.value);
                 // У клуба нет аккаунтов-участников, значит и уровня members.
                 if (parseTargetKey(e.target.value)?.type === 'club') setPubLevel('public');
+                // У недоверенной группы нет Everyone (Р65) — переключаем на участников.
+                else if (!canShareWithEveryone((publishTargets ?? []).find((t) => targetKey(t) === e.target.value)))
+                  setPubLevel('members');
               }}
               className="rounded-lg px-2 py-1.5 text-xs"
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
@@ -758,7 +761,9 @@ function MyMediaSection({
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
             >
               <option value="members" disabled={parseTargetKey(pubGroupId)?.type === 'club'}>group members</option>
-              <option value="public">public (visible to everyone)</option>
+              <option value="public" disabled={!canShareWithEveryone((publishTargets ?? []).find((t) => targetKey(t) === pubGroupId))}>
+                public (visible to everyone)
+              </option>
             </select>
             <button
               type="button"
@@ -770,6 +775,9 @@ function MyMediaSection({
               Submit
             </button>
           </div>
+          {!canShareWithEveryone((publishTargets ?? []).find((t) => targetKey(t) === pubGroupId)) && (
+            <div className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>{EVERYONE_TRUSTED_ONLY}</div>
+          )}
           {pubError && <div className="text-[10px]" style={{ color: '#e23b5a' }}>{pubError}</div>}
 
           {/* Заявки этого медиа */}

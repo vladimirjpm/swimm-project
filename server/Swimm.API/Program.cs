@@ -159,6 +159,18 @@ builder.Services.AddRateLimiter(options =>
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0
                 }));
+    // Жалобы «Report» на медиа (Р62): свободный текст «Other» — поэтому строже медиа-мутаций.
+    // Ключ — userId ([Authorize]-эндпоинт).
+    options.AddPolicy(MediaReportRules.RateLimitPolicy, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                          ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = MediaReportRules.RateLimitPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
     // Тело отказа — { error }: так его читают клиентские обработчики (saveResultFrom, RSVP);
     // вход (login-modal) смотрит только на статус 429, тело ему не мешает.
     options.OnRejected = async (context, ct) =>

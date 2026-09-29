@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useCurrentIdentity, useMyHubGroups } from '../use-my-hub-groups';
 import { publicationsApiFetch, SwimContextLine } from './group-bits';
+import { EVERYONE_TRUSTED_ONLY, mediaReportsSummary, TRUSTED_HOW_TO, TRUSTED_NOTE } from '../../../hooks/useUserMedia';
 import type { GroupPublicationItem, HubGroupDetails } from '../types';
 
 /**
@@ -66,9 +67,16 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
     rejected: 'text-[var(--t-danger)]',
   };
 
+  // Заявка «public» у недоверенной группы (подана, пока флаг был, или флаг сняли) — сказать, что
+  // одобрение покажет её только участникам (Р65).
+  const untrustedPublic = group.is_trusted === false && items.some((i) => i.level === 'public' && i.status === 'pending');
+
   return (
     <div id="publications-inbox" className="deep-card" aria-label="Publications inbox">
       <h2 className="deep-card-title mb-4">Publication requests</h2>
+      {untrustedPublic && (
+        <p className="m-0 mb-3 text-[11.5px] leading-snug text-[var(--t-warn)]">{EVERYONE_TRUSTED_ONLY}</p>
+      )}
       <div className="flex flex-col gap-2">
         {items.map((item) => {
           let domain = item.url;
@@ -97,6 +105,12 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
                   />
                 )}
                 <p className="m-0 truncate text-[11px] text-[var(--t-text-3)]">{item.owner_email}</p>
+                {/* Жалобы (Р62): тренер видит состояние, причины и число — без имён. */}
+                {mediaReportsSummary(item.moderation_state, item.open_reports) && (
+                  <p className="m-0 text-[11px] font-bold text-[var(--t-warn)]">
+                    {mediaReportsSummary(item.moderation_state, item.open_reports)}
+                  </p>
+                )}
               </div>
               <span className={badgeCls}>{PUBLICATION_LEVEL_LABEL[item.level]}</span>
               <span className={`hp-mono text-[10.5px] font-extrabold uppercase ${statusCls[item.status]}`}>
@@ -142,5 +156,31 @@ function PublicationsInbox({ group, onDecided }: { group: HubGroupDetails; onDec
   );
 }
 
+/**
+ * Карточка охвата медиа в табе Admin (Р63/Р65, решения Влада 29.09.2026): доверенная — зелёная
+ * строка «✓ Trusted»; недоверенная, подписанная на клуб, — «Everyone только для Trusted» и как
+ * получить флаг; недоверенная без подписки — ничего. Погашенный «Everyone 🌐» в селектах
+ * публикации объясняет себя сам — от подписки не зависит.
+ */
+export function GroupTrustCard({ group }: { group: HubGroupDetails }) {
+  if (group.is_virtual || group.is_trusted == null) return null;
+  if (group.is_trusted) {
+    return (
+      <div className="deep-card" aria-label="Public media reach">
+        <p className="m-0 text-[12.5px] font-bold leading-snug text-[var(--t-good)]">{TRUSTED_NOTE}</p>
+      </div>
+    );
+  }
+  // Недоверенная без подписки на клуб — молчим (решение Влада 29.09.2026): это компания своих,
+  // и предупреждение там шум. Подписанная на клуб выглядит «лицом клуба» — ей сказать надо.
+  if (group.followed_club_id == null) return null;
+  return (
+    <div className="deep-card" aria-label="Public media reach">
+      <h2 className="deep-card-title mb-2">Public media reach</h2>
+      <p className="m-0 text-[12.5px] leading-snug text-[var(--t-text-2)]">{EVERYONE_TRUSTED_ONLY}</p>
+      <p className="m-0 mt-1.5 text-[12px] leading-snug text-[var(--t-text-3)]">{TRUSTED_HOW_TO}</p>
+    </div>
+  );
+}
 
 export default PublicationsInbox;

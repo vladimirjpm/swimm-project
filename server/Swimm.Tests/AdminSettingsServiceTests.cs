@@ -30,8 +30,20 @@ public class AdminSettingsServiceTests
         // + FavoritesMaxSwimmers/FavoritesMaxClubs (лимиты избранного, 2026-09-10)
         // + CacheRowPrecision/CacheHitVerifyPercent (точность сброса кэша, К4б.3, 2026-09-14)
         // + CacheColumnPrecision (служебные колонки, К4б.6, 2026-09-14)
-        // + 4 потолка групп и рубильник самозаписи (HubGroupQuotaRules, Ш3.0, 2026-09-28).
-        Assert.Equal(27, all.Count);
+        // + 4 потолка групп и рубильник самозаписи (HubGroupQuotaRules, Ш3.0, 2026-09-28)
+        // + MediaReportHideThreshold (порог жалоб «Report», Р62, 2026-09-29).
+        Assert.Equal(28, all.Count);
+    }
+
+    [Fact]
+    public void MediaReportHideThreshold_DefaultsTo3_AndRejectsOutOfRange()
+    {
+        var svc = Build();
+
+        Assert.Equal("3", svc.Get(Swimm.Application.Mapping.MediaReportRules.HideThresholdKey)!.Value);
+        Assert.False(svc.Update(Swimm.Application.Mapping.MediaReportRules.HideThresholdKey, "0"));
+        Assert.False(svc.Update(Swimm.Application.Mapping.MediaReportRules.HideThresholdKey, "101"));
+        Assert.True(svc.Update(Swimm.Application.Mapping.MediaReportRules.HideThresholdKey, "5"));
     }
 
     [Fact]

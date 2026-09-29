@@ -21,7 +21,7 @@ import {
 import {
   FromMembersGallery, GroupGallery, MembersPublications, MembersReviews,
 } from './components/group-media';
-import PublicationsInbox from './components/group-admin';
+import PublicationsInbox, { GroupTrustCard } from './components/group-admin';
 import GroupJoinPolicyCard from './components/group-join-policy';
 import GroupScheduleEditor from './components/group-schedule-editor';
 import GroupLevelsCard from './components/group-levels';
@@ -46,7 +46,7 @@ import type { HubGroupDetails, TrainingRsvp } from './types';
  * а не страница сущности.
  */
 
-type GroupTab = 'overview' | 'season' | 'results' | 'swimmers' | 'media' | 'trainings' | 'admin';
+type GroupTab = 'overview' | 'season' | 'results' | 'following' | 'media' | 'trainings' | 'admin';
 
 function GroupPage({ slug }: { slug: string }) {
   const [group, setGroup] = useState<HubGroupDetails | null>(null);
@@ -61,7 +61,11 @@ function GroupPage({ slug }: { slug: string }) {
   const [resultsView, setResultsView] = useState<GroupResultsView>(() => {
     // Легаси-табы стали видами: `?tab=records` → Results·Records, `?tab=lanes` →
     // Trainings·Lanes. Переписываем до того, как каркас прочтёт `?tab=`.
-    rewriteLegacyTab({ records: { tab: 'results', view: 'records' }, lanes: { tab: 'trainings', view: 'lanes' } });
+    rewriteLegacyTab({
+      records: { tab: 'results', view: 'records' },
+      lanes: { tab: 'trainings', view: 'lanes' },
+      swimmers: { tab: 'following' }, // Р65, 29.09.2026
+    });
     return readViewParam(GROUP_RESULTS_VIEWS, 'results');
   });
   const pickResultsView = (next: GroupResultsView) => {
@@ -178,7 +182,7 @@ function GroupPage({ slug }: { slug: string }) {
         {
           id: 'members-digest',
           span: 'half' as const,
-          render: () => <GroupMembersDigest group={group} onMore={() => nav.go('swimmers')} />,
+          render: () => <GroupMembersDigest group={group} onMore={() => nav.go('following')} />,
         },
       ],
     },
@@ -204,11 +208,13 @@ function GroupPage({ slug }: { slug: string }) {
       }],
     },
     {
-      id: 'swimmers' as const,
+      // «Группа только следит» (Р65): состав — те, за кем группа следит, а не «кто у нас плавает».
+      // Старый адрес ?tab=swimmers переписывается сюда (rewriteLegacyTab выше).
+      id: 'following' as const,
       icon: '🏊',
-      label: 'Swimmers',
-      shortLabel: 'Team',
-      sub: real && manages ? `${group.members.length} · levels` : `${group.members.length} in the roster`,
+      label: 'Following',
+      shortLabel: 'Following',
+      sub: real && manages ? `${group.members.length} · levels` : `${group.members.length} swimmers`,
       editable: real && manages,
       // Управляющему — выпадашка уровня у каждого пловца (docs/plans/lane-plans-plan.md).
       cards: () => [{ id: 'members', render: () => <GroupMembersCard group={group} editLevels={real && manages} /> }],
@@ -316,6 +322,11 @@ function GroupPage({ slug }: { slug: string }) {
               policy={group.join_policy === 'approval' ? 'approval' : 'open'}
             />
           ),
+        },
+        {
+          // Сообщение Р58: без «Trusted» public-медиа группы видны всем только здесь.
+          id: 'trust',
+          render: () => <GroupTrustCard group={group} />,
         },
         {
           id: 'publications-inbox',

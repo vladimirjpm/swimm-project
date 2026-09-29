@@ -144,6 +144,11 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 .ToListAsync();
         }
         members = HubGroupRosterOrder.Apply(members, adminSwimmerIds.ToHashSet());
+        // Роль coach/captain — заявление владельца о чужом человеке: наружу её не отдаём (Р65,
+        // «группа только следит»). Ответ страницы общий на всех, поэтому прятать на клиенте мало —
+        // JSON видит любой. Порядок «тренер первым» (решение 26.09.2026) уже применён выше;
+        // роли видит управляющий в редакторе состава. Зачёт ниже берёт роль отсюда — тоже member.
+        foreach (var m in members) m.Role = HubGroupRosterOrder.MemberRole;
 
         var dto = new HubGroupDetailsDto
         {
@@ -158,6 +163,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             Country = group.Country?.CountryCode,
             ClubName = group.Club?.Name,
             IsOfficial = group.IsOfficial,
+            IsTrusted = HubGroupTrustRules.IsTrusted(group),
             JoinPolicy = group.JoinPolicy,
             IsPrivate = HubGroupVisibilityRules.IsPrivate(Visibility, group.IsPublic),
             Links = ParseLinks(group.Links),

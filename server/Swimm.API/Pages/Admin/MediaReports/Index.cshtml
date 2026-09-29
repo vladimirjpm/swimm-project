@@ -1,0 +1,174 @@
+@page
+@using Swimm.API.Pages.Admin.Shared
+@using Swimm.Application.Mapping
+@model Swimm.API.Pages.Admin.MediaReports.IndexModel
+@{
+    ViewData["Title"] = "Media reports";
+    ViewData["PageSubtitle"] = "Жалобы «Report» на фото и видео — решает только админ сайта";
+    var flash = TempData["Flash"] as string;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+<div class="mb-4 flex flex-wrap items-center gap-2">
+    <a href="@Url.Page("Index")"
+       class="admin-btn py-1 px-2.5 @(Model.ShowOpen ? "admin-btn-primary" : "admin-btn-ghost")">Ждут решения · @Model.OpenCount</a>
+    <a href="@Url.Page("Index", new { status = "closed" })"
+       class="admin-btn py-1 px-2.5 @(!Model.ShowOpen ? "admin-btn-primary" : "admin-btn-ghost")">Разобранные</a>
+    <span class="ml-auto text-xs text-admin-text-muted">
+        Порог: <strong class="text-admin-text">@Model.Threshold</strong> открытых жалоб прячут медиа везде —
+        <a href="/Admin/Settings" class="text-admin-accent hover:underline">MediaReportHideThreshold</a>
+    </span>
+</div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="admin-card text-center text-admin-text-muted italic py-10">
+        @(Model.ShowOpen ? "Жалоб, ждущих решения, нет." : "Разобранных жалоб пока нет.")
+    </div>
+}
+
+<div class="flex flex-col gap-4">
+    @foreach (var item in Model.Items)
+    {
+        var openReports = item.Reports.Count(r => r.Status == MediaReportRules.StatusOpen);
+        <div class="admin-card" id="media-@item.MediaId">
+            <div class="flex flex-wrap items-start gap-3">
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="@item.Url" target="_blank" rel="noopener noreferrer nofollow"
+                           class="font-mono text-sm text-admin-accent hover:underline break-all">@item.Url ↗</a>
+                        <span class="text-xs text-admin-text-muted">@item.MediaType · @item.SourceType · #@item.MediaId</span>
+                        @{
+                            var (stateText, stateVariant) = item.ModerationState switch
+                            {
+                                MediaReportRules.StateUnderReview => ("Спрятано до решения", "warning"),
+                                MediaReportRules.StateRemoved => ("Снято", "danger"),
+                                _ => ("Видно", "success"),
+                            };
+                        }
+                        <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel(stateText, stateVariant)' />
+                    </div>
+                    <div class="mt-1 text-sm">
+                        Пловец:
+                        <a href="@(Model.PublicSiteBaseUrl + PublicSite.SwimmerPath(item.SwimmerId))" target="_blank" rel="noopener"
+                           class="text-admin-accent hover:underline">@item.SwimmerName ↗</a>
+                        @if (item.ResultLabel != null)
+                        {
+                            <span class="text-admin-text-muted"> · @item.ResultLabel</span>
+                        }
+                    </div>
+                    <div class="mt-0.5 text-xs text-admin-text-muted">
+                        Автор: @item.OwnerEmail
+                        · <a href="/Admin/Users?userId=@item.OwnerUserId" class="text-admin-accent hover:underline">в Users</a>
+                    </div>
+                    @if (item.Publications.Count > 0)
+                    {
+                        <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                            @foreach (var p in item.Publications)
+                            {
+                                <span class="text-admin-text-muted">
+                                    @if (p.TargetSlug != null)
+                                    {
+                                        <a href="@(Model.PublicSiteBaseUrl + PublicSite.GroupPath(p.TargetSlug))" target="_blank" rel="noopener"
+                                           class="text-admin-accent hover:underline">@p.TargetName ↗</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-admin-text">@p.TargetName (клуб)</span>
+                                    }
+                                    · @p.Level · @p.Status@(p.Trusted ? " · trusted" : "")
+                                </span>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="flex shrink-0 flex-wrap gap-2">
+                    @if (openReports > 0 || item.ModerationState == MediaReportRules.StateUnderReview)
+                    {
+                        <form method="post" asp-page-handler="Keep" asp-route-status="@Model.Status" class="inline">
+                            <input type="hidden" name="mediaId" value="@item.MediaId" />
+                            <button type="submit" class="admin-btn admin-btn-primary py-1 px-2.5 whitespace-nowrap"
+                                    title="Закрыть жалобы и снова показать медиа">Оставить</button>
+                        </form>
+                    }
+                    @if (item.ModerationState != MediaReportRules.StateRemoved)
+                    {
+                        <form method="post" asp-page-handler="Remove" asp-route-status="@Model.Status" class="inline js-media-remove">
+                            <input type="hidden" name="mediaId" value="@item.MediaId" />
+                            <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5 whitespace-nowrap"
+                                    title="Отклонить все публикации; заново подать будет нельзя">Снять</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form method="post" asp-page-handler="Keep" asp-route-status="@Model.Status" class="inline">
+                            <input type="hidden" name="mediaId" value="@item.MediaId" />
+                            <button type="submit" class="admin-btn admin-btn-ghost py-1 px-2.5 whitespace-nowrap"
+                                    title="Разрешить автору публиковать снова (отклонённые публикации не вернутся)">Вернуть</button>
+                        </form>
+                    }
+                </div>
+            </div>
+
+            <div class="mt-3 overflow-x-auto">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Кто</th>
+                            <th>Причина</th>
+                            <th>Текст</th>
+                            <th>Статус</th>
+                            <th>Когда</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in item.Reports)
+                        {
+                            <tr>
+                                <td class="text-xs">@r.ReporterEmail</td>
+                                <td class="whitespace-nowrap">@MediaReportRules.ReasonLabelRu(r.Reason)</td>
+                                @* Текст пользователя: Razor экранирует, Html.Raw здесь нельзя. *@
+                                <td class="max-w-[360px] whitespace-pre-wrap break-words text-admin-text-muted">@(r.Comment ?? "—")</td>
+                                <td>
+                                    @{
+                                        var (rText, rVariant) = r.Status switch
+                                        {
+                                            MediaReportRules.StatusKept => ("Оставлено", "neutral"),
+                                            MediaReportRules.StatusRemoved => ("Снято", "danger"),
+                                            _ => ("Открыта", "warning"),
+                                        };
+                                    }
+                                    <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel(rText, rVariant)' />
+                                </td>
+                                <td class="whitespace-nowrap text-admin-text-muted">@r.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+<script>
+    // «Снять» необратимо для публикаций — подтверждение, как у удалений в админке.
+    document.querySelectorAll('.js-media-remove').forEach((form) => {
+        form.addEventListener('submit', async (e) => {
+            if (form.dataset.confirmed) return;
+            e.preventDefault();
+            const ok = await adminConfirm({
+                title: 'Снять медиа?',
+                message: 'Все его публикации будут отклонены, заново подать его автор не сможет. Открытые жалобы закроются.',
+                confirmText: 'Снять',
+                danger: true,
+            });
+            if (ok) { form.dataset.confirmed = '1'; form.submit(); }
+        });
+    });
+</script>

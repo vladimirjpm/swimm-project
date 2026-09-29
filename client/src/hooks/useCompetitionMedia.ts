@@ -50,7 +50,7 @@ export function useCompetitionMedia(sourceParams?: Record<string, string>): UseC
 
     fetch(`/api/media/results?${query}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
-      .then((list: { result_id: number | null; media_type: string; source_type: string; url: string }[]) => {
+      .then((list: { media_id?: number; is_mine?: boolean; result_id: number | null; media_type: string; source_type: string; url: string }[]) => {
         if (cancelled) return;
         const map = new Map<number, GalleryItem[]>();
         const flat: CompetitionMediaItem[] = [];
@@ -59,6 +59,9 @@ export function useCompetitionMedia(sourceParams?: Record<string, string>): UseC
             type: item.media_type === 'image' ? 'image' : 'video',
             sourceType: item.source_type as GalleryItem['sourceType'],
             url: item.url,
+            // Для «Report» в лайтбоксе (Р62).
+            mediaId: item.media_id,
+            isMine: item.is_mine,
           };
           flat.push({ ...gi, result_id: item.result_id });
           // competition-level медиа (result_id == null) в карту заплывов не попадает

@@ -1234,6 +1234,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<bool>("IsTest")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsTrusted")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("JoinPolicy")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1936,6 +1939,62 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_LanePlanSwimmers", null, t =>
                         {
                             t.HasCheckConstraint("CK_LanePlanSwimmers_LaneNo", "\"LaneNo\" IS NULL OR \"LaneNo\" >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.MediaReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DecidedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("ReporterUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("UserMediaId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReporterUserId");
+
+                    b.HasIndex("Status", "UserMediaId");
+
+                    b.HasIndex("UserMediaId", "ReporterUserId")
+                        .IsUnique();
+
+                    b.ToTable("Sys_MediaReports", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_MediaReports_OtherNeedsComment", "\"Reason\" <> 'other' OR (\"Comment\" IS NOT NULL AND length(btrim(\"Comment\")) > 0)");
+
+                            t.HasCheckConstraint("CK_MediaReports_Reason", "\"Reason\" IN ('wrong_swimmer', 'inappropriate', 'spam', 'privacy', 'other')");
+
+                            t.HasCheckConstraint("CK_MediaReports_Status", "\"Status\" IN ('open', 'kept', 'removed')");
                         });
                 });
 
@@ -3450,6 +3509,10 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("ModerationState")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<long?>("ResultId")
                         .HasColumnType("bigint");
 
@@ -3487,6 +3550,8 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_UserMedia", null, t =>
                         {
                             t.HasCheckConstraint("CK_UserMedia_Level", "\"Level\" IN ('swimmer', 'competition', 'result')");
+
+                            t.HasCheckConstraint("CK_UserMedia_ModerationState", "\"ModerationState\" IS NULL OR \"ModerationState\" IN ('under_review', 'removed')");
 
                             t.HasCheckConstraint("CK_UserMedia_Visibility", "\"Visibility\" IN ('private', 'public')");
                         });
@@ -4284,6 +4349,25 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Plan");
 
                     b.Navigation("Swimmer");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.MediaReport", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "Reporter")
+                        .WithMany()
+                        .HasForeignKey("ReporterUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.UserMedia", "Media")
+                        .WithMany()
+                        .HasForeignKey("UserMediaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Media");
+
+                    b.Navigation("Reporter");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.PointRuleClubsEntry", b =>

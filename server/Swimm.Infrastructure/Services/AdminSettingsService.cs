@@ -79,6 +79,11 @@ public class AdminSettingsService : ISettingsService
             new(HubGroupQuotaRules.SelfJoinEnabledKey, "true", "bool", "livesite",
                 "Самозапись в группы: false — кнопка «Join» закрыта всем (рубильник на волну спама). " +
                 "Добавление участника админом группы по email работает"),
+            // Жалобы «Report» (Р62, 29.09.2026): правило и пределы — MediaReportRules.
+            new(MediaReportRules.HideThresholdKey, MediaReportRules.DefaultHideThreshold.ToString(), "int", "livesite",
+                "Жалобы на медиа: сколько ОТКРЫТЫХ жалоб от разных аккаунтов прячет медиа со всех витрин " +
+                "(включая страницу группы) до решения админа сайта на /Admin/MediaReports, 1..100. " +
+                "Действует на новые жалобы: уже спрятанное смена порога не возвращает"),
             // Дефолт perGroup (решение 11.09.2026, §6-6): иначе галочка «Public group» у группы
             // ни на что не влияла. Приватная = только для участников, остальным — заглушка.
             new(HubGroupVisibilityRules.SettingKey, HubGroupVisibilityRules.Default, "string", "livesite",
@@ -179,6 +184,9 @@ public class AdminSettingsService : ISettingsService
             && !HubGroupQuotaRules.IsValidLimit(int.Parse(newValue)))
             return false;
         if (key == CacheSettings.HitVerifyPercent && int.Parse(newValue) is < 0 or > 100)
+            return false;
+        if (key == MediaReportRules.HideThresholdKey
+            && int.Parse(newValue) is < MediaReportRules.MinHideThreshold or > MediaReportRules.MaxHideThreshold)
             return false;
 
         _settings[key] = existing with { Value = newValue };
