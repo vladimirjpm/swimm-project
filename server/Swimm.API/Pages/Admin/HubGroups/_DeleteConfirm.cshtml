@@ -22,6 +22,7 @@
         const lines = [];
         if (impact) {
             if (impact.swimmers) lines.push(`• пловцов в составе: ${impact.swimmers} (в справочнике они останутся)`);
+            if (impact.privateSwimmers) lines.push(`• из них пловцов группы: ${impact.privateSwimmers} — удалятся насовсем, с временами тренировок`);
             if (impact.accountMembers) lines.push(`• участников-аккаунтов: ${impact.accountMembers}`);
             if (impact.admins) lines.push(`• админов группы: ${impact.admins}`);
             if (impact.trainingSessions) lines.push(`• тренировок: ${impact.trainingSessions}, результатов в них: ${impact.trainingResults}`);

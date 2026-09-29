@@ -198,7 +198,10 @@ public partial class HubGroupCrudCore
         var groupExists = await _db.HubGroups.AnyAsync(g => g.Id == hubGroupId);
         if (!groupExists) return HubGroupMemberSaveResult.Fail($"Группа #{hubGroupId} не найдена");
 
-        var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == swimmerId);
+        // Пловец чужой группы (Р71) для этой группы не существует — тот же ответ, что на
+        // несуществующий id, чтобы перебором нельзя было узнать, кто где заведён.
+        var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == swimmerId
+            && (s.PrivateHubGroupId == null || s.PrivateHubGroupId == hubGroupId));
         if (!swimmerExists) return HubGroupMemberSaveResult.Fail($"Пловец #{swimmerId} не найден");
 
         if (!HubGroupMember.Roles.Contains(role)) role = "member";
@@ -209,7 +212,8 @@ public partial class HubGroupCrudCore
             return HubGroupMemberSaveResult.Fail("Этот пловец уже состоит в группе");
 
         if (maxManual is int limit && await _db.HubGroupMembers.CountAsync(m =>
-                m.HubGroupId == hubGroupId && m.Source == HubGroupMemberSource.Manual) >= limit)
+                m.HubGroupId == hubGroupId
+                && (m.Source == HubGroupMemberSource.Manual || m.Source == HubGroupMemberSource.Private)) >= limit)
             return HubGroupMemberSaveResult.Fail(HubGroupQuotaRules.RosterFullError(limit));
 
         if (existing != null)
@@ -251,6 +255,50 @@ public partial class HubGroupCrudCore
         return HubGroupMemberSaveResult.Ok();
     }
 
+    /// <summary>
+    /// Завести пловца группы (Р71) и сразу поставить его в состав — одним сохранением: пловец
+    /// без строки состава был бы ничейным. Считается ручной строкой состава (тот же потолок).
+    /// </summary>
+    public async Task<PrivateSwimmerSaveResult> AddPrivateSwimmerAsync(
+        int hubGroupId, string? firstName, string? lastName, string? gender, int? birthYear, int? maxManual = null)
+    {
+        var groupExists = await _db.HubGroups.AnyAsync(g => g.Id == hubGroupId);
+        if (!groupExists) return PrivateSwimmerSaveResult.Fail($"Group #{hubGroupId} not found");
+
+        var input = PrivateSwimmerRules.Normalize(firstName, lastName, gender, birthYear, DateTime.UtcNow.Year);
+        if (input.Error != null) return PrivateSwimmerSaveResult.Fail(input.Error);
+
+        if (maxManual is int limit && await _db.HubGroupMembers.CountAsync(m =>
+                m.HubGroupId == hubGroupId
+                && (m.Source == HubGroupMemberSource.Manual || m.Source == HubGroupMemberSource.Private)) >= limit)
+            return PrivateSwimmerSaveResult.Fail(HubGroupQuotaRules.RosterFullError(limit));
+
+        var maxOrder = await _db.HubGroupMembers.Where(m => m.HubGroupId == hubGroupId)
+            .Select(m => (int?)m.SortOrder).MaxAsync() ?? 0;
+
+        var swimmer = new Swimmer
+        {
+            FirstName = input.First,
+            LastName = input.Last,
+            Gender = input.Gender,
+            BirthYear = input.BirthYear,
+            Origin = PrivateSwimmerRules.Origin,
+            PrivateHubGroupId = hubGroupId,
+        };
+        _db.HubGroupMembers.Add(new HubGroupMember
+        {
+            HubGroupId = hubGroupId,
+            Swimmer = swimmer,
+            Role = "member",
+            SortOrder = maxOrder + 1,
+            Source = HubGroupMemberSource.Private,
+        });
+        await _db.SaveChangesAsync();
+
+        await TouchGroupAsync(hubGroupId);
+        return PrivateSwimmerSaveResult.Ok(swimmer.Id);
+    }
+
     public async Task<HubGroupMemberSaveResult> UpdateMemberAsync(int hubGroupId, int memberId, string role, int sortOrder)
     {
         var member = await _db.HubGroupMembers.FindAsync(memberId);
@@ -277,6 +325,21 @@ public partial class HubGroupCrudCore
         var member = await _db.HubGroupMembers.FindAsync(memberId);
         if (member == null || member.HubGroupId != hubGroupId)
             return HubGroupMemberSaveResult.Fail($"Участник #{memberId} не найден");
+
+        // Пловца группы (Р71) вне группы нет, и вернуть его поиском нельзя — удалить из состава
+        // значит удалить насовсем, с его временами тренировок. Обычный путь для него — «неактивен»
+        // (SetExcludedAsync); сюда клиент приходит из списка Inactive, с подтверждением.
+        // Времена — явно: Sys_TrainingResults держит пловца RESTRICT.
+        var privateSwimmer = await _db.Swimmers
+            .FirstOrDefaultAsync(s => s.Id == member.SwimmerId && s.PrivateHubGroupId == hubGroupId);
+        if (privateSwimmer != null)
+        {
+            _db.TrainingResults.RemoveRange(await _db.TrainingResults.Where(r => r.SwimmerId == privateSwimmer.Id).ToListAsync());
+            _db.Swimmers.Remove(privateSwimmer);
+            await _db.SaveChangesAsync();
+            await TouchGroupAsync(hubGroupId);
+            return HubGroupMemberSaveResult.Ok();
+        }
 
         var hideAsClub = member.Source == HubGroupMemberSource.Club
             || await HubGroupClubRoster.IsInSubscribedClubAsync(

@@ -211,7 +211,9 @@ public class HubGroupUserService : IHubGroupUserService
         var user = await _db.AppUsers.FirstOrDefaultAsync(u => u.Email == email);
         if (user == null) return HubGroupMemberSaveResult.Fail("Пользователь с таким email не найден");
 
-        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId))
+        // Пловец чужой группы (Р71) меткой не ставится — для этой группы его нет.
+        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId
+                && (s.PrivateHubGroupId == null || s.PrivateHubGroupId == hubGroupId)))
             return HubGroupMemberSaveResult.Fail("Пловец не найден");
 
         var quota = await CheckMembershipQuotasAsync(hubGroupId, user.Id, pending: false, selfJoin: false);
@@ -226,7 +228,9 @@ public class HubGroupUserService : IHubGroupUserService
             .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
         if (member == null) return HubGroupMemberSaveResult.Fail("Участник не найден");
 
-        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId))
+        // Пловец чужой группы (Р71) меткой не ставится — для этой группы его нет.
+        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId
+                && (s.PrivateHubGroupId == null || s.PrivateHubGroupId == hubGroupId)))
             return HubGroupMemberSaveResult.Fail("Пловец не найден");
 
         member.SwimmerId = swimmerId;

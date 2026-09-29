@@ -56,11 +56,13 @@ const ROLE_LABEL: Record<HubGroupMember['role'], string | null> = {
 };
 
 /**
- * Чипы участника состава: роль (coach / captain) и «admin», если это админ группы. Порядок —
- * как у состава: тренер, потом админ. Тренер-админ несёт оба.
+ * Чипы участника состава: роль (coach / captain), «admin», если это админ группы, и «group
+ * only» у пловца группы (Р71 — его видят только свои). Порядок — как у состава: тренер, потом
+ * админ. Тренер-админ несёт оба.
  */
-const memberChips = (m: Pick<HubGroupMember, 'role' | 'is_admin'>): string[] =>
-  [ROLE_LABEL[m.role], m.is_admin ? 'admin' : null].filter((x): x is string => !!x);
+const memberChips = (m: Pick<HubGroupMember, 'role' | 'is_admin' | 'is_private'>): string[] =>
+  [ROLE_LABEL[m.role], m.is_admin ? 'admin' : null, m.is_private ? 'group only' : null]
+    .filter((x): x is string => !!x);
 
 const LINK_LABEL: Record<string, string> = {
   whatsapp: 'WhatsApp',

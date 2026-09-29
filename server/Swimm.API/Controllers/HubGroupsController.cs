@@ -309,6 +309,32 @@ public class HubGroupsController : ControllerBase
     }
 
     /// <summary>
+    /// Пловцы группы (Р71) — люди без аккаунта и без loglig, которых завёл тренер. Видят только
+    /// свои: управляющие (CanEdit) и активные участники-аккаунты, как тренировки. Личный ответ,
+    /// мимо общего кэша страницы и без хранения в браузере.
+    /// </summary>
+    [HttpGet("/api/hub-groups/{slug}/private-members")]
+    [Authorize]
+    public async Task<IActionResult> GetPrivateMembers(string slug)
+    {
+        if (string.IsNullOrWhiteSpace(slug) || slug.Length > 120)
+            return BadRequest("slug is required");
+
+        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(raw, out var userId)) return Unauthorized();
+
+        var groupId = await VisibleGroupIdAsync(slug);
+        if (groupId is null) return NotFound();
+
+        var perms = await _permissions.GetPermissionsAsync(groupId.Value, userId, User.IsInRole("Admin"));
+        var isMember = await _trainings.IsActiveAccountMemberAsync(groupId.Value, userId);
+        if (!perms.CanEdit && !isMember) return Forbid();
+
+        Response.Headers.CacheControl = PrivateCacheControlValue;
+        return Ok(await _groups.GetPrivateMembersAsync(groupId.Value));
+    }
+
+    /// <summary>
     /// Members-медиа группы (тренерские разборы, 2B′): Visibility=members вне тренировок,
     /// с контекстом якоря (пловец/заплыв). Видят активные участники-аккаунты группы и
     /// управляющие (CanEdit) — та же аудитория, что у тренировок. Без кэша (личное).

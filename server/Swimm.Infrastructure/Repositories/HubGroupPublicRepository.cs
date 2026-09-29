@@ -71,7 +71,8 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 IsOfficial = g.IsOfficial,
                 // Скрытых владельцем клубных пловцов (IsExcluded) не видит НИ ОДИН читатель
                 // состава — ни счётчик, ни страница, ни ростер соревнований.
-                MemberCount = g.Members.Count(m => !m.IsExcluded)
+                // Пловцы группы (Р71) — только для своих: в публичном счётчике их нет.
+                MemberCount = g.Members.Count(m => !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == null)
             })
             .ToListAsync();
     }
@@ -98,8 +99,10 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 .FirstOrDefaultAsync(g => g.Id == groupId && g.Slug == slug);
             if (group == null) return null;
 
+            // Общий ответ кэшируется один на всех, кому можно смотреть группу, поэтому пловцов
+            // группы (Р71) здесь нет: своим их отдаёт GetPrivateMembersAsync личным запросом.
             members = await _read.HubGroupMembers.AsNoTracking()
-                .Where(m => m.HubGroupId == groupId && !m.IsExcluded)
+                .Where(m => m.HubGroupId == groupId && !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == null)
                 .OrderBy(m => m.SortOrder)
                 .Select(m => new HubGroupPublicMemberDto
                 {
@@ -290,10 +293,26 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         if (groupId == null) return null;
 
         return await _read.HubGroupMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == groupId && !m.IsExcluded)
+            .Where(m => m.HubGroupId == groupId && !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == null)
             .Select(m => m.SwimmerId)
             .ToListAsync();
     }
+
+    public async Task<List<HubGroupPublicMemberDto>> GetPrivateMembersAsync(int groupId) =>
+        await _read.HubGroupMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == groupId && !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == groupId)
+            .OrderBy(m => m.SortOrder).ThenBy(m => m.Swimmer!.LastName)
+            .Select(m => new HubGroupPublicMemberDto
+            {
+                SwimmerId = m.SwimmerId,
+                Name = (m.Swimmer!.LastName + " " + m.Swimmer.FirstName).Trim(),
+                NameEn = (m.Swimmer.LastNameEn + " " + m.Swimmer.FirstNameEn).Trim(),
+                BirthYear = m.Swimmer.BirthYear,
+                // Роль наружу не отдаётся (Р65), клуба у пловца группы нет по смыслу.
+                Role = "member",
+                IsPrivate = true,
+            })
+            .ToListAsync();
 
     public async Task<HubGroupAccessDto?> GetAccessAsync(string slug, int? userId, bool isSiteAdmin)
     {

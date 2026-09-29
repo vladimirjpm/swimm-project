@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import DeepEntityPage from '../components/deep/entity-page';
 import type {
   EntityPageStatus, EntityTabNav, EntityTabSpec,
@@ -26,7 +26,7 @@ import GroupJoinPolicyCard from './components/group-join-policy';
 import GroupScheduleEditor from './components/group-schedule-editor';
 import GroupLevelsCard from './components/group-levels';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
-import type { HubGroupDetails, TrainingRsvp } from './types';
+import type { HubGroupDetails, HubGroupMember, TrainingRsvp } from './types';
 
 /**
  * Страница группы `/groups/{slug}` — ТРЕТИЙ потребитель общего каркаса
@@ -49,7 +49,15 @@ import type { HubGroupDetails, TrainingRsvp } from './types';
 type GroupTab = 'overview' | 'season' | 'results' | 'following' | 'media' | 'trainings' | 'admin';
 
 function GroupPage({ slug }: { slug: string }) {
-  const [group, setGroup] = useState<HubGroupDetails | null>(null);
+  const [loadedGroup, setGroup] = useState<HubGroupDetails | null>(null);
+  // Пловцы группы (Р71): только своим, личным запросом — общий ответ страницы их не несёт.
+  const [privateMembers, setPrivateMembers] = useState<HubGroupMember[]>([]);
+  const group = useMemo(
+    () => (loadedGroup && privateMembers.length > 0
+      ? { ...loadedGroup, members: [...loadedGroup.members, ...privateMembers] }
+      : loadedGroup),
+    [loadedGroup, privateMembers],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<'not-found' | 'failed' | null>(null);
 
@@ -133,6 +141,18 @@ function GroupPage({ slug }: { slug: string }) {
     group?.next_training?.id,
     real && (manages || isMember) && !membersOnly,
   );
+
+  // Пловцы группы (Р71) — тем же гейтом, что ответы на занятие: сервер ответил бы остальным 403.
+  const insiderSlug = real && (manages || isMember) && !membersOnly ? group!.slug : null;
+  useEffect(() => {
+    if (!insiderSlug) { setPrivateMembers([]); return undefined; }
+    let alive = true;
+    fetch(`/api/hub-groups/${encodeURIComponent(insiderSlug)}/private-members`, { credentials: 'include' })
+      .then((r) => (r.ok ? (r.json() as Promise<HubGroupMember[]>) : []))
+      .then((data) => { if (alive) setPrivateMembers(data); })
+      .catch(() => { if (alive) setPrivateMembers([]); });
+    return () => { alive = false; };
+  }, [insiderSlug]);
 
   const membershipStatus = group == null
     ? null

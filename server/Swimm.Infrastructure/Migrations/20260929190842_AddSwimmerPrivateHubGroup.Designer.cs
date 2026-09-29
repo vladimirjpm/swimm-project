@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Swimm.Infrastructure.Data;
@@ -11,9 +12,11 @@ using Swimm.Infrastructure.Data;
 namespace Swimm.Infrastructure.Migrations
 {
     [DbContext(typeof(SwimmDbContext))]
-    partial class SwimmDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929190842_AddSwimmerPrivateHubGroup")]
+    partial class AddSwimmerPrivateHubGroup
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1638,9 +1641,9 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.ToTable("HubGroupMembers", null, t =>
                         {
-                            t.HasCheckConstraint("CK_HubGroupMembers_ExcludedOnlyClub", "NOT \"IsExcluded\" OR \"Source\" IN ('club', 'private')");
+                            t.HasCheckConstraint("CK_HubGroupMembers_ExcludedOnlyClub", "NOT \"IsExcluded\" OR \"Source\" = 'club'");
 
-                            t.HasCheckConstraint("CK_HubGroupMembers_Source", "\"Source\" IN ('manual', 'club', 'private')");
+                            t.HasCheckConstraint("CK_HubGroupMembers_Source", "\"Source\" IN ('manual', 'club')");
                         });
                 });
 

@@ -44,6 +44,9 @@ public interface IHubGroupAdminService
     /// <summary>Добавить участника. Отказ — если пловец уже состоит в группе (unique-пара).</summary>
     Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role);
 
+    /// <summary>Завести пловца группы (Р71) и поставить в состав; виден только своим.</summary>
+    Task<PrivateSwimmerSaveResult> AddPrivateSwimmerAsync(int hubGroupId, AddPrivateSwimmerRequest input);
+
     /// <summary>Изменить роль/порядок участника. Отказ, если участник не принадлежит hubGroupId.</summary>
     Task<HubGroupMemberSaveResult> UpdateMemberAsync(int hubGroupId, int memberId, string role, int sortOrder);
 

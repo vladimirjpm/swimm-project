@@ -29,6 +29,11 @@ export interface HubGroupMember {
   role: 'member' | 'captain' | 'coach';
   /** Админ группы, чей аккаунт привязан к этому пловцу (сервер: HubGroupRosterOrder) — чип «admin». */
   is_admin?: boolean;
+  /**
+   * Пловец группы (Р71): завёл тренер, в федерации его нет, виден только своим. Приходит
+   * отдельным личным запросом `/private-members`, страницы пловца у него нет — без ссылки.
+   */
+  is_private?: boolean;
 }
 
 export interface HubGroupBest {

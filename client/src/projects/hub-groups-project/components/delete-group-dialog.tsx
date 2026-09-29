@@ -91,6 +91,9 @@ export default function DeleteGroupDialog({ groupId, groupName, onConfirm, onClo
 function ImpactList({ impact: i }: { impact: HubGroupDeleteImpact }) {
   const lines: string[] = [];
   if (i.swimmers) lines.push(`${count(i.swimmers, 'swimmer')} on the roster — the swimmers themselves stay on the site`);
+  if (i.privateSwimmers) {
+    lines.push(`${count(i.privateSwimmers, 'group-only swimmer')} you added yourself — deleted for good, with their training times`);
+  }
   if (i.accountMembers) lines.push(count(i.accountMembers, 'account member'));
   if (i.admins) lines.push(count(i.admins, 'group admin'));
   if (i.trainingSessions) lines.push(`${count(i.trainingSessions, 'training session')} with ${count(i.trainingResults, 'result')}`);

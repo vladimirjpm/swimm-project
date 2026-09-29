@@ -57,13 +57,29 @@ export interface HubGroupMemberRow {
   clubName?: string | null;
   role: 'member' | 'captain' | 'coach';
   sortOrder: number;
-  /** manual — добавлен руками; club — из подписки на клуб, пересобирается сам. */
-  source: 'manual' | 'club';
+  /**
+   * manual — добавлен руками; club — из подписки на клуб, пересобирается сам; private — пловец
+   * группы (Р71), заведённый тренером: его делают неактивным (isExcluded), а не удаляют.
+   */
+  source: 'manual' | 'club' | 'private';
   /**
    * Владелец скрыл клубного пловца: его не видно нигде на сайте, и пересборка его не
    * возвращает. Приходит только в панель управления — отсюда его возвращают.
    */
   isExcluded: boolean;
+  /**
+   * Пловец группы (Р71): завёл тренер, в федерации его нет, виден только своим. Убрать из
+   * состава = сделать неактивным (времена сохраняются); удалить насовсем — из списка Inactive.
+   */
+  isPrivate: boolean;
+}
+
+/** Ввод «завести пловца группы» (Р71). */
+export interface PrivateSwimmerInput {
+  firstName: string;
+  lastName: string;
+  gender: '' | 'male' | 'female';
+  birthYear: number | null;
 }
 
 /** Подписка группы на клуб: состав собирается из пловцов клуба (docs/hubgroups-architecture.md §4а). */
@@ -174,8 +190,10 @@ export interface HubGroupDeleteImpact {
   nameEn?: string | null;
   isOfficial: boolean;
   clubName?: string | null;
-  /** Пловцы в составе — сами пловцы остаются на сайте. */
+  /** Пловцы в составе — сами пловцы остаются на сайте (кроме пловцов группы). */
   swimmers: number;
+  /** Из них пловцы группы (Р71) — удаляются насовсем вместе с временами тренировок. */
+  privateSwimmers: number;
   accountMembers: number;
   admins: number;
   trainingSessions: number;

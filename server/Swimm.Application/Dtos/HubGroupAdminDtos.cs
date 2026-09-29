@@ -51,8 +51,14 @@ public sealed class HubGroupDeleteImpactDto
     public bool IsOfficial { get; set; }
     public string? ClubName { get; set; }
 
-    /// <summary>Пловцы в составе. Сами пловцы остаются в справочнике.</summary>
+    /// <summary>Пловцы в составе. Сами пловцы остаются в справочнике — кроме пловцов группы.</summary>
     public int Swimmers { get; set; }
+
+    /// <summary>
+    /// Из них пловцы группы (Р71): вне группы их нет, поэтому они удаляются насовсем вместе с
+    /// временами тренировок (каскад <c>Swimmers.PrivateHubGroupId</c>).
+    /// </summary>
+    public int PrivateSwimmers { get; set; }
 
     /// <summary>Участники-аккаунты (active и pending).</summary>
     public int AccountMembers { get; set; }
@@ -132,6 +138,9 @@ public sealed class HubGroupMemberRowDto
     /// вернуть); публичные ответы скрытых не содержат вовсе.
     /// </summary>
     public bool IsExcluded { get; set; }
+
+    /// <summary>Пловец группы (Р71) — заведён тренером, виден только своим.</summary>
+    public bool IsPrivate { get; set; }
 }
 
 /// <summary>Полные данные группы для формы Admin/HubGroups/Edit.</summary>
@@ -228,4 +237,21 @@ public sealed record HubGroupMemberSaveResult(bool Success, string? Error)
 {
     public static HubGroupMemberSaveResult Ok() => new(true, null);
     public static HubGroupMemberSaveResult Fail(string error) => new(false, error);
+}
+
+/// <summary>Итог «завести пловца группы» (Р71): при успехе — id нового пловца.</summary>
+public sealed record PrivateSwimmerSaveResult(bool Success, string? Error, int? SwimmerId)
+{
+    public static PrivateSwimmerSaveResult Ok(int swimmerId) => new(true, null, swimmerId);
+    public static PrivateSwimmerSaveResult Fail(string error) => new(false, error, null);
+}
+
+/// <summary>Тело «завести пловца группы» (Р71): человек без аккаунта и без loglig.</summary>
+public sealed class AddPrivateSwimmerRequest
+{
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    /// <summary>male / female / пусто.</summary>
+    public string? Gender { get; set; }
+    public int? BirthYear { get; set; }
 }

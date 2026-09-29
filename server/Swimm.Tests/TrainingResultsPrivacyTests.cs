@@ -31,7 +31,10 @@ public class TrainingResultsPrivacyTests
         ["Swimm.Infrastructure/Services/PersonaSeeder.cs"] =
             "сидер тестовых персонажей — запись",
         ["Swimm.Infrastructure/Services/HubGroupAdminService.cs"] =
-            "перечень потерь при удалении группы — только ЧИСЛО сессий и результатов",
+            "перечень потерь при удалении группы — только ЧИСЛО сессий и результатов; удаление сессий " +
+            "своей группы перед её удалением (Р71: каскад на пловцов группы упирался в RESTRICT)",
+        ["Swimm.Infrastructure/Services/HubGroupCrudCore.cs"] =
+            "удаление пловца группы (Р71) из состава = удаление насовсем вместе с его временами; не чтение",
         ["Swimm.Infrastructure/Services/HubGroupMediaService.cs"] =
             "привязка медиа к занятию: «эта сессия — этой группы», только id сессии",
         ["Swimm.Infrastructure/Services/SwimmerMergeService.cs"] =

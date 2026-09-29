@@ -80,7 +80,8 @@ public class HubGroupAdminService : IHubGroupAdminService
                 SortOrder = m.SortOrder,
                 // Панель управления получает и скрытых — там их возвращают.
                 Source = m.Source,
-                IsExcluded = m.IsExcluded
+                IsExcluded = m.IsExcluded,
+                IsPrivate = m.Swimmer.PrivateHubGroupId == id
             })
             .ToListAsync();
 
@@ -201,6 +202,11 @@ public class HubGroupAdminService : IHubGroupAdminService
         var group = await _db.HubGroups.FindAsync(id);
         if (group == null || impact == null) return HubGroupSaveResult.Fail($"Группа #{id} не найдена");
 
+        // Сессии тренировок — явно и РАНЬШЕ группы. Каскад от группы унёс бы их и так, но пловцы
+        // группы (Р71) уходят тем же каскадом, а Sys_TrainingResults держит пловца RESTRICT: в
+        // одном DELETE порядок каскадов не гарантирован, и удаление падало. EF удаляет сессии
+        // (их результаты — каскадом в БД) отдельной командой до группы.
+        _db.TrainingSessions.RemoveRange(await _db.TrainingSessions.Where(s => s.HubGroupId == id).ToListAsync());
         _db.HubGroups.Remove(group);
         await _db.SaveChangesAsync();
 
@@ -235,6 +241,7 @@ public class HubGroupAdminService : IHubGroupAdminService
                 LanePlans = _db.LanePlans.Count(p => p.HubGroupId == g.Id),
                 TrainingRsvps = _db.HubGroupTrainingRsvps.Count(r => r.HubGroupId == g.Id),
                 LeveledAccounts = _db.HubGroupAccountLevels.Count(l => l.HubGroupId == g.Id),
+                PrivateSwimmers = _db.Swimmers.Count(s => s.PrivateHubGroupId == g.Id),
                 ActiveBreaks = _db.HubGroupBreaks.Count(b =>
                     b.HubGroupId == g.Id && b.EndedAt == null && (b.Until == null || b.Until >= today)),
                 HasPendingClubRequest = _db.HubGroupClubRequests.Any(r =>
@@ -248,6 +255,7 @@ public class HubGroupAdminService : IHubGroupAdminService
     {
         var parts = new List<string>();
         if (i.Swimmers > 0) parts.Add($"пловцов в составе {i.Swimmers}");
+        if (i.PrivateSwimmers > 0) parts.Add($"из них пловцов группы (удалены насовсем) {i.PrivateSwimmers}");
         if (i.AccountMembers > 0) parts.Add($"аккаунтов {i.AccountMembers}");
         if (i.Admins > 0) parts.Add($"админов группы {i.Admins}");
         if (i.TrainingSessions > 0) parts.Add($"тренировок {i.TrainingSessions} (результатов {i.TrainingResults})");
@@ -275,7 +283,10 @@ public class HubGroupAdminService : IHubGroupAdminService
         var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (words.Length == 0) return [];
 
-        var swimmersQuery = _db.Swimmers.AsNoTracking().Include(s => s.Club).AsQueryable();
+        // Пловец чужой группы (Р71) в другую группу не добавляется — и в поиске его нет. Своих
+        // пловцов группы тренер видит в составе, искать их не нужно.
+        var swimmersQuery = _db.Swimmers.AsNoTracking().Include(s => s.Club)
+            .Where(s => s.PrivateHubGroupId == null);
 
         foreach (var word in words)
         {
@@ -309,7 +320,7 @@ public class HubGroupAdminService : IHubGroupAdminService
     public async Task<IReadOnlyList<SwimmerSearchResultDto>> GetClubSwimmersAsync(int clubId)
     {
         return await _db.Swimmers.AsNoTracking()
-            .Where(s => s.ClubId == clubId)
+            .Where(s => s.ClubId == clubId && s.PrivateHubGroupId == null)
             .Include(s => s.Club)
             .OrderBy(s => s.LastName)
             .Take(200)
@@ -326,6 +337,10 @@ public class HubGroupAdminService : IHubGroupAdminService
 
     public Task<HubGroupMemberSaveResult> AddMemberAsync(int hubGroupId, int swimmerId, string role) =>
         _core.AddMemberAsync(hubGroupId, swimmerId, role,
+            maxManual: HubGroupQuotaRules.Limit(_settings, HubGroupQuotaRules.MaxManualSwimmersKey));
+
+    public Task<PrivateSwimmerSaveResult> AddPrivateSwimmerAsync(int hubGroupId, AddPrivateSwimmerRequest input) =>
+        _core.AddPrivateSwimmerAsync(hubGroupId, input.FirstName, input.LastName, input.Gender, input.BirthYear,
             maxManual: HubGroupQuotaRules.Limit(_settings, HubGroupQuotaRules.MaxManualSwimmersKey));
 
     public Task<HubGroupMemberSaveResult> UpdateMemberAsync(int hubGroupId, int memberId, string role, int sortOrder) =>

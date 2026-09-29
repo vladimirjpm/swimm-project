@@ -222,6 +222,14 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey(e => e.ClubId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // Пловец группы (Р71) живёт и умирает с группой: SetNull сделал бы его публичным.
+            entity.HasOne(e => e.PrivateHubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.PrivateHubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.PrivateHubGroupId)
+                .HasFilter("\"PrivateHubGroupId\" IS NOT NULL");
+
             entity.HasOne(e => e.Country)
                 .WithMany()
                 .HasForeignKey(e => e.CountryId)
@@ -1117,13 +1125,14 @@ public class SwimmDbContext : DbContext
 
             entity.HasCheckConstraint(
                 "CK_HubGroupMembers_Source",
-                @"""Source"" IN ('manual', 'club')");
+                @"""Source"" IN ('manual', 'club', 'private')");
 
-            // Скрыть можно только клубного: ручного владелец убирает удалением, а «ручной и
-            // скрытый» — противоречие, которое читатели состава трактовали бы по-разному.
+            // Скрыть можно клубного и пловца группы (Р71, «неактивен»): ручного владелец убирает
+            // удалением, а «ручной и скрытый» — противоречие, которое читатели состава трактовали
+            // бы по-разному. Скрытую строку все читатели состава и так пропускают (!IsExcluded).
             entity.HasCheckConstraint(
                 "CK_HubGroupMembers_ExcludedOnlyClub",
-                @"NOT ""IsExcluded"" OR ""Source"" = 'club'");
+                @"NOT ""IsExcluded"" OR ""Source"" IN ('club', 'private')");
         });
 
         // Подписка группы на клуб (docs/plans/hubgroup-club-subscription-plan.md) — бизнес-

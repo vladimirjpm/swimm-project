@@ -1610,8 +1610,10 @@ public class ResultRepository : IResultRepository
 
         async Task<SwimmerProfileDto?> LoadAsync()
         {
+            // Пловец группы (Р71) публичного профиля не имеет: для страницы пловца, сравнения и
+            // всех публичных вкладок его нет — 404, как у несуществующего id.
             var s = await _db.Swimmers.AsNoTracking()
-                .Where(x => x.Id == id)
+                .Where(x => x.Id == id && x.PrivateHubGroupId == null)
                 .Select(x => new
                 {
                     x.Id,

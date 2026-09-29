@@ -167,6 +167,22 @@ public class MyHubGroupsController : ControllerBase
         return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 
+    /// <summary>
+    /// Завести пловца группы (Р71): человека без аккаунта и без loglig, чтобы ставить его на
+    /// дорожки и писать ему времена тренировок. Виден только своим; снаружи его нет.
+    /// </summary>
+    [HttpPost("{id:int}/private-swimmers")]
+    public async Task<IActionResult> AddPrivateSwimmer(int id, [FromBody] AddPrivateSwimmerRequest request)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _admin.AddPrivateSwimmerAsync(id, request);
+        return result.Success ? Ok(new { swimmerId = result.SwimmerId }) : BadRequest(new { error = result.Error });
+    }
+
     [HttpPut("{id:int}/members/{memberId:int}")]
     public async Task<IActionResult> UpdateMember(int id, int memberId, [FromBody] UpdateMemberRequest request)
     {
@@ -258,6 +274,7 @@ public class MyHubGroupsController : ControllerBase
     /// <summary>
     /// Скрыть / вернуть клубного пловца (владелец/админ группы). Скрытый не возвращается
     /// пересборкой и не виден ни на одной витрине; ручного так не прячут — его удаляют.
+    /// Пловца группы (Р71) так делают неактивным: вне состава и дорожек, времена целы.
     /// </summary>
     [HttpPut("{id:int}/members/{memberId:int}/excluded")]
     public async Task<IActionResult> SetMemberExcluded(int id, int memberId, [FromBody] SetMemberExcludedRequest request)

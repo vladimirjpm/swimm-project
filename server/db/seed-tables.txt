@@ -56,6 +56,10 @@ Sys_StartListPulls           # журнал заборов стартового 
 # Журнал действий администраторов (ActorName / ActorUserId / IpAddress):
 #   Sys_AdminAudit
 #
+# Swimmers едет БЕЗ пловцов групп (Р71, Swimmers.PrivateHubGroupId не пуст): их группы в прод
+#   не переносятся, а вне своей группы такого пловца нет. dump-seed.sh вырезает эти строки
+#   из COPY "Swimmers" сам (иначе restore упал бы на FK PrivateHubGroupId -> HubGroups).
+#
 # HubGroups и HubGroupMembers — ЕДИНСТВЕННАЯ FK через границу:
 #   HubGroups.OwnerUserId NOT NULL → Sys_AppUsers. Без владельца группа не вставится.
 #   Локально это одна тестовая группа на 19 участников — в проде создаётся заново

@@ -378,7 +378,8 @@ public class SwimmerPageRepository : ISwimmerPageRepository
 
         async Task<List<SwimmerSearchHitDto>> LoadAsync()
         {
-            var swimmers = _read.Swimmers.AsNoTracking();
+            // Пловцы группы (Р71) в публичном поиске не находятся.
+            var swimmers = _read.Swimmers.AsNoTracking().Where(s => s.PrivateHubGroupId == null);
             foreach (var word in words)
             {
                 var pattern = $"%{word}%";

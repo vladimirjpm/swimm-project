@@ -100,7 +100,8 @@ public class UserMediaRepository : IUserMediaRepository
 
     public async Task<UserMediaDto?> AddAsync(int userId, AddUserMediaRequest request)
     {
-        var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == request.SwimmerId);
+        // Пловец группы (Р71) — не адресат личного медиа: оно публикуется наружу.
+        var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == request.SwimmerId && s.PrivateHubGroupId == null);
         if (!swimmerExists) return null;
 
         // Уровень выводим сами из привязок — клиенту не доверяем.

@@ -84,6 +84,10 @@ public sealed class HubGroupPublicMemberDto
     /// </summary>
     [JsonPropertyName("is_admin")]
     public bool IsAdmin { get; set; }
+
+    /// <summary>Пловец группы (Р71): виден только своим, страницы пловца у него нет.</summary>
+    [JsonPropertyName("is_private")]
+    public bool IsPrivate { get; set; }
 }
 
 /// <summary>«Рекорд группы» — лучшее время участников по оси стиль+дистанция+бассейн.</summary>

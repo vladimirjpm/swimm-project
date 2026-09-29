@@ -8,7 +8,21 @@ import { GROUP_DISCLAIMER, ROLE_LABEL, memberChips, swimmerDisplayName } from '.
 import { levelColor } from './level-color';
 import { useGroupLevels } from './use-group-levels';
 import { useGroupBreaks } from './use-group-breaks';
-import type { HubGroupDetails, HubGroupRecentResult, HubGroupStanding } from '../types';
+import type { HubGroupDetails, HubGroupMember, HubGroupRecentResult, HubGroupStanding } from '../types';
+
+/**
+ * Имя в составе — ссылка на страницу пловца. У пловца группы (Р71) страницы нет (сервер
+ * отвечает 404), поэтому у него просто текст.
+ */
+function MemberNameLink({ member, className, style, children }: {
+  member: HubGroupMember;
+  className: string;
+  style: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  if (member.is_private) return <div className={className} style={style}>{children}</div>;
+  return <a href={routes.swimmer(member.swimmer_id)} className={className} style={style}>{children}</a>;
+}
 
 /**
  * Карточки страницы группы — на ОБЩИХ примитивах, а не на своей вёрстке (этап C плана
@@ -109,18 +123,14 @@ function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetail
                 borderRadius: 'var(--deep-radius-row)',
               }}
             >
-              <a
-                href={routes.swimmer(m.swimmer_id)}
-                className="min-w-0 no-underline"
-                style={{ color: 'inherit' }}
-              >
+              <MemberNameLink member={m} className="min-w-0 no-underline" style={{ color: 'inherit' }}>
                 <div className="truncate text-[14px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
                   {name}
                 </div>
                 <div className="truncate text-[11.5px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                   {[m.birth_year > 0 ? m.birth_year : null, m.club_name].filter(Boolean).join(' · ')}
                 </div>
-              </a>
+              </MemberNameLink>
               {memberChips(m).length > 0 && (
                 <span className="flex shrink-0 gap-1">
                   {memberChips(m).map((label) => (
@@ -493,9 +503,9 @@ function GroupMembersDigest({ group, onMore }: { group: HubGroupDetails; onMore:
             className="flex items-center justify-between gap-3 px-3 py-2"
             style={{ background: 'var(--deep-card-bg-row)', borderRadius: 'var(--deep-radius-row)' }}
           >
-            <a href={routes.swimmer(m.swimmer_id)} className="min-w-0 truncate text-[12.5px] font-extrabold no-underline" style={{ color: 'var(--deep-text)' }}>
+            <MemberNameLink member={m} className="min-w-0 truncate text-[12.5px] font-extrabold no-underline" style={{ color: 'var(--deep-text)' }}>
               {m.name || m.name_en}
-            </a>
+            </MemberNameLink>
             {memberChips(m).length > 0 && (
               <span className="flex shrink-0 gap-1">
                 {memberChips(m).map((label) => (

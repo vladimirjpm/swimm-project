@@ -451,6 +451,10 @@ Razor + Tailwind, Competitions/Categories CRUD, фоновый импорт.)
   роли наружу не отдаются, «Everyone 🌐» только у доверенной группы.
   Тест приватности тренировок (И16) — `TrainingResultsPrivacyTests`. Хвосты — [`plans/entity-hero-roles-handoff.md`](plans/entity-hero-roles-handoff.md) §2.
   [`plans/entity-hero-roles-plan.md`](plans/entity-hero-roles-plan.md).
+  Дополнено 29.09 в том же PR #100: **пловцы группы** — человек без аккаунта и без loglig,
+  которого заводит тренер, виден только своей группе (Р71; Deactivate вместо удаления);
+  **пара-очки** не считаются очками FINA (Р67–Р68); **скан качества** сам после импорта,
+  помеченные вне Best swim / High Point (Р69–Р70). Передача — plans/entity-hero-roles-handoff.md.
 
 **Критерий приёмки (8.1–8.10, выполнено):** группа создаётся в админке и пользователем по правам,
 публичная страница показывает состав/рекорды/заплывы/сезонный зачёт/галерею, избранное работает
