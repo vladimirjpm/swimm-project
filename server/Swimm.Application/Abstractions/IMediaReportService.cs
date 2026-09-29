@@ -28,4 +28,13 @@ public interface IMediaReportService
     /// медиа <c>removed</c>). false — медиа нет.
     /// </summary>
     Task<bool> DecideAsync(int mediaId, bool keep, int adminUserId);
+
+    /// <summary>
+    /// Снимок жалоб перед тем, как владелец удалит своё медиа (жалобы уйдут каскадом). null — медиа
+    /// не его, нет или жалоб на него не было: писать в аудит нечего.
+    /// </summary>
+    Task<MediaReportDeleteTrail?> CaptureBeforeOwnerDeleteAsync(int ownerUserId, int mediaId);
+
+    /// <summary>Запись в аудит (<c>media.report.owner-delete</c>) — после успешного удаления.</summary>
+    Task LogOwnerDeleteAsync(MediaReportDeleteTrail trail);
 }

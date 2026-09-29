@@ -81,3 +81,15 @@ public sealed class MediaReportRowDto
     public string Status { get; set; } = "";
     public DateTime CreatedAt { get; set; }
 }
+
+/// <summary>
+/// След жалоб медиа, которое владелец удаляет сам: снимается ДО удаления (жалобы уходят каскадом)
+/// и пишется в аудит <c>media.report.owner-delete</c>, чтобы админ сайта знал, что медиа с жалобами
+/// было и ушло не его решением. Владельцу не показывается (решение Влада 29.09.2026).
+/// </summary>
+public sealed record MediaReportDeleteTrail(
+    int MediaId, string Url, int SwimmerId, string? ModerationState,
+    int Open, int Decided,
+    /// <summary>Причина → число жалоб (все статусы).</summary>
+    IReadOnlyDictionary<string, int> Reasons,
+    IReadOnlyList<int> ReporterUserIds);

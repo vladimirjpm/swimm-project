@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Moq;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
@@ -12,7 +14,7 @@ namespace Swimm.Tests;
 /// <summary>
 /// Сводка «Здоровье данных» для дашборда /Admin (docs/plans/admin-dashboard-health-2-plan.md):
 /// счётчики по всем блокам (пловцы/клубы/соревнования/результаты/рекорды/медиа/юзеры-группы/
-/// система) + кэш на 2 минуты. Фейки дедуп-сервисов — простые классы-стабы (Moq в проекте нет).
+/// система) + кэш на 2 минуты. Фейки дедуп-сервисов — простые классы-стабы.
 /// </summary>
 public class DashboardStatusServiceTests
 {
@@ -72,6 +74,7 @@ public class DashboardStatusServiceTests
             // Реестр без единой проверки: состояний нет → дашборд считает метрики вживую,
             // как до Д3. Ровно то, что нужно тестам «старых» счётчиков.
             dataChecks ?? new DataCheckRunner(db, []),
+            new MediaReportService(db, Mock.Of<ISettingsService>(), Mock.Of<IAdminAuditService>()),
             cache ?? new MemoryCache(new MemoryCacheOptions()));
 
     [Fact]
@@ -614,6 +617,51 @@ public class DashboardStatusServiceTests
         Assert.Equal(1, result.Media.Video);
         Assert.Equal(1, result.Media.Photo);
         Assert.Equal(1, result.Media.ModerationPending);
+    }
+
+    /// <summary>
+    /// Жалобы «Report»: считается МЕДИА с открытыми жалобами (не жалобы) — как вкладка «Ждут
+    /// решения» на /Admin/MediaReports; разобранные жалобы в счёт не идут.
+    /// </summary>
+    [Fact]
+    public async Task GetStatusAsync_Media_CountsMediaWithOpenReportsAndHidden()
+    {
+        await using var db = CreateDb(nameof(GetStatusAsync_Media_CountsMediaWithOpenReportsAndHidden));
+
+        var author = new AppUser { Email = "a@x.com", DisplayName = "A" };
+        var r1 = new AppUser { Email = "r1@x.com", DisplayName = "R1" };
+        var r2 = new AppUser { Email = "r2@x.com", DisplayName = "R2" };
+        var swimmer = new Swimmer { LastName = "A", FirstName = "A", BirthYear = 2000 };
+        db.AppUsers.AddRange(author, r1, r2);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+
+        UserMedia M(string url, string? state = null) => new()
+        {
+            UserId = author.Id, SwimmerId = swimmer.Id, Level = "swimmer", MediaType = "image",
+            SourceType = "other", Url = url, ModerationState = state,
+        };
+        var hidden = M("https://example.com/1.jpg", MediaReportRules.StateUnderReview);
+        var reported = M("https://example.com/2.jpg");
+        var decided = M("https://example.com/3.jpg");
+        db.UserMedia.AddRange(hidden, reported, decided);
+        await db.SaveChangesAsync();
+
+        MediaReport R(UserMedia m, AppUser by, string status) => new()
+        {
+            UserMediaId = m.Id, ReporterUserId = by.Id, Reason = "spam", Status = status,
+        };
+        db.MediaReports.AddRange(
+            R(hidden, r1, MediaReportRules.StatusOpen),
+            R(hidden, r2, MediaReportRules.StatusOpen),
+            R(reported, r1, MediaReportRules.StatusOpen),
+            R(decided, r1, MediaReportRules.StatusKept));
+        await db.SaveChangesAsync();
+
+        var result = await CreateService(db).GetStatusAsync(CancellationToken.None);
+
+        Assert.Equal(2, result.Media.ReportsOpen);
+        Assert.Equal(1, result.Media.ReportsHidden);
     }
 
     [Fact]

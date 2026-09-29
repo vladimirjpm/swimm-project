@@ -81,6 +81,18 @@ public sealed class HubGroupDeleteImpactDto
     /// </summary>
     public int TrainingRsvps { get; set; }
 
+    /// <summary>
+    /// Аккаунты с уровнем в группе (Sys_HubGroupAccountLevels) — оценка тренера для тех, кого нет
+    /// в loglig; уйдёт с группой, как и уровни пловцов.
+    /// </summary>
+    public int LeveledAccounts { get; set; }
+
+    /// <summary>
+    /// Действующие сегодня перерывы «On break» (Sys_HubGroupBreaks; закончившиеся — история, их не
+    /// считаем). В «есть что терять» не входят по той же причине, что ответы на тренировки.
+    /// </summary>
+    public int ActiveBreaks { get; set; }
+
     public bool HasPendingClubRequest { get; set; }
 
     /// <summary>
@@ -89,7 +101,7 @@ public sealed class HubGroupDeleteImpactDto
     /// </summary>
     public bool HasContent =>
         Swimmers + AccountMembers + Admins + TrainingSessions + Media + MediaPublications
-            + LeveledSwimmers + LanePlans > 0
+            + LeveledSwimmers + LeveledAccounts + LanePlans > 0
         || IsOfficial || HasPendingClubRequest;
 }
 

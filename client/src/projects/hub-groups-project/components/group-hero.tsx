@@ -52,6 +52,7 @@ function GroupHero({ group, membership, insider, rsvp, onWhosComing, hideTrainin
           <DeepHeroPhoto
             url={group.hero_image_url}
             mobileUrl={group.hero_image_mobile_url}
+            mediaId={group.hero_user_media_id}
             placeholder="No group photo yet"
           />
         )}

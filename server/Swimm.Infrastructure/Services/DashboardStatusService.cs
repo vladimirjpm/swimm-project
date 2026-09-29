@@ -3,6 +3,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -21,6 +22,7 @@ public class DashboardStatusService(
     IClubDedupService clubDedup,
     IRecordQualityService recordQuality,
     IDataCheckRunner dataChecks,
+    IMediaReportService mediaReports,
     IMemoryCache cache) : IDashboardStatusService
 {
     private const string CacheKey = "dashboard:status";
@@ -490,6 +492,11 @@ public class DashboardStatusService(
         var unchecked_ = await db.UserMedia.AsNoTracking().CountAsync(m => m.LinkCheckedAt == null, ct);
         var moderationPending = await db.UserMediaPublications.AsNoTracking()
             .CountAsync(p => p.Status == UserMediaPublicationStatus.Pending, ct);
+        // Жалобы «Report» (Р62): число — тем же кодом, что вкладка «Ждут решения» на
+        // /Admin/MediaReports, иначе дашборд и очередь разойдутся.
+        var reportsOpen = await mediaReports.CountOpenAsync();
+        var reportsHidden = await db.UserMedia.AsNoTracking()
+            .CountAsync(m => m.ModerationState == MediaReportRules.StateUnderReview, ct);
 
         return new DashboardMediaStatus(
             Total: total,
@@ -497,7 +504,9 @@ public class DashboardStatusService(
             Photo: photo,
             Broken: broken,
             Unchecked: unchecked_,
-            ModerationPending: moderationPending);
+            ModerationPending: moderationPending,
+            ReportsOpen: reportsOpen,
+            ReportsHidden: reportsHidden);
     }
 
     private async Task<DashboardUsersGroupsStatus> BuildUsersGroupsAsync(CancellationToken ct)

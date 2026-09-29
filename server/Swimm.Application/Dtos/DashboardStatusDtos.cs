@@ -139,7 +139,12 @@ public sealed record DashboardMediaStatus(
     int Total, int Video, int Photo,
     int Broken, int Unchecked,
     /// <summary>UserMediaPublications.Status == "pending".</summary>
-    int ModerationPending);
+    int ModerationPending,
+    /// <summary>Медиа с открытыми жалобами «Report» — очередь /Admin/MediaReports
+    /// (<c>IMediaReportService.CountOpenAsync</c>).</summary>
+    int ReportsOpen,
+    /// <summary>Из них набрали порог и спрятаны со всех витрин (<c>ModerationState = under_review</c>).</summary>
+    int ReportsHidden);
 
 /// <summary>Блок «Пользователи/группы».</summary>
 public sealed record DashboardUsersGroupsStatus(

@@ -401,6 +401,14 @@ public sealed class HubGroupDetailsDto
     [JsonPropertyName("hero_media_id")]
     public int? HeroMediaId { get; set; }
 
+    /// <summary>
+    /// Id пользовательского медиа (Sys_UserMedia), которое СЕЙЧАС стоит фото шапки, — когда шапка
+    /// взята из публикации участника. Лайтбокс шапки показывает по нему «Report» (Р62). null —
+    /// шапка из медиа тренера, из обложки или картинки нет.
+    /// </summary>
+    [JsonPropertyName("hero_user_media_id")]
+    public int? HeroUserMediaId { get; set; }
+
     [JsonPropertyName("location")]
     public string? Location { get; set; }
 

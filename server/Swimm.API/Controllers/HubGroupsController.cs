@@ -180,6 +180,7 @@ public class HubGroupsController : ControllerBase
                     SourceType = p.SourceType,
                     Url = p.Url,
                     Caption = p.ResultLabel,
+                    MediaId = p.MediaId,
                 }));
                 // Фото шапки «из медиа»: указатель `hero.mediaId` разрешается ПО СОБРАННОЙ
                 // ленте — в ней и свои медиа (id > 0), и одобренные публикации (id < 0),
@@ -195,7 +196,11 @@ public class HubGroupsController : ControllerBase
                     // быть не должно. Не картинка или медиа удалили — молча падаем на
                     // обложку, которую положил репозиторий.
                     if (heroItem is not null && heroItem.MediaType == "image")
+                    {
                         dto.HeroImageUrl = heroItem.Url;
+                        // Шапка из публикации участника — на неё можно пожаловаться (Р62).
+                        dto.HeroUserMediaId = heroItem.MediaId;
+                    }
                 }
                 // То же для мобильного фото шапки — по тем же правилам (только картинка).
                 if (dto.HeroMobileMediaId is { } heroMobileMediaId)

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
@@ -212,6 +213,8 @@ public class HubGroupAdminService : IHubGroupAdminService
 
     public async Task<HubGroupDeleteImpactDto?> GetDeleteImpactAsync(int id)
     {
+        // «Действует» — как HubGroupBreakRules.IsActive: день по Израилю, не по UTC.
+        var today = DateOnly.FromDateTime(IsraelTime.ToLocal(DateTime.UtcNow));
         return await _db.HubGroups.AsNoTracking()
             .Where(g => g.Id == id)
             .Select(g => new HubGroupDeleteImpactDto
@@ -231,6 +234,9 @@ public class HubGroupAdminService : IHubGroupAdminService
                 LeveledSwimmers = _db.HubGroupSwimmerLevels.Count(l => l.HubGroupId == g.Id),
                 LanePlans = _db.LanePlans.Count(p => p.HubGroupId == g.Id),
                 TrainingRsvps = _db.HubGroupTrainingRsvps.Count(r => r.HubGroupId == g.Id),
+                LeveledAccounts = _db.HubGroupAccountLevels.Count(l => l.HubGroupId == g.Id),
+                ActiveBreaks = _db.HubGroupBreaks.Count(b =>
+                    b.HubGroupId == g.Id && b.EndedAt == null && (b.Until == null || b.Until >= today)),
                 HasPendingClubRequest = _db.HubGroupClubRequests.Any(r =>
                     r.HubGroupId == g.Id && r.Status == HubGroupClubRequestStatus.Pending)
             })
@@ -248,8 +254,10 @@ public class HubGroupAdminService : IHubGroupAdminService
         if (i.Media > 0) parts.Add($"медиа {i.Media}");
         if (i.MediaPublications > 0) parts.Add($"публикаций медиа {i.MediaPublications}");
         if (i.LeveledSwimmers > 0) parts.Add($"уровней пловцов {i.LeveledSwimmers}");
+        if (i.LeveledAccounts > 0) parts.Add($"уровней аккаунтов {i.LeveledAccounts}");
         if (i.LanePlans > 0) parts.Add($"планов дорожек {i.LanePlans}");
         if (i.TrainingRsvps > 0) parts.Add($"ответов на тренировки {i.TrainingRsvps}");
+        if (i.ActiveBreaks > 0) parts.Add($"действующих перерывов {i.ActiveBreaks}");
         if (i.IsOfficial) parts.Add($"официальная группа клуба «{i.ClubName}»");
         if (i.HasPendingClubRequest) parts.Add("заявка на официальный статус");
 

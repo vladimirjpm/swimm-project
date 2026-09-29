@@ -41,22 +41,26 @@ SQL-ом, запись в `Sys_AdminAudit`.
 
 Всё мелкое, можно одним заходом. После каждого — тесты, `tsc`, проверка на стенде, доки.
 
-1. **Перечень потерь при удалении.** Группа: перерывы (`Sys_HubGroupBreaks`) и уровни аккаунтов
+1. ✅ **Сделано 29.09** — группа: `LeveledAccounts` + `ActiveBreaks` в перечне и аудите; медиа: аудит
+   `media.report.owner-delete`, владельцу не показываем (docs/admin-pages/mediareports.md). Было:
+   **Перечень потерь при удалении.** Группа: перерывы (`Sys_HubGroupBreaks`) и уровни аккаунтов
    (`Sys_HubGroupAccountLevels`) каскад уносит молча — добавить в `HubGroupDeleteImpactDto`
    (`HubGroupAdminService.GetDeleteImpactAsync`), в текст диалога клиента
    (`hub-groups-project/components/delete-group-dialog.tsx`) и админки
    (`Pages/Admin/HubGroups/_DeleteConfirm.cshtml`, `DeleteAuditSummary`). Медиа: жалобы
    (`Sys_MediaReports`) уходят каскадом при удалении медиа владельцем — решить, показывать ли
    владельцу («на медиа есть жалобы») и оставлять ли след админу (запись в аудит).
-2. **Счётчик жалоб на дашборде.** `IMediaReportService.CountOpenAsync()` уже есть; карточка
+2. ✅ **Сделано 29.09** — метрика «Жалобы» в блоке «Медиа» `/Admin` (`ReportsOpen` / `ReportsHidden`
+   в `DashboardMediaStatus`, docs/admin-pages/index.md). Было: **Счётчик жалоб на дашборде.** `IMediaReportService.CountOpenAsync()` уже есть; карточка
    «требует внимания» на `/Admin` (`DashboardStatusService`, `docs/admin-pages/index.md`) со
    ссылкой на `/Admin/MediaReports`. ⚠ Сводка дашборда кэшируется 2 минуты сознательно.
-3. **«Report» у фото шапки группы.** Фото шапки из публикации участника (в `group.gallery` у
+3. ✅ **Сделано 29.09** — `media_id` у строк-публикаций `group.gallery`, `hero_user_media_id` у группы,
+   `DeepHeroPhoto mediaId` (docs/media-page.md §9). Было: **«Report» у фото шапки группы.** Фото шапки из публикации участника (в `group.gallery` у
    публикаций id отрицательный = −id публикации, `HubGroupsController` ~стр. 175) открывается в
    лайтбоксе без `mediaId` → кнопки нет. Протащить `media_id` в `HubGroupMediaDto` для строк из
    публикаций и в `GalleryItem` в `components/deep/hero-photo.tsx` / выборе фото в `group-page.tsx`.
    Медиа тренера (`HubGroupMedia`, положительные id) — не пользовательское, «Report» там нет.
-4. **Отметка посещения после занятия** — экрана «кто пришёл» нет. Тренер уже может править ответы
+4. **Отметка посещения после занятия** (Влад 29.09: скорее не нужно) — экрана «кто пришёл» нет. Тренер уже может править ответы
    неделю назад (`TrainingRsvpRules.ManagerDaysBack`); нужен вид прошедшего занятия в Trainings
    с отметкой «был / не был». Нужны решения Влада (отдельный статус или тот же RSVP; видят ли
    участники).

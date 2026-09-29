@@ -159,6 +159,8 @@ export interface HubGroupMediaItem {
   source_type: 'youtube' | 'vimeo' | 'album' | 'other';
   url: string;
   caption?: string | null;
+  /** Id Sys_UserMedia — только у публикаций участников (id < 0) в `group.gallery`; для «Report». */
+  media_id?: number | null;
 }
 
 /** Алиас для контекста тренировок (TrainingInfo.media) — форма та же. */

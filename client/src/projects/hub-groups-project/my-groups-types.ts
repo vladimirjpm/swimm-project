@@ -188,6 +188,10 @@ export interface HubGroupDeleteImpact {
   leveledSwimmers: number;
   /** Планы дорожек со всей расстановкой. */
   lanePlans: number;
+  /** Аккаунты с уровнем (у кого нет пловца в loglig). */
+  leveledAccounts: number;
+  /** Действующие сегодня «On break». */
+  activeBreaks: number;
   hasPendingClubRequest: boolean;
   /** Есть что терять — тогда подтверждение просит ввести имя группы. */
   hasContent: boolean;

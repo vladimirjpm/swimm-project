@@ -214,4 +214,34 @@ public class MediaReportService : IMediaReportService
             new { mediaId, reports = openReports.Select(r => r.Id).ToList(), rejectedPublications = rejected });
         return true;
     }
+
+    public async Task<MediaReportDeleteTrail?> CaptureBeforeOwnerDeleteAsync(int ownerUserId, int mediaId)
+    {
+        var media = await _db.UserMedia.AsNoTracking()
+            .Where(m => m.Id == mediaId && m.UserId == ownerUserId)
+            .Select(m => new { m.Url, m.SwimmerId, m.ModerationState })
+            .FirstOrDefaultAsync();
+        if (media == null) return null;
+
+        var reports = await _db.MediaReports.AsNoTracking()
+            .Where(r => r.UserMediaId == mediaId)
+            .Select(r => new { r.Reason, r.Status, r.ReporterUserId })
+            .ToListAsync();
+        if (reports.Count == 0) return null;
+
+        var open = reports.Count(r => r.Status == MediaReportRules.StatusOpen);
+        return new MediaReportDeleteTrail(
+            mediaId, media.Url, media.SwimmerId, media.ModerationState,
+            Open: open, Decided: reports.Count - open,
+            Reasons: reports.GroupBy(r => r.Reason).ToDictionary(g => g.Key, g => g.Count()),
+            ReporterUserIds: reports.Select(r => r.ReporterUserId).Distinct().ToList());
+    }
+
+    public Task LogOwnerDeleteAsync(MediaReportDeleteTrail t) =>
+        // Актор — владелец (из HTTP-контекста). Решение по жалобам он этим не принимал, но без
+        // записи медиа молча выпало бы из очереди /Admin/MediaReports.
+        _audit.LogAsync("media.report.owner-delete", "UserMedia", t.MediaId.ToString(),
+            $"Владелец удалил медиа #{t.MediaId} с жалобами: открытых {t.Open}, разобранных {t.Decided}"
+                + (t.ModerationState != null ? $", состояние {t.ModerationState}" : ""),
+            t);
 }

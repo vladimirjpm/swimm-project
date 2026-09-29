@@ -21,12 +21,17 @@ import { HelperMedia } from '../../../utils/helpers';
  * `mobileUrl` в полную высоту 292px (4:3 на 390px); его нет — десктопное фото ужимается в
  * полосу 180px с обрезкой по центру. Переключение — `<picture>` и классы, без JS-медиазапросов.
  * На десктопе мобильное фото не используется никогда. Заглушка на телефоне — той же полосой.
+ *
+ * `mediaId` — фото из публикации участника группы: лайтбокс показывает на него «Report» (Р62).
+ * Фото тренера и обложка клуба не пользовательские — их не передают, кнопки нет.
  */
 
 interface Props {
   url: string | null | undefined;
   /** Отдельное фото для телефона (4:3); null — на телефоне полоса из десктопного. */
   mobileUrl?: string | null;
+  /** Id Sys_UserMedia, если фото — публикация участника; даёт «Report» в лайтбоксе. */
+  mediaId?: number | null;
   /** Подпись заглушки: «No club photo yet» / «No group photo yet». */
   placeholder: string;
 }
@@ -34,7 +39,7 @@ interface Props {
 /** Порог тот же, что у колонок `DeepHeroBand`: уже него фото встаёт над именем. */
 const MOBILE_MEDIA = '(max-width: 959px)';
 
-function DeepHeroPhoto({ url, mobileUrl, placeholder }: Props) {
+function DeepHeroPhoto({ url, mobileUrl, mediaId, placeholder }: Props) {
   const [open, setOpen] = useState(false);
   // Полное мобильное фото — только когда есть и десктопное: без него на десктопе заглушка,
   // а на телефоне фото, и это была бы ровно та «прыгающая шапка», от которой заглушка.
@@ -69,7 +74,7 @@ function DeepHeroPhoto({ url, mobileUrl, placeholder }: Props) {
             </picture>
           </button>
           <UI_SwimmerGallery
-            gallery={[{ type: 'image', url }]}
+            gallery={[{ type: 'image', url, mediaId: mediaId ?? undefined }]}
             popupSize="xl"
             openIndex={open ? 0 : null}
             onClose={() => setOpen(false)}

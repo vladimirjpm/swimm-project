@@ -276,6 +276,8 @@ export interface HubGroupDetails {
   show_hero_image?: boolean;
   /** Какое медиа помечено фото шапки; null — берётся обложка. */
   hero_media_id?: number | null;
+  /** Id Sys_UserMedia фото шапки, если оно из публикации участника, — для «Report» в лайтбоксе. */
+  hero_user_media_id?: number | null;
   location?: string | null;
   /** Alpha-3 код страны группы (ISR…), null — не задана. Флаг — через UI_FlagEmoji. */
   country?: string | null;

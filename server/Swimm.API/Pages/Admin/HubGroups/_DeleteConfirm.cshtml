@@ -28,6 +28,8 @@
             if (impact.media) lines.push(`• медиа группы: ${impact.media}`);
             if (impact.mediaPublications) lines.push(`• публикаций медиа участников: ${impact.mediaPublications} (сами медиа останутся у авторов)`);
             if (impact.leveledSwimmers) lines.push(`• уровней пловцов: ${impact.leveledSwimmers}`);
+            if (impact.leveledAccounts) lines.push(`• уровней аккаунтов: ${impact.leveledAccounts}`);
+            if (impact.activeBreaks) lines.push(`• действующих перерывов «On break»: ${impact.activeBreaks}`);
             if (impact.lanePlans) lines.push(`• планов дорожек: ${impact.lanePlans}`);
             if (impact.isOfficial) lines.push(`• официальный статус группы клуба «${iso(impact.clubName)}»`);
             if (impact.hasPendingClubRequest) lines.push('• заявка на официальный статус');

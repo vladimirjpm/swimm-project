@@ -496,9 +496,14 @@ rejected`; статус карточки выводит `derivedCardStatus` (`st
   делом `ModerationState` и /Admin/MediaReports. Кнопка — в лайтбоксе `UI_SwimmerGallery`, ей
   нужен `mediaId` в `GalleryItem`: `VisibleResultMediaDto` несёт `media_id` + `is_mine`,
   `PublishedMediaItemDto` — `media_id` (без `is_mine`: лента общая, свою жалобу отклонит сервер).
+  Фото шапки группы из публикации участника — тоже: строки-публикации в `group.gallery` (id < 0)
+  несут `media_id`, а сама группа — `hero_user_media_id` (только когда шапка реально из
+  публикации-картинки; иначе null), его передаёт `DeepHeroPhoto` в лайтбокс. Медиа тренера
+  (`HubGroupMedia`, id > 0) и обложка клуба не пользовательские — кнопки там нет.
   Тренер в inbox-е публикаций видит `moderation_state` и `open_reports` (причина → число), без
   имён — их видит только админ сайта. API: `POST /api/media/{id}/report` (`{reason, comment}`),
-  страница — `docs/admin-pages/mediareports.md`.
+  страница — `docs/admin-pages/mediareports.md`. Владелец удалил медиа с жалобами — жалобы
+  уходят каскадом, след для админа — аудит `media.report.owner-delete` (владельцу не показываем).
 - **Картинка по ссылке — через `HelperMedia.directImageUrl` и с `referrerPolicy="no-referrer"`**
   (11.09.2026). Ссылка «Поделиться» из Google Drive (`drive.google.com/file/d/{id}/view`)
   ведёт на СТРАНИЦУ просмотрщика: код 200, но это HTML, и `<img>` показывает битое фото.

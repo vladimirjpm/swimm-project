@@ -237,6 +237,40 @@ public class MediaReportTests
         Assert.False(resubmit.Success);
     }
 
+    /// <summary>
+    /// Владелец удаляет медиа с жалобами сам — жалобы уходят каскадом, поэтому след для админа
+    /// снимается ДО удаления (хвост 8.15). Без жалоб и у чужого медиа следа нет.
+    /// </summary>
+    [Fact]
+    public async Task OwnerDelete_CapturesReportsTrail_AndLogsIt()
+    {
+        await using var db = CreateDb(nameof(OwnerDelete_CapturesReportsTrail_AndLogsIt));
+        var s = await SeedAsync(db);
+        var audit = new Mock<IAdminAuditService>();
+        var svc = new MediaReportService(db, new SettingsStub(2), audit.Object);
+
+        Assert.Null(await svc.CaptureBeforeOwnerDeleteAsync(s.Publisher.Id, s.Media.Id));  // жалоб нет
+
+        await svc.ReportAsync(s.A.Id, s.Media.Id, Why(MediaReportRules.ReasonSpam), false);
+        await svc.ReportAsync(s.B.Id, s.Media.Id, Why(MediaReportRules.ReasonPrivacy), false);
+        Assert.True(await svc.DecideAsync(s.Media.Id, keep: true, adminUserId: s.C.Id));
+        await svc.ReportAsync(s.C.Id, s.Media.Id, Why(MediaReportRules.ReasonSpam), false);
+
+        Assert.Null(await svc.CaptureBeforeOwnerDeleteAsync(s.A.Id, s.Media.Id));  // не владелец
+
+        var trail = await svc.CaptureBeforeOwnerDeleteAsync(s.Publisher.Id, s.Media.Id);
+        Assert.NotNull(trail);
+        Assert.Equal(1, trail!.Open);
+        Assert.Equal(2, trail.Decided);
+        Assert.Equal(2, trail.Reasons[MediaReportRules.ReasonSpam]);
+        Assert.Equal(3, trail.ReporterUserIds.Count);
+
+        await svc.LogOwnerDeleteAsync(trail);
+        audit.Verify(a => a.LogAsync("media.report.owner-delete", "UserMedia", s.Media.Id.ToString(),
+            It.Is<string>(t => t.Contains("открытых 1") && t.Contains("разобранных 2")),
+            trail, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact]
     public async Task CoachInbox_ShowsReasonCounts_WithoutReporters()
     {
