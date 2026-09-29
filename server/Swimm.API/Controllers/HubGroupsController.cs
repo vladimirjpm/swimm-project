@@ -7,6 +7,7 @@ using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Swimm.API.Controllers;
 
@@ -18,6 +19,7 @@ namespace Swimm.API.Controllers;
 /// Виртуальная группа «Моё избранное» — per-user, поэтому БЕЗ общего кэша.
 /// </summary>
 [ApiController]
+[EnableRateLimiting(HubGroupQuotaRules.RateLimitPolicy)]
 public class HubGroupsController : ControllerBase
 {
     private readonly IHubGroupPublicRepository _groups;
@@ -178,6 +180,7 @@ public class HubGroupsController : ControllerBase
                     SourceType = p.SourceType,
                     Url = p.Url,
                     Caption = p.ResultLabel,
+                    MediaId = p.MediaId,
                 }));
                 // Фото шапки «из медиа»: указатель `hero.mediaId` разрешается ПО СОБРАННОЙ
                 // ленте — в ней и свои медиа (id > 0), и одобренные публикации (id < 0),
@@ -193,7 +196,18 @@ public class HubGroupsController : ControllerBase
                     // быть не должно. Не картинка или медиа удалили — молча падаем на
                     // обложку, которую положил репозиторий.
                     if (heroItem is not null && heroItem.MediaType == "image")
+                    {
                         dto.HeroImageUrl = heroItem.Url;
+                        // Шапка из публикации участника — на неё можно пожаловаться (Р62).
+                        dto.HeroUserMediaId = heroItem.MediaId;
+                    }
+                }
+                // То же для мобильного фото шапки — по тем же правилам (только картинка).
+                if (dto.HeroMobileMediaId is { } heroMobileMediaId)
+                {
+                    var mobileItem = dto.Gallery.FirstOrDefault(m => m.Id == heroMobileMediaId);
+                    if (mobileItem is not null && mobileItem.MediaType == "image")
+                        dto.HeroImageMobileUrl = mobileItem.Url;
                 }
                 // Лента хайлайтов шапки — строго после заполнения Gallery (video/photo берутся из неё).
                 dto.Highlights = HubGroupHighlightsBuilder.Build(dto);
@@ -292,6 +306,32 @@ public class HubGroupsController : ControllerBase
         if (!perms.CanEdit && !isMember) return Forbid();
 
         return Ok(await _trainings.GetTrainingsAsync(groupId.Value));
+    }
+
+    /// <summary>
+    /// Пловцы группы (Р71) — люди без аккаунта и без loglig, которых завёл тренер. Видят только
+    /// свои: управляющие (CanEdit) и активные участники-аккаунты, как тренировки. Личный ответ,
+    /// мимо общего кэша страницы и без хранения в браузере.
+    /// </summary>
+    [HttpGet("/api/hub-groups/{slug}/private-members")]
+    [Authorize]
+    public async Task<IActionResult> GetPrivateMembers(string slug)
+    {
+        if (string.IsNullOrWhiteSpace(slug) || slug.Length > 120)
+            return BadRequest("slug is required");
+
+        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(raw, out var userId)) return Unauthorized();
+
+        var groupId = await VisibleGroupIdAsync(slug);
+        if (groupId is null) return NotFound();
+
+        var perms = await _permissions.GetPermissionsAsync(groupId.Value, userId, User.IsInRole("Admin"));
+        var isMember = await _trainings.IsActiveAccountMemberAsync(groupId.Value, userId);
+        if (!perms.CanEdit && !isMember) return Forbid();
+
+        Response.Headers.CacheControl = PrivateCacheControlValue;
+        return Ok(await _groups.GetPrivateMembersAsync(groupId.Value));
     }
 
     /// <summary>

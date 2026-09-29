@@ -13,6 +13,8 @@ public sealed class HubGroupAdminRowDto
     public bool IsOfficial { get; set; }
     /// <summary>Тестовая группа (HubGroup.IsTest) — метка TEST и фильтр в списке админки.</summary>
     public bool IsTest { get; set; }
+    /// <summary>Флаг «Trusted» (HubGroup.IsTrusted, Р56) — метка TRUSTED в списке админки.</summary>
+    public bool IsTrusted { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
@@ -49,8 +51,14 @@ public sealed class HubGroupDeleteImpactDto
     public bool IsOfficial { get; set; }
     public string? ClubName { get; set; }
 
-    /// <summary>Пловцы в составе. Сами пловцы остаются в справочнике.</summary>
+    /// <summary>Пловцы в составе. Сами пловцы остаются в справочнике — кроме пловцов группы.</summary>
     public int Swimmers { get; set; }
+
+    /// <summary>
+    /// Из них пловцы группы (Р71): вне группы их нет, поэтому они удаляются насовсем вместе с
+    /// временами тренировок (каскад <c>Swimmers.PrivateHubGroupId</c>).
+    /// </summary>
+    public int PrivateSwimmers { get; set; }
 
     /// <summary>Участники-аккаунты (active и pending).</summary>
     public int AccountMembers { get; set; }
@@ -73,6 +81,24 @@ public sealed class HubGroupDeleteImpactDto
     /// <summary>Планы дорожек (Sys_LanePlans) со всеми дорожками и расстановкой.</summary>
     public int LanePlans { get; set; }
 
+    /// <summary>
+    /// Ответы на тренировки (Sys_HubGroupTrainingRsvps). В «есть что терять» не входят: без
+    /// участников они ничего не значат, а участники уже посчитаны.
+    /// </summary>
+    public int TrainingRsvps { get; set; }
+
+    /// <summary>
+    /// Аккаунты с уровнем в группе (Sys_HubGroupAccountLevels) — оценка тренера для тех, кого нет
+    /// в loglig; уйдёт с группой, как и уровни пловцов.
+    /// </summary>
+    public int LeveledAccounts { get; set; }
+
+    /// <summary>
+    /// Действующие сегодня перерывы «On break» (Sys_HubGroupBreaks; закончившиеся — история, их не
+    /// считаем). В «есть что терять» не входят по той же причине, что ответы на тренировки.
+    /// </summary>
+    public int ActiveBreaks { get; set; }
+
     public bool HasPendingClubRequest { get; set; }
 
     /// <summary>
@@ -81,7 +107,7 @@ public sealed class HubGroupDeleteImpactDto
     /// </summary>
     public bool HasContent =>
         Swimmers + AccountMembers + Admins + TrainingSessions + Media + MediaPublications
-            + LeveledSwimmers + LanePlans > 0
+            + LeveledSwimmers + LeveledAccounts + LanePlans > 0
         || IsOfficial || HasPendingClubRequest;
 }
 
@@ -112,6 +138,9 @@ public sealed class HubGroupMemberRowDto
     /// вернуть); публичные ответы скрытых не содержат вовсе.
     /// </summary>
     public bool IsExcluded { get; set; }
+
+    /// <summary>Пловец группы (Р71) — заведён тренером, виден только своим.</summary>
+    public bool IsPrivate { get; set; }
 }
 
 /// <summary>Полные данные группы для формы Admin/HubGroups/Edit.</summary>
@@ -135,6 +164,9 @@ public sealed class HubGroupEditDto
     public bool IsOfficial { get; set; }
     /// <summary>Тестовая группа (HubGroup.IsTest) — видят только site-админ и utest-аккаунты.</summary>
     public bool IsTest { get; set; }
+    /// <summary>Флаг «Trusted» (HubGroup.IsTrusted, Р56): public-медиа группы видны всем и в
+    /// протоколе, и на карточке пловца. Официальная доверенная и без флага.</summary>
+    public bool IsTrusted { get; set; }
     /// <summary>open | approval — политика самозаписи (см. HubGroupJoinPolicy).</summary>
     public string JoinPolicy { get; set; } = "open";
     public List<HubGroupLinkDto> Links { get; set; } = [];
@@ -169,6 +201,11 @@ public sealed class HubGroupInputDto
     /// группу тестовой или снять пометку не может.
     /// </summary>
     public bool IsTest { get; set; }
+    /// <summary>
+    /// Флаг «Trusted» (Р56). Как и <see cref="IsTest"/>, читает ТОЛЬКО админский путь: владелец из
+    /// «My groups» выдать доверие своей группе не может — в этом весь смысл флага (И15).
+    /// </summary>
+    public bool IsTrusted { get; set; }
 }
 
 /// <summary>Опция клуба для select в форме.</summary>
@@ -200,4 +237,21 @@ public sealed record HubGroupMemberSaveResult(bool Success, string? Error)
 {
     public static HubGroupMemberSaveResult Ok() => new(true, null);
     public static HubGroupMemberSaveResult Fail(string error) => new(false, error);
+}
+
+/// <summary>Итог «завести пловца группы» (Р71): при успехе — id нового пловца.</summary>
+public sealed record PrivateSwimmerSaveResult(bool Success, string? Error, int? SwimmerId)
+{
+    public static PrivateSwimmerSaveResult Ok(int swimmerId) => new(true, null, swimmerId);
+    public static PrivateSwimmerSaveResult Fail(string error) => new(false, error, null);
+}
+
+/// <summary>Тело «завести пловца группы» (Р71): человек без аккаунта и без loglig.</summary>
+public sealed class AddPrivateSwimmerRequest
+{
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    /// <summary>male / female / пусто.</summary>
+    public string? Gender { get; set; }
+    public int? BirthYear { get; set; }
 }

@@ -5,195 +5,198 @@ import { useLoginModal } from '../../components/login-modal/login-modal-context'
 import UI_ClubLogo from '../../components/mix/club-logo/club-logo';
 import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
 import DeepHeroBand from '../../components/deep/hero-band';
-import { DeepBadge, DeepKpi } from '../../components/deep/kpi';
+import DeepHeroPhoto from '../../components/deep/hero-photo';
+import { DeepKpi, DeepKpiLink, DeepKpiRow } from '../../components/deep/kpi';
+import { DeepCtaChip, DeepHeroSubline, DeepHeroTitle, DeepMenuChip } from '../../components/deep/hero-identity';
+import { routes } from '../../../utils/routes';
 import { showcaseNoticeText } from '../../../utils/helpers/season-helper';
-import { HelperMedia } from '../../../utils/helpers';
 
 /**
  * Hero страницы клуба — ОДИН ИЗ вариантов шапки сущности (второй — группа). Корпус полосы и
- * кирпичи (бейдж, плитка KPI) общие: `deep/hero-band.tsx`, `deep/kpi.tsx`. Здесь остаётся
- * только то, что специфично клубу: логотип (или инициалы — это штатный вид, а не пустое
- * состояние), имя на иврите крупно + латиницей мелко, набор бейджей и состав KPI-ряда.
+ * кирпичи общие: `deep/hero-band.tsx`, `deep/kpi.tsx`, `deep/hero-identity.tsx`. Раскладка —
+ * хендофф group-club-changes, варианты 7a (телефон) и 6b (десктоп).
  *
- * Фото шапки есть (шаг A7): берётся из `hero_image_url`, а показывать ли блок — настройка
- * `show_hero_image` из таба Admin. Нет ссылки — рисуем ЗАГЛУШКУ, а не схлопываем колонку:
- * так правая колонка не прыгает между сущностями, и админу видно, куда класть картинку
- * (решение Влада 09.09.2026, docs/plans/entity-page-shell-plan.md §3.9). Прежний отказ от
- * фото (2026-08-01, «данных нет») этим отменён — данные появились.
+ * Слева колонка логотипа, под логотипом — «✓ Following» (тап → меню с Unfollow; гостю
+ * «+ Follow» → вход): колонка под логотипом всё равно пустая, и шапка не растёт. Справа имя
+ * (иврит, до двух строк), подзаголовок `{name_en} · {флаг} {страна} · since {год}` и ссылка
+ * «Official group →» — ТОЛЬКО если у клуба есть официальная группа: нет группы — нет ни
+ * ссылки, ни заглушки, ни отступа.
+ *
+ * Страница клуба — только для чтения: ни тренеров, ни ролей, ни фиолетового. Всё, чем
+ * можно управлять, живёт в официальной группе клуба.
+ *
+ * Фото шапки: `hero_image_url` (и `hero_image_mobile_url` для телефона), показывать ли —
+ * настройка `show_hero_image` из таба Admin. Нет ссылки — ЗАГЛУШКА, а не схлопнутая колонка
+ * (решение Влада 09.09.2026, подтверждено 28.09.2026).
  */
 
 interface Props {
   club: ClubProfile;
   kpi: ClubKpi;
+  /** Стартов в текущем скоупе — число плитки «Competitions →» (то же, что у таба History). */
+  competitions: number;
+  /** Подпись скоупа плитки соревнований: она слушает карусель сезонов. */
+  scopeLabel: string;
+  /** Переход в таб History. */
+  onCompetitions: () => void;
 }
 
-// Подписи скоупа у плиток свои (см. ниже), поэтому общий scopeLabel страницы шапке
-// больше не нужен: у неё нет ни одной цифры, которая слушала бы карусель сезонов.
-function ClubHero({ club, kpi }: Props) {
+function ClubHero({ club, kpi, competitions, scopeLabel, onCompetitions }: Props) {
   return (
-    <DeepHeroBand aside={club.show_hero_image ? <ClubPhoto url={club.hero_image_url} /> : undefined}>
-      <div className="flex items-start gap-5">
-        <UI_ClubLogo clubName={club.name} size={96} />
+    <DeepHeroBand
+      aside={club.show_hero_image
+        ? <DeepHeroPhoto url={club.hero_image_url} mobileUrl={club.hero_image_mobile_url} placeholder="No club photo yet" />
+        : undefined}
+    >
+      <div className="flex items-start gap-3.5 min-[960px]:gap-5">
+        <div className="flex w-[84px] flex-none flex-col items-center gap-2 min-[960px]:w-[112px]">
+          {/* Логотип двумя размерами: у UI_ClubLogo размер числом, а не классом. */}
+          <span className="min-[960px]:hidden"><UI_ClubLogo clubName={club.name} size={72} /></span>
+          <span className="hidden min-[960px]:block"><UI_ClubLogo clubName={club.name} size={96} /></span>
+          <FollowClubChip clubId={club.id} />
+        </div>
 
-        <div className="min-w-0 flex-1">
-          <h1
-            className="truncate text-[40px] leading-tight"
-            style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}
-          >
-            {club.name}
-          </h1>
-          {club.name_en && (
-            <div className="text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-              {club.name_en}
-            </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1">
+          <DeepHeroTitle size="club">{club.name}</DeepHeroTitle>
+          <DeepHeroSubline
+            parts={[
+              club.name_en && club.name_en !== club.name ? club.name_en : null,
+              club.country_code ? (
+                <span className="whitespace-nowrap [&_img]:inline-block [&_img]:h-[12px] [&_img]:w-4 [&_img]:align-[-1px]"><UI_FlagEmoji countryCode={club.country_code} /> {club.country_name ?? club.country_code}</span>
+              ) : null,
+              club.first_season != null ? `since ${club.first_season}` : null,
+            ]}
+          />
+          {club.official_group_slug && (
+            <a
+              href={routes.group(club.official_group_slug)}
+              title={club.official_group_name ?? undefined}
+              className="mt-1 flex items-center gap-1.5 self-start text-[12px] font-extrabold no-underline min-[960px]:text-[13px]"
+              style={{ color: 'var(--deep-accent)' }}
+            >
+              <span
+                aria-hidden="true"
+                className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] text-[9px] min-[960px]:h-5 min-[960px]:w-5 min-[960px]:text-[10px]"
+                style={{
+                  background: 'var(--deep-accent-grad)',
+                  color: 'var(--deep-accent-ink)',
+                  fontFamily: 'var(--deep-font-display)',
+                }}
+              >
+                {(club.official_group_name?.trim()[0] ?? 'G').toUpperCase()}
+              </span>
+              Official group →
+            </a>
           )}
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {club.country_code && (
-              <DeepBadge>
-                <UI_FlagEmoji countryCode={club.country_code} /> {club.country_name ?? club.country_code}
-              </DeepBadge>
-            )}
-            {club.official_group_slug && (
-              <a href={`/groups/${club.official_group_slug}`} className="no-underline">
-                <DeepBadge accent>Official group</DeepBadge>
-              </a>
-            )}
-            {/* Бейджа «N swimmers» тут больше нет: пловцы стали плиткой KPI, а две
-                одинаковые цифры в одной шапке читаются как ошибка. */}
-            {club.first_season != null && <DeepBadge>since {club.first_season}</DeepBadge>}
-            <FollowClubButton clubId={club.id} />
-          </div>
         </div>
       </div>
 
       {/* Плитки (решение Влада 2026-08-09). Скоуп у них РАЗНЫЙ и потому подписан у каждой:
           чемпионаты и победы — за всю историю клуба (карусель сезонов на них не влияет),
           рекорды — действующие, season bests — за витринный сезон, который режется
-          последним зимним чемпионатом (docs/season-boundary-rule.md). */}
-      <div className="mt-6 flex flex-wrap gap-8">
-        <DeepKpi label="Championships" value={kpi.championships} hint="all time" />
-        <DeepKpi
-          label="Championship wins"
-          value={kpi.championship_wins}
-          hint="all time"
-          gold={kpi.championship_wins > 0}
-        />
-        <DeepKpi label="Records" value={kpi.records} hint="in force" />
-        <DeepKpi
-          label="Season bests"
-          value={kpi.season_bests}
-          hint={kpi.showcase_season ? `season ${kpi.showcase_season}` : 'this season'}
-          // Сентябрь-февраль: подпись говорит «season 2025/26», хотя идёт уже 2026/27.
-          // Плитка узкая, полную оговорку в неё не вложить — отдаём её тултипом, тем же
-          // текстом, что стоит плашкой над карточкой Season best (docs/season-boundary-rule.md).
-          title={showcaseNoticeText(kpi.season_notice) ?? undefined}
-        />
-        <DeepKpi label="Swimmers" value={club.swimmer_count} hint="current roster" />
-      </div>
+          последним зимним чемпионатом (docs/season-boundary-rule.md). Нулевые не кладём.
+          Телефон — сетка 3×2 с короткими подписями. */}
+      <DeepKpiRow>
+        {kpi.championships > 0 && (
+          <DeepKpi label="Championships" shortLabel="Champs" value={kpi.championships} hint="all time" />
+        )}
+        {kpi.championship_wins > 0 && (
+          <DeepKpi
+            label="Championship wins"
+            shortLabel="Wins"
+            value={kpi.championship_wins}
+            hint="all time"
+            gold
+          />
+        )}
+        {kpi.records > 0 && <DeepKpi label="Records" value={kpi.records} hint="in force" />}
+        {kpi.season_bests > 0 && (
+          <DeepKpi
+            label="Season bests"
+            shortLabel={kpi.showcase_season ? `SB ${kpi.showcase_season.replace(/^20/, '')}` : 'Season bests'}
+            value={kpi.season_bests}
+            hint={kpi.showcase_season ? `season ${kpi.showcase_season}` : 'this season'}
+            // Сентябрь-февраль: подпись говорит «season 2025/26», хотя идёт уже 2026/27.
+            // Плитка узкая, полную оговорку в неё не вложить — отдаём её тултипом, тем же
+            // текстом, что стоит плашкой над карточкой Season best (docs/season-boundary-rule.md).
+            title={showcaseNoticeText(kpi.season_notice) ?? undefined}
+          />
+        )}
+        {club.swimmer_count > 0 && (
+          <DeepKpi label="Swimmers" value={club.swimmer_count} hint="current roster" />
+        )}
+        {competitions > 0 && (
+          <DeepKpiLink label="Competitions →" value={competitions} hint={scopeLabel} onClick={onCompetitions} />
+        )}
+      </DeepKpiRow>
     </DeepHeroBand>
   );
 }
 
 /**
- * «Follow club» — клуб в избранное (П1 плана docs/plans/hubgroup-club-subscription-plan.md).
- * До неё добавить клуб в избранное на клиенте было негде: избранные клубы только читались —
- * стартовый протокол, карточка избранного соревнования.
+ * «✓ Following» под логотипом — клуб в избранном (П1 плана docs/plans/hubgroup-club-subscription-plan.md).
+ * Отписка — в меню чипа, а не второй кнопкой.
  *
  * Избранный клуб в пловцов НЕ разворачивается (решение Влада 10.09.2026): это сигнал «мы» —
  * голубой клуб рядом с золотым «моим» пловцом, — а не 160 сердечек. Поэтому у клубов свой
  * лимит (3 по умолчанию), и лимит пловцов кнопка не трогает.
- *
- * Стоит в ряду бейджей с `ml-auto`: на широком экране уезжает к правому краю колонки имени,
- * на узком переносится строкой ниже, не выталкивая логотип из ряда.
  */
-function FollowClubButton({ clubId }: { clubId: number }) {
+function FollowClubChip({ clubId }: { clubId: number }) {
   const { isAuthenticated, loading, favoriteClubIds, toggleFavoriteClub, fullHint } = useFavoritesContext();
   const { openLoginModal } = useLoginModal();
   const [busy, setBusy] = useState(false);
 
-  // Пока избранное не приехало, состояние кнопки неизвестно — лучше пусто, чем мигнуть «Follow».
-  if (loading) return null;
+  // Пока избранное не приехало, состояние неизвестно — держим место, чтобы шапка не прыгнула,
+  // и не мигаем «Follow».
+  if (loading) return <span aria-hidden="true" className="h-[26px] min-[960px]:h-[30px]" />;
 
-  const base = 'hp-mono ml-auto shrink-0 rounded-[10px] border px-4 py-2 text-[13px] font-extrabold';
-  const filled = { background: 'var(--deep-accent)', borderColor: 'var(--deep-accent)', color: 'var(--deep-accent-ink)' };
-  const outlined = { background: 'var(--deep-accent-chip)', borderColor: 'var(--deep-accent-border)', color: 'var(--deep-accent)' };
-
-  // Гостю — та же кнопка, клик ведёт во вход: фича видна, но требует логина (как сердечко
-  // в таблице результатов).
+  // Гостю — та же кнопка, клик ведёт во вход: фича видна, но требует логина.
   if (!isAuthenticated) {
     return (
-      <button type="button" onClick={openLoginModal} title="Sign in to follow this club" className={`${base} hover:brightness-110`} style={filled}>
-        + Follow club
-      </button>
-    );
-  }
-
-  const following = favoriteClubIds.has(clubId);
-  // Подсказка только для ещё-не-избранного: отписаться можно всегда.
-  const blockedHint = following ? null : fullHint('club');
-
-  if (blockedHint) {
-    // Подпись под кнопкой видна и на телефоне, где title не всплывает.
-    return (
-      <span className="ml-auto flex shrink-0 flex-col items-end gap-1">
-        <button type="button" aria-disabled="true" title={blockedHint} className={`${base} cursor-not-allowed opacity-50`} style={outlined}>
-          + Follow club
-        </button>
-        <span className="text-[11px] font-bold" style={{ color: 'var(--deep-text-ghost)' }}>{blockedHint}</span>
-      </span>
+      <DeepCtaChip size="follow" filled onClick={openLoginModal} title="Sign in to follow this club">
+        + Follow
+      </DeepCtaChip>
     );
   }
 
   const toggle = async () => {
     setBusy(true);
-    try {
-      await toggleFavoriteClub(clubId);
-    } finally {
-      setBusy(false);
-    }
+    try { await toggleFavoriteClub(clubId); } finally { setBusy(false); }
   };
 
-  return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={toggle}
-      aria-pressed={following}
-      title={following ? 'Unfollow — remove the club from your favorites' : 'Add the club to your favorites'}
-      className={`${base} hover:brightness-110 disabled:opacity-50`}
-      style={following ? outlined : filled}
-    >
-      {following ? '✓ Following' : '+ Follow club'}
-    </button>
-  );
-}
-
-/** Фото клуба либо заглушка на его месте — колонка не схлопывается (план §3.9). */
-function ClubPhoto({ url }: { url: string | null }) {
-  if (url) {
+  if (favoriteClubIds.has(clubId)) {
     return (
-      <img
-        src={HelperMedia.directImageUrl(url)}
-        referrerPolicy="no-referrer"
-        alt=""
-        className="h-full min-h-[200px] w-full rounded-2xl border object-cover"
-        style={{ borderColor: 'var(--deep-card-border)' }}
+      <DeepMenuChip
+        variant="follow"
+        label="✓ Following"
+        busy={busy}
+        title="The club is in your favorites"
+        items={[{ label: 'Unfollow', danger: true, onSelect: toggle }]}
       />
     );
   }
 
+  // Лимит избранных клубов исчерпан — кнопка видна, но не жмётся; причина — в title
+  // (колонка под логотипом узкая, подпись под ней не поместится).
+  const blockedHint = fullHint('club');
+  if (blockedHint) {
+    return (
+      <button
+        type="button"
+        aria-disabled="true"
+        title={blockedHint}
+        className="hp-mono flex h-[26px] w-full cursor-not-allowed items-center justify-center rounded-[8px] border px-1 text-[10.5px] font-extrabold opacity-50 min-[960px]:h-[30px] min-[960px]:rounded-[9px] min-[960px]:text-[12px]"
+        style={{ background: 'var(--deep-accent-chip)', borderColor: 'var(--deep-accent-border)', color: 'var(--deep-accent)' }}
+      >
+        + Follow
+      </button>
+    );
+  }
+
   return (
-    <div
-      className="flex h-full min-h-[200px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed"
-      style={{ borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg-row)' }}
-      aria-hidden="true"
-    >
-      <span className="text-[28px]">🏊</span>
-      <span className="text-[11.5px] font-extrabold" style={{ color: 'var(--deep-text-ghost)' }}>
-        No club photo yet
-      </span>
-    </div>
+    <DeepCtaChip size="follow" filled busy={busy} onClick={toggle} title="Add the club to your favorites">
+      + Follow
+    </DeepCtaChip>
   );
 }
 

@@ -1,3 +1,4 @@
+using Moq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,7 +28,8 @@ public class HubGroupDeleteTests
     private static HubGroupAdminService Service(SwimmDbContext db, ICurrentActor? actor = null) =>
         new(db, new HubGroupCrudCore(db),
             new AdminAuditService(db, actor ?? new FakeActor(7, "owner@example.com", null),
-                NullLogger<AdminAuditService>.Instance));
+                NullLogger<AdminAuditService>.Instance),
+            Mock.Of<ISettingsService>());
 
     private static async Task<(AppUser owner, HubGroup group)> SeedGroupAsync(SwimmDbContext db, string name = "Dolphins")
     {
@@ -134,6 +136,47 @@ public class HubGroupDeleteTests
         Assert.Equal(2, impact.LanePlans);
         Assert.Equal(0, impact.Swimmers);  // пловец в составе не стоит — терять есть что и без него
         Assert.True(impact.HasContent);
+    }
+
+    /// <summary>
+    /// Уровни аккаунтов и «On break» каскад уносил молча (хвост 8.15). Уровни аккаунтов — работа
+    /// тренера, как уровни пловцов, поэтому сами по себе «есть что терять»; перерывы считаются
+    /// только действующие — закончившиеся и истёкшие это история, а не потеря.
+    /// </summary>
+    [Fact]
+    public async Task Impact_CountsAccountLevelsAndActiveBreaks()
+    {
+        await using var db = CreateDb(nameof(Impact_CountsAccountLevelsAndActiveBreaks));
+        var (owner, group) = await SeedGroupAsync(db);
+        var other = new HubGroup { Name = "Other", Slug = "other", OwnerUserId = owner.Id };
+        db.Add(other);
+        await db.SaveChangesAsync();
+        var level = new HubGroupLevel { HubGroupId = group.Id, Rank = 1, Name = "Fast" };
+        var otherLevel = new HubGroupLevel { HubGroupId = other.Id, Rank = 1, Name = "Fast" };
+        db.AddRange(level, otherLevel);
+        await db.SaveChangesAsync();
+        db.HubGroupAccountLevels.AddRange(
+            new HubGroupAccountLevel { HubGroupId = group.Id, UserId = owner.Id, LevelId = level.Id },
+            new HubGroupAccountLevel { HubGroupId = other.Id, UserId = owner.Id, LevelId = otherLevel.Id });  // чужая
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        db.HubGroupBreaks.AddRange(
+            new HubGroupBreak { HubGroupId = group.Id, UserId = owner.Id },                                  // бессрочный
+            new HubGroupBreak { HubGroupId = group.Id, SwimmerId = 1, Until = today.AddDays(30) },           // до даты
+            new HubGroupBreak { HubGroupId = group.Id, SwimmerId = 2, EndedAt = DateTime.UtcNow },           // закончился
+            new HubGroupBreak { HubGroupId = group.Id, SwimmerId = 3, Until = today.AddDays(-30) },          // истёк
+            new HubGroupBreak { HubGroupId = other.Id, UserId = owner.Id });                                 // чужой
+        await db.SaveChangesAsync();
+
+        var impact = (await Service(db).GetDeleteImpactAsync(group.Id))!;
+
+        Assert.Equal(1, impact.LeveledAccounts);
+        Assert.Equal(2, impact.ActiveBreaks);
+        Assert.True(impact.HasContent);
+
+        await Service(db).DeleteAsync(group.Id);
+        var audit = await db.AdminAudits.SingleAsync();
+        Assert.Contains("уровней аккаунтов 1", audit.Summary);
+        Assert.Contains("действующих перерывов 2", audit.Summary);
     }
 
     [Fact]

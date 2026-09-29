@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
 using Xunit;
@@ -46,6 +47,7 @@ public class ImportRecalculationTests
         }
 
         public Task<int> RecalculateAllCombinedAsync(CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> RecalculateAllParaPointsAsync(CancellationToken ct = default) => Task.FromResult(0);
     }
 
     private static object Item(string lastName, int lane, string competition = "Combine Meet",
@@ -119,6 +121,59 @@ public class ImportRecalculationTests
         Assert.Empty(result.ErrorMessages);
         Assert.Single(await db.Results.ToListAsync());
         Assert.Contains(result.DiagnosticLog, l => l.Contains("пересчёт не удался"));
+    }
+
+    private sealed class SuspectSpy : ISuspectResultService
+    {
+        public List<(int? EventId, int? CompetitionId)> Scans { get; } = [];
+        public bool Throw { get; init; }
+
+        public Task<SuspectScanResultDto> ScanAsync(int? eventId, int? competitionId, CancellationToken ct = default)
+        {
+            Scans.Add((eventId, competitionId));
+            if (Throw) throw new InvalidOperationException("scan failed");
+            return Task.FromResult(new SuspectScanResultDto(1, 1, 0, 0, []));
+        }
+
+        public Task<IReadOnlyList<SuspectRowDto>> GetFlaggedAsync(int? eventId, int? competitionId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<IReadOnlyList<SuspectRowDto>> SearchAsync(
+            int? eventId, int? competitionId, string query, int limit = 30, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<bool> SetManualAsync(long resultId, bool flagged, string? note, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
+    /// <summary>
+    /// Переимпорт сбрасывает автопометки качества — без скана ошибка протокола проходила на
+    /// витрину (Р70: 1512 после переимпорта 19.09). Импорт сканирует каждый затронутый день.
+    /// </summary>
+    [Fact]
+    public async Task Import_RunsQualityScan_ForTouchedCompetition()
+    {
+        await using var db = CreateDb(nameof(Import_RunsQualityScan_ForTouchedCompetition));
+        var spy = new SuspectSpy();
+        var svc = new JsonImportService(db, new NullCache(), suspects: spy);
+
+        var result = await svc.ImportAsync(ToStream(new[] { Item("Cohen", lane: 1), Item("Levi", lane: 2) }));
+
+        Assert.Empty(result.ErrorMessages);
+        var compId = (await db.Competitions.SingleAsync()).Id;
+        Assert.Equal([((int?)null, (int?)compId)], spy.Scans);
+        Assert.Contains(result.DiagnosticLog, l => l.StartsWith("Качество: помечено 1"));
+    }
+
+    [Fact]
+    public async Task QualityScanFailure_DoesNotRollBackImport()
+    {
+        await using var db = CreateDb(nameof(QualityScanFailure_DoesNotRollBackImport));
+        var svc = new JsonImportService(db, new NullCache(), suspects: new SuspectSpy { Throw = true });
+
+        var result = await svc.ImportAsync(ToStream(new[] { Item("Cohen", lane: 1) }));
+
+        Assert.Empty(result.ErrorMessages);
+        Assert.Single(await db.Results.ToListAsync());
+        Assert.Contains(result.DiagnosticLog, l => l.Contains("скан не удался"));
     }
 
     [Fact]

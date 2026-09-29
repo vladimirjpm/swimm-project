@@ -74,4 +74,11 @@ public sealed class HeroDisplaySettings
     /// </summary>
     [JsonPropertyName("mediaId")]
     public int? MediaId { get; set; }
+
+    /// <summary>
+    /// То же для мобильного фото шапки: id строки медиа; null — берём колонку
+    /// <c>CoverImageMobileUrl</c> (а нет и её — телефон показывает полосу из десктопного).
+    /// </summary>
+    [JsonPropertyName("mobileMediaId")]
+    public int? MobileMediaId { get; set; }
 }

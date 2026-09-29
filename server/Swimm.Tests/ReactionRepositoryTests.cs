@@ -192,7 +192,7 @@ public class ReactionRepositoryTests
         var media = NewMedia(owner, swimmer);
         db.UserMedia.Add(media);
         await db.SaveChangesAsync();
-        var group = new HubGroup { Name = "G", Slug = "g-" + Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true };
+        var group = new HubGroup { Name = "G", Slug = "g-" + Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true, IsTrusted = true };
         db.HubGroups.Add(group);
         await db.SaveChangesAsync();
         db.UserMediaPublications.Add(new UserMediaPublication
@@ -225,7 +225,7 @@ public class ReactionRepositoryTests
         await db.SaveChangesAsync();
         var media = NewMedia(owner, swimmer);
         db.UserMedia.Add(media);
-        var group = new HubGroup { Name = "G", Slug = "g-" + Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true };
+        var group = new HubGroup { Name = "G", Slug = "g-" + Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true, IsTrusted = true };
         db.HubGroups.Add(group);
         await db.SaveChangesAsync();
         db.HubGroupUserMembers.Add(new HubGroupUserMember { HubGroupId = group.Id, UserId = member.Id, Status = HubGroupUserMemberStatus.Active });
@@ -257,7 +257,7 @@ public class ReactionRepositoryTests
         await db.SaveChangesAsync();
         var media = NewMedia(owner, swimmer);
         db.UserMedia.Add(media);
-        var group = new HubGroup { Name = "G", Slug = "g-" + Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true };
+        var group = new HubGroup { Name = "G", Slug = "g-" + Guid.NewGuid().ToString("N"), OwnerUserId = owner.Id, IsPublic = true, IsTrusted = true };
         db.HubGroups.Add(group);
         await db.SaveChangesAsync();
         db.UserMediaPublications.Add(new UserMediaPublication

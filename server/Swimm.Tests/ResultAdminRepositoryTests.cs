@@ -35,6 +35,7 @@ public class ResultAdminRepositoryTests
         }
 
         public Task<int> RecalculateAllCombinedAsync(CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> RecalculateAllParaPointsAsync(CancellationToken ct = default) => Task.FromResult(0);
     }
 
     /// <summary>Кладёт один индивидуальный результат, возвращает его Id + ключевые сущности.</summary>

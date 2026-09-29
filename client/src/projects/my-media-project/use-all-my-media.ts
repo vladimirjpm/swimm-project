@@ -19,6 +19,11 @@ export interface AllUserMediaDto {
   competition_date?: string | null;
   club_name?: string | null;
   created_at: string;
+  /**
+   * Жалобы «Report» (Р62): under_review — спрятано со всех витрин до решения админа сайта;
+   * removed — админ снял (поделиться заново нельзя). null — обычное.
+   */
+  moderation_state?: 'under_review' | 'removed' | null;
 }
 
 export interface AddMediaInput {
@@ -36,6 +41,8 @@ export interface PublishTargetDto {
   type: 'group' | 'club';
   id: number;
   name: string;
+  /** Доверенная цель (Р56): public отсюда виден всем и в протоколе, и на карточке. У клуба всегда true. */
+  trusted?: boolean;
 }
 
 // ── Antiforgery token cache (та же механика, что и useUserMedia/useFavorites) ──

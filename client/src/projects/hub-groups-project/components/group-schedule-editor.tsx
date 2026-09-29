@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { GroupTrainingSchedule, GroupTrainingSlot } from '../types';
+import type { GroupTrainingSchedule, GroupTrainingSlot, LaneViewMode, WhoIsComing } from '../types';
 import { DAY_SHORT } from './group-training-slots';
 
 /**
@@ -11,6 +11,9 @@ import { DAY_SHORT } from './group-training-slots';
  *
  * Дни недели — ISO (1 = Mon … 7 = Sun), как в JSON и на сервере; порядок кнопок начинается
  * с воскресенья, потому что неделя в Израиле начинается с него.
+ *
+ * Блок «Lanes» (Ш3.3): сколько дорожек обычно, режим вида по дорожкам и кто видит имена
+ * «кто идёт» — всё в том же JSON расписания (`usual_lanes`, `lane_view`, `who_is_coming`).
  */
 
 /** Токен antiforgery: свой кэш на модуль — как у остальных мутирующих клиентов проекта. */
@@ -59,6 +62,10 @@ function GroupScheduleEditor({
   const [place, setPlace] = useState(schedule?.place ?? '');
   const [poolType, setPoolType] = useState(schedule?.pool_type ?? '');
   const [note, setNote] = useState(schedule?.note ?? '');
+  const [usualLanes, setUsualLanes] = useState(schedule?.usual_lanes != null ? String(schedule.usual_lanes) : '');
+  const [laneView, setLaneView] = useState<LaneViewMode>(schedule?.lane_view ?? 'auto');
+  const [whoIsComing, setWhoIsComing] = useState<WhoIsComing>(schedule?.who_is_coming ?? 'members');
+  const [rsvpTop, setRsvpTop] = useState(!!schedule?.rsvp_top);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -91,6 +98,10 @@ function GroupScheduleEditor({
       // Ключи snake_case — как их объявляет серверный DTO (JsonPropertyName).
       // camelCase здесь молча терялся бы: биндер не нашёл бы поле и оставил null.
       slots, place, pool_type: poolType, note,
+      usual_lanes: usualLanes === '' ? null : Number(usualLanes),
+      lane_view: laneView,
+      who_is_coming: whoIsComing,
+      rsvp_top: rsvpTop,
     });
     setSaving(false);
     if (result.ok) {
@@ -171,6 +182,62 @@ function GroupScheduleEditor({
           placeholder="Note — e.g. “summer schedule in WhatsApp”"
           className={inputCls}
         />
+      </div>
+
+      <div className="mt-4 border-t border-[var(--t-border-2)] pt-3">
+        <div className="text-[12px] font-black uppercase tracking-[0.06em] text-[var(--t-text-2)]">Lanes</div>
+        <div className="mt-2 flex flex-col gap-2 text-[12.5px] text-[var(--t-text-2)]">
+          <label className="flex flex-wrap items-center gap-2">
+            <span className="w-[120px]">Usual lanes</span>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={usualLanes}
+              onChange={(e) => { setUsualLanes(e.target.value); setSaved(false); }}
+              placeholder="—"
+              className={`${inputCls} w-[80px]`}
+            />
+            <span className="text-[11px] text-[var(--t-text-3)]">empty — from the last lane plan</span>
+          </label>
+          <label className="flex flex-wrap items-center gap-2">
+            <span className="w-[120px]">Lane view</span>
+            <select
+              value={laneView}
+              onChange={(e) => { setLaneView(e.target.value as LaneViewMode); setSaved(false); }}
+              className={`${inputCls} cursor-pointer`}
+            >
+              <option value="auto">Auto — plan, else by level</option>
+              <option value="plan">Coach&apos;s plan only</option>
+              <option value="off">Off — list only</option>
+            </select>
+          </label>
+          <label className="flex flex-wrap items-center gap-2">
+            <span className="w-[120px]">Who&apos;s coming</span>
+            <select
+              value={whoIsComing}
+              onChange={(e) => { setWhoIsComing(e.target.value as WhoIsComing); setSaved(false); }}
+              className={`${inputCls} cursor-pointer`}
+            >
+              <option value="members">Members see names</option>
+              <option value="coach">Only coaches see names</option>
+            </select>
+          </label>
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={rsvpTop}
+              onChange={(e) => { setRsvpTop(e.target.checked); setSaved(false); }}
+              className="mt-[3px] cursor-pointer"
+            />
+            <span>
+              Ask at the top of the page
+              <span className="block text-[11px] text-[var(--t-text-3)]">
+                members who haven&apos;t answered see “Are you coming?” above the photo
+              </span>
+            </span>
+          </label>
+        </div>
       </div>
 
       {error && <p className="m-0 mt-2 text-[12px] font-bold text-[var(--t-danger)]">{error}</p>}

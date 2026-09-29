@@ -25,6 +25,7 @@ public class JsonImportService : IImportService
     private readonly IDataCheckRunner? _checks;
     private readonly IStartListStitchService? _stitch;
     private readonly IHubGroupClubSubscriptionService? _clubSync;
+    private readonly ISuspectResultService? _suspects;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -43,11 +44,18 @@ public class JsonImportService : IImportService
     /// Пересборка составов групп, подписанных на клубы этого импорта. Необязательна по той же
     /// причине, что и <paramref name="recalc"/>.
     /// </param>
+    /// <param name="suspects">
+    /// Скан качества («Качество», SuspectReason) по импортированным дням (Р70). Переимпорт
+    /// сбрасывает автопометки, и без скана ошибка протокола проходила на витрину: у 1512 после
+    /// переимпорта 19.09 отсечка 50 м вместо финиша дала 117 333 очка FINA и «лучший заплыв».
+    /// Необязателен по той же причине, что и <paramref name="recalc"/>.
+    /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null,
         IDataCheckRunner? checks = null,
         IStartListStitchService? stitch = null,
-        IHubGroupClubSubscriptionService? clubSync = null)
+        IHubGroupClubSubscriptionService? clubSync = null,
+        ISuspectResultService? suspects = null)
     {
         _db    = db;
         _cache = cache;
@@ -55,6 +63,7 @@ public class JsonImportService : IImportService
         _checks = checks;
         _stitch = stitch;
         _clubSync = clubSync;
+        _suspects = suspects;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -1075,6 +1084,37 @@ public class JsonImportService : IImportService
                 diagnosticLog.Add(
                     $"Combine All Results: пересчёт не удался ({ex.GetType().Name}: {ex.Message}). " +
                     "Импорт сохранён; выполните `dotnet run -- --recalc-combined`.");
+            }
+        }
+
+        // Скан качества по импортированным дням (Р70) — ПОСЛЕ коммита и в try/catch, как пересчёт:
+        // прибор не имеет права уронить загруженное. Ручные пометки скан не трогает.
+        if (_suspects is not null && touchedCompetitionKeys.Count > 0)
+        {
+            // Область — как у кнопки «Качество»: событие целиком, если оно есть (правила сравнивают
+            // дни между собой, и скан одного дня снял бы пометки, которые держатся на соседних).
+            var scopes = touchedCompetitionKeys
+                .Select(k => competitionCache[k])
+                .Select(c => c.EventId is int eid ? (EventId: (int?)eid, CompetitionId: (int?)null) : (null, c.Id))
+                .Distinct()
+                .ToList();
+            try
+            {
+                int flagged = 0, cleared = 0, manualKept = 0;
+                foreach (var (eventId, competitionId) in scopes)
+                {
+                    var scan = await _suspects.ScanAsync(eventId, competitionId);
+                    flagged += scan.Flagged;
+                    cleared += scan.Cleared;
+                    manualKept += scan.ManualKept;
+                }
+                diagnosticLog.Add($"Качество: помечено {flagged}, снято {cleared}, ручных сохранено {manualKept}");
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Качество: скан не удался ({ex.GetType().Name}: {ex.Message}). " +
+                    "Импорт сохранён; выполните `dotnet run -- --quality-scan <eventId>`.");
             }
         }
 

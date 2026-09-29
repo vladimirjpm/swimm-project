@@ -71,6 +71,12 @@ public class UserFavoriteRepository : IUserFavoriteRepository
 
     public async Task<AddFavoriteResult> AddAsync(int userId, AddFavoriteRequest request)
     {
+        // Пловец группы (Р71) в избранное не берётся: избранное отдаёт имя и питает витрины
+        // вне группы. Внутри группы «за кого этот аккаунт» — метка членства.
+        if (request.TargetType == FavoritesRules.TargetSwimmer
+            && !await _db.Swimmers.AnyAsync(s => s.Id == request.SwimmerId && s.PrivateHubGroupId == null))
+            return AddFavoriteResult.NotFound();
+
         // «Посчитать → вставить» — одна транзакция под блокировкой пользователя (как у лимита
         // групп в HubGroupUserService): без неё две вкладки на 29-м пловце обе видят «есть
         // место» и обе вставляют. Execution strategy обязательна: ручная транзакция при

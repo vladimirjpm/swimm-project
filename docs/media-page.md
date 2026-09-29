@@ -99,6 +99,7 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 | GET | `/api/me/moderation/media` | сводный inbox модерации: группы, где я владелец/админ + все клубные заявки, если я site admin | `IUserMediaPublicationService.GetModerationFeedAsync`; строка несёт `target_type`, от него зависит ручка решения |
 | GET | `/api/me/media/{id}/publish-targets` | в какие КОЛЛЕКТИВЫ можно подать это медиа | группа: пловец в ростере + я член/владелец/админ (site admin тоже — чинилось 09.09); клуб пловца добавляется сам, ростер там из справочника федерации |
 | POST | `/api/me/media/{id}/publications` | подать заявку (`{target_type, target_id, level}`) | `[EnableRateLimiting("media")]`; привилегия по цели → авто-`approved` (у группы владелец/админ/site-admin, у клуба только site-admin); у клуба `level` может быть только `public`; кэш витрины сбрасывает само сохранение (перехватчик К4) |
+| POST | `/api/media/{id}/report` | жалоба «Report» на чужое видимое медиа (`{reason, comment}`; причины `wrong_swimmer / inappropriate / spam / privacy / other`, у other текст ≤500 обязателен) | `MediaReportsController`, `[Authorize]`, antiforgery, `[EnableRateLimiting("reports")]` 10/мин; своё → 400, невидимое → 404, повтор → 200 `already_reported`; ответ не говорит, спрятано ли медиа (Р62/Р64) |
 | DELETE | `/api/me/media/{id}/publications/{targetType}/{targetId}` | отозвать заявку (любой статус) | кэш витрины коллектива сбрасывает само сохранение (К4) |
 | GET | `/api/clubs/{id}/media` | публичная лента клуба: одобренные `public`-публикации его пловцов | анонимно; ростер клуба — из справочника федерации; строка — `PublishedMediaItemDto` (см. ниже) |
 
@@ -467,7 +468,7 @@ rejected`; статус карточки выводит `derivedCardStatus` (`st
   ⚠ На клиенте цель ходит ключом-строкой `«group:17»` / `«club:438»` (`targetKey`,
   `parseTargetKey` в `hooks/useUserMedia.ts`): у `<select>` значение всегда строка, а цель —
   пара, числом её не выразить.
-- **Кому видно members-видео — ОДНО правило** (`MediaPublicationAudience`, 10.09.2026):
+- **Кому видно members-видео — ОДНО правило** (`MediaPublicationAudience`, 10.09.2026; про public — пункт ниже):
   активный участник-аккаунт группы публикации, её владелец, админ группы, админ сайта — та же
   аудитория, что у ленты members на странице группы (`CanEdit ∪ участник`). Действует в
   протоколе (`/api/media/results`), на странице пловца (`/api/swimmers/{id}/media`) и в лайке.
@@ -475,6 +476,34 @@ rejected`; статус карточки выводит `derivedCardStatus` (`st
   поэтому админ группы, не вступивший в неё, видел разбор на странице группы, но не в
   протоколе; а лайк не смотрел на статус и пускал заявку (pending). Новая витрина с
   публикациями — через `MediaPublicationAudience.CanSee`, не своей проверкой.
+- **«Everyone 🌐» — только у доверенной группы** (Р56/Р59/Р65, 29.09.2026). Группа доверенная —
+  `HubGroup.IsTrusted` (галка админа сайта в Admin/HubGroups) или официальная, правило
+  `HubGroupTrustRules`. Недоверенной подать `public` нельзя (`SubmitAsync` → 400), в селектах
+  пункт погашен (`canShareWithEveryone`, текст `EVERYONE_TRUSTED_ONLY` в `hooks/useUserMedia.ts`).
+  Public недоверенной группы (флаг сняли после публикации) = members везде, и на странице группы
+  тоже: `MediaPublicationAudience.CanSee` без исключений, `GetApprovedForGroupAsync(public)` пуст,
+  а лента `members` его включает. Клубная публикация — public всегда (решает админ сайта). Лайк и
+  жалоба — по тому же `CanSee`. «Почему моё видео не видно всем» — первым делом флаг группы. Цели
+  подачи несут `trusted`. `GroupTrustCard` в табе Admin (Р63): доверенной — зелёная строка
+  `TRUSTED_NOTE`; недоверенной — `EVERYONE_TRUSTED_ONLY` + как получить флаг, только если группа
+  подписана на клуб; без подписки карточки нет.
+- **Жалобы «Report» прячут медиа ВЕЗДЕ** (Р62/Р64, 29.09.2026). `UserMedia.ModerationState`
+  (`under_review` — открытых жалоб набралось до порога `MediaReportHideThreshold`; `removed` —
+  снял админ сайта) убирает медиа из всех чужих витрин: `MediaPublicationAudience.NotHidden`
+  (протокол, карточка пловца, результаты группы, лайк) и `PublishedItemsAsync` (галерея группы,
+  лента клуба). Никому — ни тренеру, ни админу сайта; владелец видит своё (путь «своё») с
+  пометкой на `/my-media`, а подать заново не может (`SubmitAsync`). «Видео пропало» — первым
+  делом `ModerationState` и /Admin/MediaReports. Кнопка — в лайтбоксе `UI_SwimmerGallery`, ей
+  нужен `mediaId` в `GalleryItem`: `VisibleResultMediaDto` несёт `media_id` + `is_mine`,
+  `PublishedMediaItemDto` — `media_id` (без `is_mine`: лента общая, свою жалобу отклонит сервер).
+  Фото шапки группы из публикации участника — тоже: строки-публикации в `group.gallery` (id < 0)
+  несут `media_id`, а сама группа — `hero_user_media_id` (только когда шапка реально из
+  публикации-картинки; иначе null), его передаёт `DeepHeroPhoto` в лайтбокс. Медиа тренера
+  (`HubGroupMedia`, id > 0) и обложка клуба не пользовательские — кнопки там нет.
+  Тренер в inbox-е публикаций видит `moderation_state` и `open_reports` (причина → число), без
+  имён — их видит только админ сайта. API: `POST /api/media/{id}/report` (`{reason, comment}`),
+  страница — `docs/admin-pages/mediareports.md`. Владелец удалил медиа с жалобами — жалобы
+  уходят каскадом, след для админа — аудит `media.report.owner-delete` (владельцу не показываем).
 - **Картинка по ссылке — через `HelperMedia.directImageUrl` и с `referrerPolicy="no-referrer"`**
   (11.09.2026). Ссылка «Поделиться» из Google Drive (`drive.google.com/file/d/{id}/view`)
   ведёт на СТРАНИЦУ просмотрщика: код 200, но это HTML, и `<img>` показывает битое фото.

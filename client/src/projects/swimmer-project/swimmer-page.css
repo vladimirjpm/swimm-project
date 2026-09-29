@@ -26,7 +26,10 @@
   font-family: var(--deep-font-display); font-size: 27px; line-height: 1;
   color: var(--deep-accent); font-variant-numeric: tabular-nums;
 }
+/* margin-top: auto — подпись прибита к низу плитки: плитки в ряду одной высоты (по самой
+   высокой, у достижений), и без него «Medals» / «Level» висели посередине. */
 .deep-kpi-label {
+  margin-top: auto;
   font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
   color: var(--deep-text-faint);
 }
@@ -162,38 +165,8 @@
   margin-bottom: 6px;
 }
 
-/* ── Полоса фильтров таба Results ────────────────────────────────────────── */
-/* flex-wrap, а не скролл: на 375px чипы переносятся на вторую строку, и ни один
-   не оказывается за краем экрана. */
-
-.deep-filters { margin-bottom: 12px; }
-.deep-filter-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.deep-filter-chip {
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 12px; border-radius: var(--deep-radius-pill);
-  background: var(--deep-card-bg-raised); border: 1px solid var(--deep-card-border);
-  color: var(--deep-text-mute); cursor: pointer;
-  font-size: 12px; font-weight: 800;
-  /* Тап-таргет мобайла — как у плиток-табов (deep-theme.css) */
-  min-height: 36px;
-}
-.deep-filter-chip:hover { color: var(--deep-text); }
-.deep-filter-chip--active {
-  background: var(--deep-accent-chip); border-color: var(--deep-accent-border);
-  color: var(--deep-accent); box-shadow: var(--deep-accent-glow);
-}
-.deep-filter-chip__badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
-  /* Кольцо по currentColor, а не своя заливка: бейдж наследует цвет чипа и потому
-     читается в обеих темах и в обоих состояниях — правило парных токенов. */
-  border: 1px solid currentColor; color: inherit;
-  font-size: 10px; font-weight: 900; font-variant-numeric: tabular-nums;
-}
-.deep-filter-caption {
-  margin-top: 8px;
-  font-size: 11px; font-weight: 700; color: var(--deep-text-faint);
-}
+/* Полоса фильтров таба Results (.deep-filter-*) переехала в deep-theme.css — она общая
+   с табом Results клуба и группы (components/deep/view-chips.tsx). */
 
 /* ── Season best: место среди сверстников ────────────────────────────────── */
 

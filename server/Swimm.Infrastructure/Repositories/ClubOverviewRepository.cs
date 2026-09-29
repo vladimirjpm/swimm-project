@@ -79,6 +79,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 CountryCode = c.Country != null ? c.Country.CountryCode : null,
                 CountryName = c.Country != null ? c.Country.CountryName : null,
                 c.CoverImageUrl,
+                c.CoverImageMobileUrl,
                 c.DisplaySettings,
             })
             .FirstOrDefaultAsync();
@@ -97,7 +98,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 CountryCode = club.CountryCode,
                 CountryName = club.CountryName,
                 SwimmerCount = await _read.Swimmers.AsNoTracking()
-                    .CountAsync(s => s.ClubId == resolvedClubId),
+                    .CountAsync(s => s.ClubId == resolvedClubId && s.PrivateHubGroupId == null),
                 FirstSeason = rows.Count > 0 ? rows.Min(r => r.Season) : null,
                 LastSeason = rows.Count > 0 ? rows.Max(r => r.Season) : null,
                 // Указатель на картинку разрешает СЕРВЕР — наружу уходит один готовый URL.
@@ -105,6 +106,8 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 // (docs/plans/entity-page-shell-plan.md §3.10), поэтому берётся CoverImageUrl.
                 CoverImageUrl = club.CoverImageUrl,
                 HeroImageUrl = club.CoverImageUrl,
+                CoverImageMobileUrl = club.CoverImageMobileUrl,
+                HeroImageMobileUrl = club.CoverImageMobileUrl,
                 ShowHeroImage = EntityDisplaySettings.Parse(club.DisplaySettings).Hero.Show,
             },
             Seasons = rows

@@ -196,7 +196,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
       {/* PTS */}
       {hasInternationalPoints && (
         <div className="self-center text-right">
-          <div className="text-base font-extrabold text-[var(--theme-mode-text)] tabular-nums leading-none">{res.international_points ?? ''}</div>
+          <div className="text-base font-extrabold text-[var(--theme-mode-text)] tabular-nums leading-none">{HelperResults.pointsLabel(res)}</div>
           <div className="text-[8.5px] font-bold tracking-wide text-[var(--theme-mode-text-muted)] mt-0.5">PTS</div>
         </div>
       )}

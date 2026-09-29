@@ -384,9 +384,12 @@ public class ResultRepository : IResultRepository
         var hasAwards = await query.AnyAsync(r => r.Competition.IsAward);
 
         // Лучший заплыв — максимум FINA-очков; тай-брейк по времени, затем Id (стабильность).
-        // ♂/♀ (design_handoff вариант 4) — та же проекция с фильтром по полу.
+        // ♂/♀ (design_handoff вариант 4) — та же проекция с фильтром по полу. Пара-очки с FINA
+        // не сравнимы (Р67): 931 за 1:22.76 на 100 в/с иначе забирал «лучший заплыв» чемпионата.
+        // Помеченные ошибки протокола тоже (Р69): отсечка 50 м вместо финиша на 400 в/с дала
+        // 117 333 очка — как и рекорды, помеченная строка в зачётных выборках не участвует.
         static IQueryable<OverviewBestSwimDto> BestSwimProjection(IQueryable<Domain.Entities.ResultRecord> q) =>
-            q.Where(r => !r.TimeFail && r.InternationalPoints > 0)
+            q.Where(r => !r.TimeFail && !r.IsParaPoints && r.SuspectReason == null && r.InternationalPoints > 0)
              .OrderByDescending(r => r.InternationalPoints)
              .ThenBy(r => r.TimeMillisecond)
              .ThenBy(r => r.Id)
@@ -566,8 +569,10 @@ public class ResultRepository : IResultRepository
         // legacy-ветки (соревнование без правила), где эстафетные FINA-очки иначе попали бы
         // в сумму пловца. Флаг правила остаётся вторым рубежом в PointRulesSwimmersScoring.
         // NB: в медальном зачёте «Most decorated» эстафеты, наоборот, считаются.
+        // Помеченные ошибки протокола (SuspectReason) не участвуют ни очками, ни местом (Р69):
+        // у 1512 неверные времена переставили и места 1–7 заплыва.
         var hpRows = await query
-            .Where(r => r.RelayId == null && !r.TimeFail
+            .Where(r => r.RelayId == null && !r.TimeFail && r.SuspectReason == null
                         && (r.Gender == "male" || r.Gender == "female")
                         && r.Swimmer.BirthYear > 0
                         // combine-all: дисциплина зачитывается один раз — по лучшему заплыву,
@@ -587,7 +592,8 @@ public class ResultRepository : IResultRepository
                 Year = r.CompetitionDate.Year,
                 r.AgeGroup,
                 IsMasters = r.Competition.IsMasters,
-                r.InternationalPoints,
+                // Пара-очки в сумму FINA не идут (Р67); очки за место правило считает по месту.
+                InternationalPoints = r.IsParaPoints ? 0 : r.InternationalPoints,
                 // Э2.5: поля для расчёта по правилу. Место берём объединённое, если
                 // соревнование его считает и тоггл включён — иначе место в заплыве.
                 Place = filter.Combined && r.Competition.ShowCombineAllResults && r.CombinedPlace != null
@@ -1482,7 +1488,7 @@ public class ResultRepository : IResultRepository
                 r.Competition.EventId,
                 r.CompetitionDate,
                 r.Position,
-                r.InternationalPoints,
+                r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
                 r.TimeMillisecond,
                 r.TimeOriginal,
                 r.TimeFail,
@@ -1604,8 +1610,10 @@ public class ResultRepository : IResultRepository
 
         async Task<SwimmerProfileDto?> LoadAsync()
         {
+            // Пловец группы (Р71) публичного профиля не имеет: для страницы пловца, сравнения и
+            // всех публичных вкладок его нет — 404, как у несуществующего id.
             var s = await _db.Swimmers.AsNoTracking()
-                .Where(x => x.Id == id)
+                .Where(x => x.Id == id && x.PrivateHubGroupId == null)
                 .Select(x => new
                 {
                     x.Id,

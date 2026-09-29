@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.API.Pages.Admin.Shared;
 
 namespace Swimm.API.Pages.Admin.Competitions;
 
@@ -108,11 +109,7 @@ public class IndexModel : PageModel
     public IReadOnlyList<SeasonCountDto> SeasonCounts { get; private set; } = [];
 
     /// <summary>Правила очков и типы бассейна — для селектов панели быстрой правки строки.</summary>
-    /// <summary>
-    /// База для ссылок «смотреть на сайте». В проде клиент лежит на том же origin, что и
-    /// админка, поэтому пусто = относительные ссылки; в Development клиент крутится на своём
-    /// Vite-порту. Настройка <c>PublicSite:BaseUrl</c> — как на /Admin/Health.
-    /// </summary>
+    /// <summary>База для ссылок «смотреть на сайте» — <see cref="PublicSite.BaseUrl"/>.</summary>
     public string PublicSiteBaseUrl { get; private set; } = "";
 
     public IReadOnlyList<PointRuleRowDto> ClubRules { get; private set; } = [];
@@ -121,11 +118,7 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync()
     {
-        // Dev-адрес клиента нельзя зашивать в разметку: он уехал бы в прод. Та же настройка,
-        // что у /Admin/Health — пусто в проде значит «тот же origin», ссылка относительная.
-        PublicSiteBaseUrl = (_config["PublicSite:BaseUrl"]
-            ?? (_env.IsDevelopment() ? "http://localhost:5173" : ""))
-            .TrimEnd('/');
+        PublicSiteBaseUrl = PublicSite.BaseUrl(_config, _env);
 
         if (PageNumber < 1) PageNumber = 1;
         if (string.IsNullOrEmpty(Stage))

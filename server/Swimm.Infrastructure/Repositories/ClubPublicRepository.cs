@@ -65,7 +65,9 @@ public class ClubPublicRepository : IClubPublicRepository
         // границы возраста разворачиваются в границы BirthYear (ниже).
         var ageYear = seasonYear + 1;
 
-        var query = _read.Swimmers.AsNoTracking().Where(s => s.ClubId == resolvedClubId);
+        // Пловцы группы (Р71) в составе клуба не видны, даже если им проставлен клуб.
+        var query = _read.Swimmers.AsNoTracking()
+            .Where(s => s.ClubId == resolvedClubId && s.PrivateHubGroupId == null);
 
         if (!string.IsNullOrWhiteSpace(gender))
         {
@@ -312,7 +314,7 @@ public class ClubPublicRepository : IClubPublicRepository
                 r.Competition.Name,
                 r.Competition.Date,
                 r.CompetitionDate,
-                r.InternationalPoints,
+                r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
                 r.Swimmer.BirthYear))
             .ToListAsync();
 

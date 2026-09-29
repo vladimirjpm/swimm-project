@@ -71,7 +71,8 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 IsOfficial = g.IsOfficial,
                 // Скрытых владельцем клубных пловцов (IsExcluded) не видит НИ ОДИН читатель
                 // состава — ни счётчик, ни страница, ни ростер соревнований.
-                MemberCount = g.Members.Count(m => !m.IsExcluded)
+                // Пловцы группы (Р71) — только для своих: в публичном счётчике их нет.
+                MemberCount = g.Members.Count(m => !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == null)
             })
             .ToListAsync();
     }
@@ -98,8 +99,10 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 .FirstOrDefaultAsync(g => g.Id == groupId && g.Slug == slug);
             if (group == null) return null;
 
+            // Общий ответ кэшируется один на всех, кому можно смотреть группу, поэтому пловцов
+            // группы (Р71) здесь нет: своим их отдаёт GetPrivateMembersAsync личным запросом.
             members = await _read.HubGroupMembers.AsNoTracking()
-                .Where(m => m.HubGroupId == groupId && !m.IsExcluded)
+                .Where(m => m.HubGroupId == groupId && !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == null)
                 .OrderBy(m => m.SortOrder)
                 .Select(m => new HubGroupPublicMemberDto
                 {
@@ -144,6 +147,11 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 .ToListAsync();
         }
         members = HubGroupRosterOrder.Apply(members, adminSwimmerIds.ToHashSet());
+        // Роль coach/captain — заявление владельца о чужом человеке: наружу её не отдаём (Р65,
+        // «группа только следит»). Ответ страницы общий на всех, поэтому прятать на клиенте мало —
+        // JSON видит любой. Порядок «тренер первым» (решение 26.09.2026) уже применён выше;
+        // роли видит управляющий в редакторе состава. Зачёт ниже берёт роль отсюда — тоже member.
+        foreach (var m in members) m.Role = HubGroupRosterOrder.MemberRole;
 
         var dto = new HubGroupDetailsDto
         {
@@ -158,6 +166,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             Country = group.Country?.CountryCode,
             ClubName = group.Club?.Name,
             IsOfficial = group.IsOfficial,
+            IsTrusted = HubGroupTrustRules.IsTrusted(group),
             JoinPolicy = group.JoinPolicy,
             IsPrivate = HubGroupVisibilityRules.IsPrivate(Visibility, group.IsPublic),
             Links = ParseLinks(group.Links),
@@ -194,6 +203,9 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         dto.ShowHeroImage = display.Hero.Show;
         dto.HeroMediaId = display.Hero.MediaId;
         dto.HeroImageUrl = group.CoverImageUrl;
+        dto.HeroMobileMediaId = display.Hero.MobileMediaId;
+        dto.CoverImageMobileUrl = group.CoverImageMobileUrl;
+        dto.HeroImageMobileUrl = group.CoverImageMobileUrl;
 
         FillTrainingSchedule(dto, group.TrainingSchedule);
 
@@ -221,6 +233,10 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             Place = schedule.Place,
             PoolType = schedule.PoolType,
             Note = schedule.Note,
+            UsualLanes = schedule.UsualLanes,
+            LaneView = schedule.EffectiveLaneView,
+            WhoIsComing = schedule.EffectiveWhoIsComing,
+            RsvpTop = schedule.RsvpTop == true,
         };
 
         var next = schedule.NextOccurrence(IsraelTime.ToLocal(DateTime.UtcNow));
@@ -228,6 +244,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
 
         dto.NextTraining = new NextTrainingDto
         {
+            Id = TrainingRsvpRules.SessionKey(next.Value.Date, next.Value.Slot.Start),
             Date = next.Value.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             Start = next.Value.Slot.Start,
             End = next.Value.Slot.End,
@@ -276,10 +293,26 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         if (groupId == null) return null;
 
         return await _read.HubGroupMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == groupId && !m.IsExcluded)
+            .Where(m => m.HubGroupId == groupId && !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == null)
             .Select(m => m.SwimmerId)
             .ToListAsync();
     }
+
+    public async Task<List<HubGroupPublicMemberDto>> GetPrivateMembersAsync(int groupId) =>
+        await _read.HubGroupMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == groupId && !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == groupId)
+            .OrderBy(m => m.SortOrder).ThenBy(m => m.Swimmer!.LastName)
+            .Select(m => new HubGroupPublicMemberDto
+            {
+                SwimmerId = m.SwimmerId,
+                Name = (m.Swimmer!.LastName + " " + m.Swimmer.FirstName).Trim(),
+                NameEn = (m.Swimmer.LastNameEn + " " + m.Swimmer.FirstNameEn).Trim(),
+                BirthYear = m.Swimmer.BirthYear,
+                // Роль наружу не отдаётся (Р65), клуба у пловца группы нет по смыслу.
+                Role = "member",
+                IsPrivate = true,
+            })
+            .ToListAsync();
 
     public async Task<HubGroupAccessDto?> GetAccessAsync(string slug, int? userId, bool isSiteAdmin)
     {
@@ -370,11 +403,29 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
 
         // «Рекорды группы»: лучшее время по каждой оси стиль+дистанция+бассейн+пол.
         // Эстафеты и незачтённые времена (DSQ/DNS) не участвуют.
-        dto.Bests = await db.Results.AsNoTracking()
+        dto.Bests = await LoadBestsAsync(db, swimmerIds, since: null);
+        // Лучшие за сезон (чип «Season bests» таба Results) — та же ось, тот же отбор, но
+        // только заплывы текущего сезона — того же, что у зачёта (`season_label`).
+        dto.SeasonBests = await LoadBestsAsync(db, swimmerIds, since: seasonStart);
+
+        dto.Competitions = await BuildCompetitionsAsync(db, swimmerIds, dto.Bests);
+
+        await FillStandingsAsync(db, dto, swimmerIds, seasonStart);
+    }
+
+    /// <summary>
+    /// Лучшее время ростера по каждой оси стиль+дистанция+бассейн+пол; <paramref name="since"/>
+    /// сужает до заплывов с этой даты (season bests). Эстафеты и незачтённые (DSQ/DNS) — мимо.
+    /// </summary>
+    private static async Task<List<HubGroupBestDto>> LoadBestsAsync(
+        SwimmDbContext db, List<int> swimmerIds, DateTime? since)
+    {
+        var bests = await db.Results.AsNoTracking()
             .Where(r => swimmerIds.Contains(r.SwimmerId)
                         && r.TimeMillisecond != null
                         && !r.TimeFail
-                        && r.RelayId == null)
+                        && r.RelayId == null
+                        && (since == null || r.CompetitionDate >= since))
             .GroupBy(r => new { StyleName = r.Style.Name, r.Distance, r.Competition.PoolType, r.Gender })
             .Select(g => g
                 .OrderBy(r => r.TimeMillisecond)
@@ -391,22 +442,84 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                     SwimmerId = r.SwimmerId,
                     SwimmerName = (r.Swimmer.LastName + " " + r.Swimmer.FirstName).Trim(),
                     SwimmerNameEn = (r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn).Trim(),
+                    CompetitionId = r.CompetitionId,
                     CompetitionName = r.Competition.Name,
                     Date = r.Competition.Date,
-                    Points = r.InternationalPoints
+                    Points = r.IsParaPoints ? 0 : r.InternationalPoints  // пара-очки — не FINA (Р67)
                 })
                 .First())
             .ToListAsync();
 
-        dto.Bests = dto.Bests
+        return bests
             .OrderBy(b => b.StyleName)
             .ThenBy(b => b.Distance.Length)
             .ThenBy(b => b.Distance)
             .ThenBy(b => b.Gender)
             .ToList();
-
-        await FillStandingsAsync(db, dto, swimmerIds, seasonStart);
     }
+
+    /// <summary>
+    /// Все старты ростера для таба Results. Группировка и цифры строки — чистая функция
+    /// <see cref="HubGroupCompetitionsBuilder"/>; здесь только забор заплывов.
+    ///
+    /// Эстафеты — по членству (docs/relays.md), но БЕЗ подзапроса «RelayId в членствах» на
+    /// всей таблице: у <c>Results.RelayId</c> нет индекса, и OR с EXISTS уводил бы запрос
+    /// ростера мимо индекса по пловцу. Поэтому два узких шага: членства ростера → все ноги
+    /// этих эстафет → строки этих ног с этими RelayId (индекс по SwimmerId).
+    /// </summary>
+    private static async Task<List<HubGroupCompetitionDto>> BuildCompetitionsAsync(
+        SwimmDbContext db, List<int> swimmerIds, List<HubGroupBestDto> bests)
+    {
+        var rows = await db.Results.AsNoTracking()
+            .Where(r => swimmerIds.Contains(r.SwimmerId))
+            .Select(CompetitionSwimProjection)
+            .ToListAsync();
+
+        // Эстафеты, где плыл кто-то из ростера, и весь их состав.
+        var memberships = await db.RelayMembers.AsNoTracking()
+            .Where(m => swimmerIds.Contains(m.SwimmerId))
+            .Select(m => new { m.RelayId, m.SwimmerId })
+            .ToListAsync();
+        if (memberships.Count > 0)
+        {
+            var relayIds = memberships.Select(m => m.RelayId).Distinct().ToList();
+            var legIds = await db.RelayMembers.AsNoTracking()
+                .Where(m => relayIds.Contains(m.RelayId))
+                .Select(m => m.SwimmerId)
+                .Distinct()
+                .ToListAsync();
+            var known = rows.Select(r => r.Id).ToHashSet();
+            var relayRows = await db.Results.AsNoTracking()
+                .Where(r => legIds.Contains(r.SwimmerId) && r.RelayId != null && relayIds.Contains(r.RelayId.Value))
+                .Select(CompetitionSwimProjection)
+                .ToListAsync();
+            rows.AddRange(relayRows.Where(r => known.Add(r.Id)));
+        }
+        if (rows.Count == 0) return [];
+
+        var relayRosterLegs = memberships
+            .GroupBy(m => m.RelayId)
+            .ToDictionary(g => g.Key, g => g.Select(m => m.SwimmerId).ToList());
+        return HubGroupCompetitionsBuilder.Build(rows, swimmerIds.ToHashSet(), relayRosterLegs, bests);
+    }
+
+    /// <summary>Проекция заплыва для списка стартов.</summary>
+    private static readonly System.Linq.Expressions.Expression<Func<ResultRecord, HubGroupCompetitionSwim>> CompetitionSwimProjection =
+        r => new HubGroupCompetitionSwim
+        {
+            Id = r.Id,
+            CompetitionId = r.CompetitionId,
+            EventId = r.Competition.EventId,
+            Name = r.Competition.Event != null ? r.Competition.Event.Name : r.Competition.Name,
+            CompetitionDate = r.CompetitionDate,
+            SwimmerId = r.SwimmerId,
+            RelayId = r.RelayId,
+            Position = r.Position,
+            TimeFail = r.TimeFail,
+            HeatType = r.HeatType,
+            Round = r.Round,
+            IsAward = r.Competition.IsAward,
+        };
 
     /// <summary>
     /// «Последний старт» ростера целиком: турнир самого свежего заплыва ленты.
@@ -526,7 +639,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                 Position = r.HeatType == "prelim" || r.HeatType == "extra" || r.Round == ResultRounds.FinalOpen
                     ? null : r.Position,
                 TimeFail = r.TimeFail,
-                InternationalPoints = r.InternationalPoints,
+                InternationalPoints = r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
                 CompetitionDate = r.CompetitionDate,
                 IsMasters = r.Competition.IsMasters,
                 RuleId = r.Competition.PointRuleClubsId

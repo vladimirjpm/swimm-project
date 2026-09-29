@@ -64,7 +64,10 @@ public static class ResultMapping
         TimeSplit = r.TimeSplit,
         TimeFail = r.TimeFail,
         TimeFailNote = r.TimeFailNote,
-        InternationalPoints = r.InternationalPoints,
+        // Пара-очки наружу как FINA не отдаём (Р67): клиент сам сравнивает эти очки (лучший у
+        // клуба, личная полоса) — 0 плюс флаг, по которому строка пишет «para» вместо числа.
+        InternationalPoints = r.IsParaPoints ? 0 : r.InternationalPoints,
+        ParaPoints = r.IsParaPoints,
         Note = r.Note,
         IsRelay = r.RelayId != null,
         RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,

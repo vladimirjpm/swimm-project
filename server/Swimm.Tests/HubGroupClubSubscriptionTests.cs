@@ -458,7 +458,7 @@ public class HubGroupClubSubscriptionTests
         Assert.Equal(1, Assert.Single(await pub.GetGroupsAsync()).MemberCount);
 
         // Админка и «My groups»: счётчик — видимые, форма — все, со скрытым флагом.
-        var admin = new HubGroupAdminService(db, Core(db), Mock.Of<IAdminAuditService>());
+        var admin = new HubGroupAdminService(db, Core(db), Mock.Of<IAdminAuditService>(), new SettingsStub());
         Assert.Equal(1, Assert.Single(await admin.GetAllAsync()).MemberCount);
         var form = await admin.GetByIdAsync(w.Group.Id);
         Assert.True(form!.Members.Single(m => m.SwimmerId == hidden.Id).IsExcluded);

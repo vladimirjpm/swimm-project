@@ -48,4 +48,10 @@ public interface IHubGroupPublicRepository
     /// эндпоинт результатов с фильтрами). null — группы нет. Доступ к приватной решает вызывающий.
     /// </summary>
     Task<List<int>?> GetRosterSwimmerIdsAsync(string slug);
+
+    /// <summary>
+    /// Пловцы группы (Р71) — только для своих (управляющие, активные участники, админ сайта;
+    /// проверяет вызывающий). В общем ответе страницы их нет: он кэшируется один на всех.
+    /// </summary>
+    Task<List<HubGroupPublicMemberDto>> GetPrivateMembersAsync(int groupId);
 }

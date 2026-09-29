@@ -16,6 +16,7 @@ namespace Swimm.Application.Mapping;
 public static class HubGroupRosterOrder
 {
     public const string CoachRole = "coach";
+    public const string MemberRole = "member";
 
     /// <summary>
     /// Состав в порядке «тренер → админы → остальные» и с пометкой <c>IsAdmin</c> (чип

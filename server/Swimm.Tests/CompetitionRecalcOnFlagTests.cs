@@ -38,6 +38,7 @@ public class CompetitionRecalcOnFlagTests
         }
 
         public Task<int> RecalculateAllCombinedAsync(CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> RecalculateAllParaPointsAsync(CancellationToken ct = default) => Task.FromResult(0);
     }
 
     private static async Task<Competition> SeedAsync(SwimmDbContext db, bool showCombine)

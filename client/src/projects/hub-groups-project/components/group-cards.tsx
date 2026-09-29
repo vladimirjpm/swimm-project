@@ -5,7 +5,24 @@ import SwimRow from '../../components/swim-row/swim-row';
 import { routes } from '../../../utils/routes';
 import HelperResults from '../../../utils/helpers/helper-results';
 import { GROUP_DISCLAIMER, ROLE_LABEL, memberChips, swimmerDisplayName } from './group-bits';
-import type { HubGroupDetails, HubGroupRecentResult, HubGroupStanding } from '../types';
+import { levelColor } from './level-color';
+import { useGroupLevels } from './use-group-levels';
+import { useGroupBreaks } from './use-group-breaks';
+import type { HubGroupDetails, HubGroupMember, HubGroupRecentResult, HubGroupStanding } from '../types';
+
+/**
+ * Имя в составе — ссылка на страницу пловца. У пловца группы (Р71) страницы нет (сервер
+ * отвечает 404), поэтому у него просто текст.
+ */
+function MemberNameLink({ member, className, style, children }: {
+  member: HubGroupMember;
+  className: string;
+  style: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  if (member.is_private) return <div className={className} style={style}>{children}</div>;
+  return <a href={routes.swimmer(member.swimmer_id)} className={className} style={style}>{children}</a>;
+}
 
 /**
  * Карточки страницы группы — на ОБЩИХ примитивах, а не на своей вёрстке (этап C плана
@@ -29,44 +46,91 @@ import type { HubGroupDetails, HubGroupRecentResult, HubGroupStanding } from '..
 const poolOf = (value?: string | null): PoolFilter | null =>
   value === '25m' || value === '50m' ? value : null;
 
-/** Участники: тренер и капитаны первыми, дальше как отдал сервер. */
-function GroupMembersCard({ group }: { group: HubGroupDetails }) {
+/**
+ * Участники: тренер и капитаны первыми, дальше как отдал сервер.
+ *
+ * `editLevels` — зритель управляет группой: у каждого пловца выпадашка уровня
+ * (docs/plans/lane-plans-plan.md, «Уровень из таба Swimmers»). Тренер открывает состав и
+ * правит уровни тут же, не уходя в Admin. Уровни приватные — остальным их не грузим вовсе.
+ * Там же — «⏸» перерыв пловца (Ш3.1): бессрочно, пока тренер не снимет или сам человек не
+ * ответит «Going». Перерывы тоже приватные и грузятся только управляющему.
+ */
+function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetails; editLevels?: boolean }) {
+  const levels = useGroupLevels(group.id, editLevels);
+  const breaks = useGroupBreaks(group.id, editLevels);
+  const [levelError, setLevelError] = useState<string | null>(null);
+  const onBreakSwimmers = useMemo(
+    () => new Set((breaks.data?.breaks ?? []).filter((b) => b.swimmer_id != null).map((b) => b.swimmer_id!)),
+    [breaks.data],
+  );
+
+  const toggleBreak = async (swimmerId: number) => {
+    setLevelError(null);
+    setLevelError(await breaks.setBreak({ swimmer_id: swimmerId, on_break: !onBreakSwimmers.has(swimmerId) }));
+  };
+
+  // Уровень ставится только пловцу видимого состава (сервер) — у кого строки в ответе
+  // уровней нет, выпадашку не рисуем.
+  const levelBySwimmer = useMemo(
+    () => new Map((levels.data?.swimmers ?? []).map((s) => [s.swimmerId, s.levelId])),
+    [levels.data],
+  );
+  const levelById = useMemo(
+    () => new Map((levels.data?.levels ?? []).map((l) => [l.id, l])),
+    [levels.data],
+  );
+  const noLevelCount = levels.data ? levels.data.swimmers.filter((s) => s.levelId == null).length : 0;
+
+  const setLevel = async (swimmerId: number, levelId: number | null) => {
+    setLevelError(null);
+    setLevelError(await levels.setSwimmerLevel(swimmerId, levelId));
+  };
+
   return (
-    <section className="deep-card mb-4" aria-label="Members">
-      <div className="deep-card-title">Members</div>
+    <section className="deep-card mb-4" aria-label="Following">
+      <div className="deep-card-title">Following</div>
       <div className="deep-card-sub mt-1">
-        {group.members.length} in the roster
+        {group.members.length} {group.members.length === 1 ? 'swimmer' : 'swimmers'} the group follows
+        {editLevels && levels.data && (noLevelCount > 0 ? ` · ${noLevelCount} without a level` : ' · levels set for everyone')}
+        {editLevels && onBreakSwimmers.size > 0 && ` · ${onBreakSwimmers.size} on break`}
       </div>
+      {editLevels && levels.loadError && (
+        <p className="m-0 mt-2 text-[12px] font-bold text-[var(--t-danger)]">Could not load levels.</p>
+      )}
+      {levelError && (
+        <p className="m-0 mt-2 text-[12px] font-bold text-[var(--t-danger)]" role="alert">{levelError}</p>
+      )}
 
       {group.members.length === 0 ? (
         <div className="mt-4 text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
           {group.is_virtual
             ? 'No swimmers in favorites yet — tap the hearts on results.'
-            : 'The roster is empty for now.'}
+            : 'The group doesn’t follow any swimmers yet.'}
         </div>
       ) : (
         <ul className="m-0 mt-4 flex list-none flex-col gap-1.5 p-0">
-          {group.members.map((m) => (
+          {group.members.map((m) => {
+            const hasLevelRow = levelBySwimmer.has(m.swimmer_id);
+            const levelId = levelBySwimmer.get(m.swimmer_id) ?? null;
+            const level = levelId != null ? levelById.get(levelId) : undefined;
+            const name = m.name || m.name_en;
+            return (
             <li
               key={m.swimmer_id}
-              className="flex items-center justify-between gap-3 px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3 py-2"
               style={{
                 background: 'var(--deep-card-bg-row)',
                 borderRadius: 'var(--deep-radius-row)',
               }}
             >
-              <a
-                href={routes.swimmer(m.swimmer_id)}
-                className="min-w-0 no-underline"
-                style={{ color: 'inherit' }}
-              >
+              <MemberNameLink member={m} className="min-w-0 no-underline" style={{ color: 'inherit' }}>
                 <div className="truncate text-[14px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
-                  {m.name || m.name_en}
+                  {name}
                 </div>
                 <div className="truncate text-[11.5px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                   {[m.birth_year > 0 ? m.birth_year : null, m.club_name].filter(Boolean).join(' · ')}
                 </div>
-              </a>
+              </MemberNameLink>
               {memberChips(m).length > 0 && (
                 <span className="flex shrink-0 gap-1">
                   {memberChips(m).map((label) => (
@@ -84,8 +148,44 @@ function GroupMembersCard({ group }: { group: HubGroupDetails }) {
                   ))}
                 </span>
               )}
+              {editLevels && levels.data && hasLevelRow && (
+                <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={breaks.busy || !breaks.data}
+                    aria-pressed={onBreakSwimmers.has(m.swimmer_id)}
+                    onClick={() => { void toggleBreak(m.swimmer_id); }}
+                    title={onBreakSwimmers.has(m.swimmer_id)
+                      ? 'On break — tap to end'
+                      : 'Put on break: not placed in lanes until back'}
+                    className="hp-mono h-[26px] cursor-pointer rounded-[8px] border px-2 text-[11px] font-extrabold disabled:opacity-50"
+                    style={onBreakSwimmers.has(m.swimmer_id)
+                      ? { background: 'var(--deep-gold-bar)', borderColor: 'var(--deep-gold-bar)', color: 'var(--deep-accent-ink)' }
+                      : { background: 'transparent', borderColor: 'var(--t-border)', color: 'var(--deep-text-mute)' }}
+                  >
+                    {onBreakSwimmers.has(m.swimmer_id) ? '⏸ On break' : '⏸'}
+                  </button>
+                  <span
+                    className="inline-block h-[10px] w-[10px] shrink-0 rounded-full"
+                    style={{ background: level ? levelColor(level) : 'var(--t-border)' }}
+                  />
+                  <select
+                    value={levelId ?? ''}
+                    onChange={(e) => setLevel(m.swimmer_id, e.target.value === '' ? null : Number(e.target.value))}
+                    disabled={levels.pendingSwimmer === m.swimmer_id}
+                    aria-label={`Level of ${name}`}
+                    className="max-w-[160px] cursor-pointer rounded-[9px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2 py-[4px] text-[12px] font-bold text-[var(--t-text)] disabled:opacity-60"
+                  >
+                    <option value="">No level</option>
+                    {levels.data.levels.map((l) => (
+                      <option key={l.id} value={l.id}>{l.rank} · {l.name}</option>
+                    ))}
+                  </select>
+                </span>
+              )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
@@ -181,24 +281,37 @@ function GroupStandingsCard({ group }: { group: HubGroupDetails }) {
   );
 }
 
-/** Рекорды группы — та же форма, что у стены рекордов клуба. */
-function GroupRecordsCard({ group }: { group: HubGroupDetails }) {
+/**
+ * Рекорды группы — та же форма, что у стены рекордов клуба. И все (чип «Records» таба
+ * Results), и сезонные (чип «Season bests»): разные только строки и подписи. По умолчанию —
+ * рекорды за всё время.
+ */
+function GroupRecordsCard({
+  group, season,
+}: {
+  group: HubGroupDetails;
+  /** true — лучшие за текущий сезон (`season_bests`), а не за всё время. */
+  season?: boolean;
+}) {
   const [pool, setPool] = useState<PoolFilter>('all');
+  const source = season ? (group.season_bests ?? []) : group.bests;
 
   const rows = useMemo(
-    () => (pool === 'all' ? group.bests : group.bests.filter((b) => poolOf(b.pool_type) === pool)),
-    [group.bests, pool],
+    () => (pool === 'all' ? source : source.filter((b) => poolOf(b.pool_type) === pool)),
+    [source, pool],
   );
 
   return (
     <ClubRecordCard
-      title="Group records"
-      subtitle="best time among the roster · by event and pool"
+      title={season ? 'Season bests' : 'Group records'}
+      subtitle={season
+        ? `best time among the roster this season${group.season_label ? ` · ${group.season_label}` : ''}`
+        : 'best time among the roster · by event and pool'}
       count={rows.length}
-      countLabel="RECORDS"
+      countLabel={season ? 'EVENTS' : 'RECORDS'}
       pool={pool}
       onPool={setPool}
-      emptyText="No counted results yet."
+      emptyText={season ? 'No counted results this season yet.' : 'No counted results yet.'}
       isEmpty={rows.length === 0}
     >
       {rows.map((b) => (
@@ -372,16 +485,16 @@ function GroupLastStartCard({ group, onMore }: { group: HubGroupDetails; onMore:
 function GroupMembersDigest({ group, onMore }: { group: HubGroupDetails; onMore: () => void }) {
   return (
     <DeepDigestCard
-      title="Members"
-      subtitle={group.is_virtual ? 'from your favorites' : 'roster kept by the group creator'}
+      title="Following"
+      subtitle={group.is_virtual ? 'from your favorites' : 'swimmers the group follows'}
       count={group.members.length}
-      countLabel="SWIMMERS"
+      countLabel="FOLLOWING"
       moreLabel={`All ${group.members.length} →`}
       onMore={onMore}
       isEmpty={group.members.length === 0}
       emptyText={group.is_virtual
         ? 'No swimmers in favorites yet — tap the hearts on results.'
-        : 'The roster is empty for now.'}
+        : 'The group doesn’t follow any swimmers yet.'}
     >
       <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
         {group.members.slice(0, DIGEST_MEMBERS).map((m) => (
@@ -390,9 +503,9 @@ function GroupMembersDigest({ group, onMore }: { group: HubGroupDetails; onMore:
             className="flex items-center justify-between gap-3 px-3 py-2"
             style={{ background: 'var(--deep-card-bg-row)', borderRadius: 'var(--deep-radius-row)' }}
           >
-            <a href={routes.swimmer(m.swimmer_id)} className="min-w-0 truncate text-[12.5px] font-extrabold no-underline" style={{ color: 'var(--deep-text)' }}>
+            <MemberNameLink member={m} className="min-w-0 truncate text-[12.5px] font-extrabold no-underline" style={{ color: 'var(--deep-text)' }}>
               {m.name || m.name_en}
-            </a>
+            </MemberNameLink>
             {memberChips(m).length > 0 && (
               <span className="flex shrink-0 gap-1">
                 {memberChips(m).map((label) => (

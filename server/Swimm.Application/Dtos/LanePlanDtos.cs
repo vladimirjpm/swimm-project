@@ -58,6 +58,13 @@ public sealed class LanePlanSwimmerDto
     /// <summary>Пловца уже нет в составе группы — в плане он остался (план — снимок).</summary>
     [JsonPropertyName("left_group")]
     public bool LeftGroup { get; set; }
+
+    /// <summary>
+    /// На перерыве в день плана (Ш3.1, «On break»): редактор не кладёт его в Unassigned новой
+    /// раскладки; руками перетащить можно.
+    /// </summary>
+    [JsonPropertyName("on_break")]
+    public bool OnBreak { get; set; }
 }
 
 public sealed class LanePlanLaneDto

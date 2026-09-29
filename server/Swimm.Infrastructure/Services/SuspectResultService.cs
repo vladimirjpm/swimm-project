@@ -27,7 +27,7 @@ public class SuspectResultService(SwimmDbContext db) : ISuspectResultService
             .Select(r => new SuspectCandidateRow(
                 r.Id, r.SwimmerId, r.Style.Name, r.Distance, r.Gender,
                 r.TimeMillisecond, r.CompetitionDate, r.RelayId != null, r.TimeFail, r.AgeGroup,
-                r.InternationalPoints, r.HeatType, r.Round, r.Heat, r.Swimmer.Gender,
+                r.IsParaPoints ? 0 : r.InternationalPoints, r.HeatType, r.Round, r.Heat, r.Swimmer.Gender,
                 r.Competition.PoolType))
             .ToListAsync(ct);
 
@@ -132,7 +132,8 @@ public class SuspectResultService(SwimmDbContext db) : ISuspectResultService
 
         var history = await db.Results.AsNoTracking()
             .Where(r => swimmerIds.Contains(r.SwimmerId))
-            .Where(r => r.RelayId == null && !r.TimeFail && r.InternationalPoints > 0)
+            // Пара-очки с FINA не сравнимы (Р67) — в личную историю «выброса» не входят.
+            .Where(r => r.RelayId == null && !r.TimeFail && !r.IsParaPoints && r.InternationalPoints > 0)
             .Where(r => r.CompetitionDate >= from && r.CompetitionDate <= to)
             .Select(r => new { r.Id, r.SwimmerId, r.InternationalPoints, r.CompetitionDate })
             .ToListAsync(ct);

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Swimm.Application.Constants;
 using Npgsql;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -210,8 +211,13 @@ public class HubGroupUserService : IHubGroupUserService
         var user = await _db.AppUsers.FirstOrDefaultAsync(u => u.Email == email);
         if (user == null) return HubGroupMemberSaveResult.Fail("Пользователь с таким email не найден");
 
-        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId))
+        // Пловец чужой группы (Р71) меткой не ставится — для этой группы его нет.
+        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId
+                && (s.PrivateHubGroupId == null || s.PrivateHubGroupId == hubGroupId)))
             return HubGroupMemberSaveResult.Fail("Пловец не найден");
+
+        var quota = await CheckMembershipQuotasAsync(hubGroupId, user.Id, pending: false, selfJoin: false);
+        if (quota != null) return HubGroupMemberSaveResult.Fail(quota);
 
         return await InsertUserMemberAsync(hubGroupId, user.Id, addedByUserId, swimmerId: swimmerId, note: NormalizeNote(note));
     }
@@ -222,7 +228,9 @@ public class HubGroupUserService : IHubGroupUserService
             .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
         if (member == null) return HubGroupMemberSaveResult.Fail("Участник не найден");
 
-        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId))
+        // Пловец чужой группы (Р71) меткой не ставится — для этой группы его нет.
+        if (swimmerId != null && !await _db.Swimmers.AnyAsync(s => s.Id == swimmerId
+                && (s.PrivateHubGroupId == null || s.PrivateHubGroupId == hubGroupId)))
             return HubGroupMemberSaveResult.Fail("Пловец не найден");
 
         member.SwimmerId = swimmerId;
@@ -244,6 +252,12 @@ public class HubGroupUserService : IHubGroupUserService
         if (member == null) return HubGroupMemberSaveResult.Fail("Участник не найден");
 
         _db.HubGroupUserMembers.Remove(member);
+        // Ответы на ПРЕДСТОЯЩИЕ тренировки уходят вместе с участием: вернётся в группу — не
+        // должен оказаться «идущим» на то, от чего ушёл. Прошлые остаются — это история
+        // (в полосе их и так не видно: она считает только активных участников).
+        var today = DateOnly.FromDateTime(IsraelTime.ToLocal(DateTime.UtcNow));
+        _db.HubGroupTrainingRsvps.RemoveRange(_db.HubGroupTrainingRsvps
+            .Where(r => r.HubGroupId == hubGroupId && r.UserId == userId && r.SessionDate >= today));
         await _db.SaveChangesAsync();
         return HubGroupMemberSaveResult.Ok();
     }
@@ -270,7 +284,47 @@ public class HubGroupUserService : IHubGroupUserService
         var status = isPrivate || group.JoinPolicy == HubGroupJoinPolicy.Approval
             ? HubGroupUserMemberStatus.Pending
             : HubGroupUserMemberStatus.Active;
+
+        var quota = await CheckMembershipQuotasAsync(
+            hubGroupId, userId, pending: status == HubGroupUserMemberStatus.Pending, selfJoin: true);
+        if (quota != null) return HubGroupMemberSaveResult.Fail(quota);
+
         return await InsertUserMemberAsync(hubGroupId, userId, addedByUserId: null, status);
+    }
+
+    /// <summary>
+    /// Потолки вставки участника-аккаунта (Ш3.0, <see cref="HubGroupQuotaRules"/>): рубильник
+    /// самозаписи, заполненность группы, число членств аккаунта и его висящих заявок. Уже
+    /// состоящему не отказываем по потолку — повтор получит свой отказ «уже участник» из
+    /// <see cref="InsertUserMemberAsync"/>. null — можно.
+    /// </summary>
+    private async Task<string?> CheckMembershipQuotasAsync(int hubGroupId, int userId, bool pending, bool selfJoin)
+    {
+        if (selfJoin && !HubGroupQuotaRules.SelfJoinEnabled(_settings))
+            return HubGroupQuotaRules.SelfJoinClosedError;
+
+        if (await _db.HubGroupUserMembers.AnyAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId))
+            return null;
+
+        var groupLimit = HubGroupQuotaRules.Limit(_settings, HubGroupQuotaRules.MaxAccountMembersKey);
+        if (await _db.HubGroupUserMembers.CountAsync(m => m.HubGroupId == hubGroupId) >= groupLimit)
+            return HubGroupQuotaRules.GroupFullError(groupLimit);
+
+        var membershipLimit = HubGroupQuotaRules.Limit(_settings, HubGroupQuotaRules.MaxMembershipsPerUserKey);
+        if (await _db.HubGroupUserMembers.CountAsync(m => m.UserId == userId) >= membershipLimit)
+            return selfJoin
+                ? HubGroupQuotaRules.TooManyMembershipsError(membershipLimit)
+                : HubGroupQuotaRules.UserTooManyMembershipsError(membershipLimit);
+
+        if (pending)
+        {
+            var pendingLimit = HubGroupQuotaRules.Limit(_settings, HubGroupQuotaRules.MaxPendingPerUserKey);
+            if (await _db.HubGroupUserMembers.CountAsync(m =>
+                    m.UserId == userId && m.Status == HubGroupUserMemberStatus.Pending) >= pendingLimit)
+                return HubGroupQuotaRules.TooManyPendingError(pendingLimit);
+        }
+
+        return null;
     }
 
     public async Task<HubGroupMemberSaveResult> ApproveUserMemberAsync(int hubGroupId, int userId)
@@ -323,7 +377,20 @@ public class HubGroupUserService : IHubGroupUserService
             Place = Clean(schedule?.Place),
             PoolType = Clean(schedule?.PoolType),
             Note = Clean(schedule?.Note),
+            UsualLanes = schedule?.UsualLanes,
+            // auto — значение по умолчанию: храним только отличие от него.
+            LaneView = Clean(schedule?.LaneView)?.ToLowerInvariant() is { } view && view != GroupLaneView.Auto ? view : null,
+            WhoIsComing = Clean(schedule?.WhoIsComing)?.ToLowerInvariant() is { } who && who != GroupWhoIsComing.Members ? who : null,
+            // Выключено — по умолчанию: храним только включённое.
+            RsvpTop = schedule?.RsvpTop == true ? true : null,
         };
+
+        if (model.UsualLanes is int lanes && lanes is < LanePlanRules.MinLanes or > LanePlanRules.MaxLanes)
+            return HubGroupMemberSaveResult.Fail($"Usual lanes: from {LanePlanRules.MinLanes} to {LanePlanRules.MaxLanes}.");
+        if (model.LaneView != null && !GroupLaneView.All.Contains(model.LaneView))
+            return HubGroupMemberSaveResult.Fail("Lane view must be auto, plan or off.");
+        if (model.WhoIsComing != null && !GroupWhoIsComing.All.Contains(model.WhoIsComing))
+            return HubGroupMemberSaveResult.Fail("Who's coming must be members or coach.");
 
         // Битые слоты не сохраняем: расписание — витрина, и «Ср :» в шапке хуже пустоты.
         // Валидность считает сам домен (день 1..7 + разбор HH:mm), второго мнения тут нет.

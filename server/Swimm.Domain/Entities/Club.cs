@@ -39,6 +39,14 @@ public class Club
     public string? CoverImageUrl { get; set; }
 
     /// <summary>
+    /// Фото шапки для ТЕЛЕФОНА (4:3, хендофф group-club-changes HERO-PHOTO.md). Необязательно:
+    /// null — на телефоне показывается полоса из <see cref="CoverImageUrl"/>. На десктопе не
+    /// используется никогда.
+    /// </summary>
+    [MaxLength(1000)]
+    public string? CoverImageMobileUrl { get; set; }
+
+    /// <summary>
     /// Настройки ОТОБРАЖЕНИЯ страницы (JSON) — разбирает <see cref="EntityDisplaySettings"/>,
     /// руками колонку не читать. Пусто = дефолты.
     /// </summary>

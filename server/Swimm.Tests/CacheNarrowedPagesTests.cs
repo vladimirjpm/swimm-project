@@ -43,9 +43,12 @@ public class CacheNarrowedPagesTests
     /// <summary>
     /// Группа из базы — то, что о ней нужно сценариям. <paramref name="RunnerUserIds"/> — владелец и
     /// админы: их строки <c>Sys_AppUsers</c> страница читает (порядок состава, HubGroupRosterOrder).
+    /// <paramref name="Trusted"/> — доверенная (Р65): только её страница читает public-публикации;
+    /// у недоверенной публичная лента пуста, и публикации страница не читает вовсе.
+    /// <paramref name="PublishedMediaIds"/> — медиа, которые страница ПОКАЗЫВАЕТ (у недоверенной пусто).
     /// </summary>
     private sealed record LiveGroup(int Id, string Slug, int? ClubId, int? FollowedClubId, IReadOnlyList<int> PublishedMediaIds,
-        int OwnerUserId, IReadOnlyList<int> RunnerUserIds)
+        int OwnerUserId, IReadOnlyList<int> RunnerUserIds, bool Trusted)
     {
         public string Key => $"http:hub-groups:group:{Slug}";
     }
@@ -137,7 +140,7 @@ public class CacheNarrowedPagesTests
         {
             // Вне сборки записи кэша — эти запросы ничьих меток не ставят.
             var groups = await _rw.HubGroups.AsNoTracking().OrderBy(g => g.Id)
-                .Select(g => new { g.Id, g.Slug, g.ClubId, g.OwnerUserId })
+                .Select(g => new { g.Id, g.Slug, g.ClubId, g.OwnerUserId, Trusted = g.IsTrusted || g.IsOfficial })
                 .ToListAsync();
             var admins = await _rw.HubGroupAdmins.AsNoTracking()
                 .Select(a => new { a.HubGroupId, a.UserId })
@@ -153,9 +156,10 @@ public class CacheNarrowedPagesTests
 
             Groups = groups
                 .Select(g => new LiveGroup(g.Id, g.Slug, g.ClubId, follows.TryGetValue(g.Id, out var club) ? club : null,
-                    published.Where(p => p.GroupId == g.Id).Select(p => p.UserMediaId).ToList(),
+                    g.Trusted ? published.Where(p => p.GroupId == g.Id).Select(p => p.UserMediaId).ToList() : [],
                     g.OwnerUserId,
-                    admins.Where(a => a.HubGroupId == g.Id).Select(a => a.UserId).Append(g.OwnerUserId).Distinct().ToList()))
+                    admins.Where(a => a.HubGroupId == g.Id).Select(a => a.UserId).Append(g.OwnerUserId).Distinct().ToList(),
+                    g.Trusted))
                 .ToList();
             _mediaSwimmers = published.DistinctBy(p => p.UserMediaId).ToDictionary(p => p.UserMediaId, p => p.SwimmerId);
             SpareMediaId = (published.Count > 0 ? published.Max(p => p.UserMediaId) : 0) + 1;
@@ -643,10 +647,12 @@ public class CacheNarrowedPagesTests
 
     /// <summary>
     /// Чего план не лечит (§6): удаление медиа каскадит в публикации, а чьи они — трекер не
-    /// знает (anyrow). Падают страницы всех групп, даже если у медиа публикаций не было.
+    /// знает (anyrow). Падают страницы всех групп, которые ЧИТАЮТ публикации, даже если у медиа
+    /// публикаций не было. С Р65 это только доверенные: у недоверенной публичная лента пуста, и
+    /// публикаций её страница не читает — удаление медиа её не роняет.
     /// </summary>
     [Fact]
-    public async Task MediaDeleted_DropsEveryPage()
+    public async Task MediaDeleted_DropsEveryPageThatReadsPublications()
     {
         await using var world = await World.OpenAsync();
         if (world == null || world.Groups.Count == 0) return;
@@ -655,7 +661,7 @@ public class CacheNarrowedPagesTests
         db.UserMedia.Remove(await db.UserMedia.SingleAsync(m => m.Id == world.SpareMediaId));
         await db.SaveChangesAsync();
 
-        foreach (var g in world.Groups) Assert.False(await world.Cached(g));
+        foreach (var g in world.Groups) Assert.Equal(!g.Trusted, await world.Cached(g));
     }
 
     // ── Клуб: обзор и состав (§3.2, К4б.5) ──────────────────────────────────────────────
