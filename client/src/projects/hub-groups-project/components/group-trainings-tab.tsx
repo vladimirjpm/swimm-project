@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { routes } from '../../../utils/routes';
 import { readViewParam, writeViewParam } from '../../components/deep/view-chips';
 import GroupLanes from './group-lanes';
+import GroupSessions from './group-sessions';
 import { LanePool, MyBreakControl, RsvpNotes, RsvpSegment } from './group-pool';
 import { RsvpBar, RsvpPeopleList } from './group-rsvp';
 import { formatNextDate } from './group-training-slots';
@@ -16,7 +17,9 @@ import type { HubGroupDetails } from '../types';
  * План дорожек — про те же занятия, что и журнал тренировок, поэтому он живёт здесь же.
  * Вид — в `?view=` (как чипы Results), по умолчанию Sessions без параметра.
  *
- * Sessions — ближайшее занятие со списком «кто идёт» (Ш2) и вход в журнал тренировок (сама
+ * Sessions — ближайшее занятие со списком «кто идёт» (Ш2), карточка «Trainings & videos»
+ * (тренер заводит тренировку и без времён, к ней видео — Е3 group-events-media-plan) и вход в
+ * журнал тренировок (сама
  * таблица живёт на ДРУГОМ экране, `/groups/{slug}/results?tab=trainings`). Сюда ведёт
  * «Who's coming →» из шапки. Управляющему — все участники по группам ответа, и он ставит
  * ответ за человека (и перерыв); участнику — вид по дорожкам (3b, Ш3.3), свой переключатель
@@ -71,6 +74,7 @@ function GroupTrainingsTab({
       ) : (
         <>
           <NextSessionCard group={group} rsvp={rsvp} />
+          <GroupSessions groupId={group.id} />
           <section className="deep-card mb-0">
             <div className="deep-card-title">Training log</div>
             <div className="deep-card-sub mt-1">private — group members and admins</div>
@@ -143,7 +147,14 @@ function NextSessionCard({ group, rsvp }: { group: HubGroupDetails; rsvp?: Train
         </div>
       )}
 
-      {r.is_member && breaks.data && (
+      {r.is_member && breaks.data && myBreak?.kind === 'not_training' && (
+        // Р74: статус ставит тренер, себе его не снять; ответ всё равно считается на этот день.
+        <p className="m-0 mt-3 text-[12px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+          The coach marked you as not training with the group — if you come, answer and you’re counted that day.
+        </p>
+      )}
+
+      {r.is_member && breaks.data && myBreak?.kind !== 'not_training' && (
         <div className="mt-3">
           <MyBreakControl
             onBreak={myBreak != null}
@@ -159,9 +170,11 @@ function NextSessionCard({ group, rsvp }: { group: HubGroupDetails; rsvp?: Train
           <RsvpPeopleList
             rsvp={r}
             disabled={!r.can_answer}
-            onAnswerFor={(userId, a) => { void rsvp!.answerFor(userId, a); }}
-            onToggleBreak={(userId, onBreak) => breaks.setBreak({ user_id: userId, on_break: onBreak })}
-            breakBusy={breaks.busy}
+            onAnswerFor={(p, a) => { void rsvp!.answerFor(p, a); }}
+            onSetStatus={(p, status) => breaks.setBreak(p.user_id != null
+              ? { user_id: p.user_id, status }
+              : { swimmer_id: p.swimmer_id, status })}
+            statusBusy={breaks.busy}
           />
         </div>
       )}

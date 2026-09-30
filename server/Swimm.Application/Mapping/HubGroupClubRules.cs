@@ -180,16 +180,17 @@ public static class HubGroupClubRules
         : $"A group already follows this club: {Isolate(groupName)}. Join it instead?";
 
     /// <summary>
-    /// Две строки одной группы после склейки пловцов-дублей сходятся в одну. Ручная побеждает —
-    /// и тогда пловец видим: владелец выбрал его сам, а «ручной и скрытый» не бывает
-    /// (CK_HubGroupMembers_ExcludedOnlyClub). Обе клубные — скрыт, если скрыта хоть одна:
-    /// владелец уже сказал, что не хочет видеть этого человека.
+    /// Две строки одной группы после склейки пловцов-дублей сходятся в одну. Ручная побеждает, и
+    /// видимость берётся у ручной: активная ручная — пловец видим (владелец выбрал его сам);
+    /// неактивны все ручные (Р74, «Inactive») — скрыт. Обе клубные — скрыт, если скрыта хоть
+    /// одна: владелец уже сказал, что не хочет видеть этого человека.
     /// </summary>
     public static (string Source, bool IsExcluded) MergeRows(
         (string Source, bool IsExcluded) a, (string Source, bool IsExcluded) b)
     {
-        if (a.Source == HubGroupMemberSource.Manual || b.Source == HubGroupMemberSource.Manual)
-            return (HubGroupMemberSource.Manual, false);
+        var manual = new[] { a, b }.Where(r => r.Source == HubGroupMemberSource.Manual).ToList();
+        if (manual.Count > 0)
+            return (HubGroupMemberSource.Manual, manual.All(r => r.IsExcluded));
 
         return (HubGroupMemberSource.Club, a.IsExcluded || b.IsExcluded);
     }

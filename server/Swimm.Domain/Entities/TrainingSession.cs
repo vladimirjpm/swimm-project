@@ -40,5 +40,26 @@ public class TrainingSession
     [MaxLength(500)]
     public string? Note { get; set; }
 
+    /// <summary>
+    /// Название тренировки для людей («Underwater filming»). Заводит тренер кнопкой — тренировка
+    /// может быть и без времён, а к ней видео (docs/plans/group-events-media-plan.md, Е1). У
+    /// залитых скриптом сессий пусто — там говорит <see cref="Name"/> (план из источника).
+    /// </summary>
+    [MaxLength(100)]
+    public string? Title { get; set; }
+
+    /// <summary>Начало «HH:mm» — связка с занятием расписания (ключ RSVP «дата + начало»); null — не задано.</summary>
+    [MaxLength(5)]
+    public string? StartTime { get; set; }
+
+    /// <summary>Кто завёл кнопкой; null — залито скриптом (или аккаунт удалён — SetNull).</summary>
+    public int? CreatedByUserId { get; set; }
+
+    [ForeignKey(nameof(CreatedByUserId))]
+    public AppUser? CreatedBy { get; set; }
+
+    /// <summary>Когда заведена кнопкой; null — у залитых скриптом.</summary>
+    public DateTime? CreatedAt { get; set; }
+
     public ICollection<TrainingResult> Results { get; set; } = new List<TrainingResult>();
 }

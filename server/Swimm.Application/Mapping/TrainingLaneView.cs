@@ -25,12 +25,13 @@ public static class TrainingLaneView
     public const string SourceWater = "water";
 
     /// <summary>
-    /// Человек в бассейне (ответил «иду» или «не уверен»). <paramref name="SortKey"/> — место в
+    /// Человек в бассейне (ответил «иду» или «не уверен»). <paramref name="UserId"/> null — пловец
+    /// группы без аккаунта, за которого ответил тренер (Р73). <paramref name="SortKey"/> — место в
     /// порядке состава (аккаунты без пловца — после состава); <paramref name="Claims"/> — сколько
     /// аккаунтов группы называют себя тем же пловцом.
     /// </summary>
     public sealed record Person(
-        int UserId, int? SwimmerId, string Name, string? Gender, string Answer, string? Note,
+        int? UserId, int? SwimmerId, string Name, string? Gender, string Answer, string? Note,
         int? LevelId, int SortKey, int Claims);
 
     public sealed record LevelInfo(int Id, int Rank, string Name, string? Color);
@@ -49,7 +50,7 @@ public static class TrainingLaneView
         if (plan == null && laneView == GroupLaneView.Plan) return null;
 
         var levelById = levels.ToDictionary(l => l.Id);
-        var people = pool.OrderBy(p => p.SortKey).ThenBy(p => p.UserId).ToList();
+        var people = pool.OrderBy(p => p.SortKey).ThenBy(p => p.UserId).ThenBy(p => p.SwimmerId).ToList();
 
         TrainingLanePersonDto ToDto(Person p)
         {

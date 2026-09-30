@@ -78,6 +78,18 @@ public sealed class GroupTrainingSchedule
     public string EffectiveWhoIsComing =>
         WhoIsComing == GroupWhoIsComing.Coach ? GroupWhoIsComing.Coach : GroupWhoIsComing.Members;
 
+    /// <summary>
+    /// Кто добавляет видео к тренировкам (<see cref="GroupTrainingMedia"/>, Е2
+    /// docs/plans/group-events-media-plan.md): members — все активные участники (по умолчанию,
+    /// решение Влада 30.09.2026), coach — только управляющие. null — members.
+    /// </summary>
+    [JsonPropertyName("training_media")]
+    public string? TrainingMedia { get; set; }
+
+    [JsonIgnore]
+    public string EffectiveTrainingMedia =>
+        TrainingMedia == GroupTrainingMedia.Coach ? GroupTrainingMedia.Coach : GroupTrainingMedia.Members;
+
     private static readonly JsonSerializerOptions Options = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -166,6 +178,15 @@ public static class GroupLaneView
 
 /// <summary>Кто видит имена «кто идёт» (<see cref="GroupTrainingSchedule.WhoIsComing"/>).</summary>
 public static class GroupWhoIsComing
+{
+    public const string Members = "members";
+    public const string Coach = "coach";
+
+    public static readonly string[] All = [Members, Coach];
+}
+
+/// <summary>Кто добавляет видео к тренировкам (<see cref="GroupTrainingSchedule.TrainingMedia"/>).</summary>
+public static class GroupTrainingMedia
 {
     public const string Members = "members";
     public const string Coach = "coach";

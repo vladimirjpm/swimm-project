@@ -150,6 +150,7 @@ public static class DependencyInjection
         services.AddScoped<IHubGroupLevelService, HubGroupLevelService>();
         services.AddScoped<ILanePlanService, LanePlanService>();
         services.AddScoped<ITrainingRsvpService, TrainingRsvpService>();
+        services.AddScoped<ITrainingSessionService, TrainingSessionService>();
         services.AddScoped<IHubGroupBreakService, HubGroupBreakService>();
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
         services.AddScoped<IClubStandingService, ClubStandingService>();

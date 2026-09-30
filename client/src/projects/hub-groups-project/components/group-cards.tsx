@@ -4,8 +4,10 @@ import DeepDigestCard from '../../components/deep/digest-card';
 import SwimRow from '../../components/swim-row/swim-row';
 import { routes } from '../../../utils/routes';
 import HelperResults from '../../../utils/helpers/helper-results';
-import { GROUP_DISCLAIMER, ROLE_LABEL, memberChips, swimmerDisplayName } from './group-bits';
+import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
+import { GROUP_DISCLAIMER, ROLE_LABEL, memberChips, publicationsApiFetch, swimmerDisplayName } from './group-bits';
 import { levelColor } from './level-color';
+import PersonStatusSelect, { type RosterStatus } from './person-status';
 import { useGroupLevels } from './use-group-levels';
 import { useGroupBreaks } from './use-group-breaks';
 import type { HubGroupDetails, HubGroupMember, HubGroupRecentResult, HubGroupStanding } from '../types';
@@ -52,21 +54,52 @@ const poolOf = (value?: string | null): PoolFilter | null =>
  * `editLevels` — зритель управляет группой: у каждого пловца выпадашка уровня
  * (docs/plans/lane-plans-plan.md, «Уровень из таба Swimmers»). Тренер открывает состав и
  * правит уровни тут же, не уходя в Admin. Уровни приватные — остальным их не грузим вовсе.
- * Там же — «⏸» перерыв пловца (Ш3.1): бессрочно, пока тренер не снимет или сам человек не
- * ответит «Going». Перерывы тоже приватные и грузятся только управляющему.
+ * Там же — статус пловца (Р74, решение Влада 30.09.2026): Active / On break / Doesn't train with
+ * us / Inactive. Перерыв — бессрочно, пока тренер не снимет или человек не ответит «Going»;
+ * «не тренируется» — тренер-пловчиха, в группе, но не в воде; Inactive — скрыть из состава
+ * (Restore — в My groups). Перерывы приватные и грузятся только управляющему; пометку «doesn't
+ * train with us» видят все свои (`insider` — участник или управляющий).
  */
-function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetails; editLevels?: boolean }) {
+function GroupMembersCard({ group, editLevels = false, insider = false }: {
+  group: HubGroupDetails;
+  editLevels?: boolean;
+  insider?: boolean;
+}) {
   const levels = useGroupLevels(group.id, editLevels);
-  const breaks = useGroupBreaks(group.id, editLevels);
+  const breaks = useGroupBreaks(group.id, editLevels || insider);
   const [levelError, setLevelError] = useState<string | null>(null);
+  const [pendingInactive, setPendingInactive] = useState<{ swimmerId: number; name: string } | null>(null);
   const onBreakSwimmers = useMemo(
     () => new Set((breaks.data?.breaks ?? []).filter((b) => b.swimmer_id != null).map((b) => b.swimmer_id!)),
     [breaks.data],
   );
+  const notTrainingSwimmers = useMemo(
+    () => new Set((breaks.data?.not_training ?? []).filter((b) => b.swimmer_id != null).map((b) => b.swimmer_id!)),
+    [breaks.data],
+  );
+  const statusOfSwimmer = (swimmerId: number): RosterStatus =>
+    notTrainingSwimmers.has(swimmerId) ? 'not_training' : onBreakSwimmers.has(swimmerId) ? 'break' : 'active';
 
-  const toggleBreak = async (swimmerId: number) => {
+  const setStatus = async (swimmerId: number, name: string, next: RosterStatus) => {
     setLevelError(null);
-    setLevelError(await breaks.setBreak({ swimmer_id: swimmerId, on_break: !onBreakSwimmers.has(swimmerId) }));
+    // Inactive — не флаг, а скрытие строки состава: с подтверждением, Restore — в My groups.
+    if (next === 'inactive') { setPendingInactive({ swimmerId, name }); return; }
+    setLevelError(await breaks.setBreak({ swimmer_id: swimmerId, status: next }));
+  };
+
+  const makeInactive = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!pendingInactive) return { success: false };
+    const r = await publicationsApiFetch(
+      `/api/me/hub-groups/${group.id}/members/by-swimmer/${pendingInactive.swimmerId}/excluded`,
+      { method: 'PUT', body: JSON.stringify({ excluded: true }) },
+    );
+    if (!r.ok) {
+      const payload = await r.json().catch(() => null) as { error?: string } | null;
+      return { success: false, error: payload?.error ?? 'Could not save. Try again.' };
+    }
+    // Состав приходит ответом страницы — честно показать новое состояние = перечитать её.
+    window.location.reload();
+    return { success: true };
   };
 
   // Уровень ставится только пловцу видимого состава (сервер) — у кого строки в ответе
@@ -93,6 +126,7 @@ function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetail
         {group.members.length} {group.members.length === 1 ? 'swimmer' : 'swimmers'} the group follows
         {editLevels && levels.data && (noLevelCount > 0 ? ` · ${noLevelCount} without a level` : ' · levels set for everyone')}
         {editLevels && onBreakSwimmers.size > 0 && ` · ${onBreakSwimmers.size} on break`}
+        {insider && notTrainingSwimmers.size > 0 && ` · ${notTrainingSwimmers.size} don’t train with us`}
       </div>
       {editLevels && levels.loadError && (
         <p className="m-0 mt-2 text-[12px] font-bold text-[var(--t-danger)]">Could not load levels.</p>
@@ -129,6 +163,12 @@ function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetail
                 </div>
                 <div className="truncate text-[11.5px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                   {[m.birth_year > 0 ? m.birth_year : null, m.club_name].filter(Boolean).join(' · ')}
+                  {/* Р74: пометка своим — в группе, но с нами не плавает. */}
+                  {notTrainingSwimmers.has(m.swimmer_id) && (
+                    <span className="italic" style={{ color: 'var(--deep-text-ghost)' }}>
+                      {m.birth_year > 0 || m.club_name ? ' · ' : ''}doesn’t train with us
+                    </span>
+                  )}
                 </div>
               </MemberNameLink>
               {memberChips(m).length > 0 && (
@@ -149,22 +189,15 @@ function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetail
                 </span>
               )}
               {editLevels && levels.data && hasLevelRow && (
-                <span className="ml-auto flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
+                // Статус + уровень переносятся строкой: на телефоне вдвоём они шире строки (Р74).
+                <span className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1.5">
+                  <PersonStatusSelect
+                    value={statusOfSwimmer(m.swimmer_id)}
+                    withInactive
                     disabled={breaks.busy || !breaks.data}
-                    aria-pressed={onBreakSwimmers.has(m.swimmer_id)}
-                    onClick={() => { void toggleBreak(m.swimmer_id); }}
-                    title={onBreakSwimmers.has(m.swimmer_id)
-                      ? 'On break — tap to end'
-                      : 'Put on break: not placed in lanes until back'}
-                    className="hp-mono h-[26px] cursor-pointer rounded-[8px] border px-2 text-[11px] font-extrabold disabled:opacity-50"
-                    style={onBreakSwimmers.has(m.swimmer_id)
-                      ? { background: 'var(--deep-gold-bar)', borderColor: 'var(--deep-gold-bar)', color: 'var(--deep-accent-ink)' }
-                      : { background: 'transparent', borderColor: 'var(--t-border)', color: 'var(--deep-text-mute)' }}
-                  >
-                    {onBreakSwimmers.has(m.swimmer_id) ? '⏸ On break' : '⏸'}
-                  </button>
+                    name={name}
+                    onChange={(next) => { void setStatus(m.swimmer_id, name, next); }}
+                  />
                   <span
                     className="inline-block h-[10px] w-[10px] shrink-0 rounded-full"
                     style={{ background: level ? levelColor(level) : 'var(--t-border)' }}
@@ -187,6 +220,22 @@ function GroupMembersCard({ group, editLevels = false }: { group: HubGroupDetail
             );
           })}
         </ul>
+      )}
+
+      {pendingInactive && (
+        <ConfirmDialog
+          // Имя — в <bdi>: иврит внутри английской фразы иначе разворачивает кавычки.
+          title={<>Make “<bdi>{pendingInactive.name}</bdi>” inactive?</>}
+          confirmLabel="Make inactive"
+          busyLabel="Saving…"
+          onConfirm={makeInactive}
+          onClose={() => setPendingInactive(null)}
+        >
+          <p className="mt-3 text-[13px] text-[var(--t-text-2)]">
+            They leave the group’s swimmers, lanes and records here. Results stay on their own page;
+            bring them back with Restore in My groups → the group’s roster.
+          </p>
+        </ConfirmDialog>
       )}
 
       {/* Ростер собирает человек, а не федерация — это надо говорить вслух: иначе группа

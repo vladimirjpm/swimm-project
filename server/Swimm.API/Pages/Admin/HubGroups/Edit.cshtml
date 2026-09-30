@@ -234,6 +234,11 @@
                                             из подписки на клуб@(m.IsExcluded ? " · скрыт владельцем" : "")
                                         </div>
                                     }
+                                    else if (m.IsExcluded)
+                                    {
+                                        @* Ручной или пловец группы в «Inactive» (Р74): ушёл из группы, Restore — у владельца в My groups. *@
+                                        <div class="text-[11px] text-admin-text-muted italic">неактивен (Inactive) — вернуть может владелец</div>
+                                    }
                                 </td>
                                 <td>@(m.BirthYear > 0 ? m.BirthYear.ToString() : "—")</td>
                                 <td>@(m.ClubName ?? "—")</td>

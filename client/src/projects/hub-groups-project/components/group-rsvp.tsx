@@ -1,6 +1,8 @@
 import React from 'react';
 import { formatBreakLength } from './group-pool';
-import type { RsvpAnswer, RsvpNote, TrainingRsvp, TrainingRsvpPerson } from '../types';
+import { rsvpPersonKey } from '../use-training-rsvp';
+import PersonStatusSelect, { statusOf } from './person-status';
+import type { PersonStatus, RsvpAnswer, RsvpNote, TrainingRsvp, TrainingRsvpPerson } from '../types';
 
 /**
  * Кирпичи ответов «иду / не уверен / не приду» (хендофф group-club-changes §4, вариант 2a;
@@ -149,7 +151,7 @@ function RsvpStaffRow({ rsvp, onOpen }: { rsvp: TrainingRsvp; onOpen: () => void
     <div className="flex items-center gap-2">
       <div className="flex">
         {shown.map((p) => (
-          <span key={p.user_id} className="-mr-1.5"><RsvpAvatar person={p} /></span>
+          <span key={rsvpPersonKey(p)} className="-mr-1.5"><RsvpAvatar person={p} /></span>
         ))}
       </div>
       {going.length > shown.length && (
@@ -169,37 +171,45 @@ function RsvpStaffRow({ rsvp, onOpen }: { rsvp: TrainingRsvp; onOpen: () => void
   );
 }
 
-type PeopleGroup = RsvpAnswer | 'none' | 'break';
+type PeopleGroup = RsvpAnswer | 'none' | 'break' | 'not_training';
 
 const GROUP_TITLE: Record<PeopleGroup, string> = {
   yes: 'Going', maybe: 'Not sure', no: "Can't come", none: 'No answer', break: 'On break',
+  not_training: 'Doesn’t train with us',
 };
 
-/** В какой группе списка человек: ответ, иначе «на перерыве» (Ш3.1), иначе «нет ответа». */
-const groupOf = (p: TrainingRsvpPerson): PeopleGroup => p.answer ?? (p.on_break ? 'break' : 'none');
+/**
+ * В какой группе списка человек: ответ, иначе «не тренируется с группой» (Р74), иначе «на
+ * перерыве» (Ш3.1), иначе «нет ответа».
+ */
+const groupOf = (p: TrainingRsvpPerson): PeopleGroup =>
+  p.answer ?? (p.not_training ? 'not_training' : p.on_break ? 'break' : 'none');
 
 /**
  * Список «кто идёт» для управляющего (таб Trainings → Sessions): группы Going / Not sure /
  * Can't come / No answer / On break; у каждого — три маленькие кнопки, тренер ставит ответ за
  * человека. Ответ, поставленный тренером, помечен «by coach»; вернувшийся с перерыва ответом
- * «Going» — «back after …». `onToggleBreak` — тренер ставит/снимает перерыв (бессрочно).
+ * «Going» — «back after …». `onSetStatus` — тренер ставит статус (Р74): в строю / перерыв
+ * (бессрочно) / «не тренируется с группой».
+ * Пловцы группы без аккаунта (Р73) — в том же списке с пометкой «no account»: за них отвечает
+ * только тренер.
  */
 function RsvpPeopleList({
-  rsvp, onAnswerFor, disabled, onToggleBreak, breakBusy,
+  rsvp, onAnswerFor, disabled, onSetStatus, statusBusy,
 }: {
   rsvp: TrainingRsvp;
-  onAnswerFor: (userId: number, next: RsvpAnswer | null) => void;
+  onAnswerFor: (person: TrainingRsvpPerson, next: RsvpAnswer | null) => void;
   disabled?: boolean;
-  onToggleBreak?: (userId: number, onBreak: boolean) => Promise<string | null>;
-  breakBusy?: boolean;
+  onSetStatus?: (person: TrainingRsvpPerson, status: PersonStatus) => Promise<string | null>;
+  statusBusy?: boolean;
 }) {
-  const [breakError, setBreakError] = React.useState<string | null>(null);
+  const [statusError, setStatusError] = React.useState<string | null>(null);
   const people = rsvp.people ?? [];
-  const groups: PeopleGroup[] = ['yes', 'maybe', 'no', 'none', 'break'];
-  const toggleBreak = async (p: TrainingRsvpPerson) => {
-    if (!onToggleBreak) return;
-    setBreakError(null);
-    setBreakError(await onToggleBreak(p.user_id, !p.on_break));
+  const groups: PeopleGroup[] = ['yes', 'maybe', 'no', 'none', 'break', 'not_training'];
+  const setStatus = async (p: TrainingRsvpPerson, status: PersonStatus) => {
+    if (!onSetStatus) return;
+    setStatusError(null);
+    setStatusError(await onSetStatus(p, status));
   };
   if (people.length === 0) {
     return (
@@ -217,14 +227,14 @@ function RsvpPeopleList({
           <div key={g}>
             <div
               className="mb-1.5 text-[10px] font-extrabold uppercase tracking-[.08em]"
-              style={{ color: g === 'none' || g === 'break' ? 'var(--deep-text-mute)' : TONE[g].fg }}
+              style={{ color: g === 'none' || g === 'break' || g === 'not_training' ? 'var(--deep-text-mute)' : TONE[g].fg }}
             >
               {GROUP_TITLE[g]} · {rows.length}
             </div>
             <div className="flex flex-col gap-1">
               {rows.map((p) => (
                 <div
-                  key={p.user_id}
+                  key={rsvpPersonKey(p)}
                   className="flex items-center gap-2.5 px-2.5 py-1.5"
                   style={{ background: 'var(--deep-card-bg-row)', borderRadius: 'var(--deep-radius-row)' }}
                 >
@@ -233,37 +243,36 @@ function RsvpPeopleList({
                     <div dir="auto" className="truncate text-left text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
                       {p.name}
                     </div>
-                    {(p.note || p.set_by_coach || p.on_break || p.back_after_days != null) && (
+                    {(p.note || p.set_by_coach || p.on_break || p.not_training || p.back_after_days != null || p.user_id == null) && (
                       <div className="truncate text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                         {[
+                          p.user_id == null ? 'no account' : null,
                           p.note ? NOTE_LABEL[p.note] : null,
                           p.set_by_coach ? 'by coach' : null,
                           p.on_break && p.answer ? 'on break' : null,
+                          p.not_training && p.answer ? 'doesn’t train with us' : null,
                           p.back_after_days != null ? `back after ${formatBreakLength(p.back_after_days)}` : null,
                         ].filter(Boolean).join(' · ')}
                       </div>
                     )}
+                    {/* Статус — под именем, а не в ряду: в ряду на телефоне имени оставалось ~55px. */}
+                    {onSetStatus && (
+                      <div className="mt-1">
+                        <PersonStatusSelect
+                          compact
+                          value={statusOf(p)}
+                          disabled={statusBusy}
+                          name={p.name}
+                          onChange={(next) => { if (next !== 'inactive') void setStatus(p, next); }}
+                        />
+                      </div>
+                    )}
                   </div>
-                  {onToggleBreak && (
-                    <button
-                      type="button"
-                      disabled={breakBusy}
-                      aria-pressed={!!p.on_break}
-                      onClick={() => { void toggleBreak(p); }}
-                      title={p.on_break ? 'End the break' : 'Put on break (not counted until back)'}
-                      className="hp-mono h-7 w-8 cursor-pointer rounded-[8px] border text-[12px] font-extrabold disabled:opacity-50"
-                      style={p.on_break
-                        ? { background: 'var(--deep-gold-bar)', borderColor: 'var(--deep-gold-bar)', color: 'var(--deep-accent-ink)' }
-                        : { background: 'var(--deep-card-bg)', borderColor: 'var(--deep-card-border)', color: 'var(--deep-text-mute)' }}
-                    >
-                      ⏸
-                    </button>
-                  )}
                   <RsvpButtons
                     size="compact"
                     current={p.answer}
                     disabled={disabled}
-                    onAnswer={(next) => onAnswerFor(p.user_id, next)}
+                    onAnswer={(next) => onAnswerFor(p, next)}
                   />
                 </div>
               ))}
@@ -271,8 +280,8 @@ function RsvpPeopleList({
           </div>
         );
       })}
-      {breakError && (
-        <p className="m-0 text-[12px] font-extrabold" style={{ color: 'var(--deep-danger)' }} role="alert">{breakError}</p>
+      {statusError && (
+        <p className="m-0 text-[12px] font-extrabold" style={{ color: 'var(--deep-danger)' }} role="alert">{statusError}</p>
       )}
     </div>
   );

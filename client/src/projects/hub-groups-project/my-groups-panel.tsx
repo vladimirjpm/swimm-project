@@ -398,6 +398,8 @@ function AddPrivateSwimmerForm({ onAdd }: { onAdd: (input: PrivateSwimmerInput) 
  *   · пришедшие из подписки на клуб — свёрнутым списком с поиском (их бывает 150+) и «Hide»
  *     вместо ✕: удалённого клубного вернула бы следующая пересборка;
  *   · скрытые владельцем — отдельно, с «Restore».
+ * Ручной пловец и пловец группы (Р71) уходят в «Inactive» (Deactivate, Р74 — 30.09.2026): из
+ * состава, дорожек и рекордов группы, Restore возвращает; удалить насовсем — оттуда.
  */
 function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
   hubGroupId: number;
@@ -430,8 +432,9 @@ function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
   const manual = edit.data.members.filter((m) => m.source !== 'club' && !m.isExcluded);
   const fromClub = edit.data.members.filter((m) => m.source === 'club' && !m.isExcluded);
   const hidden = edit.data.members.filter((m) => m.source === 'club' && m.isExcluded);
-  // Неактивные пловцы группы (Р71): вне состава и дорожек, времена целы — отсюда Restore.
-  const inactive = edit.data.members.filter((m) => m.source === 'private' && m.isExcluded);
+  // Неактивные — пловцы группы (Р71) и ручные (Р74): вне состава и дорожек, времена целы —
+  // отсюда Restore и удаление насовсем.
+  const inactive = edit.data.members.filter((m) => m.source !== 'club' && m.isExcluded);
 
   const filter = clubFilter.trim().toLowerCase();
   const fromClubShown = filter.length === 0
@@ -450,15 +453,13 @@ function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {manual.map((m) => (
           <MemberLine key={m.id} m={m} edit={edit}
-            action={m.isPrivate
-              ? (
-                <button type="button" className={btnCls}
-                  title="Take off the roster and lanes — training times are kept, restore any time"
-                  onClick={() => edit.setMemberExcluded(m.id, true)}>
-                  Deactivate
-                </button>
-              )
-              : <button type="button" className={btnDangerCls} onClick={() => edit.removeMember(m.id)}>✕</button>} />
+            action={(
+              <button type="button" className={btnCls}
+                title="Take off the roster, lanes and group records — times are kept, restore any time"
+                onClick={() => edit.setMemberExcluded(m.id, true)}>
+                Deactivate
+              </button>
+            )} />
         ))}
         {edit.data.members.length === 0 && (
           <p className="text-[12.5px] text-[var(--t-text-2)]">The roster is empty.</p>
@@ -510,7 +511,15 @@ function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
                       <button type="button" className={btnCls} onClick={() => edit.setMemberExcluded(m.id, false)}>
                         Restore
                       </button>
-                      <RemovePrivateSwimmerButton onConfirm={() => edit.removeMember(m.id)} />
+                      {m.isPrivate
+                        ? <RemovePrivateSwimmerButton onConfirm={() => edit.removeMember(m.id)} />
+                        // Пловец из loglig остаётся в справочнике — убираем только строку группы.
+                        : (
+                          <button type="button" className={btnDangerCls} title="Remove from the group for good"
+                            onClick={() => edit.removeMember(m.id)}>
+                            ✕
+                          </button>
+                        )}
                     </span>
                   )} />
               ))}

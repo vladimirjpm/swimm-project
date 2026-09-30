@@ -176,6 +176,10 @@ public class HubGroupClubSubscriptionTests
     [InlineData("club", false, "club", true, "club", true)]      // обе клубные — скрыта, если хоть одна
     [InlineData("club", false, "club", false, "club", false)]
     [InlineData("manual", false, "manual", false, "manual", false)]
+    // Р74: ручная бывает «Inactive» — видимость берётся у ручных.
+    [InlineData("manual", true, "club", false, "manual", true)]
+    [InlineData("manual", true, "manual", false, "manual", false)] // хоть одна ручная активна — видим
+    [InlineData("manual", true, "manual", true, "manual", true)]
     public void MergeRows_ManualWins_ExcludedIfEitherClub(
         string aSource, bool aExcluded, string bSource, bool bExcluded, string source, bool excluded)
     {
@@ -483,18 +487,29 @@ public class HubGroupClubSubscriptionTests
     }
 
     [Fact]
-    public async Task SetExcluded_ManualRow_Refused()
+    public async Task SetExcluded_ManualRow_IsInactive_SyncLeavesIt_RestoreBringsBack()
     {
-        await using var db = CreateDb(nameof(SetExcluded_ManualRow_Refused));
+        // Р74 (Влад, 30.09.2026): ручного делают «Inactive» — строка скрыта, Restore вернёт.
+        // Пересборка по клубу ручных не трогает — ни скрытых, ни видимых.
+        await using var db = CreateDb(nameof(SetExcluded_ManualRow_IsInactive_SyncLeavesIt_RestoreBringsBack));
         var w = await SeedWorldAsync(db);
         var s = await SwimmerAsync(db, w, "S", w.B, CurrentSeason);
         await Core(db).AddMemberAsync(w.Group.Id, s.Id, "member");
         var row = await RowOfAsync(db, w.Group.Id, s);
+        db.HubGroupBreaks.Add(new HubGroupBreak { HubGroupId = w.Group.Id, SwimmerId = s.Id, Kind = HubGroupBreakKind.NotTraining });
+        await db.SaveChangesAsync();
 
-        var result = await Service(db).SetExcludedAsync(w.Group.Id, row.Id, true);
+        var hidden = await Service(db).SetExcludedBySwimmerAsync(w.Group.Id, s.Id, true);
 
-        Assert.False(result.Success);
+        Assert.True(hidden.Success);
+        var after = await RowOfAsync(db, w.Group.Id, s);
+        Assert.Equal((HubGroupMemberSource.Manual, true), (after.Source, after.IsExcluded));
+        // Статус один: Inactive закрывает «не тренируется».
+        Assert.NotNull((await db.HubGroupBreaks.SingleAsync()).EndedAt);
+
+        Assert.True((await Service(db).SetExcludedAsync(w.Group.Id, row.Id, false)).Success);
         Assert.False((await RowOfAsync(db, w.Group.Id, s)).IsExcluded);
+        Assert.False((await Service(db).SetExcludedBySwimmerAsync(w.Group.Id, 999999, true)).Success);
     }
 
     [Fact]

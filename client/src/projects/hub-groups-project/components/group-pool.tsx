@@ -96,7 +96,12 @@ function LaneRow({
       >
         {label}
       </span>
-      {shown.map((p, i) => <PoolCircle key={p.user_id ?? `hidden-${i}`} p={p} />)}
+      {shown.map((p, i) => (
+        <PoolCircle
+          key={p.user_id != null ? `u${p.user_id}` : p.swimmer_id != null ? `s${p.swimmer_id}` : `hidden-${i}`}
+          p={p}
+        />
+      ))}
       {rest > 0 && (
         <span
           className="hp-mono flex h-[26px] min-w-[26px] flex-none items-center justify-center rounded-full px-1 text-[10px] font-extrabold"

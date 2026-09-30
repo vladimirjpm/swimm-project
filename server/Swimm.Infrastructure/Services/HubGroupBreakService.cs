@@ -10,7 +10,8 @@ using Swimm.Infrastructure.Data;
 namespace Swimm.Infrastructure.Services;
 
 /// <summary>
-/// Флаг «On break» (<see cref="IHubGroupBreakService"/>, Ш3.1). Пишет и читает через
+/// Статус человека в группе (<see cref="IHubGroupBreakService"/>): «On break» (Ш3.1) и
+/// «Doesn't train with us» (Р74) — одна строка на человека, вид в <c>Kind</c>. Пишет и читает через
 /// <see cref="SwimmDbContext"/>: таблица — <c>Sys_</c>, роль swimm_ro её не видит. Без кэша.
 /// </summary>
 public class HubGroupBreakService : IHubGroupBreakService
@@ -18,6 +19,9 @@ public class HubGroupBreakService : IHubGroupBreakService
     private readonly SwimmDbContext _db;
 
     public HubGroupBreakService(SwimmDbContext db) => _db = db;
+
+    /// <summary>Статус «в строю» — строки нет (открытая закрывается).</summary>
+    private const string StatusActive = "active";
 
     private static DateOnly Today(DateTime nowUtc) => DateOnly.FromDateTime(IsraelTime.ToLocal(nowUtc));
 
@@ -29,19 +33,36 @@ public class HubGroupBreakService : IHubGroupBreakService
         var mine = await _db.HubGroupBreaks.AsNoTracking()
             .Where(b => b.HubGroupId == hubGroupId && b.UserId == viewerUserId
                         && b.EndedAt == null && (b.Until == null || b.Until >= today))
-            .Select(b => new { b.UserId, b.SwimmerId, b.Since, b.Until, b.SetByUserId, b.EndedAt, b.EndedByRsvp, Name = b.User!.DisplayName })
+            .Select(b => new { b.UserId, b.SwimmerId, b.Since, b.Until, b.SetByUserId, b.EndedAt, b.EndedByRsvp, b.Kind, Name = b.User!.DisplayName })
             .FirstOrDefaultAsync();
 
         var dto = new HubGroupBreaksDto
         {
-            Mine = mine == null ? null : ToDto(mine.UserId, mine.SwimmerId, mine.Name, mine.Since, mine.Until, mine.SetByUserId, null),
+            Mine = mine == null ? null : ToDto(mine.UserId, mine.SwimmerId, mine.Name, mine.Since, mine.Until, mine.SetByUserId, null, mine.Kind),
             CanManage = isManager,
         };
+
+        // «Не тренируется с группой» — всем, кто видит группу изнутри (Р74): пометка в Following.
+        var notTraining = await _db.HubGroupBreaks.AsNoTracking()
+            .Where(b => b.HubGroupId == hubGroupId && b.EndedAt == null && b.Kind == HubGroupBreakKind.NotTraining)
+            .Select(b => new
+            {
+                b.UserId, b.SwimmerId, b.Since, b.SetByUserId,
+                UserName = b.User != null ? b.User.DisplayName : null,
+                SwimmerName = b.Swimmer != null ? (b.Swimmer.LastName + " " + b.Swimmer.FirstName).Trim() : null,
+                SwimmerNameEn = b.Swimmer != null ? (b.Swimmer.LastNameEn + " " + b.Swimmer.FirstNameEn).Trim() : null,
+            })
+            .ToListAsync();
+        dto.NotTraining = notTraining
+            .Select(r => ToDto(r.UserId, r.SwimmerId, NameOf(r.UserName, r.SwimmerName, r.SwimmerNameEn),
+                r.Since, null, r.SetByUserId, null, HubGroupBreakKind.NotTraining))
+            .OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
         if (!isManager) return dto;
 
         var since = now.AddDays(-HubGroupBreakRules.BackMarkerDays);
         var rows = await _db.HubGroupBreaks.AsNoTracking()
-            .Where(b => b.HubGroupId == hubGroupId
+            .Where(b => b.HubGroupId == hubGroupId && b.Kind == HubGroupBreakKind.Break
                         && ((b.EndedAt == null && (b.Until == null || b.Until >= today))
                             || (b.EndedByRsvp && b.EndedAt >= since)))
             .Select(b => new
@@ -52,9 +73,6 @@ public class HubGroupBreakService : IHubGroupBreakService
                 SwimmerNameEn = b.Swimmer != null ? (b.Swimmer.LastNameEn + " " + b.Swimmer.FirstNameEn).Trim() : null,
             })
             .ToListAsync();
-
-        string NameOf(string? user, string? he, string? en) =>
-            user ?? (!string.IsNullOrEmpty(he) ? he : en) ?? "";
 
         dto.Breaks = rows
             .Where(r => r.EndedAt == null)
@@ -73,9 +91,13 @@ public class HubGroupBreakService : IHubGroupBreakService
         return dto;
     }
 
+    private static string NameOf(string? user, string? he, string? en) =>
+        user ?? (!string.IsNullOrEmpty(he) ? he : en) ?? "";
+
     private static HubGroupBreakDto ToDto(int? userId, int? swimmerId, string name, DateTime since,
-        DateOnly? until, int? setBy, int? backAfterDays) => new()
+        DateOnly? until, int? setBy, int? backAfterDays, string kind = HubGroupBreakKind.Break) => new()
     {
+        Kind = kind,
         UserId = userId,
         SwimmerId = swimmerId,
         Name = name,
@@ -94,6 +116,14 @@ public class HubGroupBreakService : IHubGroupBreakService
 
         if (input.UserId != null && input.SwimmerId != null)
             return HubGroupBreakSaveResult.Fail(400, "Pick a member or a swimmer, not both.");
+
+        // Статус (Р74): active / break / not_training; без него — старый флаг on_break.
+        var status = input.Status?.Trim().ToLowerInvariant() ?? (input.OnBreak ? HubGroupBreakKind.Break : StatusActive);
+        if (status != StatusActive && !HubGroupBreakKind.All.Contains(status))
+            return HubGroupBreakSaveResult.Fail(400, "Status must be active, break or not_training.");
+        // «Не тренируется с группой» ставит только тренер (решение Влада 30.09.2026) — и бессрочно.
+        if (status == HubGroupBreakKind.NotTraining && !isManager)
+            return HubGroupBreakSaveResult.Fail(403, "Only the group coach can mark someone as not training with the group.");
 
         DateOnly? until = null;
         if (!string.IsNullOrWhiteSpace(input.Until))
@@ -134,24 +164,33 @@ public class HubGroupBreakService : IHubGroupBreakService
 
         var open = await subject.FirstOrDefaultAsync(b => b.EndedAt == null);
 
-        if (!input.OnBreak)
+        if (status == StatusActive)
         {
             if (open != null) open.EndedAt = now;
         }
         else
         {
-            var invalid = HubGroupBreakRules.ValidateUntil(until, today, bySelf: !isManager);
-            if (invalid != null) return HubGroupBreakSaveResult.Fail(400, invalid);
+            if (status == HubGroupBreakKind.NotTraining)
+            {
+                until = null;
+            }
+            else
+            {
+                var invalid = HubGroupBreakRules.ValidateUntil(until, today, bySelf: !isManager);
+                if (invalid != null) return HubGroupBreakSaveResult.Fail(400, invalid);
+            }
 
             if (open == null)
             {
                 open = new HubGroupBreak { HubGroupId = hubGroupId, UserId = userId, SwimmerId = swimmerId };
                 _db.HubGroupBreaks.Add(open);
             }
-            // Истёкшую открытую строку переиспользуем как новый перерыв: закрывать её и вставлять
-            // рядом новую в одном SaveChanges — риск наступить на частичный UNIQUE.
-            if (open.Id == 0 || !HubGroupBreakRules.IsActive(open.EndedAt, open.Until, today))
+            // Истёкшую открытую строку (и строку другого вида — статус сменился) переиспользуем как
+            // новую: закрывать её и вставлять рядом новую в одном SaveChanges — риск наступить на
+            // частичный UNIQUE. Новый статус — новый отсчёт «с какого дня».
+            if (open.Id == 0 || open.Kind != status || !HubGroupBreakRules.IsActive(open.EndedAt, open.Until, today))
                 open.Since = now;
+            open.Kind = status;
             open.Until = until;
             open.EndedByRsvp = false;
             open.SetByUserId = actorUserId;

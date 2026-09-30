@@ -42,8 +42,12 @@ public interface IHubGroupClubSubscriptionService
     Task<HubGroupClubSyncResult> SyncAllAsync();
 
     /// <summary>
-    /// Скрыть / вернуть клубного пловца. Скрытый остаётся строкой — пересборка его не
-    /// возвращает, — но ни один читатель состава его не видит. Ручного скрыть нельзя.
+    /// Скрыть / вернуть пловца состава («Inactive» / Restore). Скрытый остаётся строкой —
+    /// пересборка его не возвращает, — но ни один читатель состава его не видит. Любой вид строки
+    /// (Р74): клубный, ручной, пловец группы. Скрытие закрывает его «On break» / «Doesn't train».
     /// </summary>
     Task<HubGroupMemberSaveResult> SetExcludedAsync(int hubGroupId, int memberId, bool excluded);
+
+    /// <summary>То же по пловцу — для выпадашки статуса в Following (там нет id строки состава).</summary>
+    Task<HubGroupMemberSaveResult> SetExcludedBySwimmerAsync(int hubGroupId, int swimmerId, bool excluded);
 }

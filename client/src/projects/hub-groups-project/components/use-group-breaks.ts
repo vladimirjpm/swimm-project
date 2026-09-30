@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { HubGroupBreaks } from '../types';
+import type { BreakInput, HubGroupBreaks } from '../types';
 import { lanePlansApi } from './lane-plans-api';
 
 /**
@@ -24,9 +24,7 @@ export function useGroupBreaks(groupId: number, enabled: boolean, onChanged?: ()
   }, [groupId, enabled]);
 
   /** Возвращает текст ошибки сервера или null. */
-  const setBreak = useCallback(async (
-    input: { on_break: boolean; until?: string | null; user_id?: number | null; swimmer_id?: number | null },
-  ): Promise<string | null> => {
+  const setBreak = useCallback(async (input: BreakInput): Promise<string | null> => {
     setBusy(true);
     const r = await lanePlansApi.setBreak(groupId, input);
     setBusy(false);

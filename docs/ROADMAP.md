@@ -453,6 +453,12 @@ Razor + Tailwind, Competitions/Categories CRUD, фоновый импорт.)
   [`plans/entity-hero-roles-plan.md`](plans/entity-hero-roles-plan.md).
   Дополнено 29.09 в том же PR #100: **пловцы группы** — человек без аккаунта и без loglig,
   которого заводит тренер, виден только своей группе (Р71; Deactivate вместо удаления);
+  за него «иду / не приду» ставит тренер — он в полосе, списке и на дорожках (Р73);
+  **тренировки кнопкой** (30.09, Е1 [plans/group-events-media-plan.md](plans/group-events-media-plan.md)):
+  тренер заводит тренировку и без времён («подводная съёмка»); ссылки к ней добавляют и
+  участники (Е2, группа может поставить «только тренер»); экран — карточка «Trainings & videos»
+  в табе Trainings → Sessions (Е3); **статус человека в группе** (30.09, Р74): Active / On break /
+  Doesn't train with us / Inactive одной выпадашкой в Following и «кто идёт»;
   **пара-очки** не считаются очками FINA (Р67–Р68); **скан качества** сам после импорта,
   помеченные вне Best swim / High Point (Р69–Р70). Передача — plans/entity-hero-roles-handoff.md.
 

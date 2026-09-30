@@ -9,9 +9,7 @@ import UI_PullBuoyIcon from '../../components/mix/pull-buoy-icon/pull-buoy-icon'
 import UI_FinsIcon from '../../components/mix/fins-icon/fins-icon';
 import UI_NormativeLevelIcon from '../../components/mix/normative-level-icon/normative-level-icon';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
-import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
-import { GalleryItem, TrainingMediaItem } from '../../../utils/interfaces/results';
-import { HelperMedia } from '../../../utils/helpers';
+import TrainingMediaStrip from './training-media-strip';
 
 interface Props {
   results: Result[];
@@ -34,63 +32,6 @@ const prettyDate = (d?: string) => {
   return `${dd} ${MONTHS[(Number(mm) || 1) - 1]} ${yy ?? ''}`.trim();
 };
 
-function MediaStripTile({ item, onClick }: { item: TrainingMediaItem; onClick?: () => void }) {
-  if (item.media_type === 'album') {
-    return (
-      <a href={item.url} target="_blank" rel="noopener noreferrer" className="tbs-media-tile tbs-media-album">
-        <span>📂 {item.caption || 'Album'} ↗</span>
-      </a>
-    );
-  }
-
-  const thumbUrl = HelperMedia.resolveThumbUrl(item.media_type, item.source_type, item.url);
-
-  return (
-    <div className="tbs-media-tile" onClick={onClick}>
-      {thumbUrl ? <img loading="lazy" src={thumbUrl} referrerPolicy="no-referrer" alt="" /> : <span className="tbs-media-fallback">🎬</span>}
-      {item.media_type === 'video' && <span className="tbs-media-play">▶</span>}
-      {item.caption && <span className="tbs-media-caption">{item.caption}</span>}
-    </div>
-  );
-}
-
-/** Медиа-лента тренировки под сводкой сессии: тайлы + ОДИН лайтбокс на полосу. */
-function TrainingMediaStrip({ media }: { media: TrainingMediaItem[] }) {
-  const [openIndex, setOpenIndex] = React.useState<number | null>(null);
-
-  // album в лайтбокс не попадает — массив и карта индексов считаются один раз на media.
-  const { lightboxGalleryItems, indexById } = useMemo(() => {
-    const lightboxItems = media.filter((m) => m.media_type !== 'album');
-    return {
-      lightboxGalleryItems: lightboxItems.map((m): GalleryItem => ({
-        type: m.media_type === 'video' ? 'video' : 'image',
-        sourceType: m.source_type === 'album' ? undefined : (m.source_type as GalleryItem['sourceType']),
-        url: m.url,
-      })),
-      indexById: new Map(lightboxItems.map((m, i) => [m.id, i])),
-    };
-  }, [media]);
-
-  if (media.length === 0) return null;
-
-  return (
-    <div className="tbs-media-strip">
-      {media.map((item) => (
-        <MediaStripTile
-          key={item.id}
-          item={item}
-          onClick={item.media_type === 'album' ? undefined : () => setOpenIndex(indexById.get(item.id) ?? 0)}
-        />
-      ))}
-      <UI_SwimmerGallery
-        gallery={lightboxGalleryItems}
-        openIndex={openIndex}
-        onClose={() => setOpenIndex(null)}
-      />
-    </div>
-  );
-}
-
 const swimmerName = (r: Result) =>
   `${r.first_name ?? ''}${r.last_name ? ' ' + r.last_name : ''}`.trim() ||
   `${r.first_name_en ?? ''} ${r.last_name_en ?? ''}`.trim();
@@ -102,7 +43,9 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
   const sessions = useMemo(() => {
     const map = new Map<string, Result[]>();
     for (const r of results) {
-      const id = String(r?.training?.trainingId ?? 'na');
+      // По настоящему id сессии: у заведённых кнопкой (Е1) ключ источника нечисловой, и по
+      // trainingId (= 0 у них) все такие тренировки слиплись бы в одну.
+      const id = String(r?.training?.sessionId ?? r?.training?.trainingId ?? 'na');
       if (!map.has(id)) map.set(id, []);
       map.get(id)!.push(r);
     }

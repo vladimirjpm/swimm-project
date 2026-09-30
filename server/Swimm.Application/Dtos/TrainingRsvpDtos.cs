@@ -34,8 +34,9 @@ public sealed class TrainingRsvpDto
     public int No { get; set; }
 
     /// <summary>
-    /// Знаменатель полосы: активные участники-аккаунты, кроме тех, кто на перерыве и не ответил
-    /// (Ш3.1 — «On break» не висит вечным «нет ответа»). Остаток — «нет ответа».
+    /// Знаменатель полосы: активные участники-аккаунты и активные пловцы группы без аккаунта
+    /// (Р73), кроме тех, кто на перерыве и не ответил (Ш3.1 — «On break» не висит вечным «нет
+    /// ответа»). Остаток — «нет ответа».
     /// </summary>
     [JsonPropertyName("total")]
     public int Total { get; set; }
@@ -59,6 +60,10 @@ public sealed class TrainingRsvpDto
     /// <summary>Зритель на перерыве в день занятия (Ш3.1): ответ «Going» его снимет.</summary>
     [JsonPropertyName("on_break")]
     public bool OnBreak { get; set; }
+
+    /// <summary>Зритель «не тренируется с группой» (Р74): ответить может, статус ответ не снимает.</summary>
+    [JsonPropertyName("not_training")]
+    public bool NotTraining { get; set; }
 
     /// <summary>Последний день перерыва зрителя yyyy-MM-dd; null — бессрочно или не на перерыве.</summary>
     [JsonPropertyName("break_until")]
@@ -92,12 +97,20 @@ public sealed class TrainingRsvpMineDto
     public bool SetByCoach { get; set; }
 }
 
+/// <summary>
+/// Человек в списке тренера: участник-аккаунт (<see cref="UserId"/>) или пловец группы без
+/// аккаунта (<see cref="SwimmerId"/>, Р73) — ровно одно из двух.
+/// </summary>
 public sealed class TrainingRsvpPersonDto
 {
     [JsonPropertyName("user_id")]
-    public int UserId { get; set; }
+    public int? UserId { get; set; }
 
-    /// <summary>Имя аккаунта (как в списке участников группы).</summary>
+    /// <summary>Пловец группы (Р71), за которого отвечает тренер; null — это аккаунт.</summary>
+    [JsonPropertyName("swimmer_id")]
+    public int? SwimmerId { get; set; }
+
+    /// <summary>Имя аккаунта (как в списке участников группы) или пловца группы (иврит по умолчанию).</summary>
     [JsonPropertyName("name")]
     public string Name { get; set; } = "";
 
@@ -118,6 +131,10 @@ public sealed class TrainingRsvpPersonDto
     /// <summary>На перерыве в день занятия (Ш3.1).</summary>
     [JsonPropertyName("on_break")]
     public bool OnBreak { get; set; }
+
+    /// <summary>«Не тренируется с группой» (Р74): в знаменатель не входит, пока не ответит.</summary>
+    [JsonPropertyName("not_training")]
+    public bool NotTraining { get; set; }
 
     /// <summary>Сам вернулся с перерыва недавно — сколько дней был на нём («back after …»).</summary>
     [JsonPropertyName("back_after_days")]
@@ -215,6 +232,13 @@ public sealed class TrainingRsvpInputDto
     /// <summary>За кого отвечаем; null — за себя. Чужой — только управляющему.</summary>
     [JsonPropertyName("user_id")]
     public int? UserId { get; set; }
+
+    /// <summary>
+    /// Ответ за пловца группы без аккаунта (Р73) — только управляющему; вместе с
+    /// <see cref="UserId"/> нельзя.
+    /// </summary>
+    [JsonPropertyName("swimmer_id")]
+    public int? SwimmerId { get; set; }
 }
 
 /// <summary>Итог записи ответа: либо новые ответы занятия, либо код отказа.</summary>

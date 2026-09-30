@@ -16,6 +16,13 @@ public sealed class HubGroupBreaksDto
     [JsonPropertyName("breaks")]
     public List<HubGroupBreakDto>? Breaks { get; set; }
 
+    /// <summary>
+    /// «Не тренируется с группой» (Р74) — и управляющему, и участнику: это не личное, как
+    /// перерыв, а «тренер-пловчиха с нами не плавает», пометка серым в Following.
+    /// </summary>
+    [JsonPropertyName("not_training")]
+    public List<HubGroupBreakDto> NotTraining { get; set; } = [];
+
     /// <summary>Вернулись сами (ответом «Going») за последние дни — только управляющему.</summary>
     [JsonPropertyName("returns")]
     public List<HubGroupBreakDto>? Returns { get; set; }
@@ -52,6 +59,10 @@ public sealed class HubGroupBreakDto
     /// <summary>Только у возвращений: сколько дней был на перерыве.</summary>
     [JsonPropertyName("back_after_days")]
     public int? BackAfterDays { get; set; }
+
+    /// <summary>break | not_training (<c>HubGroupBreakKind</c>).</summary>
+    [JsonPropertyName("kind")]
+    public string Kind { get; set; } = "break";
 }
 
 /// <summary>
@@ -66,9 +77,17 @@ public sealed class HubGroupBreakInputDto
     [JsonPropertyName("swimmer_id")]
     public int? SwimmerId { get; set; }
 
-    /// <summary>true — на перерыв, false — снять.</summary>
+    /// <summary>true — на перерыв, false — снять. Не читается, если задан <see cref="Status"/>.</summary>
     [JsonPropertyName("on_break")]
     public bool OnBreak { get; set; }
+
+    /// <summary>
+    /// Статус человека (Р74): <c>active</c> — снять флаг, <c>break</c> — перерыв,
+    /// <c>not_training</c> — «не тренируется с группой» (только управляющему, бессрочно).
+    /// null — по <see cref="OnBreak"/>, как раньше.
+    /// </summary>
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
 
     /// <summary>yyyy-MM-dd — последний день перерыва; null — бессрочно (только тренеру).</summary>
     [JsonPropertyName("until")]

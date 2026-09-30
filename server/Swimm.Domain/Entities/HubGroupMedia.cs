@@ -70,7 +70,12 @@ public class HubGroupMedia
     [MaxLength(200)]
     public string? Caption { get; set; }
 
-    public int CreatedByUserId { get; set; }
+    /// <summary>
+    /// Кто добавил: управляющий или (у тренировки, Е2 group-events-media-plan) участник — автор
+    /// удаляет своё. null — аккаунт удалён (SetNull): ссылка группы остаётся, удалить её может
+    /// управляющий.
+    /// </summary>
+    public int? CreatedByUserId { get; set; }
 
     [ForeignKey(nameof(CreatedByUserId))]
     public AppUser? CreatedByUser { get; set; }

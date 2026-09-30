@@ -308,7 +308,148 @@ public class TrainingRsvpTests
         Assert.True(result.Success);
         Assert.Equal(
             [(s.Anna, today.AddDays(-3)), (s.Boris, today.AddDays(3))],
-            db.HubGroupTrainingRsvps.OrderBy(r => r.UserId).Select(r => new ValueTuple<int, DateOnly>(r.UserId, r.SessionDate)));
+            db.HubGroupTrainingRsvps.OrderBy(r => r.UserId).Select(r => new ValueTuple<int, DateOnly>(r.UserId!.Value, r.SessionDate)));
+    }
+
+    // ── Пловец группы без аккаунта (Р73) ────────────────────────────────────
+
+    /// <summary>Пловец группы (Р71) «Gal» в составе — Source = private, аккаунта у него нет.</summary>
+    private static async Task<(int SwimmerId, int MemberId)> AddGroupSwimmerAsync(SwimmDbContext db, int groupId,
+        string first = "Gal", bool excluded = false)
+    {
+        var swimmer = new Swimmer { LastName = "G", FirstName = first, Gender = "male", BirthYear = 1985, PrivateHubGroupId = groupId };
+        var member = new HubGroupMember
+        {
+            HubGroupId = groupId, Swimmer = swimmer, Role = "member", Source = HubGroupMemberSource.Private, IsExcluded = excluded,
+        };
+        db.HubGroupMembers.Add(member);
+        await db.SaveChangesAsync();
+        return (swimmer.Id, member.Id);
+    }
+
+    private static TrainingRsvpInputDto ForSwimmer(string? answer, int swimmerId, string? note = null) =>
+        new() { Answer = answer, Note = note, SwimmerId = swimmerId };
+
+    [Fact]
+    public async Task Coach_AnswersForGroupSwimmer_CountedInBarListAndPool()
+    {
+        await using var db = CreateDb(nameof(Coach_AnswersForGroupSwimmer_CountedInBarListAndPool));
+        var s = await SeedAsync(db);
+        var (gal, _) = await AddGroupSwimmerAsync(db, s.GroupId);
+        var service = new TrainingRsvpService(db);
+
+        var before = await service.GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon);
+        Assert.Equal(4, before!.Total);                                   // 3 аккаунта + пловец группы
+        Assert.Contains(before.People!, p => p.SwimmerId == gal && p.UserId == null && p.Answer == null);
+
+        var result = await service.SetAsync(s.GroupId, TueKey, s.Coach, true, ForSwimmer("yes", gal, "late"), MondayNoon);
+
+        var dto = result.Rsvp!;
+        Assert.Equal((1, 4), (dto.Yes, dto.Total));
+        var row = dto.People!.Single(p => p.SwimmerId == gal);
+        Assert.Equal(("G Gal", "yes", "late", "male", false), (row.Name, row.Answer, row.Note, row.Gender, row.SetByCoach));
+        var stored = await db.HubGroupTrainingRsvps.SingleAsync();
+        Assert.Equal((null, gal, s.Coach), (stored.UserId, stored.SwimmerId, stored.SetByUserId));
+
+        // Участник видит его в бассейне: имя пловца, кружок не свой.
+        var anna = await service.GetAsync(s.GroupId, TueKey, s.Anna, false, MondayNoon);
+        var inPool = anna!.LaneView!.Lanes.SelectMany(l => l.People).Concat(anna.LaneView.NoLane).Single();
+        Assert.Equal((null, gal, "G Gal", false), (inPool.UserId, inPool.SwimmerId, inPool.Name, inPool.IsMe));
+        Assert.Equal(1, anna.Yes);
+
+        // Повторный тап снимает ответ.
+        var cleared = await service.SetAsync(s.GroupId, TueKey, s.Coach, true, ForSwimmer(null, gal), MondayNoon);
+        Assert.Equal(0, cleared.Rsvp!.Yes);
+        Assert.Empty(db.HubGroupTrainingRsvps);
+    }
+
+    [Fact]
+    public async Task ForGroupSwimmer_OnlyTheCoach_OnlyActiveSwimmersOfThisGroup()
+    {
+        await using var db = CreateDb(nameof(ForGroupSwimmer_OnlyTheCoach_OnlyActiveSwimmersOfThisGroup));
+        var s = await SeedAsync(db);
+        var (gal, _) = await AddGroupSwimmerAsync(db, s.GroupId);
+        var (inactive, _) = await AddGroupSwimmerAsync(db, s.GroupId, "Old", excluded: true);
+        var annaSwimmer = await db.HubGroupUserMembers.Where(m => m.UserId == s.Anna).Select(m => m.SwimmerId!.Value).SingleAsync();
+        var service = new TrainingRsvpService(db);
+
+        var byMember = await service.SetAsync(s.GroupId, TueKey, s.Anna, false, ForSwimmer("yes", gal), MondayNoon);
+        var both = await service.SetAsync(s.GroupId, TueKey, s.Coach, true,
+            new TrainingRsvpInputDto { Answer = "yes", UserId = s.Anna, SwimmerId = gal }, MondayNoon);
+        var forInactive = await service.SetAsync(s.GroupId, TueKey, s.Coach, true, ForSwimmer("yes", inactive), MondayNoon);
+        // Обычный пловец (не пловец группы) — за него отвечает его аккаунт.
+        var forLoglig = await service.SetAsync(s.GroupId, TueKey, s.Coach, true, ForSwimmer("yes", annaSwimmer), MondayNoon);
+
+        Assert.Equal(403, byMember.Status);
+        Assert.Equal(400, both.Status);
+        Assert.Equal(400, forInactive.Status);
+        Assert.Equal(400, forLoglig.Status);
+        Assert.Empty(db.HubGroupTrainingRsvps);
+
+        var dto = await service.GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon);
+        Assert.DoesNotContain(dto!.People!, p => p.SwimmerId == inactive);
+        Assert.Equal(4, dto.Total);
+    }
+
+    [Fact]
+    public async Task GroupSwimmerClaimedByAMember_AnswersThroughTheAccount_NotTwice()
+    {
+        await using var db = CreateDb(nameof(GroupSwimmerClaimedByAMember_AnswersThroughTheAccount_NotTwice));
+        var s = await SeedAsync(db);
+        var (gal, _) = await AddGroupSwimmerAsync(db, s.GroupId);
+        // Тренер пометил Веру этим пловцом — теперь это один человек.
+        var vera = await db.HubGroupUserMembers.SingleAsync(m => m.UserId == s.Vera);
+        vera.SwimmerId = gal;
+        await db.SaveChangesAsync();
+        var service = new TrainingRsvpService(db);
+
+        var forSwimmer = await service.SetAsync(s.GroupId, TueKey, s.Coach, true, ForSwimmer("yes", gal), MondayNoon);
+        var dto = await service.GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon);
+
+        Assert.Equal(400, forSwimmer.Status);
+        Assert.Equal(3, dto!.Total);
+        Assert.DoesNotContain(dto.People!, p => p.SwimmerId != null);
+    }
+
+    [Fact]
+    public async Task GroupSwimmer_OnBreak_NotInTotal_GoingEndsTheBreak()
+    {
+        await using var db = CreateDb(nameof(GroupSwimmer_OnBreak_NotInTotal_GoingEndsTheBreak));
+        var s = await SeedAsync(db);
+        var (gal, _) = await AddGroupSwimmerAsync(db, s.GroupId);
+        db.HubGroupBreaks.Add(new HubGroupBreak { HubGroupId = s.GroupId, SwimmerId = gal, Since = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) });
+        await db.SaveChangesAsync();
+        var service = new TrainingRsvpService(db);
+
+        var before = await service.GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon);
+        Assert.Equal(3, before!.Total);
+        Assert.True(before.People!.Single(p => p.SwimmerId == gal).OnBreak);
+
+        var after = await service.SetAsync(s.GroupId, TueKey, s.Coach, true, ForSwimmer("yes", gal), MondayNoon);
+
+        Assert.Equal(4, after.Rsvp!.Total);
+        var ended = await db.HubGroupBreaks.SingleAsync();
+        Assert.NotNull(ended.EndedAt);
+        Assert.True(ended.EndedByRsvp);
+    }
+
+    [Fact]
+    public async Task DeactivatingGroupSwimmer_DropsUpcomingAnswers_KeepsPastOnes()
+    {
+        await using var db = CreateDb(nameof(DeactivatingGroupSwimmer_DropsUpcomingAnswers_KeepsPastOnes));
+        var s = await SeedAsync(db);
+        var (gal, memberId) = await AddGroupSwimmerAsync(db, s.GroupId);
+        var today = DateOnly.FromDateTime(IsraelTimeNow());
+        db.HubGroupTrainingRsvps.AddRange(
+            new HubGroupTrainingRsvp { HubGroupId = s.GroupId, SessionDate = today.AddDays(3), SessionStart = "20:00", SwimmerId = gal, Answer = "yes" },
+            new HubGroupTrainingRsvp { HubGroupId = s.GroupId, SessionDate = today.AddDays(-3), SessionStart = "20:00", SwimmerId = gal, Answer = "yes" });
+        await db.SaveChangesAsync();
+
+        var result = await new HubGroupClubSubscriptionService(db, new HubGroupCrudCore(db))
+            .SetExcludedAsync(s.GroupId, memberId, excluded: true);
+
+        Assert.True(result.Success);
+        Assert.Equal([today.AddDays(-3)], db.HubGroupTrainingRsvps.Select(r => r.SessionDate));
     }
 
     private static DateTime IsraelTimeNow() => Swimm.Application.Constants.IsraelTime.ToLocal(DateTime.UtcNow);

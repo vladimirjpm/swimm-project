@@ -237,7 +237,10 @@ function GroupPage({ slug }: { slug: string }) {
       sub: real && manages ? `${group.members.length} · levels` : `${group.members.length} swimmers`,
       editable: real && manages,
       // Управляющему — выпадашка уровня у каждого пловца (docs/plans/lane-plans-plan.md).
-      cards: () => [{ id: 'members', render: () => <GroupMembersCard group={group} editLevels={real && manages} /> }],
+      cards: () => [{
+        id: 'members',
+        render: () => <GroupMembersCard group={group} editLevels={real && manages} insider={real && (manages || isMember)} />,
+      }],
     },
     real && {
       id: 'media' as const,

@@ -65,22 +65,42 @@ public class TrainingRsvpService : ITrainingRsvpService
         // приду» она бессмысленна и молча снимается.
         if (answer is null or TrainingRsvpAnswer.No) note = null;
 
-        // За другого отвечает только управляющий (тренер по просьбе в WhatsApp), и только за
-        // активного участника. Сам за себя — только участник: управляющий вне состава в
-        // полосе не считается, и его ответ повис бы невидимым.
-        var targetUserId = input.UserId ?? actorUserId;
-        var forOther = targetUserId != actorUserId;
-        if (forOther && !isManager)
-            return TrainingRsvpSaveResult.Fail(403, "Only the group coach can answer for another member.");
+        if (input.UserId != null && input.SwimmerId != null)
+            return TrainingRsvpSaveResult.Fail(400, "Answer for a member or for a swimmer, not both.");
 
-        var targetIsMember = await IsActiveMemberAsync(hubGroupId, targetUserId);
-        if (!targetIsMember)
-            return TrainingRsvpSaveResult.Fail(400, forOther
-                ? "This person is not an active member of the group."
-                : "Only group members answer. Join the group first.");
+        int? targetUserId = null, targetSwimmerId = null;
+        bool forOther;
+        if (input.SwimmerId is int swimmerId)
+        {
+            // Пловец группы без аккаунта (Р73): сам ответить не может — только тренер. Стоит им
+            // активный участник — отвечает аккаунт, иначе человек посчитался бы дважды.
+            if (!isManager)
+                return TrainingRsvpSaveResult.Fail(403, "Only the group coach can answer for a swimmer.");
+            var block = await GroupSwimmerBlockReasonAsync(hubGroupId, swimmerId);
+            if (block != null) return TrainingRsvpSaveResult.Fail(400, block);
+            targetSwimmerId = swimmerId;
+            forOther = true;
+        }
+        else
+        {
+            // За другого отвечает только управляющий (тренер по просьбе в WhatsApp), и только за
+            // активного участника. Сам за себя — только участник: управляющий вне состава в
+            // полосе не считается, и его ответ повис бы невидимым.
+            targetUserId = input.UserId ?? actorUserId;
+            forOther = targetUserId != actorUserId;
+            if (forOther && !isManager)
+                return TrainingRsvpSaveResult.Fail(403, "Only the group coach can answer for another member.");
+
+            var targetIsMember = await IsActiveMemberAsync(hubGroupId, targetUserId.Value);
+            if (!targetIsMember)
+                return TrainingRsvpSaveResult.Fail(400, forOther
+                    ? "This person is not an active member of the group."
+                    : "Only group members answer. Join the group first.");
+        }
 
         var row = await _db.HubGroupTrainingRsvps.FirstOrDefaultAsync(r =>
-            r.HubGroupId == hubGroupId && r.SessionDate == date && r.SessionStart == start && r.UserId == targetUserId);
+            r.HubGroupId == hubGroupId && r.SessionDate == date && r.SessionStart == start
+            && (targetSwimmerId != null ? r.SwimmerId == targetSwimmerId : r.UserId == targetUserId));
 
         if (answer == null)
         {
@@ -92,7 +112,8 @@ public class TrainingRsvpService : ITrainingRsvpService
             {
                 row = new HubGroupTrainingRsvp
                 {
-                    HubGroupId = hubGroupId, SessionDate = date, SessionStart = start, UserId = targetUserId,
+                    HubGroupId = hubGroupId, SessionDate = date, SessionStart = start,
+                    UserId = targetUserId, SwimmerId = targetSwimmerId,
                 };
                 _db.HubGroupTrainingRsvps.Add(row);
             }
@@ -104,7 +125,7 @@ public class TrainingRsvpService : ITrainingRsvpService
 
         // «Going» на занятие внутри перерыва — человек вернулся (Ш3.1): перерыв закрывается,
         // тренеру — пометка «back after …». Перерыв, который к этой дате и так кончится, не трогаем.
-        if (answer == TrainingRsvpAnswer.Yes) await EndBreaksByRsvpAsync(hubGroupId, targetUserId, date);
+        if (answer == TrainingRsvpAnswer.Yes) await EndBreaksByRsvpAsync(hubGroupId, targetUserId, targetSwimmerId, date);
 
         await _db.SaveChangesAsync();
 
@@ -114,15 +135,19 @@ public class TrainingRsvpService : ITrainingRsvpService
     /// <summary>
     /// Закрыть открытые перерывы человека на дату занятия: его аккаунта и пловца, которым он стоит
     /// в группе (флаг один на человека — <see cref="HubGroupBreakQuery"/>, <see cref="HubGroupPersonResolver"/>).
+    /// Ответ за пловца группы (Р73) закрывает перерыв самого пловца.
     /// </summary>
-    private async Task EndBreaksByRsvpAsync(int hubGroupId, int userId, DateOnly sessionDate)
+    private async Task EndBreaksByRsvpAsync(int hubGroupId, int? userId, int? swimmerId, DateOnly sessionDate)
     {
-        var labelSwimmer = (await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, [userId]))[userId];
+        var labelSwimmer = swimmerId
+            ?? (await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, [userId!.Value]))[userId.Value];
 
+        // Только перерыв: «не тренируется с группой» (Р74) ответ не снимает — человек посчитан
+        // на этот день, и всё.
         var open = await _db.HubGroupBreaks
-            .Where(b => b.HubGroupId == hubGroupId && b.EndedAt == null
+            .Where(b => b.HubGroupId == hubGroupId && b.EndedAt == null && b.Kind == HubGroupBreakKind.Break
                         && (b.Until == null || b.Until >= sessionDate)
-                        && (b.UserId == userId || (labelSwimmer != null && b.SwimmerId == labelSwimmer)))
+                        && ((userId != null && b.UserId == userId) || (labelSwimmer != null && b.SwimmerId == labelSwimmer)))
             .ToListAsync();
         foreach (var b in open)
         {
@@ -138,7 +163,8 @@ public class TrainingRsvpService : ITrainingRsvpService
     /// </summary>
     private async Task<TrainingLaneViewDto?> BuildLaneViewAsync(int hubGroupId, GroupTrainingSchedule schedule,
         DateOnly date, IReadOnlyDictionary<int, (string Name, string? Gender)> members,
-        IReadOnlyDictionary<int, HubGroupTrainingRsvp> answers, int viewerUserId, bool isManager)
+        IReadOnlyDictionary<int, int?> resolved, IReadOnlyDictionary<int, HubGroupTrainingRsvp> answers,
+        IReadOnlyDictionary<int, HubGroupTrainingRsvp> swimmerAnswers, int viewerUserId, bool isManager)
     {
         var mode = schedule.EffectiveLaneView;
         if (mode == GroupLaneView.Off) return null;
@@ -156,7 +182,6 @@ public class TrainingRsvpService : ITrainingRsvpService
             .FirstOrDefaultAsync();
 
         // Кем стоит каждый участник (не только пришедшие): «2 claim» считается по всей группе.
-        var resolved = await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, members.Keys.ToList());
         var claims = resolved.Values.Where(v => v != null)
             .GroupBy(v => v!.Value)
             .ToDictionary(g => g.Key, g => g.Count());
@@ -189,33 +214,48 @@ public class TrainingRsvpService : ITrainingRsvpService
 
         // В бассейне — ответившие «иду» и «не уверен». Пловцы — в порядке состава; аккаунты без
         // пловца — после состава, по имени (детерминированно, не «каждый раз по-разному»).
-        var coming = answers.Values
-            .Where(a => a.Answer is TrainingRsvpAnswer.Yes or TrainingRsvpAnswer.Maybe && members.ContainsKey(a.UserId))
-            .ToList();
+        static bool InPool(HubGroupTrainingRsvp a) => a.Answer is TrainingRsvpAnswer.Yes or TrainingRsvpAnswer.Maybe;
+        var coming = answers.Values.Where(a => InPool(a) && members.ContainsKey(a.UserId!.Value)).ToList();
         var accountsOrder = coming
-            .Where(a => resolved[a.UserId] == null)
-            .OrderBy(a => members[a.UserId].Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(a => a.UserId)
-            .Select((a, i) => (a.UserId, i))
+            .Where(a => resolved[a.UserId!.Value] == null)
+            .OrderBy(a => members[a.UserId!.Value].Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(a => a.UserId)
+            .Select((a, i) => (UserId: a.UserId!.Value, i))
             .ToDictionary(x => x.UserId, x => roster.Count + x.i);
 
         var pool = coming.Select(a =>
         {
-            var member = members[a.UserId];
-            if (resolved[a.UserId] is int sid && rosterAt.TryGetValue(sid, out var at))
+            var userId = a.UserId!.Value;
+            var member = members[userId];
+            if (resolved[userId] is int sid && rosterAt.TryGetValue(sid, out var at))
             {
                 return new TrainingLaneView.Person(
-                    a.UserId, sid,
+                    userId, sid,
                     string.IsNullOrEmpty(at.r.Name) ? at.r.NameEn : at.r.Name,
                     at.r.Gender ?? member.Gender,
                     a.Answer, a.Note,
-                    swimmerLevels.TryGetValue(sid, out var sl) ? sl : accountLevels.TryGetValue(a.UserId, out var al) ? al : null,
+                    swimmerLevels.TryGetValue(sid, out var sl) ? sl : accountLevels.TryGetValue(userId, out var al) ? al : null,
                     at.i, claims.GetValueOrDefault(sid, 1));
             }
             return new TrainingLaneView.Person(
-                a.UserId, null, member.Name, member.Gender, a.Answer, a.Note,
-                accountLevels.TryGetValue(a.UserId, out var level) ? level : null,
-                accountsOrder[a.UserId], 1);
+                userId, null, member.Name, member.Gender, a.Answer, a.Note,
+                accountLevels.TryGetValue(userId, out var level) ? level : null,
+                accountsOrder[userId], 1);
         }).ToList();
+
+        // Пловцы группы без аккаунта (Р73): за них ответил тренер, стоят пловцом состава.
+        pool.AddRange(swimmerAnswers.Values
+            .Where(a => InPool(a) && rosterAt.ContainsKey(a.SwimmerId!.Value))
+            .Select(a =>
+            {
+                var sid = a.SwimmerId!.Value;
+                var at = rosterAt[sid];
+                return new TrainingLaneView.Person(
+                    null, sid,
+                    string.IsNullOrEmpty(at.r.Name) ? at.r.NameEn : at.r.Name,
+                    at.r.Gender, a.Answer, a.Note,
+                    swimmerLevels.TryGetValue(sid, out var sl) ? sl : null,
+                    at.i, 1);
+            }));
 
         var planModel = plan == null ? null : new TrainingLaneView.Plan(
             plan.LaneCount,
@@ -231,13 +271,63 @@ public class TrainingRsvpService : ITrainingRsvpService
         _db.HubGroupUserMembers.AnyAsync(m =>
             m.HubGroupId == hubGroupId && m.UserId == userId && m.Status == HubGroupUserMemberStatus.Active);
 
-    /// <summary>Порядок групп списка у управляющего: иду → не уверен → не приду → без ответа → на перерыве.</summary>
-    private static int AnswerOrder(string? answer, bool onBreak) => answer switch
+    private sealed record GroupSwimmer(int SwimmerId, string Name, string? Gender);
+
+    /// <summary>
+    /// Пловцы группы без аккаунта, за которых отвечает тренер (Р73): <c>Swimmer.PrivateHubGroupId</c>
+    /// этой группы, в составе и не неактивны. Кем-то из <paramref name="claimed"/> (пловцы, которыми
+    /// стоят активные участники, <see cref="HubGroupPersonResolver"/>) — нет: человек отвечает
+    /// аккаунтом и дважды не считается. Имя — как в виде по дорожкам: иврит, иначе английское.
+    /// </summary>
+    private async Task<List<GroupSwimmer>> LoadGroupSwimmersAsync(int hubGroupId, IReadOnlySet<int> claimed)
+    {
+        var rows = await _db.HubGroupMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId && !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == hubGroupId)
+            .Select(m => new
+            {
+                m.SwimmerId,
+                Name = (m.Swimmer!.LastName + " " + m.Swimmer.FirstName).Trim(),
+                NameEn = (m.Swimmer.LastNameEn + " " + m.Swimmer.FirstNameEn).Trim(),
+                m.Swimmer.Gender,
+            })
+            .ToListAsync();
+        return rows
+            .Where(r => !claimed.Contains(r.SwimmerId))
+            .Select(r => new GroupSwimmer(r.SwimmerId, string.IsNullOrEmpty(r.Name) ? r.NameEn : r.Name, r.Gender))
+            .ToList();
+    }
+
+    /// <summary>Почему за этого пловца нельзя ответить (Р73); null — можно.</summary>
+    private async Task<string?> GroupSwimmerBlockReasonAsync(int hubGroupId, int swimmerId)
+    {
+        var inGroup = await _db.HubGroupMembers.AnyAsync(m =>
+            m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId && !m.IsExcluded
+            && m.Swimmer!.PrivateHubGroupId == hubGroupId);
+        if (!inGroup) return "This swimmer is not an active swimmer of the group.";
+
+        var memberIds = await ActiveMemberIdsAsync(hubGroupId);
+        var resolved = await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, memberIds);
+        return resolved.Values.Contains(swimmerId)
+            ? "A member account stands for this swimmer — answer for that member instead."
+            : null;
+    }
+
+    private Task<List<int>> ActiveMemberIdsAsync(int hubGroupId) =>
+        _db.HubGroupUserMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId && m.Status == HubGroupUserMemberStatus.Active)
+            .Select(m => m.UserId)
+            .ToListAsync();
+
+    /// <summary>
+    /// Порядок групп списка у управляющего: иду → не уверен → не приду → без ответа → на перерыве
+    /// → не тренируется с группой (Р74).
+    /// </summary>
+    private static int AnswerOrder(string? answer, bool onBreak, bool notTraining) => answer switch
     {
         TrainingRsvpAnswer.Yes => 0,
         TrainingRsvpAnswer.Maybe => 1,
         TrainingRsvpAnswer.No => 2,
-        _ => onBreak ? 4 : 3,
+        _ => notTraining ? 5 : onBreak ? 4 : 3,
     };
 
     private async Task<TrainingRsvpDto> BuildAsync(int hubGroupId, GroupTrainingSchedule schedule,
@@ -257,33 +347,49 @@ public class TrainingRsvpService : ITrainingRsvpService
             .ToListAsync();
         var memberIds = members.Select(m => m.UserId).ToHashSet();
 
-        var answers = (await _db.HubGroupTrainingRsvps.AsNoTracking()
-                .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date && r.SessionStart == start)
-                .ToListAsync())
-            .Where(r => memberIds.Contains(r.UserId))
-            .ToDictionary(r => r.UserId);
+        // Пловцы группы без аккаунта (Р73) — в том же знаменателе, кроме тех, кем стоит участник.
+        var resolved = await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, memberIds.ToList());
+        var groupSwimmers = await LoadGroupSwimmersAsync(hubGroupId,
+            resolved.Values.Where(v => v != null).Select(v => v!.Value).ToHashSet());
+        var groupSwimmerIds = groupSwimmers.Select(s => s.SwimmerId).ToHashSet();
+
+        var rows = await _db.HubGroupTrainingRsvps.AsNoTracking()
+            .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date && r.SessionStart == start)
+            .ToListAsync();
+        var answers = rows
+            .Where(r => r.UserId is int u && memberIds.Contains(u))
+            .ToDictionary(r => r.UserId!.Value);
+        var swimmerAnswers = rows
+            .Where(r => r.SwimmerId is int s && groupSwimmerIds.Contains(s))
+            .ToDictionary(r => r.SwimmerId!.Value);
+        var all = answers.Values.Concat(swimmerAnswers.Values).ToList();
 
         // На перерыве в день занятия (Ш3.1): не ответил — не в знаменателе и не в «нет ответа»;
         // ответил — считается как все (сумма иду + не уверен + не приду + нет ответа = total).
         var onBreak = await HubGroupBreakQuery.LoadAsync(_db, hubGroupId, date);
-        var counted = memberIds.Count(id => !onBreak.UserIds.Contains(id) || answers.ContainsKey(id));
+        var counted = memberIds.Count(id => !onBreak.UserIds.Contains(id) || answers.ContainsKey(id))
+                      + groupSwimmerIds.Count(id => !onBreak.SwimmerIds.Contains(id) || swimmerAnswers.ContainsKey(id));
         var viewerBreakUntil = !onBreak.UserIds.Contains(viewerUserId) ? null : await _db.HubGroupBreaks.AsNoTracking()
             .Where(b => b.HubGroupId == hubGroupId && b.UserId == viewerUserId && b.EndedAt == null)
             .Select(b => b.Until)
             .FirstOrDefaultAsync();
 
         var backAfter = new Dictionary<int, int>();
+        var swimmerBackAfter = new Dictionary<int, int>();
         if (isManager)
         {
             var nowUtc = DateTime.UtcNow;
             var markerFrom = nowUtc.AddDays(-HubGroupBreakRules.BackMarkerDays);
             var returns = await _db.HubGroupBreaks.AsNoTracking()
-                .Where(b => b.HubGroupId == hubGroupId && b.UserId != null && b.EndedByRsvp && b.EndedAt >= markerFrom)
-                .Select(b => new { UserId = b.UserId!.Value, b.Since, b.EndedAt, b.EndedByRsvp })
+                .Where(b => b.HubGroupId == hubGroupId && b.EndedByRsvp && b.EndedAt >= markerFrom)
+                .Select(b => new { b.UserId, b.SwimmerId, b.Since, b.EndedAt, b.EndedByRsvp })
                 .ToListAsync();
             foreach (var r in returns)
-                if (HubGroupBreakRules.BackAfterDays(r.Since, r.EndedAt, r.EndedByRsvp, nowUtc) is int days)
-                    backAfter[r.UserId] = Math.Max(backAfter.GetValueOrDefault(r.UserId), days);
+            {
+                if (HubGroupBreakRules.BackAfterDays(r.Since, r.EndedAt, r.EndedByRsvp, nowUtc) is not int days) continue;
+                var (target, key) = r.UserId is int u ? (backAfter, u) : (swimmerBackAfter, r.SwimmerId!.Value);
+                target[key] = Math.Max(target.GetValueOrDefault(key), days);
+            }
         }
 
         var slot = TrainingRsvpRules.FindSlot(schedule, date, start)!;
@@ -291,7 +397,8 @@ public class TrainingRsvpService : ITrainingRsvpService
         answers.TryGetValue(viewerUserId, out var mine);
 
         var laneView = await BuildLaneViewAsync(hubGroupId, schedule, date,
-            members.ToDictionary(m => m.UserId, m => (m.Name, m.Gender)), answers, viewerUserId, isManager);
+            members.ToDictionary(m => m.UserId, m => (m.Name, m.Gender)), resolved, answers, swimmerAnswers,
+            viewerUserId, isManager);
 
         return new TrainingRsvpDto
         {
@@ -299,9 +406,9 @@ public class TrainingRsvpService : ITrainingRsvpService
             Date = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             Start = start,
             End = slot.End,
-            Yes = answers.Values.Count(r => r.Answer == TrainingRsvpAnswer.Yes),
-            Maybe = answers.Values.Count(r => r.Answer == TrainingRsvpAnswer.Maybe),
-            No = answers.Values.Count(r => r.Answer == TrainingRsvpAnswer.No),
+            Yes = all.Count(r => r.Answer == TrainingRsvpAnswer.Yes),
+            Maybe = all.Count(r => r.Answer == TrainingRsvpAnswer.Maybe),
+            No = all.Count(r => r.Answer == TrainingRsvpAnswer.No),
             Total = counted,
             Mine = mine == null ? null : new TrainingRsvpMineDto
             {
@@ -311,7 +418,8 @@ public class TrainingRsvpService : ITrainingRsvpService
             CanManage = isManager,
             CanAnswer = (isMember || isManager)
                         && TrainingRsvpRules.EditBlockReason(schedule, date, start, now, isManager) == null,
-            OnBreak = onBreak.UserIds.Contains(viewerUserId),
+            OnBreak = onBreak.UserIds.Contains(viewerUserId) && !onBreak.NotTrainingUserIds.Contains(viewerUserId),
+            NotTraining = onBreak.NotTrainingUserIds.Contains(viewerUserId),
             BreakUntil = viewerBreakUntil?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             LaneView = laneView,
             People = !isManager ? null : members
@@ -326,11 +434,29 @@ public class TrainingRsvpService : ITrainingRsvpService
                         Answer = a?.Answer,
                         Note = a?.Note,
                         SetByCoach = a?.SetByUserId != null,
-                        OnBreak = onBreak.UserIds.Contains(m.UserId),
+                        OnBreak = onBreak.UserIds.Contains(m.UserId) && !onBreak.NotTrainingUserIds.Contains(m.UserId),
+                        NotTraining = onBreak.NotTrainingUserIds.Contains(m.UserId),
                         BackAfterDays = backAfter.TryGetValue(m.UserId, out var days) ? days : null,
                     };
                 })
-                .OrderBy(p => AnswerOrder(p.Answer, p.OnBreak))
+                .Concat(groupSwimmers.Select(s =>
+                {
+                    swimmerAnswers.TryGetValue(s.SwimmerId, out var a);
+                    return new TrainingRsvpPersonDto
+                    {
+                        SwimmerId = s.SwimmerId,
+                        Name = s.Name,
+                        Gender = s.Gender is "male" or "female" ? s.Gender : null,
+                        Answer = a?.Answer,
+                        Note = a?.Note,
+                        // За пловца без аккаунта всегда отвечает тренер — пометка «by coach» тут шум.
+                        SetByCoach = false,
+                        OnBreak = onBreak.SwimmerIds.Contains(s.SwimmerId) && !onBreak.NotTrainingSwimmerIds.Contains(s.SwimmerId),
+                        NotTraining = onBreak.NotTrainingSwimmerIds.Contains(s.SwimmerId),
+                        BackAfterDays = swimmerBackAfter.TryGetValue(s.SwimmerId, out var days) ? days : null,
+                    };
+                }))
+                .OrderBy(p => AnswerOrder(p.Answer, p.OnBreak, p.NotTraining))
                 .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToList(),
         };

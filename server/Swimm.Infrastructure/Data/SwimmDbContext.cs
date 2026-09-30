@@ -1127,12 +1127,10 @@ public class SwimmDbContext : DbContext
                 "CK_HubGroupMembers_Source",
                 @"""Source"" IN ('manual', 'club', 'private')");
 
-            // Скрыть можно клубного и пловца группы (Р71, «неактивен»): ручного владелец убирает
-            // удалением, а «ручной и скрытый» — противоречие, которое читатели состава трактовали
-            // бы по-разному. Скрытую строку все читатели состава и так пропускают (!IsExcluded).
-            entity.HasCheckConstraint(
-                "CK_HubGroupMembers_ExcludedOnlyClub",
-                @"NOT ""IsExcluded"" OR ""Source"" IN ('club', 'private')");
+            // Скрыть (IsExcluded, «Inactive») можно строку любого вида: клубного, пловца группы
+            // (Р71) и — с 30.09.2026 (Р74) — ручного: «ушёл из группы», но вернуть одной кнопкой
+            // Restore. Ограничение CK_HubGroupMembers_ExcludedOnlyClub снято. Скрытую строку все
+            // читатели состава пропускают (!IsExcluded); пересборка по клубу ручных не трогает.
         });
 
         // Подписка группы на клуб (docs/plans/hubgroup-club-subscription-plan.md) — бизнес-
@@ -1279,10 +1277,12 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey(e => e.TrainingId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Автор — и участник (видео к тренировке, Е2): его аккаунт не должен держать ссылку
+            // группы RESTRICT-ом, удалили аккаунт — медиа остаётся без автора.
             entity.HasOne(e => e.CreatedByUser)
                 .WithMany()
                 .HasForeignKey(e => e.CreatedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.SetNull);
 
             // Якоря 2B′: удаление пловца/заплыва уносит и привязанные разборы (cascade) —
             // медиа-ссылка без своего якоря бессмысленна.
@@ -1327,6 +1327,12 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.HubGroupId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Кто завёл тренировку кнопкой (Е1): удалили аккаунт — тренировка остаётся.
+            entity.HasOne(e => e.CreatedBy)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Тренировочный повтор — ПРИВАТНЫЕ данные, Sys_-таблица БЕЗ grant swimm_ro.
@@ -1398,12 +1404,22 @@ public class SwimmDbContext : DbContext
         // подпись с дорожки (SET NULL), уход пловца из состава план не трогает.
         // Ответы «иду / не приду» на занятие — ПРИВАТНЫЕ, Sys_ без grant swimm_ro
         // (docs/plans/entity-hero-roles-plan.md, Ш2). Занятие — пара «дата + начало слота»:
-        // расписание регулярное, строк занятий нет. Один ответ человека на занятие.
+        // расписание регулярное, строк занятий нет. Один ответ человека на занятие. Субъект —
+        // ровно одно из двух: аккаунт или пловец группы (Р73) — частичные UNIQUE, как у перерывов.
         modelBuilder.Entity<HubGroupTrainingRsvp>(entity =>
         {
             entity.ToTable("Sys_HubGroupTrainingRsvps");
-            entity.HasIndex(e => new { e.HubGroupId, e.SessionDate, e.SessionStart, e.UserId }).IsUnique();
+            // Имена явно: автоимя длиннее 63 символов, Postgres режет его, и два индекса спорили бы.
+            entity.HasIndex(e => new { e.HubGroupId, e.SessionDate, e.SessionStart, e.UserId })
+                .IsUnique()
+                .HasFilter(@"""UserId"" IS NOT NULL")
+                .HasDatabaseName("IX_Sys_HubGroupTrainingRsvps_Session_UserId");
+            entity.HasIndex(e => new { e.HubGroupId, e.SessionDate, e.SessionStart, e.SwimmerId })
+                .IsUnique()
+                .HasFilter(@"""SwimmerId"" IS NOT NULL")
+                .HasDatabaseName("IX_Sys_HubGroupTrainingRsvps_Session_SwimmerId");
             entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.SwimmerId);
 
             entity.HasOne(e => e.HubGroup)
                 .WithMany()
@@ -1420,6 +1436,13 @@ public class SwimmDbContext : DbContext
                 .HasForeignKey(e => e.SetByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Subject",
+                @"(""UserId"" IS NULL) <> (""SwimmerId"" IS NULL)");
             entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Answer", @"""Answer"" IN ('yes', 'maybe', 'no')");
             entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Note",
                 @"""Note"" IS NULL OR ""Note"" IN ('late', 'first-hour', 'leaving-early')");
@@ -1459,6 +1482,10 @@ public class SwimmDbContext : DbContext
 
             entity.HasCheckConstraint("CK_HubGroupBreaks_Subject",
                 @"(""UserId"" IS NULL) <> (""SwimmerId"" IS NULL)");
+            // «Не тренируется с группой» — бессрочно по смыслу: даты окончания у него нет.
+            entity.Property(e => e.Kind).HasDefaultValue(HubGroupBreakKind.Break);
+            entity.HasCheckConstraint("CK_HubGroupBreaks_Kind",
+                @"""Kind"" IN ('break', 'not_training') AND (""Kind"" = 'break' OR ""Until"" IS NULL)");
         });
 
         // Уровень аккаунта без пловца (Ш3.1) — пара к Sys_HubGroupSwimmerLevels, тот же составной

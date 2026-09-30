@@ -37,6 +37,9 @@ public class TrainingResultsPrivacyTests
             "удаление пловца группы (Р71) из состава = удаление насовсем вместе с его временами; не чтение",
         ["Swimm.Infrastructure/Services/HubGroupMediaService.cs"] =
             "привязка медиа к занятию: «эта сессия — этой группы», только id сессии",
+        ["Swimm.Infrastructure/Services/TrainingSessionService.cs"] =
+            "тренировки как записи (заводит тренер, Е1 group-events-media-plan): сама сессия и только " +
+            "«есть ли времена» (Any) — времён не читает; аудиторию проверяет контроллер",
         ["Swimm.Infrastructure/Services/SwimmerMergeService.cs"] =
             "склейка пловцов переносит тренировочные строки на оставшегося",
         ["Swimm.Infrastructure/Services/SwimmerDedupService.cs"] =

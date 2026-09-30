@@ -1366,6 +1366,13 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("HubGroupId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("break");
+
                     b.Property<int?>("SetByUserId")
                         .HasColumnType("integer");
 
@@ -1399,6 +1406,8 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.ToTable("Sys_HubGroupBreaks", null, t =>
                         {
+                            t.HasCheckConstraint("CK_HubGroupBreaks_Kind", "\"Kind\" IN ('break', 'not_training') AND (\"Kind\" = 'break' OR \"Until\" IS NULL)");
+
                             t.HasCheckConstraint("CK_HubGroupBreaks_Subject", "(\"UserId\" IS NULL) <> (\"SwimmerId\" IS NULL)");
                         });
                 });
@@ -1533,7 +1542,7 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("CreatedByUserId")
+                    b.Property<int?>("CreatedByUserId")
                         .HasColumnType("integer");
 
                     b.Property<int>("HubGroupId")
@@ -1638,8 +1647,6 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.ToTable("HubGroupMembers", null, t =>
                         {
-                            t.HasCheckConstraint("CK_HubGroupMembers_ExcludedOnlyClub", "NOT \"IsExcluded\" OR \"Source\" IN ('club', 'private')");
-
                             t.HasCheckConstraint("CK_HubGroupMembers_Source", "\"Source\" IN ('manual', 'club', 'private')");
                         });
                 });
@@ -1695,26 +1702,40 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("SetByUserId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("SwimmerId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("UserId")
+                    b.Property<int?>("UserId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("SetByUserId");
 
+                    b.HasIndex("SwimmerId");
+
                     b.HasIndex("UserId");
 
+                    b.HasIndex("HubGroupId", "SessionDate", "SessionStart", "SwimmerId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Sys_HubGroupTrainingRsvps_Session_SwimmerId")
+                        .HasFilter("\"SwimmerId\" IS NOT NULL");
+
                     b.HasIndex("HubGroupId", "SessionDate", "SessionStart", "UserId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_Sys_HubGroupTrainingRsvps_Session_UserId")
+                        .HasFilter("\"UserId\" IS NOT NULL");
 
                     b.ToTable("Sys_HubGroupTrainingRsvps", null, t =>
                         {
                             t.HasCheckConstraint("CK_HubGroupTrainingRsvps_Answer", "\"Answer\" IN ('yes', 'maybe', 'no')");
 
                             t.HasCheckConstraint("CK_HubGroupTrainingRsvps_Note", "\"Note\" IS NULL OR \"Note\" IN ('late', 'first-hour', 'leaving-early')");
+
+                            t.HasCheckConstraint("CK_HubGroupTrainingRsvps_Subject", "(\"UserId\" IS NULL) <> (\"SwimmerId\" IS NULL)");
                         });
                 });
 
@@ -3284,6 +3305,12 @@ namespace Swimm.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("Date")
                         .HasColumnType("timestamp with time zone");
 
@@ -3308,7 +3335,17 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(5)
                         .HasColumnType("character varying(5)");
 
+                    b.Property<string>("StartTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("HubGroupId", "ExternalTrainingId")
                         .IsUnique();
@@ -4142,8 +4179,7 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasOne("Swimm.Domain.Entities.AppUser", "CreatedByUser")
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
                         .WithMany()
@@ -4237,15 +4273,21 @@ namespace Swimm.Infrastructure.Migrations
                         .HasForeignKey("SetByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Swimm.Domain.Entities.Swimmer", "Swimmer")
+                        .WithMany()
+                        .HasForeignKey("SwimmerId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Swimm.Domain.Entities.AppUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("HubGroup");
 
                     b.Navigation("SetBy");
+
+                    b.Navigation("Swimmer");
 
                     b.Navigation("User");
                 });
@@ -4540,11 +4582,18 @@ namespace Swimm.Infrastructure.Migrations
 
             modelBuilder.Entity("Swimm.Domain.Entities.TrainingSession", b =>
                 {
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
                         .WithMany()
                         .HasForeignKey("HubGroupId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("CreatedBy");
 
                     b.Navigation("HubGroup");
                 });

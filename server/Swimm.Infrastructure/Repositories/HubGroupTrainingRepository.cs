@@ -82,7 +82,8 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
 
         return new TrainingRowDto
         {
-            Competition = session.Name ?? session.ExternalTrainingId,
+            // Название тренера (Е1) — первым: у заведённых кнопкой ключ источника «ui-…» людям не нужен.
+            Competition = session.Title ?? session.Name ?? session.ExternalTrainingId,
             IsMasters = true,
             AgeGroup = sw.BirthYear > 0 ? sw.BirthYear.ToString() : string.Empty,
             Date = session.Date.ToString("dd/MM/yyyy"),
@@ -112,9 +113,12 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
 
             Training = new TrainingInfoDto
             {
-                TrainingId = long.TryParse(session.ExternalTrainingId, out var tid) ? tid : 0,
+                // Ключ источника — число (дата Дельфина «20251028»); у нечислового («ui-…» тренировки,
+                // заведённой кнопкой, и «utest-training-1») — id сессии: клиент считает строку
+                // тренировкой только при ненулевом trainingId, с нулём журнал был пуст.
+                TrainingId = long.TryParse(session.ExternalTrainingId, out var tid) ? tid : session.Id,
                 SessionId = session.Id,
-                TrainingName = session.Name ?? string.Empty,
+                TrainingName = session.Title ?? session.Name ?? string.Empty,
                 Note = session.Note,
                 Set = r.SetNo,
                 Order = r.OrderNo,

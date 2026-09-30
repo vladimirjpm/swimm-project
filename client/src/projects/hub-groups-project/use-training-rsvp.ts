@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { publicationsApiFetch } from './components/group-bits';
-import type { RsvpAnswer, RsvpNote, TrainingRsvp } from './types';
+import type { RsvpAnswer, RsvpNote, TrainingRsvp, TrainingRsvpPerson } from './types';
 
 /**
  * Ответы «иду / не уверен / не приду» на одно занятие (docs/plans/entity-hero-roles-plan.md, Ш2).
@@ -21,13 +21,18 @@ export interface TrainingRsvpState {
   error: string | null;
   /** Свой ответ; повторный тап той же кнопки вызывающий передаёт как `null` (снять). */
   answer: (answer: RsvpAnswer | null, note?: RsvpNote | null) => Promise<void>;
-  /** Управляющий ставит ответ за участника (попросил в WhatsApp). */
-  answerFor: (userId: number, answer: RsvpAnswer | null) => Promise<void>;
+  /** Управляющий ставит ответ за участника (попросил в WhatsApp) или за пловца группы без аккаунта. */
+  answerFor: (person: TrainingRsvpPerson, answer: RsvpAnswer | null) => Promise<void>;
   /** Перечитать с сервера — после того, что меняет ответы со стороны (перерыв, Ш3.1). */
   reload: () => void;
 }
 
 const COUNT_KEY: Record<RsvpAnswer, 'yes' | 'maybe' | 'no'> = { yes: 'yes', maybe: 'maybe', no: 'no' };
+
+/** Ключ человека в списке тренера: аккаунт и пловец группы (Р73) — разные пространства id. */
+export function rsvpPersonKey(p: TrainingRsvpPerson): string {
+  return p.user_id != null ? `u${p.user_id}` : `s${p.swimmer_id}`;
+}
 
 /** Счётчики после смены одного ответа `from` → `to` (для оптимистичного вида). */
 function shiftCounts(r: TrainingRsvp, from: RsvpAnswer | null, to: RsvpAnswer | null): TrainingRsvp {
@@ -95,18 +100,22 @@ export function useTrainingRsvp(groupId: number | null, sessionId: string | null
     await send(optimistic, { answer: next, note });
   }, [send]);
 
-  const answerFor = useCallback(async (userId: number, next: RsvpAnswer | null) => {
+  const answerFor = useCallback(async (target: TrainingRsvpPerson, next: RsvpAnswer | null) => {
     const current = confirmed.current;
     if (!current?.people) return;
-    const person = current.people.find((p) => p.user_id === userId);
+    const key = rsvpPersonKey(target);
+    const person = current.people.find((p) => rsvpPersonKey(p) === key);
     if (!person) return;
     const optimistic = {
       ...shiftCounts(current, person.answer, next),
-      people: current.people.map((p) => (p.user_id === userId
-        ? { ...p, answer: next, note: null, set_by_coach: next != null }
+      people: current.people.map((p) => (rsvpPersonKey(p) === key
+        // За пловца группы отвечает только тренер — пометку «by coach» сервер ему не ставит.
+        ? { ...p, answer: next, note: null, set_by_coach: next != null && p.user_id != null }
         : p)),
     };
-    await send(optimistic, { answer: next, user_id: userId });
+    await send(optimistic, person.user_id != null
+      ? { answer: next, user_id: person.user_id }
+      : { answer: next, swimmer_id: person.swimmer_id });
   }, [send]);
 
   return { rsvp, loading, error, answer, answerFor, reload };

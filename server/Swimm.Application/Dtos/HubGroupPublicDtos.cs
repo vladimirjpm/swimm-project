@@ -558,6 +558,10 @@ public sealed class GroupTrainingScheduleDto
     /// <summary>Режим «сверху» (Ш4): не ответившему участнику «Are you coming?» над фото.</summary>
     [JsonPropertyName("rsvp_top")]
     public bool? RsvpTop { get; set; }
+
+    /// <summary>members | coach — кто добавляет видео к тренировкам (<c>GroupTrainingMedia</c>); null — members.</summary>
+    [JsonPropertyName("training_media")]
+    public string? TrainingMedia { get; set; }
 }
 
 /// <summary>Занятие недели: день ISO (1 = Mon … 7 = Sun) и часы по стенным часам бассейна.</summary>
