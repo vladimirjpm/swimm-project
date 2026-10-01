@@ -74,6 +74,8 @@ export const lanePlansApi = {
   publish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/publish`),
   unpublish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/unpublish`),
   remove: (groupId: number, date: string) => request<void>('DELETE', `${base(groupId)}/${date}`),
+  /** Зритель открыл вид Lanes (Т1б): гаснет «тебя перенесли». GET плана метку не гасит. */
+  markSeen: (groupId: number) => request<void>('PUT', `${base(groupId)}/seen`),
   levels: (groupId: number) => request<HubGroupLevels>('GET', `/api/me/hub-groups/${groupId}/levels`),
   /** Уровень пловца: null — «без уровня». Тело camelCase, как у всей ручки уровней. */
   setSwimmerLevel: (groupId: number, swimmerId: number, levelId: number | null) =>

@@ -6,9 +6,13 @@ import { HelperMedia } from '../../../utils/helpers';
 
 /**
  * Медиа-лента тренировки: тайлы + ОДИН лайтбокс на полосу. Одна на журнал тренировок
- * (`training-by-session`) и карточку тренировок группы (`group-sessions`, Е3
- * docs/plans/group-events-media-plan.md) — чтобы превью, лайтбокс и «album наружу» не
+ * (`training-by-session`) и ленту тренировок группы (`hub-groups-project/components/trainings/feed/`, Е3
+ * docs/plans/group-events-media-plan.md, Т4) — чтобы превью, лайтбокс и «album наружу» не
  * разъехались.
+ *
+ * `onOpen` — клик по тайлу отдаётся наружу (индекс в списке БЕЗ альбомов), а своего лайтбокса
+ * полоса не рисует: так таб Trainings группы открывает общий лайтбокс из реестра форм. Без него
+ * поведение прежнее (журнал `training-by-session`: свой `UI_SwimmerGallery` на полосу).
  *
  * `onRemove` + `canRemove` — кнопка ✕ на тайле (автор — своё, тренер — любое; решает сервер
  * флагом `can_delete`). Без них лента только для чтения.
@@ -51,13 +55,17 @@ function MediaStripTile({ item, onClick, onRemove }: { item: StripItem; onClick?
 }
 
 function TrainingMediaStrip<T extends StripItem>({
-  media, className, onRemove, canRemove,
+  media, className, size = 'md', onRemove, canRemove, onOpen,
 }: {
   media: T[];
   /** Доп. класс полосы (у карточки группы свои отступы). */
   className?: string;
+  /** Размер плиток: `md` 86×60 (по умолчанию), `lg` 110×72 — лента тренировок на десктопе. */
+  size?: 'md' | 'lg';
   onRemove?: (item: T) => void;
   canRemove?: (item: T) => boolean;
+  /** Клик по тайлу (кроме альбома); если задан — своего лайтбокса нет. */
+  onOpen?: (index: number) => void;
 }) {
   const [openIndex, setOpenIndex] = React.useState<number | null>(null);
 
@@ -77,20 +85,28 @@ function TrainingMediaStrip<T extends StripItem>({
   if (media.length === 0) return null;
 
   return (
-    <div className={`tbs-media-strip${className ? ` ${className}` : ''}`}>
+    <div className={`tbs-media-strip${size === 'lg' ? ' tbs-media-strip--lg' : ''}${className ? ` ${className}` : ''}`}>
       {media.map((item) => (
         <MediaStripTile
           key={item.id}
           item={item}
-          onClick={item.media_type === 'album' ? undefined : () => setOpenIndex(indexById.get(item.id) ?? 0)}
+          onClick={item.media_type === 'album'
+            ? undefined
+            : () => {
+              const index = indexById.get(item.id) ?? 0;
+              if (onOpen) onOpen(index);
+              else setOpenIndex(index);
+            }}
           onRemove={onRemove && (canRemove?.(item) ?? true) ? () => onRemove(item) : undefined}
         />
       ))}
-      <UI_SwimmerGallery
-        gallery={lightboxGalleryItems}
-        openIndex={openIndex}
-        onClose={() => setOpenIndex(null)}
-      />
+      {!onOpen && (
+        <UI_SwimmerGallery
+          gallery={lightboxGalleryItems}
+          openIndex={openIndex}
+          onClose={() => setOpenIndex(null)}
+        />
+      )}
     </div>
   );
 }

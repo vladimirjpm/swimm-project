@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { publicationsApiFetch } from './components/group-bits';
 import type {
-  TrainingSession, TrainingSessionInput, TrainingSessionList, TrainingSessionMediaInput,
+  TrainingSession, TrainingSessionInput, TrainingSessionList, TrainingSessionMediaInput, TrainingSessionSets,
 } from './types';
 
 /**
@@ -25,6 +25,15 @@ export interface TrainingSessionsState {
   remove: (id: number) => Promise<string | null>;
   addMedia: (sessionId: number, input: TrainingSessionMediaInput) => Promise<string | null>;
   removeMedia: (sessionId: number, mediaId: number) => Promise<string | null>;
+  /** ★ ключевого сета (Р4), только управляющему; null снимает. После записи список перечитывается. */
+  setKeySet: (sessionId: number, setNo: number | null) => Promise<string | null>;
+  /** «Sets & times» тренировки — лениво, при раскрытии (не кэшируется здесь). */
+  loadSets: (sessionId: number) => Promise<TrainingSessionSets | null>;
+  /**
+   * Зритель открыл ленту Trainings (Т1б): гаснет «новые видео». Список НЕ перечитывается — метка
+   * на открытой ленте остаётся до следующей загрузки, чтобы «NEW» было видно, пока смотрят.
+   */
+  markSeen: () => Promise<void>;
 }
 
 async function errorOf(r: Response, fallback: string): Promise<string> {
@@ -85,8 +94,27 @@ export function useTrainingSessions(groupId: number | null, enabled: boolean): T
     write(`${base}/${sessionId}/media`, 'POST', input, 'Could not add the link.'), [write, base]);
   const removeMedia = useCallback((sessionId: number, mediaId: number) =>
     write(`${base}/${sessionId}/media/${mediaId}`, 'DELETE', undefined, 'Could not remove the link.'), [write, base]);
+  const setKeySet = useCallback((sessionId: number, setNo: number | null) =>
+    write(`${base}/${sessionId}/key-set`, 'PUT', { set_no: setNo }, 'Could not mark the set.'), [write, base]);
 
-  return { data, loading, loadError, busy, create, update, remove, addMedia, removeMedia };
+  const loadSets = useCallback(async (sessionId: number) => {
+    if (!base) return null;
+    try {
+      const r = await publicationsApiFetch(`${base}/${sessionId}/sets`, { cache: 'no-store' });
+      return r.ok ? await r.json() as TrainingSessionSets : null;
+    } catch {
+      return null;
+    }
+  }, [base]);
+
+  const markSeen = useCallback(async () => {
+    if (!base) return;
+    await publicationsApiFetch(`${base}/seen`, { method: 'PUT' }).catch(() => undefined);
+  }, [base]);
+
+  return {
+    data, loading, loadError, busy, create, update, remove, addMedia, removeMedia, setKeySet, loadSets, markSeen,
+  };
 }
 
 /** Подпись тренировки: название тренера, иначе план из источника, иначе «Training». */

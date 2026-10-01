@@ -202,6 +202,29 @@ export interface TrainingSessionMedia {
   mine: boolean;
   /** Своё — автор, любое — управляющий. */
   can_delete: boolean;
+  /** Добавил другой после того, как зритель открывал ленту (не старше 14 дней) — «NEW» (Т1б). */
+  is_new?: boolean;
+}
+
+/** Показатели карточки тренировки (Т1а, Р2): объём ОДНОГО пловца и сколько записано. */
+export interface TrainingSessionStats {
+  /** Метры; клиент пишет `2.4 km`. */
+  meters: number;
+  swimmers: number;
+}
+
+/** Строка «You» (Т1а, Р4): мой быстрейший повтор в сете, помеченном тренером ★. */
+export interface TrainingMyKey {
+  set_no: number;
+  order_no: number;
+  swimmer_id: number;
+  kind: 'me' | 'family';
+  name: string;
+  name_en: string;
+  distance: string;
+  style: string;
+  /** Время как записано — тренировочный замер (И11 к нему не применяется). */
+  time: string;
 }
 
 export interface TrainingSession {
@@ -220,12 +243,53 @@ export interface TrainingSession {
   has_results: boolean;
   created_in_app: boolean;
   media: TrainingSessionMedia[];
+  /** null — времён нет (карточка без показателей). */
+  stats?: TrainingSessionStats | null;
+  /** Ключевой сет — ★ тренера; null — не помечен. */
+  key_set_no?: number | null;
+  /** null — ★ нет или моих повторов в сете нет: строки «You» нет. */
+  my_key?: TrainingMyKey | null;
 }
 
 export interface TrainingSessionList {
   sessions: TrainingSession[];
   can_manage: boolean;
   can_add_media: boolean;
+  /** Медиа других после `PUT …/sessions/seen` зрителя (не старше 14 дней) — акцентная метка (Т1б). */
+  new_media_count?: number;
+}
+
+/** Строка «Sets & times»: `1.1 · имя · время · V3 · уровень` (5a #4). */
+export interface TrainingSetRow {
+  order_no: number;
+  swimmer_id: number;
+  name: string;
+  name_en: string;
+  distance: string;
+  style: string;
+  /** null — повтор без замера. */
+  time: string | null;
+  /** v1..v5; null — не задана. */
+  intensity: string | null;
+  level: { id: number; rank: number; name: string; color?: string | null } | null;
+  /** Мой пловец (сам или семья) — подсветка и фильтр «Me». */
+  mine: boolean;
+}
+
+export interface TrainingSet {
+  set_no: number;
+  /** Помечен тренером ★. */
+  is_key: boolean;
+  rows: TrainingSetRow[];
+}
+
+/** `GET /api/hub-groups/{id}/sessions/{sid}/sets` — лениво при раскрытии (Т1а). */
+export interface TrainingSessionSets {
+  session_id: number;
+  key_set_no: number | null;
+  /** Управляющий — может ставить ★. */
+  can_manage: boolean;
+  sets: TrainingSet[];
 }
 
 export interface TrainingSessionInput {
@@ -390,6 +454,8 @@ export interface HubGroupDetails {
   training_schedule?: GroupTrainingSchedule | null;
   /** Ближайшее занятие по расписанию (считает сервер). */
   next_training?: NextTraining | null;
+  /** До трёх ближайших занятий (первое = `next_training`) — вид Next таба Trainings (Т1б). */
+  next_trainings?: NextTraining[];
 }
 
 // ── Уровни пловцов группы (docs/plans/lane-plans-plan.md, L1) ─────────────────
@@ -491,7 +557,15 @@ export interface LanePlan {
    * «Мои» пловцы этого плана — карточка «Your lane». Только подсветка, прав не даёт:
    * `me` — сам зритель, `family` — за кого он смотрит. Сперва `me`.
    */
-  my_swimmers: { swimmer_id: number; kind: 'me' | 'family' }[];
+  my_swimmers: {
+    swimmer_id: number;
+    kind: 'me' | 'family';
+    /**
+     * С какой дорожки тренер перенёс пловца в опубликованном плане после того, как зритель
+     * открывал Lanes (`PUT …/lane-plans/seen`) — золотая метка (Т1б). null — не переносили / видел.
+     */
+    moved_from_lane?: number | null;
+  }[];
 }
 
 export interface LanePlanInput {

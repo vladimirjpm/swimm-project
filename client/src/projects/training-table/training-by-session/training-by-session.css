@@ -77,6 +77,8 @@
 .tbs-media-album { position: relative; }
 /* Карточка тренировок группы: лента без боковых отступов журнала */
 .tbs-media-strip.tbs-media-strip--flush { padding: 0; }
+/* Лента тренировок группы на десктопе: плитки крупнее (110×72) */
+.tbs-media-strip--lg .tbs-media-tile { width: 110px; height: 72px; }
 
 .tbs-media-album {
   display: flex; align-items: center; justify-content: center;

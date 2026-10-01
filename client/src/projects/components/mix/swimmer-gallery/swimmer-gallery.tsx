@@ -17,18 +17,6 @@ interface UI_SwimmerGalleryProps {
   onClose?: () => void;
 }
 
-const getEmbedUrl = (item: GalleryItem): string | null => {
-  if (item.sourceType === 'youtube') {
-    const id = item.code ?? HelperMedia.extractYoutubeId(item.url);
-    if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
-  }
-  if (item.sourceType === 'vimeo') {
-    const id = item.code ?? HelperMedia.extractVimeoId(item.url);
-    if (id) return `https://player.vimeo.com/video/${id}`;
-  }
-  return null;
-};
-
 const GalleryItemView: React.FC<{ item: GalleryItem }> = ({ item }) => {
   if (item.type === 'image') {
     return (
@@ -42,7 +30,7 @@ const GalleryItemView: React.FC<{ item: GalleryItem }> = ({ item }) => {
   }
 
   // video
-  const embedUrl = getEmbedUrl(item);
+  const embedUrl = HelperMedia.embedUrl(item.sourceType, item.url, item.code);
   if (embedUrl) {
     return (
       <iframe

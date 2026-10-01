@@ -7,7 +7,7 @@ import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from './use
 import GroupHero from './components/group-hero';
 import { GroupIcon } from './components/group-bits';
 import { GroupResultsTab, GROUP_RESULTS_VIEWS, type GroupResultsView } from './components/group-competitions';
-import GroupTrainingsTab from './components/group-trainings-tab';
+import GroupTrainingsTab from './components/trainings/trainings-tab';
 import { formatNextDate, scheduleDaysLabel } from './components/group-training-slots';
 import { readViewParam, rewriteLegacyTab, writeViewParam } from '../components/deep/view-chips';
 import { useTrainingRsvp } from './use-training-rsvp';
@@ -275,7 +275,7 @@ function GroupPage({ slug }: { slug: string }) {
       icon: '◷',
       label: 'Trainings',
       shortLabel: 'Train',
-      sub: manages || isMember ? 'sessions · lanes' : '🔒 members only',
+      sub: manages || isMember ? 'trainings · lanes' : '🔒 members only',
       // Управляющему — инструмент (Coach tools), участнику — обычный таб. Непайщику замок, а
       // не пропажа таба (правило каркаса: locked ≠ «не класть»). Внутри — Sessions | Lanes:
       // план дорожек был отдельным табом (docs/plans/lane-plans-plan.md).

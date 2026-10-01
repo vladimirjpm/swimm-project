@@ -59,6 +59,24 @@ export default class HelperMedia {
   }
 
   /**
+   * Адрес встраиваемого плеера: YouTube (без cookies) и Vimeo; у остальных источников — null
+   * (прямой файл или ссылка «Open ↗»). `code` — готовый id ролика, если он уже известен
+   * (у галереи пловца он приходит отдельным полем), иначе берётся из адреса.
+   * Единственная копия: лайтбокс галереи пловца и лайтбокс тренировок строят адрес здесь.
+   */
+  static embedUrl(sourceType: string | undefined, url?: string | null, code?: string | null): string | null {
+    if (sourceType === 'youtube') {
+      const id = code ?? HelperMedia.extractYoutubeId(url);
+      if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
+    }
+    if (sourceType === 'vimeo') {
+      const id = code ?? HelperMedia.extractVimeoId(url);
+      if (id) return `https://player.vimeo.com/video/${id}`;
+    }
+    return null;
+  }
+
+  /**
    * URL превью-картинки для тайла галереи: image — сам URL (Drive-ссылка → прямой адрес),
    * youtube — статичный кадр с img.youtube.com; для vimeo/other/album превью нет
    * (null → иконка-заглушка).

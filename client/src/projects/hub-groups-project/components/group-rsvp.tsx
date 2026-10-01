@@ -1,13 +1,11 @@
 import React from 'react';
-import { formatBreakLength } from './group-pool';
 import { rsvpPersonKey } from '../use-training-rsvp';
-import PersonStatusSelect, { statusOf } from './person-status';
-import type { PersonStatus, RsvpAnswer, RsvpNote, TrainingRsvp, TrainingRsvpPerson } from '../types';
+import type { RsvpAnswer, TrainingRsvp, TrainingRsvpPerson } from '../types';
 
 /**
  * Кирпичи ответов «иду / не уверен / не приду» (хендофф group-club-changes §4, вариант 2a;
- * план docs/plans/entity-hero-roles-plan.md, Ш2): полоса со счётчиками, три кнопки, строка
- * тренера (аватары + «Who's coming →») и список людей для таба Trainings.
+ * план docs/plans/entity-hero-roles-plan.md, Ш2): полоса со счётчиками, три кнопки и строка
+ * тренера (аватары + «Who's coming →»). Список людей тренера — `trainings/coach/roll-call.tsx` (Т6).
  *
  * Цвета — роли темы: иду `--deep-live`, не уверен `--deep-gold-bar` / `--deep-gold`, не приду
  * `--deep-danger`. Текст на ЗАЛИТОЙ кнопке — `--deep-accent-ink`: в тёмной теме цвета светлые,
@@ -34,9 +32,6 @@ const TONE: Record<RsvpAnswer, Tone> = {
 
 const BUTTON_LABEL: Record<RsvpAnswer, string> = { yes: '✓ Going', maybe: '? Not sure', no: "✕ Can't come" };
 const COUNT_LABEL: Record<RsvpAnswer, string> = { yes: 'going', maybe: 'not sure', no: 'not going' };
-const NOTE_LABEL: Record<RsvpNote, string> = {
-  late: 'late ~10 min', 'first-hour': '1st hour only', 'leaving-early': 'leaving early',
-};
 const ORDER: RsvpAnswer[] = ['yes', 'maybe', 'no'];
 
 /**
@@ -171,122 +166,6 @@ function RsvpStaffRow({ rsvp, onOpen }: { rsvp: TrainingRsvp; onOpen: () => void
   );
 }
 
-type PeopleGroup = RsvpAnswer | 'none' | 'break' | 'not_training';
-
-const GROUP_TITLE: Record<PeopleGroup, string> = {
-  yes: 'Going', maybe: 'Not sure', no: "Can't come", none: 'No answer', break: 'On break',
-  not_training: 'Doesn’t train with us',
-};
-
-/**
- * В какой группе списка человек: ответ, иначе «не тренируется с группой» (Р74), иначе «на
- * перерыве» (Ш3.1), иначе «нет ответа».
- */
-const groupOf = (p: TrainingRsvpPerson): PeopleGroup =>
-  p.answer ?? (p.not_training ? 'not_training' : p.on_break ? 'break' : 'none');
-
-/**
- * Список «кто идёт» для управляющего (таб Trainings → Sessions): группы Going / Not sure /
- * Can't come / No answer / On break; у каждого — три маленькие кнопки, тренер ставит ответ за
- * человека. Ответ, поставленный тренером, помечен «by coach»; вернувшийся с перерыва ответом
- * «Going» — «back after …». `onSetStatus` — тренер ставит статус (Р74): в строю / перерыв
- * (бессрочно) / «не тренируется с группой».
- * Пловцы группы без аккаунта (Р73) — в том же списке с пометкой «no account»: за них отвечает
- * только тренер.
- */
-function RsvpPeopleList({
-  rsvp, onAnswerFor, disabled, onSetStatus, statusBusy,
-}: {
-  rsvp: TrainingRsvp;
-  onAnswerFor: (person: TrainingRsvpPerson, next: RsvpAnswer | null) => void;
-  disabled?: boolean;
-  onSetStatus?: (person: TrainingRsvpPerson, status: PersonStatus) => Promise<string | null>;
-  statusBusy?: boolean;
-}) {
-  const [statusError, setStatusError] = React.useState<string | null>(null);
-  const people = rsvp.people ?? [];
-  const groups: PeopleGroup[] = ['yes', 'maybe', 'no', 'none', 'break', 'not_training'];
-  const setStatus = async (p: TrainingRsvpPerson, status: PersonStatus) => {
-    if (!onSetStatus) return;
-    setStatusError(null);
-    setStatusError(await onSetStatus(p, status));
-  };
-  if (people.length === 0) {
-    return (
-      <p className="m-0 text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-        The group has no member accounts yet — people answer after they join the group.
-      </p>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-3">
-      {groups.map((g) => {
-        const rows = people.filter((p) => groupOf(p) === g);
-        if (rows.length === 0) return null;
-        return (
-          <div key={g}>
-            <div
-              className="mb-1.5 text-[10px] font-extrabold uppercase tracking-[.08em]"
-              style={{ color: g === 'none' || g === 'break' || g === 'not_training' ? 'var(--deep-text-mute)' : TONE[g].fg }}
-            >
-              {GROUP_TITLE[g]} · {rows.length}
-            </div>
-            <div className="flex flex-col gap-1">
-              {rows.map((p) => (
-                <div
-                  key={rsvpPersonKey(p)}
-                  className="flex items-center gap-2.5 px-2.5 py-1.5"
-                  style={{ background: 'var(--deep-card-bg-row)', borderRadius: 'var(--deep-radius-row)' }}
-                >
-                  <RsvpAvatar person={p} size={26} ring={false} />
-                  <div className="min-w-0 flex-1">
-                    <div dir="auto" className="truncate text-left text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
-                      {p.name}
-                    </div>
-                    {(p.note || p.set_by_coach || p.on_break || p.not_training || p.back_after_days != null || p.user_id == null) && (
-                      <div className="truncate text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-                        {[
-                          p.user_id == null ? 'no account' : null,
-                          p.note ? NOTE_LABEL[p.note] : null,
-                          p.set_by_coach ? 'by coach' : null,
-                          p.on_break && p.answer ? 'on break' : null,
-                          p.not_training && p.answer ? 'doesn’t train with us' : null,
-                          p.back_after_days != null ? `back after ${formatBreakLength(p.back_after_days)}` : null,
-                        ].filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                    {/* Статус — под именем, а не в ряду: в ряду на телефоне имени оставалось ~55px. */}
-                    {onSetStatus && (
-                      <div className="mt-1">
-                        <PersonStatusSelect
-                          compact
-                          value={statusOf(p)}
-                          disabled={statusBusy}
-                          name={p.name}
-                          onChange={(next) => { if (next !== 'inactive') void setStatus(p, next); }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <RsvpButtons
-                    size="compact"
-                    current={p.answer}
-                    disabled={disabled}
-                    onAnswer={(next) => onAnswerFor(p, next)}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-      {statusError && (
-        <p className="m-0 text-[12px] font-extrabold" style={{ color: 'var(--deep-danger)' }} role="alert">{statusError}</p>
-      )}
-    </div>
-  );
-}
-
 /** Чип липкой полосы: ответ участника / «going?» / счётчики тренеру (хендофф §5). */
 function rsvpStickyChip(rsvp: TrainingRsvp, dayLabel: string): { label: string; style: React.CSSProperties } {
   if (rsvp.can_manage) {
@@ -306,4 +185,4 @@ function rsvpStickyChip(rsvp: TrainingRsvp, dayLabel: string): { label: string; 
   return { label, style: { borderColor: TONE[a].fill, background: TONE[a].fill, color: 'var(--deep-accent-ink)' } };
 }
 
-export { RsvpBar, RsvpButtons, RsvpStaffRow, RsvpPeopleList, rsvpStickyChip };
+export { RsvpBar, RsvpButtons, RsvpStaffRow, rsvpStickyChip };

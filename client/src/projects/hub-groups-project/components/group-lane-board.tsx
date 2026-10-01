@@ -1,14 +1,16 @@
 import React from 'react';
 import type { LanePlan, LanePlanLane, LanePlanSwimmer } from '../types';
+import LaneCircle from './group-lane-circle';
 import { levelColor } from './level-color';
+import { workoutOneLine } from './trainings/next/next-format';
 
 /**
- * Доска плана дорожек — только просмотр (docs/plans/lane-plans-plan.md). Одна на тренера
- * (вид между правками) и участника: дорожка = карточка с уровнем, заданием и людьми, первый
- * в дорожке ведёт. Полоска слева — цвет уровня, тот же, что в карточке Levels.
- *
- * L4: над доской — карточка «Your lane» на каждого «своего» пловца (`my_swimmers`: сам зритель
- * и его семья), в дорожках их имена подсвечены. Это только подсветка, прав она не даёт.
+ * Доска плана дорожек — вид участника (Т7, хендофф Trainings Tab, 1e; docs/plans/lane-plans-plan.md).
+ * Сверху — «Your lane» на каждого «своего» пловца (`my_swimmers`: сам зритель и его семья) —
+ * крупно: номер и уровень, задание, товарищи по дорожке; перенесённому тренером — золотая заметка
+ * «Coach moved you from lane 3 to 2» (метку не гасим, `PUT …/lane-plans/seen` вызывает Т8). Остальные
+ * дорожки — компактно одним бассейном. Это только подсветка, прав она не даёт. У тренера доски нет
+ * — он сразу в редакторе (`group-lane-editor.tsx`).
  */
 
 export function SwimmerName({ swimmer }: { swimmer: Pick<LanePlanSwimmer, 'name' | 'name_en'> }) {
@@ -25,10 +27,12 @@ export function LevelChip({ level }: { level: NonNullable<LanePlanLane['level']>
   );
 }
 
-const ordinal = (n: number) => {
-  const tail = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
-  return `${n}${tail}`;
-};
+/** Подпись дорожки: «2 · medium» (уровень в нижнем регистре, если он есть) либо «2». */
+function laneLabel(lane: LanePlanLane): string {
+  return lane.level ? `${lane.lane_no} · ${lane.level.name.toLowerCase()}` : String(lane.lane_no);
+}
+
+const laneColor = (lane: LanePlanLane | null) => (lane?.level ? levelColor(lane.level) : null);
 
 /** Где стоит пловец: дорожка и место в ней, либо Unassigned. */
 function findPlace(plan: LanePlan, swimmerId: number) {
@@ -40,46 +44,79 @@ function findPlace(plan: LanePlan, swimmerId: number) {
   return swimmer ? { lane: null, index: -1, swimmer } : null;
 }
 
-function YourLaneCard({ plan, swimmerId, kind }: { plan: LanePlan; swimmerId: number; kind: 'me' | 'family' }) {
+/** Золотая заметка о переносе — над карточкой «Your lane». */
+function MovedNote({ kind, swimmer, from, lane }: {
+  kind: 'me' | 'family';
+  swimmer: LanePlanSwimmer;
+  from: number;
+  lane: LanePlanLane | null;
+}) {
+  return (
+    <div
+      role="status"
+      className="flex items-center gap-2 rounded-full border text-[11px] font-bold"
+      style={{
+        padding: '6px 12px', borderColor: 'var(--deep-gold-border)', background: 'var(--deep-gold-chip)', color: 'var(--deep-gold)',
+      }}
+    >
+      <span aria-hidden="true" className="inline-block flex-none rounded-full" style={{ width: 7, height: 7, background: 'var(--deep-gold-bar)' }} />
+      <span className="min-w-0">
+        Coach moved {kind === 'me' ? 'you' : <SwimmerName swimmer={swimmer} />} from lane {from} to {lane ? lane.lane_no : 'unassigned'}
+      </span>
+    </div>
+  );
+}
+
+function YourLaneCard({
+  plan, swimmerId, kind, mineMe,
+}: {
+  plan: LanePlan;
+  swimmerId: number;
+  kind: 'me' | 'family';
+  /** Пловцы-«я» зрителя: у них в списке дорожки стоит «you». */
+  mineMe: Set<number>;
+}) {
   const place = findPlace(plan, swimmerId);
   if (!place) return null;
-  const { lane, index, swimmer } = place;
-  const color = lane?.level ? levelColor(lane.level) : 'var(--t-accent)';
+  const { lane, swimmer } = place;
+  const workout = lane?.workout?.trim() ? lane.workout : null;
 
   return (
     <section
-      className="flex min-w-0 flex-col gap-2 rounded-[14px] border-2 border-[var(--t-accent)] bg-[var(--t-accent-soft)] p-3.5"
+      className="flex min-w-0 flex-col gap-2 rounded-[16px] border p-3.5"
+      style={{ borderColor: 'var(--deep-accent-border)', background: 'var(--deep-pool-water)' }}
       aria-label={kind === 'me' ? 'Your lane' : `Lane for ${swimmer.name || swimmer.name_en}`}
     >
-      <div className="flex items-baseline gap-2">
-        <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-[var(--t-accent)]">
-          {kind === 'me' ? 'Your lane' : 'Lane for'}
-        </span>
-        <span className="min-w-0 truncate text-[13px] font-black text-[var(--t-text)]">
-          <SwimmerName swimmer={swimmer} />
-        </span>
+      <div className="text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--deep-pool-label)' }}>
+        {kind === 'me' ? 'Your lane' : <>Lane for <SwimmerName swimmer={swimmer} /></>}
       </div>
 
       {lane ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-baseline gap-1.5">
-              <span className="text-[12px] font-extrabold text-[var(--t-text-2)]">Lane</span>
-              <span className="hp-mono text-[34px] font-black leading-none" style={{ color }}>{lane.lane_no}</span>
-            </span>
-            {lane.level && <LevelChip level={lane.level} />}
-            <span className="ml-auto text-[12px] font-bold text-[var(--t-text-2)]">
-              {index === 0
-                ? (lane.swimmers.length > 1 ? `leads · ${lane.swimmers.length} in the lane` : 'alone in the lane')
-                : `${ordinal(index + 1)} of ${lane.swimmers.length}`}
-            </span>
+          <div className="text-[28px] leading-none" style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}>
+            {laneLabel(lane)}
           </div>
-          {lane.workout
-            ? <p className="m-0 whitespace-pre-wrap text-[14px] font-bold leading-[1.45] text-[var(--t-text)]">{lane.workout}</p>
-            : <p className="m-0 text-[12px] italic text-[var(--t-text-3)]">No workout yet</p>}
+          {workout && (
+            <div dir="auto" className="hp-mono whitespace-pre-wrap text-[13px] font-extrabold leading-[1.6]" style={{ color: 'var(--deep-text)' }}>
+              {workout}
+            </div>
+          )}
+          <ul className="m-0 mt-1 flex list-none flex-col gap-1 p-0">
+            {lane.swimmers.map((s) => (
+              <li key={s.swimmer_id} className="flex min-w-0 items-center gap-2">
+                <LaneCircle name={s.name || s.name_en} color={laneColor(lane)} size={24} />
+                <span className="min-w-0 truncate text-[12.5px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
+                  <SwimmerName swimmer={s} />
+                </span>
+                {mineMe.has(s.swimmer_id) && (
+                  <span className="flex-none text-[10.5px]" style={{ color: 'var(--deep-accent)' }}>you</span>
+                )}
+              </li>
+            ))}
+          </ul>
         </>
       ) : (
-        <p className="m-0 text-[13px] font-bold text-[var(--t-text-2)]">
+        <p className="m-0 text-[13px] font-bold" style={{ color: 'var(--t-text-3)' }}>
           On the list for today — the coach hasn’t picked a lane yet.
         </p>
       )}
@@ -87,80 +124,90 @@ function YourLaneCard({ plan, swimmerId, kind }: { plan: LanePlan; swimmerId: nu
   );
 }
 
-function LaneCard({ lane, mine }: { lane: LanePlanLane; mine: Set<number> }) {
+/** Остальные дорожки — один бассейн: строка на дорожку, пунктир каната между ними. */
+function OtherLanesPool({ lanes }: { lanes: LanePlanLane[] }) {
   return (
-    <section
-      className="flex min-w-0 flex-col rounded-[12px] border border-[var(--t-border)] bg-[var(--t-nested)] p-3"
-      style={{ borderLeft: `4px solid ${lane.level ? levelColor(lane.level) : 'var(--t-border)'}` }}
-      aria-label={`Lane ${lane.lane_no}`}
+    <div
+      className="overflow-hidden rounded-[12px] border"
+      style={{ borderColor: 'var(--deep-pool-border)', background: 'var(--deep-pool-water)' }}
+      role="list"
+      aria-label="Lanes"
     >
-      <header className="flex items-center gap-2">
-        <span className="hp-mono text-[20px] font-black leading-none text-[var(--t-text)]">{lane.lane_no}</span>
-        <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-[var(--t-text-3)]">Lane</span>
-        <span className="ml-auto min-w-0">{lane.level && <LevelChip level={lane.level} />}</span>
-      </header>
-
-      {lane.workout
-        ? <p className="m-0 mt-2 whitespace-pre-wrap text-[13px] font-semibold leading-[1.45] text-[var(--t-text)]">{lane.workout}</p>
-        : <p className="m-0 mt-2 text-[12px] italic text-[var(--t-text-3)]">No workout yet</p>}
-
-      {lane.swimmers.length > 0 ? (
-        <ol className="m-0 mt-2.5 flex list-none flex-col gap-1 border-t border-[var(--t-border-2)] p-0 pt-2">
-          {lane.swimmers.map((s, i) => {
-            const isMine = mine.has(s.swimmer_id);
-            return (
-              <li
-                key={s.swimmer_id}
-                className={`flex items-baseline gap-2 rounded-[6px] text-[13px] ${isMine ? '-mx-1.5 bg-[var(--t-accent-soft)] px-1.5' : ''}`}
-                aria-current={isMine ? 'true' : undefined}
-              >
-                <span className="hp-mono w-[14px] shrink-0 text-right text-[11px] text-[var(--t-text-3)]">{i + 1}</span>
-                <span className={`min-w-0 truncate font-bold ${
-                  s.left_group ? 'text-[var(--t-text-3)]' : isMine ? 'text-[var(--t-accent)]' : 'text-[var(--t-text)]'
-                }`}>
-                  <SwimmerName swimmer={s} />
+      {lanes.map((lane, i) => {
+        const workout = workoutOneLine(lane.workout);
+        return (
+          <div
+            key={lane.lane_no}
+            role="listitem"
+            className="flex min-h-[48px] items-center gap-2.5"
+            style={{ padding: '6px 10px', borderTop: i === 0 ? undefined : '1px dashed var(--deep-pool-rope)' }}
+          >
+            <div className="w-[96px] flex-none">
+              <div className="hp-mono truncate text-[10.5px] font-extrabold" style={{ color: 'var(--deep-pool-label)' }}>
+                {laneLabel(lane)}
+              </div>
+              {workout && (
+                <div dir="auto" className="hp-mono truncate text-[10px] font-bold" style={{ color: 'var(--t-text-3)' }} title={workout}>
+                  {workout}
+                </div>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              {lane.swimmers.map((s) => (
+                <span key={s.swimmer_id} title={s.name || s.name_en}>
+                  <LaneCircle name={s.name || s.name_en} color={laneColor(lane)} size={26} />
                 </span>
-                {s.left_group && <span className="text-[10.5px] text-[var(--t-text-3)]">left the group</span>}
-              </li>
-            );
-          })}
-        </ol>
-      ) : (
-        <p className="m-0 mt-2.5 border-t border-[var(--t-border-2)] pt-2 text-[12px] text-[var(--t-text-3)]">Empty lane</p>
-      )}
-    </section>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
 function GroupLaneBoard({ plan }: { plan: LanePlan }) {
   const mySwimmers = plan.my_swimmers ?? [];
   const mine = new Set(mySwimmers.map((m) => m.swimmer_id));
+  const mineMe = new Set(mySwimmers.filter((m) => m.kind === 'me').map((m) => m.swimmer_id));
+  // Дорожки моих пловцов уже выше крупно — в общий бассейн не входят.
+  const myLaneNos = new Set(mySwimmers.map((m) => findPlace(plan, m.swimmer_id)?.lane?.lane_no).filter((n): n is number => n != null));
+  const otherLanes = plan.lanes.filter((l) => !myLaneNos.has(l.lane_no));
 
   return (
-    <div>
+    <div className="flex min-w-0 flex-col gap-3">
       {mySwimmers.length > 0 && (
-        <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {mySwimmers.map((m) => (
-            <YourLaneCard key={m.swimmer_id} plan={plan} swimmerId={m.swimmer_id} kind={m.kind} />
-          ))}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {mySwimmers.map((m) => {
+            const place = findPlace(plan, m.swimmer_id);
+            return (
+              <div key={m.swimmer_id} className="flex min-w-0 flex-col gap-2">
+                {place && m.moved_from_lane != null && (
+                  <MovedNote kind={m.kind} swimmer={place.swimmer} from={m.moved_from_lane} lane={place.lane} />
+                )}
+                <YourLaneCard plan={plan} swimmerId={m.swimmer_id} kind={m.kind} mineMe={mineMe} />
+              </div>
+            );
+          })}
         </div>
       )}
       {plan.note && (
-        <p className="m-0 mb-3 whitespace-pre-wrap rounded-[10px] bg-[var(--t-accent-soft)] px-3 py-2 text-[13px] font-semibold text-[var(--t-text)]">
+        <p
+          className="m-0 whitespace-pre-wrap rounded-[10px] px-3 py-2 text-[13px] font-semibold"
+          style={{ background: 'var(--deep-accent-soft)', color: 'var(--deep-text)' }}
+        >
           {plan.note}
         </p>
       )}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 min-[1200px]:grid-cols-3">
-        {plan.lanes.map((lane) => <LaneCard key={lane.lane_no} lane={lane} mine={mine} />)}
-      </div>
+      {otherLanes.length > 0 && <OtherLanesPool lanes={otherLanes} />}
       {plan.unassigned.length > 0 && (
-        <div className="mt-3 rounded-[12px] border border-dashed border-[var(--t-border)] p-3">
-          <div className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-[var(--t-text-3)]">
+        <div className="rounded-[12px] p-3" style={{ border: '1px dashed var(--deep-card-border)' }}>
+          <div className="text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
             Not placed in a lane yet
           </div>
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[13px] font-bold">
             {plan.unassigned.map((s) => (
-              <span key={s.swimmer_id} className={mine.has(s.swimmer_id) ? 'text-[var(--t-accent)]' : 'text-[var(--t-text)]'}>
+              <span key={s.swimmer_id} style={{ color: mine.has(s.swimmer_id) ? 'var(--deep-accent)' : 'var(--deep-text)' }}>
                 <SwimmerName swimmer={s} />
               </span>
             ))}

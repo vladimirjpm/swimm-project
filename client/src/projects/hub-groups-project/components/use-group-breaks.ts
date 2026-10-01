@@ -13,6 +13,9 @@ import { lanePlansApi } from './lane-plans-api';
 export function useGroupBreaks(groupId: number, enabled: boolean, onChanged?: () => void) {
   const [data, setData] = useState<HubGroupBreaks | null>(null);
   const [busy, setBusy] = useState(false);
+  const [version, setVersion] = useState(0);
+  /** Перечитать с сервера — после того, что меняет перерыв со стороны (ответ «Going» его снимает). */
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     if (!enabled) { setData(null); return undefined; }
@@ -21,7 +24,7 @@ export function useGroupBreaks(groupId: number, enabled: boolean, onChanged?: ()
       if (!cancelled && r.ok && r.data) setData(r.data);
     });
     return () => { cancelled = true; };
-  }, [groupId, enabled]);
+  }, [groupId, enabled, version]);
 
   /** Возвращает текст ошибки сервера или null. */
   const setBreak = useCallback(async (input: BreakInput): Promise<string | null> => {
@@ -36,5 +39,5 @@ export function useGroupBreaks(groupId: number, enabled: boolean, onChanged?: ()
     return r.error ?? 'Could not save. Try again.';
   }, [groupId, onChanged]);
 
-  return { data, busy, setBreak };
+  return { data, busy, setBreak, reload };
 }
