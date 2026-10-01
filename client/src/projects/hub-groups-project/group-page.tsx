@@ -139,7 +139,10 @@ function GroupPage({ slug }: { slug: string }) {
 
   // Управляющий группой — тот же гейт, что у инбокса и тренировок: админ сайта ИЛИ это моя
   // группа. Права на таб `Admin` и на его содержимое обязаны считаться одинаково.
-  const manages = group != null && (isAdmin || myGroups.some((g) => g.id === group.id));
+  // Управляет ЭТОЙ группой (владелец / админ группы) — без админа сайта: от этого зависит чип
+  // членства в шапке («✓ Coach» вместо «+ Join group»), а админ сайта группе не тренер.
+  const managesGroup = group != null && myGroups.some((g) => g.id === group.id);
+  const manages = managesGroup || (group != null && isAdmin);
   const isMember = group != null && joined.some((j) => j.id === group.id && j.status === 'active');
 
   // Виртуальное «Моё избранное» — реальной группы за ним нет: ни медиа (галерея висит на
@@ -320,7 +323,7 @@ function GroupPage({ slug }: { slug: string }) {
       locked: !(manages || isMember),
       // Замок гостя / не участника (хендофф 4a, Т9): карточка пустого состояния, под ней — расписание
       // (то, что и так видно в шапке) и тот же чип вступления, что в шапке (одно состояние членства).
-      lockNotice: <GroupTrainingsLock group={group} membership={{ isAuthenticated, status: membershipStatus, join, leave }} />,
+      lockNotice: <GroupTrainingsLock group={group} membership={{ isAuthenticated, status: membershipStatus, join, leave, manages: managesGroup }} />,
       cards: (nav: EntityTabNav<GroupTab>) => [{
         id: 'trainings',
         render: () => (
@@ -418,7 +421,7 @@ function GroupPage({ slug }: { slug: string }) {
             <GroupHero
               group={group}
               insider={manages || isMember}
-              membership={{ isAuthenticated, status: membershipStatus, join, leave }}
+              membership={{ isAuthenticated, status: membershipStatus, join, leave, manages: managesGroup }}
               rsvp={rsvp}
               onWhosComing={() => nav.go('trainings')}
               hideTraining={banner}
