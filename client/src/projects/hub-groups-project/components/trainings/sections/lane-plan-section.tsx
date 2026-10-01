@@ -9,19 +9,24 @@ import { TrainingsSection } from '../trainings-section';
  * Из контекста берёт ширину (`isDesktop`), флаг несохранённых правок (`setLanesDirty` — каркас
  * спрашивает «Discard?» при смене вида) и перечитывание списка планов (`reloadLanePlans` — вид
  * Next тренера показывает статус плана).
+ *
+ * На телефоне — в `deep-panel-row`, как лента и Next: панель там без боковых паддингов, и без
+ * обёртки стрелки дат, тулбар и дорожки стояли вплотную к краю экрана (найдено на Т10).
  */
 function LanePlanSection() {
   const { group, manages, isDesktop, setLanesDirty, reloadLanePlans, markLanesShown } = useTrainingsTab();
   return (
     <TrainingsSection id="lane-plan" bare>
-      <GroupLanes
-        groupId={group.id}
-        manages={manages}
-        desktop={isDesktop}
-        onDirtyChange={setLanesDirty}
-        onPlansChanged={reloadLanePlans}
-        onPlanShown={markLanesShown}
-      />
+      <div className={isDesktop ? undefined : 'deep-panel-row'}>
+        <GroupLanes
+          groupId={group.id}
+          manages={manages}
+          desktop={isDesktop}
+          onDirtyChange={setLanesDirty}
+          onPlansChanged={reloadLanePlans}
+          onPlanShown={markLanesShown}
+        />
+      </div>
     </TrainingsSection>
   );
 }
