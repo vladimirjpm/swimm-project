@@ -19,7 +19,7 @@ export function MarkDot({ mark }: { mark: TrainingMark }) {
       className="inline-flex shrink-0 items-center justify-center rounded-full text-[10px] font-black leading-none"
       style={mark.count != null
         ? { minWidth: 18, height: 18, padding: '0 5px', background: MARK_COLOR[mark.tone], color: 'var(--deep-accent-ink)' }
-        : { width: 8, height: 8, background: MARK_COLOR[mark.tone] }}
+        : { width: 7, height: 7, background: MARK_COLOR[mark.tone] }}
       role="img"
       aria-label={mark.label}
       title={mark.label}

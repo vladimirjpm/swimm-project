@@ -8,6 +8,8 @@ import GroupHero from './components/group-hero';
 import { GroupIcon } from './components/group-bits';
 import { GroupResultsTab, GROUP_RESULTS_VIEWS, type GroupResultsView } from './components/group-competitions';
 import GroupTrainingsTab from './components/trainings/trainings-tab';
+import { MarkDot } from './components/trainings/trainings-section';
+import { redMark } from './components/trainings/use-training-marks';
 import { formatNextDate, scheduleDaysLabel } from './components/group-training-slots';
 import { readViewParam, rewriteLegacyTab, writeViewParam } from '../components/deep/view-chips';
 import { useTrainingRsvp } from './use-training-rsvp';
@@ -141,6 +143,8 @@ function GroupPage({ slug }: { slug: string }) {
     group?.next_training?.id,
     real && (manages || isMember) && !membersOnly,
   );
+  // Не ответившие на ближайшее занятие — красный бейдж таба Trainings у тренера (Т8).
+  const trainingsRed = manages ? redMark(rsvp.rsvp) : null;
 
   // Пловцы группы (Р71) — тем же гейтом, что ответы на занятие: сервер ответил бы остальным 403.
   const insiderSlug = real && (manages || isMember) && !membersOnly ? group!.slug : null;
@@ -280,6 +284,10 @@ function GroupPage({ slug }: { slug: string }) {
       // не пропажа таба (правило каркаса: locked ≠ «не класть»). Внутри — Sessions | Lanes:
       // план дорожек был отдельным табом (docs/plans/lane-plans-plan.md).
       pinned: manages,
+      // Красная пилюля с числом не ответивших на ближайшее занятие (Т8) — только тренеру; участнику
+      // таб не закреплён, бейджа у него нет. Остальные метки таба вне его не показываем.
+      badge: trainingsRed?.count ? String(trainingsRed.count) : undefined,
+      badgeTone: 'danger' as const,
       locked: !(manages || isMember),
       lockNotice: (
         <div
@@ -428,12 +436,16 @@ function GroupStickyStatus({
   // тренеру — счётчики (хендофф §5).
   if (insider && next && rsvp && rsvp.session_id === next.id) {
     const chip = rsvpStickyChip(rsvp, formatNextDate(next.date).split(' ')[0]);
+    // Красная метка: участнику точка ПЕРЕД текстом, тренеру пилюля с числом ПОСЛЕ счётчиков.
+    const dot = chip.mark ? <MarkDot mark={chip.mark} /> : null;
     return (
       <span
-        className="hp-mono flex h-7 items-center rounded-[8px] border px-2.5 text-[11px] font-extrabold min-[960px]:h-[30px] min-[960px]:rounded-[9px] min-[960px]:px-3 min-[960px]:text-[12px]"
+        className="hp-mono flex h-7 items-center gap-1.5 rounded-[8px] border px-2.5 text-[11px] font-extrabold min-[960px]:h-[30px] min-[960px]:rounded-[9px] min-[960px]:px-3 min-[960px]:text-[12px]"
         style={chip.style}
       >
+        {!rsvp.can_manage && dot}
         {chip.label}
+        {rsvp.can_manage && dot}
       </span>
     );
   }

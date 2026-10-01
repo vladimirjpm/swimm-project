@@ -41,7 +41,7 @@ function statusInfo(status: LanePlanStatus | null): { text: string; color: strin
 }
 
 function GroupLanes({
-  groupId, manages, desktop, onDirtyChange, onPlansChanged,
+  groupId, manages, desktop, onDirtyChange, onPlansChanged, onPlanShown,
 }: {
   groupId: number;
   manages: boolean;
@@ -51,6 +51,12 @@ function GroupLanes({
   onDirtyChange?: (dirty: boolean) => void;
   /** План создан / сохранён / опубликован / удалён — вид Next тренера перечитывает статус плана. */
   onPlansChanged?: () => void;
+  /**
+   * Участнику: план на дату пришёл (или его нет) — каркас таба может гасить метку «тебя перенесли»
+   * (`PUT …/lane-plans/seen`). Раньше нельзя: тот PUT стирает `moved_from_lane`, и заметка о
+   * переносе не дошла бы до доски.
+   */
+  onPlanShown?: () => void;
 }) {
   const [plans, setPlans] = useState<LanePlanSummary[] | null>(null);
   const [listError, setListError] = useState(false);
@@ -118,6 +124,10 @@ function GroupLanes({
     });
     return () => { cancelled = true; };
   }, [groupId, date]);
+
+  useEffect(() => {
+    if (!manages && (state.kind === 'ready' || state.kind === 'none')) onPlanShown?.();
+  }, [manages, state.kind, onPlanShown]);
 
   // Флаг правок — наверх; при размонтировании (смена вида, уход с таба) сбрасывается.
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);

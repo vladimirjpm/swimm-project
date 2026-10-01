@@ -1,6 +1,7 @@
 import React from 'react';
 import { rsvpPersonKey } from '../use-training-rsvp';
 import type { RsvpAnswer, TrainingRsvp, TrainingRsvpPerson } from '../types';
+import { redMark, type TrainingMark } from './trainings/use-training-marks';
 
 /**
  * Кирпичи ответов «иду / не уверен / не приду» (хендофф group-club-changes §4, вариант 2a;
@@ -166,23 +167,30 @@ function RsvpStaffRow({ rsvp, onOpen }: { rsvp: TrainingRsvp; onOpen: () => void
   );
 }
 
-/** Чип липкой полосы: ответ участника / «going?» / счётчики тренеру (хендофф §5). */
-function rsvpStickyChip(rsvp: TrainingRsvp, dayLabel: string): { label: string; style: React.CSSProperties } {
+/**
+ * Чип липкой полосы: ответ участника / «Answer · Wed 20:00» / счётчики тренеру (хендофф §5).
+ * `mark` — красная метка (Т8): участнику точка перед текстом, тренеру пилюля с числом после; рисует вызывающий.
+ */
+function rsvpStickyChip(
+  rsvp: TrainingRsvp, dayLabel: string,
+): { label: string; style: React.CSSProperties; mark: TrainingMark | null } {
   if (rsvp.can_manage) {
     return {
       label: `${rsvp.yes} ✓ · ${rsvp.maybe} ? · ${rsvp.no} ✕`,
       style: { borderColor: 'var(--deep-ow-border)', background: 'var(--deep-ow-chip)', color: 'var(--deep-ow)' },
+      mark: redMark(rsvp),
     };
   }
   const a = rsvp.mine?.answer;
   if (!a) {
     return {
-      label: `${dayLabel} ${rsvp.start} · going?`,
-      style: { borderColor: 'var(--deep-live-border)', background: 'var(--deep-card-bg)', color: 'var(--deep-live)' },
+      label: `Answer · ${dayLabel} ${rsvp.start}`,
+      style: { borderColor: 'var(--deep-danger)', background: 'var(--deep-card-bg)', color: 'var(--deep-text)' },
+      mark: redMark(rsvp),
     };
   }
   const label = a === 'yes' ? `✓ Going · ${dayLabel} ${rsvp.start}` : a === 'maybe' ? `? Not sure · ${dayLabel}` : `✕ Can't · ${dayLabel}`;
-  return { label, style: { borderColor: TONE[a].fill, background: TONE[a].fill, color: 'var(--deep-accent-ink)' } };
+  return { label, style: { borderColor: TONE[a].fill, background: TONE[a].fill, color: 'var(--deep-accent-ink)' }, mark: null };
 }
 
 export { RsvpBar, RsvpButtons, RsvpStaffRow, rsvpStickyChip };

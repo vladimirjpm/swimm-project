@@ -39,6 +39,8 @@ export interface DeepTabItem<T extends string> {
   pinned?: boolean;
   /** Короткая метка у инструмента: «3 new» — ждущие заявки. Только у `pinned`. */
   badge?: string;
+  /** `danger` — бейдж красной пилюлей с числом («нужен ответ»), а не серым «· 3 new». */
+  badgeTone?: 'danger';
 }
 
 interface Props<T extends string> {
@@ -112,7 +114,11 @@ function DeepTabs<T extends string>({ tabs, active, onSelect, ariaLabel, toolsLa
               >
                 <span className="deep-tool-tab__icon" aria-hidden="true">{tab.icon}</span>
                 <span className="deep-tool-tab__name">{tab.label}</span>
-                {tab.badge && <span className="deep-tool-tab__badge">{tab.badge}</span>}
+                {tab.badge && (
+                  <span className={`deep-tool-tab__badge${tab.badgeTone === 'danger' ? ' deep-tool-tab__badge--danger' : ''}`}>
+                    {tab.badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>

@@ -4,6 +4,7 @@ import type { TrainingRsvpState } from '../../../use-training-rsvp';
 import { lanePlansApi } from '../../lane-plans-api';
 import { FullPool, MiniPool } from '../next/lane-block';
 import { useTrainingsTab } from '../trainings-context';
+import { MarkDot } from '../trainings-section';
 
 /**
  * Бассейн вида тренера (Т6, хендофф Trainings Tab, 2a / 3b): мини-бассейн (телефон) или полный
@@ -11,7 +12,8 @@ import { useTrainingsTab } from '../trainings-context';
  * дорожкам считает сервер (`lane_view` ответа занятия) — здесь только рисуем.
  *
  * Статус плана берём из `lanePlans` контекста (`Draft` / `Published` / нет плана). Число
- * неразложенных не показываем — его даёт только полный план (Т7/Т8).
+ * неразложенных даёт полный план выбранного занятия — `upcomingPlans` контекста (Т8); пока плана
+ * там нет, пилюля без числа. Золотая точка у входа в Lanes — `marks.lanes` (план ближайшего занятия).
  */
 
 type PlanState = 'draft' | 'published' | 'none';
@@ -31,8 +33,11 @@ function withoutMe(r: TrainingRsvp): TrainingRsvp {
   };
 }
 
-/** Пилюля статуса плана: «● Draft plan» золотом, «Published» зелёным, «No lane plan» серым. */
-function PlanPill({ state }: { state: PlanState }) {
+/**
+ * Пилюля статуса плана: «● Draft plan» / «● Draft · 3 unassigned» золотом, «Published» (с числом
+ * неразложенных — «Published · 3 unassigned») зелёным, «No lane plan» серым.
+ */
+function PlanPill({ state, unassigned = 0 }: { state: PlanState; unassigned?: number }) {
   if (state === 'draft') {
     return (
       <span
@@ -40,7 +45,7 @@ function PlanPill({ state }: { state: PlanState }) {
         style={{ borderColor: 'var(--deep-gold-border)', background: 'var(--deep-gold-chip)', color: 'var(--deep-gold)' }}
       >
         <span aria-hidden="true" className="inline-block rounded-full" style={{ width: 6, height: 6, background: 'var(--deep-gold-bar)' }} />
-        Draft plan
+        {unassigned > 0 ? `Draft · ${unassigned} unassigned` : 'Draft plan'}
       </span>
     );
   }
@@ -50,12 +55,15 @@ function PlanPill({ state }: { state: PlanState }) {
       style={{ color: state === 'published' ? 'var(--deep-live)' : 'var(--t-text-3)' }}
     >
       {state === 'published' ? 'Published' : 'No lane plan'}
+      {state === 'published' && unassigned > 0 && (
+        <> · <span style={{ color: 'var(--deep-gold)' }}>{unassigned}</span> unassigned</>
+      )}
     </span>
   );
 }
 
 function CoachPoolBlock({ session, roll }: { session: NextTraining; roll: TrainingRsvpState | null }) {
-  const { group, isDesktop, setView, lanePlans, reloadLanePlans } = useTrainingsTab();
+  const { group, isDesktop, setView, lanePlans, reloadLanePlans, upcomingPlans, marks } = useTrainingsTab();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +73,9 @@ function CoachPoolBlock({ session, roll }: { session: NextTraining; roll: Traini
   // Планов ещё нет в памяти (грузятся) — статус не показываем, чтобы не мигать «No lane plan».
   const plan = lanePlans?.find((p) => p.date === session.date) ?? null;
   const state: PlanState | null = lanePlans == null ? null : plan ? plan.status : 'none';
+  // Неразложенные — из полного плана ЭТОГО занятия; плана в памяти ещё нет — без числа.
+  const unassigned = upcomingPlans[session.date]?.unassigned.length ?? 0;
+  const lanesDot = marks.lanes ? <MarkDot mark={{ ...marks.lanes, count: undefined }} /> : null;
 
   const publish = async () => {
     setBusy(true);
@@ -86,14 +97,15 @@ function CoachPoolBlock({ session, roll }: { session: NextTraining; roll: Traini
         className="flex items-center justify-between gap-3 px-2.5 py-1.5 text-[11px] font-bold"
         style={{ borderTop: r?.lane_view ? '1px solid var(--deep-pool-border)' : undefined, color: 'var(--t-text-3)' }}
       >
-        {state ? <PlanPill state={state} /> : <span />}
+        {state ? <PlanPill state={state} unassigned={unassigned} /> : <span />}
         <button
           type="button"
           onClick={() => setView('lanes')}
-          className="-my-[7px] h-10 cursor-pointer border-0 bg-transparent px-2 text-[11px] font-extrabold"
+          className="-my-[7px] inline-flex h-10 cursor-pointer items-center gap-1.5 border-0 bg-transparent px-2 text-[11px] font-extrabold"
           style={{ color: 'var(--deep-ow)' }}
         >
           Lanes ›
+          {lanesDot}
         </button>
       </div>
     );
@@ -111,16 +123,17 @@ function CoachPoolBlock({ session, roll }: { session: NextTraining; roll: Traini
       <div className="flex flex-wrap items-center justify-between gap-x-2.5 gap-y-2">
         <span className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
           Lanes
-          {state && <PlanPill state={state} />}
+          {state && <PlanPill state={state} unassigned={unassigned} />}
         </span>
         <span className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setView('lanes')}
-            className="h-[30px] cursor-pointer whitespace-nowrap border px-3 text-[12px] font-extrabold"
+            className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 whitespace-nowrap border px-3 text-[12px] font-extrabold"
             style={{ borderRadius: 9, borderColor: 'var(--deep-ow-border)', background: 'var(--deep-ow-chip)', color: 'var(--deep-ow)' }}
           >
             ✎ Edit lanes
+            {lanesDot}
           </button>
           {state === 'draft' && (
             <button

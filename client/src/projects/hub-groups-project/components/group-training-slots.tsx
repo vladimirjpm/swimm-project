@@ -1,6 +1,8 @@
 import React from 'react';
 import { RsvpBar, RsvpButtons, RsvpStaffRow } from './group-rsvp';
 import type { TrainingRsvpState } from '../use-training-rsvp';
+import { MarkDot } from './trainings/trainings-section';
+import { redMark } from './trainings/use-training-marks';
 import type { GroupTrainingSchedule, NextTraining } from '../types';
 
 /**
@@ -93,6 +95,8 @@ function GroupTrainingBlock({
     const r = rsvp?.rsvp && rsvp.rsvp.session_id === next.id ? rsvp.rsvp : null;
     const showButtons = !!r && r.is_member && r.can_answer;
     const showStaff = !!r && r.can_manage;
+    // Красная метка (Т8): участнику точка, тренеру пилюля с числом не ответивших.
+    const red = redMark(r);
     // Раскладка (хендофф 2a / 4a): телефон — столбиком NEXT → полоса → кнопки → строка
     // тренера; десктоп — сетка «NEXT | кнопки», полоса на всю ширину под ними. Порядок
     // задают `order-*`, а не две разметки: элемент один, меняется только место.
@@ -116,6 +120,7 @@ function GroupTrainingBlock({
               <span className="hp-mono text-[13px] font-extrabold min-[960px]:text-[15px]" style={{ color: 'var(--deep-text)' }}>
                 {formatNextDate(next.date)} · {next.start}
               </span>
+              {red && <span className="self-center"><MarkDot mark={red} /></span>}
               {relative && (
                 <span className="text-[11.5px] font-bold min-[960px]:text-[12.5px]" style={{ color: 'var(--deep-text-mute)' }}>
                   {relative}

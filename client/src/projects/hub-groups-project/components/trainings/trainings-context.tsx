@@ -3,13 +3,13 @@ import { DEEP_DESKTOP_QUERY, useMediaQuery } from '../../../../hooks/useMediaQue
 import { readViewParam, writeViewParam } from '../../../components/deep/view-chips';
 import { useTrainingSessions, type TrainingSessionsState } from '../../use-training-sessions';
 import { useTrainingRsvp, type TrainingRsvpState } from '../../use-training-rsvp';
-import type { HubGroupDetails, LanePlanSummary, RsvpAnswer, RsvpNote, TrainingRsvpPerson } from '../../types';
+import type { HubGroupDetails, LanePlan, LanePlanSummary, RsvpAnswer, RsvpNote, TrainingRsvpPerson } from '../../types';
 import ConfirmDialog from '../../../components/confirm-dialog/confirm-dialog';
 import { lanePlansApi } from '../lane-plans-api';
 import { useGroupBreaks } from '../use-group-breaks';
 import { nextSessions } from './next/next-format';
 import type { TrainingsSheet } from './trainings-sheets';
-import { useTrainingMarks, type TrainingMarks } from './use-training-marks';
+import { goldMark, useTrainingMarks, type TrainingMarks } from './use-training-marks';
 
 /**
  * Общие данные таба Trainings — ОДНО место на все секции (docs/plans/trainings-tab-redesign-plan.md
@@ -20,7 +20,11 @@ import { useTrainingMarks, type TrainingMarks } from './use-training-marks';
  * Ответы на занятие (`rsvp`) приходят сверху: их же читают шапка и липкая полоса страницы
  * группы, экземпляр один. План дорожек и редактор грузит `GroupLanes` (Т7 оставил это там: дата, план и черновик
  * живут вместе); в контексте — список планов (`lanePlans`) для статуса «Draft / Published» вида
- * тренера и флаг несохранённых правок редактора (`lanesDirty`) для подтверждения ухода.
+ * тренера, полные планы ближайших занятий (`upcomingPlans`, Т8) для меток и числа неразложенных,
+ * и флаг несохранённых правок редактора (`lanesDirty`) для подтверждения ухода.
+ *
+ * Метки внимания (Т8) считаются здесь же и здесь же гасятся: `markSeen` ленты и Lanes вызывает
+ * контекст (один раз за монтирование), секции о нём не знают.
  */
 
 export type TrainingsView = 'next' | 'trainings' | 'lanes';
@@ -71,6 +75,18 @@ export interface TrainingsTabState {
   /** Планы дорожек группы (только `manages`; `null` — ещё не пришли или не управляющий). */
   lanePlans: LanePlanSummary[] | null;
   reloadLanePlans: () => void;
+  /**
+   * Полные планы дорожек ближайших занятий (до трёх РАЗНЫХ дат `nextSessions(group)`): ключ —
+   * yyyy-MM-dd. `null` — плана нет (404: участнику черновик тоже 404 — это не ошибка); ключа нет —
+   * ещё не пришёл. Нужны меткам (черновик / неразложенные / «тебя перенесли») и числу
+   * неразложенных в бассейне тренера. Перечитываются по `reloadLanePlans()`. Секции планы НЕ грузят.
+   */
+  upcomingPlans: Record<string, LanePlan | null>;
+  /**
+   * Доска Lanes участника получила план (или узнала, что его нет) — теперь можно гасить золотую
+   * метку «тебя перенесли» на сервере. Зовёт `GroupLanes` через секцию; раньше — нельзя (см. контекст).
+   */
+  markLanesShown: () => void;
   /**
    * Тренер поменял чей-то ответ (шторка человека): сообщить переклички, чтобы она показала тост
    * «Undo». Без слушателя (переклички нет на экране) — ничего не делает.
@@ -160,7 +176,60 @@ export function TrainingsTabProvider({
   const r = rsvp?.rsvp;
   // Перерыв меняет знаменатель и бассейн — после его правки ответы перечитываются.
   const breaks = useGroupBreaks(group.id, !!r && (r.is_member || r.can_manage), rsvp?.reload);
-  const marks = useTrainingMarks();
+
+  // Полные планы ближайших занятий (Т8): метки и число неразложенных. Даты — строкой-ключом,
+  // чтобы эффект не перезапускался на каждый новый массив `nextSessions`.
+  const planDatesKey = Array.from(new Set(nextSessions(group).map((s) => s.date))).join(',');
+  const [upcomingPlans, setUpcomingPlans] = useState<Record<string, LanePlan | null>>({});
+  useEffect(() => {
+    if (!planDatesKey) return undefined;
+    let cancelled = false;
+    planDatesKey.split(',').forEach((date) => {
+      lanePlansApi.get(group.id, date).then((res) => {
+        if (cancelled) return;
+        if (res.ok && res.data) setUpcomingPlans((prev) => ({ ...prev, [date]: res.data ?? null }));
+        else if (res.status === 404) setUpcomingPlans((prev) => ({ ...prev, [date]: null }));
+      });
+    });
+    return () => { cancelled = true; };
+  }, [group.id, planDatesKey, lanePlansVersion]);
+
+  // Метки внимания. Ближайшее занятие — `group.next_training` (ответы `rsvp`), не выбранное тренером.
+  const nextDate = group.next_training?.date ?? null;
+  const nextPlan = nextDate ? upcomingPlans[nextDate] ?? null : null;
+  const [trainingsSeen, setTrainingsSeen] = useState(false);
+  const [lanesSeen, setLanesSeen] = useState(false);
+  const marks = useTrainingMarks({
+    rsvp: r ?? null, manages, nextPlan, sessions: sessions.data, trainingsSeen, lanesSeen,
+  });
+
+  // Гашение «нового» — один раз за монтирование таба (флаги в ref), не на каждое переключение видов.
+  // Лента на экране: телефон — вид Trainings, десктоп — правая колонка (всё, кроме Lanes).
+  const feedShown = isDesktop ? view !== 'lanes' : view === 'trainings';
+  const newMedia = sessions.data?.new_media_count ?? 0;
+  const feedSeenSent = useRef(false);
+  const { markSeen: markFeedSeen } = sessions;
+  useEffect(() => {
+    if (!feedShown || newMedia <= 0 || feedSeenSent.current) return;
+    feedSeenSent.current = true;
+    setTrainingsSeen(true);
+    void markFeedSeen();
+  }, [feedShown, newMedia, markFeedSeen]);
+  // Участнику Lanes гасит золотую «тебя перенесли»; сама заметка на доске остаётся (план уже загружен).
+  // Тренеру не гасит ничего: его метка держится, пока план черновик / есть неразложенные.
+  // ⚠ Только ПОСЛЕ того, как доска получила свой план (`markLanesShown` из `GroupLanes`): `PUT
+  // …/lane-plans/seen` гасит `moved_from_lane` на сервере, и уйди он раньше `GET` доски — заметка
+  // «Coach moved you…» не показалась бы ни разу (доска сперва грузит список планов, потом план).
+  const memberGoldLit = !manages && goldMark(nextPlan, false) != null;
+  const [lanesShown, setLanesShown] = useState(false);
+  const markLanesShown = useCallback(() => setLanesShown(true), []);
+  const lanesSeenSent = useRef(false);
+  useEffect(() => {
+    if (view !== 'lanes' || !lanesShown || !memberGoldLit || lanesSeenSent.current) return;
+    lanesSeenSent.current = true;
+    setLanesSeen(true);
+    void lanePlansApi.markSeen(group.id);
+  }, [view, lanesShown, memberGoldLit, group.id]);
 
   // Ответы на 2-е и 3-е занятие: хуки вызываются ВСЕГДА и в одном порядке (sessionId undefined — нет занятия).
   const upcomingIds = nextSessions(group);
@@ -178,11 +247,11 @@ export function TrainingsTabProvider({
 
   const value = useMemo<TrainingsTabState>(() => ({
     group, manages, isDesktop, view, setView, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
-    rollIndex, setRollIndex, lanePlans, reloadLanePlans, onRollChange, setRollChangeListener,
+    rollIndex, setRollIndex, lanePlans, reloadLanePlans, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener,
     sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
     group, manages, isDesktop, view, setView, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, lanePlans, reloadLanePlans,
-    onRollChange, setRollChangeListener, sessions, breaks, marks, closeSheet, sheet,
+    upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sessions, breaks, marks, closeSheet, sheet,
   ]);
 
   return (

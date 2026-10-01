@@ -505,6 +505,14 @@
 .deep-tool-tab__icon { font-size: 15px; flex: none; }
 .deep-tool-tab__name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .deep-tool-tab__badge { margin-left: auto; flex: none; font-size: 10.5px; font-weight: 800; opacity: .8; }
+/* Красная пилюля с числом («нужен ответ»): тренеру в закреплённом табе Trainings. */
+.deep-tool-tab__badge--danger {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--deep-danger); color: var(--deep-accent-ink);
+  font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+  font-size: 10.5px; font-weight: 800; line-height: 1; opacity: 1;
+}
 
 /* Чип «✎ You can edit» над панелью редактируемого таба. */
 .deep-edit-chip {
@@ -692,6 +700,9 @@
   .deep-tool-tab__icon { font-size: 16px; }
   .deep-tool-tab__badge { margin-left: 0; font-weight: 700; opacity: .75; }
   .deep-tool-tab__badge::before { content: '· '; }
+  /* Красная пилюля — без точки-разделителя мобильной версии, непрозрачная. */
+  .deep-tool-tab__badge--danger { font-weight: 800; opacity: 1; }
+  .deep-tool-tab__badge--danger::before { content: none; }
   .deep-entity-main--dock { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
   /* Открыт инструмент — у верхнего ряда нет активного язычка, и панель отбивает фиолетовая
      линия сверху: видно, откуда пришёл контент. */

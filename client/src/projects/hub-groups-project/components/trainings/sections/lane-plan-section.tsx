@@ -11,7 +11,7 @@ import { TrainingsSection } from '../trainings-section';
  * Next тренера показывает статус плана).
  */
 function LanePlanSection() {
-  const { group, manages, isDesktop, setLanesDirty, reloadLanePlans } = useTrainingsTab();
+  const { group, manages, isDesktop, setLanesDirty, reloadLanePlans, markLanesShown } = useTrainingsTab();
   return (
     <TrainingsSection id="lane-plan" bare>
       <GroupLanes
@@ -20,6 +20,7 @@ function LanePlanSection() {
         desktop={isDesktop}
         onDirtyChange={setLanesDirty}
         onPlansChanged={reloadLanePlans}
+        onPlanShown={markLanesShown}
       />
     </TrainingsSection>
   );

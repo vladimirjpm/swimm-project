@@ -3,6 +3,7 @@ import type { NextTraining, TrainingLane, TrainingLanePerson, TrainingRsvp } fro
 import { PoolCircle, sourceCaption } from '../../group-pool';
 import { formatNextDate } from '../../group-training-slots';
 import { useTrainingsTab } from '../trainings-context';
+import { MarkDot } from '../trainings-section';
 import {
   dayNumLabel, desktopKicker, timeRangeLabel, untilLabel, workoutOneLine,
 } from './next-format';
@@ -222,7 +223,7 @@ export function MiniPool({ r, footer }: { r: TrainingRsvp; footer?: React.ReactN
 
 /** Под мини-бассейном: «5 going · 1 maybe» слева, «Lanes ›» справа. */
 export function PoolFooter({ r }: { r: TrainingRsvp }) {
-  const { setView } = useTrainingsTab();
+  const { setView, marks } = useTrainingsTab();
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="hp-mono flex flex-wrap items-center gap-x-1.5 text-[12px] font-bold" style={{ color: 'var(--t-text-3)' }}>
@@ -233,10 +234,11 @@ export function PoolFooter({ r }: { r: TrainingRsvp }) {
       <button
         type="button"
         onClick={() => setView('lanes')}
-        className="cursor-pointer border-0 bg-transparent p-0 text-[12px] font-extrabold"
+        className="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-[12px] font-extrabold"
         style={{ color: 'var(--deep-accent)' }}
       >
         Lanes ›
+        {marks.lanes && <MarkDot mark={{ ...marks.lanes, count: undefined }} />}
       </button>
     </div>
   );
@@ -285,7 +287,7 @@ function FullRow({
  * и без колонки YOU / подсветки «моей» дорожки.
  */
 export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolean }) {
-  const { setView } = useTrainingsTab();
+  const { setView, marks } = useTrainingsTab();
   const view = r.lane_view;
   if (!view) return null;
   const water = view.source === 'water';
@@ -302,10 +304,11 @@ export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolea
           <button
             type="button"
             onClick={() => setView('lanes')}
-            className="cursor-pointer border-0 bg-transparent p-0 text-[12px] font-extrabold"
+            className="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-[12px] font-extrabold"
             style={{ color: 'var(--deep-accent)' }}
           >
             Lanes ›
+            {marks.lanes && <MarkDot mark={{ ...marks.lanes, count: undefined }} />}
           </button>
         </div>
       )}
