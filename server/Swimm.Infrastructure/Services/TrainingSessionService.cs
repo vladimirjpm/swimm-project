@@ -12,26 +12,33 @@ namespace Swimm.Infrastructure.Services;
 
 /// <summary>
 /// Тренировки группы как записи и ссылки к ним (<see cref="ITrainingSessionService"/>, Е1–Е2
-/// плана docs/plans/group-events-media-plan.md). Времён НЕ читает и не отдаёт — только «есть ли
-/// они» (И16: показ времён — только <c>HubGroupTrainingRepository</c>). Без кэша: данные группы
-/// приватные, правят кликом.
+/// плана docs/plans/group-events-media-plan.md) и лента поверх них (показатели, «You», «Sets &amp;
+/// times» — Т1а docs/plans/trainings-tab-redesign-plan.md). Сам времён из таблиц НЕ читает — только
+/// «есть ли они»; повторы для ленты берёт у <see cref="IHubGroupTrainingRepository"/> (И16: показ
+/// времён — только там), счёт — <see cref="TrainingFeed"/>. Без кэша: данные группы приватные,
+/// правят кликом.
 /// </summary>
 public class TrainingSessionService : ITrainingSessionService
 {
     private readonly SwimmDbContext _db;
     private readonly IHubGroupMediaService _media;
+    private readonly IHubGroupTrainingRepository _trainings;
 
-    public TrainingSessionService(SwimmDbContext db, IHubGroupMediaService media)
+    public TrainingSessionService(SwimmDbContext db, IHubGroupMediaService media, IHubGroupTrainingRepository trainings)
     {
         _db = db;
         _media = media;
+        _trainings = trainings;
     }
 
     private static DateOnly Today(DateOnly? todayLocal) =>
         todayLocal ?? DateOnly.FromDateTime(IsraelTime.ToLocal(DateTime.UtcNow));
 
-    /// <summary>Кто смотрит — для флагов «моё / могу удалить» у ссылок.</summary>
-    private sealed record Viewer(int UserId, bool IsManager);
+    /// <summary>
+    /// Кто смотрит — для флагов «моё / могу удалить» у ссылок; <paramref name="NewSince"/> задан —
+    /// медиа других позже него помечаются «новым» (Т1б).
+    /// </summary>
+    private sealed record Viewer(int UserId, bool IsManager, DateTime? NewSince = null);
 
     public async Task<TrainingSessionListDto> ListAsync(int hubGroupId, int viewerUserId, bool isManager)
     {
@@ -46,15 +53,22 @@ public class TrainingSessionService : ITrainingSessionService
             })
             .ToListAsync();
 
-        var viewer = new Viewer(viewerUserId, isManager);
+        var seen = await HubGroupSeenStore.GetAsync(_db, hubGroupId, viewerUserId);
+        var viewer = new Viewer(viewerUserId, isManager, HubGroupSeenStore.NewMediaSince(seen, DateTime.UtcNow));
         var media = await LoadMediaAsync(hubGroupId, sessions.Select(s => s.Session.Id).ToList(), viewer);
+        var feed = await LoadFeedAsync(hubGroupId,
+            sessions.Where(s => s.HasResults).Select(s => s.Session).ToList(), viewerUserId);
         return new TrainingSessionListDto
         {
-            Sessions = sessions.Select(s => ToDto(s.Session, s.HasResults, media)).ToList(),
+            Sessions = sessions.Select(s => WithFeed(ToDto(s.Session, s.HasResults, media), feed)).ToList(),
             CanManage = isManager,
             CanAddMedia = isManager || await MembersAddMediaAsync(hubGroupId),
+            NewMediaCount = media.Values.Sum(list => list.Count(m => m.IsNew)),
         };
     }
+
+    public Task MarkSeenAsync(int hubGroupId, int viewerUserId) =>
+        HubGroupSeenStore.TouchAsync(_db, hubGroupId, viewerUserId, s => s.TrainingsSeenAt = DateTime.UtcNow);
 
     public async Task<TrainingSessionSaveResult> CreateAsync(int hubGroupId, int actorUserId,
         TrainingSessionInputDto input, DateOnly? todayLocal = null)
@@ -135,7 +149,54 @@ public class TrainingSessionService : ITrainingSessionService
         await _db.SaveChangesAsync();
 
         var media = await LoadMediaAsync(hubGroupId, [session.Id], new Viewer(actorUserId, IsManager: true));
-        return TrainingSessionSaveResult.Ok(ToDto(session, hasResults, media));
+        var feed = hasResults ? await LoadFeedAsync(hubGroupId, [session], actorUserId) : NoFeed;
+        return TrainingSessionSaveResult.Ok(WithFeed(ToDto(session, hasResults, media), feed));
+    }
+
+    public async Task<TrainingSessionSetsDto?> GetSetsAsync(int hubGroupId, int sessionId, int viewerUserId,
+        bool isManager)
+    {
+        var session = await _db.TrainingSessions.AsNoTracking()
+            .Where(s => s.Id == sessionId && s.HubGroupId == hubGroupId)
+            .Select(s => new { s.Id, s.KeySetNo })
+            .FirstOrDefaultAsync();
+        if (session == null) return null;
+
+        var repeats = await _trainings.GetRepeatsAsync(hubGroupId, [sessionId]);
+        var mine = (await MySwimmersQuery.LoadAsync(_db, hubGroupId, viewerUserId))
+            .Select(m => m.SwimmerId).ToHashSet();
+        var swimmerIds = repeats.Select(r => r.SwimmerId).Distinct().ToList();
+        var levels = (await _db.HubGroupSwimmerLevels.AsNoTracking()
+                .Where(l => l.HubGroupId == hubGroupId && swimmerIds.Contains(l.SwimmerId))
+                .Select(l => new { l.SwimmerId, l.Level!.Id, l.Level.Rank, l.Level.Name, l.Level.Color })
+                .ToListAsync())
+            .ToDictionary(l => l.SwimmerId, l => new TrainingFeed.Level(l.Id, l.Rank, l.Name, l.Color));
+
+        return new TrainingSessionSetsDto
+        {
+            SessionId = session.Id,
+            KeySetNo = session.KeySetNo,
+            CanManage = isManager,
+            Sets = TrainingFeed.Sets(repeats, session.KeySetNo, mine, levels),
+        };
+    }
+
+    public async Task<TrainingSessionSaveResult> SetKeySetAsync(int hubGroupId, int sessionId, int actorUserId,
+        TrainingKeySetInputDto input)
+    {
+        var session = await _db.TrainingSessions.FirstOrDefaultAsync(s => s.Id == sessionId && s.HubGroupId == hubGroupId);
+        if (session == null) return TrainingSessionSaveResult.Fail(404, "Training not found.");
+
+        var repeats = await _trainings.GetRepeatsAsync(hubGroupId, [sessionId]);
+        if (input.SetNo is int setNo && !repeats.Any(r => r.SetNo == setNo))
+            return TrainingSessionSaveResult.Fail(400, "This training has no such set.");
+
+        session.KeySetNo = input.SetNo;
+        await _db.SaveChangesAsync();
+
+        var media = await LoadMediaAsync(hubGroupId, [session.Id], new Viewer(actorUserId, IsManager: true));
+        var feed = await FeedAsync(hubGroupId, [session], repeats, actorUserId);
+        return TrainingSessionSaveResult.Ok(WithFeed(ToDto(session, repeats.Count > 0, media), feed));
     }
 
     public async Task<(int Status, string? Error)> DeleteAsync(int hubGroupId, int sessionId)
@@ -215,6 +276,44 @@ public class TrainingSessionService : ITrainingSessionService
         return GroupTrainingSchedule.Parse(json).EffectiveTrainingMedia == GroupTrainingMedia.Members;
     }
 
+    /// <summary>Показатели и «You» сессии — только у сессий с временами.</summary>
+    private sealed record Feed(TrainingSessionStatsDto? Stats, TrainingSessionMyKeyDto? MyKey);
+
+    private static readonly IReadOnlyDictionary<int, Feed> NoFeed = new Dictionary<int, Feed>();
+
+    private async Task<IReadOnlyDictionary<int, Feed>> LoadFeedAsync(int hubGroupId,
+        IReadOnlyList<TrainingSession> sessions, int viewerUserId)
+    {
+        if (sessions.Count == 0) return NoFeed;
+        var repeats = await _trainings.GetRepeatsAsync(hubGroupId, sessions.Select(s => s.Id).ToList());
+        return await FeedAsync(hubGroupId, sessions, repeats, viewerUserId);
+    }
+
+    private async Task<IReadOnlyDictionary<int, Feed>> FeedAsync(int hubGroupId,
+        IReadOnlyList<TrainingSession> sessions, IReadOnlyList<TrainingFeed.Repeat> repeats, int viewerUserId)
+    {
+        // «Мои» нужны только там, где тренер поставил ★, — иначе «You» нет и запросы лишние.
+        var mine = sessions.Any(s => s.KeySetNo != null)
+            ? await MySwimmersQuery.LoadAsync(_db, hubGroupId, viewerUserId)
+            : [];
+        var bySession = repeats.ToLookup(r => r.SessionId);
+        return sessions.ToDictionary(s => s.Id, s =>
+        {
+            var own = bySession[s.Id].ToList();
+            return new Feed(TrainingFeed.Stats(own), TrainingFeed.MyKey(own, s.KeySetNo, mine));
+        });
+    }
+
+    private static TrainingSessionDto WithFeed(TrainingSessionDto dto, IReadOnlyDictionary<int, Feed> feed)
+    {
+        if (feed.TryGetValue(dto.Id, out var f))
+        {
+            dto.Stats = f.Stats;
+            dto.MyKey = f.MyKey;
+        }
+        return dto;
+    }
+
     private Task<bool> HasResultsAsync(int sessionId) =>
         _db.TrainingSessions.Where(s => s.Id == sessionId).AnyAsync(s => s.Results.Any());
 
@@ -245,7 +344,7 @@ public class TrainingSessionService : ITrainingSessionService
             .Select(m => new
             {
                 TrainingId = m.TrainingId!.Value,
-                m.Id, m.MediaType, m.SourceType, m.Url, m.Caption, m.CreatedByUserId,
+                m.Id, m.MediaType, m.SourceType, m.Url, m.Caption, m.CreatedByUserId, m.CreatedAt,
             })
             .ToListAsync();
         return rows
@@ -259,6 +358,7 @@ public class TrainingSessionService : ITrainingSessionService
                 Caption = r.Caption,
                 Mine = r.CreatedByUserId == viewer.UserId,
                 CanDelete = CanDelete(r.CreatedByUserId, viewer),
+                IsNew = viewer.NewSince is DateTime since && r.CreatedByUserId != viewer.UserId && r.CreatedAt > since,
             }).ToList());
     }
 
@@ -273,6 +373,7 @@ public class TrainingSessionService : ITrainingSessionService
         Note = s.Note,
         PoolType = string.IsNullOrWhiteSpace(s.PoolType) ? null : s.PoolType,
         HasResults = hasResults,
+        KeySetNo = s.KeySetNo,
         CreatedInApp = s.ExternalTrainingId.StartsWith(TrainingSessionRules.ExternalIdPrefix, StringComparison.Ordinal),
         Media = media.TryGetValue(s.Id, out var list) ? list : [],
     };

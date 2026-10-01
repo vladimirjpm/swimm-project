@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Repositories;
@@ -69,6 +70,22 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
             IsMasters = true,
             Results = results,
         };
+    }
+
+    public async Task<List<TrainingFeed.Repeat>> GetRepeatsAsync(int hubGroupId, IReadOnlyCollection<int> sessionIds)
+    {
+        if (sessionIds.Count == 0) return [];
+
+        var ids = sessionIds.Distinct().ToList();
+        return await _db.TrainingResults.AsNoTracking()
+            .Where(r => ids.Contains(r.SessionId) && r.Session!.HubGroupId == hubGroupId)
+            .OrderBy(r => r.SessionId).ThenBy(r => r.SetNo).ThenBy(r => r.OrderNo).ThenBy(r => r.Id)
+            .Select(r => new TrainingFeed.Repeat(
+                r.SessionId, r.SetNo, r.OrderNo, r.SwimmerId,
+                (r.Swimmer!.LastName + " " + r.Swimmer.FirstName).Trim(),
+                (r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn).Trim(),
+                r.Distance, r.Style != null ? r.Style.Name : "", r.TimeOriginal, r.TimeMillisecond, r.Intensity))
+            .ToListAsync();
     }
 
     private static TrainingRowDto Map(

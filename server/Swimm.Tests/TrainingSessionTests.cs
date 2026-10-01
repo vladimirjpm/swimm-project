@@ -4,6 +4,7 @@ using Swimm.Application.Mapping;
 using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Repositories;
 using Swimm.Infrastructure.Services;
 using Xunit;
 
@@ -61,7 +62,8 @@ public class TrainingSessionTests
 
     // ── TrainingSessionService ──────────────────────────────────────────────
 
-    private static TrainingSessionService Service(SwimmDbContext db) => new(db, new HubGroupMediaService(db));
+    private static TrainingSessionService Service(SwimmDbContext db) =>
+        new(db, new HubGroupMediaService(db), new HubGroupTrainingRepository(db));
 
     private static SwimmDbContext CreateDb(string name) =>
         new(new DbContextOptionsBuilder<SwimmDbContext>().UseInMemoryDatabase(name).Options);

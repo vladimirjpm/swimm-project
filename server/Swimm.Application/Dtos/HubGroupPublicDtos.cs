@@ -526,6 +526,14 @@ public sealed class HubGroupDetailsDto
     /// </summary>
     [JsonPropertyName("next_training")]
     public NextTrainingDto? NextTraining { get; set; }
+
+    /// <summary>
+    /// Три ближайших занятия (первое — то же, что <see cref="NextTraining"/>) — вид «Next» таба
+    /// Trainings отвечает сразу на три (docs/plans/trainings-tab-redesign-plan.md, Т1б). Ответы —
+    /// личные, их здесь нет (как и у <see cref="NextTraining"/>). Пусто — расписания нет.
+    /// </summary>
+    [JsonPropertyName("next_trainings")]
+    public List<NextTrainingDto> NextTrainings { get; set; } = [];
 }
 
 /// <summary>Расписание как оно есть — для показа строкой и для формы редактирования.</summary>

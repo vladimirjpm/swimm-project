@@ -39,7 +39,8 @@ public class TrainingResultsPrivacyTests
             "привязка медиа к занятию: «эта сессия — этой группы», только id сессии",
         ["Swimm.Infrastructure/Services/TrainingSessionService.cs"] =
             "тренировки как записи (заводит тренер, Е1 group-events-media-plan): сама сессия и только " +
-            "«есть ли времена» (Any) — времён не читает; аудиторию проверяет контроллер",
+            "«есть ли времена» (Any) и ★ ключевого сета (KeySetNo) — времён не читает: повторы для ленты берёт у " +
+            "IHubGroupTrainingRepository; аудиторию проверяет контроллер",
         ["Swimm.Infrastructure/Services/SwimmerMergeService.cs"] =
             "склейка пловцов переносит тренировочные строки на оставшегося",
         ["Swimm.Infrastructure/Services/SwimmerDedupService.cs"] =

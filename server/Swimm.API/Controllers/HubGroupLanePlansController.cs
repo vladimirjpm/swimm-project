@@ -79,6 +79,22 @@ public class HubGroupLanePlansController : ControllerBase
     }
 
     /// <summary>Доска на дату. 404 — плана нет (или участнику — он ещё черновик).</summary>
+    /// <summary>
+    /// Зритель открыл вид Lanes (Т1б, `marks-spec.md`): гаснет золотая метка «тебя перенесли».
+    /// Отдельной ручкой, а не побочным эффектом GET плана: план грузится и ради метки на табе
+    /// группы — такой GET гасил бы метку раньше, чем человек её увидел.
+    /// </summary>
+    [HttpPut("seen")]
+    public async Task<IActionResult> Seen(int id)
+    {
+        var (_, denied) = await ViewerAsync(id);
+        if (denied != null) return denied;
+
+        await _plans.MarkSeenAsync(id, CurrentUserId()!.Value);
+        Response.Headers.CacheControl = "private, no-store";
+        return NoContent();
+    }
+
     [HttpGet("{date}")]
     public async Task<IActionResult> Get(int id, string date)
     {

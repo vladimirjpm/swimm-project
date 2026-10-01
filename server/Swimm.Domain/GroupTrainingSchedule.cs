@@ -127,28 +127,41 @@ public sealed class GroupTrainingSchedule
     /// </summary>
     public (DateOnly Date, GroupTrainingSlot Slot)? NextOccurrence(DateTime nowLocal)
     {
-        (DateOnly Date, GroupTrainingSlot Slot)? best = null;
+        var next = NextOccurrences(nowLocal, 1);
+        return next.Count == 0 ? null : next[0];
+    }
+
+    /// <summary>
+    /// <paramref name="count"/> ближайших занятий подряд, по тому же правилу, что
+    /// <see cref="NextOccurrence"/>: начавшееся сегодня — уже не ближайшее. Нужны виду «Next» таба
+    /// Trainings — ответ сразу на три занятия (docs/plans/trainings-tab-redesign-plan.md, Т1б).
+    /// Пусто — расписания нет или все слоты битые.
+    /// </summary>
+    public List<(DateOnly Date, GroupTrainingSlot Slot)> NextOccurrences(DateTime nowLocal, int count)
+    {
+        var result = new List<(DateOnly Date, GroupTrainingSlot Slot)>();
+        // Дубль слота (тот же день и начало) — одно занятие: ключ ответов у них общий.
+        var valid = Slots.Where(s => s.IsValid)
+            .DistinctBy(s => (s.Day, s.StartTime!.Value))
+            .OrderBy(s => s.StartTime!.Value)
+            .ToList();
+        if (valid.Count == 0 || count <= 0) return result;
+
         var today = DateOnly.FromDateTime(nowLocal);
-
-        foreach (var slot in Slots)
+        var now = TimeOnly.FromDateTime(nowLocal);
+        // Каждый день недели с занятием встречается раз в 7 дней — count недель с запасом хватит.
+        for (var delta = 0; delta <= 7 * count && result.Count < count; delta++)
         {
-            if (!slot.IsValid) continue;
-            var start = slot.StartTime!.Value;
-
-            // Сколько дней до этого дня недели (0 — сегодня); сегодняшнее уже начавшееся
-            // занятие переносим на следующую неделю.
-            var delta = ((slot.Day - (int)IsoDayOfWeek(today)) + 7) % 7;
-            if (delta == 0 && TimeOnly.FromDateTime(nowLocal) >= start) delta = 7;
-
             var date = today.AddDays(delta);
-            if (best == null || date < best.Value.Date
-                || (date == best.Value.Date && start < best.Value.Slot.StartTime!.Value))
+            var isoDay = (int)IsoDayOfWeek(date);
+            foreach (var slot in valid.Where(s => s.Day == isoDay))
             {
-                best = (date, slot);
+                if (delta == 0 && now >= slot.StartTime!.Value) continue;
+                result.Add((date, slot));
+                if (result.Count == count) break;
             }
         }
-
-        return best;
+        return result;
     }
 
     /// <summary>ISO-номер дня недели (1 = понедельник … 7 = воскресенье).</summary>

@@ -74,6 +74,18 @@ public class HubGroupTrainingSessionsController : ControllerBase
         return Ok(await _sessions.ListAsync(id, userId, isManager));
     }
 
+    /// <summary>Зритель открыл ленту (Т1б): гаснет метка «новые видео».</summary>
+    [HttpPut("seen")]
+    public async Task<IActionResult> Seen(int id)
+    {
+        var (userId, _, denied) = await ViewerAsync(id);
+        if (denied != null) return denied;
+
+        await _sessions.MarkSeenAsync(id, userId);
+        Response.Headers.CacheControl = "private, no-store";
+        return NoContent();
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create(int id, [FromBody] TrainingSessionInputDto input)
     {
@@ -90,6 +102,28 @@ public class HubGroupTrainingSessionsController : ControllerBase
         if (denied != null) return denied;
 
         return Reply(await _sessions.UpdateAsync(id, sessionId, userId, input));
+    }
+
+    /// <summary>«Sets &amp; times» (Т1а): лениво, при раскрытии карточки; та же аудитория, что у списка.</summary>
+    [HttpGet("{sessionId:int}/sets")]
+    public async Task<IActionResult> Sets(int id, int sessionId)
+    {
+        var (userId, isManager, denied) = await ViewerAsync(id);
+        if (denied != null) return denied;
+
+        var sets = await _sessions.GetSetsAsync(id, sessionId, userId, isManager);
+        Response.Headers.CacheControl = "private, no-store";
+        return sets == null ? NotFound(new { error = "Training not found." }) : Ok(sets);
+    }
+
+    /// <summary>★ ключевого сета (Р4) — только управляющий; <c>set_no: null</c> снимает.</summary>
+    [HttpPut("{sessionId:int}/key-set")]
+    public async Task<IActionResult> KeySet(int id, int sessionId, [FromBody] TrainingKeySetInputDto input)
+    {
+        var (userId, denied) = await ManagerAsync(id);
+        if (denied != null) return denied;
+
+        return Reply(await _sessions.SetKeySetAsync(id, sessionId, userId, input));
     }
 
     /// <summary>Только тренировку без времён; её медиа уходит с ней.</summary>

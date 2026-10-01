@@ -1785,6 +1785,27 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_HubGroupUserMembers", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupUserSeen", b =>
+                {
+                    b.Property<int>("HubGroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LanesSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("TrainingsSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("HubGroupId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Sys_HubGroupUserSeen", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.ImportHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -1948,6 +1969,12 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int?>("LaneNo")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("MovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("MovedFromLaneNo")
                         .HasColumnType("integer");
 
                     b.Property<int>("OrderNo")
@@ -3322,6 +3349,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("HubGroupId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("KeySetNo")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
@@ -4321,6 +4351,25 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("HubGroup");
 
                     b.Navigation("Swimmer");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupUserSeen", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
+                        .WithMany()
+                        .HasForeignKey("HubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("HubGroup");
 
                     b.Navigation("User");
                 });

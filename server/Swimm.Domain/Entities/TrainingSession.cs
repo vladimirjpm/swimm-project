@@ -61,5 +61,12 @@ public class TrainingSession
     /// <summary>Когда заведена кнопкой; null — у залитых скриптом.</summary>
     public DateTime? CreatedAt { get; set; }
 
+    /// <summary>
+    /// Ключевой сет — ★ тренера (docs/plans/trainings-tab-redesign-plan.md, Р4): по нему строка
+    /// «You» в ленте (быстрейший повтор «моих» пловцов в этом сете). null — не помечен, строки нет.
+    /// В источнике Дельфина такого поля нет — метка только на сайте.
+    /// </summary>
+    public int? KeySetNo { get; set; }
+
     public ICollection<TrainingResult> Results { get; set; } = new List<TrainingResult>();
 }

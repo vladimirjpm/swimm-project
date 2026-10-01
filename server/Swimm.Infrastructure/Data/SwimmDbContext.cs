@@ -123,6 +123,7 @@ public class SwimmDbContext : DbContext
     public DbSet<HubGroupTrainingRsvp> HubGroupTrainingRsvps => Set<HubGroupTrainingRsvp>();
     public DbSet<HubGroupBreak> HubGroupBreaks => Set<HubGroupBreak>();
     public DbSet<HubGroupAccountLevel> HubGroupAccountLevels => Set<HubGroupAccountLevel>();
+    public DbSet<HubGroupUserSeen> HubGroupUserSeen => Set<HubGroupUserSeen>();
 
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
@@ -1486,6 +1487,25 @@ public class SwimmDbContext : DbContext
             entity.Property(e => e.Kind).HasDefaultValue(HubGroupBreakKind.Break);
             entity.HasCheckConstraint("CK_HubGroupBreaks_Kind",
                 @"""Kind"" IN ('break', 'not_training') AND (""Kind"" = 'break' OR ""Until"" IS NULL)");
+        });
+
+        // «Когда открывал» виды таба Trainings (Т1б trainings-tab-redesign-plan) — ПРИВАТНЫЕ,
+        // Sys_ БЕЗ grant swimm_ro. Ключ (группа, аккаунт): у тренера-не-участника членства нет.
+        modelBuilder.Entity<HubGroupUserSeen>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupUserSeen");
+            entity.HasKey(e => new { e.HubGroupId, e.UserId });
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Уровень аккаунта без пловца (Ш3.1) — пара к Sys_HubGroupSwimmerLevels, тот же составной

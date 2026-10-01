@@ -240,19 +240,24 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             TrainingMedia = schedule.EffectiveTrainingMedia,
         };
 
-        var next = schedule.NextOccurrence(IsraelTime.ToLocal(DateTime.UtcNow));
-        if (next == null) return;
-
-        dto.NextTraining = new NextTrainingDto
-        {
-            Id = TrainingRsvpRules.SessionKey(next.Value.Date, next.Value.Slot.Start),
-            Date = next.Value.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            Start = next.Value.Slot.Start,
-            End = next.Value.Slot.End,
-            Place = schedule.Place,
-            PoolType = schedule.PoolType,
-        };
+        // Ответ кэшируется (К4, TTL страницы) — «ближайшие» живут по тому же правилу, что и
+        // одно ближайшее занятие раньше: начавшееся уходит из списка не позже, чем через TTL.
+        dto.NextTrainings = schedule.NextOccurrences(IsraelTime.ToLocal(DateTime.UtcNow), NextTrainingsCount)
+            .Select(next => new NextTrainingDto
+            {
+                Id = TrainingRsvpRules.SessionKey(next.Date, next.Slot.Start),
+                Date = next.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Start = next.Slot.Start,
+                End = next.Slot.End,
+                Place = schedule.Place,
+                PoolType = schedule.PoolType,
+            })
+            .ToList();
+        dto.NextTraining = dto.NextTrainings.FirstOrDefault();
     }
+
+    /// <summary>Сколько ближайших занятий отдаёт страница группы — вид «Next» таба Trainings.</summary>
+    private const int NextTrainingsCount = 3;
 
     public async Task<HubGroupDetailsDto> GetFavoritesGroupAsync(int userId)
     {

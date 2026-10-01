@@ -93,4 +93,14 @@ public class LanePlanSwimmer
 
     /// <summary>Порядок внутри дорожки (кто ведёт) — как прислал редактор.</summary>
     public int OrderNo { get; set; }
+
+    /// <summary>
+    /// С какой дорожки тренер перенёс пловца в ОПУБЛИКОВАННОМ плане (Т1б, золотая метка «тебя
+    /// перенесли»). Пишется при сохранении, если дорожка сменилась; правки черновика не считаются.
+    /// null — не переносили (или переносили из Unassigned — это «поставили», а не «перенесли»).
+    /// </summary>
+    public int? MovedFromLaneNo { get; set; }
+
+    /// <summary>Когда перенесли (UTC) — сравнивается с <c>HubGroupUserSeen.LanesSeenAt</c> зрителя.</summary>
+    public DateTime? MovedAt { get; set; }
 }

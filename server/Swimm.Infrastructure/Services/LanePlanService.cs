@@ -98,6 +98,13 @@ public class LanePlanService : ILanePlanService
 
         var inPlan = plan.Swimmers.Select(s => s.SwimmerId).ToHashSet();
         var mySwimmers = viewerUserId is int uid ? await LoadMySwimmersAsync(hubGroupId, uid, inPlan) : [];
+        if (mySwimmers.Count > 0)
+        {
+            var seenAt = (await HubGroupSeenStore.GetAsync(_db, hubGroupId, viewerUserId!.Value))?.LanesSeenAt;
+            var rows = plan.Swimmers.ToDictionary(s => s.SwimmerId);
+            foreach (var my in mySwimmers)
+                my.MovedFromLane = UnseenMove(rows[my.SwimmerId], seenAt);
+        }
 
         return new LanePlanDto
         {
@@ -131,41 +138,28 @@ public class LanePlanService : ILanePlanService
     }
 
     /// <summary>
-    /// «Мои» пловцы плана (L4, «Your lane») — только подсветка, прав не даёт, поэтому годятся и
-    /// недоверенные источники (правило «primary favorite недоверенный» — про права, не про
-    /// подсветку). «me»: привязка аккаунта админом сайта (<c>AppUser.SwimmerId</c>) и избранное
-    /// «Me»; «family»: избранное-семья и метка членства в этой группе. Берём только тех, кто в
-    /// плане (на дорожке или в Unassigned): «Not today» участник не видит.
+    /// Перенос, которого зритель ещё не видел: тренер переставил пловца в опубликованном плане
+    /// после последнего открытия вида Lanes (никогда не открывал — любой перенос новый).
+    /// </summary>
+    private static int? UnseenMove(LanePlanSwimmer row, DateTime? lanesSeenAt) =>
+        row.MovedFromLaneNo is int from && row.MovedAt is DateTime at && from != row.LaneNo
+        && (lanesSeenAt == null || lanesSeenAt < at)
+            ? from
+            : null;
+
+    public Task MarkSeenAsync(int hubGroupId, int viewerUserId) =>
+        HubGroupSeenStore.TouchAsync(_db, hubGroupId, viewerUserId, s => s.LanesSeenAt = DateTime.UtcNow);
+
+    /// <summary>
+    /// «Мои» пловцы плана (L4, «Your lane») — круг <see cref="MySwimmersQuery"/>. Берём только тех,
+    /// кто в плане (на дорожке или в Unassigned): «Not today» участник не видит.
     /// </summary>
     private async Task<List<LanePlanMySwimmerDto>> LoadMySwimmersAsync(int hubGroupId, int userId, IReadOnlySet<int> inPlan)
     {
         if (inPlan.Count == 0) return [];
 
-        var linked = await _db.AppUsers.AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => u.SwimmerId)
-            .FirstOrDefaultAsync();
-
-        var favorites = await _db.UserFavorites.AsNoTracking()
-            .Where(f => f.UserId == userId && f.SwimmerId != null && (f.IsPrimary || f.IsFamily))
-            .OrderBy(f => f.SortOrder).ThenBy(f => f.Id)
-            .Select(f => new { SwimmerId = f.SwimmerId!.Value, f.IsPrimary })
-            .ToListAsync();
-
-        var label = await _db.HubGroupUserMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == hubGroupId && m.UserId == userId && m.SwimmerId != null)
-            .Select(m => m.SwimmerId)
-            .FirstOrDefaultAsync();
-
-        var ordered = new List<(int SwimmerId, string Kind)>();
-        if (linked is int self) ordered.Add((self, "me"));
-        ordered.AddRange(favorites.Where(f => f.IsPrimary).Select(f => (f.SwimmerId, "me")));
-        ordered.AddRange(favorites.Where(f => !f.IsPrimary).Select(f => (f.SwimmerId, "family")));
-        if (label is int labelled) ordered.Add((labelled, "family"));
-
-        var seen = new HashSet<int>();
-        return ordered
-            .Where(x => inPlan.Contains(x.SwimmerId) && seen.Add(x.SwimmerId))
+        return (await MySwimmersQuery.LoadAsync(_db, hubGroupId, userId))
+            .Where(x => inPlan.Contains(x.SwimmerId))
             .Select(x => new LanePlanMySwimmerDto { SwimmerId = x.SwimmerId, Kind = x.Kind })
             .ToList();
     }
@@ -238,6 +232,8 @@ public class LanePlanService : ILanePlanService
                     row = new LanePlanSwimmer { SwimmerId = n.SwimmerId };
                     plan.Swimmers.Add(row);
                 }
+                else if (plan.Status == LanePlanStatus.Published)
+                    RecordMove(row, n.LaneNo, now);
                 row.LaneNo = n.LaneNo;
                 row.OrderNo = n.OrderNo;
             }
@@ -245,6 +241,25 @@ public class LanePlanService : ILanePlanService
             await _db.SaveChangesAsync();
             return HubGroupMemberSaveResult.Ok();
         });
+    }
+
+    /// <summary>
+    /// Перенос в опубликованном плане (Т1б): с дорожки на другую дорожку или в Unassigned.
+    /// Из Unassigned на дорожку — «поставили», не «перенесли». Вернули туда, откуда переносили, —
+    /// переноса для зрителя нет. Правки черновика сюда не попадают (участник их не видел).
+    /// </summary>
+    private static void RecordMove(LanePlanSwimmer row, int? newLane, DateTime now)
+    {
+        if (row.LaneNo == newLane) return;
+        if (newLane != null && newLane == row.MovedFromLaneNo)
+        {
+            row.MovedFromLaneNo = null;
+            row.MovedAt = null;
+            return;
+        }
+        if (row.LaneNo is not int from) return;
+        row.MovedFromLaneNo = from;
+        row.MovedAt = now;
     }
 
     public async Task<(LanePlanDistributionDto? Result, string? Error)> DistributeAsync(

@@ -35,6 +35,24 @@ public interface ITrainingSessionService
     Task<(int Status, string? Error)> DeleteMediaAsync(int hubGroupId, int sessionId, int mediaId, int actorUserId,
         bool isManager);
 
+    /// <summary>
+    /// «Sets &amp; times» тренировки (Т1а): сеты → повторы с уровнем и флагом «моя строка». null —
+    /// тренировки нет в этой группе.
+    /// </summary>
+    Task<TrainingSessionSetsDto?> GetSetsAsync(int hubGroupId, int sessionId, int viewerUserId, bool isManager);
+
+    /// <summary>
+    /// ★ ключевого сета (Р4) — по нему строка «You». Сет должен быть в тренировке; null снимает
+    /// пометку. Только управляющий (решает контроллер).
+    /// </summary>
+    Task<TrainingSessionSaveResult> SetKeySetAsync(int hubGroupId, int sessionId, int actorUserId,
+        TrainingKeySetInputDto input);
+
+    /// <summary>
+    /// Зритель открыл ленту Trainings — медиа других до этого момента больше не «новое» (Т1б).
+    /// </summary>
+    Task MarkSeenAsync(int hubGroupId, int viewerUserId);
+
     /// <summary>Удалить можно только тренировку БЕЗ времён; её медиа уходит с ней. Error null — удалено, иначе код и текст отказа.</summary>
     Task<(int Status, string? Error)> DeleteAsync(int hubGroupId, int sessionId);
 }
