@@ -93,7 +93,7 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 |---|---|---|---|
 | GET | `/api/me/media?swimmerId=` | список медиа юзера (опц. фильтр по пловцу) | `IUserMediaRepository.GetForUserAsync` |
 | GET | `/api/me/swims?season=` | агрегат My media v3 (заплывы сезона + медиа + реакции) | `IMySwimsRepository.GetMySwimsAsync`; сезон вне `[1990,2100]` сбрасывается на текущий |
-| POST | `/api/me/media` | добавить медиа | `[EnableRateLimiting("media")]`; 400 если `swimmer_id<=0`; 400 при достижении `MaxMediaPerUser=500`; валидация `MediaUrlValidator.TryValidate` (media_type/source_type/https/regex youtube-vimeo) |
+| POST | `/api/me/media` | добавить медиа | `[EnableRateLimiting("media")]`; 400 если `swimmer_id<=0`; 400 при достижении `MaxMediaPerUser=500`; валидация `MediaUrlValidator.TryValidate` (media_type/source_type/https/regex youtube-vimeo); **409** `This link is already added here` — та же ссылка у того же юзера к той же цели (`HasSameLinkAsync`, см. §9) |
 | DELETE | `/api/me/media/{id}` | удалить своё медиа | IDOR-проверка по `userId` в репозитории |
 | GET | `/api/me/media/publications` | статусы заявок на публикацию всех моих медиа | |
 | GET | `/api/me/moderation/media` | сводный inbox модерации: группы, где я владелец/админ + все клубные заявки, если я site admin | `IUserMediaPublicationService.GetModerationFeedAsync`; строка несёт `target_type`, от него зависит ручка решения |
@@ -421,6 +421,28 @@ rejected`; статус карточки выводит `derivedCardStatus` (`st
 - **«Link to a swim» = delete+recreate**, не PATCH — теряются `Id`, `CreatedAt` и любые
   публикации медиа (см. §5). Если баг про «пропала публикация после привязки к заплыву» —
   смотреть сюда в первую очередь.
+- **Одна ссылка к одной цели — один раз** (30.09.2026, `docs/plans/media-duplicates-handoff.md`).
+  `POST /api/me/media` отвечает 409, если у юзера уже есть та же ссылка к той же цели: тот же
+  `ResultId`; либо уровень `competition` и тот же `CompetitionId` (пловец не в счёт — таб Media
+  клеит по `(ResultId, Url)` без пловца); либо уровень `swimmer` того же пловца. Сравнение —
+  `MediaUrlValidator.DedupKey`: пробелы по краям не в счёт, у Google Drive — id файла (`/view`,
+  `?usp=sharing`, `open?id=` одного файла = одна ссылка), остальные ссылки как есть. Та же ссылка
+  к ДРУГОЙ цели (другой день события, заплыв) — разрешена. Раньше дубль заводился молча:
+  полоса «MY MEDIA — N» считала строки (15), а таб Media клеил их (10). Модал Add link теперь
+  показывает текст отказа сервера строкой над кнопками (`onSave` → `true | string`,
+  `addUserMedia` → `{ item, error }`); до этого при любом отказе он молча оставался открытым.
+  Старые дубли в базе проверка не трогает.
+- **Медиа «ко всему соревнованию» у многодневки — на ДНЕ, карточка /my-media — тоже по дню**
+  (30.09.2026). Кнопка «＋ Add media» в шапке соревнования цепляет к первому дню события, а
+  карточка на /my-media собрана по дню заплывов (`SwimList`, группа по `competition_id`). Медиа
+  дня без заплывов раньше не было видно на /my-media нигде. Теперь `/api/me/swims` отдаёт
+  `event_id` у заплыва и у медиа, и `compMediaByComp` отдаёт такое медиа карточке другого дня
+  того же события. Если у события несколько карточек (заплывы в разные дни), медиа своего дня
+  остаётся на своей, а медиа дня без карточки — на первой по порядку.
+- **`AddLinkModal` — портал в `body` с классом темы deep** (30.09.2026). Его открывают и со
+  страницы результатов (шапка соревнования, «+ Add video» на строке), где на корне темы deep
+  нет: роли `--t-*` там пустые, и модал выходил прозрачным. Класс ставит сам модал
+  (`useDeepThemeClass`) и сам подключает `deep-theme.css`, как `ConfirmDialog`.
 - **`Level` выводит сервер**, клиенту не доверяем (`UserMediaRepository.AddAsync`) — если
   на клиенте что-то не так с уровнем/группировкой, проверяй именно серверную логику вывода,
   а не то, что «передал клиент».

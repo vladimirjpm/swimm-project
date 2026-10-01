@@ -59,6 +59,10 @@ public class MySwimDto
     [JsonPropertyName("competition_id")]
     public int CompetitionId { get; set; }
 
+    /// <summary>Событие многодневки (Competition.EventId); null — однодневное соревнование.</summary>
+    [JsonPropertyName("event_id")]
+    public int? EventId { get; set; }
+
     [JsonPropertyName("competition_name")]
     public string CompetitionName { get; set; } = string.Empty;
 

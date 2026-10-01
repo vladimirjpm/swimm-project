@@ -332,10 +332,10 @@ function MyMediaContent({ deep }: { deep: string }) {
   };
 
   // ── Добавление / удаление ─────────────────────────────────────────────────
-  const handleAdd = async (input: AddMediaInput): Promise<boolean> => {
-    const item = await add(input);
+  const handleAdd = async (input: AddMediaInput): Promise<true | string> => {
+    const { item, error } = await add(input);
     if (item) { await reload(); return true; }
-    return false;
+    return error;
   };
 
   const handleDelete = async (mediaId: number) => {
@@ -1012,10 +1012,12 @@ function MyMediaContent({ deep }: { deep: string }) {
           initialSwimmerId={linkSwimTarget.swimmer_id}
           initialStep={3}
           onClose={() => setLinkSwimTarget(null)}
-          onSave={async (input): Promise<boolean> => {
-            const item = await add({ ...input, swimmer_id: linkSwimTarget.swimmer_id });
-            if (item) { await remove(linkSwimTarget.id); await reload(); }
-            return !!item;
+          onSave={async (input): Promise<true | string> => {
+            const { item, error } = await add({ ...input, swimmer_id: linkSwimTarget.swimmer_id });
+            if (!item) return error;
+            await remove(linkSwimTarget.id);
+            await reload();
+            return true;
           }}
         />
       )}

@@ -113,4 +113,34 @@ public class MediaUrlValidatorTests
         Assert.False(ok);
         Assert.NotNull(error);
     }
+    // ── DedupKey: запрет дубля ссылки (docs/plans/media-duplicates-handoff.md) ──
+
+    [Theory]
+    [InlineData("https://drive.google.com/file/d/1RH1YV22pp1ubIjvDlbxwSNsJIWOQVYOL/view")]
+    [InlineData("https://drive.google.com/file/d/1RH1YV22pp1ubIjvDlbxwSNsJIWOQVYOL/view?usp=sharing")]
+    [InlineData("https://drive.google.com/file/u/0/d/1RH1YV22pp1ubIjvDlbxwSNsJIWOQVYOL/view")]
+    [InlineData("https://drive.google.com/open?id=1RH1YV22pp1ubIjvDlbxwSNsJIWOQVYOL")]
+    [InlineData("https://drive.google.com/uc?export=view&id=1RH1YV22pp1ubIjvDlbxwSNsJIWOQVYOL")]
+    [InlineData("  https://drive.google.com/file/d/1RH1YV22pp1ubIjvDlbxwSNsJIWOQVYOL/view  ")]
+    public void DedupKey_SameDriveFile_SameKey(string url)
+    {
+        Assert.Equal("gdrive:1RH1YV22pp1ubIjvDlbxwSNsJIWOQVYOL", MediaUrlValidator.DedupKey(url));
+    }
+
+    [Fact]
+    public void DedupKey_DifferentDriveFiles_DifferentKeys()
+    {
+        Assert.NotEqual(
+            MediaUrlValidator.DedupKey("https://drive.google.com/file/d/AAA111/view"),
+            MediaUrlValidator.DedupKey("https://drive.google.com/file/d/BBB222/view"));
+    }
+
+    [Fact]
+    public void DedupKey_OtherLink_OnlyTrimmed()
+    {
+        Assert.Equal("https://youtu.be/abc123", MediaUrlValidator.DedupKey(" https://youtu.be/abc123 "));
+        Assert.NotEqual(
+            MediaUrlValidator.DedupKey("https://youtu.be/abc123"),
+            MediaUrlValidator.DedupKey("https://youtu.be/abc124"));
+    }
 }

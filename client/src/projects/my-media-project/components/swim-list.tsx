@@ -895,16 +895,28 @@ function SwimList({ swims, competitionMedia, showSwimmerName, swimmerNames, pref
     return Array.from(byComp.values());
   }, [swims]);
 
+  // Медиа «ко всему соревнованию» привязано к ДНЮ (кнопка в шапке соревнования цепляет к
+  // первому), а карточка собрана по дню заплывов. Медиа дня без своей карточки отдаём
+  // карточке другого дня того же события — иначе на /my-media его не видно нигде (30.09.2026).
   const compMediaByComp = useMemo(() => {
+    const cardDays = new Set(groups.map((g) => g[0].competition_id));
+    const cardByEvent = new Map<number, number>();
+    for (const g of groups) {
+      const ev = g[0].event_id;
+      if (ev != null && !cardByEvent.has(ev)) cardByEvent.set(ev, g[0].competition_id);
+    }
     const map = new Map<number, SwimMediaDto[]>();
     for (const m of competitionMedia) {
       if (m.competition_id == null) continue;
-      const list = map.get(m.competition_id) ?? [];
+      const key = !cardDays.has(m.competition_id) && m.event_id != null
+        ? cardByEvent.get(m.event_id) ?? m.competition_id
+        : m.competition_id;
+      const list = map.get(key) ?? [];
       list.push(m);
-      map.set(m.competition_id, list);
+      map.set(key, list);
     }
     return map;
-  }, [competitionMedia]);
+  }, [groups, competitionMedia]);
 
   return (
     <div className="flex flex-col gap-4">

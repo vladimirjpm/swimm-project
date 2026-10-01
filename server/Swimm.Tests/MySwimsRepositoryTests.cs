@@ -316,6 +316,44 @@ public class MySwimsRepositoryTests
         Assert.DoesNotContain(response.UnlinkedMedia, m => m.Id == otherUsersMedia.Id);
     }
 
+    // ── Многодневка: event_id у заплыва и у медиа дня без заплывов (карточка /my-media) ──
+
+    [Fact]
+    public async Task GetMySwims_MultiDayEvent_SwimAndCompetitionMediaCarryEventId()
+    {
+        // Случай 30.09.2026: заплывы на 2-м дне, фото «ко всему соревнованию» — на 1-м (кнопка
+        // шапки цепляет к первому дню). Клиент кладёт его в карточку по event_id.
+        await using var db = CreateDb(nameof(GetMySwims_MultiDayEvent_SwimAndCompetitionMediaCarryEventId));
+        var user = NewUser("u-event@example.com");
+        var swimmer = NewSwimmer("Иванов", "Иван");
+        db.AppUsers.Add(user);
+        db.Swimmers.Add(swimmer);
+        var ev = new CompetitionEvent { Name = "Arena" };
+        db.CompetitionEvents.Add(ev);
+        await db.SaveChangesAsync();
+        var (style, club) = await SeedRefsAsync(db);
+        var day1 = await SeedCompetitionAsync(db, "Arena", "15/10/2025");
+        var day2 = await SeedCompetitionAsync(db, "Arena", "16/10/2025");
+        var single = await SeedCompetitionAsync(db, "Single", "20/10/2025");
+        day1.EventId = ev.Id; day1.DayNumber = 1;
+        day2.EventId = ev.Id; day2.DayNumber = 2;
+        await AddFavoriteAsync(db, user, swimmer);
+
+        db.Results.Add(NewResult(swimmer, day2, style, club, new DateTime(2025, 10, 16)));
+        db.Results.Add(NewResult(swimmer, single, style, club, new DateTime(2025, 10, 20)));
+        db.UserMedia.AddRange(
+            new UserMedia { UserId = user.Id, SwimmerId = swimmer.Id, Level = "competition", CompetitionId = day1.Id, MediaType = "image", SourceType = "other", Url = "https://example.com/a.jpg" },
+            new UserMedia { UserId = user.Id, SwimmerId = swimmer.Id, Level = "competition", CompetitionId = single.Id, MediaType = "image", SourceType = "other", Url = "https://example.com/b.jpg" });
+        await db.SaveChangesAsync();
+
+        var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
+
+        Assert.Equal(ev.Id, response.Swims.Single(s => s.CompetitionId == day2.Id).EventId);
+        Assert.Null(response.Swims.Single(s => s.CompetitionId == single.Id).EventId);
+        Assert.Equal(ev.Id, response.CompetitionMedia.Single(m => m.CompetitionId == day1.Id).EventId);
+        Assert.Null(response.CompetitionMedia.Single(m => m.CompetitionId == single.Id).EventId);
+    }
+
     // ── Реакции: congrats двух юзеров → CongratsCount=2, MyCheer только у своего; лайк на медиа ──
 
     // ── Место: только у доплывшего в зачётном заплыве (инцидент И-16) ────────────

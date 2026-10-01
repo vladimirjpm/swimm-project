@@ -19,6 +19,8 @@ export interface MySwimDto {
   result_id: number;
   swimmer_id: number;
   competition_id: number;
+  /** Событие многодневки (дни — разные competition_id); null — однодневное. */
+  event_id: number | null;
   competition_name: string;
   /** dd/MM/yyyy */
   competition_date: string;

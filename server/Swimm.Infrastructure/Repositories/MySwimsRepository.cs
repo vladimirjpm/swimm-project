@@ -104,6 +104,7 @@ public class MySwimsRepository : IMySwimsRepository
                 SwimmerId = r.SwimmerId,
                 RelayId = r.RelayId,
                 CompetitionId = r.CompetitionId,
+                EventId = r.Competition.EventId,
                 CompetitionName = r.Competition.Name,
                 CompetitionDate = r.Competition.Date,
                 PoolType = r.Competition.PoolType,
@@ -277,6 +278,7 @@ public class MySwimsRepository : IMySwimsRepository
                 Url = m.Url,
                 ResultId = m.ResultId,
                 CompetitionId = m.CompetitionId,
+                EventId = m.Competition != null ? m.Competition.EventId : null,
                 CreatedAt = m.CreatedAt,
                 SwimmerName = (m.Swimmer.LastName + " " + m.Swimmer.FirstName).Trim(),
                 ResultLabel = m.ResultRecord != null

@@ -751,12 +751,12 @@ function ResultsTable() {
           contextLabel={addVideoFor.contextLabel}
           onClose={() => setAddVideoFor(null)}
           onSave={async (input) => {
-            const item = await addUserMedia(input);
+            const { item, error } = await addUserMedia(input);
             if (item) {
               refreshMedia();
               return true;
             }
-            return false;
+            return error;
           }}
         />
       )}
