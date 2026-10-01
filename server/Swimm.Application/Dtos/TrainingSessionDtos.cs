@@ -247,6 +247,37 @@ public sealed class TrainingSessionMediaDto
     /// <summary>Новое для зрителя (см. <c>new_media_count</c>) — подпись «NEW» на плитке.</summary>
     [JsonPropertyName("is_new")]
     public bool IsNew { get; set; }
+
+    /// <summary>
+    /// Кто на видео — метка тренера («Who's in it»); null — вся группа. Это метка, а не авторство:
+    /// ни прав, ни видимости она не меняет.
+    /// </summary>
+    [JsonPropertyName("swimmer")]
+    public TrainingMediaSwimmerDto? Swimmer { get; set; }
+
+    /// <summary>Отмеченный пловец — «мой» для зрителя (сам или семья): только подсветка, прав не даёт.</summary>
+    [JsonPropertyName("for_me")]
+    public bool ForMe { get; set; }
+}
+
+/// <summary>Пловец, отмеченный на видео тренировки: имя иврит / латиница — клиент берёт иврит первым.</summary>
+public sealed class TrainingMediaSwimmerDto
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("name_en")]
+    public string NameEn { get; set; } = "";
+}
+
+/// <summary>Сменить / снять метку у существующей ссылки: <c>swimmer_id: null</c> — вся группа.</summary>
+public sealed class TrainingMediaSwimmerInputDto
+{
+    [JsonPropertyName("swimmer_id")]
+    public int? SwimmerId { get; set; }
 }
 
 /// <summary>Добавить ссылку к тренировке (Е2). Проверки — те же, что у медиа группы.</summary>
@@ -265,6 +296,13 @@ public sealed class TrainingSessionMediaInputDto
 
     [JsonPropertyName("caption")]
     public string? Caption { get; set; }
+
+    /// <summary>
+    /// Кто на видео («Who's in it») — только управляющему; участнику с этим полем 403. Пловец
+    /// должен быть в видимом составе группы.
+    /// </summary>
+    [JsonPropertyName("swimmer_id")]
+    public int? SwimmerId { get; set; }
 }
 
 /// <summary>Итог добавления ссылки: либо медиа, либо код отказа (400 / 403 / 404).</summary>

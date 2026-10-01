@@ -204,6 +204,17 @@ export interface TrainingSessionMedia {
   can_delete: boolean;
   /** Добавил другой после того, как зритель открывал ленту (не старше 14 дней) — «NEW» (Т1б). */
   is_new?: boolean;
+  /** Кто на видео — метка тренера («Who's in it»); null — вся группа. Метка, не авторство: прав не даёт. */
+  swimmer?: TrainingMediaSwimmer | null;
+  /** Отмеченный пловец — «мой» для зрителя (сам или семья): только подсветка плитки. */
+  for_me?: boolean;
+}
+
+/** Пловец, отмеченный на видео тренировки; имя — иврит первым, `name_en` — фоллбек. */
+export interface TrainingMediaSwimmer {
+  id: number;
+  name: string;
+  name_en: string;
 }
 
 /** Показатели карточки тренировки (Т1а, Р2): объём ОДНОГО пловца и сколько записано. */
@@ -315,6 +326,8 @@ export interface TrainingSessionMediaInput {
   source_type: TrainingSessionMedia['source_type'];
   url: string;
   caption?: string | null;
+  /** «Who's in it» — только управляющий; null / не задан — вся группа. */
+  swimmer_id?: number | null;
 }
 
 /** Ближайшее занятие — СЧИТАЕТ СЕРВЕР в поясе Израиля, клиент только рисует. */

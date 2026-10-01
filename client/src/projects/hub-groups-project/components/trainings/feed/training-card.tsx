@@ -192,6 +192,8 @@ function TrainingCard({
               size={isDesktop ? 'lg' : 'md'}
               onRemove={(m) => setPending(m)}
               canRemove={(m) => m.can_delete}
+              // «Who's in it»: имя отмеченного пловца вместо подписи (иврит первым), мой — акцентом.
+              tagOf={(m) => (m.swimmer ? { name: m.swimmer.name || m.swimmer.name_en, mine: !!m.for_me } : null)}
               // Лайтбокс — общий реестр форм таба (`lightbox`); индекс — в списке без альбомов.
               onOpen={(index) => openSheet({ kind: 'lightbox', sessionId: session.id, index })}
             />

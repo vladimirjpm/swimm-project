@@ -16,11 +16,26 @@ import { HelperMedia } from '../../../utils/helpers';
  *
  * `onRemove` + `canRemove` — кнопка ✕ на тайле (автор — своё, тренер — любое; решает сервер
  * флагом `can_delete`). Без них лента только для чтения.
+ *
+ * `tagOf` — метка «кто на видео» (лента тренировок группы): есть метка — нижняя полоса плитки
+ * показывает имя вместо подписи (подпись остаётся в лайтбоксе), `mine` — плашка акцентом. Без
+ * пропа (журнал тренировок) вид плитки прежний.
  */
 
 type StripItem = Pick<TrainingMediaItem, 'id' | 'media_type' | 'source_type' | 'url' | 'caption'>;
 
-function MediaStripTile({ item, onClick, onRemove }: { item: StripItem; onClick?: () => void; onRemove?: () => void }) {
+/** Метка «кто на видео» на плитке: имя (иврит первым — решает вызывающий) и «это мой пловец». */
+export interface StripTag {
+  name: string;
+  mine: boolean;
+}
+
+function MediaStripTile({ item, tag, onClick, onRemove }: {
+  item: StripItem;
+  tag?: StripTag | null;
+  onClick?: () => void;
+  onRemove?: () => void;
+}) {
   const remove = onRemove && (
     <button
       type="button"
@@ -48,14 +63,16 @@ function MediaStripTile({ item, onClick, onRemove }: { item: StripItem; onClick?
     <div className="tbs-media-tile" onClick={onClick}>
       {thumbUrl ? <img loading="lazy" src={thumbUrl} referrerPolicy="no-referrer" alt="" /> : <span className="tbs-media-fallback">🎬</span>}
       {item.media_type === 'video' && <span className="tbs-media-play">▶</span>}
-      {item.caption && <span className="tbs-media-caption">{item.caption}</span>}
+      {tag ? (
+        <span className={`tbs-media-tag${tag.mine ? ' tbs-media-tag--mine' : ''}`} dir="auto"><bdi>{tag.name}</bdi></span>
+      ) : item.caption && <span className="tbs-media-caption">{item.caption}</span>}
       {remove}
     </div>
   );
 }
 
 function TrainingMediaStrip<T extends StripItem>({
-  media, className, size = 'md', onRemove, canRemove, onOpen,
+  media, className, size = 'md', onRemove, canRemove, onOpen, tagOf,
 }: {
   media: T[];
   /** Доп. класс полосы (у карточки группы свои отступы). */
@@ -66,6 +83,8 @@ function TrainingMediaStrip<T extends StripItem>({
   canRemove?: (item: T) => boolean;
   /** Клик по тайлу (кроме альбома); если задан — своего лайтбокса нет. */
   onOpen?: (index: number) => void;
+  /** Метка «кто на видео» плитки; null — метки нет. Не задан — как раньше (журнал тренировок). */
+  tagOf?: (item: T) => StripTag | null;
 }) {
   const [openIndex, setOpenIndex] = React.useState<number | null>(null);
 
@@ -90,6 +109,7 @@ function TrainingMediaStrip<T extends StripItem>({
         <MediaStripTile
           key={item.id}
           item={item}
+          tag={tagOf?.(item) ?? null}
           onClick={item.media_type === 'album'
             ? undefined
             : () => {

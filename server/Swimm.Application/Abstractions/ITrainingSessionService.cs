@@ -31,6 +31,14 @@ public interface ITrainingSessionService
     Task<TrainingSessionMediaSaveResult> AddMediaAsync(int hubGroupId, int sessionId, int actorUserId, bool isManager,
         TrainingSessionMediaInputDto input);
 
+    /// <summary>
+    /// Сменить / снять метку «кто на видео» у ссылки тренировки (<c>swimmer_id: null</c> — вся
+    /// группа). Только управляющий (решает контроллер); пловец — из видимого состава группы (400),
+    /// ссылка — этой тренировки этой группы (404).
+    /// </summary>
+    Task<TrainingSessionMediaSaveResult> SetMediaSwimmerAsync(int hubGroupId, int sessionId, int mediaId,
+        int actorUserId, TrainingMediaSwimmerInputDto input);
+
     /// <summary>Удалить ссылку тренировки: автор — свою, управляющий — любую. Error null — удалено.</summary>
     Task<(int Status, string? Error)> DeleteMediaAsync(int hubGroupId, int sessionId, int mediaId, int actorUserId,
         bool isManager);

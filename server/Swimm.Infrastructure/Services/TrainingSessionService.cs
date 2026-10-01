@@ -225,6 +225,14 @@ public class TrainingSessionService : ITrainingSessionService
         if (!isManager && !await MembersAddMediaAsync(hubGroupId))
             return TrainingSessionMediaSaveResult.Fail(403, "In this group only the coach adds videos to trainings.");
 
+        // «Who's in it» — метка тренера: участнику нельзя, пловец — из видимого состава группы.
+        if (input.SwimmerId != null)
+        {
+            if (!isManager) return TrainingSessionMediaSaveResult.Fail(403, "Only the coach tags a swimmer.");
+            if (!await InRosterAsync(hubGroupId, input.SwimmerId.Value))
+                return TrainingSessionMediaSaveResult.Fail(400, "This swimmer isn't in the group.");
+        }
+
         var onSession = await _db.HubGroupMedia.CountAsync(m => m.HubGroupId == hubGroupId && m.TrainingId == sessionId);
         if (onSession >= TrainingSessionRules.MaxMediaPerSession)
             return TrainingSessionMediaSaveResult.Fail(400,
@@ -246,6 +254,7 @@ public class TrainingSessionService : ITrainingSessionService
             Url = input.Url,
             Caption = input.Caption,
             TrainingId = sessionId,
+            SwimmerId = input.SwimmerId,   // состав и право проверены выше
         }, actorUserId);
         if (!ok) return TrainingSessionMediaSaveResult.Fail(400, error ?? "Could not add the link.");
 
@@ -253,6 +262,33 @@ public class TrainingSessionService : ITrainingSessionService
             .Single(m => m.Id == id);
         return TrainingSessionMediaSaveResult.Ok(added);
     }
+
+    public async Task<TrainingSessionMediaSaveResult> SetMediaSwimmerAsync(int hubGroupId, int sessionId, int mediaId,
+        int actorUserId, TrainingMediaSwimmerInputDto input)
+    {
+        var media = await _db.HubGroupMedia.FirstOrDefaultAsync(m =>
+            m.Id == mediaId && m.HubGroupId == hubGroupId && m.TrainingId == sessionId);
+        if (media == null) return TrainingSessionMediaSaveResult.Fail(404, "Link not found.");
+
+        if (input.SwimmerId is int swimmerId && !await InRosterAsync(hubGroupId, swimmerId))
+            return TrainingSessionMediaSaveResult.Fail(400, "This swimmer isn't in the group.");
+
+        media.SwimmerId = input.SwimmerId;
+        await _db.SaveChangesAsync();
+
+        // Вызывает только управляющий (решает контроллер).
+        var saved = (await LoadMediaAsync(hubGroupId, [sessionId], new Viewer(actorUserId, IsManager: true)))[sessionId]
+            .Single(m => m.Id == mediaId);
+        return TrainingSessionMediaSaveResult.Ok(saved);
+    }
+
+    /// <summary>
+    /// Пловец в видимом составе группы — как считает состав <c>LanePlanService.LoadRosterAsync</c>:
+    /// строка <c>HubGroupMembers</c> без <c>IsExcluded</c> (пловцы группы без федерации там тоже есть).
+    /// </summary>
+    private Task<bool> InRosterAsync(int hubGroupId, int swimmerId) =>
+        _db.HubGroupMembers.AsNoTracking()
+            .AnyAsync(m => m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId && !m.IsExcluded);
 
     public async Task<(int Status, string? Error)> DeleteMediaAsync(int hubGroupId, int sessionId, int mediaId,
         int actorUserId, bool isManager)
@@ -347,8 +383,16 @@ public class TrainingSessionService : ITrainingSessionService
             {
                 TrainingId = m.TrainingId!.Value,
                 m.Id, m.MediaType, m.SourceType, m.Url, m.Caption, m.CreatedByUserId, m.CreatedAt,
+                m.SwimmerId,
+                SwimmerName = m.Swimmer != null ? (m.Swimmer.LastName + " " + m.Swimmer.FirstName).Trim() : null,
+                SwimmerNameEn = m.Swimmer != null ? (m.Swimmer.LastNameEn + " " + m.Swimmer.FirstNameEn).Trim() : null,
             })
             .ToListAsync();
+
+        // «Мои» пловцы — один раз на запрос и только если у какой-то ссылки есть метка.
+        var mine = rows.Any(r => r.SwimmerId != null)
+            ? (await MySwimmersQuery.LoadAsync(_db, hubGroupId, viewer.UserId)).Select(x => x.SwimmerId).ToHashSet()
+            : [];
         return rows
             .GroupBy(r => r.TrainingId)
             .ToDictionary(g => g.Key, g => g.Select(r => new TrainingSessionMediaDto
@@ -361,6 +405,10 @@ public class TrainingSessionService : ITrainingSessionService
                 Mine = r.CreatedByUserId == viewer.UserId,
                 CanDelete = CanDelete(r.CreatedByUserId, viewer),
                 IsNew = viewer.NewSince is DateTime since && r.CreatedByUserId != viewer.UserId && r.CreatedAt > since,
+                Swimmer = r.SwimmerId is int sid
+                    ? new TrainingMediaSwimmerDto { Id = sid, Name = r.SwimmerName ?? "", NameEn = r.SwimmerNameEn ?? "" }
+                    : null,
+                ForMe = r.SwimmerId is int fid && mine.Contains(fid),
             }).ToList());
     }
 

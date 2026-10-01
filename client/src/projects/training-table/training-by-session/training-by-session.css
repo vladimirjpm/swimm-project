@@ -67,6 +67,14 @@
   color: #fff; font-size: 9.5px; font-weight: 700;
   padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Метка «кто на видео» (лента тренировок группы): вместо подписи; мой пловец — плашка акцентом */
+.tbs-media-tag {
+  position: absolute; inset-inline: 0; bottom: 0;
+  background: linear-gradient(0deg, rgba(0,0,0,.75), transparent);
+  color: #fff; font-size: 9.5px; font-weight: 700;
+  padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tbs-media-tag--mine { background: var(--deep-accent); color: var(--deep-accent-ink); }
 /* ✕ на тайле: своё — автор, любое — тренер (Е3 group-events-media-plan) */
 .tbs-media-remove {
   position: absolute; top: 3px; left: 3px;

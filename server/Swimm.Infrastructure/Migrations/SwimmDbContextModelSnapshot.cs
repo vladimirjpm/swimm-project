@@ -1593,7 +1593,7 @@ namespace Swimm.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("CK_HubGroupMedia_AlbumInvariant", "(\"MediaType\" = 'album') = (\"SourceType\" = 'album')");
 
-                            t.HasCheckConstraint("CK_HubGroupMedia_AnchorMembersOnly", "(\"SwimmerId\" IS NULL AND \"ResultId\" IS NULL) OR \"Visibility\" = 'members'");
+                            t.HasCheckConstraint("CK_HubGroupMedia_AnchorMembersOnly", "(\"ResultId\" IS NULL OR \"Visibility\" = 'members') AND (\"SwimmerId\" IS NULL OR \"Visibility\" = 'members' OR \"TrainingId\" IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_HubGroupMedia_MediaType", "\"MediaType\" IN ('image', 'video', 'album')");
 

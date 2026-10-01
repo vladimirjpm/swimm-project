@@ -154,6 +154,23 @@ public class HubGroupTrainingSessionsController : ControllerBase
         return StatusCode(result.Status, new { error = result.Error });
     }
 
+    /// <summary>
+    /// Сменить / снять метку «кто на видео» у ссылки — только управляющий;
+    /// <c>swimmer_id: null</c> снимает. Метка прав и видимости не меняет.
+    /// </summary>
+    [HttpPut("{sessionId:int}/media/{mediaId:int}/swimmer")]
+    public async Task<IActionResult> SetMediaSwimmer(int id, int sessionId, int mediaId,
+        [FromBody] TrainingMediaSwimmerInputDto input)
+    {
+        var (userId, denied) = await ManagerAsync(id);
+        if (denied != null) return denied;
+
+        var result = await _sessions.SetMediaSwimmerAsync(id, sessionId, mediaId, userId, input);
+        Response.Headers.CacheControl = "private, no-store";
+        if (result.Media != null) return Ok(result.Media);
+        return StatusCode(result.Status, new { error = result.Error });
+    }
+
     /// <summary>Удалить ссылку: автор — свою, управляющий — любую.</summary>
     [HttpDelete("{sessionId:int}/media/{mediaId:int}")]
     public async Task<IActionResult> DeleteMedia(int id, int sessionId, int mediaId)

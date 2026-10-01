@@ -416,6 +416,37 @@ rejected`; статус карточки выводит `derivedCardStatus` (`st
 Карточка «Broken media links» на `/Admin` (дашборд «здоровье данных») ссылается на эту
 страницу.
 
+## 8½. Метка пловца на видео тренировки (01.10.2026)
+
+Тренер может отметить на ссылке тренировки, **кто на видео** («Who's in it»: технический разбор,
+съёмка одного человека). Это **метка, а не авторство**: колонка `Sys_HubGroupMedia.SwimmerId`
+(для медиа тренировок раньше всегда `null`), автор остаётся `CreatedByUserId` — квота «N of 10
+yours», «Added by you» и право удалить считаются по нему, как и раньше.
+
+- **Кто ставит:** только управляющий. Участник с `swimmer_id` в `POST …/sessions/{id}/media` →
+  403 «Only the coach tags a swimmer.». Пловец-метка прав не получает никаких (снять метку или
+  удалить ссылку он не может — связь «я — этот пловец» на сайте не доверенная).
+- **Кого можно:** пловца из видимого состава группы (`HubGroupMembers` без `IsExcluded`, как
+  `LanePlanService.LoadRosterAsync`; пловцы группы без федерации тоже). Иначе 400 «This swimmer
+  isn't in the group.». Ушёл из состава ПОСЛЕ отметки — метка остаётся (снимок).
+- **Один пловец на ссылку** (одна колонка, таблицы отметок нет). Сменить / снять —
+  `PUT /api/hub-groups/{id}/sessions/{sessionId}/media/{mediaId}/swimmer`, тело
+  `{ "swimmer_id": 123 }` или `{ "swimmer_id": null }`, только управляющий; ответ — обновлённое
+  медиа. Форма «Add video» (поле «Who's in it») и лайтбокс (строка над кнопками) — у управляющего.
+- **Ответ медиа** несёт `swimmer { id, name, name_en }` (или `null`) и `for_me` — отмеченный
+  пловец «мой» для зрителя (`MySwimmersQuery`: сам и семья; только подсветка плитки акцентом).
+- **Видимость не меняется.** Метка не выводит ссылку ни на страницу пловца, ни в галерею группы:
+  `GetGalleryAsync` / `GetMembersMediaAsync` фильтруют `TrainingId == null` (покрыто тестом).
+  `Visibility` у медиа тренировки не используется — `members` туда не ставить, иначе ссылка
+  уедет в закрытую галерею.
+- **Проверка в базе:** `CK_HubGroupMedia_AnchorMembersOnly` раньше пускал `SwimmerId` только при
+  `Visibility = 'members'` — метка на видео тренировки падала 500. Миграция
+  `AllowSwimmerTagOnTrainingMedia` разрешила `SwimmerId` при `TrainingId IS NOT NULL`; якорь-заплыв
+  (`ResultId`) — по-прежнему только members. InMemory-тесты check-ограничений не видят — для них
+  `TrainingMediaTagPgTests` (живой Postgres).
+- **Два пути записи, проверка одна:** состав проверяет сам `HubGroupMediaService.AddAsync` — к нему
+  ведёт и ручка тренировки, и ручка галереи группы `POST /api/hub-groups/{id}/media` с `training_id`.
+
 ## 9. Footguns
 
 - **«Link to a swim» = delete+recreate**, не PATCH — теряются `Id`, `CreatedAt` и любые

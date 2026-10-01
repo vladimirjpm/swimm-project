@@ -414,6 +414,225 @@ public class TrainingSessionTests
         Assert.Equal(TrainingSessionRules.MaxMediaPerSession, await db.HubGroupMedia.CountAsync());
     }
 
+    // ── «Who's in it»: тренер отмечает пловца на видео (01.10.2026) ─────────
+    // Метка, а не авторство: автор — кто добавил; метку ставит только управляющий; пловец — из
+    // видимого состава группы (HubGroupMembers без IsExcluded); видимость медиа метка не меняет.
+
+    private static TrainingSessionMediaInputDto Tagged(int? swimmerId, string url = "https://youtu.be/tag") =>
+        new() { MediaType = "video", SourceType = "youtube", Url = url, Caption = "Breaststroke kick", SwimmerId = swimmerId };
+
+    /// <summary>Два пловца в составе группы; третий — исключённый из состава; четвёртый — в составе чужой группы.</summary>
+    private sealed record Roster(int Dana, int Eli, int Excluded, int Foreign);
+
+    private static async Task<Roster> SeedRosterAsync(SwimmDbContext db, Seed s)
+    {
+        Swimmer Make(string last, string first, string lastEn, string firstEn) => new()
+        {
+            LastName = last, FirstName = first, LastNameEn = lastEn, FirstNameEn = firstEn, Gender = "female", BirthYear = 2010,
+        };
+        var dana = Make("כהן", "דנה", "Cohen", "Dana");
+        var eli = Make("לוי", "אלי", "Levi", "Eli");
+        var excluded = Make("בר", "נועה", "Bar", "Noa");
+        var foreign = Make("רז", "גיל", "Raz", "Gil");
+        db.Swimmers.AddRange(dana, eli, excluded, foreign);
+        await db.SaveChangesAsync();
+        db.HubGroupMembers.AddRange(
+            new HubGroupMember { HubGroupId = s.GroupId, SwimmerId = dana.Id },
+            new HubGroupMember { HubGroupId = s.GroupId, SwimmerId = eli.Id },
+            new HubGroupMember { HubGroupId = s.GroupId, SwimmerId = excluded.Id, IsExcluded = true },
+            new HubGroupMember { HubGroupId = s.OtherGroupId, SwimmerId = foreign.Id });
+        await db.SaveChangesAsync();
+        return new Roster(dana.Id, eli.Id, excluded.Id, foreign.Id);
+    }
+
+    [Fact]
+    public async Task Coach_TagsSwimmerOnLink_NameInResponse_AuthorStaysTheCoach()
+    {
+        await using var db = CreateDb(nameof(Coach_TagsSwimmerOnLink_NameInResponse_AuthorStaysTheCoach));
+        var (service, s, filming) = await FilmingAsync(db);
+        var r = await SeedRosterAsync(db, s);
+
+        var added = await service.AddMediaAsync(s.GroupId, filming, s.Coach, isManager: true, Tagged(r.Dana));
+
+        var m = Assert.IsType<TrainingSessionMediaDto>(added.Media);
+        Assert.Equal((r.Dana, "כהן דנה", "Cohen Dana"), (m.Swimmer!.Id, m.Swimmer.Name, m.Swimmer.NameEn));
+        var row = await db.HubGroupMedia.SingleAsync();
+        Assert.Equal((r.Dana, s.Coach, (int?)filming), (row.SwimmerId, row.CreatedByUserId, row.TrainingId));
+        // Метка не делает ссылку «закрытой галереей»: Visibility остаётся public (не используется).
+        Assert.Equal(HubGroupMediaVisibility.Public, row.Visibility);
+    }
+
+    [Fact]
+    public async Task AddMedia_WithoutSwimmer_HasNoTag()
+    {
+        await using var db = CreateDb(nameof(AddMedia_WithoutSwimmer_HasNoTag));
+        var (service, s, filming) = await FilmingAsync(db);
+
+        var added = await service.AddMediaAsync(s.GroupId, filming, s.Coach, true, Tagged(null));
+
+        Assert.Null(added.Media!.Swimmer);
+        Assert.False(added.Media.ForMe);
+        Assert.Null((await db.HubGroupMedia.SingleAsync()).SwimmerId);
+    }
+
+    [Fact]
+    public async Task Member_SendingSwimmerId_Is403_NoLink()
+    {
+        await using var db = CreateDb(nameof(Member_SendingSwimmerId_Is403_NoLink));
+        var (service, s, filming) = await FilmingAsync(db);
+        var r = await SeedRosterAsync(db, s);
+
+        var result = await service.AddMediaAsync(s.GroupId, filming, Member, isManager: false, Tagged(r.Dana));
+
+        Assert.Equal((403, "Only the coach tags a swimmer."), (result.Status, result.Error));
+        Assert.Empty(db.HubGroupMedia);
+    }
+
+    [Fact]
+    public async Task Tag_SwimmerOutsideTheRoster_Is400_NoLink()
+    {
+        await using var db = CreateDb(nameof(Tag_SwimmerOutsideTheRoster_Is400_NoLink));
+        var (service, s, filming) = await FilmingAsync(db);
+        var r = await SeedRosterAsync(db, s);
+
+        var excluded = await service.AddMediaAsync(s.GroupId, filming, s.Coach, true, Tagged(r.Excluded));
+        var foreign = await service.AddMediaAsync(s.GroupId, filming, s.Coach, true, Tagged(r.Foreign));
+        var nobody = await service.AddMediaAsync(s.GroupId, filming, s.Coach, true, Tagged(987654));
+
+        Assert.Equal((400, 400, 400), (excluded.Status, foreign.Status, nobody.Status));
+        Assert.Equal("This swimmer isn't in the group.", excluded.Error);
+        Assert.Empty(db.HubGroupMedia);
+    }
+
+    [Fact]
+    public async Task ForMe_TrueOnlyForTheViewerWhoseSwimmerIsTagged()
+    {
+        await using var db = CreateDb(nameof(ForMe_TrueOnlyForTheViewerWhoseSwimmerIsTagged));
+        var (service, s, filming) = await FilmingAsync(db);
+        var r = await SeedRosterAsync(db, s);
+        var parent = new AppUser { Email = "dana@example.com", DisplayName = "Dana", SecurityStamp = "s", SwimmerId = r.Dana };
+        var bystander = new AppUser { Email = "other@example.com", DisplayName = "Other", SecurityStamp = "s", SwimmerId = r.Eli };
+        db.AppUsers.AddRange(parent, bystander);
+        await db.SaveChangesAsync();
+        await service.AddMediaAsync(s.GroupId, filming, s.Coach, true, Tagged(r.Dana));
+
+        var forDana = (await service.ListAsync(s.GroupId, parent.Id, false)).Sessions.Single(x => x.Id == filming).Media.Single();
+        var forEli = (await service.ListAsync(s.GroupId, bystander.Id, false)).Sessions.Single(x => x.Id == filming).Media.Single();
+        var forCoach = (await service.ListAsync(s.GroupId, s.Coach, true)).Sessions.Single(x => x.Id == filming).Media.Single();
+
+        Assert.Equal((true, false, false), (forDana.ForMe, forEli.ForMe, forCoach.ForMe));
+        // Метка видна всем зрителям, а прав «моему» пловцу не даёт: удалить он не может.
+        Assert.All(new[] { forDana, forEli }, m => Assert.Equal((r.Dana, false), (m.Swimmer!.Id, m.CanDelete)));
+    }
+
+    [Fact]
+    public async Task SetMediaSwimmer_ChangesAndClearsTheTag()
+    {
+        await using var db = CreateDb(nameof(SetMediaSwimmer_ChangesAndClearsTheTag));
+        var (service, s, filming) = await FilmingAsync(db);
+        var r = await SeedRosterAsync(db, s);
+        var link = (await service.AddMediaAsync(s.GroupId, filming, Member, false, Video())).Media!;
+        Assert.Null(link.Swimmer);
+
+        var tagged = await service.SetMediaSwimmerAsync(s.GroupId, filming, link.Id, s.Coach,
+            new TrainingMediaSwimmerInputDto { SwimmerId = r.Dana });
+        var changed = await service.SetMediaSwimmerAsync(s.GroupId, filming, link.Id, s.Coach,
+            new TrainingMediaSwimmerInputDto { SwimmerId = r.Eli });
+        Assert.Equal(r.Dana, tagged.Media!.Swimmer!.Id);
+        Assert.Equal((r.Eli, "לוי אלי"), (changed.Media!.Swimmer!.Id, changed.Media.Swimmer.Name));
+        Assert.Equal(r.Eli, (await db.HubGroupMedia.SingleAsync()).SwimmerId);
+        // Автор — по-прежнему участник, не тренер.
+        Assert.Equal(Member, (await db.HubGroupMedia.SingleAsync()).CreatedByUserId);
+
+        var cleared = await service.SetMediaSwimmerAsync(s.GroupId, filming, link.Id, s.Coach,
+            new TrainingMediaSwimmerInputDto { SwimmerId = null });
+        Assert.NotNull(cleared.Media);
+        Assert.Null(cleared.Media.Swimmer);
+        Assert.Null((await db.HubGroupMedia.SingleAsync()).SwimmerId);
+    }
+
+    [Fact]
+    public async Task SetMediaSwimmer_ForeignTrainingOrLink_Is404_BadSwimmer_Is400()
+    {
+        await using var db = CreateDb(nameof(SetMediaSwimmer_ForeignTrainingOrLink_Is404_BadSwimmer_Is400));
+        var (service, s, filming) = await FilmingAsync(db);
+        var r = await SeedRosterAsync(db, s);
+        var link = (await service.AddMediaAsync(s.GroupId, filming, s.Coach, true, Tagged(r.Dana))).Media!;
+        var input = new TrainingMediaSwimmerInputDto { SwimmerId = r.Eli };
+
+        var otherGroup = await service.SetMediaSwimmerAsync(s.OtherGroupId, filming, link.Id, s.Coach, input);
+        var otherSession = await service.SetMediaSwimmerAsync(s.GroupId, s.SeededSessionId, link.Id, s.Coach, input);
+        var noLink = await service.SetMediaSwimmerAsync(s.GroupId, filming, 99999, s.Coach, input);
+        var excluded = await service.SetMediaSwimmerAsync(s.GroupId, filming, link.Id, s.Coach,
+            new TrainingMediaSwimmerInputDto { SwimmerId = r.Excluded });
+        var foreign = await service.SetMediaSwimmerAsync(s.GroupId, filming, link.Id, s.Coach,
+            new TrainingMediaSwimmerInputDto { SwimmerId = r.Foreign });
+
+        Assert.Equal((404, 404, 404), (otherGroup.Status, otherSession.Status, noLink.Status));
+        Assert.Equal((400, 400), (excluded.Status, foreign.Status));
+        Assert.Equal("This swimmer isn't in the group.", excluded.Error);
+        // Всё отказано — метка осталась прежней.
+        Assert.Equal(r.Dana, (await db.HubGroupMedia.SingleAsync()).SwimmerId);
+    }
+
+    [Fact]
+    public async Task Tag_LeavingTheRosterAfterwards_KeepsTheTag()
+    {
+        await using var db = CreateDb(nameof(Tag_LeavingTheRosterAfterwards_KeepsTheTag));
+        var (service, s, filming) = await FilmingAsync(db);
+        var r = await SeedRosterAsync(db, s);
+        await service.AddMediaAsync(s.GroupId, filming, s.Coach, true, Tagged(r.Dana));
+
+        var member = await db.HubGroupMembers.SingleAsync(m => m.HubGroupId == s.GroupId && m.SwimmerId == r.Dana);
+        member.IsExcluded = true;
+        await db.SaveChangesAsync();
+
+        var media = (await service.ListAsync(s.GroupId, s.Coach, true)).Sessions.Single(x => x.Id == filming).Media.Single();
+        Assert.Equal("כהן דנה", media.Swimmer!.Name);   // снимок, как у плана дорожек
+    }
+
+    [Fact]
+    public async Task TaggedTrainingLink_NeverReachesTheGroupGalleries()
+    {
+        await using var db = CreateDb(nameof(TaggedTrainingLink_NeverReachesTheGroupGalleries));
+        var (service, s, filming) = await FilmingAsync(db);
+        var r = await SeedRosterAsync(db, s);
+        await service.AddMediaAsync(s.GroupId, filming, s.Coach, true, Tagged(r.Dana));
+        var gallery = new HubGroupMediaService(db);
+
+        // Ссылка существует и помечена, но ни публичная галерея, ни закрытая (разборы) её не видят.
+        Assert.Equal(r.Dana, (await db.HubGroupMedia.SingleAsync()).SwimmerId);
+        Assert.Empty(await gallery.GetGalleryAsync(s.GroupId));
+        Assert.Empty(await gallery.GetMembersMediaAsync(s.GroupId));
+    }
+
+    /// <summary>
+    /// Второй путь к тем же ссылкам — ручка галереи группы с <c>training_id</c>
+    /// (<see cref="HubGroupMediaService.AddAsync"/> напрямую): метку тоже ставит только пловцу из
+    /// состава этой группы, иначе любой управляющий отметил бы любого пловца сайта.
+    /// </summary>
+    [Fact]
+    public async Task GalleryPathWithTrainingId_TagsOnlyARosterSwimmer()
+    {
+        await using var db = CreateDb(nameof(GalleryPathWithTrainingId_TagsOnlyARosterSwimmer));
+        var (_, s, filming) = await FilmingAsync(db);
+        var r = await SeedRosterAsync(db, s);
+        var gallery = new HubGroupMediaService(db);
+        HubGroupMediaInputDto Input(int swimmerId) => new()
+        {
+            MediaType = "video", SourceType = "youtube", Url = $"https://youtu.be/g{swimmerId}", TrainingId = filming, SwimmerId = swimmerId,
+        };
+
+        var foreign = await gallery.AddAsync(s.GroupId, Input(r.Foreign), s.Coach);
+        var excluded = await gallery.AddAsync(s.GroupId, Input(r.Excluded), s.Coach);
+        var unknown = await gallery.AddAsync(s.GroupId, Input(999_999), s.Coach);
+        var ok = await gallery.AddAsync(s.GroupId, Input(r.Eli), s.Coach);
+
+        Assert.Equal((false, false, false, true), (foreign.Success, excluded.Success, unknown.Success, ok.Success));
+        Assert.Equal("This swimmer isn't in the group.", foreign.Error);
+        Assert.Equal(r.Eli, (await db.HubGroupMedia.SingleAsync()).SwimmerId);
+    }
+
     [Fact]
     public void Schedule_TrainingMedia_DefaultsToMembers_UnknownIsMembers()
     {

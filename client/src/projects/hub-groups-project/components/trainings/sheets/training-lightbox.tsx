@@ -15,18 +15,22 @@ import { formatSheetDate, sourceLabel } from './link-helpers';
  * Список — ссылки тренировки без альбомов (альбом открывается наружу, как в ленте). Листание:
  * свайп по горизонтали (порог 50px), стрелки ← → и точки; `Esc` закрывает. Автора сервер не
  * отдаёт (правило приватности ленты группы), поэтому «Added by you» — только у своих ссылок.
+ *
+ * Метка «Who's in it» (тренер отмечает пловца на видео): в строке меты — `For <имя>`; управляющему
+ * над кнопками — выбор пловца (Whole group + состав), смена пишется сразу. Метка прав не даёт.
  */
 
 const SWIPE_PX = 50;
 
 function TrainingLightbox({ sheet, onClose }: TrainingsSheetProps<'lightbox'>) {
-  const { sessions } = useTrainingsTab();
+  const { sessions, manages, group } = useTrainingsTab();
   const session = sessions.data?.sessions.find((s) => s.id === sheet.sessionId) ?? null;
 
   const [index, setIndex] = useState(sheet.index);
   // Только что удалённые: список перечитывается хуком с задержкой, а убранная ссылка не должна мигать.
   const [removed, setRemoved] = useState<number[]>([]);
   const [confirming, setConfirming] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const touchX = useRef<number | null>(null);
 
@@ -69,7 +73,15 @@ function TrainingLightbox({ sheet, onClose }: TrainingsSheetProps<'lightbox'>) {
 
   const label = sourceLabel(item.url, item.media_type);
   const embedUrl = item.media_type === 'video' ? HelperMedia.embedUrl(item.source_type, item.url) : null;
-  const meta = [item.mine ? 'Added by you' : null, label].filter(Boolean).join(' · ');
+  const metaRest = [item.mine ? 'Added by you' : null, label].filter(Boolean).join(' · ');
+  const tagName = item.swimmer ? (item.swimmer.name || item.swimmer.name_en) : null;
+  // Отмеченный мог уйти из состава после метки (снимок) — его вариант остаётся в списке.
+  const tagMissing = item.swimmer != null && !group.members.some((m) => m.swimmer_id === item.swimmer!.id);
+  const changeTag = async (value: string) => {
+    setTagError(null);
+    const e = await sessions.setMediaSwimmer(session.id, item.id, value === '' ? null : Number(value));
+    if (e) setTagError(e);
+  };
   const openLabel = label === 'Link' ? 'Open link ↗' : label === 'Photo' ? 'Open photo ↗' : `Open on ${label} ↗`;
 
   const player = item.media_type === 'image' ? (
@@ -151,7 +163,9 @@ function TrainingLightbox({ sheet, onClose }: TrainingsSheetProps<'lightbox'>) {
         </div>
         <div className="mx-auto flex w-full flex-col gap-1 px-4" style={{ maxWidth: 960 }}>
           {item.caption && <div dir="auto" className="text-[15px] font-extrabold">{item.caption}</div>}
-          <div className="text-[12px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>{meta}</div>
+          <div className="text-[12px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+            {tagName && <>For <bdi>{tagName}</bdi>{metaRest ? ' · ' : ''}</>}{metaRest}
+          </div>
         </div>
         {items.length > 1 && (
           <div className="flex justify-center" role="group" aria-label="Pick a link">
@@ -184,6 +198,33 @@ function TrainingLightbox({ sheet, onClose }: TrainingsSheetProps<'lightbox'>) {
         style={{ borderColor: 'var(--deep-card-border)', paddingBottom: 'calc(20px + env(safe-area-inset-bottom))' }}
       >
         {/* Кнопки — по ширине плеера: на десктопе во весь экран они уезжали к краям. */}
+        {manages && (
+          <div className="mx-auto mb-3 flex w-full flex-col gap-1.5" style={{ maxWidth: 960 }}>
+            <label className="flex items-center gap-3">
+              <span className="shrink-0 text-[12px] font-extrabold" style={{ color: 'var(--deep-text-mute)' }}>Who’s in it</span>
+              <select
+                value={item.swimmer?.id ?? ''}
+                disabled={sessions.busy}
+                onChange={(e) => { void changeTag(e.target.value); }}
+                dir="auto"
+                className="h-10 min-w-0 flex-1 cursor-pointer rounded-[10px] border px-3 text-[13px] font-bold outline-none disabled:cursor-default disabled:opacity-60"
+                style={{
+                  background: 'var(--deep-card-bg)', borderColor: 'var(--deep-card-border)', color: 'var(--deep-text)',
+                  colorScheme: 'dark',
+                }}
+              >
+                <option value="">Whole group</option>
+                {tagMissing && item.swimmer && <option value={item.swimmer.id}>{tagName}</option>}
+                {group.members.map((m) => (
+                  <option key={m.swimmer_id} value={m.swimmer_id}>{m.name || m.name_en}</option>
+                ))}
+              </select>
+            </label>
+            {tagError && (
+              <p className="m-0 text-[12px] font-extrabold" style={{ color: 'var(--deep-danger)' }} role="alert">{tagError}</p>
+            )}
+          </div>
+        )}
         <div className="mx-auto flex w-full gap-2" style={{ maxWidth: 960 }}>
         <a
           href={item.url}

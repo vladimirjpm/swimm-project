@@ -6,13 +6,16 @@ import {
 import { sessionLabel } from '../../../use-training-sessions';
 import { useTrainingsTab } from '../trainings-context';
 import type { TrainingsSheetProps } from '../trainings-sheets';
+import { trainingTypeOf } from '../training-types';
 import {
   formatSheetDate, guessKind, MAX_MEDIA_PER_MEMBER, sourceLabel, sourceOf, type LinkKind,
 } from './link-helpers';
 
 /**
- * Форма ссылки «Add video» (тон accent): тренировка, ссылка, тип, подпись. Сайт ничего не
- * хранит — только ссылку. Тип угадывается по адресу, пока человек не выбрал сам.
+ * Форма ссылки «Add video» (тон accent): тренировка, ссылка, «Who's in it» (только управляющему),
+ * тип, подпись. Сайт ничего не хранит — только ссылку. Тип угадывается по адресу, пока человек не
+ * выбрал сам. «Who's in it» — метка тренера «кто на видео» (не авторство): у тренировки типа
+ * technique поле раскрыто сразу, у остальных — текстовая кнопка «+ Tag a swimmer».
  */
 
 const KINDS: { kind: LinkKind; label: string }[] = [
@@ -22,7 +25,7 @@ const KINDS: { kind: LinkKind; label: string }[] = [
 ];
 
 function AddVideoSheet({ sheet, onClose }: TrainingsSheetProps<'add-video'>) {
-  const { sessions } = useTrainingsTab();
+  const { sessions, manages, group } = useTrainingsTab();
   const data = sessions.data;
 
   // Новые сверху: дата, при равных — позднее время и свежая запись.
@@ -36,6 +39,9 @@ function AddVideoSheet({ sheet, onClose }: TrainingsSheetProps<'add-video'>) {
   const [caption, setCaption] = useState('');
   const [kind, setKind] = useState<LinkKind>('video');
   const [kindTouched, setKindTouched] = useState(false);
+  // «Who's in it»: пусто — вся группа. Раскрыто само у technique, у остальных — по «+ Tag a swimmer».
+  const [swimmerId, setSwimmerId] = useState('');
+  const [tagOpen, setTagOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Кадр, который не загрузился, — блок превью прячем (по адресу кадра).
   const [badThumb, setBadThumb] = useState<string | null>(null);
@@ -44,6 +50,7 @@ function AddVideoSheet({ sheet, onClose }: TrainingsSheetProps<'add-video'>) {
   const trimmed = url.trim();
   const valid = /^https:\/\//i.test(trimmed);
   const selected = list.find((s) => s.id === sessionId) ?? null;
+  const tagShown = manages && (tagOpen || swimmerId !== '' || (selected != null && trainingTypeOf(selected).id === 'technique'));
 
   const onUrl = (next: string) => {
     setUrl(next);
@@ -64,6 +71,7 @@ function AddVideoSheet({ sheet, onClose }: TrainingsSheetProps<'add-video'>) {
       source_type: sourceOf(kind, trimmed),
       url: trimmed,
       caption: caption.trim() || null,
+      ...(manages ? { swimmer_id: swimmerId === '' ? null : Number(swimmerId) } : {}),
     });
     if (e) setError(e);
     else onClose();
@@ -124,6 +132,31 @@ function AddVideoSheet({ sheet, onClose }: TrainingsSheetProps<'add-video'>) {
           )}
         </div>
       </SheetField>
+
+      {manages && (tagShown ? (
+        <SheetField label="Who’s in it">
+          <select
+            value={swimmerId}
+            onChange={(e) => setSwimmerId(e.target.value)}
+            className={`${SHEET_FIELD_CLS} cursor-pointer`}
+            dir="auto"
+          >
+            <option value="">Whole group</option>
+            {group.members.map((m) => (
+              <option key={m.swimmer_id} value={m.swimmer_id}>{m.name || m.name_en}</option>
+            ))}
+          </select>
+        </SheetField>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setTagOpen(true)}
+          className="cursor-pointer self-start border-0 bg-transparent p-0 text-[12px] font-extrabold"
+          style={{ color: 'var(--deep-ow)' }}
+        >
+          + Tag a swimmer
+        </button>
+      ))}
 
       <div className="flex items-end gap-3">
         {showThumb && (

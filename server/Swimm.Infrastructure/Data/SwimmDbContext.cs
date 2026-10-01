@@ -1314,9 +1314,12 @@ public class SwimmDbContext : DbContext
                 @"""Visibility"" IN ('public', 'members')");
 
             // Якорь на персону — только members-слой: публично вешать медиа на пловца нельзя.
+            // Исключение (Р8, 01.10.2026): метка «кто на видео» у медиа ТРЕНИРОВКИ (TrainingId задан) —
+            // её аудитория — аудитория тренировки, Visibility там не используется. Якорь-заплыв
+            // (ResultId) — по-прежнему только members.
             entity.HasCheckConstraint(
                 "CK_HubGroupMedia_AnchorMembersOnly",
-                @"(""SwimmerId"" IS NULL AND ""ResultId"" IS NULL) OR ""Visibility"" = 'members'");
+                @"(""ResultId"" IS NULL OR ""Visibility"" = 'members') AND (""SwimmerId"" IS NULL OR ""Visibility"" = 'members' OR ""TrainingId"" IS NOT NULL)");
         });
 
         // Тренировочная сессия — ПРИВАТНЫЕ данные группы, Sys_-таблица БЕЗ grant swimm_ro.
