@@ -176,6 +176,7 @@ function EntityPanel({ cards }: { cards: EntityCardSpec[] }) {
       {cards.map((card, i) => (
         <div
           key={card.id}
+          data-card={card.id}
           className={[
             'min-w-0',
             card.span === 'half' ? '' : 'min-[960px]:col-span-2',

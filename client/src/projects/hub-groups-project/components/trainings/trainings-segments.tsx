@@ -6,6 +6,7 @@ import { MarkDot } from './trainings-section';
  * Переключатель видов таба Trainings на телефоне: `Next · Trainings · Lanes` (хендофф 2a), вид
  * в `?view=`. Участнику — акцентный сегмент (`--deep-seg-*`), управляющему — фиолетовая
  * таблетка (`--deep-ow`): у него здесь правка. На сегменте — метка внимания своего вида (Т8).
+ * Участнику без расписания и без опубликованных планов Lanes скрыт (`lanesHidden`, Т9).
  * На десктопе переключателя нет — две колонки.
  */
 
@@ -16,7 +17,7 @@ const SEGMENTS: { id: TrainingsView; label: string }[] = [
 ];
 
 function TrainingsSegments() {
-  const { view, setView, manages, marks } = useTrainingsTab();
+  const { view, setView, manages, marks, lanesHidden } = useTrainingsTab();
   return (
     <div className="deep-panel-row mb-3">
       <div
@@ -25,7 +26,7 @@ function TrainingsSegments() {
         role="group"
         aria-label="Trainings view"
       >
-        {SEGMENTS.map(({ id, label }) => {
+        {SEGMENTS.filter(({ id }) => !(id === 'lanes' && lanesHidden)).map(({ id, label }) => {
           const active = view === id;
           const mark = marks[id];
           return (

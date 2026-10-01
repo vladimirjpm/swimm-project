@@ -72,9 +72,17 @@ export interface TrainingsTabState {
   /** Какое из трёх ближайших занятий открыто у тренера (0..2), вид `coach-next` (Т6). */
   rollIndex: number;
   setRollIndex: (index: number) => void;
-  /** Планы дорожек группы (только `manages`; `null` — ещё не пришли или не управляющий). */
+  /** Планы дорожек группы: тренеру — все, участнику — опубликованные (`null` — ещё не пришли). */
   lanePlans: LanePlanSummary[] | null;
   reloadLanePlans: () => void;
+  /**
+   * Сегмент Lanes скрыт (Т9): участнику нечего показывать — у группы нет расписания и ни одного
+   * опубликованного плана. Пока список планов не пришёл, тоже скрыт (сегмент не мигает).
+   * Тренеру Lanes виден всегда — он может создать план.
+   */
+  lanesHidden: boolean;
+  /** «Set schedule» тренера — открыть Admin и прокрутить к расписанию; нет — кнопки нет. */
+  openSchedule?: () => void;
   /**
    * Полные планы дорожек ближайших занятий (до трёх РАЗНЫХ дат `nextSessions(group)`): ключ —
    * yyyy-MM-dd. `null` — плана нет (404: участнику черновик тоже 404 — это не ошибка); ключа нет —
@@ -112,11 +120,12 @@ export function useTrainingsTab(): TrainingsTabState {
 }
 
 export function TrainingsTabProvider({
-  group, manages, rsvp, children,
+  group, manages, rsvp, openSchedule, children,
 }: {
   group: HubGroupDetails;
   manages: boolean;
   rsvp?: TrainingRsvpState | null;
+  openSchedule?: () => void;
   children: React.ReactNode;
 }) {
   const isDesktop = useMediaQuery(DEEP_DESKTOP_QUERY);
@@ -158,18 +167,25 @@ export function TrainingsTabProvider({
   }, []);
   const onRollChange = useCallback((change: RollChange) => { rollListener.current?.(change); }, []);
 
-  // Планы дорожек — статус «Draft / Published» на дату занятия (только управляющему).
+  // Планы дорожек: тренеру — статус «Draft / Published» на дату занятия; участнику (сервер отдаёт
+  // ему только опубликованные) — чтобы знать, есть ли что показать во вкладке Lanes (`lanesHidden`).
   const [lanePlans, setLanePlans] = useState<LanePlanSummary[] | null>(null);
   const [lanePlansVersion, setLanePlansVersion] = useState(0);
   const reloadLanePlans = useCallback(() => setLanePlansVersion((v) => v + 1), []);
   useEffect(() => {
-    if (!manages) { setLanePlans(null); return undefined; }
     let cancelled = false;
     lanePlansApi.list(group.id).then((res) => {
       if (!cancelled && res.ok && res.data) setLanePlans(res.data);
     });
     return () => { cancelled = true; };
-  }, [group.id, manages, lanePlansVersion]);
+  }, [group.id, lanePlansVersion]);
+  const lanesHidden = !manages && !group.training_schedule && (lanePlans == null || lanePlans.length === 0);
+  // Пришли по `?view=lanes`, а вкладка скрыта — на Next (правок у участника нет, подтверждение не нужно).
+  // Только когда список планов ПРИШЁЛ: пока он грузится, сегмент скрыт, но диплинк на опубликованный
+  // план группы без расписания откатывать рано.
+  useEffect(() => {
+    if (lanesHidden && lanePlans != null && view === 'lanes') applyView('next');
+  }, [lanesHidden, lanePlans, view, applyView]);
 
   // Таб рисуется только своим (у остальных замок) — список тренировок можно грузить сразу.
   const sessions = useTrainingSessions(group.id, true);
@@ -247,11 +263,11 @@ export function TrainingsTabProvider({
 
   const value = useMemo<TrainingsTabState>(() => ({
     group, manages, isDesktop, view, setView, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
-    rollIndex, setRollIndex, lanePlans, reloadLanePlans, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener,
+    rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener,
     sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
     group, manages, isDesktop, view, setView, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, lanePlans, reloadLanePlans,
-    upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sessions, breaks, marks, closeSheet, sheet,
+    lanesHidden, openSchedule, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sessions, breaks, marks, closeSheet, sheet,
   ]);
 
   return (

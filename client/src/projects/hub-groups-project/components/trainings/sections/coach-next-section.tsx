@@ -4,6 +4,7 @@ import RollCall from '../coach/roll-call';
 import SessionNav from '../coach/session-nav';
 import { nextSessions } from '../next/next-format';
 import { useTrainingsTab } from '../trainings-context';
+import TrainingsEmpty, { TrainingsEmptyActions, TrainingsEmptyButton } from '../trainings-empty';
 import { TrainingsSection } from '../trainings-section';
 
 /**
@@ -22,18 +23,26 @@ import { TrainingsSection } from '../trainings-section';
 const LIVE_BORDER = { borderColor: 'var(--deep-live-border)' } as const;
 
 function CoachNextSection() {
-  const { group, isDesktop, rollIndex, upcoming } = useTrainingsTab();
+  const { group, isDesktop, rollIndex, upcoming, openSchedule, openSheet } = useTrainingsTab();
   const sessions = nextSessions(group);
   const session = sessions[rollIndex];
 
   if (!session) {
     return (
-      <TrainingsSection
-        id="coach-next"
-        title="Next training"
-        status="empty"
-        empty="No regular schedule yet — set it in Admin → Training schedule."
-      />
+      <TrainingsSection id="coach-next" bare>
+        <div className={isDesktop ? undefined : 'deep-panel-row'}>
+          <TrainingsEmpty
+            glyph="◷"
+            title="No weekly schedule yet"
+            text="Set training days and members can answer “Going” for each one. Lanes and roll call work from the schedule."
+          >
+            <TrainingsEmptyActions>
+              {openSchedule && <TrainingsEmptyButton primary onClick={openSchedule}>Set schedule</TrainingsEmptyButton>}
+              <TrainingsEmptyButton onClick={() => openSheet({ kind: 'new-training' })}>+ New training</TrainingsEmptyButton>
+            </TrainingsEmptyActions>
+          </TrainingsEmpty>
+        </div>
+      </TrainingsSection>
     );
   }
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { RsvpNotes } from '../../group-pool';
 import { useTrainingsTab } from '../trainings-context';
+import TrainingsEmpty from '../trainings-empty';
 import { TrainingsSection } from '../trainings-section';
 import AnswersBlock, { AnswersCaption, useFirstUnanswered } from '../next/answers-block';
 import { BreakLink, BreakRow, useHasBreakLink } from '../next/break-block';
@@ -25,12 +26,16 @@ function MemberNextSection() {
 
   if (!next) {
     return (
-      <TrainingsSection
-        id="member-next"
-        title="Next training"
-        status="empty"
-        empty="No regular schedule yet — the next training shows here once the coach sets it."
-      />
+      <TrainingsSection id="member-next" bare>
+        {/* На телефоне — на боковой линии сегментов (`deep-panel-row`), как лента. */}
+        <div className={isDesktop ? undefined : 'deep-panel-row'}>
+          <TrainingsEmpty
+            glyph="◷"
+            title="No weekly schedule yet"
+            text="When the coach sets training days, the next training and “Are you coming?” will appear here."
+          />
+        </div>
+      </TrainingsSection>
     );
   }
 

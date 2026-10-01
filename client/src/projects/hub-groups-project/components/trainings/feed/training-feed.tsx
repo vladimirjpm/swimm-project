@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { TrainingSessionList, TrainingSessionSets } from '../../../types';
 import { useTrainingsTab } from '../trainings-context';
+import TrainingsEmpty from '../trainings-empty';
 import FeedFilters, { type FeedFilter } from './feed-filters';
 import { monthKey } from './feed-format';
 import TrainingCard from './training-card';
@@ -84,11 +85,7 @@ function TrainingFeed({ data }: { data: TrainingSessionList }) {
   };
 
   let emptyText: string | null = null;
-  if (all.length === 0) {
-    emptyText = manages
-      ? 'No trainings yet. Add one — e.g. “Underwater filming” — and attach videos to it. Times aren’t needed.'
-      : 'No trainings yet.';
-  } else if (filtered.length === 0) {
+  if (all.length > 0 && filtered.length === 0) {
     emptyText = filter === 'times' ? 'No trainings with times yet.' : 'No trainings with videos yet.';
   }
 
@@ -108,6 +105,16 @@ function TrainingFeed({ data }: { data: TrainingSessionList }) {
           onChange={changeFilter}
           coach={manages}
           isDesktop={isDesktop}
+        />
+      )}
+
+      {all.length === 0 && (
+        <TrainingsEmpty
+          glyph="▶"
+          title="No trainings yet"
+          text={manages
+            ? 'Add one — e.g. “Underwater filming” — and attach videos to it. Times aren’t needed.'
+            : 'Trainings show up here after the coach adds one or imports times. Then you can attach videos and photos to them.'}
         />
       )}
 

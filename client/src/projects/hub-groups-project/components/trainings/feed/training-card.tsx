@@ -57,6 +57,8 @@ function TrainingCard({
   const dateCol = isDesktop ? 44 : 40;
   const gap = isDesktop ? 10 : 8;
   const newCount = session.media.filter((m) => m.is_new).length;
+  // Нет ни одного видео и можно добавить — вместо ссылки «+ Add video» плитка на месте полосы.
+  const noMediaTile = canAddMedia && session.media.length === 0;
   const empty = !session.has_results && session.media.length === 0;
   const stats = session.stats;
   const myKey = session.my_key;
@@ -102,7 +104,8 @@ function TrainingCard({
             borderColor: 'var(--deep-card-border)',
             background: isDesktop ? 'var(--deep-card-bg-raised)' : 'var(--deep-card-bg)',
             padding: isDesktop ? '12px 14px' : '10px 12px',
-            opacity: empty ? 0.6 : 1,
+            // С плиткой «+ Add video» не приглушаем: тренировка ждёт видео, а не «пустая» (хендофф 4a).
+            opacity: empty && !noMediaTile ? 0.6 : 1,
           }}
         >
           <div className="flex items-start justify-between gap-3">
@@ -167,19 +170,36 @@ function TrainingCard({
             </div>
           )}
 
-          <TrainingMediaStrip
-            media={session.media}
-            className="tbs-media-strip--flush"
-            size={isDesktop ? 'lg' : 'md'}
-            onRemove={(m) => setPending(m)}
-            canRemove={(m) => m.can_delete}
-            // Лайтбокс — общий реестр форм таба (`lightbox`); индекс — в списке без альбомов.
-            onOpen={(index) => openSheet({ kind: 'lightbox', sessionId: session.id, index })}
-          />
+          {noMediaTile ? (
+            // Нет видео, а добавить можно (хендофф 4a): плитка на месте полосы медиа.
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                aria-label="Add video"
+                onClick={() => openSheet({ kind: 'add-video', sessionId: session.id })}
+                className="flex shrink-0 cursor-pointer flex-col items-center justify-center border bg-transparent p-0"
+                style={{ width: 86, height: 60, borderRadius: 10, borderStyle: 'dashed', borderColor: 'var(--deep-card-border)', color: 'var(--deep-accent)' }}
+              >
+                <span aria-hidden="true" className="text-[16px] font-extrabold leading-none">+</span>
+                <span className="text-[10.5px] font-extrabold leading-tight">Add video</span>
+              </button>
+              <span className="text-[11px] font-bold" style={{ color: 'var(--t-text-3)' }}>Only the group sees them.</span>
+            </div>
+          ) : (
+            <TrainingMediaStrip
+              media={session.media}
+              className="tbs-media-strip--flush"
+              size={isDesktop ? 'lg' : 'md'}
+              onRemove={(m) => setPending(m)}
+              canRemove={(m) => m.can_delete}
+              // Лайтбокс — общий реестр форм таба (`lightbox`); индекс — в списке без альбомов.
+              onOpen={(index) => openSheet({ kind: 'lightbox', sessionId: session.id, index })}
+            />
+          )}
 
-          {(canAddMedia || session.has_results) && (
+          {((canAddMedia && !noMediaTile) || session.has_results) && (
             <div className="flex flex-wrap gap-4">
-              {canAddMedia && (
+              {canAddMedia && !noMediaTile && (
                 <button
                   type="button"
                   className={linkBtn}

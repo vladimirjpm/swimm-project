@@ -8,6 +8,8 @@ import GroupHero from './components/group-hero';
 import { GroupIcon } from './components/group-bits';
 import { GroupResultsTab, GROUP_RESULTS_VIEWS, type GroupResultsView } from './components/group-competitions';
 import GroupTrainingsTab from './components/trainings/trainings-tab';
+import TrainingsEmpty from './components/trainings/trainings-empty';
+import GroupMembershipChip, { type GroupMembershipState } from './components/group-membership';
 import { MarkDot } from './components/trainings/trainings-section';
 import { redMark } from './components/trainings/use-training-marks';
 import { formatNextDate, scheduleDaysLabel } from './components/group-training-slots';
@@ -289,17 +291,19 @@ function GroupPage({ slug }: { slug: string }) {
       badge: trainingsRed?.count ? String(trainingsRed.count) : undefined,
       badgeTone: 'danger' as const,
       locked: !(manages || isMember),
-      lockNotice: (
-        <div
-          className="rounded-[12px] border border-dashed p-3.5 text-[13px] font-bold"
-          style={{ borderColor: 'var(--deep-card-border)', color: 'var(--deep-text-mute)' }}
-        >
-          🔒 Trainings and lane plans are visible to group members only.
-        </div>
-      ),
-      cards: () => [{
+      // Замок гостя / не участника (хендофф 4a, Т9): карточка пустого состояния, под ней — расписание
+      // (то, что и так видно в шапке) и тот же чип вступления, что в шапке (одно состояние членства).
+      lockNotice: <GroupTrainingsLock group={group} membership={{ isAuthenticated, status: membershipStatus, join, leave }} />,
+      cards: (nav: EntityTabNav<GroupTab>) => [{
         id: 'trainings',
-        render: () => <GroupTrainingsTab group={group} manages={manages} rsvp={rsvp} />,
+        render: () => (
+          <GroupTrainingsTab
+            group={group}
+            manages={manages}
+            rsvp={rsvp}
+            onOpenSchedule={() => openScheduleCard(nav)}
+          />
+        ),
       }],
     },
     // Управление — только управляющим, и не показывается вовсе остальным (план §3.8):
@@ -414,6 +418,50 @@ function GroupPage({ slug }: { slug: string }) {
       tabsAriaLabel="Group sections"
       tabs={tabs}
     />
+  );
+}
+
+/**
+ * «Set schedule» тренера (Т9): открыть таб Admin и прокрутить к карточке расписания. Карточка
+ * Admin появляется в DOM после переключения таба — ищем её на следующем тике; прокрутка
+ * `window.scrollTo` с отступом под липкую зону (как `nav.go`), не `scrollIntoView`.
+ */
+function openScheduleCard(nav: EntityTabNav<GroupTab>) {
+  nav.go('admin');
+  window.setTimeout(() => {
+    const el = document.querySelector('[data-card="training-schedule"]');
+    if (!el) return;
+    // 170 — топбар + полоса сущности + ряд табов на телефоне (со 120 заголовок карточки уходил под них).
+    window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - 170, behavior: 'smooth' });
+  }, 0);
+}
+
+/** Замок таба Trainings для гостя и не участника: пустое состояние + дни/место + вступление. */
+function GroupTrainingsLock({ group, membership }: { group: HubGroupDetails; membership: GroupMembershipState }) {
+  const schedule = group.training_schedule;
+  const days = scheduleDaysLabel(schedule);
+  const place = schedule?.place || null;
+  const pool = schedule?.pool_type || null;
+  return (
+    <TrainingsEmpty
+      glyph="🔒"
+      title="Members only"
+      text="Trainings and lane plans are visible to group members only."
+    >
+      {(days || place || pool) && (
+        <div className="flex flex-col text-[12px] font-bold" style={{ gap: 6, color: 'var(--t-text-3)' }}>
+          {days && <div>◷ {days}</div>}
+          {(place || pool) && (
+            <div>
+              {place && <bdi>{place}</bdi>}
+              {place && pool && ' · '}
+              {pool}
+            </div>
+          )}
+        </div>
+      )}
+      <GroupMembershipChip group={group} membership={membership} />
+    </TrainingsEmpty>
   );
 }
 
