@@ -233,10 +233,12 @@ function GroupLanes({
     </>
   );
 
-  /** Шапка десктопа (6b): разделитель, ‹ ›, «Lanes · дата ▾», пилюля статуса, справа тулбар. */
+  /**
+   * Шапка десктопа (6b): ‹ ›, «Lanes · дата ▾», пилюля статуса, справа тулбар. «← Back to Next»
+   * рисует каркас таба строкой выше, поэтому разделителя из прототипа перед стрелками нет.
+   */
   const header = (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <span aria-hidden="true" className="h-[20px] w-px flex-none" style={{ background: 'var(--deep-card-border)' }} />
       <div className="flex items-center gap-1.5">{arrows(36)}</div>
       {dateButton('flex-none', (
         <div className="flex items-center gap-1.5 text-[18px]" style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}>

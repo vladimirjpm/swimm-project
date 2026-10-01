@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
 import type { HubGroupLevel, HubGroupLevels, LanePlan, LanePlanInput, LanePlanSwimmer } from '../types';
@@ -38,6 +38,16 @@ import { levelColor } from './level-color';
  */
 
 const MAX_LANES = 12;
+
+/**
+ * Десктоп: дорожки колонками (Р6 п.5 — при ≤ 6), пока колонке достаётся хотя бы MIN_COLUMN px,
+ * иначе сетка. Редактор не шире 1118px, и 6 колонок там — по 137px: имя в плашке уже не видно
+ * (на 960px — по 100px). Поэтому порог — по ширине, а «≤ 6» — только потолок.
+ */
+const MAX_COLUMNS = 6;
+const MIN_COLUMN = 150;
+const UNASSIGNED_COLUMN = 220;
+const COLUMN_GAP = 12;
 
 type Target = number | 'unassigned' | 'out';
 
@@ -185,6 +195,17 @@ function GroupLaneEditor({
   /** Выбранный для переноса пловец — один на весь редактор. */
   const [selected, setSelected] = useState<number | null>(null);
   const [outOpen, setOutOpen] = useState(false);
+  /** Ширина редактора — выбор «колонки или сетка» на десктопе. */
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!root) return undefined;
+    setWidth(root.clientWidth);
+    const ro = new ResizeObserver(() => setWidth(root.clientWidth));
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [root]);
 
   const info = useMemo(() => new Map([...base.info, ...init.info]), [base, init]);
   const levelById = useMemo(() => new Map(levels.levels.map((l) => [l.id, l])), [levels]);
@@ -454,14 +475,14 @@ function GroupLaneEditor({
             value={lane.levelId ?? ''}
             onChange={(e) => patchLane(no, { levelId: e.target.value === '' ? null : Number(e.target.value) })}
             aria-label={`Level of lane ${no}`}
-            className={`min-w-0 flex-1 basis-[80px] cursor-pointer rounded-[8px] border px-2 text-[12px] font-extrabold ${desktop ? 'h-[32px]' : 'h-[34px]'}`}
+            className={`min-w-0 flex-1 basis-[120px] cursor-pointer rounded-[8px] border px-2 text-[12px] font-extrabold ${desktop ? 'h-[32px]' : 'h-[34px]'}`}
             style={field}
           >
             <option value="">No level</option>
             {levels.levels.map((l: HubGroupLevel) => <option key={l.id} value={l.id}>{l.rank} · {l.name}</option>)}
           </select>
           <span className="hp-mono ml-auto text-[10.5px]" style={{ color: 'var(--t-text-3)' }}>
-            {desktop ? `${ids.length} swimmers` : ids.length}
+            {desktop ? `${ids.length} ${ids.length === 1 ? 'swimmer' : 'swimmers'}` : ids.length}
           </span>
         </header>
         <textarea
@@ -559,11 +580,12 @@ function GroupLaneEditor({
     />
   );
 
-  const wide = desktop && laneCount > 6;
+  const columnWidth = (width - UNASSIGNED_COLUMN - COLUMN_GAP * laneCount) / laneCount;
+  const wide = desktop && (laneCount > MAX_COLUMNS || columnWidth < MIN_COLUMN);
   const saveState: SaveBarState = needsSave ? 'unsaved' : (plan?.status ?? 'draft');
 
   return (
-    <div>
+    <div ref={setRoot}>
       {/* Тулбар: телефон — здесь, десктоп — в шапке вида (портал; пока узла нет — не рисуем). */}
       {desktop ? (toolbarHost ? createPortal(toolbar, toolbarHost) : null) : toolbar}
 
@@ -578,7 +600,7 @@ function GroupLaneEditor({
         style={field}
       />
 
-      {/* Дорожки (Р6 п.5): телефон — столбиком; десктоп ≤ 6 — колонки + Unassigned 220, > 6 — сетка. */}
+      {/* Дорожки (Р6 п.5): телефон — столбиком; десктоп — колонки + Unassigned 220, пока влезают (MIN_COLUMN), иначе сетка. */}
       {!desktop && (
         <div className="mt-3 flex flex-col gap-3">
           {laneNos.map((no) => laneCard(no, false))}
