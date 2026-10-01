@@ -97,6 +97,11 @@ public class TrainingSessionService : ITrainingSessionService
         var pool = v.PoolType
                    ?? (schedulePool is { Length: > 0 and <= TrainingSessionRules.PoolTypeMax } ? schedulePool : "");
 
+        // «Ask who's coming» (Р9): проверяем по ИТОГОВОМУ началу — оно могло прийти из расписания.
+        var asksRsvp = input.AsksRsvp == true;
+        if (asksRsvp && TrainingSessionRules.AsksRsvpBlockReason(start, v.Date, Today(todayLocal)) is { } blocked)
+            return TrainingSessionSaveResult.Fail(400, blocked);
+
         var session = new TrainingSession
         {
             HubGroupId = hubGroupId,
@@ -107,6 +112,7 @@ public class TrainingSessionService : ITrainingSessionService
             Note = v.Note,
             PoolType = pool,
             Type = v.Type ?? TrainingSessionType.Swim,
+            AsksRsvp = asksRsvp,
             CreatedByUserId = actorUserId,
             CreatedAt = DateTime.UtcNow,
         };
@@ -126,6 +132,12 @@ public class TrainingSessionService : ITrainingSessionService
         var (value, error) = TrainingSessionRules.Normalize(input, Today(todayLocal));
         if (error != null) return TrainingSessionSaveResult.Fail(400, error);
         var v = value!;
+
+        // «Ask who's coming» (Р9): поставить — только с началом и датой не раньше сегодняшней; снять
+        // можно всегда; не прислали (null) — оставить как было.
+        if (input.AsksRsvp == true
+            && TrainingSessionRules.AsksRsvpBlockReason(v.StartTime, v.Date, Today(todayLocal)) is { } blocked)
+            return TrainingSessionSaveResult.Fail(400, blocked);
 
         var hasResults = await HasResultsAsync(sessionId);
         var dateTime = ToDbDate(v.Date);
@@ -148,6 +160,7 @@ public class TrainingSessionService : ITrainingSessionService
         session.Note = v.Note;
         session.PoolType = pool;
         if (v.Type != null) session.Type = v.Type;   // не прислали — оставить как было
+        if (input.AsksRsvp != null) session.AsksRsvp = input.AsksRsvp.Value;
         await _db.SaveChangesAsync();
 
         var media = await LoadMediaAsync(hubGroupId, [session.Id], new Viewer(actorUserId, IsManager: true));
@@ -423,6 +436,7 @@ public class TrainingSessionService : ITrainingSessionService
         Note = s.Note,
         PoolType = string.IsNullOrWhiteSpace(s.PoolType) ? null : s.PoolType,
         Type = s.Type,
+        AsksRsvp = s.AsksRsvp,
         HasResults = hasResults,
         KeySetNo = s.KeySetNo,
         CreatedInApp = s.ExternalTrainingId.StartsWith(TrainingSessionRules.ExternalIdPrefix, StringComparison.Ordinal),

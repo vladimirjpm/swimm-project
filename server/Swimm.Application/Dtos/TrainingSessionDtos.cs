@@ -63,6 +63,10 @@ public sealed class TrainingSessionDto
     [JsonPropertyName("type")]
     public string Type { get; set; } = "swim";
 
+    /// <summary>«Ask who's coming» (Р9): разовое занятие — тренировка в Next, на неё отвечают.</summary>
+    [JsonPropertyName("asks_rsvp")]
+    public bool AsksRsvp { get; set; }
+
     /// <summary>Есть записанные времена: дату и бассейн не поменять, удалить нельзя.</summary>
     [JsonPropertyName("has_results")]
     public bool HasResults { get; set; }
@@ -340,6 +344,13 @@ public sealed class TrainingSessionInputDto
     /// <summary>Тип тренировки (см. <c>TrainingSessionType</c>); пусто при создании — swim, при правке — не меняется.</summary>
     [JsonPropertyName("type")]
     public string? Type { get; set; }
+
+    /// <summary>
+    /// «Ask who's coming» (Р9): null — при создании false, при правке не менять. Поставить можно только
+    /// тренировке с началом и датой не раньше сегодняшней (по Израилю); снять — всегда.
+    /// </summary>
+    [JsonPropertyName("asks_rsvp")]
+    public bool? AsksRsvp { get; set; }
 }
 
 /// <summary>Итог записи: либо тренировка, либо код отказа (400 / 404).</summary>

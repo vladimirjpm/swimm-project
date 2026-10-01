@@ -2,14 +2,16 @@ import React, { useRef, useState } from 'react';
 import {
   DeepSheet, SheetButton, SheetError, SheetField, SheetFooter, SHEET_FIELD_CLS, SHEET_MONO_FIELD_CLS, SHEET_TEXTAREA_CLS,
 } from '../../../../components/deep/deep-sheet';
-import type { TrainingType } from '../../../types';
+import type { TrainingSessionInput, TrainingType } from '../../../types';
 import { todayInIsrael } from '../../lane-plans-api';
 import { useTrainingsTab } from '../trainings-context';
 import { DEFAULT_TRAINING_TYPE, TRAINING_TYPES, trainingTypeOf } from '../training-types';
 import type { TrainingsSheetProps } from '../trainings-sheets';
 
 /**
- * Форма тренировки (`new-training` / `edit-training`, тон coach): дата, старт, тип, название, заметка.
+ * Форма тренировки (`new-training` / `edit-training`, тон coach): дата, старт, тип, название, заметка,
+ * галка «Ask who's coming» (Р9 — разовое занятие в Next, на него отвечают; видна при заданном старте
+ * и дате не раньше сегодняшней, по умолчанию выключена).
  * Тип — фиксированный список (`training-types.ts`), по умолчанию Swim; правится и у тренировки с
  * временами (дата и бассейн у неё закрыты, тип — нет).
  * Тренер заводит тренировку и без времён («Underwater filming») — потом цепляет к ней ссылки.
@@ -24,7 +26,7 @@ function TrainingFormSheet({ sheet, onClose }: {
   sheet: TrainingsSheetProps<'new-training'>['sheet'] | TrainingsSheetProps<'edit-training'>['sheet'];
   onClose: () => void;
 }) {
-  const { sessions } = useTrainingsTab();
+  const { sessions, reloadNextTrainings } = useTrainingsTab();
   const session = sheet.kind === 'edit-training' ? sheet.session : null;
 
   const [date, setDate] = useState(session?.date ?? todayInIsrael());
@@ -33,21 +35,30 @@ function TrainingFormSheet({ sheet, onClose }: {
   const [start, setStart] = useState(session?.start ?? '');
   const [note, setNote] = useState(session?.note ?? '');
   const [type, setType] = useState<TrainingType>(session ? trainingTypeOf(session).id : DEFAULT_TRAINING_TYPE);
+  const [asksRsvp, setAsksRsvp] = useState(session?.asks_rsvp === true);
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
   const dateLocked = !!session?.has_results;
   const canSave = !sessions.busy && !!title.trim() && !!date;
 
+  // Галка видна, когда задан старт и дата не раньше сегодняшней (по Израилю) — иначе занятию нечем
+  // быть. Скрыта: если она была включена (правка старой тренировки) — снимаем, иначе молчим.
+  const canAsk = !!start && date >= todayInIsrael();
+
   const save = async () => {
     if (!canSave) return;
     setError(null);
-    const input = { date, title: title.trim(), start: start || null, note: note.trim() || null, type };
+    const input: TrainingSessionInput = { date, title: title.trim(), start: start || null, note: note.trim() || null, type };
+    if (canAsk) input.asks_rsvp = asksRsvp;
+    else if (session?.asks_rsvp) input.asks_rsvp = false;
     const e = session
       ? await sessions.update(session.id, { ...input, pool_type: session.pool_type ?? null })
       : await sessions.create(input);
-    if (e) setError(e);
-    else onClose();
+    if (e) { setError(e); return; }
+    // Разовое занятие появилось / исчезло / сдвинулось — Next перечитывает ближайшие.
+    if (input.asks_rsvp === true || session?.asks_rsvp) reloadNextTrainings();
+    onClose();
   };
 
   return (
@@ -116,6 +127,24 @@ function TrainingFormSheet({ sheet, onClose }: {
           })}
         </div>
       </SheetField>
+
+      {canAsk && (
+        <div className="flex flex-col gap-1">
+          <label className="flex cursor-pointer items-center gap-2.5">
+            <input
+              type="checkbox"
+              checked={asksRsvp}
+              onChange={(e) => setAsksRsvp(e.target.checked)}
+              className="flex-none cursor-pointer"
+              style={{ width: 20, height: 20, accentColor: 'var(--deep-ow)' }}
+            />
+            <span className="text-[12.5px] font-extrabold" style={{ color: 'var(--t-text)' }}>Ask who's coming</span>
+          </label>
+          <span className="text-[11px] font-semibold" style={{ color: 'var(--t-text-3)' }}>
+            Shows in Next — members answer Going / Not sure / Can't.
+          </span>
+        </div>
+      )}
 
       <SheetField label="Name">
         <input

@@ -7,6 +7,7 @@ import { MarkDot } from '../trainings-section';
 import {
   dayNumLabel, desktopKicker, timeRangeLabel, untilLabel, workoutOneLine,
 } from './next-format';
+import { CancelledPill } from './session-tag';
 
 /**
  * Ближайшее занятие участника: шапка, «Your lane», бассейн и счётчики (Т5, хендофф Trainings Tab,
@@ -71,6 +72,9 @@ export function NextHeader({
   const until = untilLabel(next.date, next.start, next.end);
   const times = timeRangeLabel(next.start, next.end);
 
+  // Р9: отменённое занятие (ответ пришёл с `cancelled`, список ещё не перечитан) — «Cancelled» вместо отсчёта.
+  const cancelled = next.cancelled === true || r?.cancelled === true;
+
   if (variant === 'phone') {
     return (
       <div className="flex items-baseline justify-between gap-3">
@@ -78,7 +82,7 @@ export function NextHeader({
           <span className="text-[15px] font-extrabold" style={{ color: 'var(--deep-text)' }}>{dayNumLabel(next.date)} · </span>
           <span className="hp-mono text-[15px] font-extrabold" style={{ color: 'var(--deep-text)' }}>{times}</span>
         </div>
-        {until && (
+        {cancelled ? <CancelledPill /> : until && (
           <span className="flex-none text-[10.5px] font-extrabold" style={{ color: 'var(--deep-live)' }}>{until}</span>
         )}
       </div>
@@ -95,7 +99,7 @@ export function NextHeader({
           style={{ color: 'var(--deep-live)' }}
         >
           <span aria-hidden="true" className="inline-block flex-none rounded-full" style={{ width: 7, height: 7, background: 'var(--deep-live)' }} />
-          {desktopKicker(next.date, next.start, next.end)}
+          {cancelled ? <CancelledPill /> : desktopKicker(next.date, next.start, next.end)}
         </div>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-1" style={{ color: 'var(--deep-text)' }}>
           <span className="text-[22px]" style={{ fontFamily: 'var(--deep-font-display)' }}>{formatNextDate(next.date)} · </span>

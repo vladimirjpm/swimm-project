@@ -77,6 +77,16 @@ public static class TrainingSessionRules
         return (new Normalized(date, start, title, note, pool, type), null);
     }
 
+    /// <summary>
+    /// Можно ли поставить галку «Ask who's coming» (Р9): нужны начало и дата не раньше сегодняшней
+    /// (по Израилю) — иначе занятие нечем адресовать / отвечать на него уже поздно. null — можно,
+    /// иначе текст для 400. Снять галку можно всегда — эту проверку тогда не зовут.
+    /// </summary>
+    public static string? AsksRsvpBlockReason(string? start, DateOnly date, DateOnly todayLocal) =>
+        start == null || date < todayLocal
+            ? "Only a future training with a start time can ask who's coming."
+            : null;
+
     /// <summary>Натуральный ключ новой тренировки: уникален в группе, не число (клиент не спутает с датой источника).</summary>
     public static string NewExternalId() => ExternalIdPrefix + Guid.NewGuid().ToString("N")[..16];
 }

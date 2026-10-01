@@ -109,8 +109,18 @@ export function workoutOneLine(workout: string | null | undefined): string | nul
   return text || null;
 }
 
-/** До трёх ближайших занятий группы (первое = `next_training`); нет поля — одно, нет занятия — пусто. */
+/**
+ * Сколько занятий-строк вмещает вид Next: три не отменённых + отменённые между ними (Р9). Сервер
+ * отдаёт именно столько (`GET …/next-trainings`); потолок клиента — на случай, когда отмен много.
+ */
+export const NEXT_ENTRIES_MAX = 6;
+
+/**
+ * Ближайшие занятия группы по порядку: не отменённые (до трёх) и отменённые между ними — те же
+ * строки, что в `group.next_trainings`. Первое НЕ отменённое — `group.next_training`. Нет поля —
+ * одно, нет занятия — пусто.
+ */
 export function nextSessions(group: HubGroupDetails): NextTraining[] {
   const list = group.next_trainings ?? (group.next_training ? [group.next_training] : []);
-  return list.slice(0, 3);
+  return list.slice(0, NEXT_ENTRIES_MAX);
 }

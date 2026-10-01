@@ -1671,6 +1671,45 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_HubGroupSwimmerLevels", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupTrainingCancellation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<int>("HubGroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Start")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("HubGroupId", "Date", "Start")
+                        .IsUnique();
+
+                    b.ToTable("Sys_HubGroupTrainingCancellations", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupTrainingRsvp", b =>
                 {
                     b.Property<int>("Id")
@@ -3332,6 +3371,11 @@ namespace Swimm.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("AsksRsvp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -4293,6 +4337,24 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Level");
 
                     b.Navigation("Swimmer");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupTrainingCancellation", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
+                        .WithMany()
+                        .HasForeignKey("HubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("HubGroup");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupTrainingRsvp", b =>

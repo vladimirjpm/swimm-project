@@ -23,16 +23,27 @@ import { TrainingsSheetHost } from './trainings-sheets';
  *   во всю ширину с «← Back to Next» (6b: редактору дорожек нужна ширина под колонки).
  */
 function GroupTrainingsTab({
-  group, manages, rsvp, onOpenSchedule,
+  group, manages, rsvp, onOpenSchedule, onNextTrainingsChanged,
 }: {
   group: HubGroupDetails;
   manages: boolean;
   rsvp?: TrainingRsvpState | null;
   /** «Set schedule» тренера: открыть Admin и прокрутить к карточке расписания (страница группы). */
   onOpenSchedule?: () => void;
+  /**
+   * Список ближайших занятий изменился (Р9: разовое занятие, отмена / возврат) — страница группы
+   * перечитывает `GET …/next-trainings` и подменяет `next_trainings` в `group`.
+   */
+  onNextTrainingsChanged?: () => void;
 }) {
   return (
-    <TrainingsTabProvider group={group} manages={manages} rsvp={rsvp} openSchedule={onOpenSchedule}>
+    <TrainingsTabProvider
+      group={group}
+      manages={manages}
+      rsvp={rsvp}
+      openSchedule={onOpenSchedule}
+      onNextTrainingsChanged={onNextTrainingsChanged}
+    >
       <TrainingsLayout />
       <SheetHost />
     </TrainingsTabProvider>

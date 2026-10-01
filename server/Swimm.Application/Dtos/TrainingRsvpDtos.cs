@@ -24,6 +24,20 @@ public sealed class TrainingRsvpDto
     [JsonPropertyName("end")]
     public string? End { get; set; }
 
+    /// <summary>Занятие отменено тренером (Р9): ответить нельзя, ответы на месте.</summary>
+    [JsonPropertyName("cancelled")]
+    public bool Cancelled { get; set; }
+
+    [JsonPropertyName("cancel_reason")]
+    public string? CancelReason { get; set; }
+
+    /// <summary>Название разовой тренировки (для шапки занятия); у занятия по расписанию — null.</summary>
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
     [JsonPropertyName("yes")]
     public int Yes { get; set; }
 
@@ -239,6 +253,13 @@ public sealed class TrainingRsvpInputDto
     /// </summary>
     [JsonPropertyName("swimmer_id")]
     public int? SwimmerId { get; set; }
+}
+
+/// <summary>Отмена занятия (Р9): причина по желанию, до <c>TrainingRsvpRules.CancelReasonMax</c> символов.</summary>
+public sealed class TrainingCancelInputDto
+{
+    [JsonPropertyName("reason")]
+    public string? Reason { get; set; }
 }
 
 /// <summary>Итог записи ответа: либо новые ответы занятия, либо код отказа.</summary>

@@ -1,15 +1,19 @@
 import React from 'react';
-import type { RsvpAnswer } from '../../../types';
+import type { NextTraining, RsvpAnswer } from '../../../types';
 import type { TrainingRsvpState } from '../../../use-training-rsvp';
 import { formatSheetDate } from '../sheets/link-helpers';
 import { useTrainingsTab } from '../trainings-context';
 import { nextSessions, relativePrefix, rowDateLabel } from './next-format';
+import { CancelledPill, CancelReason, SessionTag } from './session-tag';
 
 /**
  * «Your answers» — ответы участника на три ближайших занятия (Т5, хендофф Trainings Tab, 2a / 3a).
- * Состояние берём из `useTrainingsTab().upcoming`: `[0]` — тот же экземпляр, что у шапки страницы,
- * `[1]`/`[2]` — свои. Телефон — строки со справа тремя кнопками 40×40; десктоп — сетка из трёх
- * мини-карточек.
+ * Состояние берём из `useTrainingsTab().upcoming` по индексу строки: первое НЕ отменённое занятие —
+ * тот же экземпляр, что у шапки страницы, остальные — свои. Телефон — строки со справа тремя
+ * кнопками 40×40; десктоп — сетка мини-карточек.
+ *
+ * Р9: разовое занятие несёт название и значок типа рядом с датой; отменённое остаётся в списке с
+ * пилюлей «Cancelled» и причиной — кнопок ответа у него нет (сервер всё равно не примет).
  */
 
 const ANSWERS: { id: RsvpAnswer; glyph: string; label: string }[] = [
@@ -58,8 +62,9 @@ export function AnswersCaption({ dot = false }: { dot?: boolean }) {
  * человека не спрашивают — красного нет (`marks-spec.md`: `can_answer && mine == null && !on_break`).
  */
 export function useFirstUnanswered(): boolean {
-  const { upcoming } = useTrainingsTab();
-  const r = upcoming[0]?.rsvp;
+  // Ближайшее НЕ отменённое занятие — это и есть `rsvp` страницы (отменённое ответа не ждёт).
+  const { rsvp } = useTrainingsTab();
+  const r = rsvp?.rsvp;
   return !!r && r.can_answer && r.mine == null && !r.on_break;
 }
 
@@ -130,6 +135,8 @@ export default function AnswersBlock({ variant }: { variant: 'phone' | 'desktop'
   const sessions = nextSessions(group);
   if (sessions.length === 0) return null;
   const compact = variant === 'desktop';
+  // «Первое» для тревожного красного — первое НЕ отменённое занятие, а не строка 0.
+  const firstLive = sessions.findIndex((s) => !s.cancelled);
 
   const pick = async (i: number, ans: RsvpAnswer) => {
     const state = upcoming[i];
@@ -156,11 +163,21 @@ export default function AnswersBlock({ variant }: { variant: 'phone' | 'desktop'
     return { s, i, state: stale ? null : state };
   });
 
+  /** Подпись под датой: у отменённого — пилюля и причина, иначе ответ. */
+  const caption = (s: NextTraining, i: number, state: TrainingRsvpState | null) => (s.cancelled ? (
+    <div className="flex flex-col items-start gap-0.5">
+      <CancelledPill />
+      <CancelReason reason={s.cancel_reason} />
+    </div>
+  ) : (
+    <Caption state={state} date={s.date} first={i === firstLive} />
+  ));
+
   if (compact) {
     return (
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
         {rows.map(({ s, i, state }) => {
-          const unanswered = i === 0 && !!state?.rsvp && state.rsvp.mine == null && !state.rsvp.on_break;
+          const unanswered = i === firstLive && !s.cancelled && !!state?.rsvp && state.rsvp.mine == null && !state.rsvp.on_break;
           return (
             <div
               key={s.id ?? `${s.date}-${s.start}`}
@@ -174,9 +191,12 @@ export default function AnswersBlock({ variant }: { variant: 'phone' | 'desktop'
                 <div className="whitespace-nowrap text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
                   {rowDateLabel(s.date, s.start)}
                 </div>
-                <Caption state={state} date={s.date} first={i === 0} />
+                <SessionTag session={s} className="max-w-full" />
+                {caption(s, i, state)}
               </div>
-              <AnswerButtons state={state} date={s.date} compact onPick={(a) => { void pick(i, a); }} />
+              {!s.cancelled && (
+                <AnswerButtons state={state} date={s.date} compact onPick={(a) => { void pick(i, a); }} />
+              )}
               {state?.error && (
                 <p className="m-0 text-[12px] font-bold" style={{ color: 'var(--deep-danger)' }}>{state.error}</p>
               )}
@@ -197,12 +217,17 @@ export default function AnswersBlock({ variant }: { variant: 'phone' | 'desktop'
         >
           <div className="flex min-h-[48px] items-center gap-2 py-1">
             <div className="min-w-0 flex-1">
-              <div className="whitespace-nowrap text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
-                {rowDateLabel(s.date, s.start)}
+              <div className="flex min-w-0 items-baseline gap-2">
+                <span className="flex-none whitespace-nowrap text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
+                  {rowDateLabel(s.date, s.start)}
+                </span>
+                <SessionTag session={s} className="min-w-0" />
               </div>
-              <Caption state={state} date={s.date} first={i === 0} />
+              {caption(s, i, state)}
             </div>
-            <AnswerButtons state={state} date={s.date} compact={false} onPick={(a) => { void pick(i, a); }} />
+            {!s.cancelled && (
+              <AnswerButtons state={state} date={s.date} compact={false} onPick={(a) => { void pick(i, a); }} />
+            )}
           </div>
           {state?.error && (
             <p className="m-0 pb-1.5 text-[12px] font-bold" style={{ color: 'var(--deep-danger)' }}>{state.error}</p>

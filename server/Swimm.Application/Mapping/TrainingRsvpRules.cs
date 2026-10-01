@@ -22,6 +22,12 @@ public static class TrainingRsvpRules
     /// </summary>
     public const int ManagerDaysBack = 7;
 
+    /// <summary>Потолок причины отмены занятия (Р9) — символов.</summary>
+    public const int CancelReasonMax = 200;
+
+    /// <summary>Сколько ближайших занятий отдаёт Next (<c>GET …/next-trainings</c>, не считая отменённых).</summary>
+    public const int NextCount = 3;
+
     public static string SessionKey(DateOnly date, string start) =>
         $"{date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}-{start.Replace(":", "")}";
 
@@ -47,31 +53,34 @@ public static class TrainingRsvpRules
     }
 
     /// <summary>
-    /// Можно ли СМОТРЕТЬ ответы на это занятие: оно есть в расписании и лежит в окне
-    /// [сегодня − <see cref="ManagerDaysBack"/>; сегодня + <see cref="DaysAhead"/>].
+    /// Можно ли СМОТРЕТЬ ответы на это занятие: оно есть (слот расписания или разовое —
+    /// <see cref="TrainingOccurrences.Find"/>) и лежит в окне
+    /// [сегодня − <see cref="ManagerDaysBack"/>; сегодня + <see cref="DaysAhead"/>]. Отменённое
+    /// смотреть можно: ответы при отмене не удаляются, а тренеру нужно видеть, что отменил.
     /// </summary>
-    public static bool IsViewable(GroupTrainingSchedule schedule, DateOnly date, string start, DateTime nowLocal)
+    public static bool IsViewable(TrainingOccurrences.Occurrence? occurrence, DateTime nowLocal)
     {
-        if (FindSlot(schedule, date, start) == null) return false;
+        if (occurrence == null) return false;
         var today = DateOnly.FromDateTime(nowLocal);
-        return date >= today.AddDays(-ManagerDaysBack) && date <= today.AddDays(DaysAhead);
+        return occurrence.Date >= today.AddDays(-ManagerDaysBack) && occurrence.Date <= today.AddDays(DaysAhead);
     }
 
     /// <summary>
     /// Можно ли МЕНЯТЬ ответ. Участник — пока занятие не началось; управляющий — ещё
     /// <see cref="ManagerDaysBack"/> дней после (поправить по факту). Вперёд — не дальше
-    /// <see cref="DaysAhead"/> дней. null — можно, иначе причина для ответа 400.
+    /// <see cref="DaysAhead"/> дней. Отменённое — нельзя никому. null — можно, иначе причина для
+    /// ответа 400.
     /// </summary>
-    public static string? EditBlockReason(
-        GroupTrainingSchedule schedule, DateOnly date, string start, DateTime nowLocal, bool isManager)
+    public static string? EditBlockReason(TrainingOccurrences.Occurrence? occurrence, DateTime nowLocal, bool isManager)
     {
-        var slot = FindSlot(schedule, date, start);
-        if (slot == null) return "There is no such training in the schedule.";
+        if (occurrence == null) return "There is no such training in the schedule.";
+        if (occurrence.Cancelled) return "This training is cancelled.";
 
+        var date = occurrence.Date;
         var today = DateOnly.FromDateTime(nowLocal);
         if (date > today.AddDays(DaysAhead)) return $"You can answer at most {DaysAhead} days ahead.";
 
-        var startsAt = date.ToDateTime(slot.StartTime!.Value);
+        var startsAt = date.ToDateTime(TimeOnly.ParseExact(occurrence.Start, "HH:mm", CultureInfo.InvariantCulture));
         if (isManager)
             return date < today.AddDays(-ManagerDaysBack) ? "This training is too old to change." : null;
         return nowLocal >= startsAt ? "This training has already started." : null;

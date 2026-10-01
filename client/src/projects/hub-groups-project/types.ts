@@ -266,6 +266,8 @@ export interface TrainingSession {
   stats?: TrainingSessionStats | null;
   /** Ключевой сет — ★ тренера; null — не помечен. */
   key_set_no?: number | null;
+  /** «Ask who's coming» (Р9): разовое занятие — тренировка в Next, на неё отвечают. */
+  asks_rsvp?: boolean;
   /** null — ★ нет или моих повторов в сете нет: строки «You» нет. */
   my_key?: TrainingMyKey | null;
 }
@@ -319,6 +321,11 @@ export interface TrainingSessionInput {
   pool_type?: string | null;
   /** Не прислали — при создании swim, при правке не меняется. */
   type?: TrainingType;
+  /**
+   * «Ask who's coming» (Р9). Не прислали — при создании false, при правке не меняется. Поставить
+   * можно только тренировке с началом и датой не раньше сегодняшней; снять — всегда.
+   */
+  asks_rsvp?: boolean;
 }
 
 export interface TrainingSessionMediaInput {
@@ -340,6 +347,18 @@ export interface NextTraining {
   end?: string | null;
   place?: string | null;
   pool_type?: string | null;
+  // Р9 (разовые занятия и отмены) — только в приватном списке `GET /api/hub-groups/{id}/next-trainings`;
+  // в кэшируемом ответе страницы группы их нет.
+  /** Название разовой тренировки; у занятия по расписанию — нет. */
+  title?: string | null;
+  type?: TrainingType | null;
+  /** Id тренировки (`Sys_TrainingSessions`), если у занятия она есть. */
+  training_id?: number | null;
+  /** Занятие только разовое: такого слота в расписании нет. */
+  one_off?: boolean;
+  /** Отменено тренером: остаётся в списке с пометкой «Cancelled», ответить нельзя. */
+  cancelled?: boolean;
+  cancel_reason?: string | null;
 }
 
 /**
@@ -660,6 +679,12 @@ export interface TrainingRsvp {
   date: string;
   start: string;
   end?: string | null;
+  /** Занятие отменено тренером (Р9): ответить нельзя, ответы на месте. */
+  cancelled?: boolean;
+  cancel_reason?: string | null;
+  /** Название и тип разового занятия — для шапки; у занятия по расписанию нет. */
+  title?: string | null;
+  type?: TrainingType | null;
   yes: number;
   maybe: number;
   no: number;

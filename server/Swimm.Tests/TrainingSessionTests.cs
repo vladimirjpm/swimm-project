@@ -642,4 +642,60 @@ public class TrainingSessionTests
         var coachOnly = GroupTrainingSchedule.Parse(new GroupTrainingSchedule { TrainingMedia = "coach" }.ToJson());
         Assert.Equal(GroupTrainingMedia.Coach, coachOnly.EffectiveTrainingMedia);
     }
+
+    // ── «Ask who's coming» (Р9) ─────────────────────────────────────────────
+
+    private static TrainingSessionInputDto Asking(string date = "2026-10-01", string? start = "18:00", bool? asks = true) =>
+        new() { Date = date, Title = "Underwater filming", Start = start, AsksRsvp = asks };
+
+    [Fact]
+    public async Task AsksRsvp_NeedsStartAndANotPastDate_RemovingIsAlwaysAllowed()
+    {
+        await using var db = CreateDb(nameof(AsksRsvp_NeedsStartAndANotPastDate_RemovingIsAlwaysAllowed));
+        var s = await SeedAsync(db);
+        var service = Service(db);
+
+        var ok = await service.CreateAsync(s.GroupId, s.Coach, Asking(), Today);
+        var todayItself = await service.CreateAsync(s.GroupId, s.Coach, Asking("2026-09-30"), Today);
+        var past = await service.CreateAsync(s.GroupId, s.Coach, Asking("2026-09-29"), Today);
+        var noStart = await service.CreateAsync(s.GroupId, s.Coach, Asking(start: null), Today);   // четверг — слота нет
+        // Среда — в расписании ровно одно занятие: начало подставилось, галка проходит.
+        var startFromSchedule = await service.CreateAsync(s.GroupId, s.Coach, Asking("2026-10-07", start: null), Today);
+        var off = await service.CreateAsync(s.GroupId, s.Coach, Asking("2026-09-29", asks: false), Today);
+
+        Assert.True(ok.Session!.AsksRsvp);
+        Assert.True(todayItself.Session!.AsksRsvp);
+        Assert.Equal((400, "Only a future training with a start time can ask who's coming."), (past.Status, past.Error));
+        Assert.Equal(400, noStart.Status);
+        Assert.Equal(("20:00", true), (startFromSchedule.Session!.Start, startFromSchedule.Session.AsksRsvp));
+        Assert.False(off.Session!.AsksRsvp);
+        Assert.False((await service.CreateAsync(s.GroupId, s.Coach, Asking("2026-10-02", asks: null), Today)).Session!.AsksRsvp);   // не прислали — false
+
+        // Правка: поставить на прошлую дату или без начала нельзя, снять — всегда.
+        var id = ok.Session.Id;
+        var toPast = await service.UpdateAsync(s.GroupId, id, s.Coach, Asking("2026-09-29"), Today);
+        var withoutStart = await service.UpdateAsync(s.GroupId, id, s.Coach, Asking(start: null), Today);
+        Assert.Equal(400, toPast.Status);
+        Assert.Equal(400, withoutStart.Status);
+        Assert.True((await db.TrainingSessions.FindAsync(id))!.AsksRsvp);   // отказ ничего не поменял
+
+        var kept = await service.UpdateAsync(s.GroupId, id, s.Coach, Asking(asks: null), Today);   // не прислали — как было
+        Assert.True(kept.Session!.AsksRsvp);
+        var removed = await service.UpdateAsync(s.GroupId, id, s.Coach, Asking("2026-09-29", start: null, asks: false), Today);
+        Assert.False(removed.Session!.AsksRsvp);
+        Assert.False((await db.TrainingSessions.FindAsync(id))!.AsksRsvp);
+    }
+
+    [Fact]
+    public async Task AsksRsvp_ShowsInTheList()
+    {
+        await using var db = CreateDb(nameof(AsksRsvp_ShowsInTheList));
+        var s = await SeedAsync(db);
+        var service = Service(db);
+        await service.CreateAsync(s.GroupId, s.Coach, Asking(), Today);
+
+        var list = (await service.ListAsync(s.GroupId, s.Coach, isManager: true)).Sessions;
+
+        Assert.Equal([true, false], list.Select(x => x.AsksRsvp));   // новая тренировка сверху, залитая скриптом — без галки
+    }
 }

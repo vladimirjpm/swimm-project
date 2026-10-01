@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import DeepEntityPage from '../components/deep/entity-page';
 import type {
   EntityPageStatus, EntityTabNav, EntityTabSpec,
@@ -30,7 +30,7 @@ import GroupJoinPolicyCard from './components/group-join-policy';
 import GroupScheduleEditor from './components/group-schedule-editor';
 import GroupLevelsCard from './components/group-levels';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
-import type { HubGroupDetails, HubGroupMember, TrainingRsvp } from './types';
+import type { HubGroupDetails, HubGroupMember, NextTraining, TrainingRsvp } from './types';
 
 /**
  * Страница группы `/groups/{slug}` — ТРЕТИЙ потребитель общего каркаса
@@ -56,12 +56,24 @@ function GroupPage({ slug }: { slug: string }) {
   const [loadedGroup, setGroup] = useState<HubGroupDetails | null>(null);
   // Пловцы группы (Р71): только своим, личным запросом — общий ответ страницы их не несёт.
   const [privateMembers, setPrivateMembers] = useState<HubGroupMember[]>([]);
-  const group = useMemo(
-    () => (loadedGroup && privateMembers.length > 0
-      ? { ...loadedGroup, members: [...loadedGroup.members, ...privateMembers] }
-      : loadedGroup),
-    [loadedGroup, privateMembers],
-  );
+  // Ближайшие занятия своим (Р9): с разовыми занятиями и отменами. Общий (кэшируемый) ответ страницы
+  // несёт только расписание — разовые и отмены приватные; null — ещё не пришли / не свои.
+  const [privateNext, setPrivateNext] = useState<NextTraining[] | null>(null);
+  const group = useMemo(() => {
+    if (!loadedGroup) return null;
+    let merged = loadedGroup;
+    if (privateMembers.length > 0) merged = { ...merged, members: [...merged.members, ...privateMembers] };
+    // Шапка, липкий чип, вид Next и метки читают `next_trainings` / `next_training` — подмена
+    // даёт им разовые занятия без правок. `next_training` — первое НЕ отменённое.
+    if (privateNext) {
+      merged = {
+        ...merged,
+        next_trainings: privateNext,
+        next_training: privateNext.find((n) => !n.cancelled) ?? null,
+      };
+    }
+    return merged;
+  }, [loadedGroup, privateMembers, privateNext]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<'not-found' | 'failed' | null>(null);
 
@@ -159,6 +171,21 @@ function GroupPage({ slug }: { slug: string }) {
       .catch(() => { if (alive) setPrivateMembers([]); });
     return () => { alive = false; };
   }, [insiderSlug]);
+
+  // Ближайшие занятия с разовыми и отменами — тем же гейтом (сервер ответил бы остальным 403).
+  // Счётчик версии — перечитать после правки тренировки / отмены занятия (`reloadNextTrainings`).
+  const nextGroupId = insiderSlug ? group!.id : null;
+  const [nextVersion, setNextVersion] = useState(0);
+  const reloadNextTrainings = useCallback(() => setNextVersion((v) => v + 1), []);
+  useEffect(() => {
+    if (nextGroupId == null) { setPrivateNext(null); return undefined; }
+    let alive = true;
+    fetch(`/api/hub-groups/${nextGroupId}/next-trainings`, { credentials: 'include', cache: 'no-store' })
+      .then((r) => (r.ok ? (r.json() as Promise<NextTraining[]>) : null))
+      .then((data) => { if (alive) setPrivateNext(data); })
+      .catch(() => { if (alive) setPrivateNext(null); });
+    return () => { alive = false; };
+  }, [nextGroupId, nextVersion]);
 
   const membershipStatus = group == null
     ? null
@@ -302,6 +329,7 @@ function GroupPage({ slug }: { slug: string }) {
             manages={manages}
             rsvp={rsvp}
             onOpenSchedule={() => openScheduleCard(nav)}
+            onNextTrainingsChanged={reloadNextTrainings}
           />
         ),
       }],

@@ -32,15 +32,176 @@ public class TrainingRsvpService : ITrainingRsvpService
         return row == null ? null : GroupTrainingSchedule.Parse(row.TrainingSchedule);
     }
 
+    private static DateTime DayStart(DateOnly date) =>
+        DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+
+    /// <summary>
+    /// Разовые занятия группы (тренировки с «Ask who's coming» и заданным началом) за даты
+    /// [<paramref name="from"/>; <paramref name="to"/>]. Дата тренировки в базе — полночь UTC
+    /// (<c>Sys_TrainingSessions.Date</c> — timestamptz), поэтому границы берём по дню.
+    /// </summary>
+    private async Task<List<TrainingOccurrences.OneOff>> OneOffsAsync(int hubGroupId, DateOnly from, DateOnly to)
+    {
+        var fromDb = DayStart(from);
+        var toDb = DayStart(to.AddDays(1));
+        var rows = await _db.TrainingSessions.AsNoTracking()
+            .Where(s => s.HubGroupId == hubGroupId && s.AsksRsvp && s.StartTime != null
+                        && s.Date >= fromDb && s.Date < toDb)
+            .OrderBy(s => s.Id)
+            .Select(s => new { s.Id, s.Date, s.StartTime, s.Title, s.Type, s.PoolType })
+            .ToListAsync();
+        return rows.Select(r => new TrainingOccurrences.OneOff(
+                r.Id, DateOnly.FromDateTime(r.Date), r.StartTime!, r.Title, r.Type,
+                string.IsNullOrWhiteSpace(r.PoolType) ? null : r.PoolType))
+            .ToList();
+    }
+
+    private async Task<List<TrainingOccurrences.Cancellation>> CancellationsAsync(
+        int hubGroupId, DateOnly from, DateOnly to)
+    {
+        var rows = await _db.HubGroupTrainingCancellations.AsNoTracking()
+            .Where(c => c.HubGroupId == hubGroupId && c.Date >= from && c.Date <= to)
+            .Select(c => new { c.Date, c.Start, c.Reason })
+            .ToListAsync();
+        return rows.Select(r => new TrainingOccurrences.Cancellation(r.Date, r.Start, r.Reason)).ToList();
+    }
+
+    /// <summary>Занятие с этим ключом (слот расписания или разовое) вместе с пометкой «отменено»; null — такого нет.</summary>
+    private async Task<TrainingOccurrences.Occurrence?> FindOccurrenceAsync(
+        int hubGroupId, GroupTrainingSchedule schedule, DateOnly date, string start)
+    {
+        var oneOffs = await OneOffsAsync(hubGroupId, date, date);
+        var cancellations = await CancellationsAsync(hubGroupId, date, date);
+        return TrainingOccurrences.Find(schedule, oneOffs, cancellations, date, start);
+    }
+
     public async Task<TrainingRsvpDto?> GetAsync(int hubGroupId, string sessionKey, int viewerUserId, bool isManager,
         DateTime? nowLocal = null)
     {
         if (!TrainingRsvpRules.TryParseSessionKey(sessionKey, out var date, out var start)) return null;
         var schedule = await ScheduleAsync(hubGroupId);
         var now = Now(nowLocal);
-        if (schedule == null || !TrainingRsvpRules.IsViewable(schedule, date, start, now)) return null;
+        if (schedule == null) return null;
+        var occurrence = await FindOccurrenceAsync(hubGroupId, schedule, date, start);
+        if (!TrainingRsvpRules.IsViewable(occurrence, now)) return null;
 
-        return await BuildAsync(hubGroupId, schedule, date, start, viewerUserId, isManager, now);
+        return await BuildAsync(hubGroupId, schedule, occurrence!, viewerUserId, isManager, now);
+    }
+
+    public async Task<List<NextTrainingDto>?> GetNextAsync(int hubGroupId, DateTime? nowLocal = null)
+    {
+        var schedule = await ScheduleAsync(hubGroupId);
+        if (schedule == null) return null;
+
+        var now = Now(nowLocal);
+        var today = DateOnly.FromDateTime(now);
+        var last = today.AddDays(TrainingRsvpRules.DaysAhead);
+        var oneOffs = await OneOffsAsync(hubGroupId, today, last);
+        var cancellations = await CancellationsAsync(hubGroupId, today, last);
+
+        return TrainingOccurrences.Upcoming(schedule, oneOffs, cancellations, now, TrainingRsvpRules.NextCount)
+            .Select(o => new NextTrainingDto
+            {
+                Id = TrainingRsvpRules.SessionKey(o.Date, o.Start),
+                Date = o.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Start = o.Start,
+                End = o.End,
+                Place = schedule.Place,
+                PoolType = o.PoolType ?? schedule.PoolType,
+                Title = o.Title,
+                Type = o.Type,
+                TrainingId = o.TrainingId,
+                OneOff = o.OneOff,
+                Cancelled = o.Cancelled,
+                CancelReason = o.CancelReason,
+            })
+            .ToList();
+    }
+
+    public async Task<TrainingRsvpSaveResult> CancelAsync(int hubGroupId, string sessionKey, int actorUserId,
+        string? reason, DateTime? nowLocal = null)
+    {
+        if (!TrainingRsvpRules.TryParseSessionKey(sessionKey, out var date, out var start))
+            return TrainingRsvpSaveResult.Fail(404, "Unknown training.");
+        var schedule = await ScheduleAsync(hubGroupId);
+        if (schedule == null) return TrainingRsvpSaveResult.Fail(404, "Group not found.");
+
+        var now = Now(nowLocal);
+        var occurrence = await FindOccurrenceAsync(hubGroupId, schedule, date, start);
+        if (!TrainingRsvpRules.IsViewable(occurrence, now))
+            return TrainingRsvpSaveResult.Fail(400, "There is no such training.");
+
+        var text = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (text?.Length > TrainingRsvpRules.CancelReasonMax)
+            return TrainingRsvpSaveResult.Fail(400,
+                $"Reason is longer than {TrainingRsvpRules.CancelReasonMax} characters.");
+
+        var row = await _db.HubGroupTrainingCancellations.FirstOrDefaultAsync(c =>
+            c.HubGroupId == hubGroupId && c.Date == date && c.Start == start);
+        if (row == null)
+        {
+            row = new HubGroupTrainingCancellation
+            {
+                HubGroupId = hubGroupId, Date = date, Start = start, Reason = text,
+                CreatedByUserId = actorUserId, CreatedAt = DateTime.UtcNow,
+            };
+            _db.HubGroupTrainingCancellations.Add(row);
+        }
+        else
+        {
+            row.Reason = text;   // повторная отмена — успех, причина обновляется
+        }
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Две отмены одного занятия одновременно: вторая упёрлась в UNIQUE (группа, дата, начало).
+            // Занятие уже отменено — обновляем причину у победившей строки.
+            _db.Entry(row).State = EntityState.Detached;
+            var winner = await _db.HubGroupTrainingCancellations.FirstOrDefaultAsync(c =>
+                c.HubGroupId == hubGroupId && c.Date == date && c.Start == start);
+            if (winner == null) throw;
+            winner.Reason = text;
+            await _db.SaveChangesAsync();
+        }
+
+        return await OkAsync(hubGroupId, schedule, date, start, actorUserId, now);
+    }
+
+    public async Task<TrainingRsvpSaveResult> RestoreAsync(int hubGroupId, string sessionKey, int actorUserId,
+        DateTime? nowLocal = null)
+    {
+        if (!TrainingRsvpRules.TryParseSessionKey(sessionKey, out var date, out var start))
+            return TrainingRsvpSaveResult.Fail(404, "Unknown training.");
+        var schedule = await ScheduleAsync(hubGroupId);
+        if (schedule == null) return TrainingRsvpSaveResult.Fail(404, "Group not found.");
+
+        var now = Now(nowLocal);
+        var occurrence = await FindOccurrenceAsync(hubGroupId, schedule, date, start);
+        if (!TrainingRsvpRules.IsViewable(occurrence, now))
+            return TrainingRsvpSaveResult.Fail(400, "There is no such training.");
+
+        var row = await _db.HubGroupTrainingCancellations.FirstOrDefaultAsync(c =>
+            c.HubGroupId == hubGroupId && c.Date == date && c.Start == start);
+        if (row != null)
+        {
+            _db.HubGroupTrainingCancellations.Remove(row);
+            await _db.SaveChangesAsync();
+        }
+
+        return await OkAsync(hubGroupId, schedule, date, start, actorUserId, now);
+    }
+
+    /// <summary>Ответы занятия после отмены / возврата — как GET, глазами управляющего.</summary>
+    private async Task<TrainingRsvpSaveResult> OkAsync(int hubGroupId, GroupTrainingSchedule schedule,
+        DateOnly date, string start, int actorUserId, DateTime now)
+    {
+        var occurrence = await FindOccurrenceAsync(hubGroupId, schedule, date, start);
+        return TrainingRsvpSaveResult.Ok(
+            await BuildAsync(hubGroupId, schedule, occurrence!, actorUserId, isManager: true, now));
     }
 
     public async Task<TrainingRsvpSaveResult> SetAsync(int hubGroupId, string sessionKey, int actorUserId,
@@ -52,7 +213,8 @@ public class TrainingRsvpService : ITrainingRsvpService
         if (schedule == null) return TrainingRsvpSaveResult.Fail(404, "Group not found.");
 
         var now = Now(nowLocal);
-        var blocked = TrainingRsvpRules.EditBlockReason(schedule, date, start, now, isManager);
+        var occurrence = await FindOccurrenceAsync(hubGroupId, schedule, date, start);
+        var blocked = TrainingRsvpRules.EditBlockReason(occurrence, now, isManager);
         if (blocked != null) return TrainingRsvpSaveResult.Fail(400, blocked);
 
         var answer = input.Answer?.Trim().ToLowerInvariant();
@@ -129,7 +291,7 @@ public class TrainingRsvpService : ITrainingRsvpService
 
         await _db.SaveChangesAsync();
 
-        return TrainingRsvpSaveResult.Ok(await BuildAsync(hubGroupId, schedule, date, start, actorUserId, isManager, now));
+        return TrainingRsvpSaveResult.Ok(await BuildAsync(hubGroupId, schedule, occurrence!, actorUserId, isManager, now));
     }
 
     /// <summary>
@@ -331,8 +493,10 @@ public class TrainingRsvpService : ITrainingRsvpService
     };
 
     private async Task<TrainingRsvpDto> BuildAsync(int hubGroupId, GroupTrainingSchedule schedule,
-        DateOnly date, string start, int viewerUserId, bool isManager, DateTime now)
+        TrainingOccurrences.Occurrence occurrence, int viewerUserId, bool isManager, DateTime now)
     {
+        var date = occurrence.Date;
+        var start = occurrence.Start;
         // Знаменатель полосы — активные участники-аккаунты. Ответы ушедших (и pending) не
         // считаются: полоса «13 из 18» обязана складываться из людей состава.
         var members = await _db.HubGroupUserMembers.AsNoTracking()
@@ -392,7 +556,6 @@ public class TrainingRsvpService : ITrainingRsvpService
             }
         }
 
-        var slot = TrainingRsvpRules.FindSlot(schedule, date, start)!;
         var isMember = memberIds.Contains(viewerUserId);
         answers.TryGetValue(viewerUserId, out var mine);
 
@@ -405,7 +568,11 @@ public class TrainingRsvpService : ITrainingRsvpService
             SessionId = TrainingRsvpRules.SessionKey(date, start),
             Date = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             Start = start,
-            End = slot.End,
+            End = occurrence.End,
+            Cancelled = occurrence.Cancelled,
+            CancelReason = occurrence.CancelReason,
+            Title = occurrence.Title,
+            Type = occurrence.Type,
             Yes = all.Count(r => r.Answer == TrainingRsvpAnswer.Yes),
             Maybe = all.Count(r => r.Answer == TrainingRsvpAnswer.Maybe),
             No = all.Count(r => r.Answer == TrainingRsvpAnswer.No),
@@ -417,7 +584,7 @@ public class TrainingRsvpService : ITrainingRsvpService
             IsMember = isMember,
             CanManage = isManager,
             CanAnswer = (isMember || isManager)
-                        && TrainingRsvpRules.EditBlockReason(schedule, date, start, now, isManager) == null,
+                        && TrainingRsvpRules.EditBlockReason(occurrence, now, isManager) == null,
             OnBreak = onBreak.UserIds.Contains(viewerUserId) && !onBreak.NotTrainingUserIds.Contains(viewerUserId),
             NotTraining = onBreak.NotTrainingUserIds.Contains(viewerUserId),
             BreakUntil = viewerBreakUntil?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),

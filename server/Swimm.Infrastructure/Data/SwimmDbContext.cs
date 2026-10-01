@@ -122,6 +122,7 @@ public class SwimmDbContext : DbContext
     public DbSet<LanePlanSwimmer> LanePlanSwimmers => Set<LanePlanSwimmer>();
     public DbSet<HubGroupTrainingRsvp> HubGroupTrainingRsvps => Set<HubGroupTrainingRsvp>();
     public DbSet<HubGroupBreak> HubGroupBreaks => Set<HubGroupBreak>();
+    public DbSet<HubGroupTrainingCancellation> HubGroupTrainingCancellations => Set<HubGroupTrainingCancellation>();
     public DbSet<HubGroupAccountLevel> HubGroupAccountLevels => Set<HubGroupAccountLevel>();
     public DbSet<HubGroupUserSeen> HubGroupUserSeen => Set<HubGroupUserSeen>();
 
@@ -1337,6 +1338,9 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CreatedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // «Ask who's coming» (Р9): у всех прежних тренировок — false.
+            entity.Property(e => e.AsksRsvp).HasDefaultValue(false);
         });
 
         // Тренировочный повтор — ПРИВАТНЫЕ данные, Sys_-таблица БЕЗ grant swimm_ro.
@@ -1450,6 +1454,25 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Answer", @"""Answer"" IN ('yes', 'maybe', 'no')");
             entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Note",
                 @"""Note"" IS NULL OR ""Note"" IN ('late', 'first-hour', 'leaving-early')");
+        });
+
+        // Отмена занятия (Р9) — ПРИВАТНЫЕ данные, Sys_ БЕЗ grant swimm_ro. Занятие — пара «дата +
+        // начало» (как у ответов); строка есть — занятие отменено, вернули — строку удаляют.
+        modelBuilder.Entity<HubGroupTrainingCancellation>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupTrainingCancellations");
+            entity.HasIndex(e => new { e.HubGroupId, e.Date, e.Start }).IsUnique();
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Удалили аккаунт тренера — отмена остаётся.
+            entity.HasOne(e => e.CreatedBy)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // «On break» (Ш3.1) — ПРИВАТНЫЕ данные, Sys_ БЕЗ grant swimm_ro. Субъект — ровно одно из

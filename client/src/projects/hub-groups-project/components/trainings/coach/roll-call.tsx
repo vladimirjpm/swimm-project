@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { HubGroupBreak, TrainingRsvp, TrainingRsvpPerson } from '../../../types';
 import { rsvpPersonKey, type TrainingRsvpState } from '../../../use-training-rsvp';
 import { useTrainingsTab, type RollChange } from '../trainings-context';
+import { CancelReason } from '../next/session-tag';
 import RollToast, { type RollToastData } from './roll-toast';
 import {
   avatarBackground, findBreak, groupOf, nextAnswer, personMeta, pillStyle, sortRoll, statusLabel, statusSpoken,
@@ -296,6 +297,16 @@ function RollCall({ roll, r }: { roll: TrainingRsvpState; r: TrainingRsvp }) {
     setToast(null);
     if (t) void t.undo();
   };
+
+  // Р9: занятие отменено — вместо строк «Training cancelled» и причина. Ответы на месте (вернут — снова видны).
+  if (r.cancelled) {
+    return (
+      <div className="flex flex-col gap-1">
+        <p className="m-0 text-[13px] font-extrabold" style={{ color: 'var(--deep-danger)' }}>Training cancelled</p>
+        <CancelReason reason={r.cancel_reason} />
+      </div>
+    );
+  }
 
   if (people.length === 0) {
     return (

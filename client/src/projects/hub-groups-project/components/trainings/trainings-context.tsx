@@ -7,7 +7,7 @@ import type { HubGroupDetails, LanePlan, LanePlanSummary, RsvpAnswer, RsvpNote, 
 import ConfirmDialog from '../../../components/confirm-dialog/confirm-dialog';
 import { lanePlansApi } from '../lane-plans-api';
 import { useGroupBreaks } from '../use-group-breaks';
-import { nextSessions } from './next/next-format';
+import { NEXT_ENTRIES_MAX, nextSessions } from './next/next-format';
 import type { TrainingsSheet } from './trainings-sheets';
 import { goldMark, useTrainingMarks, type TrainingMarks } from './use-training-marks';
 
@@ -64,12 +64,13 @@ export interface TrainingsTabState {
   setLanesDirty: (dirty: boolean) => void;
   rsvp: TrainingRsvpState | null;
   /**
-   * Ответы на три ближайших занятия (`group.next_trainings`): `[0]` — тот же экземпляр, что `rsvp`
-   * (ответ сразу виден и в шапке страницы), `[1]`/`[2]` — свои. Длина всегда 3; `null` — занятия
-   * нет или ответы не грузятся (гость).
+   * Ответы на ближайшие занятия (`nextSessions(group)`: три не отменённых и отменённые между ними,
+   * Р9) — по индексу строки списка. Строка, чей ключ равен `group.next_training.id` (первое НЕ
+   * отменённое), — тот же экземпляр, что `rsvp` (ответ сразу виден и в шапке страницы), остальные —
+   * свои. Длина всегда `NEXT_ENTRIES_MAX`; `null` — строки нет или ответы не грузятся (гость).
    */
   upcoming: (TrainingRsvpState | null)[];
-  /** Какое из трёх ближайших занятий открыто у тренера (0..2), вид `coach-next` (Т6). */
+  /** Какое из ближайших занятий открыто у тренера (индекс строки `nextSessions`), вид `coach-next` (Т6). */
   rollIndex: number;
   setRollIndex: (index: number) => void;
   /** Планы дорожек группы: тренеру — все, участнику — опубликованные (`null` — ещё не пришли). */
@@ -84,7 +85,13 @@ export interface TrainingsTabState {
   /** «Set schedule» тренера — открыть Admin и прокрутить к расписанию; нет — кнопки нет. */
   openSchedule?: () => void;
   /**
-   * Полные планы дорожек ближайших занятий (до трёх РАЗНЫХ дат `nextSessions(group)`): ключ —
+   * Перечитать ближайшие занятия (`GET …/next-trainings`, Р9): тренер завёл / поправил / удалил
+   * тренировку с галкой «Ask who's coming» или отменил / вернул занятие. Страница группы подменяет
+   * `next_trainings` / `next_training`; без неё (проп не передан) — ничего не делает.
+   */
+  reloadNextTrainings: () => void;
+  /**
+   * Полные планы дорожек ближайших занятий (РАЗНЫЕ даты `nextSessions(group)`): ключ —
    * yyyy-MM-dd. `null` — плана нет (404: участнику черновик тоже 404 — это не ошибка); ключа нет —
    * ещё не пришёл. Нужны меткам (черновик / неразложенные / «тебя перенесли») и числу
    * неразложенных в бассейне тренера. Перечитываются по `reloadLanePlans()`. Секции планы НЕ грузят.
@@ -120,14 +127,16 @@ export function useTrainingsTab(): TrainingsTabState {
 }
 
 export function TrainingsTabProvider({
-  group, manages, rsvp, openSchedule, children,
+  group, manages, rsvp, openSchedule, onNextTrainingsChanged, children,
 }: {
   group: HubGroupDetails;
   manages: boolean;
   rsvp?: TrainingRsvpState | null;
   openSchedule?: () => void;
+  onNextTrainingsChanged?: () => void;
   children: React.ReactNode;
 }) {
+  const reloadNextTrainings = useCallback(() => { onNextTrainingsChanged?.(); }, [onNextTrainingsChanged]);
   const isDesktop = useMediaQuery(DEEP_DESKTOP_QUERY);
   const [view, setViewState] = useState<TrainingsView>(() => readViewParam(VIEWS, DEFAULT_VIEW));
   const applyView = useCallback((next: TrainingsView) => {
@@ -247,27 +256,40 @@ export function TrainingsTabProvider({
     void lanePlansApi.markSeen(group.id);
   }, [view, lanesShown, memberGoldLit, group.id]);
 
-  // Ответы на 2-е и 3-е занятие: хуки вызываются ВСЕГДА и в одном порядке (sessionId undefined — нет занятия).
+  // Ответы на ближайшие занятия: хуки вызываются ВСЕГДА и в одном порядке (sessionId undefined — нет
+  // занятия). Строк до `NEXT_ENTRIES_MAX`: три не отменённых и отменённые между ними (Р9), поэтому
+  // первое НЕ отменённое занятие (`group.next_training`) — не обязательно строка 0. Его ответы уже
+  // грузит страница группы (`rsvp`) — своему слоту хука id не даём, чтобы не читать дважды.
   const upcomingIds = nextSessions(group);
   // Занятий стало меньше, чем выбранный индекс (прошло ближайшее) — не выходим за край.
   const rollIndex = Math.min(rollIndexRaw, Math.max(0, upcomingIds.length - 1));
   const answersEnabled = rsvp?.rsvp != null;
-  const second = useTrainingRsvp(group.id, upcomingIds[1]?.id, answersEnabled);
-  const third = useTrainingRsvp(group.id, upcomingIds[2]?.id, answersEnabled);
-  const has2 = !!upcomingIds[1]?.id;
-  const has3 = !!upcomingIds[2]?.id;
-  const upcoming = useMemo<(TrainingRsvpState | null)[]>(
-    () => [rsvp ?? null, has2 ? second : null, has3 ? third : null],
-    [rsvp, second, third, has2, has3],
-  );
+  const sharedId = group.next_training?.id;
+  const slotId = (i: number) => (upcomingIds[i]?.id && upcomingIds[i].id !== sharedId ? upcomingIds[i].id : undefined);
+  const slot0 = useTrainingRsvp(group.id, slotId(0), answersEnabled);
+  const slot1 = useTrainingRsvp(group.id, slotId(1), answersEnabled);
+  const slot2 = useTrainingRsvp(group.id, slotId(2), answersEnabled);
+  const slot3 = useTrainingRsvp(group.id, slotId(3), answersEnabled);
+  const slot4 = useTrainingRsvp(group.id, slotId(4), answersEnabled);
+  const slot5 = useTrainingRsvp(group.id, slotId(5), answersEnabled);
+  const upcoming = useMemo<(TrainingRsvpState | null)[]>(() => {
+    const slots = [slot0, slot1, slot2, slot3, slot4, slot5];
+    return Array.from({ length: NEXT_ENTRIES_MAX }, (_, i) => {
+      const id = upcomingIds[i]?.id;
+      if (!id) return null;
+      return id === sharedId ? rsvp ?? null : slots[i];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `upcomingIds` пересоздаётся на каждый рендер; ключ — состав id
+  }, [rsvp, slot0, slot1, slot2, slot3, slot4, slot5, sharedId, upcomingIds.map((s) => s.id).join(',')]);
 
   const value = useMemo<TrainingsTabState>(() => ({
     group, manages, isDesktop, view, setView, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
-    rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener,
-    sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
+    rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown,
+    onRollChange, setRollChangeListener, sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
     group, manages, isDesktop, view, setView, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, lanePlans, reloadLanePlans,
-    lanesHidden, openSchedule, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sessions, breaks, marks, closeSheet, sheet,
+    lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sessions,
+    breaks, marks, closeSheet, sheet,
   ]);
 
   return (

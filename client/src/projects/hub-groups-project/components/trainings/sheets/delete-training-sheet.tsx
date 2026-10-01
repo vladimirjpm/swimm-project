@@ -11,7 +11,7 @@ import { formatSheetDate } from './link-helpers';
  * остаются там, где лежат (YouTube, Google Photos): сайт хранил только ссылки.
  */
 function DeleteTrainingSheet({ sheet, onClose }: TrainingsSheetProps<'delete-training'>) {
-  const { sessions } = useTrainingsTab();
+  const { sessions, reloadNextTrainings } = useTrainingsTab();
   const { session } = sheet;
   const [error, setError] = useState<string | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -23,8 +23,10 @@ function DeleteTrainingSheet({ sheet, onClose }: TrainingsSheetProps<'delete-tra
   const remove = async () => {
     setError(null);
     const e = await sessions.remove(session.id);
-    if (e) setError(e);
-    else onClose();
+    if (e) { setError(e); return; }
+    // Удалили разовое занятие — оно уходит и из Next.
+    if (session.asks_rsvp) reloadNextTrainings();
+    onClose();
   };
 
   return (

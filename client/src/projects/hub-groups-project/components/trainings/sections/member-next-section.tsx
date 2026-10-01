@@ -6,6 +6,7 @@ import { TrainingsSection } from '../trainings-section';
 import AnswersBlock, { AnswersCaption, useFirstUnanswered } from '../next/answers-block';
 import { BreakLink, BreakRow, useHasBreakLink } from '../next/break-block';
 import { FullPool, MiniPool, NextHeader, PoolFooter, useNextRsvp, YourLane } from '../next/lane-block';
+import { nextSessions } from '../next/next-format';
 
 /**
  * Вид Next УЧАСТНИКА (Т5, docs/tasks/trainings-tab-t5-sonnet.md; хендофф Trainings Tab, 2a / 3a).
@@ -21,8 +22,19 @@ import { FullPool, MiniPool, NextHeader, PoolFooter, useNextRsvp, YourLane } fro
 const LIVE_BORDER = { borderColor: 'var(--deep-live-border)' } as const;
 
 function MemberNextSection() {
-  const { isDesktop } = useTrainingsTab();
+  const { isDesktop, group } = useTrainingsTab();
   const { next } = useNextRsvp();
+
+  // Р9: ближайшие занятия есть, но ВСЕ отменены — ближайшего живого нет, и «No weekly schedule yet» было
+  // бы враньём. Показываем только список ответов: у отменённых — пилюля «Cancelled» вместо кнопок.
+  if (!next && nextSessions(group).length > 0) {
+    return (
+      <TrainingsSection id="member-next-answers">
+        <div className="mb-1"><AnswersCaption /></div>
+        <AnswersBlock variant={isDesktop ? 'desktop' : 'phone'} />
+      </TrainingsSection>
+    );
+  }
 
   if (!next) {
     return (

@@ -57,7 +57,23 @@ public class HubGroupTrainingRsvpController : ControllerBase
             : (0, false, Forbid());
     }
 
-    /// <summary>Ответы на занятие. 404 — такого занятия нет (не в расписании или вне окна).</summary>
+    /// <summary>
+    /// Ближайшие занятия для вида Next (Р9): до трёх не отменённых по расписанию и разовым и
+    /// отменённые между ними. Тот же гейт, что у ответов (участник или управляющий). Разовые и
+    /// отмены приватные, в кэшируемую страницу группы они не входят — потому отдельная ручка.
+    /// </summary>
+    [HttpGet("/api/hub-groups/{id:int}/next-trainings")]
+    public async Task<IActionResult> NextTrainings(int id)
+    {
+        var (_, _, denied) = await ViewerAsync(id);
+        if (denied != null) return denied;
+
+        var list = await _rsvp.GetNextAsync(id);
+        Response.Headers.CacheControl = "private, no-store";
+        return list == null ? NotFound(new { error = "Group not found." }) : Ok(list);
+    }
+
+    /// <summary>Ответы на занятие. 404 — такого занятия нет (не в расписании, не разовое или вне окна).</summary>
     [HttpGet("{session}")]
     public async Task<IActionResult> Get(int id, string session)
     {
@@ -77,6 +93,38 @@ public class HubGroupTrainingRsvpController : ControllerBase
         if (denied != null) return denied;
 
         var result = await _rsvp.SetAsync(id, session, userId, isManager, input);
+        Response.Headers.CacheControl = "private, no-store";
+        if (result.Rsvp != null) return Ok(result.Rsvp);
+        return StatusCode(result.Status, new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Отменить занятие (Р9) — только управляющий. Занятие остаётся в Next с пометкой «Cancelled»,
+    /// ответить на него нельзя; ответы не удаляются. Повторная отмена обновляет причину.
+    /// Возвращает ответы занятия, как GET.
+    /// </summary>
+    [HttpPut("{session}/cancel")]
+    public async Task<IActionResult> Cancel(int id, string session, [FromBody] TrainingCancelInputDto? input)
+    {
+        var (userId, isManager, denied) = await ViewerAsync(id);
+        if (denied != null) return denied;
+        if (!isManager) return Forbid();
+
+        var result = await _rsvp.CancelAsync(id, session, userId, input?.Reason);
+        Response.Headers.CacheControl = "private, no-store";
+        if (result.Rsvp != null) return Ok(result.Rsvp);
+        return StatusCode(result.Status, new { error = result.Error });
+    }
+
+    /// <summary>Вернуть отменённое занятие (Р9) — только управляющий; ответы на месте.</summary>
+    [HttpDelete("{session}/cancel")]
+    public async Task<IActionResult> Restore(int id, string session)
+    {
+        var (userId, isManager, denied) = await ViewerAsync(id);
+        if (denied != null) return denied;
+        if (!isManager) return Forbid();
+
+        var result = await _rsvp.RestoreAsync(id, session, userId);
         Response.Headers.CacheControl = "private, no-store";
         if (result.Rsvp != null) return Ok(result.Rsvp);
         return StatusCode(result.Status, new { error = result.Error });

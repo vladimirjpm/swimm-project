@@ -73,17 +73,23 @@ public class TrainingRsvpTests
         Assert.NotNull(TrainingRsvpRules.FindSlot(schedule, new DateOnly(2026, 10, 3), "10:00")); // суббота
     }
 
+    /// <summary>Занятие по расписанию на дату (без разовых и отмен) — как в Find.</summary>
+    private static TrainingOccurrences.Occurrence? Occ(GroupTrainingSchedule schedule, DateOnly date, string start,
+        params TrainingOccurrences.Cancellation[] cancellations) =>
+        TrainingOccurrences.Find(schedule, [], cancellations, date, start);
+
     [Fact]
     public void Viewable_WindowIsWeekBackToFourWeeksAhead()
     {
         var today = DateOnly.FromDateTime(MondayNoon);
         var schedule = Daily();
 
-        Assert.True(TrainingRsvpRules.IsViewable(schedule, today.AddDays(-TrainingRsvpRules.ManagerDaysBack), "20:00", MondayNoon));
-        Assert.False(TrainingRsvpRules.IsViewable(schedule, today.AddDays(-TrainingRsvpRules.ManagerDaysBack - 1), "20:00", MondayNoon));
-        Assert.True(TrainingRsvpRules.IsViewable(schedule, today.AddDays(TrainingRsvpRules.DaysAhead), "20:00", MondayNoon));
-        Assert.False(TrainingRsvpRules.IsViewable(schedule, today.AddDays(TrainingRsvpRules.DaysAhead + 1), "20:00", MondayNoon));
-        Assert.False(TrainingRsvpRules.IsViewable(schedule, today, "21:00", MondayNoon));  // нет в расписании
+        Assert.True(TrainingRsvpRules.IsViewable(Occ(schedule, today.AddDays(-TrainingRsvpRules.ManagerDaysBack), "20:00"), MondayNoon));
+        Assert.False(TrainingRsvpRules.IsViewable(Occ(schedule, today.AddDays(-TrainingRsvpRules.ManagerDaysBack - 1), "20:00"), MondayNoon));
+        Assert.True(TrainingRsvpRules.IsViewable(Occ(schedule, today.AddDays(TrainingRsvpRules.DaysAhead), "20:00"), MondayNoon));
+        Assert.False(TrainingRsvpRules.IsViewable(Occ(schedule, today.AddDays(TrainingRsvpRules.DaysAhead + 1), "20:00"), MondayNoon));
+        Assert.False(TrainingRsvpRules.IsViewable(Occ(schedule, today, "21:00"), MondayNoon));  // нет в расписании
+        Assert.False(TrainingRsvpRules.IsViewable(null, MondayNoon));
     }
 
     [Fact]
@@ -94,15 +100,46 @@ public class TrainingRsvpTests
         var beforeStart = today.ToDateTime(new TimeOnly(19, 59));
         var atStart = today.ToDateTime(new TimeOnly(20, 0));
 
-        Assert.Null(TrainingRsvpRules.EditBlockReason(schedule, today, "20:00", beforeStart, isManager: false));
-        Assert.NotNull(TrainingRsvpRules.EditBlockReason(schedule, today, "20:00", atStart, isManager: false));
+        Assert.Null(TrainingRsvpRules.EditBlockReason(Occ(schedule, today, "20:00"), beforeStart, isManager: false));
+        Assert.NotNull(TrainingRsvpRules.EditBlockReason(Occ(schedule, today, "20:00"), atStart, isManager: false));
         // Тренер правит «кто пришёл» по факту — неделю после занятия.
-        Assert.Null(TrainingRsvpRules.EditBlockReason(schedule, today, "20:00", atStart, isManager: true));
-        Assert.Null(TrainingRsvpRules.EditBlockReason(schedule, today.AddDays(-7), "20:00", MondayNoon, isManager: true));
-        Assert.NotNull(TrainingRsvpRules.EditBlockReason(schedule, today.AddDays(-8), "20:00", MondayNoon, isManager: true));
+        Assert.Null(TrainingRsvpRules.EditBlockReason(Occ(schedule, today, "20:00"), atStart, isManager: true));
+        Assert.Null(TrainingRsvpRules.EditBlockReason(Occ(schedule, today.AddDays(-7), "20:00"), MondayNoon, isManager: true));
+        Assert.NotNull(TrainingRsvpRules.EditBlockReason(Occ(schedule, today.AddDays(-8), "20:00"), MondayNoon, isManager: true));
         // Вперёд — не дальше четырёх недель, никому.
-        Assert.NotNull(TrainingRsvpRules.EditBlockReason(schedule, today.AddDays(29), "20:00", MondayNoon, isManager: true));
-        Assert.NotNull(TrainingRsvpRules.EditBlockReason(schedule, today, "21:00", MondayNoon, isManager: true));
+        Assert.NotNull(TrainingRsvpRules.EditBlockReason(Occ(schedule, today.AddDays(29), "20:00"), MondayNoon, isManager: true));
+        // Нет такого занятия — прежний текст.
+        Assert.Equal("There is no such training in the schedule.",
+            TrainingRsvpRules.EditBlockReason(Occ(schedule, today, "21:00"), MondayNoon, isManager: true));
+        Assert.Equal("There is no such training in the schedule.",
+            TrainingRsvpRules.EditBlockReason(null, MondayNoon, isManager: false));
+    }
+
+    [Fact]
+    public void Edit_Cancelled_BlocksMemberAndManager()
+    {
+        var schedule = Daily();
+        var today = DateOnly.FromDateTime(MondayNoon);
+        var cancelled = Occ(schedule, today, "20:00", new TrainingOccurrences.Cancellation(today, "20:00", "Pool closed"));
+
+        Assert.Equal("This training is cancelled.", TrainingRsvpRules.EditBlockReason(cancelled, MondayNoon, isManager: false));
+        Assert.Equal("This training is cancelled.", TrainingRsvpRules.EditBlockReason(cancelled, MondayNoon, isManager: true));
+        // Смотреть отменённое можно — ответы на месте, тренеру видно, что отменил.
+        Assert.True(TrainingRsvpRules.IsViewable(cancelled, MondayNoon));
+    }
+
+    [Fact]
+    public void Edit_OneOff_AcceptsAnswerUntilStart()
+    {
+        var schedule = new GroupTrainingSchedule();   // расписания нет — только разовое
+        var today = DateOnly.FromDateTime(MondayNoon);
+        var oneOff = new TrainingOccurrences.OneOff(7, today, "20:00", "Underwater filming", "technique", "25m");
+        var occ = TrainingOccurrences.Find(schedule, [oneOff], [], today, "20:00");
+
+        Assert.NotNull(occ);
+        Assert.Null(TrainingRsvpRules.EditBlockReason(occ, MondayNoon, isManager: false));
+        Assert.Equal("This training has already started.",
+            TrainingRsvpRules.EditBlockReason(occ, today.ToDateTime(new TimeOnly(20, 0)), isManager: false));
     }
 
     // ── TrainingRsvpService ─────────────────────────────────────────────────
@@ -450,6 +487,156 @@ public class TrainingRsvpTests
 
         Assert.True(result.Success);
         Assert.Equal([today.AddDays(-3)], db.HubGroupTrainingRsvps.Select(r => r.SessionDate));
+    }
+
+    // ── Разовые занятия и отмена (Р9) ───────────────────────────────────────
+
+    private const string WedOneOffKey = "2026-09-30-1800";
+
+    /// <summary>Разовое занятие на среду 30.09 в 18:00 (в расписании Tue/Sat такого слота нет).</summary>
+    private static async Task<TrainingSession> AddOneOffAsync(SwimmDbContext db, int groupId, bool asks = true,
+        string start = "18:00", string title = "Underwater filming", string type = "technique", int day = 30)
+    {
+        var session = new TrainingSession
+        {
+            HubGroupId = groupId, ExternalTrainingId = "ui-" + Guid.NewGuid().ToString("N")[..12],
+            Date = DateTime.SpecifyKind(new DateTime(2026, 9, day), DateTimeKind.Utc), StartTime = start,
+            Title = title, Type = type, PoolType = "25m", AsksRsvp = asks,
+        };
+        db.TrainingSessions.Add(session);
+        await db.SaveChangesAsync();
+        return session;
+    }
+
+    [Fact]
+    public async Task OneOff_TakesAnAnswer_AndNextListsItBetweenScheduleSlots()
+    {
+        await using var db = CreateDb(nameof(OneOff_TakesAnAnswer_AndNextListsItBetweenScheduleSlots));
+        var s = await SeedAsync(db);
+        var oneOff = await AddOneOffAsync(db, s.GroupId);
+        await AddOneOffAsync(db, s.GroupId, asks: false, start: "19:00", title: "Plain record");   // без галки — не занятие
+        var service = new TrainingRsvpService(db);
+
+        var result = await service.SetAsync(s.GroupId, WedOneOffKey, s.Anna, false, Answer("yes"), MondayNoon);
+
+        var dto = Assert.IsType<TrainingRsvpDto>(result.Rsvp);
+        Assert.Equal((1, "yes", "Underwater filming", "technique", false), (dto.Yes, dto.Mine!.Answer, dto.Title, dto.Type, dto.Cancelled));
+        Assert.Equal(("18:00", (string?)null, true), (dto.Start, dto.End, dto.CanAnswer));
+
+        var next = await service.GetNextAsync(s.GroupId, MondayNoon);
+
+        Assert.Equal(["2026-09-29-2000", WedOneOffKey, "2026-10-03-1000"], next!.Select(n => n.Id));
+        var listed = next[1];
+        Assert.Equal((true, "Underwater filming", "technique", oneOff.Id, "25m"),
+            (listed.OneOff, listed.Title, listed.Type, listed.TrainingId, listed.PoolType));
+        Assert.False(next[0].OneOff);
+        Assert.Null(next[0].Title);
+        Assert.Equal("21:00", next[0].End);
+        // Без галки — такого занятия нет: ни ответа, ни строки в Next.
+        var plain = await service.SetAsync(s.GroupId, "2026-09-30-1900", s.Anna, false, Answer("yes"), MondayNoon);
+        Assert.Equal(400, plain.Status);
+        Assert.DoesNotContain(next, n => n.Id == "2026-09-30-1900");
+    }
+
+    [Fact]
+    public async Task OneOff_OnAScheduleSlotKey_IsOneOccurrence()
+    {
+        await using var db = CreateDb(nameof(OneOff_OnAScheduleSlotKey_IsOneOccurrence));
+        var s = await SeedAsync(db);
+        await AddOneOffAsync(db, s.GroupId, start: "20:00", title: "Test set night", type: "test-set", day: 29);   // вторник — слот 20:00
+        var service = new TrainingRsvpService(db);
+
+        var next = await service.GetNextAsync(s.GroupId, MondayNoon);
+
+        var tuesday = Assert.Single(next!, n => n.Id == TueKey);
+        Assert.Equal((false, "Test set night", "21:00"), (tuesday.OneOff, tuesday.Title, tuesday.End));   // End — от слота
+        Assert.Equal(3, next!.Count);
+    }
+
+    [Fact]
+    public async Task Cancel_BlocksAnswers_KeepsThem_RestoreBringsBack()
+    {
+        await using var db = CreateDb(nameof(Cancel_BlocksAnswers_KeepsThem_RestoreBringsBack));
+        var s = await SeedAsync(db);
+        var service = new TrainingRsvpService(db);
+        await service.SetAsync(s.GroupId, TueKey, s.Anna, false, Answer("yes"), MondayNoon);
+
+        var cancelled = await service.CancelAsync(s.GroupId, TueKey, s.Coach, "  Pool closed ", MondayNoon);
+
+        var dto = Assert.IsType<TrainingRsvpDto>(cancelled.Rsvp);
+        Assert.Equal((true, "Pool closed", false, 1), (dto.Cancelled, dto.CancelReason, dto.CanAnswer, dto.Yes));   // ответы на месте
+        var row = await db.HubGroupTrainingCancellations.SingleAsync();
+        Assert.Equal((s.GroupId, Tue, "20:00", s.Coach), (row.HubGroupId, row.Date, row.Start, row.CreatedByUserId));
+
+        // Ответить нельзя ни участнику, ни тренеру за участника.
+        var byMember = await service.SetAsync(s.GroupId, TueKey, s.Boris, false, Answer("yes"), MondayNoon);
+        var byCoach = await service.SetAsync(s.GroupId, TueKey, s.Coach, true, Answer("yes", userId: s.Boris), MondayNoon);
+        Assert.Equal((400, "This training is cancelled."), (byMember.Status, byMember.Error));
+        Assert.Equal(400, byCoach.Status);
+        Assert.Single(db.HubGroupTrainingRsvps);
+
+        // Смотреть можно, в Next остаётся с пометкой, ближайших не отменённых по-прежнему три.
+        var viewed = await service.GetAsync(s.GroupId, TueKey, s.Anna, false, MondayNoon);
+        Assert.True(viewed!.Cancelled);
+        var next = await service.GetNextAsync(s.GroupId, MondayNoon);
+        Assert.Equal(["2026-09-29-2000", "2026-10-03-1000", "2026-10-06-2000", "2026-10-10-1000"], next!.Select(n => n.Id));
+        Assert.Equal([true, false, false, false], next.Select(n => n.Cancelled));
+        Assert.Equal("Pool closed", next[0].CancelReason);
+
+        var restored = await service.RestoreAsync(s.GroupId, TueKey, s.Coach, MondayNoon);
+
+        Assert.Equal((false, null, true, 1), (restored.Rsvp!.Cancelled, restored.Rsvp.CancelReason, restored.Rsvp.CanAnswer, restored.Rsvp.Yes));
+        Assert.Empty(db.HubGroupTrainingCancellations);
+        var again = await service.SetAsync(s.GroupId, TueKey, s.Boris, false, Answer("yes"), MondayNoon);
+        Assert.Equal(2, again.Rsvp!.Yes);
+    }
+
+    [Fact]
+    public async Task Cancel_Twice_IsIdempotent_ReasonUpdated_RestoreOfNotCancelledIsOk()
+    {
+        await using var db = CreateDb(nameof(Cancel_Twice_IsIdempotent_ReasonUpdated_RestoreOfNotCancelledIsOk));
+        var s = await SeedAsync(db);
+        var service = new TrainingRsvpService(db);
+
+        Assert.Null((await service.CancelAsync(s.GroupId, TueKey, s.Coach, "Pool closed", MondayNoon)).Error);
+        var second = await service.CancelAsync(s.GroupId, TueKey, s.Coach, "Coach is ill", MondayNoon);
+        var noReason = await service.CancelAsync(s.GroupId, "2026-10-03-1000", s.Coach, null, MondayNoon);
+
+        Assert.Equal("Coach is ill", second.Rsvp!.CancelReason);
+        Assert.Equal(2, await db.HubGroupTrainingCancellations.CountAsync());
+        Assert.Null(noReason.Rsvp!.CancelReason);
+
+        Assert.Null((await service.RestoreAsync(s.GroupId, TueKey, s.Coach, MondayNoon)).Error);
+        Assert.Null((await service.RestoreAsync(s.GroupId, TueKey, s.Coach, MondayNoon)).Error);   // уже не отменено
+    }
+
+    [Fact]
+    public async Task Cancel_OneOff_Works_AndNothingExistingIs400()
+    {
+        await using var db = CreateDb(nameof(Cancel_OneOff_Works_AndNothingExistingIs400));
+        var s = await SeedAsync(db);
+        await AddOneOffAsync(db, s.GroupId);
+        var service = new TrainingRsvpService(db);
+
+        var oneOff = await service.CancelAsync(s.GroupId, WedOneOffKey, s.Coach, "Coach is ill", MondayNoon);
+        var nothing = await service.CancelAsync(s.GroupId, "2026-09-30-1900", s.Coach, null, MondayNoon);   // нет такого занятия
+        var tooFar = await service.CancelAsync(s.GroupId, "2026-11-10-2000", s.Coach, null, MondayNoon);    // вторник вне окна
+        var tooOld = await service.CancelAsync(s.GroupId, "2026-09-15-2000", s.Coach, null, MondayNoon);    // вторник 13 дней назад
+        var garbage = await service.CancelAsync(s.GroupId, "garbage", s.Coach, null, MondayNoon);
+        var longReason = await service.CancelAsync(s.GroupId, TueKey, s.Coach, new string('x', TrainingRsvpRules.CancelReasonMax + 1), MondayNoon);
+        var noGroup = await service.CancelAsync(9999, TueKey, s.Coach, null, MondayNoon);
+
+        Assert.True(oneOff.Rsvp!.Cancelled);
+        Assert.Equal((400, "There is no such training."), (nothing.Status, nothing.Error));
+        Assert.Equal(400, tooFar.Status);
+        Assert.Equal(400, tooOld.Status);
+        Assert.Equal(404, garbage.Status);
+        Assert.Equal(400, longReason.Status);
+        Assert.Equal(404, noGroup.Status);
+        Assert.Single(db.HubGroupTrainingCancellations);
+
+        var restored = await service.RestoreAsync(s.GroupId, "2026-09-30-1900", s.Coach, MondayNoon);
+        Assert.Equal(400, restored.Status);
     }
 
     private static DateTime IsraelTimeNow() => Swimm.Application.Constants.IsraelTime.ToLocal(DateTime.UtcNow);

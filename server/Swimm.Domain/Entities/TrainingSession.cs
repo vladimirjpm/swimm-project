@@ -81,6 +81,14 @@ public class TrainingSession
     [MaxLength(5)]
     public string? StartTime { get; set; }
 
+    /// <summary>
+    /// «Ask who's coming» (Р9, docs/plans/trainings-tab-redesign-plan.md): разовое занятие — тренировка
+    /// появляется в Next среди ближайших, на неё отвечают «иду / не уверен / не приду». Занятием
+    /// (occurrence) считается при <c>AsksRsvp &amp;&amp; StartTime != null</c>; без галки — просто запись
+    /// ленты. Ключ занятия — <c>yyyy-MM-dd-HHmm</c> (<c>TrainingRsvpRules.SessionKey</c>).
+    /// </summary>
+    public bool AsksRsvp { get; set; }
+
     /// <summary>Кто завёл кнопкой; null — залито скриптом (или аккаунт удалён — SetNull).</summary>
     public int? CreatedByUserId { get; set; }
 
