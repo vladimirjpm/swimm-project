@@ -473,7 +473,7 @@ Razor + Tailwind, Competitions/Categories CRUD, фоновый импорт.)
   неразложенные / тебя перенесли), акцентная (новые видео); пустые состояния. Сервер — лента
   (`stats`, `key_set_no`), `next_trainings`, «видел» (`Sys_HubGroupUserSeen`), `moved_from_lane`;
   миграции `AddTrainingKeySet`, `AddTrainingMarks`. План — [`plans/trainings-tab-redesign-plan.md`](plans/trainings-tab-redesign-plan.md).
-  Не сделано: меню статуса в Following с описаниями. Дополнено 01.10: **тип тренировки** (Р7) —
+  Меню статуса в Following с описаниями — доделано 02.10. Дополнено 01.10: **тип тренировки** (Р7) —
   фиксированный список swim / technique / dryland / open-water / test-set / other, выбор в форме,
   значок на карточке, фильтр ленты (миграция `AddTrainingSessionType`).
 
