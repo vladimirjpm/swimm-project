@@ -142,8 +142,10 @@ function SessionNav({ sessions }: { sessions: NextTraining[] }) {
   const current = sessions[index];
   if (!current) return null;
 
-  const first = index === 0;
-  const until = untilLabel(current.date, current.start, current.end);
+  // «NEXT» — у первого НЕ отменённого (как `group.next_training`), у отменённого отсчёта нет:
+  // «IN 2 DAYS» зелёным под «Cancelled» читался как «занятие будет».
+  const first = index === sessions.findIndex((s) => !s.cancelled);
+  const until = current.cancelled ? '' : untilLabel(current.date, current.start, current.end);
   const times = timeRangeLabel(current.start, current.end);
   const prev = () => setRollIndex(Math.max(0, index - 1));
   const next = () => setRollIndex(Math.min(sessions.length - 1, index + 1));
