@@ -260,6 +260,12 @@ training» с полным списком людей, под ней «Trainings 
   фильтрует `TrainingId == null`). «Save to My media» — отложено. Задание —
   `docs/tasks/training-media-swimmer-tag-sonnet.md`. **Сделано и принято 01.10.2026** (тесты
   InMemory + `TrainingMediaTagPgTests`, живая проверка тренером и участником).
+- **Р9. Разовые занятия и отмена занятия** (01.10.2026). Разовое — тренировка с галкой «Ask who's
+  coming» (`TrainingSession.AsksRsvp`), только будущая и с временем начала; отмена — таблица
+  `Sys_HubGroupTrainingCancellations` по ключу занятия «дата + начало», для занятий и расписания,
+  и разовых; ответы при отмене не удаляются. Разовые и отмены приватные: публичная (кэшируемая)
+  страница группы их не знает, своим — `GET …/next-trainings`. Делается одним заданием —
+  `docs/tasks/one-off-and-cancelled-trainings-sonnet.md`.
 
 ## 7. Как проверять
 
