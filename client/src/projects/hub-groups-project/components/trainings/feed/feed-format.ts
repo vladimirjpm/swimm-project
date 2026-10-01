@@ -1,4 +1,5 @@
 import type { TrainingSession, TrainingSet } from '../../../types';
+import { DEFAULT_TRAINING_TYPE, trainingTypeOf } from '../training-types';
 
 /**
  * Чистые функции подписей ленты тренировок (docs/tasks/trainings-tab-t4-sonnet.md): мета
@@ -51,6 +52,9 @@ export function formatKm(meters: number): string {
 /** Мета под названием: «20:00 · ⏱ times», «19:30 · no times · 3 links» (тренер), «nothing recorded». */
 export function trainingMeta(session: TrainingSession, manages: boolean): string {
   const out: string[] = [];
+  // Тип — первым, кроме обычной тренировки в воде: значок на каждой карточке был бы шумом.
+  const type = trainingTypeOf(session);
+  if (type.id !== DEFAULT_TRAINING_TYPE) out.push(`${type.glyph} ${type.label.toLowerCase()}`);
   if (session.start) out.push(session.start);
   const hasMedia = session.media.length > 0;
   if (session.has_results) out.push('⏱ times');

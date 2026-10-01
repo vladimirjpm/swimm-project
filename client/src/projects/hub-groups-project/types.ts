@@ -227,6 +227,12 @@ export interface TrainingMyKey {
   time: string;
 }
 
+/**
+ * Тип тренировки — фиксированный список сайта (решение Влада 01.10.2026), зеркало серверного
+ * `TrainingSessionType`. Подписи и значки — `components/trainings/training-types.ts`.
+ */
+export type TrainingType = 'swim' | 'technique' | 'dryland' | 'open-water' | 'test-set' | 'other';
+
 export interface TrainingSession {
   id: number;
   /** yyyy-MM-dd */
@@ -239,6 +245,8 @@ export interface TrainingSession {
   plan?: string | null;
   note?: string | null;
   pool_type?: string | null;
+  /** Тип; у ответов до 01.10.2026 поля нет — читать через `trainingTypeOf`. */
+  type?: TrainingType;
   /** Записаны времена: дату и бассейн не поменять, удалить нельзя. */
   has_results: boolean;
   created_in_app: boolean;
@@ -298,6 +306,8 @@ export interface TrainingSessionInput {
   start?: string | null;
   note?: string | null;
   pool_type?: string | null;
+  /** Не прислали — при создании swim, при правке не меняется. */
+  type?: TrainingType;
 }
 
 export interface TrainingSessionMediaInput {

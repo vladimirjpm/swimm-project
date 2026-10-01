@@ -5,6 +5,31 @@ using Microsoft.EntityFrameworkCore;
 namespace Swimm.Domain.Entities;
 
 /// <summary>
+/// Тип тренировки — фиксированный список на весь сайт (решение Влада 01.10.2026; заменяет решение
+/// 30.09 «отдельного типа нет»). Нужен ленте (фильтр, значок), видеоразбору пловца
+/// (<see cref="Technique"/>) и разовым занятиям в Next. Название тренировки (<see cref="TrainingSession.Title"/>)
+/// остаётся свободным текстом. Список меняется только кодом — и клиентским зеркалом
+/// <c>training-types.ts</c>.
+/// </summary>
+public static class TrainingSessionType
+{
+    /// <summary>Обычная тренировка в воде — по умолчанию, у залитых скриптом тоже.</summary>
+    public const string Swim = "swim";
+    /// <summary>Техника / видеоразбор.</summary>
+    public const string Technique = "technique";
+    /// <summary>Суша, ОФП.</summary>
+    public const string Dryland = "dryland";
+    public const string OpenWater = "open-water";
+    /// <summary>Контрольный сет / прикидка.</summary>
+    public const string TestSet = "test-set";
+    public const string Other = "other";
+
+    public static readonly IReadOnlyList<string> All = [Swim, Technique, Dryland, OpenWater, TestSet, Other];
+
+    public static bool IsKnown(string? type) => type != null && All.Contains(type);
+}
+
+/// <summary>
 /// Тренировочная сессия группы (SwimHub). ПРИВАТНЫЕ данные — таблица <c>Sys_TrainingSessions</c>,
 /// БЕЗ grant <c>swimm_ro</c>: видят только владелец/админ группы и (в перспективе) привязанный пловец.
 /// Соревнования тут НЕ хранятся — только тренировки. См. hubgroups-architecture.md §7.
@@ -47,6 +72,10 @@ public class TrainingSession
     /// </summary>
     [MaxLength(100)]
     public string? Title { get; set; }
+
+    /// <summary>Тип — <see cref="TrainingSessionType"/>; по умолчанию <see cref="TrainingSessionType.Swim"/>.</summary>
+    [Required, MaxLength(20)]
+    public string Type { get; set; } = TrainingSessionType.Swim;
 
     /// <summary>Начало «HH:mm» — связка с занятием расписания (ключ RSVP «дата + начало»); null — не задано.</summary>
     [MaxLength(5)]

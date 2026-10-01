@@ -274,7 +274,9 @@ train with us / Inactive — выпадашка у тренера в Following (
 
 **Тренер заводит тренировку кнопкой — и без времён** (Е1 плана
 [plans/group-events-media-plan.md](plans/group-events-media-plan.md), решение Влада 30.09.2026).
-Это та же `Sys_TrainingSessions` (отдельного типа «событие» нет): `Title` («Underwater filming»),
+Это та же `Sys_TrainingSessions` (отдельной сущности «событие» нет): `Title` («Underwater filming»),
+`Type` — тип из фиксированного списка (`TrainingSessionType`: swim · technique · dryland · open-water ·
+test-set · other, по умолчанию swim; решение Влада 01.10.2026, миграция `AddTrainingSessionType`),
 `StartTime` (связка с занятием расписания), `CreatedByUserId`, ключ `ui-…`. API
 `api/hub-groups/{id}/sessions` — читают управляющие и активные участники, меняют управляющие;
 тренировку с временами не удалить и не перенести на другую дату. К ней цепляется медиа

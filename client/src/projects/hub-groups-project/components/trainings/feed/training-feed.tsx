@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import type { TrainingSessionList, TrainingSessionSets } from '../../../types';
+import type { TrainingSessionList, TrainingSessionSets, TrainingType } from '../../../types';
 import { useTrainingsTab } from '../trainings-context';
 import TrainingsEmpty from '../trainings-empty';
+import { trainingTypeOf } from '../training-types';
 import FeedFilters, { type FeedFilter } from './feed-filters';
 import { monthKey } from './feed-format';
 import TrainingCard from './training-card';
@@ -40,24 +41,38 @@ export function NewTrainingButton({ height }: { height: number }) {
 function TrainingFeed({ data }: { data: TrainingSessionList }) {
   const { manages, isDesktop, sessions } = useTrainingsTab();
   const [filter, setFilter] = useState<FeedFilter>('all');
+  /** Тип тренировки из второго ряда чипов; null — все типы. */
+  const [typeFilter, setTypeFilter] = useState<TrainingType | null>(null);
   const [visible, setVisible] = useState(PAGE);
   const [expanded, setExpanded] = useState<number | null>(null);
   // Кэш сетов по тренировке: нет записи — ещё грузится, null — не удалось.
   const [setsCache, setSetsCache] = useState<Map<number, TrainingSessionSets | null>>(() => new Map());
 
   const all = data.sessions;
+  // Числа типов — по всей ленте; числа первого ряда — внутри выбранного типа (что увидишь, нажав).
+  const typeCounts: Partial<Record<TrainingType, number>> = {};
+  all.forEach((s) => { const t = trainingTypeOf(s).id; typeCounts[t] = (typeCounts[t] ?? 0) + 1; });
+  // Выбранный тип пропал из ленты (удалили тренировку) — фильтр по нему не держим.
+  const activeType = typeFilter && typeCounts[typeFilter] ? typeFilter : null;
+  const ofType = activeType ? all.filter((s) => trainingTypeOf(s).id === activeType) : all;
   const counts = {
-    all: all.length,
-    times: all.filter((s) => s.has_results).length,
-    videos: all.filter((s) => s.media.length > 0).length,
+    all: ofType.length,
+    times: ofType.filter((s) => s.has_results).length,
+    videos: ofType.filter((s) => s.media.length > 0).length,
   };
-  const filtered = filter === 'times' ? all.filter((s) => s.has_results)
-    : filter === 'videos' ? all.filter((s) => s.media.length > 0)
-      : all;
+  const filtered = filter === 'times' ? ofType.filter((s) => s.has_results)
+    : filter === 'videos' ? ofType.filter((s) => s.media.length > 0)
+      : ofType;
   const shown = filtered.slice(0, visible);
 
   const changeFilter = (next: FeedFilter) => {
     setFilter(next);
+    setVisible(PAGE);
+    setExpanded(null);
+  };
+
+  const changeType = (next: TrainingType | null) => {
+    setTypeFilter(next);
     setVisible(PAGE);
     setExpanded(null);
   };
@@ -103,6 +118,9 @@ function TrainingFeed({ data }: { data: TrainingSessionList }) {
           value={filter}
           counts={counts}
           onChange={changeFilter}
+          types={typeCounts}
+          type={activeType}
+          onType={changeType}
           coach={manages}
           isDesktop={isDesktop}
         />

@@ -1,13 +1,15 @@
 using System.Globalization;
 using Swimm.Application.Dtos;
+using Swimm.Domain.Entities;
 
 namespace Swimm.Application.Mapping;
 
 /// <summary>
 /// Тренировка, заведённая тренером кнопкой (docs/plans/group-events-media-plan.md, Е1): дата,
 /// название, по желанию начало, заметка, бассейн. Времён у неё может не быть вовсе — «сегодня нам
-/// делали подводную съёмку», к ней видео. Отдельного типа «событие» нет (решение Влада 30.09.2026):
-/// что это съёмка, видно из названия, а «есть ли времена» — из наличия результатов.
+/// делали подводную съёмку», к ней видео. «Есть ли времена» — из наличия результатов. Тип
+/// тренировки (<see cref="Swimm.Domain.Entities.TrainingSessionType"/>) — фиксированный список
+/// (решение Влада 01.10.2026; заменило решение 30.09 «отдельного типа нет»), название — свободное.
 /// </summary>
 public static class TrainingSessionRules
 {
@@ -33,7 +35,9 @@ public static class TrainingSessionRules
     /// <summary>Префикс натурального ключа у заведённых кнопкой (у залитых скриптом — «20251028»).</summary>
     public const string ExternalIdPrefix = "ui-";
 
-    public sealed record Normalized(DateOnly Date, string? StartTime, string Title, string? Note, string? PoolType);
+    /// <param name="Type">Тип; null — не прислали (создание — <c>swim</c>, правка — оставить как было).</param>
+    public sealed record Normalized(DateOnly Date, string? StartTime, string Title, string? Note, string? PoolType,
+        string? Type = null);
 
     /// <summary>Разобрать и проверить ввод; <c>Error</c> не null — отказ (400) с текстом для человека.</summary>
     public static (Normalized? Value, string? Error) Normalize(TrainingSessionInputDto input, DateOnly todayLocal)
@@ -63,7 +67,14 @@ public static class TrainingSessionRules
         var pool = string.IsNullOrWhiteSpace(input.PoolType) ? null : input.PoolType.Trim();
         if (pool?.Length > PoolTypeMax) return (null, "Pool type is too long (25m / 50m).");
 
-        return (new Normalized(date, start, title, note, pool), null);
+        string? type = null;
+        if (!string.IsNullOrWhiteSpace(input.Type))
+        {
+            type = input.Type.Trim().ToLowerInvariant();
+            if (!TrainingSessionType.IsKnown(type)) return (null, "Unknown training type.");
+        }
+
+        return (new Normalized(date, start, title, note, pool, type), null);
     }
 
     /// <summary>Натуральный ключ новой тренировки: уникален в группе, не число (клиент не спутает с датой источника).</summary>

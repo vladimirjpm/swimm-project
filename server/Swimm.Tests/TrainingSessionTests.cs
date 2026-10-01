@@ -13,8 +13,9 @@ namespace Swimm.Tests;
 /// <summary>
 /// Тренировки группы как записи (docs/plans/group-events-media-plan.md, Е1): тренер заводит
 /// тренировку кнопкой — и без времён («Underwater filming»), к ней потом видео. Решения Влада
-/// 30.09.2026: отдельного типа «событие» нет; удалить можно только тренировку без времён; у
-/// тренировки с временами дата и бассейн не меняются.
+/// 30.09.2026: удалить можно только тренировку без времён; у тренировки с временами дата и бассейн
+/// не меняются. Решение 01.10.2026: у тренировки есть тип из фиксированного списка
+/// (<see cref="TrainingSessionType"/>), по умолчанию swim; название — свободное.
 /// </summary>
 public class TrainingSessionTests
 {
@@ -22,8 +23,8 @@ public class TrainingSessionTests
     private static readonly DateOnly Today = new(2026, 9, 30);
 
     private static TrainingSessionInputDto Input(string? date = "2026-09-30", string? title = "Underwater filming",
-        string? start = null, string? note = null, string? pool = null) =>
-        new() { Date = date, Title = title, Start = start, Note = note, PoolType = pool };
+        string? start = null, string? note = null, string? pool = null, string? type = null) =>
+        new() { Date = date, Title = title, Start = start, Note = note, PoolType = pool, Type = type };
 
     // ── TrainingSessionRules ────────────────────────────────────────────────
 
@@ -59,6 +60,25 @@ public class TrainingSessionTests
         Assert.NotNull(TrainingSessionRules.Normalize(Input(title: new string('x', 101)), Today).Error);
         Assert.Null(TrainingSessionRules.Normalize(Input(title: new string('x', 100)), Today).Error);
     }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("  ", null)]
+    [InlineData(" Technique ", "technique")]
+    [InlineData("open-water", "open-water")]
+    public void Normalize_Type_KnownOrNotSent(string? type, string? expected)
+    {
+        var (value, error) = TrainingSessionRules.Normalize(Input(type: type), Today);
+
+        Assert.Null(error);
+        Assert.Equal(expected, value!.Type);
+    }
+
+    [Theory]
+    [InlineData("event")]
+    [InlineData("swimming")]
+    public void Normalize_Type_UnknownIsRejected(string type) =>
+        Assert.Equal("Unknown training type.", TrainingSessionRules.Normalize(Input(type: type), Today).Error);
 
     // ── TrainingSessionService ──────────────────────────────────────────────
 
@@ -195,6 +215,26 @@ public class TrainingSessionTests
         Assert.Equal(400, moved.Status);
         Assert.Equal(400, repooled.Status);
         Assert.Equal(("Sprint day", "19:30", "25m", true), (renamed.Session!.Title, renamed.Session.Start, renamed.Session.PoolType, renamed.Session.HasResults));
+    }
+
+    [Fact]
+    public async Task Type_DefaultSwim_ExplicitOnCreate_KeptWhenNotSent_ChangedWhenSent()
+    {
+        await using var db = CreateDb(nameof(Type_DefaultSwim_ExplicitOnCreate_KeptWhenNotSent_ChangedWhenSent));
+        var s = await SeedAsync(db);
+        var service = Service(db);
+
+        var plain = (await service.CreateAsync(s.GroupId, s.Coach, Input(), Today)).Session!;
+        var filming = (await service.CreateAsync(s.GroupId, s.Coach, Input(type: "technique"), Today)).Session!;
+        var kept = (await service.UpdateAsync(s.GroupId, filming.Id, s.Coach, Input(title: "Renamed"), Today)).Session!;
+        var changed = (await service.UpdateAsync(s.GroupId, filming.Id, s.Coach, Input(type: "dryland"), Today)).Session!;
+        // Залитая скриптом — тоже swim (значение по умолчанию сущности и миграции); тип у неё правится.
+        var seeded = (await service.UpdateAsync(s.GroupId, s.SeededSessionId, s.Coach,
+            Input("2026-09-28", "Test day", type: "test-set"), Today)).Session!;
+
+        Assert.Equal(("swim", "technique", "technique", "dryland", "test-set"),
+            (plain.Type, filming.Type, kept.Type, changed.Type, seeded.Type));
+        Assert.Equal("dryland", (await db.TrainingSessions.SingleAsync(x => x.Id == filming.Id)).Type);
     }
 
     [Fact]

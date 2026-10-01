@@ -59,6 +59,10 @@ public sealed class TrainingSessionDto
     [JsonPropertyName("pool_type")]
     public string? PoolType { get; set; }
 
+    /// <summary>Тип тренировки: swim / technique / dryland / open-water / test-set / other.</summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "swim";
+
     /// <summary>Есть записанные времена: дату и бассейн не поменять, удалить нельзя.</summary>
     [JsonPropertyName("has_results")]
     public bool HasResults { get; set; }
@@ -294,6 +298,10 @@ public sealed class TrainingSessionInputDto
     /// <summary>25m / 50m; пусто при создании — из расписания группы, при правке — не меняется.</summary>
     [JsonPropertyName("pool_type")]
     public string? PoolType { get; set; }
+
+    /// <summary>Тип тренировки (см. <c>TrainingSessionType</c>); пусто при создании — swim, при правке — не меняется.</summary>
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
 }
 
 /// <summary>Итог записи: либо тренировка, либо код отказа (400 / 404).</summary>

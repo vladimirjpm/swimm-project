@@ -106,6 +106,7 @@ public class TrainingSessionService : ITrainingSessionService
             Title = v.Title,
             Note = v.Note,
             PoolType = pool,
+            Type = v.Type ?? TrainingSessionType.Swim,
             CreatedByUserId = actorUserId,
             CreatedAt = DateTime.UtcNow,
         };
@@ -146,6 +147,7 @@ public class TrainingSessionService : ITrainingSessionService
         session.Title = v.Title;
         session.Note = v.Note;
         session.PoolType = pool;
+        if (v.Type != null) session.Type = v.Type;   // не прислали — оставить как было
         await _db.SaveChangesAsync();
 
         var media = await LoadMediaAsync(hubGroupId, [session.Id], new Viewer(actorUserId, IsManager: true));
@@ -372,6 +374,7 @@ public class TrainingSessionService : ITrainingSessionService
         Plan = string.IsNullOrWhiteSpace(s.Name) ? null : s.Name,
         Note = s.Note,
         PoolType = string.IsNullOrWhiteSpace(s.PoolType) ? null : s.PoolType,
+        Type = s.Type,
         HasResults = hasResults,
         KeySetNo = s.KeySetNo,
         CreatedInApp = s.ExternalTrainingId.StartsWith(TrainingSessionRules.ExternalIdPrefix, StringComparison.Ordinal),

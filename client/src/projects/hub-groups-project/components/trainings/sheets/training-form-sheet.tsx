@@ -2,12 +2,16 @@ import React, { useRef, useState } from 'react';
 import {
   DeepSheet, SheetButton, SheetError, SheetField, SheetFooter, SHEET_FIELD_CLS, SHEET_MONO_FIELD_CLS, SHEET_TEXTAREA_CLS,
 } from '../../../../components/deep/deep-sheet';
+import type { TrainingType } from '../../../types';
 import { todayInIsrael } from '../../lane-plans-api';
 import { useTrainingsTab } from '../trainings-context';
+import { DEFAULT_TRAINING_TYPE, TRAINING_TYPES, trainingTypeOf } from '../training-types';
 import type { TrainingsSheetProps } from '../trainings-sheets';
 
 /**
- * Форма тренировки (`new-training` / `edit-training`, тон coach): дата, старт, название, заметка.
+ * Форма тренировки (`new-training` / `edit-training`, тон coach): дата, старт, тип, название, заметка.
+ * Тип — фиксированный список (`training-types.ts`), по умолчанию Swim; правится и у тренировки с
+ * временами (дата и бассейн у неё закрыты, тип — нет).
  * Тренер заводит тренировку и без времён («Underwater filming») — потом цепляет к ней ссылки.
  * У тренировки с временами (`has_results`) дату не поменять — поле закрыто.
  *
@@ -28,6 +32,7 @@ function TrainingFormSheet({ sheet, onClose }: {
   const [title, setTitle] = useState(session?.title ?? session?.plan?.slice(0, 100) ?? '');
   const [start, setStart] = useState(session?.start ?? '');
   const [note, setNote] = useState(session?.note ?? '');
+  const [type, setType] = useState<TrainingType>(session ? trainingTypeOf(session).id : DEFAULT_TRAINING_TYPE);
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -37,7 +42,7 @@ function TrainingFormSheet({ sheet, onClose }: {
   const save = async () => {
     if (!canSave) return;
     setError(null);
-    const input = { date, title: title.trim(), start: start || null, note: note.trim() || null };
+    const input = { date, title: title.trim(), start: start || null, note: note.trim() || null, type };
     const e = session
       ? await sessions.update(session.id, { ...input, pool_type: session.pool_type ?? null })
       : await sessions.create(input);
@@ -83,6 +88,34 @@ function TrainingFormSheet({ sheet, onClose }: {
           Date is locked — this training has recorded times.
         </p>
       )}
+
+      <SheetField label="Type" group>
+        <div
+          className="grid grid-cols-3 gap-[2px] p-[2px]"
+          style={{ borderRadius: 12, background: 'var(--deep-seg-track)' }}
+          role="group"
+          aria-label="Training type"
+        >
+          {TRAINING_TYPES.map((t) => {
+            const on = type === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setType(t.id)}
+                className="inline-flex h-[36px] cursor-pointer items-center justify-center gap-1 border-0 px-1 text-[12px] font-extrabold"
+                style={on
+                  ? { background: 'var(--deep-ow)', color: 'var(--deep-accent-ink)', borderRadius: 10 }
+                  : { background: 'transparent', color: 'var(--t-text-2)', borderRadius: 10 }}
+              >
+                <span aria-hidden="true">{t.glyph}</span>
+                <span className="truncate">{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </SheetField>
 
       <SheetField label="Name">
         <input
