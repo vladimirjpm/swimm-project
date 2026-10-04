@@ -55,7 +55,18 @@ export default function CompetitionPersonalStrip({ overview, onOpenSwims, onOpen
         const r = await fetch('/api/me/media', { credentials: 'include' });
         if (!r.ok || cancelled) return;
         const items: AllUserMediaDto[] = await r.json();
-        setMyMedia(items.filter((m) => m.competition_id != null && dayIds.has(m.competition_id)));
+        // Склейка как у таба Media (`GetVisibleForResultsAsync`: GroupBy(ResultId, Url)) — иначе
+        // старые дубли одной ссылки полоса считает поштучно, а таб одной плиткой («MY MEDIA — 15»
+        // при 10 плитках, docs/plans/media-duplicates-handoff.md п.2). Новые дубли сервер уже не
+        // пускает (409), это про записи, заведённые до запрета.
+        const seen = new Set<string>();
+        setMyMedia(items.filter((m) => {
+          if (m.competition_id == null || !dayIds.has(m.competition_id)) return false;
+          const key = `${m.result_id ?? ''}|${m.url}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }));
       } catch { /* полоса живёт без медиа-счётчика */ }
     })();
     return () => { cancelled = true; };
