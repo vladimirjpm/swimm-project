@@ -2030,6 +2030,17 @@ public static class IsrOrgCompetitionParser
                                     }
                                 }
 
+                                // Точный дубль строки подряд — сбой экспорта источника, а не
+                                // второй заплыв (И10: одну дорожку в заплыве занимает один пловец
+                                // один раз). Живой случай — comp 1658 (loglig 11898): женский
+                                // 200 вольным напечатан каждой строкой дважды, места 1,1,3,3,5,5.
+                                // Вторую копию не берём, но пишем в журнал — он виден в превью.
+                                if (current.Results.Count > 0 && current.Results[^1] == res)
+                                {
+                                    Log($"  -> WARN exact duplicate row skipped (source printed it twice): '{entry}'");
+                                    continue;
+                                }
+
                                 current.Results.Add(res);
                                 if (res.BirthYear > 0 && res.Club.Length > 0) knownClubs.Add(res.Club);
                                 Log($"  -> Added result: {res.LastName} {res.FirstName}, time={res.Time}");
