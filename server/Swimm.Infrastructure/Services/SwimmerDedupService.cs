@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Services;
@@ -112,19 +113,14 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
             (!x.Sure, x.Distance, x.CanonicalName).CompareTo((!y.Sure, y.Distance, y.CanonicalName)));
 
         // Сироты: вообще без результатов (включая синтетические) и без единой связи.
-        var orphanIds = await OrphanQuery()
-            .Select(s => new SwimmerOrphan(
-                s.Id, (s.LastName + " " + s.FirstName).Trim(), s.BirthYear, s.Origin,
-                s.Club != null ? s.Club.Name : null))
-            .ToListAsync(ct);
-        report.Orphans.AddRange(orphanIds.OrderBy(o => o.Name, StringComparer.Ordinal));
+        report.Orphans.AddRange((await OrphansAsync(ct)).OrderBy(o => o.Name, StringComparer.Ordinal));
 
         return report;
     }
 
     public async Task<SwimmerOrphanCleanupReport> DeleteOrphansAsync(IReadOnlyCollection<int>? ids, CancellationToken ct = default)
     {
-        var orphanIds = await OrphanQuery().Select(s => s.Id).ToListAsync(ct);
+        var orphanIds = (await OrphansAsync(ct)).Select(o => o.Id).ToList();
         var orphanSet = orphanIds.ToHashSet();
 
         List<int> toDelete;
@@ -162,7 +158,11 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
     /// ⚠ CompetitionEntries — тот же класс ошибки, и он появился раньше, чем данные: пловец,
     /// заведённый из СТАРТОВОГО протокола, до первого своего заплыва не числится нигде больше.
     /// Без этой строки чистка сирот удаляла бы ровно тех новичков, ради родителей которых
-    /// фича и делается (docs/plans/start-list-plan.md §2, вариант C).</summary>
+    /// фича и делается (docs/plans/start-list-plan.md §2, вариант C).
+    ///
+    /// ⚠ Держателей рекордов этот запрос НЕ видит: ссылки на карточку у рекорда нет, связь —
+    /// по имени. Их отсекает <see cref="OrphansAsync"/> — пользоваться надо им, а не запросом
+    /// напрямую.</summary>
     private IQueryable<Swimm.Domain.Entities.Swimmer> OrphanQuery() =>
         db.Swimmers.AsNoTracking()
             .Where(s => s.SwimmerOrgId == null || !s.SwimmerOrgId.StartsWith("SYNTH-"))
@@ -176,6 +176,57 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
                 && !db.TrainingResults.Any(t => t.SwimmerId == s.Id)
                 && !db.CompetitionEntries.Any(e => e.SwimmerId == s.Id)
                 && !db.AppUsers.Any(u => u.SwimmerId == s.Id));
+
+    /// <summary>
+    /// Сироты для отчёта и для удаления — ОДИН список: <see cref="OrphanQuery"/> минус
+    /// держатели рекордов.
+    ///
+    /// Держатель рекорда без заплывов — не сирота, хотя ссылок на него нет: справочник
+    /// `Records` связан с карточкой по ИМЕНИ, и из неё берётся латиница держателя на экранах
+    /// рекордов (`RecordRepository.HolderLatinNamesAsync`). Такие карточки заведены
+    /// намеренно 17–19.09 («Имена держателей»); удали одну — у рекорда пропадёт латиница
+    /// (И-35). Висели в Health сиротами (#62871, #62873, #62874, #62876), и кнопка «удалить
+    /// сирот» стёрла бы их молча (решение Влада 06.10.2026, И-41).
+    ///
+    /// Сопоставление — тем же ключом, что у латиницы держателя: <see cref="HolderLatinName.Normalize"/>,
+    /// обе перестановки «имя фамилия», эстафетный состав делится по запятой. Ошибка в сторону
+    /// «держатель» безопасна: карточка просто не попадёт под чистку.
+    /// </summary>
+    private async Task<List<SwimmerOrphan>> OrphansAsync(CancellationToken ct)
+    {
+        var candidates = await OrphanQuery()
+            .Select(s => new
+            {
+                s.Id, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn, s.BirthYear, s.Origin,
+                Club = s.Club != null ? s.Club.Name : null,
+            })
+            .ToListAsync(ct);
+        if (candidates.Count == 0) return [];
+
+        var holders = await db.Records.AsNoTracking()
+            .Select(r => new { r.HolderName, r.HolderNameEn })
+            .Distinct()
+            .ToListAsync(ct);
+        var holderKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var h in holders)
+            foreach (var name in new[] { h.HolderName, h.HolderNameEn })
+                foreach (var part in (name ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    holderKeys.Add(HolderLatinName.Normalize(part));
+
+        bool Holds(string? first, string? last)
+        {
+            first = (first ?? "").Trim();
+            last = (last ?? "").Trim();
+            if (first.Length == 0 && last.Length == 0) return false;
+            return holderKeys.Contains(HolderLatinName.Normalize($"{first} {last}"))
+                || holderKeys.Contains(HolderLatinName.Normalize($"{last} {first}"));
+        }
+
+        return candidates
+            .Where(c => !Holds(c.FirstName, c.LastName) && !Holds(c.FirstNameEn, c.LastNameEn))
+            .Select(c => new SwimmerOrphan(c.Id, $"{c.LastName} {c.FirstName}".Trim(), c.BirthYear, c.Origin, c.Club))
+            .ToList();
+    }
 
     /// <summary>Нормализация как в dedup-report.sql: trim/lower, финальные ивритские буквы,
     /// гереш ׳/гершаим ״ → ASCII, схлопнуть пробелы.</summary>
