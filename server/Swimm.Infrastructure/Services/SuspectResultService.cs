@@ -32,7 +32,7 @@ public class SuspectResultService(SwimmDbContext db) : ISuspectResultService
             .ToListAsync(ct);
 
         var verdicts = SuspectResultDetector.Detect(
-                rows, await LoadPersonalHistoryAsync(rows, ct), await LoadWorldBestsAsync(ct))
+                rows, await LoadPersonalHistoryAsync(rows, ct), await LoadWorldBestsAsync(db, ct))
             .ToDictionary(v => v.ResultId);
 
         // Трекаем только то, что может измениться: уже помеченные + новые кандидаты.
@@ -105,9 +105,10 @@ public class SuspectResultService(SwimmDbContext db) : ISuspectResultService
     /// Мировые рекорды из справочника <c>Records</c> — тот же источник, что у попапа
     /// Normative Info. Раньше пороги лежали копией в коде и не знали про бассейн; сверка
     /// 25-метрового заплыва с рекордом длинной воды дала две ложные пометки на зимнем
-    /// чемпионате (docs/data-integrity.md, И-13).
+    /// чемпионате (docs/data-integrity.md, И-13). Общий с проверкой рекордов в превью
+    /// (<see cref="PreviewRecordCheckService"/>) — второй копии запроса не заводим.
     /// </summary>
-    private async Task<WorldBestReference> LoadWorldBestsAsync(CancellationToken ct)
+    internal static async Task<WorldBestReference> LoadWorldBestsAsync(SwimmDbContext db, CancellationToken ct)
     {
         var rows = await db.Records.AsNoTracking()
             .Where(r => r.RegionType == "world")

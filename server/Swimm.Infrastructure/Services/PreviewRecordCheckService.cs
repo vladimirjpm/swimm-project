@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Application.Validation;
 using Swimm.Infrastructure.Data;
 
@@ -11,8 +12,10 @@ namespace Swimm.Infrastructure.Services;
 /// Сверка подозрительных заплывов превью с карточкой пловца на loglig.
 ///
 /// Логика простая и держится на одном факте: протокол мы качаем С LOGLIG, значит время из
-/// него обязано быть и в карточке пловца. Совпало — рекорд настоящий, помечать нечего; в
-/// карточке время ХУЖЕ — почти наверняка разбор поехал (эталон: 00:32.59 на 100 баттерфляем).
+/// него обязано быть и в карточке пловца. В карточке время ХУЖЕ — почти наверняка разбор
+/// поехал (эталон: 00:32.59 на 100 баттерфляем). Совпало — значит, разобрали верно, но НЕ что
+/// время настоящее: ошибку федерации loglig повторяет. Её ловят мировой рекорд и уровень
+/// пловца (<see cref="RecordCheckComparer"/>, И-40).
 ///
 /// Пловца превью в БД может не быть вовсе: соревнование ещё не импортировано. Тогда ни
 /// проверять, ни привязывать нечего — так и говорим.
@@ -67,6 +70,10 @@ public class PreviewRecordCheckService : IPreviewRecordCheckService
         // и избавляет от ручного ввода id для тех, кто есть, но не привязан.
         var fromProtocol = await LoadProtocolIdsAsync(discoveredRow?.LogligId, swims, ct);
 
+        // Мировые рекорды — проверка, которой loglig не нужен: время быстрее рекорда — ошибка
+        // протокола, с чем бы оно ни совпадало (И-40).
+        var worldBests = await SuspectResultService.LoadWorldBestsAsync(_db, ct);
+
         var cards = new Dictionary<int, LogligPlayerCard?>();
         var result = new List<PreviewRecordCheckRow>();
 
@@ -90,9 +97,12 @@ public class PreviewRecordCheckService : IPreviewRecordCheckService
 
             if (logligId is not int id)
             {
+                var (noIdVerdict, noIdMessage) = RecordCheckComparer.CheckWorldBest(
+                        swim.StyleName, swim.Distance, swim.PoolType, swim.Gender, swim.Time, worldBests)
+                    ?? (RecordCheckVerdict.NotChecked, NoIdMessage(match, matches.Count));
                 result.Add(new PreviewRecordCheckRow(
                     swim.RowIndex, swim.SwimmerName, match, swimmer?.Id, null, null, swimmer?.Gender,
-                    RecordCheckVerdict.NotChecked, NoIdMessage(match, matches.Count)));
+                    noIdVerdict, noIdMessage));
                 continue;
             }
 
@@ -103,7 +113,7 @@ public class PreviewRecordCheckService : IPreviewRecordCheckService
             }
 
             var url = _loglig.BuildPublicProfileUrl(id, seasonId, resultsTab: true);
-            var (verdict, message) = Compare(card, swim);
+            var (verdict, message) = Compare(card, swim, worldBests);
 
             // Приписка о том, что делать с самим id: привязать, или ждать импорта, или выбрать
             // из тёзок. Без неё вердикт есть, а следующего шага не видно.
@@ -187,12 +197,16 @@ public class PreviewRecordCheckService : IPreviewRecordCheckService
     }
 
     /// <summary>Итог сверки одного заплыва с карточкой. Сама логика — чистая функция
-    /// <see cref="RecordCheckComparer"/>, здесь только «карточки нет».</summary>
+    /// <see cref="RecordCheckComparer"/>, здесь только «карточки нет» (мировой рекорд
+    /// проверяется и тогда).</summary>
     private static (RecordCheckVerdict Verdict, string Message) Compare(
-        LogligPlayerCard? card, ImportRecordPreviewRow swim)
+        LogligPlayerCard? card, ImportRecordPreviewRow swim, WorldBestReference worldBests)
         => card is null
-            ? (RecordCheckVerdict.NotChecked, "Карточка loglig недоступна — проверьте по ссылке руками.")
-            : RecordCheckComparer.Compare(card.Results, swim.StyleName, swim.Distance, swim.PoolType, swim.Time);
+            ? RecordCheckComparer.CheckWorldBest(
+                  swim.StyleName, swim.Distance, swim.PoolType, swim.Gender, swim.Time, worldBests)
+              ?? (RecordCheckVerdict.NotChecked, "Карточка loglig недоступна — проверьте по ссылке руками.")
+            : RecordCheckComparer.Compare(
+                card.Results, swim.StyleName, swim.Distance, swim.PoolType, swim.Time, swim.Gender, worldBests);
 
     /// <summary>
     /// Кандидаты из БД по годам рождения строк превью. Грузим узко (по годам), а сопоставляем
