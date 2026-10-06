@@ -47,6 +47,9 @@ public enum BulkPullVerdict
 /// <param name="IsChampionship">Чемпионат Израиля (по имени или регламенту).</param>
 /// <param name="PointRuleClubsId">Правило клубных очков, подобранное по фактической шкале loglig.</param>
 /// <param name="PoolType">Длина бассейна, распознанная парсером («25m»/«50m»).</param>
+/// <param name="Queued">Строка уже отправлена в импорт из этой пачки: разбор отдан очереди
+/// и удалён, повторно импортировать её нечем. Без признака панель после перезагрузки рисовала
+/// такие строки отмеченными — и пачка выглядела новым предложением (06.10.2026).</param>
 public sealed record BulkPullRowDto(
     int DiscoveredId,
     int OrgCompId,
@@ -65,7 +68,8 @@ public sealed record BulkPullRowDto(
     bool HasClubStanding,
     bool IsChampionship,
     int? PointRuleClubsId,
-    string? PoolType);
+    string? PoolType,
+    bool Queued = false);
 
 /// <summary>Состояние пачки: сколько сделано и что получилось.</summary>
 /// <param name="BatchId">Ключ пачки; переживает перезагрузку страницы (sessionStorage).</param>

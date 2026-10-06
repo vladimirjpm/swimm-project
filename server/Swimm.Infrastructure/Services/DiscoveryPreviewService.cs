@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
@@ -15,6 +16,10 @@ namespace Swimm.Infrastructure.Services;
 /// </summary>
 public class DiscoveryPreviewService : IDiscoveryPreviewService
 {
+    /// <summary>Признак мастерс-строки в JSON разбора — и строкой («"true"»), и булевым.</summary>
+    internal static readonly Regex MastersFlagRx =
+        new(@"""is_masters""\s*:\s*""?true""?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     /// <summary>
     /// Сколько живёт отложенный разбор. Было 15 минут (одиночный поток: затянул — сразу
     /// импортировал), стало 60: в пакете два десятка строк тянутся минутами, и первый разбор
@@ -233,8 +238,11 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
                 : Quote(analysis!, "championship", "регламент чемпионата Израиля")
                   + " + в названии есть «אליפות»";
 
-        // Мастерс: признак стоит у строк файла — парсер уже разметил их при разборе.
-        var isMasters = parsed.ResultsJson.Contains("\"is_masters\":true", StringComparison.OrdinalIgnoreCase);
+        // Мастерс: признак стоит у строк файла — парсер уже разметил их при разборе (по имени
+        // файла или по названию соревнования в шапке PDF, IsrOrgParser.IsMastersFile).
+        // ⚠ Парсер пишет его СТРОКОЙ («"is_masters":"true"», Models.Result.IsMasters — string),
+        // а проверка ждала голое true — и не срабатывала никогда (comp 6595, 06.10.2026).
+        var isMasters = MastersFlagRx.IsMatch(parsed.ResultsJson);
         if (isMasters) reasons["isMasters"] = "в файле есть мастерс-заплывы";
 
         // «Зачёт не ведётся» предлагаем, только когда мы ТОЧНО знаем, что его нет: null —

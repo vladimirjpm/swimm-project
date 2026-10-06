@@ -84,6 +84,21 @@ export interface SwimmerBestTime {
   isCareerBest: boolean;
   /** Мастерс-старт: у разряда своя таблица нормативов с возрастными полосами. */
   isMasters: boolean;
+  /**
+   * Самый быстрый помеченный заплыв той же дисциплины в сезоне — показывается РЯДОМ с
+   * лучшим временем (лучшее считается без него). null — такого нет.
+   */
+  underReview?: SwimmerUnderReviewSwim | null;
+}
+
+/** Помеченное время рядом с лучшим (`/best-times` → `underReview`). */
+export interface SwimmerUnderReviewSwim {
+  time?: string | null;
+  timeMs?: number | null;
+  quality: SwimQualityDto;
+  date: string;
+  competition: CompetitionRef;
+  resultId: number;
 }
 
 export interface SwimmerPersonalBest {
@@ -383,6 +398,13 @@ export const useSwimmerSummary = (id: number | null, season: number | null, enab
 export const useSwimmerBestTimes = (id: number | null, season: number | null, enabled = true) =>
   useJson<SwimmerBestTime[]>(
     id != null && enabled ? `/api/swimmers/${id}/best-times?season=${seasonParam(season)}` : null);
+
+/**
+ * Вид «Under review»: все помеченные заплывы карьеры (сезона нет — их единицы). Форма строки
+ * та же, что у Best time. Запрос уходит, только когда вид открыт и такие заплывы есть.
+ */
+export const useSwimmerUnderReview = (id: number | null, enabled = true) =>
+  useJson<SwimmerBestTime[]>(id != null && enabled ? `/api/swimmers/${id}/under-review` : null);
 
 export const useSwimmerPersonalBests = (id: number | null, poolType: string, enabled = true) =>
   useJson<SwimmerPersonalBest[]>(

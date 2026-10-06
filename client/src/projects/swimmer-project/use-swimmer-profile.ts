@@ -103,6 +103,8 @@ export interface SwimmerProfile {
   recordsHeld?: number;
   /** Сами рекорды — из них же считается recordsHeld. */
   records?: SwimmerHeldRecord[];
+  /** Помеченных ошибок протокола за карьеру; больше нуля — у таба Results есть вид «Under review». */
+  underReviewCount?: number;
   seasons?: SwimmerSeasonOption[];
 }
 

@@ -67,6 +67,8 @@ public static class SwimmerPageBuilder
         {
             Season = season,
             Label = season is null ? "career" : SeasonMath.Label(season.Value),
+            // Очки — как напечатаны в протоколе, помеченные заплывы тоже (Р76): данные протокола
+            // показываем везде, оговорку несёт пометка строки, а не пропажа цифры.
             Points = rows.Sum(r => r.InternationalPoints),
             Swims = rows.Count,
             // Дисциплины считаются ТЕМ ЖЕ ключом, что строки таба Results (без категории
@@ -130,53 +132,113 @@ public static class SwimmerPageBuilder
     /// Категория заплыва в ключ строки НЕ входит (три зачёта Маккабиады на 50 вольным дают
     /// одну строку «лучшее на 50»), в отличие от детекции личных рекордов, где она нужна.
     /// </summary>
+    ///
+    /// Помеченные заплывы (<c>SuspectReason</c>) лучшими не становятся, но и не исчезают
+    /// (решение Влада 06.10.2026): самый быстрый из них встаёт в поле <c>underReview</c>
+    /// строки своей дисциплины — рядом с лучшим временем. Дисциплина, где засчитанного
+    /// времени нет вовсе, получает строку из самого помеченного заплыва (с <c>quality</c>,
+    /// без очков) — в конце списка, после настоящих лучших.
+    /// </summary>
     public static List<SwimmerBestTimeDto> BestTimes(
         IReadOnlyList<SeasonSwimRow> allRows, int? season, int birthYear)
     {
         var careerBest = BestPerDiscipline(allRows);
-        var seasonBest = BestPerDiscipline(InSeason(allRows, season));
+        var inSeason = InSeason(allRows, season);
+        var seasonBest = BestPerDiscipline(inSeason);
+        var flagged = FastestFlaggedPerDiscipline(inSeason);
 
-        return seasonBest.Values
+        var best = seasonBest.Values
             .OrderByDescending(r => r.InternationalPoints)
             .ThenBy(r => r.StyleName)
             .Select(r =>
             {
                 var key = SeasonAggregator.DisciplineKey(r);
-                var quality = Quality(r);
-                return new SwimmerBestTimeDto
-                {
-                    DisciplineKey = key,
-                    StyleId = r.StyleId,
-                    Stroke = r.StyleName,
-                    Distance = r.Distance,
-                    PoolType = r.PoolType,
-                    WaterKind = PoolWaterKind,
-                    Time = r.TimeOriginal,
-                    TimeMs = r.TimeMilliseconds,
-                    Quality = quality,
-                    // Помеченное время в зачёт не идёт: очки прячем, чтобы дуга уровня и
-                    // подпись «Points» не показывали достижение, которого не было.
-                    Points = quality is null ? r.InternationalPoints : null,
-                    Place = r.Position,
-                    // Место показываем как в протоколе, включая предварительные; медаль по
-                    // нему НЕ выводится — её считает единое правило на клиенте
-                    // (`HelperResults.isMedalPlace`) из четырёх признаков ниже.
-                    HeatType = r.HeatType,
-                    Round = r.Round,
-                    TimeFail = r.TimeFail,
-                    CompetitionIsAward = r.IsAward,
-                    // Возраст в сезоне ЗАПЛЫВА, а не на его дату: осенний и весенний старты
-                    // одного сезона обязаны показывать один возраст.
-                    AgeInSeason = SeasonMath.AgeInSeason(SeasonAggregator.SeasonOf(r), birthYear),
-                    Splits = string.IsNullOrWhiteSpace(r.TimeSplit) ? null : r.TimeSplit,
-                    Date = r.CompetitionDate.ToString("yyyy-MM-dd"),
-                    Competition = CompetitionRef(r),
-                    ResultId = r.ResultId,
-                    IsCareerBest = careerBest.TryGetValue(key, out var best) && best.ResultId == r.ResultId,
-                    IsMasters = r.IsMasters,
-                };
-            })
+                var dto = BestTimeRow(r, birthYear,
+                    isCareerBest: careerBest.TryGetValue(key, out var top) && top.ResultId == r.ResultId);
+                if (flagged.TryGetValue(key, out var f)) dto.UnderReview = UnderReviewSwim(f);
+                return dto;
+            });
+
+        var flaggedOnly = flagged
+            .Where(kv => !seasonBest.ContainsKey(kv.Key))
+            .Select(kv => kv.Value)
+            .OrderBy(r => r.StyleName)
+            .ThenBy(r => r.TimeMilliseconds)
+            .Select(r => BestTimeRow(r, birthYear, isCareerBest: false));
+
+        return best.Concat(flaggedOnly).ToList();
+    }
+
+    /// <summary>
+    /// Вид «Under review» таба Results: все помеченные заплывы карьеры, от новых к старым.
+    /// Форма строки — та же, что у Best time, чтобы клиент рисовал её тем же рядом.
+    /// </summary>
+    public static List<SwimmerBestTimeDto> UnderReview(IReadOnlyList<SeasonSwimRow> allRows, int birthYear) =>
+        allRows
+            .Where(IsUnderReview)
+            .OrderByDescending(r => r.CompetitionDate)
+            .ThenBy(r => r.ResultId)
+            .Select(r => BestTimeRow(r, birthYear, isCareerBest: false))
             .ToList();
+
+    /// <summary>Заплыв помечен как ошибка протокола — общее правило счётчика и списка.</summary>
+    public static bool IsUnderReview(SeasonSwimRow row) => row.SuspectReason is not null;
+
+    /// <summary>
+    /// Самый быстрый помеченный ЛИЧНЫЙ заплыв с временем в каждой дисциплине — тем же ключом,
+    /// что и лучшие (<see cref="SeasonAggregator.DisciplineKey(SeasonSwimRow, bool)"/>).
+    /// </summary>
+    private static Dictionary<string, SeasonSwimRow> FastestFlaggedPerDiscipline(IEnumerable<SeasonSwimRow> rows) =>
+        rows
+            .Where(r => IsUnderReview(r) && !r.IsRelay && !r.TimeFail && r.TimeMilliseconds is > 0)
+            .GroupBy(r => SeasonAggregator.DisciplineKey(r))
+            .ToDictionary(g => g.Key, g => g.OrderBy(r => r.TimeMilliseconds).ThenBy(r => r.ResultId).First());
+
+    private static SwimmerUnderReviewSwimDto UnderReviewSwim(SeasonSwimRow r) => new()
+    {
+        Time = r.TimeOriginal,
+        TimeMs = r.TimeMilliseconds,
+        Quality = Quality(r)!,
+        Date = r.CompetitionDate.ToString("yyyy-MM-dd"),
+        Competition = CompetitionRef(r),
+        ResultId = r.ResultId,
+    };
+
+    private static SwimmerBestTimeDto BestTimeRow(SeasonSwimRow r, int birthYear, bool isCareerBest)
+    {
+        var quality = Quality(r);
+        return new SwimmerBestTimeDto
+        {
+            DisciplineKey = SeasonAggregator.DisciplineKey(r),
+            StyleId = r.StyleId,
+            Stroke = r.StyleName,
+            Distance = r.Distance,
+            PoolType = r.PoolType,
+            WaterKind = PoolWaterKind,
+            Time = r.TimeOriginal,
+            TimeMs = r.TimeMilliseconds,
+            Quality = quality,
+            // Очки напечатаны в протоколе — показываем и у помеченного времени (Р76). Достижением
+            // его делает не цифра, а наши метки: BEST и дугу уровня клиент у такой строки не рисует.
+            Points = r.InternationalPoints,
+            Place = r.Position,
+            // Место показываем как в протоколе, включая предварительные; медаль по
+            // нему НЕ выводится — её считает единое правило на клиенте
+            // (`HelperResults.isMedalPlace`) из четырёх признаков ниже.
+            HeatType = r.HeatType,
+            Round = r.Round,
+            TimeFail = r.TimeFail,
+            CompetitionIsAward = r.IsAward,
+            // Возраст в сезоне ЗАПЛЫВА, а не на его дату: осенний и весенний старты
+            // одного сезона обязаны показывать один возраст.
+            AgeInSeason = SeasonMath.AgeInSeason(SeasonAggregator.SeasonOf(r), birthYear),
+            Splits = string.IsNullOrWhiteSpace(r.TimeSplit) ? null : r.TimeSplit,
+            Date = r.CompetitionDate.ToString("yyyy-MM-dd"),
+            Competition = CompetitionRef(r),
+            ResultId = r.ResultId,
+            IsCareerBest = isCareerBest,
+            IsMasters = r.IsMasters,
+        };
     }
 
     /// <summary>
@@ -449,7 +511,7 @@ public static class SwimmerPageBuilder
                 TimeMs = r.TimeMilliseconds,
                 IsPb = pbIds.Contains(r.ResultId),
                 Quality = quality,
-                Points = quality is null ? r.InternationalPoints : null,
+                Points = r.InternationalPoints,   // как в протоколе, и у помеченных (Р76)
                 Place = r.Position,
                 HeatType = r.HeatType,
                 Season = SeasonAggregator.SeasonOf(r),

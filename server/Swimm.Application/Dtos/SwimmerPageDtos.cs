@@ -160,7 +160,7 @@ public sealed class SwimmerBestTimeDto
     [JsonPropertyName("quality")]
     public SwimQualityDto? Quality { get; set; }
 
-    /// <summary>Очки FINA. null у помеченного времени — оно в зачёт не идёт.</summary>
+    /// <summary>Очки FINA как в протоколе — и у помеченного времени (Р76).</summary>
     [JsonPropertyName("points")]
     public int? Points { get; set; }
 
@@ -214,6 +214,37 @@ public sealed class SwimmerBestTimeDto
     [JsonPropertyName("isMasters")]
     public bool IsMasters { get; set; }
 
+    /// <summary>
+    /// Самый быстрый ПОМЕЧЕННЫЙ заплыв той же дисциплины в том же сезоне — показывается
+    /// РЯДОМ с лучшим временем, а не вместо него: лучшее считается без помеченных, но
+    /// пловец (родитель) видит, что в протоколе стоит ещё и это время. null — такого нет.
+    /// У строки, где засчитанного времени нет вовсе, поле пустое: помеченный заплыв там
+    /// сам занимает строку (со своим <c>quality</c>; очки — как в протоколе, Р76).
+    /// </summary>
+    [JsonPropertyName("underReview")]
+    public SwimmerUnderReviewSwimDto? UnderReview { get; set; }
+}
+
+/// <summary>Помеченное время рядом с лучшим — минимум, чтобы подписать и сослаться.</summary>
+public sealed class SwimmerUnderReviewSwimDto
+{
+    [JsonPropertyName("time")]
+    public string? Time { get; set; }
+
+    [JsonPropertyName("timeMs")]
+    public int? TimeMs { get; set; }
+
+    [JsonPropertyName("quality")]
+    public SwimQualityDto Quality { get; set; } = new();
+
+    [JsonPropertyName("date")]
+    public string Date { get; set; } = string.Empty;
+
+    [JsonPropertyName("competition")]
+    public SwimmerCompetitionRefDto Competition { get; set; } = new();
+
+    [JsonPropertyName("resultId")]
+    public long ResultId { get; set; }
 }
 
 /// <summary>

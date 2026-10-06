@@ -167,6 +167,8 @@ function ResultsTable() {
     let bestInfo: import('../../store/store').BestLevelInfo | null = null;
 
     for (const res of baseFilteredResults) {
+      // Ошибка протокола уровня не даёт: иначе кнопка фильтра звала бы к «KMS» за 1:53 у 13-летнего.
+      if (res.suspect_reason) continue;
       const isMaster = Helper.isResultMasters(isMastersSource, res.event_style_age);
       const resolvedGender = Helper.resolveGender(res.event_style_gender);
       const levelInfo = Helper.getNormativeLevelInfo({
@@ -202,6 +204,7 @@ function ResultsTable() {
     if (!level_filter || level_filter === 'all') return baseFilteredResults;
 
     return baseFilteredResults.filter((res) => {
+      if (res.suspect_reason) return false; // уровня нет — см. bestLevelInfo выше
       const isMaster = Helper.isResultMasters(isMastersSource, res.event_style_age);
       const resolvedGender = Helper.resolveGender(res.event_style_gender);
       const levelInfo = Helper.getNormativeLevelInfo({
@@ -573,15 +576,18 @@ function ResultsTable() {
                   },
                   timeToMs(res.time),
                 );
-              const levelInfo = Helper.getNormativeLevelInfo({
-                gender: genderForRecord,
-                poolType: Helper.resolvePoolType(res.pool_type),
-                styleName: res.event_style_name,
-                distance: `${res.event_style_len}m`,
-                time: Helper.parseTimeToSeconds(res.time),
-                isMaster,
-                event_style_age: res.event_style_age,
-              });
+              // Та же логика и для дуги уровня: у помеченного заплыва она пустая, как в `SwimRow`.
+              const levelInfo = isSuspect
+                ? Helper.noLevelInfo()
+                : Helper.getNormativeLevelInfo({
+                  gender: genderForRecord,
+                  poolType: Helper.resolvePoolType(res.pool_type),
+                  styleName: res.event_style_name,
+                  distance: `${res.event_style_len}m`,
+                  time: Helper.parseTimeToSeconds(res.time),
+                  isMaster,
+                  event_style_age: res.event_style_age,
+                });
 
               const swimmerId = res.swimmer_id;
               const isFav = isAuthenticated && swimmerId != null && favoriteSwimmerIds.has(swimmerId);

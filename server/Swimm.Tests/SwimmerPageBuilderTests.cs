@@ -199,7 +199,7 @@ public class SwimmerPageBuilderTests
     }
 
     [Fact]
-    public void BestTimes_FlaggedSwim_IsNotABest_AndHasNoPoints()
+    public void BestTimes_FlaggedSwim_IsNotABest_ButStandsNextToIt()
     {
         var rows = new[]
         {
@@ -212,6 +212,68 @@ public class SwimmerPageBuilderTests
         var row = Assert.Single(best);
         Assert.Equal(61000, row.TimeMs);      // помеченное время лучшим не становится
         Assert.Null(row.Quality);
+        // …но и не пропадает: стоит рядом с лучшим, со своей пометкой.
+        Assert.NotNull(row.UnderReview);
+        Assert.Equal(32000, row.UnderReview!.TimeMs);
+        Assert.Equal("personal_outlier", row.UnderReview.Quality.Reason);
+    }
+
+    [Fact]
+    public void BestTimes_DistanceWithOnlyFlaggedSwims_GetsItsOwnRow_AfterTheRealBests()
+    {
+        // Эталон — пловец 60101: 200 вольным проплыто один раз, и это 1:53.09 из сломанного
+        // хронометража. Строка есть (пловец видит заплыв), в конце списка, очки как в протоколе (Р76).
+        var rows = new[]
+        {
+            Row(1, "2025-02-01", distance: "200", ms: 113090, points: 678, suspect: "manual"),
+            Row(2, "2025-02-01", distance: "200", ms: 140000, points: 300, suspect: "manual"),
+            Row(3, "2025-01-24", distance: "50", ms: 30550, points: 287),
+        };
+
+        var best = SwimmerPageBuilder.BestTimes(rows, season: 2024, birthYear: 2012);
+
+        Assert.Equal(["50", "200"], best.Select(b => b.Distance));
+        var flagged = best[1];
+        Assert.Equal(113090, flagged.TimeMs);              // самый быстрый из помеченных
+        Assert.NotNull(flagged.Quality);
+        Assert.Equal(678, flagged.Points);                  // напечатано в протоколе — показываем
+        Assert.False(flagged.IsCareerBest);
+        Assert.Null(flagged.UnderReview);                   // сам себе не сосед
+        Assert.Null(best[0].UnderReview);
+    }
+
+    [Fact]
+    public void Summary_FlaggedSwim_PointsCountAsPrinted()
+    {
+        var rows = new[]
+        {
+            Row(1, "2025-02-01", points: 678, suspect: "manual", competitionId: 1),
+            Row(2, "2025-02-01", points: 300, competitionId: 1),
+        };
+
+        var summary = SwimmerPageBuilder.Summary(rows, season: 2024, NoKinds);
+
+        // Очки протокола — данные, а не наше достижение: в сумме они есть (Р76).
+        Assert.Equal(978, summary.Points);
+        Assert.Equal(978, summary.Competitions.Single().Points);
+        Assert.Equal(2, summary.Swims);                     // заплыв был — в счёт стартов идёт
+    }
+
+    [Fact]
+    public void UnderReview_ListsEveryFlaggedSwimOfTheCareer_NewestFirst()
+    {
+        var rows = new[]
+        {
+            Row(1, "2024-03-01", points: 500, suspect: "time_outlier"),
+            Row(2, "2025-02-01", points: 678, suspect: "manual"),
+            Row(3, "2025-02-02"),
+        };
+
+        var list = SwimmerPageBuilder.UnderReview(rows, birthYear: 2012);
+
+        Assert.Equal([2L, 1L], list.Select(r => r.ResultId));
+        Assert.Equal([678, 500], list.Select(r => r.Points));   // очки как в протоколе (Р76)
+        Assert.Equal(list.Count, rows.Count(SwimmerPageBuilder.IsUnderReview));
     }
 
     [Fact]
@@ -407,7 +469,7 @@ public class SwimmerPageBuilderTests
         Assert.False(flagged.IsPb);
         Assert.NotNull(flagged.Quality);
         Assert.Equal("protocol", flagged.Quality!.Kind);
-        Assert.Null(flagged.Points);
+        Assert.Equal(900, flagged.Points);                       // как в протоколе (Р76)
     }
 
     [Fact]

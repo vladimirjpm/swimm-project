@@ -140,6 +140,7 @@ public class SwimmersPublicController : ControllerBase
                 },
         }).ToList();
         dto.RecordsHeld = dto.Records.Count;
+        dto.UnderReviewCount = rows.Count(SwimmerPageBuilder.IsUnderReview);
 
         // Открытая вода появится, когда заведут Competition.WaterKind
         // (docs/plans/open-water-course-plan.md): третьего PoolType не будет.
@@ -182,6 +183,24 @@ public class SwimmersPublicController : ControllerBase
                 var profile = await _results.GetSwimmerProfileAsync(id);
                 var selected = await ResolveSeasonAsync(rows, season);
                 return SwimmerPageBuilder.BestTimes(rows, selected, profile?.BirthYear ?? 0);
+            },
+            PayloadTtl, CacheControlValue);
+
+    /// <summary>
+    /// Вид «Under review» таба Results: все заплывы карьеры, помеченные как ошибка протокола.
+    /// Сезона нет сознательно — таких строк единицы, и собраны они ради того, чтобы их
+    /// заметили, а не чтобы листать по сезонам. Число в профиле (<c>underReviewCount</c>)
+    /// считается тем же правилом.
+    /// </summary>
+    [HttpGet("/api/swimmers/{id:int:min(1)}/under-review")]
+    public async Task<IActionResult> GetUnderReview(int id)
+        => await this.CachedJson(_cache,
+            $"http:swimmer:{id}:under-review",
+            async () =>
+            {
+                var rows = await _swims.GetSwimsAsync(id);
+                var profile = await _results.GetSwimmerProfileAsync(id);
+                return SwimmerPageBuilder.UnderReview(rows, profile?.BirthYear ?? 0);
             },
             PayloadTtl, CacheControlValue);
 

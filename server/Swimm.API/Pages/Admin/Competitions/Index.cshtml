@@ -1440,12 +1440,20 @@ else
                 Empty:        { icon: '⚪', label: 'нечего тянуть',  checked: false, cls: 'text-admin-text-muted' },
                 Failed:       { icon: '🔴', label: 'ошибка',         checked: false, cls: 'text-admin-danger' }
             };
+            const QUEUED = { icon: '✓', label: 'отправлено в импорт', checked: false, cls: 'text-admin-success' };
+
+            // Импортировать из пачки больше нечего: всё затянутое уже ушло в очередь.
+            const nothingLeft = batch => batch.finished
+                && !(batch.rows || []).some(r => r.previewId && !r.queued);
 
             function renderRows(rows) {
                 if (!rows.length) { rowsBox.innerHTML = ''; return; }
                 const body = rows.map(r => {
-                    const v = VERDICTS[r.verdict] ?? VERDICTS.Failed;
-                    const canImport = !!r.previewId;
+                    // Уже отправленная в импорт строка — не предложение: разбор отдан очереди,
+                    // повторно импортировать нечем. Без этого после перезагрузки страницы
+                    // строки рисовались отмеченными, и пачка выглядела свежей (06.10.2026).
+                    const v = r.queued ? QUEUED : (VERDICTS[r.verdict] ?? VERDICTS.Failed);
+                    const canImport = !!r.previewId && !r.queued;
                     // Галочку, которую админ уже трогал, перерисовка сохраняет: поллинг идёт
                     // каждые 2 секунды, и снятые вручную отметки не должны возвращаться.
                     const prev = rowsBox.querySelector(`input.bulk-row[value="${r.discoveredId}"]`);
@@ -1494,8 +1502,10 @@ else
 
             function render(batch) {
                 card.classList.remove('hidden');
+                const queuedCount = (batch.rows || []).filter(r => r.queued).length;
                 progress.textContent = batch.finished
                     ? `Готово: затянуто ${batch.done} из ${batch.total}.`
+                      + (queuedCount ? ` В импорт отправлено: ${queuedCount}.` : '')
                     : `Тяну ${Math.min(batch.done + 1, batch.total)} из ${batch.total}… (можно уйти со страницы и вернуться)`;
                 if (batch.error) progress.textContent = batch.error;
 
@@ -1585,6 +1595,7 @@ else
                         + ' Ход импорта — в <a href="/Admin/ImportHistory" class="text-admin-accent hover:underline">истории импортов</a>.'
                         + (skipped ? `<div class="mt-1 text-admin-warning">${skipped}</div>` : '');
                     rowsBox.querySelectorAll('input.bulk-row:checked').forEach(cb => { cb.checked = false; cb.disabled = true; });
+                    poll(); // подписи «✓ отправлено в импорт» и счётчик — с сервера
                 } catch (err) {
                     importOut.innerHTML = `<span class="text-admin-danger">${esc(err.message)}</span>`;
                 } finally {
@@ -1592,8 +1603,20 @@ else
                 }
             });
 
-            // Незакрытая пачка с прошлой загрузки страницы — показываем её снова.
-            if (batchId) watch();
+            // Незакрытая пачка с прошлой загрузки страницы — показываем её снова, но только
+            // если из неё ещё есть что импортировать. Отработанная пачка (всё затянутое уже в
+            // очереди) снова не всплывает: она выглядела бы предложением затянуть то, что
+            // уже импортировано.
+            if (batchId) {
+                api(`${API}/bulk-pull/${batchId}`).then(batch => {
+                    if (nothingLeft(batch)) {
+                        sessionStorage.removeItem(KEY);
+                        batchId = null;
+                    } else {
+                        watch();
+                    }
+                }).catch(() => { sessionStorage.removeItem(KEY); batchId = null; });
+            }
         })();
 
         // ── Доклейка промежуточных (Д5, docs/plans/splits-attach-without-repull-plan.md) ──

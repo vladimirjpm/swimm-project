@@ -342,10 +342,8 @@ public class IsrOrgParser : IFormatParser
         var country = ResolveCountry(hebrewFileName, countryOverride);
         var langHe = ResolveLanguage(hebrewFileName, langOverride);
 
-        var isMastersFile = Path.GetFileNameWithoutExtension(hebrewFileName)
-                            .Contains("masters", StringComparison.OrdinalIgnoreCase);
-
-        var comps = IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHe);
+        var comps = IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHe).ToList();
+        var isMastersFile = IsMastersFile(hebrewFileName, comps);
         return MapHebrewOnly(comps, country, isMastersFile, isAward, poolOverride);
     }
 
@@ -422,6 +420,24 @@ public class IsrOrgParser : IFormatParser
         }
     }
 
+    /// <summary>
+    /// Мастерский ли протокол. Раньше — только по ИМЕНИ ФАЙЛА («…masters…»): у загруженного
+    /// руками файла так и было, а у затянутого с loglig имя — номер протокола, и мастерс-
+    /// чемпионат приезжал обычным (comp 6595, зима 2025: флаг Masters в превью не вставал).
+    /// Теперь ещё и по НАЗВАНИЮ соревнования из шапки PDF: «…למאסטרס…» / «…Masters…».
+    /// Строки полос «מאסטרס נ 60-64» внутри файла признаком НЕ считаются: мастерская секция
+    /// бывает и в открытом турнире (Маккабиада), и весь файл мастерским от неё не становится.
+    /// </summary>
+    internal static bool IsMastersFile(string fileName, IEnumerable<IsrOrgCompetitionResult> comps) =>
+        Path.GetFileNameWithoutExtension(fileName).Contains("masters", StringComparison.OrdinalIgnoreCase)
+        || comps.Any(c => IsMastersTitle(c.Competition));
+
+    /// <summary>Название соревнования мастерское: «מאסטרס» (в т.ч. «למאסטרס») или «masters».</summary>
+    internal static bool IsMastersTitle(string? title) =>
+        !string.IsNullOrEmpty(title)
+        && (title.Contains("מאסטרס", StringComparison.Ordinal)
+            || title.Contains("masters", StringComparison.OrdinalIgnoreCase));
+
     private static IEnumerable<Result> ParseBilingual(
         Stream englishPdfStream, string englishFileName,
         Stream hebrewPdfStream, string hebrewFileName,
@@ -432,11 +448,9 @@ public class IsrOrgParser : IFormatParser
         var langEn = ResolveLanguage(englishFileName, englishLang);
         var langHeSync = ResolveLanguage(hebrewFileName, hebrewLang);
 
-        var isMastersFile = Path.GetFileNameWithoutExtension(hebrewFileName)
-                            .Contains("masters", StringComparison.OrdinalIgnoreCase);
-
         var compsEn = IsrOrgCompetitionParser.ParseCompetitions(englishPdfStream, langEn).ToList();
         var compsHe = IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHeSync).ToList();
+        var isMastersFile = IsMastersFile(hebrewFileName, compsHe.Concat(compsEn));
 
         return MergeBilingual(compsEn, compsHe, countryEn, isMastersFile, isAward, poolOverride);
     }

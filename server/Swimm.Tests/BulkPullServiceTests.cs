@@ -206,6 +206,24 @@ public class BulkPullServiceTests
     }
 
     [Fact]
+    public async Task Import_MarksTheRowQueued_InTheBatchStatus()
+    {
+        // Без признака панель после перезагрузки рисовала импортированные строки отмеченными,
+        // и отработанная пачка выглядела новым предложением (06.10.2026).
+        var (service, _, _) = Build(Row(1), Row(2));
+        var started = await service.StartAsync([1, 2], includeChampionships: false);
+        await WaitFinishedAsync(service, started.BatchId);
+
+        Assert.All(service.GetStatus(started.BatchId)!.Rows, r => Assert.False(r.Queued));
+
+        await service.ImportAsync(started.BatchId, [1]);
+
+        var rows = service.GetStatus(started.BatchId)!.Rows;
+        Assert.True(rows.Single(r => r.DiscoveredId == 1).Queued);
+        Assert.False(rows.Single(r => r.DiscoveredId == 2).Queued);
+    }
+
+    [Fact]
     public async Task Import_CarriesFlagsFromRegulation()
     {
         var (service, queue, _) = Build(Row(1));

@@ -212,6 +212,20 @@
    Весь экран живёт в общем семействе `../components/mix/h2h/` вместе со своими стилями —
    здесь не осталось ничего. */
 
+/* Помеченное время рядом с лучшим (Best time → `underReview`): время приглушено, но не
+   зачёркнуто — так оно напечатано в протоколе; отличает его чип «⚠ Under review». */
+.swimmer-under-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swimmer-under-review__time {
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--sr-text-mute, var(--theme-mode-text-secondary));
+}
+
 /* ── Мобайл 390 (§«Мобайл») ──────────────────────────────────────────────── */
 
 @media (max-width: 900px) {

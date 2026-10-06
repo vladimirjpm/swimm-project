@@ -17,7 +17,7 @@ import { seasonLabel } from '../../utils/helpers/season-helper';
 import { useSwimmerProfile } from './use-swimmer-profile';
 import {
   useSwimmerBestTimes, useSwimmerCompare, useSwimmerPersonalBests, useSwimmerProgress,
-  useSwimmerSearch, useSwimmerSeasonRanks, useSwimmerSummary,
+  useSwimmerSearch, useSwimmerSeasonRanks, useSwimmerSummary, useSwimmerUnderReview,
 } from './use-swimmer-page';
 import SwimmerHero from './components/swimmer-hero';
 import SwimmerMediaPanel from './components/swimmer-media-panel';
@@ -26,7 +26,7 @@ import { useAppSelector } from '../../store/store';
 import SwimmerUpcomingStarts from './components/swimmer-upcoming-starts';
 import {
   H2HPanel, holdsSeasonBest, PanelEmpty, PersonalBestsPanel, ProgressPanel, ResultsFilters,
-  ResultsPanel, SeasonBestPanel, SeasonPanel, type ResultsView,
+  ResultsPanel, SeasonBestPanel, SeasonPanel, UnderReviewPanel, type ResultsView,
 } from './components/swimmer-panels';
 
 /**
@@ -55,7 +55,7 @@ const TABS: SwimmerTab[] = ['overview', 'season', 'results', 'media', 'h2h'];
 const isTab = (v: string | null | undefined): v is SwimmerTab =>
   v != null && (TABS as string[]).includes(v);
 
-const VIEWS: ResultsView[] = ['best', 'season-best', 'records', 'progress'];
+const VIEWS: ResultsView[] = ['best', 'season-best', 'records', 'progress', 'under-review'];
 const isView = (v: string | null | undefined): v is ResultsView =>
   v != null && (VIEWS as string[]).includes(v);
 
@@ -213,6 +213,7 @@ function SwimmerProject() {
 
   const [poolType, setPoolType] = useState('25m');
   const personalBests = useSwimmerPersonalBests(swimmerId, poolType, onResults && view === 'records');
+  const underReview = useSwimmerUnderReview(swimmerId, onResults && view === 'under-review');
 
   /**
    * Сезон, за который считаются МЕСТА. Обычно это выбранный сезон, но в режиме ∞ (All)
@@ -387,14 +388,15 @@ function SwimmerProject() {
           id: 'best-times-digest',
           span: 'half' as const,
           render: () => {
-            const rows = [...(bestTimes.data ?? [])]
+            // «Strongest results» — только засчитанные: помеченный заплыв достижением не считается.
+            const rows = (bestTimes.data ?? []).filter((r) => !r.quality)
               .sort((a, b) => (b.points ?? 0) - (a.points ?? 0))
               .slice(0, 3);
             return (
               <DeepDigestCard
                 title="Best times"
                 subtitle="strongest results by FINA points"
-                count={bestTimes.data?.length ?? null}
+                count={bestTimes.data ? bestTimes.data.filter((r) => !r.quality).length : null}
                 countLabel="DISTANCES"
                 moreLabel="All best times →"
                 onMore={() => nav.go('results')}
@@ -443,12 +445,20 @@ function SwimmerProject() {
       id: 'results',
       icon: '⏱',
       label: 'Results',
-      sub: bestTimes.data ? `${bestTimes.data.length} best times` : 'best per distance',
+      // Строки из одного помеченного заплыва лучшими не считаются — и в счёт не идут.
+      sub: bestTimes.data
+        ? `${bestTimes.data.filter((r) => !r.quality).length} best times`
+        : 'best per distance',
       cards: () => [{
         id: 'results-panel',
         render: () => (!seasonReady ? <PanelEmpty>Loading…</PanelEmpty> : (
           <>
-            <ResultsFilters view={view} onView={handleView} recordsHeld={profile.recordsHeld} />
+            <ResultsFilters
+              view={view}
+              onView={handleView}
+              recordsHeld={profile.recordsHeld}
+              underReviewCount={profile.underReviewCount}
+            />
 
             {view === 'best' && (
               <ResultsPanel
@@ -484,6 +494,14 @@ function SwimmerProject() {
                 gender={gender}
                 age={profile.ageInSeason}
                 state={personalBests}
+              />
+            )}
+            {view === 'under-review' && (
+              <UnderReviewPanel
+                rows={underReview.data}
+                swimmerId={profile.id}
+                gender={gender}
+                state={underReview}
               />
             )}
             {view === 'progress' && (

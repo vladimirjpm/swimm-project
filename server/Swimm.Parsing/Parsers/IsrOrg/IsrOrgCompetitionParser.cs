@@ -316,6 +316,28 @@ public static class IsrOrgCompetitionParser
     }
 
     /// <summary>
+    /// Пол мастерской эстафеты из строки вида «מאסטרס נ 120-159». Полоса эстафеты — СУММА
+    /// возрастов четырёх ног, она не бывает меньше 100 (4 × 25). Строка с возрастом ниже —
+    /// это полоса ЛИЧНОГО вида, попавшая в эстафету (comp 6595: над первой командой
+    /// 4X50 комплекса напечатано «מאסטרס נ 85-89», а команда мужская). Её пол не берём:
+    /// «none», и пол команды выводит импорт по составу (Э4, <c>RelayGender.Resolve</c>).
+    /// Возраст остаётся как напечатан.
+    /// </summary>
+    internal static string MastersRelayBandGender(string genderRaw, string age)
+    {
+        if (!IsRelaySumBand(age))
+        {
+            Log($"  -> WARN masters relay band '{genderRaw} {age}' is below 100 — not a relay band, gender ignored");
+            return "none";
+        }
+        return HebrewTextHelper.NormalizeGenderHE(genderRaw.Trim());
+    }
+
+    /// <summary>Полоса суммы возрастов эстафеты: нижняя граница ≥ 100 (4 × 25).</summary>
+    private static bool IsRelaySumBand(string age) =>
+        int.TryParse(age.Split('-')[0], out var from) && from >= 100;
+
+    /// <summary>
     /// Дистанция заголовка → метры. Открытая вода печатается в километрах («5K חופשי»,
     /// «10K חופשי»), бассейн — в метрах («1600 חופשי», «50m Freestyle»). Без перевода
     /// 10 км и 5 км не были бы заголовками вообще: регулярки ждали цифры, строка не
@@ -750,6 +772,11 @@ public static class IsrOrgCompetitionParser
         List<RelaySwimmer>? pendingSwimmers = null;
         int pendingSwimmersOrder = 1;
 
+        // Клубы, уже встреченные в этом протоколе. Нужны строке БЕЗ года рождения: год —
+        // граница «имя | клуб», а без него клуб узнаётся по совпадению с известным
+        // (IsrOrgResultLineParser, 6595: «כללי», ויקטור בלכסן без года).
+        var knownClubs = new HashSet<string>(StringComparer.Ordinal);
+
         // Кол-во строк в начале СЛЕДУЮЩЕЙ страницы, уже "съеденных" как ноги
         // эстафеты, разорванной page-break'ом (см. ветку EN relay ниже) — их
         // не нужно заново прогонять через основной цикл разбора строк.
@@ -791,8 +818,8 @@ public static class IsrOrgCompetitionParser
                         {
                             ageGroup = mastersAgeMatch.Groups["age"].Value;
                             var genderRaw = mastersAgeMatch.Groups["gender"].Value;
-                            genderNorm = HebrewTextHelper.NormalizeGenderHE(genderRaw.Trim());
-                            Log($"  -> MATCH MastersAge for pending relay: gender={genderRaw}, age={ageGroup}");
+                            genderNorm = MastersRelayBandGender(genderRaw, ageGroup);
+                            Log($"  -> MATCH MastersAge for pending relay: gender={genderRaw}, age={ageGroup}, genderNorm={genderNorm}");
                         }
                         else
                         {
@@ -828,6 +855,53 @@ public static class IsrOrgCompetitionParser
                         pendingRelayLen = null;
                         pendingRelayLegs = 0;
                         pendingEventLine = null;
+                        continue;
+                    }
+                }
+
+                // Смена полосы ВНУТРИ идущей мастерской эстафеты: заголовок напечатан один раз,
+                // дальше только строки полос «מאסטרס שליחות 120-159», «… 160-199». Раньше полоса
+                // разбиралась лишь сразу после заголовка, а все следующие строки пропускались —
+                // 68 команд 4X50 комплекса мастерс-зимы 2025 (comp 6595) легли одним событием
+                // с полосой первой команды.
+                //
+                // ⚠ Только пока НЕ ждём заголовка личного заплыва (pendingEventLen == null) и только
+                // для полос суммы возрастов (≥ 100): строка «מאסטרס ג 21-29» после эстафеты — это
+                // полоса НОВОГО личного заплыва, а признак currentIsRelay сбрасывается позже, при
+                // создании личного события. Без этих двух условий все личные заплывы после
+                // эстафет уезжали в событие эстафеты (поймано на полном PDF 6595, 06.10.2026).
+                if (isHE && current != null && currentIsRelay && pendingRelayLen == null && pendingEventLen == null)
+                {
+                    var bandRelay = MastersRelayAgeLineRxHE.Match(line);
+                    var bandGendered = MastersAgeLineRxHE.Match(line);
+                    if (bandGendered.Success && !IsRelaySumBand(bandGendered.Groups["age"].Value))
+                        bandGendered = Match.Empty;
+                    if (bandRelay.Success || bandGendered.Success)
+                    {
+                        var newAge = bandRelay.Success ? bandRelay.Groups["age"].Value : bandGendered.Groups["age"].Value;
+                        var newGender = bandRelay.Success
+                            ? "none"
+                            : MastersRelayBandGender(bandGendered.Groups["gender"].Value, newAge);
+
+                        // Недобранный состав предыдущей команды не теряем: строка полосы
+                        // встала раньше, чем набралось четыре ноги.
+                        if (pendingRelayResult != null && pendingSwimmers is { Count: > 0 })
+                        {
+                            current.Results.Add(CreateRelayResult(pendingRelayResult, pendingSwimmers));
+                        }
+                        pendingRelayResult = null;
+                        pendingSwimmers = null;
+
+                        Log($"  -> MATCH masters relay band change: age={newAge}, gender={newGender}");
+                        yield return current;
+
+                        current = current with
+                        {
+                            AgeGroup = newAge,
+                            EventStyleAge = newAge,
+                            EventStyleGender = newGender,
+                            Results = new List<IsrOrgResult>(),
+                        };
                         continue;
                     }
                 }
@@ -1628,6 +1702,15 @@ public static class IsrOrgCompetitionParser
                                 break;
                             }
 
+                            // ...и на строке мастерской полосы («מאסטרס שליחות 100-119»): иначе
+                            // недобранный состав (нога без года, comp 6595) проскакивал её, и
+                            // следующие команды оставались в полосе предыдущей.
+                            if (MastersRelayAgeLineRxHE.IsMatch(sLine) || MastersAgeLineRxHE.IsMatch(sLine))
+                            {
+                                Log($"  -> Состав эстафеты оборван строкой полосы: '{sLine}'");
+                                break;
+                            }
+
                             if (Regex.IsMatch(sLine, @"\b\d{4}\b"))
                             {
                                 swimmers.Add(IsrOrgResultLineParser.ParseRelaySwimmerLine(sLine, order));
@@ -1924,7 +2007,7 @@ public static class IsrOrgCompetitionParser
 
                             try
                             {
-                                var res = IsrOrgResultLineParser.ParseResultLine(entry);
+                                var res = IsrOrgResultLineParser.ParseResultLine(entry, knownClubs, Log);
 
                                 // Перенос длинной фамилии: PDF иногда разносит её на соседние
                                 // строки (напр. "TSCHERKOWS" / данные / "KI"), и в строке данных
@@ -1948,6 +2031,7 @@ public static class IsrOrgCompetitionParser
                                 }
 
                                 current.Results.Add(res);
+                                if (res.BirthYear > 0 && res.Club.Length > 0) knownClubs.Add(res.Club);
                                 Log($"  -> Added result: {res.LastName} {res.FirstName}, time={res.Time}");
                             }
                             catch (Exception ex)

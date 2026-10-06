@@ -40,6 +40,8 @@ public sealed class BulkPullService : IBulkPullService
         public required List<DiscoveredCompetitionDto> Queue { get; init; }
         public required List<string> SkippedChampionships { get; init; }
         public List<BulkPullRowDto> Rows { get; } = [];
+        /// <summary>Строки, уже отправленные в импорт (под замком <see cref="Rows"/>).</summary>
+        public HashSet<int> QueuedIds { get; } = [];
         public volatile bool Finished;
         public int Total => Queue.Count;
     }
@@ -255,6 +257,7 @@ public sealed class BulkPullService : IBulkPullService
                 row.OrgCompId);
 
             previews.RemoveEntry(previewId);
+            lock (batch.Rows) batch.QueuedIds.Add(row.DiscoveredId);
             queued++;
         }
 
@@ -267,7 +270,8 @@ public sealed class BulkPullService : IBulkPullService
     private static BulkPullBatchDto ToDto(BatchState batch, string? error = null)
     {
         List<BulkPullRowDto> rows;
-        lock (batch.Rows) rows = [.. batch.Rows];
+        lock (batch.Rows)
+            rows = [.. batch.Rows.Select(r => batch.QueuedIds.Contains(r.DiscoveredId) ? r with { Queued = true } : r)];
 
         return new BulkPullBatchDto(
             batch.Id, batch.Total, rows.Count, batch.Finished, rows, batch.SkippedChampionships, error);
