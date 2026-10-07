@@ -84,18 +84,21 @@ public static partial class LogligEventResultsParser
                 continue;
             }
 
-            // Данные: 10 колонок у личных (есть год рождения), 9 у эстафет.
-            if (cells.Count is not (9 or 10)) continue;
+            // Данные: 10 колонок у личных (есть год рождения), 9 у эстафет, 8 у мастерских
+            // эстафет — там нет «ניקוד אישי» (6595, loglig 11586: иначе ни одной строки).
+            if (cells.Count is not (8 or 9 or 10)) continue;
             if (cells[0] == "מיקום") continue;   // строка заголовков таблицы
 
-            var row = ParseRow(cells, round, category, hasBirthYear: cells.Count == 10);
+            var row = ParseRow(cells, round, category,
+                hasBirthYear: cells.Count == 10, hasPersonalPoints: cells.Count != 8);
             if (row is not null) rows.Add(row);
         }
 
         return new LogligEventResults(competition, date, style, distance, gender, ageBand, isRelay, rows);
     }
 
-    private static LogligResultRow? ParseRow(List<string> cells, string round, string category, bool hasBirthYear)
+    private static LogligResultRow? ParseRow(
+        List<string> cells, string round, string category, bool hasBirthYear, bool hasPersonalPoints)
     {
         var i = 0;
         var position = ParseInt(cells[i++]);
@@ -108,7 +111,7 @@ public static partial class LogligEventResultsParser
         var lane = ParseInt(cells[i++]) ?? 0;
         var (time, failNote) = ParseTime(cells[i++]);
         var fina = ParseInt(cells[i++]) ?? 0;
-        var personal = ParseInt(cells[i++]);
+        var personal = hasPersonalPoints ? ParseInt(cells[i++]) : null;
         var clubPoints = ParseInt(cells[i]);
 
         return new LogligResultRow(

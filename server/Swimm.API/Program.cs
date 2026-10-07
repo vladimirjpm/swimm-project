@@ -1052,6 +1052,8 @@ if (args.Contains("--pull-relays"))
                       $"строк у источника {relayReport.SourceRows}, у нас {relayReport.DbRows}");
     Console.WriteLine($"  клубные очки эстафет: было {relayReport.PointsBefore}, " +
                       $"станет {relayReport.PointsAfter}, официально {relayReport.OfficialPoints}");
+    if (relayReport.UnreadableEvents is { Count: > 0 } unreadableEvents)
+        Console.WriteLine($"  loglig не отдал события (пропущены): {string.Join(", ", unreadableEvents)}");
 
     if (relayReport.Plan.Problems.Count > 0)
     {

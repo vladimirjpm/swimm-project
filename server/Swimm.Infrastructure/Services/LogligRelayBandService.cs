@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 
@@ -44,10 +45,25 @@ public sealed class LogligRelayBandService(
         var competitionName = string.Empty;
         var source = new List<RelayRowFromSource>();
         var relayEvents = 0;
+        var unreadable = new List<int>();
 
         foreach (var eventId in eventIds)
         {
-            var ev = await provider.FetchEventResultsAsync(eventId, ct);
+            // Эстафеты ищутся перебором ВСЕХ событий, поэтому один битый ответ loglig на личную
+            // дисциплину ронял весь прогон (6595: «50 גב גברים» 58133 — стабильно 500).
+            // Пропускаем и называем в отчёте: если битой окажется эстафета, её наши строки
+            // останутся без пары, и матчер сам запретит запись.
+            LogligEventResultsDto ev;
+            try
+            {
+                ev = await provider.FetchEventResultsAsync(eventId, ct);
+            }
+            catch (HttpRequestException ex)
+            {
+                logger.LogWarning("loglig событие {EventId} не прочитано: {Error}", eventId, ex.Message);
+                unreadable.Add(eventId);
+                continue;
+            }
             if (competitionName.Length == 0) competitionName = ev.CompetitionName;
             if (!ev.IsRelay) continue;
 
@@ -91,7 +107,7 @@ public sealed class LogligRelayBandService(
 
         return new LogligRelayBandReport(
             competitionName, relayEvents, source.Count, ours.Count,
-            source.Sum(r => r.OfficialClubPoints), pointsBefore, pointsAfter, applied, plan);
+            source.Sum(r => r.OfficialClubPoints), pointsBefore, pointsAfter, applied, plan, unreadable);
     }
 
     /// <summary>
