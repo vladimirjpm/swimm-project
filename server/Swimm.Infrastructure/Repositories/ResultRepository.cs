@@ -857,6 +857,7 @@ public class ResultRepository : IResultRepository
                 OverallMultiplier = r.OverallMultiplier,
                 MinEntrants = r.MinEntrants,
                 Distances = r.Distances,
+                AgeBands = r.AgeBands,
                 PointsByPlace = r.Entries
                     .OrderBy(e => e.Place)
                     .Select(e => new OverviewPointsRuleEntryDto { Place = e.Place, Points = e.Points })

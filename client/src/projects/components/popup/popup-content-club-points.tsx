@@ -218,6 +218,9 @@ function RuleBlock({ rule }: { rule: ClubPointsRule }) {
             Overall category (all ages, by time): the same places score ×{rule.overall_multiplier}, on top of the age category.
           </li>
         )}
+        {rule.age_bands && (
+          <li>Age categories by birth year: {rule.age_bands.split(',').join(', ')}; places within a category go by time.</li>
+        )}
         {rule.min_entrants != null && <li>A category scores only with at least {rule.min_entrants} starters.</li>}
         {rule.max_scoring_place != null && <li>Only places up to {rule.max_scoring_place} score.</li>}
         {places.length > 0 && <li>Any other place scores {rule.default_points}.</li>}

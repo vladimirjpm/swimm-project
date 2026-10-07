@@ -114,6 +114,8 @@ public class PointRuleInputDto
     public int? MinEntrants { get; set; }
     /// <summary>Зачётные дистанции через запятую; пусто — все.</summary>
     public string? Distances { get; set; }
+    /// <summary>Возрастные категории правила по году рождения («12-13,14-15»); пусто — из протокола.</summary>
+    public string? AgeBands { get; set; }
 
     // ── только правило пловца ─────────────────────────────────────────────────
     public string PointsSource { get; set; } = "placement";

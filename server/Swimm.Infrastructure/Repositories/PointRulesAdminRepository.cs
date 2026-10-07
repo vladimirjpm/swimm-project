@@ -494,6 +494,7 @@ public class PointRulesAdminRepository(
                 OverallMultiplier = r.OverallMultiplier,
                 MinEntrants = r.MinEntrants,
                 Distances = r.Distances,
+                AgeBands = r.AgeBands,
                 Entries = MapEntries(r.Entries.Select(e => (e.Place, e.Points))),
                 CompetitionCount = await db.Competitions.CountAsync(c => c.PointRuleClubsId == id)
             };
@@ -657,17 +658,17 @@ public class PointRulesAdminRepository(
     private sealed record ClubScoringShape(
         string Scope, DateOnly EffectiveFrom, bool ManualOnly,
         int DefaultPoints, int? MaxScoringPlace, int RelayMultiplier, string Scale,
-        int? OverallMultiplier, int? MinEntrants, string? Distances);
+        int? OverallMultiplier, int? MinEntrants, string? Distances, string? AgeBands);
 
     private static ClubScoringShape ShapeOf(PointRuleClubs r) => new(
         r.Scope, r.EffectiveFrom, r.ManualOnly, r.DefaultPoints, r.MaxScoringPlace, r.RelayMultiplier,
         ScaleKey(r.Entries.Select(e => (e.Place, e.Points))),
-        r.OverallMultiplier, r.MinEntrants, NormalizeDistances(r.Distances));
+        r.OverallMultiplier, r.MinEntrants, NormalizeDistances(r.Distances), NormalizeDistances(r.AgeBands));
 
     private static ClubScoringShape ShapeOf(PointRuleInputDto i) => new(
         i.Scope, i.EffectiveFrom, i.ManualOnly, i.DefaultPoints, i.MaxScoringPlace, i.RelayMultiplier,
         ScaleKey(i.Entries.Select(e => (e.Place, e.Points))),
-        i.OverallMultiplier, i.MinEntrants, NormalizeDistances(i.Distances));
+        i.OverallMultiplier, i.MinEntrants, NormalizeDistances(i.Distances), NormalizeDistances(i.AgeBands));
 
     /// <summary>«1600, 5000» → «1600,5000»; пусто → null. Так и хранится, и сравнивается.</summary>
     private static string? NormalizeDistances(string? distances)
@@ -753,6 +754,7 @@ public class PointRulesAdminRepository(
         rule.OverallMultiplier = input.OverallMultiplier;
         rule.MinEntrants = input.MinEntrants;
         rule.Distances = NormalizeDistances(input.Distances);
+        rule.AgeBands = NormalizeDistances(input.AgeBands);
     }
 
     private static void ApplySwimmers(PointRuleSwimmers rule, PointRuleInputDto input)
@@ -802,6 +804,12 @@ public class PointRulesAdminRepository(
             if (input.OverallMultiplier is < 1) return "Вес общей категории должен быть не меньше 1";
             if (input.MinEntrants is < 1) return "Минимум участников должен быть не меньше 1";
             if (NormalizeDistances(input.Distances) is { Length: > 100 }) return "Список дистанций длиннее 100 символов";
+            if (NormalizeDistances(input.AgeBands) is { } bands)
+            {
+                if (bands.Length > 100) return "Список возрастных категорий длиннее 100 символов";
+                try { PointRulesClubsScoring.ParseAgeBands(bands); }
+                catch (FormatException) { return "Возрастные категории — через запятую, в виде «12-13,14-15»"; }
+            }
         }
         else
         {

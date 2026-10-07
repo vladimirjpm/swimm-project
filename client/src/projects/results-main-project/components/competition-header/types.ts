@@ -103,6 +103,8 @@ export interface ClubPointsRule {
   min_entrants?: number | null;
   /** Зачётные дистанции через запятую («1600»); пусто — все. */
   distances?: string | null;
+  /** Возрастные категории по году рождения («12-13,14-15»); пусто — из протокола. */
+  age_bands?: string | null;
   points_by_place: ClubPointsRuleEntry[];
 }
 

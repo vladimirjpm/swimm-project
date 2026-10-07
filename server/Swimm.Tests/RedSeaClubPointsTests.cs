@@ -141,6 +141,63 @@ public class RedSeaClubPointsTests
         Assert.Equal(3 + 6, points[4]);
     }
 
+    // ── 2025: протокол без категорий — полосы по году рождения строит правило ─────
+
+    private static ClubPointsContextRow Aged(long id, int age, int? overallPlace, int? timeMs,
+        bool timeFail = false, string? failNote = null) =>
+        new(id, "1|1600|female", "1600", "12-99", overallPlace, timeMs, timeFail, failNote, IsRelay: false, Age: age);
+
+    /// <summary>
+    /// Эйлат-2025, 1600 м женщины (протокол loglig печатает только общее место): победительница
+    /// 12-13 — она же абсолют (3 + 6); вторая 12-13 — абсолют 2-е (2 + 4); 18-19 — первая в
+    /// своей полосе, но полоса из одного — только абсолют 3-е (2). Протокольное место «1..N»
+    /// категорией не считается.
+    /// </summary>
+    [Fact]
+    public void AgeBands_BuildCategoriesFromBirthYear()
+    {
+        var rule = RedSea();
+        rule.AgeBands = "12-13,14-15,16-17,18-19";
+
+        var points = PointRulesClubsScoring.PointsForSet(rule,
+        [
+            Aged(1, 13, 1, 1_423_000),   // אוגינץ: 12-13 1-я + абсолют 1-я
+            Aged(2, 13, 2, 1_442_000),   // גורבנקו: 12-13 2-я + абсолют 2-я
+            Aged(3, 18, 3, 1_462_000),   // רון: 18-19 одна — 0 + абсолют 3-я
+            Aged(4, 13, 4, 1_467_000),   // קאניוק: 12-13 3-я
+            Aged(5, 15, 6, 1_472_000),   // ראובני: 14-15 1-я
+            Aged(6, 15, 7, 1_474_000),   // 14-15 2-я
+            Aged(7, 14, 12, 1_521_000),  // 14-15 3-я
+            Aged(8, 25, 5, 1_470_000),   // взрослая: полосы нет, в абсолюте 5-я — 0
+            Aged(9, 13, null, null, timeFail: true, failNote: "NS"),
+        ]);
+
+        Assert.Equal(3 + 6, points[1]);
+        Assert.Equal(2 + 4, points[2]);
+        Assert.Equal(0 + 2, points[3]);
+        Assert.Equal(1, points[4]);
+        Assert.Equal(3, points[5]);
+        Assert.Equal(2, points[6]);
+        Assert.Equal(1, points[7]);
+        Assert.Equal(0, points[8]);
+        Assert.Equal(0, points[9]);
+    }
+
+    [Theory]
+    [InlineData("12-13,14-15", 2)]
+    [InlineData("17", 1)]
+    public void ParseAgeBands_Valid(string text, int count) =>
+        Assert.Equal(count, PointRulesClubsScoring.ParseAgeBands(text)!.Count);
+
+    [Fact]
+    public void AdminValidation_RejectsBadAgeBands()
+    {
+        var input = new Swimm.Application.Dtos.PointRuleInputDto { Version = "redsea.test", Scope = "all", AgeBands = "12-13,abc" };
+        var error = Swimm.Infrastructure.Repositories.PointRulesAdminRepository.Validate(
+            input, Swimm.Application.Dtos.PointRuleKind.Clubs);
+        Assert.StartsWith("Возрастные категории", error);
+    }
+
     [Theory]
     [InlineData(0, null, "Вес общей категории")]
     [InlineData(null, 0, "Минимум участников")]
@@ -178,6 +235,8 @@ public class RedSeaClubPointsTests
 
         var comp = new Competition { Name = "Eilat", Date = "25/04/2026", PoolType = "25m", PointRuleClubsId = rule.Id };
         db.Add(comp);
+        for (var id = 1; id <= 6; id++)
+            db.Add(new Swimmer { Id = id, LastName = $"S{id}", FirstName = "A", BirthYear = 2010 });
         await db.SaveChangesAsync();
 
         ResultRecord Swim(Club club, int swimmer, string category, int? place, int ms, string distance = "1600") => new()

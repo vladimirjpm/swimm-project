@@ -60,6 +60,7 @@ public static class ContextClubPoints
                 r.Competition.IsMasters,
                 RuleId = r.Competition.PointRuleClubsId,
                 r.CompetitionDate,
+                r.Swimmer.BirthYear,
             })
             .ToListAsync(ct);
 
@@ -73,7 +74,8 @@ public static class ContextClubPoints
 
             var set = PointRulesClubsScoring.PointsForSet(rule, competition.Select(r => new ClubPointsContextRow(
                 r.Id, $"{r.StyleId}|{r.Distance}|{r.Gender}", r.Distance, r.EventCategory,
-                r.Position, r.TimeMillisecond, r.TimeFail, r.TimeFailNote, r.IsRelay, r.Awarding)));
+                r.Position, r.TimeMillisecond, r.TimeFail, r.TimeFailNote, r.IsRelay, r.Awarding,
+                SeasonMath.AgeInSeason(SeasonMath.StartYearOf(r.CompetitionDate), r.BirthYear))));
             foreach (var (id, p) in set) points[id] = p;
         }
 

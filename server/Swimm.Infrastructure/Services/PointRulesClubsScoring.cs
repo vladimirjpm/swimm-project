@@ -57,7 +57,7 @@ public static class PointRulesClubsScoring
     public static bool NeedsContext(PointRuleClubs? rule) =>
         rule is not null
         && (rule.OverallMultiplier is not null || rule.MinEntrants is not null
-            || !string.IsNullOrWhiteSpace(rule.Distances));
+            || !string.IsNullOrWhiteSpace(rule.Distances) || !string.IsNullOrWhiteSpace(rule.AgeBands));
 
     /// <summary>
     /// Очки каждой строки одного соревнования по правилу «по заплыву целиком» — схема
@@ -84,7 +84,27 @@ public static class PointRulesClubsScoring
         var distances = ParseDistances(rule.Distances);
         var scored = all.Where(r => distances is null || distances.Contains(r.Distance.Trim())).ToList();
 
-        foreach (var category in scored.GroupBy(r => (r.Discipline, r.IsRelay, Category: r.Category ?? "")))
+        var bands = ParseAgeBands(rule.AgeBands);
+        if (bands is not null)
+        {
+            // Категории строит правило: полоса по возрасту, место — по времени внутри полосы.
+            foreach (var band in scored
+                         .Where(r => !r.IsRelay && r.Awarding)
+                         .Select(r => (Row: r, Band: bands.FirstOrDefault(b => r.Age >= b.Min && r.Age <= b.Max)))
+                         .Where(x => x.Band != default)
+                         .GroupBy(x => (x.Row.Discipline, x.Band), x => x.Row))
+            {
+                if (rule.MinEntrants is int min && band.Count(Started) < min) continue;
+
+                var timed = band.Where(r => !r.TimeFail && r.TimeMs > 0).ToList();
+                foreach (var r in timed)
+                    points[r.Id] = PointsFor(rule, 1 + timed.Count(o => o.TimeMs < r.TimeMs), timeFail: false);
+            }
+        }
+
+        foreach (var category in scored
+                     .Where(r => bands is null || r.IsRelay)
+                     .GroupBy(r => (r.Discipline, r.IsRelay, Category: r.Category ?? "")))
         {
             if (rule.MinEntrants is int min && category.Count(Started) < min) continue;
             if (rule.OverallMultiplier is not null && !category.Key.IsRelay && IsOpenSection(category.Key.Category))
@@ -121,6 +141,24 @@ public static class PointRulesClubsScoring
         category.StartsWith("mix", StringComparison.OrdinalIgnoreCase)
         || category.Equals("open", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>«12-13,14-15» → [(12,13),(14,15)]; одиночное «17» — полоса из одного возраста.
+    /// Пусто — null; кривой кусок — исключение (форма админки валидирует заранее).</summary>
+    public static IReadOnlyList<(int Min, int Max)>? ParseAgeBands(string? bands)
+    {
+        if (string.IsNullOrWhiteSpace(bands)) return null;
+        return bands.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(part =>
+            {
+                var ends = part.Split('-', StringSplitOptions.TrimEntries);
+                var min = int.Parse(ends[0], System.Globalization.CultureInfo.InvariantCulture);
+                var max = ends.Length > 1 ? int.Parse(ends[1], System.Globalization.CultureInfo.InvariantCulture) : min;
+                if (ends.Length > 2 || min <= 0 || max < min)
+                    throw new FormatException($"Возрастная полоса «{part}» не в формате «12-13»");
+                return (min, max);
+            })
+            .ToList();
+    }
+
     private static HashSet<string>? ParseDistances(string? distances)
     {
         if (string.IsNullOrWhiteSpace(distances)) return null;
@@ -134,6 +172,8 @@ public static class PointRulesClubsScoring
 /// <param name="Category">Программа протокола (<c>Results.EventCategory</c>).</param>
 /// <param name="Position">Место, уже очищенное от незачётных раундов (prelim, «כללי»-финал бассейна).</param>
 /// <param name="Awarding">Раунд награждаемый (не prelim/extra) — участвует в абсолютном зачёте.</param>
+/// <param name="Age">Возраст в сезоне (<c>SeasonMath.AgeInSeason</c>) — для полос <see cref="PointRuleClubs.AgeBands"/>.</param>
 public sealed record ClubPointsContextRow(
     long Id, string Discipline, string Distance, string? Category,
-    int? Position, int? TimeMs, bool TimeFail, string? FailNote, bool IsRelay, bool Awarding = true);
+    int? Position, int? TimeMs, bool TimeFail, string? FailNote, bool IsRelay, bool Awarding = true,
+    int? Age = null);

@@ -60,6 +60,15 @@ public class PointRuleClubs : IPointRule
     [MaxLength(100)]
     public string? Distances { get; set; }
 
+    /// <summary>Возрастные категории, которые правило строит САМО по году рождения («12-13,14-15,
+    /// 16-17,18-19»; возраст — <c>SeasonMath.AgeInSeason</c>): место в категории — по времени
+    /// среди её пловцов, протокольная секция и место не нужны. Красное море 2025: официальный
+    /// протокол loglig категорий не печатает (только общее место), а регламент делит по году
+    /// рождения — так же, как протокол хронометража 4sport. Вне полос — только общая категория.
+    /// null — категории берутся из протокола (<c>Results.EventCategory</c> + место).</summary>
+    [MaxLength(100)]
+    public string? AgeBands { get; set; }
+
     /// <summary>Строки шкалы: место → очки.</summary>
     public ICollection<PointRuleClubsEntry> Entries { get; set; } = [];
 }

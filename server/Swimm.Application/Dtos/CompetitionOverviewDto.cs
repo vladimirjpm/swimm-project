@@ -227,6 +227,9 @@ public sealed class OverviewPointsRuleDto
     /// <summary>Зачётные дистанции («1600»); null — все.</summary>
     [JsonPropertyName("distances")] public string? Distances { get; init; }
 
+    /// <summary>Возрастные категории, которые правило строит по году рождения («12-13,14-15»); null — из протокола.</summary>
+    [JsonPropertyName("age_bands")] public string? AgeBands { get; init; }
+
     /// <summary>Шкала «место → очки», по возрастанию места.</summary>
     [JsonPropertyName("points_by_place")]
     public IReadOnlyList<OverviewPointsRuleEntryDto> PointsByPlace { get; init; } = [];
