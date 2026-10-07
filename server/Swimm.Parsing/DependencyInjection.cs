@@ -50,6 +50,7 @@ public static class DependencyInjection
 
         // Даты дисциплин многодневки из сетки loglig (docs/plans/multiday-split-plan.md, М1).
         services.AddSingleton<IDisciplineDateSource, Discovery.LogligDisciplineDateSource>();
+        services.AddSingleton<ICollapsedDaysFixer, Discovery.LogligCollapsedDaysFixer>();
 
         // Резолвер актуальных ссылок на PDF со страницы «שיאי ישראל» — им пользуются
         // оба isr.org.il-источника рекордов, поэтому регистрируется отдельно.

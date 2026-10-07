@@ -36,6 +36,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     private readonly IRegulationFetchService _regulations;
     private readonly ICategoryRepository _categories;
     private readonly IRelaySplitProvider _relaySplits;
+    private readonly ICollapsedDaysFixer _collapsedDays;
     private readonly SwimmDbContext _db;
     private readonly IMemoryCache _cache;
     private readonly ILogger<DiscoveryPreviewService> _logger;
@@ -50,6 +51,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         IRegulationFetchService regulations,
         ICategoryRepository categories,
         IRelaySplitProvider relaySplits,
+        ICollapsedDaysFixer collapsedDays,
         SwimmDbContext db,
         IMemoryCache cache,
         ILogger<DiscoveryPreviewService> logger)
@@ -63,6 +65,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         _regulations = regulations;
         _categories = categories;
         _relaySplits = relaySplits;
+        _collapsedDays = collapsedDays;
         _db = db;
         _cache = cache;
         _logger = logger;
@@ -145,6 +148,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         await _discovery.AddLanguagesAsync(discoveredId, languages, ct);
 
         parsed = await AddRelaySplitsAsync(discoveredId, parsed, ct);
+        parsed = await FixCollapsedDaysAsync(discoveredId, parsed, ct);
 
         // Официальный клубный зачёт: есть ли он и по какой шкале. Кладём В КЭШ вместе с превью —
         // из него потом заводится правило кнопкой, и второй поход в loglig (десяток запросов
@@ -193,6 +197,36 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
             ResultsJson = outcome.ResultsJson,
             Warnings = parsed.Warnings.Append(outcome.Message).ToList(),
         };
+    }
+
+    /// <summary>
+    /// Даты дисциплин многодневки из сетки loglig, если протокол схлопнул их в одну
+    /// (docs/plans/multiday-split-plan.md, М3). Тот же круг стартов, что у эстафет, — чемпионаты:
+    /// многодневные старты — они, а остальным лишний запрос к loglig ни к чему.
+    ///
+    /// Если в базе этот старт уже лежит ОДНИМ днём без события, импорт с разными датами положит
+    /// второй день отдельным соревнованием, а строки первого дня в старом задвоит — говорим об
+    /// этом прямо в предупреждениях: сначала <c>--split-days</c>.
+    /// </summary>
+    private async Task<ParsedCompetition> FixCollapsedDaysAsync(int discoveredId, ParsedCompetition parsed, CancellationToken ct)
+    {
+        var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
+        if (row?.LogligId is not int logligId
+            || !await CompetitionAdminRepository.ShouldFetchSplitsAsync(_db, row.Name, row.OrgCompId, ct))
+            return parsed;
+
+        var fixedParsed = await _collapsedDays.FixAsync(logligId, parsed, ct);
+        if (fixedParsed.Competitions.Count < 2) return fixedParsed;
+
+        var days = await CompetitionIdentity.ResolveDaysAsync(_db, row.OrgCompId, ct);
+        if (days is [{ EventId: null } single])
+            return fixedParsed with
+            {
+                Warnings = fixedParsed.Warnings.Append(
+                    $"⚠ В базе этот старт лежит одним днём (#{single.Id}, {single.Date}) — сначала " +
+                    $"--split-days {single.Id}, иначе строки первого дня задвоятся").ToList(),
+            };
+        return fixedParsed;
     }
 
     /// <summary>

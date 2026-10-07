@@ -817,13 +817,35 @@ if (args.Contains("--repull"))
             .EnrichAsync(logligId, parsed.ResultsJson);
         parsed = parsed with { ResultsJson = splits.ResultsJson };
         Console.WriteLine($"Эстафеты: {splits.Message}");
+
+        // Даты дисциплин многодневки из сетки loglig (multiday-split-plan, М3): без них протокол
+        // «03/01 - 04/01» лёг бы одной датой, и перезалив сложил бы все строки во второй день.
+        var datesBefore = parsed.Competitions.Count;
+        parsed = await scope.ServiceProvider.GetRequiredService<ICollapsedDaysFixer>().FixAsync(logligId, parsed);
+        if (parsed.Competitions.Count != datesBefore)
+            Console.WriteLine($"Даты: {parsed.Warnings.LastOrDefault()}");
     }
+
+    // Дни этого старта в базе (Д2). Протокол многодневный, а в базе один день без события —
+    // импорт завёл бы второй день отдельным соревнованием и задвоил бы строки первого в старом.
+    var repullDays = await Swimm.Infrastructure.Services.CompetitionIdentity.ResolveDaysAsync(db, row.OrgCompId);
+    if (parsed.Competitions.Count > 1 && repullDays is [{ EventId: null } collapsedDay])
+    {
+        Console.Error.WriteLine(
+            $"НЕ ПЕРЕЗАЛИВАЮ: протокол на {parsed.Competitions.Count} дня, а в базе старт одним днём " +
+            $"#{collapsedDay.Id} ({collapsedDay.Date}). Сначала: --split-days {collapsedDay.Id}");
+        Environment.Exit(1);
+        return;
+    }
+
+    // Новый день, если появится, — к событию этого старта, а не отдельным соревнованием.
+    var repullEventId = repullDays.Select(d => d.EventId).FirstOrDefault(e => e != null);
 
     var deleteMissing = args.Contains("--delete-missing");
     using var json = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(parsed.ResultsJson));
     var result = await importer.ImportAsync(
         json, $"isrorg-{row.OrgCompId}-loglig-{logligId}-he.pdf", null,
-        new ImportEventOptions(null, null, OverwriteExisting: true, DeleteMissing: deleteMissing),
+        new ImportEventOptions(repullEventId, null, OverwriteExisting: true, DeleteMissing: deleteMissing),
         row.OrgCompId);
 
     Console.WriteLine($"\n{result.Message}");
