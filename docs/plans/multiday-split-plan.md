@@ -56,6 +56,13 @@
 Тесты: фикстуры сеток 11586 и 13805 (страницы `AthleticsDisciplines` в Fixtures/loglig);
 737 / 686 для 6595 — на синтетике из ключей.
 
+**СДЕЛАНО 07.10.2026.** `DisciplineDates` / `DisciplineDayPlanner` (Application/Mapping),
+`IDisciplineDateSource` → `LogligDisciplineDateSource` (Parsing/Discovery, DI в
+`Swimm.Parsing/DependencyInjection.cs`); строка без пола («none») получает день, только если у
+всех полов дисциплины он один. Тесты — `DisciplineDatesTests` (5). Живая проверка (код М1 по
+сетке loglig и строкам базы, без записи): **#1645 — 737 + 686, #64 — 714 + 675, без остатка
+и без неоднозначных** — план М2 применим к обоим.
+
 ### М2. `--split-days <competitionId> [--apply]` — разделить уже импортированное
 
 Dry-run по умолчанию; отчёт: сколько строк в какой день, неоднозначные и ненайденные ключи.
