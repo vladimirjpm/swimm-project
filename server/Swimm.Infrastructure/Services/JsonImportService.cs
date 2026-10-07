@@ -1196,6 +1196,26 @@ public class JsonImportService : IImportService
             diagnosticLog.Add($"Согласование пола пловцов не выполнено ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
         }
 
+        // Общая категория открытой воды — места внутри пола (Р78). Строго ПОСЛЕ согласования
+        // пола: пола в блоке «כללי» протокол не печатает, его только что дописал шаг выше.
+        if (touchedCompetitionKeys.Count > 0)
+        {
+            try
+            {
+                _db.ChangeTracker.Clear();
+                var touchedIds = touchedCompetitionKeys
+                    .Select(k => competitionCache[k].Id).Distinct().ToList();
+                var reranked = await RerankOpenWaterOpenSectionsAsync(touchedIds);
+                if (reranked > 0)
+                    diagnosticLog.Add($"Открытая вода: места общей категории пересчитаны по полу — строк {reranked}");
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Пересчёт мест общей категории открытой воды не выполнен ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+            }
+        }
+
         // Сшивка стартового протокола с результатами (шаг С9, docs/plans/start-list-plan.md):
         // заявка получает свой результат либо становится неявкой. Идёт ДО прогона проверок,
         // чтобы entries.no-show-unmatched увидел уже проставленные статусы. Как и соседи —
@@ -1793,6 +1813,33 @@ public class JsonImportService : IImportService
         await _db.SaveChangesAsync();
         return $"Пол согласован с протоколами: карточек заполнено {filled}, исправлено {corrected}, "
              + $"строк без пола дописано {rowsFilled}.";
+    }
+
+    /// <summary>
+    /// Места общей категории («כללי») открытой воды — внутри пола (Р78, правило — в
+    /// <see cref="OpenWaterOpenSectionRanker"/>). Блок общей категории узнаётся по программе
+    /// «mix-…»: парсер ставит её секции «כללי» без пола. Только соревнования этого импорта и
+    /// только с <c>StandingKindOverride = openwater</c> — смешанные блоки бассейна не трогаем.
+    /// </summary>
+    private async Task<int> RerankOpenWaterOpenSectionsAsync(IReadOnlyCollection<int> competitionIds)
+    {
+        var rows = await _db.Results
+            .Where(r => competitionIds.Contains(r.CompetitionId)
+                        && r.Competition.StandingKindOverride == StandingKinds.OpenWater
+                        && r.RelayId == null
+                        && r.EventCategory != null && r.EventCategory.StartsWith("mix"))
+            .ToListAsync();
+        if (rows.Count == 0) return 0;
+
+        var changes = OpenWaterOpenSectionRanker.Rerank(rows.Select(r => new OpenSectionRow(
+            r.Id, $"{r.CompetitionId}|{r.StyleId}|{r.Distance}|{r.EventCategory}", r.Gender, r.Position)));
+        if (changes.Count == 0) return 0;
+
+        foreach (var row in rows)
+            if (changes.TryGetValue(row.Id, out var place)) row.Position = place;
+
+        await _db.SaveChangesAsync();
+        return changes.Count;
     }
 
     /// <summary>Пол в БД живёт как male/female и как M/F — сводим к одному написанию.</summary>

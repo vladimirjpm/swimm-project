@@ -54,7 +54,10 @@ public static class LogligRelaySplitParser
 {
     // Дробная часть бывает и одной цифрой: «02:17.0» (Маккабия мастерс 2026) — без этого время уезжало
     // в название клуба, а у команды не оставалось ни времени, ни статуса.
-    private static readonly Regex TimeRx = new(@"^\d{1,2}:\d{2}\.\d{1,2}$", RegexOptions.Compiled);
+    // Часы тоже бывают: эстафета открытой воды 4X1500 плывётся полтора часа — «1:30:08.17»
+    // (Эйлат-2026, 07.10.2026); без них у всех команд пропадало время, и доклейка состава
+    // по ключу «заплыв + дорожка + время» не находила ни одной.
+    private static readonly Regex TimeRx = new(@"^(?:\d{1,2}:)?\d{1,2}:\d{2}\.\d{1,2}$", RegexOptions.Compiled);
     private static readonly Regex YearRx = new(@"^(19|20)\d{2}$", RegexOptions.Compiled);
     private static readonly Regex IntRx = new(@"^\d{1,2}$", RegexOptions.Compiled);
     private static readonly Regex BandRx = new(@"^\d{2,3}-\d{2,3}$", RegexOptions.Compiled);

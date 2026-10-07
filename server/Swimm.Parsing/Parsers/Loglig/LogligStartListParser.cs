@@ -267,6 +267,9 @@ public static partial class LogligStartListParser
             ? disciplineRaw[(distanceMatch.Index + distanceMatch.Length)..]
             : disciplineRaw;
         styleText = styleText.Replace(RelayMarker, string.Empty, StringComparison.Ordinal).Trim();
+        // «מיקס» — состав, а не стиль: «4X1500 שליחים מיקס» (открытая вода, Эйлат-2026) иначе
+        // давал стиль «מיקס», и доклейка составов не находила дисциплину (07.10.2026).
+        if (isRelay) styleText = styleText.Replace(MixMarker, string.Empty, StringComparison.Ordinal).Trim();
 
         // «4X50 שליחים» без названия стиля — у источника это вольная эстафета.
         var style = styleText.Length == 0 && isRelay
@@ -416,6 +419,7 @@ public static partial class LogligStartListParser
         SpaceRx().Replace(WebUtility.HtmlDecode(TagRx().Replace(html, " ")), " ").Trim();
 
     private const string RelayMarker = "שליחים";
+    private const string MixMarker = "מיקס";
     private const string NoTimeMarker = "NT";
     private const string HeatColumnHeader = "מקצה";
     private const string BirthYearHeader = "שנת לידה";

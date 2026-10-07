@@ -173,6 +173,68 @@ public class LogligRelaySplitParserTests
         Assert.Equal("a", (string?)rows[2]!["relay_swimmers"]![0]!["last_name"]);
     }
 
+    private static List<SplitRelayTeam> OpenWater => Parse("loglig-split-relay-14032-75021-openwater-mixed.pdf");
+
+    /// <summary>
+    /// Микс-эстафета открытой воды 4X1500 (Эйлат-2026, loglig 14032 / 75021): итоговое время
+    /// с ЧАСАМИ — «1:30:08.17». Без часов в шаблоне у всех 17 команд не было времени, и доклейка
+    /// состава не находила ни одной — оставались порванные фамилии основного протокола.
+    /// </summary>
+    [Fact]
+    public void OpenWaterRelay_HourTimes_AndCleanNames()
+    {
+        var teams = OpenWater;
+        Assert.Equal(17, teams.Count);
+        Assert.All(teams, t => Assert.Equal(4, t.Legs.Count));
+
+        var batYam = Assert.Single(teams, t => t.Time == "1:30:08.17");
+        Assert.Equal((1, 4, "הפועל בת ים"), (batYam.Heat, batYam.Lane, batYam.Club));
+        // Основной протокол рвёт «פילאר מריה» переносом и даёт «מריהפילאר».
+        Assert.Equal(("חשמה", "פילאר מריה"), (batYam.Legs[3].LastName, batYam.Legs[3].FirstName));
+
+        var dq = Assert.Single(teams, t => t.Status == "DQ");
+        Assert.Null(dq.Time);
+        Assert.Equal("וייסלר ברנד", dq.Legs[3].LastName);
+    }
+
+    /// <summary>
+    /// Снятая команда сверяется по статусу вместо времени: заплыв + дорожка + «DQ». Иначе её
+    /// порванные фамилии («ברנדוייסלר») уезжали в импорт и заводили пловцов-теней.
+    /// </summary>
+    [Fact]
+    public void Enricher_DisqualifiedTeam_MatchedByStatus()
+    {
+        static JsonObject Dq(string status) => new()
+        {
+            ["is_relay"] = true,
+            ["event_style_name"] = "freestyle",
+            ["event_style_len"] = "4X1500",
+            ["heat"] = 1,
+            ["lane"] = 17,
+            ["time"] = "",
+            ["time_fail_note"] = status,
+            ["relay_swimmers"] = new JsonArray(
+                new JsonObject { ["order"] = 1, ["last_name"] = "במירושניקו", ["first_name"] = "ניק", ["birth_year"] = 2010 },
+                new JsonObject { ["order"] = 2, ["last_name"] = "אשלגי", ["first_name"] = "אדם", ["birth_year"] = 2010 },
+                new JsonObject { ["order"] = 3, ["last_name"] = "פלסיאן", ["first_name"] = "שי", ["birth_year"] = 2012 },
+                new JsonObject { ["order"] = 4, ["last_name"] = "ברנדוייסלר", ["first_name"] = "תמר", ["birth_year"] = 2010 }),
+        };
+
+        var json = new JsonArray(Dq("DQ")).ToJsonString();
+        var (outJson, report) = RelaySplitEnricher.Apply(json,
+            new[] { new RelaySplitEvent("freestyle", "4X1500", OpenWater) }, writeSplitTimes: false);
+
+        Assert.Equal(1, report.Enriched);
+        var legs = JsonNode.Parse(outJson)!.AsArray()[0]!["relay_swimmers"]!.AsArray();
+        Assert.Equal("מירושניקוב", (string?)legs[0]!["last_name"]);
+        Assert.Equal("וייסלר ברנד", (string?)legs[3]!["last_name"]);
+
+        // Статус другой — это не та команда.
+        var (_, other) = RelaySplitEnricher.Apply(new JsonArray(Dq("NS")).ToJsonString(),
+            new[] { new RelaySplitEvent("freestyle", "4X1500", OpenWater) }, writeSplitTimes: false);
+        Assert.Equal(0, other.Enriched);
+    }
+
     [Fact]
     public void MastersBuilder_ReplacesRelays_WithBandsGenderAndPlaces()
     {

@@ -34,12 +34,13 @@ public class IsrOrgCompetitionParserOpenWaterTests
 
         // Дистанции только в метрах: «5K» и «10K» наружу не проходят.
         var lens = comps.Select(c => c.EventStyleLen).Distinct().OrderBy(x => x).ToList();
-        Assert.Equal(["10000", "1600", "3000", "5000"], lens);
+        Assert.Equal(["10000", "1600", "3000", "4X1500", "5000"], lens);
 
         // 5K — первый блок файла, раньше терялся целиком.
         Assert.Equal(73, comps.Where(c => c.EventStyleLen == "5000").Sum(c => c.Results.Count));
         Assert.Equal(21, comps.Where(c => c.EventStyleLen == "10000").Sum(c => c.Results.Count));
-        Assert.Equal(238, comps.Sum(c => c.Results.Count));
+        // 238 личных + 17 команд микс-эстафеты 4X1500.
+        Assert.Equal(255, comps.Sum(c => c.Results.Count));
 
         // Нокаут-3000 — это заплывы на 5–7 минут; двухчасовых времён (10K) там больше нет.
         var knockout = comps.Where(c => c.EventStyleLen == "3000").SelectMany(c => c.Results).ToList();
@@ -55,6 +56,31 @@ public class IsrOrgCompetitionParserOpenWaterTests
             .ToList();
         Assert.Equal(2, ahdut.Count);
         Assert.Equal(2, ahdut.Select(x => x.EventStyleLen).Distinct().Count());
+    }
+
+    /// <summary>
+    /// Шапка микс-эстафеты открытой воды — «4X1500 שליחים מיקס»: без слова стиля и с миксом
+    /// ПОСЛЕ «эстафеты». Её не узнавала ни одна регулярка, и все 17 команд (68 участников)
+    /// пропадали молча — в БД у #1547 эстафеты не было вовсе (найдено 07.10.2026).
+    /// </summary>
+    [Fact]
+    public void MixedRelayHeaderWithoutStyle_GivesAllSeventeenTeams()
+    {
+        using var fs = File.OpenRead(PdfPath);
+        var relay = Assert.Single(IsrOrgCompetitionParser.ParseCompetitions(fs, "he"),
+            c => c.EventStyleLen == "4X1500");
+
+        Assert.Equal("freestyle", relay.EventStyleName);
+        Assert.Equal("none", relay.EventStyleGender);       // смешанную ставит импорт по составу
+        Assert.Equal(17, relay.Results.Count);
+        Assert.All(relay.Results, r => Assert.Equal(4, r.RelaySwimmers?.Count));
+
+        var first = relay.Results[0];
+        Assert.Equal((1, "הפועל בת ים", "1:30:08.17"), (first.Position, first.RelayTeamName, first.Time));
+
+        // Снятая команда — без времени, со статусом.
+        var dq = Assert.Single(relay.Results, r => r.TimeFailNote == "DQ");
+        Assert.Equal(("הפועל עמק חפר", 17), (dq.RelayTeamName, dq.Lane));
     }
 
     [Theory]

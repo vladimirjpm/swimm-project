@@ -263,9 +263,14 @@ public static class IsrOrgCompetitionParser
     // Заголовок эстафеты вовсе без категории («4X50 חופשי שליחים») — masters-экспорты ARENA
     // (категория придёт строкой «מאסטרס …» ниже) и Маккаби (категории не будет совсем,
     // событие материализует первая командная строка).
+    //
+    // Стиль НЕОБЯЗАТЕЛЕН, хвост «מיקס» допустим: открытая вода печатает «4X1500 שליחים מיקס»
+    // (Эйлат-2026, OrgCompId 16809) — без стиля и с миксом после слова «эстафета». До 07.10.2026
+    // такая шапка не узнавалась ничем, и все 17 команд микс-эстафеты пропадали молча.
     private static Regex? _relayHeaderNoCategoryRxHE;
     private static Regex RelayHeaderNoCategoryRxHE => _relayHeaderNoCategoryRxHE ??= new Regex(
-        @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?<style>.+?)\s+שליח(?:ים|ות)?\s*$",
+        @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)\s+(?:(?<style>.+?)\s+)?שליח(?:ים|ות)?" +
+        "(?:\\s+(?:" + HebrewMix + "|" + HebrewMixReversed + "))?\\s*$",
         RegexOptions.Compiled);
 
     private static Regex DateLineRx => _dateLineRx ??= new Regex(
@@ -1305,7 +1310,9 @@ public static class IsrOrgCompetitionParser
                         var mm = RelayHeaderNoCategoryRxHE.Match(line);
                         int legs = int.Parse(mm.Groups["legs"].Value);
                         int legLen = int.Parse(mm.Groups["len"].Value);
-                        var styleHe = mm.Groups["style"].Value.Trim();
+                        // «4X1500 שליחים מיקס» — стиля нет: у loglig это вольная эстафета
+                        // (так же читает сетку дисциплин LogligStartListParser.ParseDiscipline).
+                        var styleHe = mm.Groups["style"].Success ? mm.Groups["style"].Value.Trim() : "חופשי";
 
                         Log($"  -> MATCH RelayHeader (masters, no age): legs={legs}, len={legLen}, style={styleHe}");
 

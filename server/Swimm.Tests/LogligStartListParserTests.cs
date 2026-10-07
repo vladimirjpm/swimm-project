@@ -188,6 +188,22 @@ public class LogligStartListParserTests
         Assert.Equal(new DateTime(2026, 2, 19, 12, 31, 0), relay.StartAtLocal);
     }
 
+    /// <summary>
+    /// Микс-эстафета открытой воды «4X1500 שליחים מיקס» (Эйлат-2026, loglig 14032): «מיקס» —
+    /// состав, а не стиль. Раньше он оставался стилем, и доклейка составов из PDF промежуточных
+    /// не находила дисциплину — у 17 команд оставались порванные фамилии ног (07.10.2026).
+    /// </summary>
+    [Fact]
+    public void Grid_OpenWaterMixedRelay_IsFreestyle()
+    {
+        var grid = LogligStartListParser.ParseDisciplineGrid(Fixture("disciplines-14032-openwater.html"));
+
+        var relay = grid.Single(r => r.DisciplineId == 75021);
+        Assert.True(relay.IsRelay);
+        Assert.Equal("4X1500", relay.Distance);
+        Assert.Equal("freestyle", relay.StyleName);
+    }
+
     [Fact]
     public void Grid_ZeroMinTimeIsNotATime()
     {
