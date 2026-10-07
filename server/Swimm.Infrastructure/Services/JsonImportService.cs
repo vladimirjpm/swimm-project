@@ -237,10 +237,13 @@ public class JsonImportService : IImportService
         var swimmerCacheEn = new Dictionary<string, Swimmer>();
         // Фоллбек «то же имя, другая граница фамилии» — см. SwimmerFullNameKey.
         var swimmerCacheByFullName = new Dictionary<string, Swimmer>();
+        // Фоллбек «то же имя другим написанием» (כתיב מלא/חסר) — см. SwimmerSpellingKey.
+        var swimmersBySpelling = new Dictionary<string, List<Swimmer>>();
         foreach (var s in await _db.Swimmers.ToListAsync())
         {
             swimmerCache.TryAdd(SwimmerMatchKey(s.LastName, s.FirstName, s.BirthYear), s);
             swimmerCacheByFullName.TryAdd(SwimmerFullNameKey(s.LastName, s.FirstName, s.BirthYear), s);
+            AddBySpelling(swimmersBySpelling, s);
             if (!string.IsNullOrWhiteSpace(s.LastNameEn))
                 swimmerCacheEn.TryAdd(SwimmerMatchKey(s.LastNameEn, s.FirstNameEn, s.BirthYear), s);
         }
@@ -646,6 +649,9 @@ public class JsonImportService : IImportService
                             s.LastName == (item.LastName ?? "") &&
                             s.FirstName == (item.FirstName ?? "") &&
                             s.BirthYear == (item.BirthYear ?? 0));
+
+                        swimmer ??= FindBySpelling(swimmersBySpelling, item.LastName, item.FirstName, item.BirthYear,
+                            club, diagnosticLog);
                     }
 
                     if (swimmer == null)
@@ -660,6 +666,7 @@ public class JsonImportService : IImportService
                         };
                         _db.Swimmers.Add(swimmer);
                         await _db.SaveChangesAsync();
+                        AddBySpelling(swimmersBySpelling, swimmer);
                     }
 
                     swimmerCache[swimmerKey] = swimmer;
@@ -725,7 +732,8 @@ public class JsonImportService : IImportService
                         TeamName = item.RelayTeamName,
                         SwimmersName = item.RelaySwimmersName
                     };
-                    relay.Members = await ResolveRelayMembersAsync(item.RelaySwimmers, swimmerCache);
+                    relay.Members = await ResolveRelayMembersAsync(
+                        item.RelaySwimmers, swimmerCache, swimmersBySpelling, club, diagnosticLog);
                     if (item.RelaySwimmers?.Any(l => !string.IsNullOrWhiteSpace(l.SplitTime)) == true)
                         competitionsWithSplits.Add(competition.Id);
                 }
@@ -1471,7 +1479,8 @@ public class JsonImportService : IImportService
     /// одной эстафеты схлопываем (уникальный индекс RelayId+SwimmerId).
     /// </summary>
     private async Task<List<RelayMember>> ResolveRelayMembersAsync(
-        List<RelaySwimmerJson>? legs, Dictionary<string, Swimmer> swimmerCache)
+        List<RelaySwimmerJson>? legs, Dictionary<string, Swimmer> swimmerCache,
+        Dictionary<string, List<Swimmer>> swimmersBySpelling, Club? club, List<string> diagnosticLog)
     {
         var members = new List<RelayMember>();
         if (legs == null || legs.Count == 0) return members;
@@ -1496,6 +1505,9 @@ public class JsonImportService : IImportService
                 // loglig берёт её из колонок) — не новый пловец, см. SwimmerFullNameKey.
                 swimmer ??= await FindLegByFullNameAsync(leg);
                 swimmer ??= await FindLegByEnglishNameAsync(leg);
+                // Нога плывёт за клуб команды — тот же фоллбек написания, что у личной строки.
+                swimmer ??= FindBySpelling(swimmersBySpelling, leg.LastName, leg.FirstName, leg.BirthYear,
+                    club, diagnosticLog);
 
                 if (swimmer == null)
                 {
@@ -1509,6 +1521,7 @@ public class JsonImportService : IImportService
                     };
                     _db.Swimmers.Add(swimmer);
                     await _db.SaveChangesAsync();
+                    AddBySpelling(swimmersBySpelling, swimmer);
                 }
                 swimmerCache[key] = swimmer;
             }
@@ -1659,6 +1672,64 @@ public class JsonImportService : IImportService
     /// ⚠ Это ФОЛЛБЕК, а не основной ключ: сначала пробуем точное совпадение, и только если его
     /// нет — этот. Сторож тёзок по клубам (И-11) работает после и не отключается.
     /// </summary>
+    /// <summary>
+    /// Ключ написания: полное имя без «י», «ו», дефисов, апострофов и пробелов + год рождения.
+    ///
+    /// Зачем: иврит пишет одно и то же имя то полным письмом, то неполным (כתיב מלא/חסר), а
+    /// протоколы ещё и ставят дефис в двойной фамилии через раз. «יוקליס עמליה» и
+    /// «יוקלס עמליה» (#61745), «בן-בסט יובל» и «בן בסט יובל» (#60127) — одни и те же люди, но
+    /// точный ключ у них разный, и каждый переимпорт заводил новую карточку (склеивали 06.10 и
+    /// снова 07.10; решение Влада 07.10.2026 — Р79 в docs/data-integrity.md).
+    ///
+    /// Ключ слабый (у разных людей скелет может совпасть), поэтому сам по себе он не решает —
+    /// см. <see cref="FindBySpelling"/>: нужны ещё тот же клуб и единственный кандидат.
+    /// null — в имени нет иврита (латиница так не пишется) или нет года.
+    /// </summary>
+    internal static string? SwimmerSpellingKey(string? last, string? first, int? year)
+    {
+        var full = $"{last} {first}";
+        if (year is not > 0 || !full.Any(c => c is >= 'א' and <= 'ת')) return null;
+
+        var skeleton = new string(SwimmerDedupService.Normalize(full)
+            .Where(c => c is not ('י' or 'ו' or '-' or '־' or ' ' or '\'' or '"'))
+            .ToArray());
+        return skeleton.Length == 0 ? null : $"{skeleton}|{year}";
+    }
+
+    private static void AddBySpelling(Dictionary<string, List<Swimmer>> index, Swimmer swimmer)
+    {
+        // Пловец группы (Р71) — не кандидат: его заводил тренер, и чужой протокол не должен
+        // попадать в его карточку (тот же принцип, что в SwimmerDedupService).
+        if (swimmer.PrivateHubGroupId != null) return;
+        if (SwimmerSpellingKey(swimmer.LastName, swimmer.FirstName, swimmer.BirthYear) is not { } key) return;
+        if (!index.TryGetValue(key, out var list)) index[key] = list = [];
+        list.Add(swimmer);
+    }
+
+    /// <summary>
+    /// Карточка того же человека, записанного другим написанием (<see cref="SwimmerSpellingKey"/>):
+    /// тот же год, ТОТ ЖЕ КЛУБ (клуб строки или его канон после склейки — у карточки клуб
+    /// последнего старта) и ровно один такой кандидат. Иначе null — вызывающий заводит новую
+    /// карточку, а сомнительную пару покажет проверка дублей в Health, решать будет человек.
+    /// </summary>
+    private static Swimmer? FindBySpelling(
+        Dictionary<string, List<Swimmer>> index, string? last, string? first, int? year,
+        Club? club, List<string> diagnosticLog)
+    {
+        if (club is null || SwimmerSpellingKey(last, first, year) is not { } key) return null;
+        if (!index.TryGetValue(key, out var candidates)) return null;
+
+        var clubIds = new[] { club.Id, club.MergedIntoId ?? club.Id };
+        var sameClub = candidates.Where(s => s.ClubId is int c && clubIds.Contains(c)).Take(2).ToList();
+        if (sameClub.Count != 1) return null;
+
+        var found = sameClub[0];
+        diagnosticLog.Add(
+            $"Другое написание: '{last} {first}' ({year}) узнан как #{found.Id} '{found.LastName} {found.FirstName}' "
+            + $"(тот же год и клуб «{club.Name}»)");
+        return found;
+    }
+
     private static string SwimmerFullNameKey(string? last, string? first, int? year)
     {
         var glued = $"{SwimmerDedupService.Normalize(last ?? "")}{SwimmerDedupService.Normalize(first ?? "")}"
