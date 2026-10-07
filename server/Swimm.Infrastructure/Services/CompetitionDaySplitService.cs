@@ -49,7 +49,14 @@ public sealed class CompetitionDaySplitService(
         {
             var why = unresolved.Count > 0
                 ? $"у {unresolved.Values.Sum()} строк нет однозначного дня — всё или ничего"
-                : $"по источнику один день ({string.Join(", ", dates.Days.Select(Format))}) — делить нечего";
+                : rows.Count == 0
+                    ? "в соревновании нет строк — делить нечего"
+                : dates.Days.Count > 1
+                    // Сетка многодневная, а все строки — дисциплины одного дня: остальные дни лежат
+                    // отдельными соревнованиями (Эйлат-2025, М4 — «дни есть, события нет»).
+                    ? $"все строки — дисциплины одного дня ({string.Join(", ", plan.ByDay.Keys.Select(Format))}) " +
+                      $"из {dates.Days.Count} по источнику — остальные дни лежат не здесь"
+                    : $"по источнику один день ({string.Join(", ", dates.Days.Select(Format))}) — делить нечего";
             return new CompetitionDaySplitReport(comp.Id, comp.Name, resolved, [], unresolved, why, false, null);
         }
 

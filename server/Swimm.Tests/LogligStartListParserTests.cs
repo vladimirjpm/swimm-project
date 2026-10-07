@@ -204,6 +204,22 @@ public class LogligStartListParserTests
         Assert.Equal("freestyle", relay.StyleName);
     }
 
+    /// <summary>
+    /// «5K חופשי» / «10K חופשי» — дистанция в метрах, как у наших строк: иначе ключ дня
+    /// «freestyle 5» не находил строк «5000», и обзор М4 считал Эйлат-2026 неоднозначным.
+    /// </summary>
+    [Fact]
+    public void Grid_OpenWaterKilometres_AreMetres()
+    {
+        var grid = LogligStartListParser.ParseDisciplineGrid(Fixture("disciplines-14032-openwater.html"));
+
+        var distances = grid.Where(r => !r.IsRelay).Select(r => (r.Distance, r.StyleName)).Distinct().ToList();
+        Assert.Contains(("5000", "freestyle"), distances);
+        Assert.Contains(("10000", "freestyle"), distances);
+        Assert.Contains(("1600", "freestyle"), distances);
+        Assert.DoesNotContain(distances, d => d.Distance is "5" or "10");
+    }
+
     [Fact]
     public void Grid_ZeroMinTimeIsNotATime()
     {

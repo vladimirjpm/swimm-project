@@ -772,6 +772,47 @@ if (args.Contains("--split-days"))
     return;
 }
 
+// Обзор многодневок, лежащих не так, как плыли (docs/plans/multiday-split-plan.md, М4):
+//   dotnet run -- --collapsed-days [--pause-ms 1000]
+// Только чтение. Ходит в loglig по каждому однодневному старту с LogligId (с паузой);
+// схлопнутым прикладывает план --split-days, а «дни есть, события нет» ищет по базе.
+if (args.Contains("--collapsed-days"))
+{
+    var pauseIndex = Array.IndexOf(args, "--pause-ms") + 1;
+    var pauseMs = pauseIndex > 0 && pauseIndex < args.Length && int.TryParse(args[pauseIndex], out var pm) ? pm : 1000;
+
+    using var scope = app.Services.CreateScope();
+    var review = await scope.ServiceProvider.GetRequiredService<ICollapsedDaysReviewService>()
+        .ReviewAsync(TimeSpan.FromMilliseconds(pauseMs), line => Console.WriteLine($"  {line}"));
+
+    Console.WriteLine($"\nСверено с сеткой loglig: {review.Checked}. Схлопнуты (сетка многодневная): {review.Collapsed.Count}");
+    foreach (var c in review.Collapsed)
+    {
+        Console.WriteLine($"\n#{c.Split.CompetitionId} «{c.Split.Name}» — compID {c.OrgCompId}, loglig {c.LogligId}, " +
+                          $"discovery #{c.DiscoveredId}; дни по сетке: {string.Join(", ", c.SourceDays.Select(d => d.ToString("dd/MM/yyyy")))}");
+        foreach (var day in c.Split.Days)
+            Console.WriteLine($"  день {day.DayNumber} {day.Date:dd/MM/yyyy}: строк {day.Rows}, медиа {day.Media}" +
+                              (day.Existing ? $" — остаётся #{day.CompetitionId}" : " — новый"));
+        foreach (var (key, count) in c.Split.Unresolved)
+            Console.WriteLine($"  без дня: {key} ×{count}");
+        Console.WriteLine(c.Split.Refusal != null
+            ? $"  --split-days НЕ поделит: {c.Split.Refusal}"
+            : $"  лечится: --split-days {c.Split.CompetitionId} --apply");
+    }
+
+    Console.WriteLine($"\nДни есть, события нет: {review.DaysWithoutEvent.Count}");
+    foreach (var g in review.DaysWithoutEvent)
+        Console.WriteLine($"  «{g.Name}» ({g.PoolType}): " + string.Join(", ", g.Days.Select(d =>
+            $"#{d.CompetitionId} {d.Date:dd/MM/yyyy} — {d.Rows} строк" + (d.OrgCompId is int org ? $", compID {org}" : ""))));
+
+    if (review.Failed.Count > 0)
+    {
+        Console.WriteLine($"\nСетку получить не удалось: {review.Failed.Count}");
+        foreach (var f in review.Failed) Console.WriteLine($"  {f}");
+    }
+    return;
+}
+
 // Переимпорт протокола из Discovery без админки (docs/data-integrity.md, чек-лист §8):
 //   dotnet run -- --repull <discoveredId> [--delete-missing]
 // Тот же путь, что кнопка «Перезатянуть»: качаем HE-протокол, парсим, импортируем с
