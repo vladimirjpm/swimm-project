@@ -25,13 +25,21 @@ public sealed record SplitSwim(string Time, int BirthYear, IReadOnlyList<string>
 /// есть нарастающее, поэтому во второй строке этой колонки нет). Колонка времени
 /// определяется по ближайшему числу шапки, а не по порядку слов.
 ///
-/// Отрезок = меньшее из двух значений колонки (нарастающее всегда больше, кроме первой
-/// колонки, где значение одно). Не сошлась сумма отрезков с итогом — пловец пропускается:
-/// лучше без промежуточных, чем с чужими.
+/// Отрезки считаем РАЗНОСТЬЮ нарастающих, а не берём из строки отрезков: так было до
+/// 07.10.2026, и на 6595 (loglig 11586) это теряло пловцов дважды:
+/// - у 800 м отметок 16, и шапка печатается В ДВЕ СТРОКИ («50…550» и «600…800») — полосы.
+///   Времена второй полосы стоят под теми же X, что первой, а отрезок первой колонки
+///   полосы (600 м) не печатается вовсе, как у 50 м. Полоса строки определяется так: строка
+///   нарастающих — та, где есть время в ПЕРВОЙ колонке следующей полосы; строка отрезков её не
+///   имеет никогда;
+/// - время бывает с одной цифрой после точки («00:40.0», «05:24.0») — оно не читалось, сумма
+///   не сходилась, и пловец пропадал целиком (по 1–9 в дисциплине).
+/// Нарастающие обязаны расти, последнее — совпасть с итогом (±0.02 на округление протокола);
+/// иначе пловец пропускается: лучше без промежуточных, чем с чужими.
 /// </summary>
 public static class LogligIndividualSplitParser
 {
-    private static readonly Regex TimeRx = new(@"^\d{1,2}:\d{2}\.\d{2}$", RegexOptions.Compiled);
+    private static readonly Regex TimeRx = new(@"^\d{1,2}:\d{2}\.\d{1,2}$", RegexOptions.Compiled);
     private static readonly Regex YearRx = new(@"^(19|20)\d{2}$", RegexOptions.Compiled);
     private static readonly Regex DistRx = new(@"^\d{2,4}$", RegexOptions.Compiled);
 
@@ -46,7 +54,8 @@ public static class LogligIndividualSplitParser
     {
         using var doc = PdfDocument.Open(pdf);
         var swims = new List<SplitSwim>();
-        var columns = new List<(int Dist, double X)>();
+        // Полосы шапки: у 800/1500 м отметки не влезают в строку и переносятся на следующую.
+        var bands = new List<List<(int Dist, double X)>>();
 
         foreach (var page in doc.GetPages())
         {
@@ -56,23 +65,28 @@ public static class LogligIndividualSplitParser
                 .Select(g => g.OrderBy(w => w.BoundingBox.Left).ToList())
                 .ToList();
 
-            // Шапка колонок: пары «'מ» + число. На странице своя (или повтор прежней).
-            var header = rows.FirstOrDefault(r => r.Any(w => w.Text == "'מ") && r.Count(w => DistRx.IsMatch(w.Text)) >= 1
-                                                  && !r.Any(w => TimeRx.IsMatch(w.Text)));
-            if (header != null)
-                columns = header.Where(w => DistRx.IsMatch(w.Text))
-                    .Select(w => (int.Parse(w.Text, CultureInfo.InvariantCulture), (double)w.BoundingBox.Left))
-                    .OrderBy(c => c.Item1).ToList();
-            if (columns.Count < 2) continue; // одна колонка (50 м) — отрезков нет
+            // Шапка колонок: строки пар «'מ» + число. На странице своя (или повтор прежней).
+            var headers = rows
+                .Where(r => r.Any(w => w.Text == "'מ") && r.Any(w => DistRx.IsMatch(w.Text))
+                            && !r.Any(w => TimeRx.IsMatch(w.Text)))
+                .Select(r => r.Where(w => DistRx.IsMatch(w.Text))
+                    .Select(w => (Dist: int.Parse(w.Text, CultureInfo.InvariantCulture), X: (double)w.BoundingBox.Left))
+                    .OrderBy(c => c.Dist).ToList())
+                .ToList();
+            if (headers.Count > 0)
+                bands = headers.DistinctBy(b => b[0].Dist).OrderBy(b => b[0].Dist).ToList();
+            if (bands.Sum(b => b.Count) < 2) continue; // одна колонка (50 м) — отрезков нет
 
             (string Time, int Year)? current = null;
-            var marks = new Dictionary<int, List<string>>();
+            var cumulative = new Dictionary<int, string>();
+            var band = -1;
 
             void Flush()
             {
-                if (current is { } c && TryLaps(c.Time, marks, columns, out var laps))
+                if (current is { } c && TryLaps(c.Time, cumulative, bands, out var laps))
                     swims.Add(new SplitSwim(c.Time, c.Year, laps));
-                marks = new Dictionary<int, List<string>>();
+                cumulative = new Dictionary<int, string>();
+                band = -1;
             }
 
             foreach (var row in rows)
@@ -86,14 +100,17 @@ public static class LogligIndividualSplitParser
                     continue;
                 }
 
-                if (current == null) continue;
-                foreach (var w in row.Where(w => TimeRx.IsMatch(w.Text)))
-                {
-                    // Время печатается левее своего числа в шапке (383 против 396): ближайшая колонка.
-                    var dist = columns.OrderBy(c => Math.Abs(c.X - w.BoundingBox.Left)).First().Dist;
-                    if (!marks.TryGetValue(dist, out var list)) marks[dist] = list = new List<string>();
-                    list.Add(w.Text);
-                }
+                var times = row.Where(w => TimeRx.IsMatch(w.Text)).ToList();
+                if (current == null || times.Count == 0 || band + 1 >= bands.Count) continue;
+
+                // Строка нарастающих следующей полосы — есть время в её ПЕРВОЙ колонке (отрезок
+                // первой колонки не печатается никогда). Иначе это строка отрезков — пропускаем.
+                var next = bands[band + 1];
+                if (!times.Any(w => Nearest(next, w).Dist == next[0].Dist)) continue;
+
+                band++;
+                foreach (var w in times)
+                    cumulative[Nearest(next, w).Dist] = w.Text;
             }
             Flush();
         }
@@ -101,29 +118,36 @@ public static class LogligIndividualSplitParser
         return swims;
     }
 
-    private static bool TryLaps(string total, Dictionary<int, List<string>> marks,
-        List<(int Dist, double X)> columns, out List<string> laps)
+    /// <summary>Время печатается левее своего числа в шапке (383 против 396): ближайшая колонка.</summary>
+    private static (int Dist, double X) Nearest(List<(int Dist, double X)> columns, Word w) =>
+        columns.OrderBy(c => Math.Abs(c.X - w.BoundingBox.Left)).First();
+
+    private static bool TryLaps(string total, Dictionary<int, string> cumulative,
+        List<List<(int Dist, double X)>> bands, out List<string> laps)
     {
         laps = new List<string>();
-        foreach (var (dist, _) in columns)
+        long previous = 0;
+        foreach (var (dist, _) in bands.SelectMany(b => b).OrderBy(c => c.Dist))
         {
-            if (!marks.TryGetValue(dist, out var values) || values.Count == 0) return false;
-            laps.Add(values.OrderBy(ToMs).First());
+            if (!cumulative.TryGetValue(dist, out var mark)) return false;
+            var ms = ToMs(mark);
+            if (ms <= previous) return false; // нарастающее обязано расти — иначе колонки разъехались
+            laps.Add(FormatLap(ms - previous));
+            previous = ms;
         }
 
-        // Страховка: сумма отрезков обязана дать итог (±0.02 на округление протокола).
-        var sum = laps.Sum(ToMs);
-        if (Math.Abs(sum - ToMs(total)) > 20) return false;
-
-        laps = laps.Select(Short).ToList();
-        return true;
+        // Страховка: последняя отметка — это итог (±0.02 на округление протокола).
+        return Math.Abs(previous - ToMs(total)) <= 20;
     }
 
-    /// <summary>«00:34.84» → «34.84», «01:08.68» → «1:08.68» — как у существующих time_split.</summary>
-    private static string Short(string t)
+    /// <summary>34 840 мс → «34.84», 68 680 → «1:08.68» — как у существующих time_split.</summary>
+    private static string FormatLap(long ms)
     {
-        var s = t.StartsWith("00:", StringComparison.Ordinal) ? t[3..] : t;
-        return s.StartsWith('0') && s.Contains(':') ? s[1..] : s;
+        var minutes = ms / 60000;
+        var seconds = (ms % 60000) / 1000.0;
+        return minutes > 0
+            ? string.Format(CultureInfo.InvariantCulture, "{0}:{1:00.00}", minutes, seconds)
+            : seconds.ToString("0.00", CultureInfo.InvariantCulture);
     }
 
     private static long ToMs(string time)

@@ -106,8 +106,7 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
         };
         var bytes = await PostFormBytesAsync(url, form, $"splits-{logligId}-{disciplineId}.pdf", ct);
         if (bytes.Length < 4 || bytes[0] != '%' || bytes[1] != 'P' || bytes[2] != 'D' || bytes[3] != 'F')
-            throw new InvalidOperationException(
-                $"loglig вернул не PDF промежуточных для дисциплины {disciplineId} (соревнование {logligId}).");
+            throw new LogligSplitPdfMissingException(logligId, disciplineId);
         return bytes;
     }
 
