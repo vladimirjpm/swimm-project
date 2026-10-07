@@ -17,9 +17,12 @@ namespace Swimm.Parsing.Parsers.IsrOrg;
 /// <param name="Band">Полоса мастерсов по СУММЕ возрастов («160-199») из строки
 /// «160-199 מאסטרס שליחים» над командами; null — строки полосы нет (не мастерс).</param>
 /// <param name="Status">Статус вместо времени («DQ», «NS», «DNF»); null — время есть.</param>
+/// <param name="LegNames">Имена ног строкой «имя фамилия» без годов — только у команды со
+/// страницы результатов (PDF промежуточных пуст): по ним состав NS-команды ищется в протоколе.</param>
 public sealed record SplitRelayTeam(
     int Heat, int Lane, string? Time, string Club, IReadOnlyList<RelaySwimmer> Legs,
-    string? Band = null, string? Status = null, bool LegsBorrowed = false);
+    string? Band = null, string? Status = null, bool LegsBorrowed = false,
+    IReadOnlyList<string>? LegNames = null);
 
 /// <summary>
 /// Разбор PDF промежуточных времён ОДНОЙ эстафетной дисциплины loglig

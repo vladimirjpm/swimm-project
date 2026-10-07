@@ -44,6 +44,10 @@ public sealed record RelayBuildEvent(string Style, string Len, string Gender, st
 /// Состав такой команды берём из строки основного протокола с тем же стилем, дистанцией,
 /// клубом и временем (<see cref="BorrowLegs"/>); нет строки и нет времени (NS) — команду не
 /// строим: заплыва не было, а владельца строки взять неоткуда.
+///
+/// Команда со страницы результатов (PDF промежуточных пуст, 6595 / 58140, 07.10.2026) несёт
+/// имена ног без годов (<see cref="SplitRelayTeam.LegNames"/>). Со временем — заимствуется как
+/// выше; без времени — по совпадению имён с ногами строки протокола (≥ 3 из 4, ровно одна).
 /// </summary>
 public static class RelayMastersBuilder
 {
@@ -108,14 +112,29 @@ public static class RelayMastersBuilder
 
     private static SplitRelayTeam? Borrow(RelayBuildEvent ev, SplitRelayTeam team, IReadOnlyList<JsonObject> oldRelays)
     {
-        if (team.Time == null) return null; // NS/DQ без состава — строить не из чего
-
-        var ms = ToMs(team.Time);
-        var match = oldRelays.FirstOrDefault(o =>
+        var sameEvent = oldRelays.Where(o =>
             (string?)o["event_style_name"] == ev.Style
             && (string?)o["event_style_len"] == ev.Len
-            && (string?)o["club"] == team.Club
-            && o["time"] is JsonValue tv && tv.TryGetValue<string>(out var time) && ToMs(time) == ms);
+            && (string?)o["club"] == team.Club).ToList();
+
+        JsonObject? match;
+        if (team.Time != null)
+        {
+            var ms = ToMs(team.Time);
+            match = sameEvent.FirstOrDefault(o =>
+                o["time"] is JsonValue tv && tv.TryGetValue<string>(out var time) && ToMs(time) == ms);
+        }
+        else if (team.LegNames is { Count: > 0 } names)
+        {
+            // Без времени ключа «время» нет, а у клуба бывает по две снятые команды — и в
+            // общем протоколе все полы эстафеты одним списком. Узнаём по составу: имена со
+            // страницы результатов против ног протокола, не меньше трёх из четырёх (перенос
+            // фамилии в PDF портит одну ногу, 6595: «טל בץרבינוביץ»). Ровно одна — иначе мимо.
+            var candidates = sameEvent.Where(o => IsNoTime(o) && SharedLegs(o, names) >= 3).ToList();
+            match = candidates.Count == 1 ? candidates[0] : null;
+            if (match == null) return null;
+        }
+        else return null; // NS/DQ без состава — строить не из чего
 
         var legs = (match?["relay_swimmers"] as JsonArray)?
             .OfType<JsonObject>()
@@ -127,6 +146,23 @@ public static class RelayMastersBuilder
         // Не нашлось — оставляем пустой: CanBuild откажет, и соревнование останется на этапе 1.
         return legs is { Count: > 0 } ? team with { Legs = legs, LegsBorrowed = true } : team;
     }
+
+    private static bool IsNoTime(JsonObject o) =>
+        o["time"] is not JsonValue tv || !tv.TryGetValue<string>(out var time) || string.IsNullOrWhiteSpace(time)
+        || (o["time_fail"] is JsonValue fv && fv.TryGetValue<bool>(out var failed) && failed);
+
+    /// <summary>Сколько ног строки протокола совпало по имени с именами со страницы результатов.</summary>
+    private static int SharedLegs(JsonObject o, IReadOnlyList<string> names)
+    {
+        var wanted = names.Select(NameKey).ToHashSet();
+        return (o["relay_swimmers"] as JsonArray)?.OfType<JsonObject>()
+            .Count(l => wanted.Contains(NameKey($"{(string?)l["first_name"]} {(string?)l["last_name"]}"))) ?? 0;
+    }
+
+    /// <summary>Имя для сравнения: без апострофов и гереша, пробелы схлопнуты.</summary>
+    private static string NameKey(string name) =>
+        string.Join(' ', name.Replace("'", "").Replace("׳", "").Replace("’", "")
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
     private static Dictionary<SplitRelayTeam, int> Places(List<SplitRelayTeam> teams)
     {
