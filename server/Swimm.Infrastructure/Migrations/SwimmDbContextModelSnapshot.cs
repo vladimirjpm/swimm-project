@@ -2161,6 +2161,10 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<string>("Distances")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateOnly>("EffectiveFrom")
                         .HasColumnType("date");
 
@@ -2168,6 +2172,12 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<int?>("MaxScoringPlace")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MinEntrants")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("OverallMultiplier")
                         .HasColumnType("integer");
 
                     b.Property<int>("RelayMultiplier")

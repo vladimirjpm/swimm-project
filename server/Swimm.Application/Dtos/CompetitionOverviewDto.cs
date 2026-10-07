@@ -218,6 +218,15 @@ public sealed class OverviewPointsRuleDto
     /// <summary>Множитель очков за эстафету (обычно 2).</summary>
     [JsonPropertyName("relay_multiplier")] public int RelayMultiplier { get; init; }
 
+    /// <summary>Вес общей категории (абсолют по времени, все возрасты, внутри пола); null — нет.</summary>
+    [JsonPropertyName("overall_multiplier")] public int? OverallMultiplier { get; init; }
+
+    /// <summary>Минимум стартовавших, при котором категория приносит очки; null — без порога.</summary>
+    [JsonPropertyName("min_entrants")] public int? MinEntrants { get; init; }
+
+    /// <summary>Зачётные дистанции («1600»); null — все.</summary>
+    [JsonPropertyName("distances")] public string? Distances { get; init; }
+
     /// <summary>Шкала «место → очки», по возрастанию места.</summary>
     [JsonPropertyName("points_by_place")]
     public IReadOnlyList<OverviewPointsRuleEntryDto> PointsByPlace { get; init; } = [];

@@ -351,6 +351,7 @@ public sealed class OfficialClubPointsMismatchCheck(SwimmDbContext db) : IDataCh
             .Where(r => r.OfficialClubPoints != null)
             .Select(r => new
             {
+                r.Id,
                 r.CompetitionId,
                 CompetitionName = r.Competition!.Name,
                 r.Competition.Date,
@@ -368,6 +369,12 @@ public sealed class OfficialClubPointsMismatchCheck(SwimmDbContext db) : IDataCh
         if (rows.Count == 0) return DataCheckOutcome.Empty;
 
         var rules = await db.PointRulesClubs.AsNoTracking().Include(r => r.Entries).ToListAsync(ct);
+
+        // Правило «по заплыву целиком» (схема Красного моря) — по всем участникам заплыва.
+        var contextPoints = await ContextClubPoints.LoadAsync(db.Results, rules,
+            ContextClubPoints.CompetitionsNeedingContext(rules, rows
+                .Select(r => (r.CompetitionId, r.RuleId, r.IsMasters, ParseDate(r.Date)))
+                .Distinct()), ct);
 
         var findings = new List<(int CompetitionId, string Name, string Date, int Ours, int Official, int Rows)>();
         foreach (var group in rows.GroupBy(r => r.CompetitionId))
@@ -387,8 +394,9 @@ public sealed class OfficialClubPointsMismatchCheck(SwimmDbContext db) : IDataCh
                                    || r.Round == ResultRounds.FinalOpen
                     ? null
                     : r.Position;
-                var mine = PointRulesClubsScoring.RelayPointsFor(
-                    rule, scoringPlace, r.TimeFail, r.IsRelay);
+                var mine = PointRulesClubsScoring.NeedsContext(rule)
+                    ? contextPoints.GetValueOrDefault(r.Id)
+                    : PointRulesClubsScoring.RelayPointsFor(rule, scoringPlace, r.TimeFail, r.IsRelay);
                 ours += mine;
                 official += r.Official;
                 if (mine != r.Official) mismatched++;

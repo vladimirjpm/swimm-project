@@ -247,6 +247,8 @@ public class ResultRepository : IResultRepository
             .Where(r => !r.Club.IsPseudo)
             .Select(r => new
             {
+                r.Id,
+                r.CompetitionId,
                 r.ClubId,
                 ClubName = r.Club.Name,
                 ClubNameEn = r.Club.NameEn,
@@ -273,6 +275,14 @@ public class ResultRepository : IResultRepository
             .Include(r => r.Entries)
             .ToListAsync();
 
+        // Правило «по заплыву целиком» (схема Красного моря): очки зависят от всех участников
+        // заплыва, а не от отфильтрованной выборки, — их считает ContextClubPoints по
+        // соревнованию целиком. Объединённых мест у такого правила нет: зачёт по протоколу.
+        var contextPoints = await ContextClubPoints.LoadAsync(_db.Results, rules,
+            ContextClubPoints.CompetitionsNeedingContext(rules, rows
+                .Select(r => (r.CompetitionId, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate)))
+                .Distinct()));
+
         // Агрегация и ранжирование — в общем ClubStandingCalculator (Application/Mapping):
         // тот же алгоритм считает материализованный зачёт страницы клуба. Здесь остаётся
         // только то, что зависит от Infrastructure: правило очков и выбор места.
@@ -296,8 +306,11 @@ public class ResultRepository : IResultRepository
             // дисциплины (по всему событию), а не по месту внутри своего заплыва/дня.
             // Раньше здесь всегда стояло протокольное Position, из-за чего Overview
             // на combine-all соревнованиях показывал очки не той системы (план Э2).
-            var place = EffectivePlace(filter.Combined && r.ShowCombine, r.Position, r.CombinedPlace);
-            var points = PointRulesClubsScoring.RelayPointsFor(rule, place, r.TimeFail, r.IsRelay);
+            var contextual = PointRulesClubsScoring.NeedsContext(rule);
+            var place = contextual ? r.Position : EffectivePlace(filter.Combined && r.ShowCombine, r.Position, r.CombinedPlace);
+            var points = contextual
+                ? contextPoints.GetValueOrDefault(r.Id)
+                : PointRulesClubsScoring.RelayPointsFor(rule, place, r.TimeFail, r.IsRelay);
 
             scoring.Add(new ClubScoringRow(
                 ClubId: r.ClubId, ClubKey: club, SwimmerId: r.SwimmerId,
@@ -841,6 +854,9 @@ public class ResultRepository : IResultRepository
                 DefaultPoints = r.DefaultPoints,
                 MaxScoringPlace = r.MaxScoringPlace,
                 RelayMultiplier = r.RelayMultiplier,
+                OverallMultiplier = r.OverallMultiplier,
+                MinEntrants = r.MinEntrants,
+                Distances = r.Distances,
                 PointsByPlace = r.Entries
                     .OrderBy(e => e.Place)
                     .Select(e => new OverviewPointsRuleEntryDto { Place = e.Place, Points = e.Points })
@@ -1672,10 +1688,34 @@ public class ResultRepository : IResultRepository
             .Include(r => r.Entries)
             .ToListAsync();
 
+        // Правило «по заплыву целиком» (схема Красного моря): на странице протокола видна лишь
+        // часть заплыва, поэтому очки таких соревнований считаются по ним целиком.
+        // Id соревнования в DTO нет — берём по строкам, и только когда такое правило вообще есть.
+        IReadOnlyDictionary<long, int> contextPoints = new Dictionary<long, int>();
+        if (rules.Any(PointRulesClubsScoring.NeedsContext))
+        {
+            var ids = items.Select(i => i.Id).ToList();
+            var competitions = await _db.Results.AsNoTracking()
+                .Where(r => ids.Contains(r.Id))
+                .Select(r => new { r.CompetitionId, r.Competition.PointRuleClubsId, r.Competition.IsMasters, r.CompetitionDate })
+                .Distinct()
+                .ToListAsync();
+            contextPoints = await ContextClubPoints.LoadAsync(_db.Results, rules,
+                ContextClubPoints.CompetitionsNeedingContext(rules, competitions
+                    .Select(c => (c.CompetitionId, c.PointRuleClubsId, c.IsMasters, DateOnly.FromDateTime(c.CompetitionDate)))));
+        }
+
         foreach (var item in items)
         {
             var date = ParseCompetitionDate(item.Date);
             var rule = CompetitionRuleResolver.Resolve(rules, item.PointRuleClubsId, item.IsMasters, date);
+
+            if (PointRulesClubsScoring.NeedsContext(rule))
+            {
+                item.ClubPoints = contextPoints.GetValueOrDefault(item.Id);
+                item.CombinedClubPoints = item.CombinedPlace is null ? null : item.ClubPoints;
+                continue;
+            }
 
             // Место prelim-заплыва очков не приносит (ранжир сессии, не награда); само
             // Position в DTO остаётся — клиент показывает место в заплыве как в протоколе.

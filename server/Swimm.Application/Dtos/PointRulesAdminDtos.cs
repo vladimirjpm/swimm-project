@@ -108,6 +108,12 @@ public class PointRuleInputDto
 
     // ── только клубное правило ────────────────────────────────────────────────
     public int RelayMultiplier { get; set; } = 2;
+    /// <summary>Вес общей категории (абсолютное место дисциплины); null — нет. См. PointRuleClubs.</summary>
+    public int? OverallMultiplier { get; set; }
+    /// <summary>Минимум стартовавших в категории; null — без порога.</summary>
+    public int? MinEntrants { get; set; }
+    /// <summary>Зачётные дистанции через запятую; пусто — все.</summary>
+    public string? Distances { get; set; }
 
     // ── только правило пловца ─────────────────────────────────────────────────
     public string PointsSource { get; set; } = "placement";

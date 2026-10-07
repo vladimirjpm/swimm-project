@@ -491,6 +491,9 @@ public class PointRulesAdminRepository(
                 MaxScoringPlace = r.MaxScoringPlace,
                 ManualOnly = r.ManualOnly,
                 RelayMultiplier = r.RelayMultiplier,
+                OverallMultiplier = r.OverallMultiplier,
+                MinEntrants = r.MinEntrants,
+                Distances = r.Distances,
                 Entries = MapEntries(r.Entries.Select(e => (e.Place, e.Points))),
                 CompetitionCount = await db.Competitions.CountAsync(c => c.PointRuleClubsId == id)
             };
@@ -653,15 +656,26 @@ public class PointRulesAdminRepository(
     /// </summary>
     private sealed record ClubScoringShape(
         string Scope, DateOnly EffectiveFrom, bool ManualOnly,
-        int DefaultPoints, int? MaxScoringPlace, int RelayMultiplier, string Scale);
+        int DefaultPoints, int? MaxScoringPlace, int RelayMultiplier, string Scale,
+        int? OverallMultiplier, int? MinEntrants, string? Distances);
 
     private static ClubScoringShape ShapeOf(PointRuleClubs r) => new(
         r.Scope, r.EffectiveFrom, r.ManualOnly, r.DefaultPoints, r.MaxScoringPlace, r.RelayMultiplier,
-        ScaleKey(r.Entries.Select(e => (e.Place, e.Points))));
+        ScaleKey(r.Entries.Select(e => (e.Place, e.Points))),
+        r.OverallMultiplier, r.MinEntrants, NormalizeDistances(r.Distances));
 
     private static ClubScoringShape ShapeOf(PointRuleInputDto i) => new(
         i.Scope, i.EffectiveFrom, i.ManualOnly, i.DefaultPoints, i.MaxScoringPlace, i.RelayMultiplier,
-        ScaleKey(i.Entries.Select(e => (e.Place, e.Points))));
+        ScaleKey(i.Entries.Select(e => (e.Place, e.Points))),
+        i.OverallMultiplier, i.MinEntrants, NormalizeDistances(i.Distances));
+
+    /// <summary>«1600, 5000» → «1600,5000»; пусто → null. Так и хранится, и сравнивается.</summary>
+    private static string? NormalizeDistances(string? distances)
+    {
+        if (string.IsNullOrWhiteSpace(distances)) return null;
+        var parts = distances.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return parts.Length == 0 ? null : string.Join(",", parts);
+    }
 
     private static string ScaleKey(IEnumerable<(int Place, int Points)> entries) =>
         string.Join(",", entries.OrderBy(e => e.Place).Select(e => $"{e.Place}:{e.Points}"));
@@ -736,6 +750,9 @@ public class PointRulesAdminRepository(
         rule.MaxScoringPlace = input.MaxScoringPlace;
         rule.ManualOnly = input.ManualOnly;
         rule.RelayMultiplier = input.RelayMultiplier;
+        rule.OverallMultiplier = input.OverallMultiplier;
+        rule.MinEntrants = input.MinEntrants;
+        rule.Distances = NormalizeDistances(input.Distances);
     }
 
     private static void ApplySwimmers(PointRuleSwimmers rule, PointRuleInputDto input)
@@ -782,6 +799,9 @@ public class PointRulesAdminRepository(
         if (kind == PointRuleKind.Clubs)
         {
             if (input.RelayMultiplier < 1) return "Множитель эстафеты должен быть не меньше 1";
+            if (input.OverallMultiplier is < 1) return "Вес общей категории должен быть не меньше 1";
+            if (input.MinEntrants is < 1) return "Минимум участников должен быть не меньше 1";
+            if (NormalizeDistances(input.Distances) is { Length: > 100 }) return "Список дистанций длиннее 100 символов";
         }
         else
         {

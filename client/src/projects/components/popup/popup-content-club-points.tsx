@@ -212,6 +212,13 @@ function RuleBlock({ rule }: { rule: ClubPointsRule }) {
 
       <ul className="mt-3 flex flex-col gap-1 text-[12.5px]" style={{ color: 'var(--theme-mode-text-secondary)' }}>
         <li>Relay results score ×{rule.relay_multiplier}.</li>
+        {rule.distances && <li>Only the {rule.distances.split(',').join(' / ')} m race scores.</li>}
+        {rule.overall_multiplier != null && (
+          <li>
+            Overall category (all ages, by time): the same places score ×{rule.overall_multiplier}, on top of the age category.
+          </li>
+        )}
+        {rule.min_entrants != null && <li>A category scores only with at least {rule.min_entrants} starters.</li>}
         {rule.max_scoring_place != null && <li>Only places up to {rule.max_scoring_place} score.</li>}
         {places.length > 0 && <li>Any other place scores {rule.default_points}.</li>}
         <li>Disqualified swims and unofficial times score nothing.</li>

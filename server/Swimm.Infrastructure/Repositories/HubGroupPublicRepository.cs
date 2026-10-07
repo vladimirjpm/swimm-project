@@ -638,6 +638,8 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                         && r.CompetitionDate >= seasonStart)
             .Select(r => new SeasonResultRow
             {
+                Id = r.Id,
+                CompetitionId = r.CompetitionId,
                 SwimmerId = r.SwimmerId,
                 // Место prelim-заплыва — ранжир сессии, не награда; общий финал «כללי»
                 // (Round=final-open) тоже не зачётный: у организатора единица зачёта —
@@ -656,6 +658,12 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
         var rules = await db.PointRulesClubs.AsNoTracking()
             .Include(r => r.Entries)
             .ToListAsync();
+
+        // Правило «по заплыву целиком» (схема Красного моря) считается по всем участникам заплыва.
+        var contextPoints = await ContextClubPoints.LoadAsync(db.Results, rules,
+            ContextClubPoints.CompetitionsNeedingContext(rules, season
+                .Select(r => (r.CompetitionId, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate)))
+                .Distinct()));
 
         var bySwimmer = season.GroupBy(r => r.SwimmerId).ToDictionary(g => g.Key, g => g.ToList());
 
@@ -679,10 +687,13 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
                     Bronzes = rows.Count(r => !r.TimeFail && r.Position == 3),
                     // Правило: привязка соревнования важнее подбора по дате (CompetitionRuleResolver).
                     ClubPoints = rows.Sum(r =>
-                        PointRulesClubsScoring.PointsFor(
-                            CompetitionRuleResolver.Resolve(
-                                rules, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate)),
-                            r.Position, r.TimeFail)),
+                    {
+                        var rule = CompetitionRuleResolver.Resolve(
+                            rules, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate));
+                        return PointRulesClubsScoring.NeedsContext(rule)
+                            ? contextPoints.GetValueOrDefault(r.Id)
+                            : PointRulesClubsScoring.PointsFor(rule, r.Position, r.TimeFail);
+                    }),
                     BestFina = rows.Count > 0 ? rows.Max(r => r.InternationalPoints) : 0
                 };
             })
@@ -694,6 +705,8 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
     /// <summary>Проекция сезонного результата для зачёта (in-memory).</summary>
     private sealed class SeasonResultRow
     {
+        public long Id { get; init; }
+        public int CompetitionId { get; init; }
         public int SwimmerId { get; init; }
         public int? Position { get; init; }
         public bool TimeFail { get; init; }

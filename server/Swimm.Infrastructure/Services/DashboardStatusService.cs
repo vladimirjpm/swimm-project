@@ -186,6 +186,7 @@ public class DashboardStatusService(
             .Where(r => dayIds.Contains(r.CompetitionId) && r.OfficialClubPoints != null)
             .Select(r => new
             {
+                r.Id,
                 r.CompetitionId,
                 r.Competition!.Date,
                 r.Competition.IsMasters,
@@ -201,6 +202,16 @@ public class DashboardStatusService(
         var rules = await db.PointRulesClubs.AsNoTracking().Include(r => r.Entries).ToListAsync(ct);
         var result = new Dictionary<int, int>();
 
+        static DateOnly DateOf(string date) =>
+            DateOnly.TryParseExact(date, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var d) ? d : DateOnly.MinValue;
+
+        // Правило «по заплыву целиком» (схема Красного моря) — по всем участникам заплыва.
+        var contextPoints = await ContextClubPoints.LoadAsync(db.Results, rules,
+            ContextClubPoints.CompetitionsNeedingContext(rules, rows
+                .Select(r => (r.CompetitionId, r.RuleId, r.IsMasters, DateOf(r.Date)))
+                .Distinct()), ct);
+
         foreach (var group in rows.GroupBy(r => r.CompetitionId))
         {
             var head = group.First();
@@ -211,11 +222,13 @@ public class DashboardStatusService(
                     System.Globalization.DateTimeStyles.None, out var d) ? d : DateOnly.MinValue);
 
             result[group.Key] = group.Count(r =>
-                PointRulesClubsScoring.RelayPointsFor(
-                    rule,
-                    r.HeatType == "prelim" || r.HeatType == "extra" || r.Round == ResultRounds.FinalOpen
-                        ? null : r.Position,
-                    r.TimeFail, r.IsRelay) != r.Official);
+                (PointRulesClubsScoring.NeedsContext(rule)
+                    ? contextPoints.GetValueOrDefault(r.Id)
+                    : PointRulesClubsScoring.RelayPointsFor(
+                        rule,
+                        r.HeatType == "prelim" || r.HeatType == "extra" || r.Round == ResultRounds.FinalOpen
+                            ? null : r.Position,
+                        r.TimeFail, r.IsRelay)) != r.Official);
         }
 
         return result;

@@ -97,6 +97,12 @@ export interface ClubPointsRule {
   default_points: number;
   max_scoring_place: number | null;
   relay_multiplier: number;
+  /** Общая категория: абсолют по времени (все возрасты, внутри пола) — очки шкалы × вес. */
+  overall_multiplier?: number | null;
+  /** Минимум стартовавших в категории для очков. */
+  min_entrants?: number | null;
+  /** Зачётные дистанции через запятую («1600»); пусто — все. */
+  distances?: string | null;
   points_by_place: ClubPointsRuleEntry[];
 }
 

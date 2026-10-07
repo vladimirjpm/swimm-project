@@ -46,4 +46,94 @@ public static class PointRulesClubsScoring
     /// <summary>Действующее на дату правило нужной области (masters/non-masters), fallback на "all".</summary>
     public static PointRuleClubs? SelectRule(IReadOnlyCollection<PointRuleClubs> rules, bool isMasters, DateOnly date)
         => CompetitionRuleResolver.SelectByDate(rules, isMasters, date);
+
+    // ── Зачёт «по заплыву целиком» (схема Красного моря) ─────────────────────────────────
+
+    /// <summary>
+    /// Правилу нужен весь заплыв, а не одна строка: общая категория, порог участников или
+    /// список зачётных дистанций. Такие правила считает <see cref="PointsForSet"/> (через
+    /// <see cref="ContextClubPoints"/>); остальные — построчно, как всегда.
+    /// </summary>
+    public static bool NeedsContext(PointRuleClubs? rule) =>
+        rule is not null
+        && (rule.OverallMultiplier is not null || rule.MinEntrants is not null
+            || !string.IsNullOrWhiteSpace(rule.Distances));
+
+    /// <summary>
+    /// Очки каждой строки одного соревнования по правилу «по заплыву целиком» — схема
+    /// «אליפות הים האדום» (регламент Эйлата 2025/2026: возрастные категории 3/2/1, общая
+    /// категория 6/4/2, медали при ≥ 3 участниках, зачёт только в заплыве 1.66 км).
+    ///
+    /// <list type="number">
+    /// <item>Дистанция вне <see cref="PointRuleClubs.Distances"/> — 0.</item>
+    /// <item>Категория (дисциплина + программа протокола): место — ПРОТОКОЛЬНОЕ, очки по шкале
+    /// как обычно; при <see cref="PointRuleClubs.MinEntrants"/> категория, где стартовало
+    /// меньше, не приносит ничего. При общей категории личная секция «כללי» (mix-…/open)
+    /// возрастной не считается: у loglig это остаток «20+», а по регламенту общая категория —
+    /// все возрасты.</item>
+    /// <item>Общая категория (<see cref="PointRuleClubs.OverallMultiplier"/>): абсолютное место
+    /// по времени среди всех личных строк дисциплины (тот же пол), делёж при равном времени;
+    /// очки шкалы × вес — СВЕРХ очков категории (победитель возраста и абсолюта получает оба).</item>
+    /// </list>
+    /// Дисциплина — <see cref="ClubPointsContextRow.Discipline"/> (стиль|дистанция|пол).
+    /// </summary>
+    public static IReadOnlyDictionary<long, int> PointsForSet(PointRuleClubs rule, IEnumerable<ClubPointsContextRow> rows)
+    {
+        var all = rows.ToList();
+        var points = all.ToDictionary(r => r.Id, _ => 0);
+        var distances = ParseDistances(rule.Distances);
+        var scored = all.Where(r => distances is null || distances.Contains(r.Distance.Trim())).ToList();
+
+        foreach (var category in scored.GroupBy(r => (r.Discipline, r.IsRelay, Category: r.Category ?? "")))
+        {
+            if (rule.MinEntrants is int min && category.Count(Started) < min) continue;
+            if (rule.OverallMultiplier is not null && !category.Key.IsRelay && IsOpenSection(category.Key.Category))
+                continue;
+
+            foreach (var r in category)
+                points[r.Id] = RelayPointsFor(rule, r.Position, r.TimeFail, r.IsRelay);
+        }
+
+        if (rule.OverallMultiplier is int weight)
+        {
+            foreach (var discipline in scored.Where(r => !r.IsRelay && r.Awarding).GroupBy(r => r.Discipline))
+            {
+                if (rule.MinEntrants is int min && discipline.Count(Started) < min) continue;
+
+                var timed = discipline.Where(r => !r.TimeFail && r.TimeMs > 0).ToList();
+                foreach (var r in timed)
+                {
+                    var place = 1 + timed.Count(o => o.TimeMs < r.TimeMs);
+                    points[r.Id] += PointsFor(rule, place, timeFail: false) * weight;
+                }
+            }
+        }
+
+        return points;
+    }
+
+    /// <summary>Стартовал ли пловец: неявка (NS/DNS) участником категории не считается, DQ и DNF — считаются.</summary>
+    private static bool Started(ClubPointsContextRow r) =>
+        !(r.TimeFail && r.FailNote?.Trim().ToUpperInvariant() is "NS" or "DNS");
+
+    /// <summary>Секция «כללי» протокола: парсер метит её программой mix-… (пола нет) или open.</summary>
+    private static bool IsOpenSection(string category) =>
+        category.StartsWith("mix", StringComparison.OrdinalIgnoreCase)
+        || category.Equals("open", StringComparison.OrdinalIgnoreCase);
+
+    private static HashSet<string>? ParseDistances(string? distances)
+    {
+        if (string.IsNullOrWhiteSpace(distances)) return null;
+        return distances.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
 }
+
+/// <summary>Строка заплыва для <see cref="PointRulesClubsScoring.PointsForSet"/>.</summary>
+/// <param name="Discipline">Ключ дисциплины внутри соревнования: стиль|дистанция|пол.</param>
+/// <param name="Category">Программа протокола (<c>Results.EventCategory</c>).</param>
+/// <param name="Position">Место, уже очищенное от незачётных раундов (prelim, «כללי»-финал бассейна).</param>
+/// <param name="Awarding">Раунд награждаемый (не prelim/extra) — участвует в абсолютном зачёте.</param>
+public sealed record ClubPointsContextRow(
+    long Id, string Discipline, string Distance, string? Category,
+    int? Position, int? TimeMs, bool TimeFail, string? FailNote, bool IsRelay, bool Awarding = true);

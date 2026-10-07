@@ -476,6 +476,8 @@ public class ClubOverviewRepository : IClubOverviewRepository
         var rows = await query
             .Select(r => new
             {
+                r.Id,
+                r.CompetitionId,
                 r.SwimmerId,
                 // Место prelim-заплыва — ранжир сессии, не награда; общий финал «כללי»
                 // (Round=final-open) тоже не зачётный: у организатора единица зачёта —
@@ -500,12 +502,21 @@ public class ClubOverviewRepository : IClubOverviewRepository
         var rules = await _read.PointRulesClubs.AsNoTracking().Include(r => r.Entries).ToListAsync();
         var seasonForAge = season ?? SeasonMath.CurrentStartYear();
 
+        // Правило «по заплыву целиком» (схема Красного моря) зависит от ВСЕХ участников заплыва,
+        // а здесь строки одного клуба — соревнование догружается целиком.
+        var contextPoints = await ContextClubPoints.LoadAsync(_read.Results, rules,
+            ContextClubPoints.CompetitionsNeedingContext(rules, rows
+                .Select(r => (r.CompetitionId, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate)))
+                .Distinct()));
+
         var acc = new Dictionary<int, ClubTopSwimmerDto>();
         foreach (var r in rows)
         {
             var rule = CompetitionRuleResolver.Resolve(
                 rules, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate));
-            var points = PointRulesClubsScoring.RelayPointsFor(rule, r.Position, r.TimeFail, r.IsRelay);
+            var points = PointRulesClubsScoring.NeedsContext(rule)
+                ? contextPoints.GetValueOrDefault(r.Id)
+                : PointRulesClubsScoring.RelayPointsFor(rule, r.Position, r.TimeFail, r.IsRelay);
 
             if (!acc.TryGetValue(r.SwimmerId, out var dto))
             {

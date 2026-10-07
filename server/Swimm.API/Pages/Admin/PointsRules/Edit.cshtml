@@ -91,6 +91,34 @@
             Без этого флага правило перехватывает все непривязанные соревнования своего scope, действующие с указанной даты.
         </div>
 
+        @if (Model.IsClubs)
+        {
+            <div class="mt-6 pt-5 border-t border-admin-border">
+                <h2 class="text-sm font-semibold text-admin-text mb-3">Зачёт по заплыву целиком</h2>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Вес общей категории</span>
+                        <input asp-for="Input.OverallMultiplier" type="number" min="1" class="admin-input" placeholder="пусто = общей категории нет" />
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Минимум участников в категории</span>
+                        <input asp-for="Input.MinEntrants" type="number" min="1" class="admin-input" placeholder="пусто = без порога" />
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">Зачётные дистанции</span>
+                        <input asp-for="Input.Distances" type="text" class="admin-input" placeholder="пусто = все, например 1600" />
+                    </label>
+                </div>
+                <div class="text-[11px] text-admin-text-muted mt-1">
+                    Общая категория — абсолютное место по времени среди всех возрастов (внутри пола); очки шкалы × вес идут сверх очков возрастной категории.
+                    Неявки (NS/DNS) участниками не считаются. Пример — «אליפות הים האדום»: шкала 3,2,1 · вес 2 · минимум 3 · дистанция 1600.
+                </div>
+            </div>
+        }
+
         @if (!Model.IsClubs)
         {
             <div class="mt-6 pt-5 border-t border-admin-border">
