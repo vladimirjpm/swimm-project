@@ -93,6 +93,26 @@ public class LogligRelaySplitParserTests
         Assert.All(bare.Legs, l => Assert.Null(l.SplitTime));
     }
 
+    /// <summary>
+    /// У снятой команды на высоте переноса фамилии левее напечатаны причина «DQ / SW» и время
+    /// «10.11» — строка-обрывок отбрасывалась целиком, и фамилия из двух слов пропадала:
+    /// нога «איריס» без фамилии, импорт заводил карточку-тень (6595, 07.10.2026; тот же дефект
+    /// у двух ног 73056 — comp 64 получил тени #62906, #62907).
+    /// </summary>
+    [Fact]
+    public void DisqualifiedTeam_TwoWordSurnames_WrappedBesideReason_AreKept()
+    {
+        var beitEil = Assert.Single(Parse("loglig-split-relay-11586-58158-women-free.pdf"), t => t.Club == "הפועל בית איל");
+        Assert.Equal("DQ", beitEil.Status);
+        Assert.Equal(
+            [("מירב", "הרוש"), ("נאוה", "טל"), ("איריס", "סברנסקי נקש"), ("תמר", "ערמון אריאלי")],
+            beitEil.Legs.Select(l => (l.FirstName, l.LastName)));
+
+        var aquatics = Assert.Single(Women, t => t.Club == "אקוותיקים" && t.Status == "DQ");
+        Assert.Contains(aquatics.Legs, l => (l.FirstName, l.LastName) == ("רהאם אריב", "מנסור"));
+        Assert.Contains(aquatics.Legs, l => (l.FirstName, l.LastName) == ("ענבר", "קנטרביץ ארליך"));
+    }
+
     [Fact]
     public void MastersBand_ComesFromBandRow()
     {

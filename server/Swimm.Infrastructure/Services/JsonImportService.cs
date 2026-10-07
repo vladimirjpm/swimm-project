@@ -633,8 +633,16 @@ public class JsonImportService : IImportService
                     }
                     else
                     {
+                        // Ивритский протокол напечатал имя ЛАТИНИЦЕЙ в основных полях, а EN-полей
+                        // у строки нет (6595: «Yael Fridland»), — ищем среди английских имён
+                        // карточек, как у ноги эстафеты. Без этого каждый переимпорт заводил
+                        // дубль рядом с פרידלנד יעל #7136 (склеивали 06.10 и снова 07.10).
+                        swimmer = swimmerKeyEn == null && IsLatinName(item.LastName, item.FirstName)
+                            ? await FindByEnglishNameAsync(item.LastName, item.FirstName, item.BirthYear)
+                            : null;
+
                         // Not in pre-loaded cache — may still exist if duplicate key collision was silenced
-                        swimmer = await _db.Swimmers.FirstOrDefaultAsync(s =>
+                        swimmer ??= await _db.Swimmers.FirstOrDefaultAsync(s =>
                             s.LastName == (item.LastName ?? "") &&
                             s.FirstName == (item.FirstName ?? "") &&
                             s.BirthYear == (item.BirthYear ?? 0));
@@ -1413,11 +1421,19 @@ public class JsonImportService : IImportService
         return hits.Count == 1 ? hits[0] : null;
     }
 
-    private async Task<Swimmer?> FindLegByEnglishNameAsync(RelaySwimmerJson leg)
+    private Task<Swimmer?> FindLegByEnglishNameAsync(RelaySwimmerJson leg) =>
+        FindByEnglishNameAsync(leg.LastName, leg.FirstName, leg.BirthYear);
+
+    /// <summary>
+    /// Карточка, чьё АНГЛИЙСКОЕ имя совпало с данным (регистр не важен) при том же годе.
+    /// Только однозначное совпадение: двое — гадать нельзя, вызывающий заводит новую карточку.
+    /// Общий для ноги эстафеты и личной строки, напечатанной латиницей.
+    /// </summary>
+    private async Task<Swimmer?> FindByEnglishNameAsync(string? lastName, string? firstName, int? birthYear)
     {
-        var last = (leg.LastName ?? "").Trim().ToUpperInvariant();
-        var first = (leg.FirstName ?? "").Trim().ToUpperInvariant();
-        if (last.Length == 0 || leg.BirthYear is not int year || year == 0) return null;
+        var last = (lastName ?? "").Trim().ToUpperInvariant();
+        var first = (firstName ?? "").Trim().ToUpperInvariant();
+        if (last.Length == 0 || birthYear is not int year || year == 0) return null;
 
         var found = await _db.Swimmers
             .Where(s => s.BirthYear == year
@@ -1593,6 +1609,13 @@ public class JsonImportService : IImportService
     /// чтобы не плодить дублей из-за непоследовательной пунктуации в протоколах isr.org.il.
     /// Хранимые Swimmer.LastName/FirstName нормализацию НЕ проходят.
     /// </summary>
+    /// <summary>Имя целиком латиницей: есть буквы, и все буквы — a–z / A–Z.</summary>
+    private static bool IsLatinName(string? last, string? first)
+    {
+        var letters = $"{last}{first}".Where(char.IsLetter).ToList();
+        return letters.Count > 0 && letters.All(char.IsAsciiLetter);
+    }
+
     private static string SwimmerMatchKey(string? last, string? first, int? year) =>
         $"{SwimmerDedupService.Normalize(last ?? "")}|{SwimmerDedupService.Normalize(first ?? "")}|{year ?? 0}";
 

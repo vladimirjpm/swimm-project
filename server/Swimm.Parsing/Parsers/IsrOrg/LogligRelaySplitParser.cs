@@ -43,6 +43,8 @@ public sealed record SplitRelayTeam(
 /// - длинная фамилия переносится на строку ВЫШЕ и НИЖЕ строки ноги («מרמור» / «סירוטה»,
 ///   «גוסטמלסק» / «י»): обрывок до двух букв приклеивается без пробела, длиннее — через пробел,
 ///   но после конечной буквы (ץ ך ם ן ף) слово кончилось — «רבינוביץ» / «בץ» через пробел;
+/// - у снятой команды на высоте переноса левее стоят «DQ / SW» и «10.11» — обрывок берём из
+///   слов зоны имён, а не только из строки, целиком лежащей в ней (6595 / 58158);
 /// - команда может начаться внизу страницы, а ноги уйти на следующую — состояние сквозное.
 /// Собралось не ровно четыре ноги — команда возвращается без ног (fail-safe, без догадок).
 /// Над командами стоит строка полосы мастерсов («160-199 מאסטרס שליחים») — она уходит в
@@ -61,6 +63,9 @@ public static class LogligRelaySplitParser
     private const string PlaceWordVisual = "םוקימ"; // «מיקום» в визуальном порядке PdfPig
     private const string FirstNameHeaderVisual = "יטרפ"; // «פרטי»
     private const string LastNameHeaderVisual = "החפשמ"; // «משפחה»
+
+    /// <summary>Слова шапки колонок ног в визуальном порядке: «שם», «שנת», «לידה», «פרטי», «משפחה».</summary>
+    private static readonly HashSet<string> HeaderWordsVisual = ["םש", "תנש", "הדיל", FirstNameHeaderVisual, LastNameHeaderVisual];
 
     /// <summary>
     /// Дальность обрывка имени от строки ноги. Живые файлы: ±4 pt («גוסטמלסק»/«י») и до
@@ -129,9 +134,17 @@ public static class LogligRelaySplitParser
                     continue;
                 }
 
-                // Обрывок имени: только слова в зоне имён, без чисел.
-                if (row.Words.All(w => w.BoundingBox.Left >= nameZoneX && !w.Text.Any(char.IsDigit)))
-                    fragments.Add(row);
+                // Обрывок имени: слова в зоне имён, без чисел. Берём их и из строки, где левее
+                // напечатано что-то ещё: у снятой команды на высоте переноса фамилии стоят
+                // причина «DQ / SW» и время «10.11» — строка целиком не годилась, и фамилия из
+                // двух слов теряла хвост вместе с головой (6595 / 58158: «איריס סברנסקי נקש»,
+                // «תמר ערמון אריאלי» → нога без фамилии, импорт завёл карточки «איריס», «תמר»).
+                // Шапку колонок («שם · שנת לידה · פרטי · משפחה») обрывком не считаем.
+                var nameWords = row.Words.Where(w => w.BoundingBox.Left >= nameZoneX).ToList();
+                if (nameWords.Count > 0
+                    && !nameWords.Any(w => w.Text.Any(char.IsDigit))
+                    && !row.Words.Any(w => HeaderWordsVisual.Contains(w.Text)))
+                    fragments.Add(row with { Words = nameWords });
             }
 
             foreach (var (row, team) in legRows)
