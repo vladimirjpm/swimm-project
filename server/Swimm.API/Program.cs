@@ -722,6 +722,56 @@ if (args.Contains("--attach-splits"))
     return;
 }
 
+// Деление схлопнутой многодневки по дням БЕЗ переимпорта (docs/plans/multiday-split-plan.md, М2):
+//   dotnet run -- --split-days <competitionId> [--loglig <id>] [--apply]
+// Даты дисциплин — из сетки loglig; строки переносятся UPDATE-ом (Id те же — медиа, пометки,
+// этапы и промежуточные едут с ними). Без --apply — только план. Всё или ничего.
+if (args.Contains("--split-days"))
+{
+    var idIndex = Array.IndexOf(args, "--split-days") + 1;
+    if (idIndex >= args.Length || !int.TryParse(args[idIndex], out var splitCompetitionId))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --split-days <competitionId> [--loglig <id>] [--apply]");
+        Environment.Exit(1);
+        return;
+    }
+
+    int? splitLoglig = null;
+    var splitLogligIndex = Array.IndexOf(args, "--loglig") + 1;
+    if (splitLogligIndex > 0 && splitLogligIndex < args.Length && int.TryParse(args[splitLogligIndex], out var sl))
+        splitLoglig = sl;
+
+    var splitApply = args.Contains("--apply");
+    using var scope = app.Services.CreateScope();
+    var splitter = scope.ServiceProvider.GetRequiredService<ICompetitionDaySplitService>();
+    var split = await splitter.SplitAsync(splitCompetitionId, splitLoglig, splitApply);
+
+    Console.WriteLine($"#{split.CompetitionId} «{split.Name}», loglig {split.LogligId?.ToString() ?? "—"}");
+    foreach (var day in split.Days)
+        Console.WriteLine($"  день {day.DayNumber} {day.Date:dd/MM/yyyy}: строк {day.Rows}, медиа {day.Media} — "
+            + (day.Existing ? $"остаётся #{day.CompetitionId}" : day.CompetitionId is int id ? $"новый #{id}" : "новое соревнование"));
+    foreach (var (key, count) in split.Unresolved)
+        Console.WriteLine($"  без дня: {key} ×{count}");
+
+    if (split.Refusal != null)
+    {
+        Console.WriteLine($"НЕ ДЕЛИМ: {split.Refusal}");
+        return;
+    }
+    if (!split.Applied)
+    {
+        Console.WriteLine("Ничего не записано (dry-run). Повторите с --apply.");
+        return;
+    }
+
+    await scope.ServiceProvider.GetRequiredService<IAdminAuditService>().LogAsync(
+        "competition.split-days", "Competition", split.CompetitionId.ToString(),
+        $"Многодневка разделена по дням (loglig {split.LogligId}): событие #{split.EventId}, "
+        + string.Join("; ", split.Days.Select(d => $"день {d.DayNumber} {d.Date:dd/MM/yyyy} #{d.CompetitionId} — {d.Rows} строк")));
+    Console.WriteLine($"ПРИМЕНЕНО: событие #{split.EventId}, дни пересчитаны.");
+    return;
+}
+
 // Переимпорт протокола из Discovery без админки (docs/data-integrity.md, чек-лист §8):
 //   dotnet run -- --repull <discoveredId> [--delete-missing]
 // Тот же путь, что кнопка «Перезатянуть»: качаем HE-протокол, парсим, импортируем с

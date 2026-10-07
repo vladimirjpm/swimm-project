@@ -53,14 +53,16 @@ public sealed class DisciplineDates
     public IReadOnlyList<DisciplineDayKey> Ambiguous { get; }
 
     /// <summary>
-    /// День строки. Сначала точный ключ; не нашёлся (пол строки «none» или пустой — старые
-    /// эстафеты без пола) — все ключи с тем же стилем и дистанцией, если они в ОДИН день.
-    /// null — дня нет или он неоднозначен.
+    /// День строки. Сначала точный ключ; у строки БЕЗ пола («none» или пусто — старые эстафеты)
+    /// — все ключи с тем же стилем и дистанцией, если они в ОДИН день. Строке с известным полом
+    /// чужой пол не подставляем: мужская дисциплина, которой нет у источника, получила бы дату
+    /// женской (пойман тестом М2, 07.10.2026). null — дня нет или он неоднозначен.
     /// </summary>
     public DateOnly? DateOf(DisciplineDayKey key)
     {
         if (Ambiguous.Contains(key)) return null;
         if (_dates.TryGetValue(key, out var exact)) return exact;
+        if (key.Gender is not ("" or "none")) return null;
 
         var sameEvent = _dates.Where(kv => kv.Key.Style == key.Style && kv.Key.Distance == key.Distance)
             .Select(kv => kv.Value).Distinct().ToList();

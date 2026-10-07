@@ -70,6 +70,16 @@ public class DisciplineDatesTests
         Assert.Null(dates.DateOf(new("freestyle", "1500", "male")));  // такой дисциплины нет
     }
 
+    /// <summary>Строке с известным полом чужой пол не подставляется, даже если он единственный.</summary>
+    [Fact]
+    public void RowWithGender_NeverBorrowsAnotherGendersDay()
+    {
+        var onlyWomen = new DisciplineDates([(new DisciplineDayKey("butterfly", "200", "female"), D(2025, 1, 3))]);
+
+        Assert.Null(onlyWomen.DateOf(new("butterfly", "200", "male")));
+        Assert.Equal(D(2025, 1, 3), onlyWomen.DateOf(new("butterfly", "200", "none")));
+    }
+
     [Fact]
     public void Planner_SplitsRowsByDay_AllOrNothing()
     {

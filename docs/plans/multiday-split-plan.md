@@ -95,6 +95,14 @@ Dry-run по умолчанию; отчёт: сколько строк в как
 `OrgCompId`, уникальный `(Name, Date, PoolType)`, FK медиа — память
 «InMemory не видит CK Postgres»).
 
+**КОД СДЕЛАН 07.10.2026, на данных НЕ применён.** `ICompetitionDaySplitService` →
+`CompetitionDaySplitService` (Infrastructure, DI), CLI `--split-days <id> [--loglig <id>] [--apply]`
+с аудитом `competition.split-days`. Тесты — `CompetitionDaySplitServiceTests` (3, InMemory) и
+`CompetitionDaySplitPgTests` (живой Postgres, свои строки, чистка в finally). Попутно тест поймал
+дыру М1: строке с ИЗВЕСТНЫМ полом запасной поиск отдавал день чужого пола — теперь только
+строкам без пола. Dry-run на живых: **#1645** — день 1 03/01 (737, новый), день 2 04/01 (686,
+остаётся #1645); **#64** — день 1 09/01 (714, медиа 6, новый), день 2 10/01 (675, медиа 5).
+
 ### М3. Импорт: перезалив не должен схлопнуть дни обратно
 
 После М2 `--repull` 6595 при датах «всё 04/01» сопоставит ВСЕ строки дню 04/01 (идентичность

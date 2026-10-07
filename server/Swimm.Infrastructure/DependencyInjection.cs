@@ -118,6 +118,8 @@ public static class DependencyInjection
         services.AddScoped<IPointRulesAdminRepository, PointRulesAdminRepository>();
         services.AddScoped<IResultAdminRepository, ResultAdminRepository>();
         services.AddScoped<IResultTransferService, ResultTransferService>();
+        // Деление схлопнутой многодневки по дням без переимпорта (multiday-split-plan, М2).
+        services.AddScoped<ICompetitionDaySplitService, CompetitionDaySplitService>();
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
         services.AddScoped<IClubPublicRepository, ClubPublicRepository>();
         services.AddScoped<IStartListPublicRepository, StartListPublicRepository>();
