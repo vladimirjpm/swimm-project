@@ -50,6 +50,11 @@ public enum BulkPullVerdict
 /// <param name="Queued">Строка уже отправлена в импорт из этой пачки: разбор отдан очереди
 /// и удалён, повторно импортировать её нечем. Без признака панель после перезагрузки рисовала
 /// такие строки отмеченными — и пачка выглядела новым предложением (06.10.2026).</param>
+/// <param name="ImportState">Ход импорта отправленной строки: <c>queued</c> / <c>running</c> /
+/// <c>completed</c> / <c>failed</c>; null — в импорт не отправлялась или очередь задачу уже не
+/// помнит (перезапуск API). Без него «в очередь ушло» было последним, что знала панель (08.10.2026).</param>
+/// <param name="ImportCreated">Сколько строк результатов создал завершённый импорт.</param>
+/// <param name="ImportError">Почему импорт упал (или ошибки строк у завершённого).</param>
 public sealed record BulkPullRowDto(
     int DiscoveredId,
     int OrgCompId,
@@ -69,7 +74,10 @@ public sealed record BulkPullRowDto(
     bool IsChampionship,
     int? PointRuleClubsId,
     string? PoolType,
-    bool Queued = false);
+    bool Queued = false,
+    string? ImportState = null,
+    int? ImportCreated = null,
+    string? ImportError = null);
 
 /// <summary>Состояние пачки: сколько сделано и что получилось.</summary>
 /// <param name="BatchId">Ключ пачки; переживает перезагрузку страницы (sessionStorage).</param>
@@ -79,6 +87,8 @@ public sealed record BulkPullRowDto(
 /// <param name="Rows">Готовые строки — в порядке обработки.</param>
 /// <param name="SkippedChampionships">Имена чемпионатов, исключённых из пачки по умолчанию.</param>
 /// <param name="Error">Пачка не стартовала (например, пустой список).</param>
+/// <param name="ImportsPending">Отправленные в импорт строки ещё в очереди или импортируются —
+/// панель продолжает опрос, пока это true, и только потом пишет «импорт завершён».</param>
 public sealed record BulkPullBatchDto(
     Guid BatchId,
     int Total,
@@ -86,7 +96,8 @@ public sealed record BulkPullBatchDto(
     bool Finished,
     IReadOnlyList<BulkPullRowDto> Rows,
     IReadOnlyList<string> SkippedChampionships,
-    string? Error = null);
+    string? Error = null,
+    bool ImportsPending = false);
 
 /// <summary>Итог пакетного импорта: сколько строк ушло в очередь и что не поехало.</summary>
 /// <param name="Queued">Сколько заданий поставлено в очередь импорта.</param>

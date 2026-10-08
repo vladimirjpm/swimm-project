@@ -40,8 +40,11 @@ public sealed class BulkPullService : IBulkPullService
         public required List<DiscoveredCompetitionDto> Queue { get; init; }
         public required List<string> SkippedChampionships { get; init; }
         public List<BulkPullRowDto> Rows { get; } = [];
-        /// <summary>Строки, уже отправленные в импорт (под замком <see cref="Rows"/>).</summary>
-        public HashSet<int> QueuedIds { get; } = [];
+        /// <summary>
+        /// Строки, уже отправленные в импорт, → задача очереди (под замком <see cref="Rows"/>).
+        /// По задаче статус пачки показывает ход импорта и момент, когда он доработал.
+        /// </summary>
+        public Dictionary<int, Guid> QueuedJobs { get; } = [];
         public volatile bool Finished;
         public int Total => Queue.Count;
     }
@@ -248,7 +251,7 @@ public sealed class BulkPullService : IBulkPullService
                 IsChampionship: row.IsChampionship,
                 PoolType: row.PoolType);
 
-            jobs.Enqueue(
+            var jobId = jobs.Enqueue(
                 Encoding.UTF8.GetBytes(entry.Parsed.ResultsJson),
                 entry.FileName,
                 [DefaultCategoryKey],
@@ -257,7 +260,7 @@ public sealed class BulkPullService : IBulkPullService
                 row.OrgCompId);
 
             previews.RemoveEntry(previewId);
-            lock (batch.Rows) batch.QueuedIds.Add(row.DiscoveredId);
+            lock (batch.Rows) batch.QueuedJobs[row.DiscoveredId] = jobId;
             queued++;
         }
 
@@ -267,13 +270,48 @@ public sealed class BulkPullService : IBulkPullService
         return await Task.FromResult(new BulkImportResultDto(queued, skipped));
     }
 
-    private static BulkPullBatchDto ToDto(BatchState batch, string? error = null)
+    private BulkPullBatchDto ToDto(BatchState batch, string? error = null)
     {
-        List<BulkPullRowDto> rows;
+        List<(BulkPullRowDto Row, Guid? JobId)> snapshot;
         lock (batch.Rows)
-            rows = [.. batch.Rows.Select(r => batch.QueuedIds.Contains(r.DiscoveredId) ? r with { Queued = true } : r)];
+            snapshot = [.. batch.Rows.Select(r =>
+                (r, batch.QueuedJobs.TryGetValue(r.DiscoveredId, out var job) ? job : (Guid?)null))];
+
+        // Очередь — синглтон; ход импорта берём у неё на каждый опрос, а не храним копией.
+        IImportJobQueue? jobs = null;
+        if (snapshot.Any(s => s.JobId != null))
+        {
+            using var scope = _scopes.CreateScope();
+            jobs = scope.ServiceProvider.GetService<IImportJobQueue>();
+        }
+
+        var rows = snapshot.Select(s => s.JobId is Guid jobId
+                ? WithImportStatus(s.Row with { Queued = true }, jobs?.GetStatus(jobId))
+                : s.Row)
+            .ToList();
+        var pending = rows.Any(r => r.ImportState is "queued" or "running");
 
         return new BulkPullBatchDto(
-            batch.Id, batch.Total, rows.Count, batch.Finished, rows, batch.SkippedChampionships, error);
+            batch.Id, batch.Total, rows.Count, batch.Finished, rows, batch.SkippedChampionships, error, pending);
     }
+
+    /// <summary>
+    /// Статус задачи очереди → поля строки. Нет статуса (очередь задачу не помнит — перезапуск
+    /// API) — строка остаётся просто «отправлена», без хода импорта: ждать её нечего.
+    /// </summary>
+    internal static BulkPullRowDto WithImportStatus(BulkPullRowDto row, ImportJobStatus? status) => status switch
+    {
+        null => row,
+        { State: ImportJobState.Queued } => row with { ImportState = "queued" },
+        { State: ImportJobState.Running } => row with { ImportState = "running" },
+        { State: ImportJobState.Failed } => row with { ImportState = "failed", ImportError = status.Error },
+        _ => row with
+        {
+            ImportState = "completed",
+            ImportCreated = status.Result?.Created,
+            ImportError = status.Result is { Errors: > 0 } r
+                ? $"ошибок строк: {r.Errors}" + (r.ErrorMessages.FirstOrDefault() is { } first ? $" — {first}" : "")
+                : null,
+        },
+    };
 }

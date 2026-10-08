@@ -1441,9 +1441,26 @@ else
                 Failed:       { icon: '🔴', label: 'ошибка',         checked: false, cls: 'text-admin-danger' }
             };
             const QUEUED = { icon: '✓', label: 'отправлено в импорт', checked: false, cls: 'text-admin-success' };
+            const SPIN = '<span class="admin-spinner mr-1 size-3 align-middle"></span>';
 
-            // Импортировать из пачки больше нечего: всё затянутое уже ушло в очередь.
-            const nothingLeft = batch => batch.finished
+            // Ход импорта отправленной строки (поле importState с сервера, 08.10.2026). null —
+            // очередь задачу не помнит (перезапуск API): остаётся просто «отправлено».
+            function importCell(r) {
+                switch (r.importState) {
+                    case 'queued':  return `<span class="text-admin-accent">${SPIN}в очереди импорта</span>`;
+                    case 'running': return `<span class="text-admin-accent">${SPIN}импортирую…</span>`;
+                    case 'completed':
+                        return `<span class="text-admin-success">✓ импортировано${r.importCreated != null ? ` (${fmtN(r.importCreated)} строк)` : ''}</span>`
+                            + (r.importError ? `<div class="text-[12px] text-admin-warning">${esc(r.importError)}</div>` : '');
+                    case 'failed':
+                        return `<span class="text-admin-danger">✗ импорт упал</span>`
+                            + (r.importError ? `<div class="text-[12px] text-admin-danger">${esc(r.importError)}</div>` : '');
+                    default: return `<span class="${QUEUED.cls}">${QUEUED.icon} ${esc(QUEUED.label)}</span>`;
+                }
+            }
+
+            // Импортировать из пачки больше нечего: всё затянутое уже ушло в очередь и доимпортировалось.
+            const nothingLeft = batch => batch.finished && !batch.importsPending
                 && !(batch.rows || []).some(r => r.previewId && !r.queued);
 
             function renderRows(rows) {
@@ -1471,7 +1488,7 @@ else
                     return `<tr data-verdict="${esc(r.verdict)}">
                         <td class="align-top"><input type="checkbox" class="bulk-row cursor-pointer" value="${r.discoveredId}"
                             ${checked ? 'checked' : ''} ${canImport ? '' : 'disabled'} /></td>
-                        <td class="align-top whitespace-nowrap ${v.cls}">${v.icon} ${esc(v.label)}</td>
+                        <td class="align-top whitespace-nowrap ${v.cls}">${r.queued ? importCell(r) : `${v.icon} ${esc(v.label)}`}</td>
                         <td class="align-top" dir="rtl" style="text-align:left">
                             <a href="https://isr.org.il/comp.asp?compID=${r.orgCompId}" target="_blank" rel="noopener"
                                class="text-admin-accent hover:underline">${esc(r.name)} ↗</a>
@@ -1493,6 +1510,8 @@ else
             }
 
             function updateImportBtn() {
+                // Пока импорт идёт, кнопка «занята» — подпись и доступность ведёт render().
+                if (importBtn.getAttribute('aria-busy') === 'true') return;
                 const n = rowsBox.querySelectorAll('input.bulk-row:checked').length;
                 importBtn.disabled = n === 0;
                 importBtn.textContent = n ? `Импортировать отмеченные (${n})` : 'Импортировать отмеченные';
@@ -1502,12 +1521,34 @@ else
 
             function render(batch) {
                 card.classList.remove('hidden');
-                const queuedCount = (batch.rows || []).filter(r => r.queued).length;
-                progress.textContent = batch.finished
-                    ? `Готово: затянуто ${batch.done} из ${batch.total}.`
-                      + (queuedCount ? ` В импорт отправлено: ${queuedCount}.` : '')
-                    : `Тяну ${Math.min(batch.done + 1, batch.total)} из ${batch.total}… (можно уйти со страницы и вернуться)`;
-                if (batch.error) progress.textContent = batch.error;
+                const sent = (batch.rows || []).filter(r => r.queued);
+                const done = sent.filter(r => r.importState === 'completed' || r.importState === 'failed');
+                const failed = sent.filter(r => r.importState === 'failed').length;
+                const spin = '<span class="admin-spinner mr-1.5 align-middle text-admin-accent"></span>';
+
+                if (batch.error) {
+                    progress.textContent = batch.error;
+                } else if (!batch.finished) {
+                    progress.innerHTML = spin + `Тяну ${Math.min(batch.done + 1, batch.total)} из ${batch.total}… `
+                        + '<span class="opacity-70">(можно уйти со страницы и вернуться)</span>';
+                } else if (batch.importsPending) {
+                    // Импорт идёт в фоновой очереди по одному — счётчик по завершённым строкам.
+                    progress.innerHTML = spin + `Затянуто ${batch.done} из ${batch.total}. `
+                        + `Импортирую: готово ${done.length} из ${sent.length}…`;
+                } else if (done.length) {
+                    // Флаг окончания: все отправленные строки доимпортировались (или упали).
+                    progress.innerHTML = `Затянуто ${batch.done} из ${batch.total}. `
+                        + (failed
+                            ? `<span class="font-semibold text-admin-warning">Импорт завершён: ${done.length - failed} из ${sent.length}, ошибок ${failed}.</span>`
+                            : `<span class="font-semibold text-admin-success">✓ Импорт завершён: ${done.length} из ${sent.length}.</span>`);
+                } else {
+                    progress.textContent = `Готово: затянуто ${batch.done} из ${batch.total}.`
+                        + (sent.length ? ` В импорт отправлено: ${sent.length}.` : '');
+                }
+
+                // Кнопки «заняты», пока идёт их работа: забор пачки и импорт отмеченных.
+                if (startBtn) adminBusy(startBtn, !batch.finished, 'Тяну…');
+                adminBusy(importBtn, !!batch.importsPending, 'Импортирую…');
 
                 const skipped = batch.skippedChampionships || [];
                 skippedBox.classList.toggle('hidden', skipped.length === 0);
@@ -1524,7 +1565,8 @@ else
                 try {
                     const batch = await api(`${API}/bulk-pull/${batchId}`);
                     render(batch);
-                    if (batch.finished) { clearInterval(timer); timer = null; }
+                    // Опрос живёт, пока тянется пачка ИЛИ идёт импорт отправленных строк.
+                    if (batch.finished && !batch.importsPending) { clearInterval(timer); timer = null; }
                 } catch (err) {
                     clearInterval(timer); timer = null;
                     sessionStorage.removeItem(KEY);
@@ -1543,7 +1585,7 @@ else
                 startBtn.addEventListener('click', async () => {
                     const ids = (startBtn.dataset.ids || '').split(',').filter(Boolean).map(Number);
                     const includeChampionships = document.getElementById('bulk-include-champ').checked;
-                    startBtn.disabled = true;
+                    adminBusy(startBtn, true, 'Тяну…'); // снимет render(), когда пачка закончится
                     card.classList.remove('hidden');
                     importOut.textContent = '';
                     rowsBox.innerHTML = '';
@@ -1560,8 +1602,7 @@ else
                         watch();
                     } catch (err) {
                         progress.textContent = err.message;
-                    } finally {
-                        startBtn.disabled = false;
+                        adminBusy(startBtn, false);
                     }
                 });
             }
@@ -1577,13 +1618,17 @@ else
                 sessionStorage.removeItem(KEY);
                 if (timer) { clearInterval(timer); timer = null; }
                 batchId = null;
+                // Закрытие только прячет панель: пачка и импорт на сервере идут дальше.
+                if (startBtn) adminBusy(startBtn, false);
+                adminBusy(importBtn, false);
+                updateImportBtn();
             });
 
             importBtn.addEventListener('click', async () => {
                 const ids = [...rowsBox.querySelectorAll('input.bulk-row:checked')].map(cb => Number(cb.value));
                 if (!ids.length) return;
-                importBtn.disabled = true;
-                importOut.textContent = 'Ставлю в очередь импорта…';
+                adminBusy(importBtn, true, 'Ставлю в очередь…');
+                importOut.textContent = '';
                 try {
                     const r = await api(`${API}/bulk-import`, {
                         method: 'POST',
@@ -1591,14 +1636,16 @@ else
                         body: JSON.stringify({ batchId, ids })
                     });
                     const skipped = (r.skipped || []).map(esc).join('<br>');
-                    importOut.innerHTML = `<span class="text-admin-success">В очередь ушло: ${r.queued}.</span>`
-                        + ' Ход импорта — в <a href="/Admin/ImportHistory" class="text-admin-accent hover:underline">истории импортов</a>.'
+                    importOut.innerHTML = `В очередь ушло: ${r.queued}. Ход — в таблице выше и в `
+                        + '<a href="/Admin/ImportHistory" class="text-admin-accent hover:underline">истории импортов</a>.'
                         + (skipped ? `<div class="mt-1 text-admin-warning">${skipped}</div>` : '');
                     rowsBox.querySelectorAll('input.bulk-row:checked').forEach(cb => { cb.checked = false; cb.disabled = true; });
-                    poll(); // подписи «✓ отправлено в импорт» и счётчик — с сервера
+                    // Опрос мог остановиться на конце забора — запускаем снова: теперь он ждёт
+                    // конца импорта, а «занятость» кнопки ведёт render() по importsPending.
+                    watch();
                 } catch (err) {
                     importOut.innerHTML = `<span class="text-admin-danger">${esc(err.message)}</span>`;
-                } finally {
+                    adminBusy(importBtn, false);
                     updateImportBtn();
                 }
             });
@@ -2227,9 +2274,11 @@ else
                 slLog.textContent = slReport;
                 slLog.scrollTop = slLog.scrollHeight;
             };
-            const slSet = (text, cls) => {
+            const slSet = (text, cls, busy = false) => {
                 slStatus.textContent = text;
                 slStatus.className = 'mt-3 text-[13px] ' + cls;
+                if (busy) slStatus.insertAdjacentHTML('afterbegin',
+                    '<span class="admin-spinner mr-1.5 align-middle text-admin-accent"></span>');
             };
             document.getElementById('startlist-close')
                 .addEventListener('click', () => slDlg.close());
@@ -2244,12 +2293,12 @@ else
             });
 
             window.discStartList = async (id, btn) => {
-                btn.disabled = true;
+                adminBusy(btn, true);
                 const url = `${API}/${id}/start-list`;
                 slReport = '';
                 slLog.textContent = '';
                 slTitle.textContent = discName(id);
-                slSet('Тяну с loglig… (может занять несколько минут)', 'text-admin-text-muted');
+                slSet('Тяну с loglig… (может занять несколько минут)', 'text-admin-text-muted', true);
                 slLine(`POST ${url}`);
                 slLine(`Соревнование: ${discName(id)} (discoveredId ${id})`);
                 if (!slDlg.open) slDlg.showModal();
@@ -2296,7 +2345,7 @@ else
                     slLine(`Исключение: ${e.name}: ${e.message}`);
                     if (e.stack) slLine(e.stack);
                 } finally {
-                    btn.disabled = false;
+                    adminBusy(btn, false);
                 }
             };
 

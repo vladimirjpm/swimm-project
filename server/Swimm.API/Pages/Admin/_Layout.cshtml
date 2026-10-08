@@ -64,6 +64,24 @@ function toast(msg, duration) {
 // дашборде, переехал сюда, когда понадобился второй странице (прогон по странам).
 function fmtN(n) { return (n ?? 0).toLocaleString('ru-RU'); }
 
+// Кнопка «занята»: колесико перед текстом (CSS .admin-btn[aria-busy]) + disabled против
+// двойного нажатия. text — подпись на время работы; снятие возвращает прежнюю.
+//   adminBusy(btn, true, 'Импортирую…'); try { … } finally { adminBusy(btn, false); }
+function adminBusy(btn, on, text) {
+    if (!btn) return;
+    if (on) {
+        if (btn.getAttribute('aria-busy') !== 'true') btn.dataset.idleText = btn.textContent;
+        btn.setAttribute('aria-busy', 'true');
+        btn.disabled = true;
+        if (text) btn.textContent = text;
+    } else {
+        btn.removeAttribute('aria-busy');
+        btn.disabled = false;
+        if (btn.dataset.idleText != null) btn.textContent = btn.dataset.idleText;
+        delete btn.dataset.idleText;
+    }
+}
+
 function esc(s) {
     if (!s) return '';
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

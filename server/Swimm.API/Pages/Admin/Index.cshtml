@@ -500,7 +500,7 @@
             let note = freshNote(f);
             const noteClass = f?.needsCheck && !st ? 'text-admin-warning' : 'text-admin-text-muted';
             const noteTitle = f?.checkedAt ? `Последняя успешная проверка: ${fmtDT(f.checkedAt)}` : '';
-            if (st?.state === 'running') mark = '<span class="inline-block w-2.5 h-2.5 rounded-full border-2 border-admin-accent/25 border-t-admin-accent animate-spin"></span>';
+            if (st?.state === 'running') mark = '<span class="admin-spinner size-2.5 text-admin-accent"></span>';
             else if (st?.state === 'ok') { mark = '<span class="text-admin-success">✓</span>'; note = st.changes > 0 ? `+${st.added} / ~${st.changed}` : 'без изменений'; }
             else if (st?.state === 'err') { mark = '<span class="text-admin-danger">✗</span>'; note = st.error; }
             return `<div class="flex items-center gap-2 text-[12px] py-0.5">
