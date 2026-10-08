@@ -772,6 +772,55 @@ if (args.Contains("--split-days"))
     return;
 }
 
+// Сбор отдельных соревнований в многодневное событие (docs/plans/multiday-split-plan.md, М4):
+//   dotnet run -- --join-days <id>,<id>[,<id>…] [--apply]
+// Обратное к --split-days: дни уже лежат порознь (импорт разложил по датам), события нет.
+// Строки не двигаются; настройки дней не выравниваются — расхождения только печатаются.
+if (args.Contains("--join-days"))
+{
+    var joinIndex = Array.IndexOf(args, "--join-days") + 1;
+    var joinIds = joinIndex < args.Length
+        ? args[joinIndex].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => int.TryParse(s, out var v) ? v : 0).ToList()
+        : [];
+    if (joinIds.Count < 2 || joinIds.Contains(0))
+    {
+        Console.Error.WriteLine("Usage: dotnet run -- --join-days <id>,<id>[,<id>…] [--apply]");
+        Environment.Exit(1);
+        return;
+    }
+
+    var joinApply = args.Contains("--apply");
+    using var scope = app.Services.CreateScope();
+    var joiner = scope.ServiceProvider.GetRequiredService<ICompetitionDayJoinService>();
+    var join = await joiner.JoinAsync(joinIds, joinApply);
+
+    Console.WriteLine($"«{join.Name}», compID {join.OrgCompId?.ToString() ?? "—"}");
+    foreach (var day in join.Days)
+        Console.WriteLine($"  день {day.DayNumber} {day.Date:dd/MM/yyyy}: #{day.CompetitionId}, строк {day.Rows}" +
+                          (day.OrgCompId is int org ? $", compID {org}" : ""));
+    foreach (var diff in join.Differences)
+        Console.WriteLine($"  ⚠ расходится {diff}");
+
+    if (join.Refusal != null)
+    {
+        Console.WriteLine($"НЕ СОБИРАЕМ: {join.Refusal}");
+        return;
+    }
+    if (!join.Applied)
+    {
+        Console.WriteLine("Ничего не записано (dry-run). Повторите с --apply.");
+        return;
+    }
+
+    await scope.ServiceProvider.GetRequiredService<IAdminAuditService>().LogAsync(
+        "competition.join-days", "CompetitionEvent", join.EventId!.Value.ToString(),
+        $"Дни собраны в событие #{join.EventId} (compID {join.OrgCompId?.ToString() ?? "—"}): "
+        + string.Join("; ", join.Days.Select(d => $"день {d.DayNumber} {d.Date:dd/MM/yyyy} #{d.CompetitionId} — {d.Rows} строк")));
+    Console.WriteLine($"ПРИМЕНЕНО: событие #{join.EventId}, дни пересчитаны.");
+    return;
+}
+
 // Обзор многодневок, лежащих не так, как плыли (docs/plans/multiday-split-plan.md, М4):
 //   dotnet run -- --collapsed-days [--pause-ms 1000]
 // Только чтение. Ходит в loglig по каждому однодневному старту с LogligId (с паузой);
@@ -802,8 +851,11 @@ if (args.Contains("--collapsed-days"))
 
     Console.WriteLine($"\nДни есть, события нет: {review.DaysWithoutEvent.Count}");
     foreach (var g in review.DaysWithoutEvent)
+    {
         Console.WriteLine($"  «{g.Name}» ({g.PoolType}): " + string.Join(", ", g.Days.Select(d =>
             $"#{d.CompetitionId} {d.Date:dd/MM/yyyy} — {d.Rows} строк" + (d.OrgCompId is int org ? $", compID {org}" : ""))));
+        Console.WriteLine($"    лечится: --join-days {string.Join(",", g.Days.Select(d => d.CompetitionId))} --apply");
+    }
 
     if (review.Failed.Count > 0)
     {
