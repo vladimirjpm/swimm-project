@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useAppSelector } from '../../../../store/store';
 import { useClubSummary } from '../../../../hooks/useClubSummary';
 import { routes } from '../../../../utils/routes';
-import ClubPointsUnofficialChip from './club-points-unofficial-chip';
+import UI_ClubPointsUnofficialChip from '../../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
 import type { Result } from '../../../../utils/interfaces/results';
 
 // Таб Clubs: клубный зачёт источника (/api/club-summary, фаза 3.4) + drill-down по клубу:
@@ -155,7 +155,7 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub, uno
       <div className="min-w-0 overflow-x-auto rounded-[12px] p-4" style={cardStyle}>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <span className="text-[14px] font-extrabold">Club standings</span>
-          {unofficial && <ClubPointsUnofficialChip />}
+          {unofficial && <UI_ClubPointsUnofficialChip />}
         </div>
         {clubs.length === 0 ? (
           <div className="py-6 text-center text-[12.5px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}>

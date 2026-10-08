@@ -2,7 +2,7 @@ import React from 'react';
 import type { CompetitionOverview, OverviewClub } from '../types';
 import { GENDER_CIRCLE } from '../overview-shared';
 import UI_ClubIcon from '../../../../components/mix/club-icon/club-icon';
-import ClubPointsUnofficialChip from '../club-points-unofficial-chip';
+import UI_ClubPointsUnofficialChip from '../../../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
 import { rootActions, useAppDispatch } from '../../../../../store/store';
 import { Enums } from '../../../../../utils/interfaces/enums';
 
@@ -132,7 +132,7 @@ export default function ModuleCardClubs({
                 ★ Differs from official — ours verified
               </span>
             )}
-            {unofficial && <ClubPointsUnofficialChip />}
+            {unofficial && <UI_ClubPointsUnofficialChip />}
             <span className="flex-1" />
             <button type="button" onClick={() => onOpenTab('clubs')} className="ov2-card__link">
               Clubs tab →

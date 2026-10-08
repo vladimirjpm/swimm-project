@@ -14,7 +14,8 @@ namespace Swimm.Tests;
 /// «Unofficial», когда официального зачёта у соревнования нет, а очки посчитаны нами по шкале
 /// правила (docs/competition-overview-cards.md, раздел Top clubs).
 /// Признак: HasOfficialClubStanding = false, либо null + ClubPointsDisabled; явное true главнее
-/// пометки. В выборке из нескольких соревнований — только если так у всех.
+/// пометки, ручная привязка правила снимает признак. В выборке из нескольких соревнований —
+/// только если так у всех.
 /// </summary>
 public class OverviewClubPointsUnofficialTests
 {
@@ -73,6 +74,37 @@ public class OverviewClubPointsUnofficialTests
             .GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
 
         Assert.Equal(expected, overview.ClubPointsUnofficial);
+    }
+
+    [Fact]
+    public async Task ExplicitRule_RemovesUnofficial_EvenWithoutLogligTable()
+    {
+        // Чемпионат, чей зачёт на loglig не публикуется, но правило привязано вручную по
+        // регламенту: шкалу выбрал организатор, а не автоподбор — чипа нет (решение 08.10.2026).
+        await using var db = CreateDb(nameof(ExplicitRule_RemovesUnofficial_EvenWithoutLogligTable));
+
+        var style = new Style { Name = "freestyle" };
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var swimmer = new Swimmer { FirstName = "A", LastName = "B", FirstNameEn = "A", LastNameEn = "B", BirthYear = 2012 };
+        var rule = new PointRuleClubs
+        {
+            Version = "test.30", EffectiveFrom = new DateOnly(2025, 1, 1), Scope = "all",
+            DefaultPoints = 0, MaxScoringPlace = 24, RelayMultiplier = 2, ManualOnly = true,
+            Entries = { new PointRuleClubsEntry { Place = 1, Points = 30 } }
+        };
+        db.AddRange(style, club, swimmer, rule);
+        await db.SaveChangesAsync();
+        var comp = Comp(false, false);
+        comp.PointRuleClubsId = rule.Id;
+        db.Add(comp);
+        await db.SaveChangesAsync();
+        db.Results.Add(Row(comp.Id, swimmer.Id, club.Id, style.Id));
+        await db.SaveChangesAsync();
+
+        var overview = await new ResultRepository(db, new NullCache())
+            .GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = comp.Id });
+
+        Assert.False(overview.ClubPointsUnofficial);
     }
 
     [Fact]

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import UI_ClubDetails from '../mix/club-details/club-details';
 import { useFilterHost } from './filter-host';
 import FilterCard from './filter-card';
+import UI_ClubPointsUnofficialChip from '../mix/club-points-unofficial-chip/club-points-unofficial-chip';
 
 /**
  * Клуб. Список и метрики приходят готовыми из хоста (Ф3) — он же знает, откуда их брать:
@@ -40,8 +41,10 @@ const FilterClub: React.FC = () => {
           all
         </button>
         {hasStats && (
-          <div className="text-[11px] text-[var(--theme-mode-text-muted)]">
-            ⭐ rating · 🏊 swimmers · ✅ events
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--theme-mode-text-muted)]">
+            <span>⭐ rating · 🏊 swimmers · ✅ events</span>
+            {/* «⭐ rating» — клубные очки: без официального зачёта это наша оценка (Р80). */}
+            {clubs.pointsUnofficial && <UI_ClubPointsUnofficialChip size="sm" />}
           </div>
         )}
         {clubs.searchable && (

@@ -119,6 +119,8 @@ export interface ClubStandingsTable {
   group_key: string | null;
   group_name: string | null;
   club_count: number;
+  /** Официального клубного зачёта нет — очки наша оценка, чип «Unofficial» (Р80). */
+  unofficial?: boolean;
   rows: ClubStandingRow[];
 }
 
@@ -136,6 +138,8 @@ export interface ClubTimelineItem {
   silver: number;
   bronze: number;
   swimmer_count: number;
+  /** Очки этого старта — наша оценка, официального зачёта нет (Р80). */
+  unofficial?: boolean;
 }
 
 export interface ClubTopSwimmer {

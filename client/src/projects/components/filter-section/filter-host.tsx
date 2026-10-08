@@ -110,6 +110,9 @@ export interface FilterClubOptions {
   /** Показывать поле поиска. Решает хост: список из сервера бывает длинным, локальная
    *  сводка по выборке — нет. */
   searchable?: boolean;
+  /** Очки клубов — наша оценка, официального зачёта у соревнования нет (Р80): карточка
+   *  ставит чип «Unofficial» у легенды. Не задан — чипа нет. */
+  pointsUnofficial?: boolean;
 }
 
 export interface FilterOptions {
@@ -334,6 +337,7 @@ export function useReduxFilterHost(active = true): FilterHost {
   }, [active, paged, results]);
 
   const pagedClubs = useClubSummary(sourceParams, paged);
+  const pointsUnofficial = useAppSelector((state) => state.clubPointsUnofficial);
 
   const clubs = useMemo<FilterClubOptions | undefined>(() => {
     if (!active) return undefined;
@@ -354,8 +358,9 @@ export function useReduxFilterHost(active = true): FilterHost {
         },
       })),
       searchable: paged,
+      pointsUnofficial,
     };
-  }, [active, paged, pagedClubs, summaryClubs]);
+  }, [active, paged, pagedClubs, summaryClubs, pointsUnofficial]);
 
   const options = useMemo<FilterOptions>(
     () => ({

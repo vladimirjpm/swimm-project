@@ -822,17 +822,16 @@ public class ResultRepository : IResultRepository
 
         // Официального клубного зачёта нет — наши очки остаются нашей оценкой по шкале правила
         // (обычно автоподбор = шкала чемпионата Израиля), и витрина подписывает их «Unofficial».
-        // Признак соревнования: loglig проверен и зачёта нет (HasOfficialClubStanding = false)
-        // либо не проверялся, но админ пометил «клубный зачёт не ведётся». Явное true главнее
-        // пометки. Как и бейдж сверки — только если так у ВСЕХ соревнований выборки: в сезонном
-        // срезе с чемпионатом внутри сумма уже не «неофициальная целиком».
+        // Признак — Competition.IsClubPointsUnofficial. Как и бейдж сверки — только если так у
+        // ВСЕХ соревнований выборки: в сезонном срезе с чемпионатом внутри сумма уже не
+        // «неофициальная целиком».
         var officialFlags = await query
-            .Select(r => new { r.Competition.HasOfficialClubStanding, r.Competition.ClubPointsDisabled })
+            .Select(r => new { r.Competition.HasOfficialClubStanding, r.Competition.ClubPointsDisabled, r.Competition.PointRuleClubsId })
             .Distinct()
             .ToListAsync();
 
         var clubPointsUnofficial = officialFlags.Count > 0 && officialFlags.All(f =>
-            f.HasOfficialClubStanding == false || (f.HasOfficialClubStanding == null && f.ClubPointsDisabled));
+            Competition.IsClubPointsUnofficial(f.HasOfficialClubStanding, f.ClubPointsDisabled, f.PointRuleClubsId));
 
         // Объяснение расхождения — только к бейджу расхождения и только если оно одно на всю
         // выборку: два разных объяснения в одном попапе противоречили бы друг другу.
