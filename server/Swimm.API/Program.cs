@@ -866,7 +866,7 @@ if (args.Contains("--collapsed-days"))
 }
 
 // Переимпорт протокола из Discovery без админки (docs/data-integrity.md, чек-лист §8):
-//   dotnet run -- --repull <discoveredId> [--delete-missing]
+//   dotnet run -- --repull <discoveredId> [--delete-missing] [--dry-run [--json-out <file>]]
 // Тот же путь, что кнопка «Перезатянуть»: качаем HE-протокол, парсим, импортируем с
 // перезаписью. --delete-missing дополнительно удаляет строки, которых нет в файле (дубликаты
 // и следы старых разборов) — по умолчанию ВЫКЛЮЧЕНО, как и в UI: удаление отдельное решение.
@@ -875,7 +875,7 @@ if (args.Contains("--repull"))
     var idIndex = Array.IndexOf(args, "--repull") + 1;
     if (idIndex >= args.Length || !int.TryParse(args[idIndex], out var discoveredId))
     {
-        Console.Error.WriteLine("Usage: dotnet run -- --repull <discoveredId> [--delete-missing]");
+        Console.Error.WriteLine("Usage: dotnet run -- --repull <discoveredId> [--delete-missing] [--dry-run [--json-out <file>]]");
         Environment.Exit(1);
         return;
     }
@@ -933,6 +933,21 @@ if (args.Contains("--repull"))
 
     // Новый день, если появится, — к событию этого старта, а не отдельным соревнованием.
     var repullEventId = repullDays.Select(d => d.EventId).FirstOrDefault(e => e != null);
+
+    // Сухой прогон: весь конвейер (PDF → разбор → эстафеты → даты) без импорта. Проверить, что
+    // перезалив положит, — до того как он что-то перепишет (08.10.2026: этап ויקטור בלכסן).
+    if (args.Contains("--dry-run"))
+    {
+        var outIndex = Array.IndexOf(args, "--json-out") + 1;
+        if (outIndex > 0 && outIndex < args.Length)
+        {
+            await File.WriteAllTextAsync(args[outIndex], parsed.ResultsJson);
+            Console.WriteLine($"JSON разбора: {Path.GetFullPath(args[outIndex])}");
+        }
+        Console.WriteLine($"Сухой прогон: дней в протоколе {parsed.Competitions.Count}, в базе {repullDays.Count}" +
+                          (repullEventId is int ev ? $" (событие #{ev})" : "") + ". Ничего не импортировано.");
+        return;
+    }
 
     var deleteMissing = args.Contains("--delete-missing");
     using var json = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(parsed.ResultsJson));

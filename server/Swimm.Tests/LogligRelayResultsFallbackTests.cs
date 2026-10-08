@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Parsing.Discovery;
+using Swimm.Parsing.Models;
 using Swimm.Parsing.Parsers.IsrOrg;
 using Swimm.Parsing.Parsers.Loglig;
 using Xunit;
@@ -77,10 +78,15 @@ public class LogligRelayResultsFallbackTests
              (int?)omer["position"], (string?)omer["last_name"], (int?)omer["birth_year"]));
         Assert.Equal(2, (int?)rows.Single(r => (string?)r["time"] == "01:52.64")["position"]);
 
-        // Своя полоса «85-89» — первое место, как у loglig; состав из трёх ног протокола.
+        // Своя полоса «85-89» — первое место, как у loglig. В протоколе три ноги (у ויקטור בלכסן
+        // года нет нигде); четвёртая — по именам со страницы результатов, третьим этапом, без
+        // года, а שגיא כהן, которого протокол пронумеровал третьим, — четвёртый (08.10.2026).
         var haifa = rows.Single(r => (string?)r["time"] == "01:51.82");
-        Assert.Equal(("85-89", 1, 3), ((string?)haifa["age_group"], (int?)haifa["position"],
-            haifa["relay_swimmers"]!.AsArray().Count));
+        Assert.Equal(("85-89", 1), ((string?)haifa["age_group"], (int?)haifa["position"]));
+        Assert.Equal(
+            [(1, "סולניק", "גיא", (int?)1995), (2, "שמואלי", "בן", 1999), (3, "בלכסן", "ויקטור", null), (4, "כהן", "שגיא", 1992)],
+            haifa["relay_swimmers"]!.AsArray().OfType<JsonObject>()
+                .Select(l => ((int)l["order"]!, (string)l["last_name"]!, (string)l["first_name"]!, (int?)l["birth_year"])));
 
         // NS — по именам ног, без места.
         var ns = rows.Single(r => (string?)r["club"] == "מועדון ספורט דניה");
@@ -138,6 +144,28 @@ public class LogligRelayResultsFallbackTests
 
         Assert.Equal(protocol, outcome.ResultsJson);
         Assert.Equal(0, outcome.Enriched);
+    }
+
+    /// <summary>
+    /// Достраиваем, только когда КАЖДАЯ нога протокола узнана по имени: иначе список имён и
+    /// состав могут оказаться разными людьми (перенос фамилии в PDF — «טל בץרבינוביץ»).
+    /// </summary>
+    [Fact]
+    public void CompleteFromNames_ProtocolLegNotRecognised_KeepsProtocolLegs()
+    {
+        List<RelaySwimmer> legs = [new(1, "סולניק", "גיא", 1995, null, null), new(2, "בץרבינוביץ", "טל", 1997, null, null)];
+
+        var same = RelayMastersBuilder.CompleteFromNames(legs, ["גיא סולניק", "טל רבינוביץ", "ויקטור בלכסן"]);
+
+        Assert.Same(legs, same);
+    }
+
+    [Fact]
+    public void CompleteFromNames_SingleWordName_CannotSplit_KeepsProtocolLegs()
+    {
+        List<RelaySwimmer> legs = [new(1, "סולניק", "גיא", 1995, null, null)];
+
+        Assert.Same(legs, RelayMastersBuilder.CompleteFromNames(legs, ["גיא סולניק", "ויקטור"]));
     }
 
     private static List<SplitRelayTeam> Pick(params string?[] times) =>

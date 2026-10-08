@@ -48,6 +48,8 @@ public sealed record RelayBuildEvent(string Style, string Len, string Gender, st
 /// Команда со страницы результатов (PDF промежуточных пуст, 6595 / 58140, 07.10.2026) несёт
 /// имена ног без годов (<see cref="SplitRelayTeam.LegNames"/>). Со временем — заимствуется как
 /// выше; без времени — по совпадению имён с ногами строки протокола (≥ 3 из 4, ровно одна).
+/// Ногу, которой в строке протокола нет (нога без года), достраивает по этим именам
+/// <see cref="CompleteFromNames"/>.
 /// </summary>
 public static class RelayMastersBuilder
 {
@@ -144,7 +146,42 @@ public static class RelayMastersBuilder
             .ToList();
 
         // Не нашлось — оставляем пустой: CanBuild откажет, и соревнование останется на этапе 1.
-        return legs is { Count: > 0 } ? team with { Legs = legs, LegsBorrowed = true } : team;
+        if (legs is not { Count: > 0 }) return team;
+        return team with { Legs = CompleteFromNames(legs, team.LegNames), LegsBorrowed = true };
+    }
+
+    /// <summary>
+    /// Ноги, которых протокол не опознал, — по именам со страницы результатов (6595, מכבי חיפה
+    /// 01:51.82: у ויקטור בלכסן года нет нигде, строка ноги без года неотличима от переноса
+    /// фамилии, и в составе было три ноги из четырёх; 08.10.2026). Достраиваем только если КАЖДАЯ
+    /// нога протокола узнана по имени ровно в одном месте списка: тогда список — тот же состав,
+    /// и его порядок — порядок этапов (протокол, пропустив строку, нумерует оставшихся подряд).
+    /// Недостающая нога — без года; имя режем «имя … фамилия» (последнее слово — фамилия), как
+    /// пишет loglig. Иначе — состав протокола как был.
+    /// </summary>
+    internal static List<RelaySwimmer> CompleteFromNames(List<RelaySwimmer> legs, IReadOnlyList<string>? names)
+    {
+        if (names is not { Count: > 0 } || legs.Count >= names.Count) return legs;
+
+        var keys = names.Select(NameKey).ToList();
+        var slots = new List<int>(legs.Count); // slots[j] — место ноги legs[j] в списке имён
+        foreach (var leg in legs)
+        {
+            var key = NameKey($"{leg.FirstName} {leg.LastName}");
+            var found = keys.Select((k, i) => (k, i)).Where(x => x.k == key).Select(x => x.i).ToList();
+            if (found.Count != 1 || slots.Contains(found[0])) return legs;
+            slots.Add(found[0]);
+        }
+
+        var completed = legs.Select((l, j) => l with { Order = slots[j] + 1 }).ToList();
+        for (var i = 0; i < names.Count; i++)
+        {
+            if (slots.Contains(i)) continue;
+            var words = keys[i].Split(' ');
+            if (words.Length < 2) return legs; // одно слово — не разрезать на имя и фамилию
+            completed.Add(new RelaySwimmer(i + 1, words[^1], string.Join(' ', words[..^1]), null, null, null));
+        }
+        return completed.OrderBy(l => l.Order).ToList();
     }
 
     private static bool IsNoTime(JsonObject o) =>
