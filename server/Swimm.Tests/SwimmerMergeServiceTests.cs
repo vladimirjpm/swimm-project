@@ -323,4 +323,99 @@ public class SwimmerMergeServiceTests
 
         Assert.Equal(3, await db.Swimmers.CountAsync());
     }
+
+    // ── Привязка к loglig (02.10.2026: подтверждённая привязка жила на обрезанной тени) ──
+
+    private static Swimmer Linked(string last, string first, int logligId, string status = "Verified") => new()
+    {
+        LastName = last, FirstName = first, BirthYear = 2009,
+        LogligId = logligId, LogligIdStatus = status, LogligIdSource = "auto",
+        LogligIdSuggestedByUserId = 7, LogligIdSuggestedAt = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
+        LogligIdVerifiedAt = new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc),
+    };
+
+    [Fact]
+    public async Task Merge_DuplicateHasLoglig_CanonicalNot_MovesTheWholeLink()
+    {
+        // #7915 «רותם עין» (265495) → #8058 «רותם עין גל»: раньше привязка исчезала с дублем.
+        await using var db = CreateDb(nameof(Merge_DuplicateHasLoglig_CanonicalNot_MovesTheWholeLink));
+        var canon = NewSwimmer("עין גל", "רותם", 2009);
+        var dup = Linked("עין", "רותם", 265495);
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db).MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("merged", report.Pairs.Single().Status);
+        Assert.Contains(report.Pairs.Single().Actions, a => a.StartsWith("Swimmer.LogligId ← дубль (265495"));
+        var c = await db.Swimmers.AsNoTracking().SingleAsync();
+        Assert.Equal((265495, "Verified", "auto", (int?)7), (c.LogligId, c.LogligIdStatus, c.LogligIdSource, c.LogligIdSuggestedByUserId));
+        Assert.Equal(new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc), c.LogligIdVerifiedAt);
+    }
+
+    [Fact]
+    public async Task Merge_BothLiveLogligIds_Conflict_NothingMerged()
+    {
+        await using var db = CreateDb(nameof(Merge_BothLiveLogligIds_Conflict_NothingMerged));
+        var canon = Linked("כהן", "דנה", 111);
+        var dup = Linked("כהן", "דנה", 222, "Suggested");
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db).MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        var pair = report.Pairs.Single();
+        Assert.Equal("conflict", pair.Status);
+        Assert.Contains(pair.Conflicts, c => c.Contains("111") && c.Contains("222"));
+        Assert.Equal(2, await db.Swimmers.CountAsync());
+    }
+
+    [Fact]
+    public async Task Merge_CanonicalRejected_DuplicateVerified_LiveLinkWins()
+    {
+        // Rejected — метка «не он», а не привязка: как в LogligLinkService, живая её вытесняет.
+        await using var db = CreateDb(nameof(Merge_CanonicalRejected_DuplicateVerified_LiveLinkWins));
+        var canon = Linked("לוי", "נועה", 333, "Rejected");
+        var dup = Linked("לוי", "נועה", 444);
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db).MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("merged", report.Pairs.Single().Status);
+        var c = await db.Swimmers.AsNoTracking().SingleAsync();
+        Assert.Equal((444, "Verified"), (c.LogligId, c.LogligIdStatus));
+    }
+
+    [Fact]
+    public async Task Merge_DuplicateRejected_CanonicalKeepsItsLink()
+    {
+        await using var db = CreateDb(nameof(Merge_DuplicateRejected_CanonicalKeepsItsLink));
+        var canon = Linked("מזרחי", "עידו", 555);
+        var dup = Linked("מזרחי", "עידו", 666, "Rejected");
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db).MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("merged", report.Pairs.Single().Status);
+        Assert.Contains(report.Pairs.Single().Actions, a => a.Contains("не перенесён"));
+        Assert.Equal((555, "Verified"), await db.Swimmers.AsNoTracking().Select(s => new ValueTuple<int?, string?>(s.LogligId, s.LogligIdStatus)).SingleAsync());
+    }
+
+    [Fact]
+    public async Task Merge_DryRun_LogligPlanReported_NothingWritten()
+    {
+        await using var db = CreateDb(nameof(Merge_DryRun_LogligPlanReported_NothingWritten));
+        var canon = NewSwimmer("שחר בית און", "שחר", 2009);
+        var dup = Linked("בית", "שחר", 277224);
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db).MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)]);
+
+        Assert.Contains(report.Pairs.Single().Actions, a => a.StartsWith("Swimmer.LogligId ← дубль (277224"));
+        Assert.Null((await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == canon.Id)).LogligId);
+        Assert.Equal(277224, (await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == dup.Id)).LogligId);
+    }
 }
