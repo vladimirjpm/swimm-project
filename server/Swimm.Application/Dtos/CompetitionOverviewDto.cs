@@ -77,6 +77,17 @@ public sealed class CompetitionOverviewDto
     /// </summary>
     [JsonPropertyName("club_points_mismatch_note")]
     public CompetitionNoteDto? ClubPointsMismatchNote { get; init; }
+
+    /// <summary>
+    /// Официального клубного зачёта у соревнования нет: loglig проверен и таблицы нет
+    /// (<c>HasOfficialClubStanding = false</c>) либо не проверялся, но стоит пометка «клубный
+    /// зачёт не ведётся» (<c>ClubPointsDisabled</c>). Очки всё равно считаются — по
+    /// привязанному правилу или автоподбору, — и это НАШ вывод, а не цифра протокола, поэтому
+    /// клиент ставит чип «Unofficial» на Top clubs и таб Clubs. true — только если так у ВСЕХ
+    /// соревнований выборки.
+    /// </summary>
+    [JsonPropertyName("club_points_unofficial")]
+    public bool ClubPointsUnofficial { get; init; }
     [JsonPropertyName("top_clubs_men")] public IReadOnlyList<ClubSummaryDto> TopClubsMen { get; init; } = [];
     [JsonPropertyName("top_clubs_women")] public IReadOnlyList<ClubSummaryDto> TopClubsWomen { get; init; } = [];
     /// <summary>

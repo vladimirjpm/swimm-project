@@ -210,6 +210,10 @@ export interface CompetitionOverview {
    *  «место / по регламенту / начислено». Показывается в попапе «Points system».
    *  Приходит только вместе с 'mismatch'. */
   club_points_mismatch_note: CompetitionMismatchNote | null;
+  /** Официального клубного зачёта нет (loglig без таблицы / «зачёт не ведётся») — очки наша
+   *  оценка по шкале правила, витрина ставит чип «Unofficial». true — если так у ВСЕХ
+   *  соревнований выборки. */
+  club_points_unofficial?: boolean;
   top_clubs_men: OverviewClub[];
   top_clubs_women: OverviewClub[];
   /** Самые титулованные: при равном наборе медалей — все, а не первый попавшийся. */

@@ -547,7 +547,11 @@ function ResultsMain() {
             onAddMedia={auth.isAuthenticated && addMedia.canAdd ? addMedia.openModal : undefined}
           />
         ) : compTab === 'clubs' ? (
-          <CompetitionClubs sourceParams={compSourceParams} onOpenSwimsForClub={handleOpenSwimsForClub} />
+          <CompetitionClubs
+            sourceParams={compSourceParams}
+            onOpenSwimsForClub={handleOpenSwimsForClub}
+            unofficial={!!compOverview?.club_points_unofficial}
+          />
         ) : compTab === 'media' ? (
           <CompetitionMedia
             items={compMediaItems}

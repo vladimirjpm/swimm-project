@@ -820,6 +820,20 @@ public class ResultRepository : IResultRepository
 
         var clubPointsVerified = verifiedKinds.Count == 1 ? verifiedKinds[0] : null;
 
+        // Официального клубного зачёта нет — наши очки остаются нашей оценкой по шкале правила
+        // (обычно автоподбор = шкала чемпионата Израиля), и витрина подписывает их «Unofficial».
+        // Признак соревнования: loglig проверен и зачёта нет (HasOfficialClubStanding = false)
+        // либо не проверялся, но админ пометил «клубный зачёт не ведётся». Явное true главнее
+        // пометки. Как и бейдж сверки — только если так у ВСЕХ соревнований выборки: в сезонном
+        // срезе с чемпионатом внутри сумма уже не «неофициальная целиком».
+        var officialFlags = await query
+            .Select(r => new { r.Competition.HasOfficialClubStanding, r.Competition.ClubPointsDisabled })
+            .Distinct()
+            .ToListAsync();
+
+        var clubPointsUnofficial = officialFlags.Count > 0 && officialFlags.All(f =>
+            f.HasOfficialClubStanding == false || (f.HasOfficialClubStanding == null && f.ClubPointsDisabled));
+
         // Объяснение расхождения — только к бейджу расхождения и только если оно одно на всю
         // выборку: два разных объяснения в одном попапе противоречили бы друг другу.
         // У многодневки примечание записано каждому дню одинаковым, поэтому сравниваем
@@ -913,6 +927,7 @@ public class ResultRepository : IResultRepository
             ClubPointsRules = appliedRules,
             ClubPointsVerified = clubPointsVerified,
             ClubPointsMismatchNote = clubPointsMismatchNote,
+            ClubPointsUnofficial = clubPointsUnofficial,
             TopClubsMen = topClubsMen,
             TopClubsWomen = topClubsWomen,
             TopMedalists = topMedalists,
