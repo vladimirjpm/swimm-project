@@ -120,17 +120,21 @@ function UnderReviewBeside({ swim }: { swim: SwimmerUnderReviewSwim }) {
  * бейдж и таблица мест могли бы разойтись.
  */
 export function ResultsPanel({
-  rows, swimmerId, gender, sbKeys, state,
+  rows, swimmerId, gender, sbKeys, career = false, state,
 }: {
   rows: SwimmerBestTime[] | null;
   swimmerId: number;
   gender: 'male' | 'female';
   sbKeys?: ReadonlySet<string>;
+  /** Выбран режим «за карьеру» (∞): пустоту нельзя называть «в этом сезоне». */
+  career?: boolean;
   state: PanelLoad;
 }) {
   if (state.error) return <PanelEmpty>Could not load best times.</PanelEmpty>;
-  if (!rows) return <PanelEmpty>{noDataText(state.loading, 'No best times for this season.')}</PanelEmpty>;
-  if (rows.length === 0) return <PanelEmpty>No swims in this season yet.</PanelEmpty>;
+  if (!rows) {
+    return <PanelEmpty>{noDataText(state.loading, career ? 'No best times yet.' : 'No best times for this season.')}</PanelEmpty>;
+  }
+  if (rows.length === 0) return <PanelEmpty>{career ? 'No swims yet.' : 'No swims in this season yet.'}</PanelEmpty>;
 
   return (
     <>

@@ -475,6 +475,7 @@ function SwimmerProject() {
                 swimmerId={profile.id}
                 gender={gender}
                 sbKeys={sbKeys}
+                career={activeSeason == null}
                 state={bestTimes}
               />
             )}
