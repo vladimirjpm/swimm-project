@@ -156,10 +156,14 @@ function SwimmerProject() {
 
   // Умолчание — ВИТРИННЫЙ сезон: до зимних чемпионатов это прошлый сезон, а не свежий
   // (docs/season-boundary-rule.md). Сервер помечает его isDisplayDefault.
+  // Сезонов нет вовсе (пловец без заплывов в базе — держатель рекордов, #62873) — ждать
+  // витринного нечего: режим «за карьеру» (null). Иначе сезон навсегда оставался «не выбран»,
+  // все табы гейтятся seasonReady и висели на «Loading…».
   useEffect(() => {
-    if (season !== undefined || !profile?.seasons?.length) return;
-    const preferred = profile.seasons.find((s) => s.isDisplayDefault) ?? profile.seasons[0];
-    setSeason(preferred.season);
+    if (season !== undefined || !profile) return;
+    const seasons = profile.seasons ?? [];
+    const preferred = seasons.find((s) => s.isDisplayDefault) ?? seasons[0];
+    setSeason(preferred?.season ?? null);
   }, [profile, season]);
 
   const writeQuery = (
