@@ -202,7 +202,9 @@ Redis — нет); сброс — по метке, не перебором кл�
    страж тёзок, ноги эстафет; правила тестируются по одному (`ImportSwimmerResolverTests`).
    09.10: `SwimmDbContext.OnModelCreating` → классы `IEntityTypeConfiguration` в
    `Infrastructure/Data/Configurations/`; `IsrOrgCompetitionParser.ParseLines` (1350 строк) →
-   вложенный `LineParser` с цепочкой методов `Try…` под эталонами `ParserGoldenTests`. Остальное —
+   вложенный `LineParser` с цепочкой методов `Try…` под эталонами `ParserGoldenTests`;
+   `JsonImportService.ImportAsync` → вложенный `ImportRun`; обзор соревнования
+   (`/api/competition-overview`) — `ResultRepository.Overview.cs`, метод на карточку. Остальное —
    `docs/plans/refactor-handoff.md`.
 7. `Gallery`/`GalleryItem` (импортные медиа заплыва) НЕ смешивать с `Sys_UserMedia`
    (пользовательские ссылки) — это разные вещи по владению и приватности.

@@ -8,7 +8,7 @@
 
 | Слой | Файлы |
 |---|---|
-| Расчёт | `server/Swimm.Infrastructure/Repositories/ResultRepository.cs` → `GetCompetitionOverviewAsync` |
+| Расчёт | `server/Swimm.Infrastructure/Repositories/ResultRepository.Overview.cs` → `GetCompetitionOverviewAsync`; по методу на карточку: `BestSwimProjection`, `LoadMedalRowsAsync` + `BuildMedalists` (Most decorated), `LoadHighPointAwardsAsync` (legacy / по правилу), `LoadAppliedClubRulesAsync` / `LoadClubPointsVerifiedAsync` / `IsClubPointsUnofficialAsync` (Top clubs; сами очки — `GetClubSummaryAsync` в `ResultRepository.cs`), `DetectNewRecordsAsync` |
 | Контракт | `server/Swimm.Application/Dtos/CompetitionOverviewDto.cs`, эндпоинт `GET /api/competition-overview` |
 | Мозаика | `client/.../competition-header/overview2/competition-overview2.tsx` + `module-defs.ts` (порядок и ключи модулей) |
 | Карточки | `overview2/module-card-*.tsx` |

@@ -43,7 +43,8 @@ internal static class CliCommands
         (args => args.Contains("--pull-events"), LogligCli.PullEventsAsync),
         (args => args.Contains("--pull-relays"), LogligCli.PullRelaysAsync),
         (args => args.Contains("--points-diff"), LogligCli.PointsDiffAsync),
-        (args => args.Contains("--data-checks"), DataChecksCli.DataChecksAsync),
+        // Псевдоним --check-data (была вторая копия с другим выводом); место в списке прежнее.
+        (args => args.Contains("--data-checks"), DataChecksCli.CheckDataAsync),
         (args => args.Contains("--discovery-sync"), DiscoveryCli.DiscoverySyncAsync),
         (args => args.Contains("--merge-swimmers"), MergeCli.MergeSwimmersAsync),
         (args => args.Contains("--backfill-relay-members"), RecalcCli.BackfillRelayMembersAsync),
