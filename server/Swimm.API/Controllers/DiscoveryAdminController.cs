@@ -557,7 +557,8 @@ public class DiscoveryAdminController : ControllerBase
         {
             Version = version,
             EffectiveFrom = new DateOnly(year ?? DateTime.UtcNow.Year, 1, 1),
-            Description = $"Заведено из превью затягивания по официальному зачёту loglig: {name}",
+            // Описание видно посетителю в попапе «Points system» — только по-английски.
+            Description = $"Points scale taken from the official loglig club standings of {name}",
             Scope = "all",
             DefaultPoints = 0,
             MaxScoringPlace = scale[^1].Key,
