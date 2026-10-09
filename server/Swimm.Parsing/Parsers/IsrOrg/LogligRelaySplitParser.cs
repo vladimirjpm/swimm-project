@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Swimm.Parsing.Helpers;
 using Swimm.Parsing.Models;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
@@ -193,20 +194,11 @@ public static class LogligRelaySplitParser
                 : words.OrderBy(w => w.BoundingBox.Left).Select(w => w.Text);
             var part = string.Join(' ', ordered);
             if (result.Length == 0) result = part;
-            else if (IsMidWordWrap(result, part)) result += part; // «גוסטמלסק» + «י»
+            else if (HebrewTextHelper.IsMidWordWrap(result, part)) result += part; // «גוסטמלסק» + «י»
             else result += " " + part;
         }
         return result.Trim();
     }
-
-    /// <summary>
-    /// Перенос посреди слова или между словами. Обрывок короче трёх букв — почти всегда хвост
-    /// слова («גוסטמלסק»+«י», «SHOHA»+«M»), но не когда строка кончается ивритской КОНЕЧНОЙ
-    /// буквой (ץ ך ם ן ף): ими слово заканчивается, значит дальше новое слово —
-    /// «רבינוביץ»+«בץ» это «רבינוביץ בץ», а не «רבינוביץבץ» (пойман 19.09.2026, мастерс 13805).
-    /// </summary>
-    private static bool IsMidWordWrap(string before, string part) =>
-        part.Length <= 2 && !"ךםןףץ".Contains(before[^1]);
 
     private static string Logical(string visual) =>
         visual.Any(IsHebrew) ? new string(visual.Reverse().ToArray()) : visual;

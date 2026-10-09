@@ -96,33 +96,24 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         ParsedCompetition parsed;
         try
         {
-            using var ms = new MemoryStream(primary);
-            using var msEn = pdfHe != null && pdfEn != null ? new MemoryStream(pdfEn) : null;
-            parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
-                ms, primaryName, "IsrOrg",
-                IsAward: false, PoolType: null,
-                SecondaryStream: msEn, SecondaryFileName: msEn != null ? fileNameEn : null,
-                ExtraFiles: null,
-                Country: null, Language: language));
-        }
-        catch (InvalidOperationException ex) when (pdfHe != null && pdfEn != null)
-        {
-            // Пара не склеилась (разный порядок записей и т.п.) — деградируем до HE-only,
-            // EN-имена добираются потом кнопкой «Синхр. языки» после починки.
-            _logger.LogWarning(ex, "Discovery: двуязычная пара не склеилась (id={Id}), парсим HE-only", discoveredId);
-            languages.Remove("en");
-            using var ms = new MemoryStream(pdfHe);
-            try
+            if (pdfHe != null)
             {
-                parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
-                    ms, fileNameHe, "IsrOrg",
-                    IsAward: false, PoolType: null,
-                    SecondaryStream: null, SecondaryFileName: null, ExtraFiles: null,
-                    Country: null, Language: "he"));
+                // Пара HE + EN; не склеилась — HE-only (общее правило с консольным --repull).
+                var pair = await ProtocolPairParser.ParseAsync(_sourceProvider, pdfHe, fileNameHe, pdfEn, fileNameEn);
+                parsed = pair.Parsed;
+                if (pair.PairError != null)
+                {
+                    // EN-имена добираются потом кнопкой «Синхр. языки» после починки.
+                    _logger.LogWarning("Discovery: двуязычная пара не склеилась (id={Id}), парсим HE-only: {Error}",
+                        discoveredId, pair.PairError);
+                    languages.Remove("en");
+                }
             }
-            catch (InvalidOperationException ex2)
+            else
             {
-                return DiscoveryPreviewResult.Failed(ex2.Message);
+                using var ms = new MemoryStream(primary);
+                parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
+                    ms, primaryName, "IsrOrg", Language: language));
             }
         }
         catch (InvalidOperationException ex)

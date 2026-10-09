@@ -19,7 +19,18 @@ public record IsrOrgResult(
     string? RelayTeamName,
     string? RelaySwimmersName,
     List<RelaySwimmer>? RelaySwimmers
-);
+)
+{
+    /// <summary>
+    /// Имя собрано из двух строк-фрагментов вокруг строки данных (перенос в ячейке, И-48);
+    /// склейка уже в <see cref="LastName"/>. Нужно паре HE+EN: колонку переноса (имя или
+    /// фамилия) и пробел решает ивритская строка.
+    /// </summary>
+    public IsrOrgNameWrap? NameWrap { get; init; }
+}
+
+/// <summary>Две части перенесённого имени: строка над данными и строка под ними.</summary>
+public sealed record IsrOrgNameWrap(string Before, string After);
 
 public record IsrOrgCompetitionResult(
     string Competition,

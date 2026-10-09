@@ -532,6 +532,9 @@ public class IsrOrgParser : IFormatParser
 
                 var age = DetermineAge(eventYear, rEn.BirthYear, compEn.EventStyleAge);
                 var ageGroup = AgeGroupHelper.GetAgeGroup(age);
+                var (lastNameEn, firstNameEn) = ReferenceEquals(rEn, rHe)
+                    ? (rEn.LastName, rEn.FirstName)
+                    : ResolveWrappedEnName(rEn, rHe);
 
                 yield return new Result(
                     Country: countryEn,
@@ -551,8 +554,8 @@ public class IsrOrgParser : IFormatParser
                     Lane: rEn.Lane,
                     LastName: rHe.LastName,
                     FirstName: rHe.FirstName,
-                    LastNameEn: !string.IsNullOrWhiteSpace(rEn.LastName) ? rEn.LastName : rHe.LastName,
-                    FirstNameEn: !string.IsNullOrWhiteSpace(rEn.FirstName) ? rEn.FirstName : rHe.FirstName,
+                    LastNameEn: !string.IsNullOrWhiteSpace(lastNameEn) ? lastNameEn : rHe.LastName,
+                    FirstNameEn: !string.IsNullOrWhiteSpace(firstNameEn) ? firstNameEn : rHe.FirstName,
                     BirthYear: rEn.BirthYear,
                     Club: rHe.Club,
                     ClubEn: !string.IsNullOrWhiteSpace(rEn.Club) ? rEn.Club : rHe.Club,
@@ -571,6 +574,41 @@ public class IsrOrgParser : IFormatParser
             }
         }
     }
+
+    /// <summary>
+    /// EN-имя строки, у которой имя перенесено в ячейке на две строки (И-48). Парсер EN-файла
+    /// колонку переноса не видит: перенос всегда ложится в фамилию, а единственное имя строки
+    /// данных — в имя. Когда перенесено ИМЯ («OLEKSAND» / «R» над и под «MYKHALKIN»), EN-поля
+    /// выходят переставленными — так в базе появилось 34 карточки с «YEHONATAN» в фамилии.
+    ///
+    /// Здесь поле выбирает ивритская строка той же пары: какой вариант (перенос = фамилия или
+    /// перенос = имя) лучше сходится с ивритскими полями по скелету согласных
+    /// (<see cref="NameTransliteration"/>); без явного перевеса — как разобрал парсер. Склейку
+    /// частей решает парсер (<see cref="IsrOrgCompetitionParser.JoinWrappedName"/>), а ивритское
+    /// поле из двух и больше слов («ששון טשקנט») всегда даёт пробел — даже если первая часть
+    /// длинная, а вторая короткая.
+    /// </summary>
+    internal static (string LastName, string FirstName) ResolveWrappedEnName(IsrOrgResult en, IsrOrgResult he)
+    {
+        if (en.NameWrap is not { } wrap) return (en.LastName, en.FirstName);
+
+        // Иврит только ДОБАВЛЯЕТ пробел: одно ивритское слово не значит, что английских тоже одно
+        // («יהונתן» ↔ «YONATHAN SHLOMO», «בן» ↔ «BEN BENJAMIN» — второе имя есть только в EN).
+        string JoinFor(string heField) =>
+            HebrewWordCount(heField) >= 2 ? $"{wrap.Before} {wrap.After}" : en.LastName;
+
+        var single = en.FirstName;
+        var asLast = (Last: JoinFor(he.LastName), First: single);
+        var asFirst = (Last: single, First: JoinFor(he.FirstName));
+
+        double Score((string Last, string First) v) =>
+            NameTransliteration.Similarity(he.LastName, v.Last) + NameTransliteration.Similarity(he.FirstName, v.First);
+
+        return Score(asFirst) > Score(asLast) + 0.2 ? asFirst : asLast;
+    }
+
+    private static int HebrewWordCount(string s) =>
+        s.Split([' ', '-', '־'], StringSplitOptions.RemoveEmptyEntries).Length;
 
     private static readonly Regex AgeBandRx = new(@"^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$", RegexOptions.Compiled);
 

@@ -25,17 +25,17 @@ public class SwimmerSpellingVariantImportTests
     [InlineData("קליטצ׳וק", "ליאורה", "קליטצ'וק", "ליאורה")]
     public void SpellingKey_SameForVariants(string lastA, string firstA, string lastB, string firstB) =>
         Assert.Equal(
-            JsonImportService.SwimmerSpellingKey(lastA, firstA, 2011),
-            JsonImportService.SwimmerSpellingKey(lastB, firstB, 2011));
+            ImportSwimmerResolver.SwimmerSpellingKey(lastA, firstA, 2011),
+            ImportSwimmerResolver.SwimmerSpellingKey(lastB, firstB, 2011));
 
     [Fact]
     public void SpellingKey_DiffersByYear_AndIsNullForLatin()
     {
         Assert.NotEqual(
-            JsonImportService.SwimmerSpellingKey("יוקליס", "עמליה", 2011),
-            JsonImportService.SwimmerSpellingKey("יוקלס", "עמליה", 2012));
-        Assert.Null(JsonImportService.SwimmerSpellingKey("Ukeles", "Amalia", 2011));
-        Assert.Null(JsonImportService.SwimmerSpellingKey("יוקלס", "עמליה", 0));
+            ImportSwimmerResolver.SwimmerSpellingKey("יוקליס", "עמליה", 2011),
+            ImportSwimmerResolver.SwimmerSpellingKey("יוקלס", "עמליה", 2012));
+        Assert.Null(ImportSwimmerResolver.SwimmerSpellingKey("Ukeles", "Amalia", 2011));
+        Assert.Null(ImportSwimmerResolver.SwimmerSpellingKey("יוקלס", "עמליה", 0));
     }
 
     // ── Импорт ────────────────────────────────────────────────────────────────

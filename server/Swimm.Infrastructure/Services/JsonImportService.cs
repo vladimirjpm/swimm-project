@@ -222,31 +222,9 @@ public class JsonImportService : IImportService
             clubCache.TryAdd($"{c.Name}|{c.NameEn}", c);
 
         // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.
-        // Второй индекс по EN-имени — фоллбек-матчинг для двуязычных/EN-протоколов
-        // (Maccabiah-кейс: пловец известен под английским именем).
-        // Страж тёзок (инцидент И-11, docs/data-integrity.md). Ключ матчинга пловца —
-        // «фамилия|имя|годРождения», без клуба и без внешнего id, поэтому два ребёнка-тёзки
-        // одного года рождения склеивались в одну запись ВСЕГДА. Признак, что это разные
-        // люди: в ОДНОМ соревновании пловец не может выступать за два клуба.
-        //   seenClubInCompetition: (соревнование, пловец) → канонический клуб этого прогона;
-        //   namesakeByClub:        (соревнование, ключ имени, клуб) → выделенный тёзка.
-        var seenClubInCompetition = new Dictionary<(int CompetitionId, int SwimmerId), int>();
-        var namesakeByClub = new Dictionary<(int CompetitionId, string NameKey, int ClubId), Swimmer>();
-
-        var swimmerCache = new Dictionary<string, Swimmer>();
-        var swimmerCacheEn = new Dictionary<string, Swimmer>();
-        // Фоллбек «то же имя, другая граница фамилии» — см. SwimmerFullNameKey.
-        var swimmerCacheByFullName = new Dictionary<string, Swimmer>();
-        // Фоллбек «то же имя другим написанием» (כתיב מלא/חסר) — см. SwimmerSpellingKey.
-        var swimmersBySpelling = new Dictionary<string, List<Swimmer>>();
-        foreach (var s in await _db.Swimmers.ToListAsync())
-        {
-            swimmerCache.TryAdd(SwimmerMatchKey(s.LastName, s.FirstName, s.BirthYear), s);
-            swimmerCacheByFullName.TryAdd(SwimmerFullNameKey(s.LastName, s.FirstName, s.BirthYear), s);
-            AddBySpelling(swimmersBySpelling, s);
-            if (!string.IsNullOrWhiteSpace(s.LastNameEn))
-                swimmerCacheEn.TryAdd(SwimmerMatchKey(s.LastNameEn, s.FirstNameEn, s.BirthYear), s);
-        }
+        // Пловцы: строка протокола → карточка (точный ключ, фоллбеки, страж тёзок И-11) —
+        // ImportSwimmerResolver, один на импорт.
+        var swimmers = await ImportSwimmerResolver.LoadAsync(_db, diagnosticLog);
 
         // Categories: Key → Category (для привязки соревнований к категориям на импорте).
         var categoryCache = new Dictionary<string, Category>(StringComparer.OrdinalIgnoreCase);
@@ -578,147 +556,14 @@ public class JsonImportService : IImportService
                     clubCache[clubKey] = club;
                 }
 
-                // 5. Swimmer
-                var swimmerKey = SwimmerMatchKey(item.LastName, item.FirstName, item.BirthYear);
-                // EN-ключ значим, только если EN-имя реально отличается от основного
-                // (двуязычный парсер фоллбечит EN←HE при пустой английской строке).
-                var swimmerKeyEn = !string.IsNullOrWhiteSpace(item.LastNameEn)
-                    ? SwimmerMatchKey(item.LastNameEn, item.FirstNameEn, item.BirthYear)
-                    : null;
-                if (swimmerKeyEn == swimmerKey) swimmerKeyEn = null;
-
-                // Анонимные relay-леги (без имени/фамилии и без года рождения — например,
-                // DQ/NS-леги из протоколов, где парсер не смог восстановить личность) все
-                // нормализуются в один и тот же пустой ключ. Если пускать их через обычный
-                // dedup/кэш, несвязанные леги разных команд/стран схлопываются в один
-                // Swimmer (баг: swimmer_id 8243 переиспользовался для легов Israel, USA,
-                // Germany, Brazil и "Maccabiah MIX" в одном заезде). Поэтому для таких строк
-                // матчинг и кэш полностью пропускаем — каждая строка получает свою запись.
-                var isAnonymousSwimmer =
-                    SwimmerDedupService.Normalize(item.LastName ?? "") == string.Empty &&
-                    SwimmerDedupService.Normalize(item.FirstName ?? "") == string.Empty;
-
-                Swimmer swimmer;
-                if (isAnonymousSwimmer)
-                {
-                    swimmer = new Swimmer
-                    {
-                        LastName = item.LastName ?? string.Empty,
-                        FirstName = item.FirstName ?? string.Empty,
-                        LastNameEn = item.LastNameEn ?? string.Empty,
-                        FirstNameEn = item.FirstNameEn ?? string.Empty,
-                        BirthYear = item.BirthYear ?? 0
-                    };
-                    _db.Swimmers.Add(swimmer);
-                    await _db.SaveChangesAsync();
-                }
-                else if (!swimmerCache.TryGetValue(swimmerKey, out swimmer!))
-                {
-                    // Фоллбек по EN-имени: пловец с заполненными *En-полями либо созданный
-                    // из EN-протокола (английское имя в основных полях) — второй случай
-                    // канонизируем: HE в основные поля, EN в *En.
-                    if (swimmerKeyEn != null
-                        && (swimmerCacheEn.TryGetValue(swimmerKeyEn, out swimmer)
-                            || swimmerCache.TryGetValue(swimmerKeyEn, out swimmer)))
-                    {
-                        if (SwimmerMatchKey(swimmer.LastName, swimmer.FirstName, swimmer.BirthYear) == swimmerKeyEn)
-                        {
-                            swimmer.LastName = item.LastName ?? string.Empty;
-                            swimmer.FirstName = item.FirstName ?? string.Empty;
-                            swimmer.LastNameEn = item.LastNameEn ?? string.Empty;
-                            swimmer.FirstNameEn = item.FirstNameEn ?? string.Empty;
-                        }
-                    }
-                    else if (swimmerCacheByFullName.TryGetValue(
-                                 SwimmerFullNameKey(item.LastName, item.FirstName, item.BirthYear), out swimmer))
-                    {
-                        // Тот же человек, разрезанный на имя и фамилию иначе, — не новый пловец.
-                    }
-                    else
-                    {
-                        // Ивритский протокол напечатал имя ЛАТИНИЦЕЙ в основных полях, а EN-полей
-                        // у строки нет (6595: «Yael Fridland»), — ищем среди английских имён
-                        // карточек, как у ноги эстафеты. Без этого каждый переимпорт заводил
-                        // дубль рядом с פרידלנד יעל #7136 (склеивали 06.10 и снова 07.10).
-                        swimmer = swimmerKeyEn == null && IsLatinName(item.LastName, item.FirstName)
-                            ? await FindByEnglishNameAsync(item.LastName, item.FirstName, item.BirthYear)
-                            : null;
-
-                        // Not in pre-loaded cache — may still exist if duplicate key collision was silenced
-                        swimmer ??= await _db.Swimmers.FirstOrDefaultAsync(s =>
-                            s.LastName == (item.LastName ?? "") &&
-                            s.FirstName == (item.FirstName ?? "") &&
-                            s.BirthYear == (item.BirthYear ?? 0));
-
-                        swimmer ??= FindBySpelling(swimmersBySpelling, item.LastName, item.FirstName, item.BirthYear,
-                            club, diagnosticLog);
-                    }
-
-                    if (swimmer == null)
-                    {
-                        swimmer = new Swimmer
-                        {
-                            LastName = item.LastName ?? string.Empty,
-                            FirstName = item.FirstName ?? string.Empty,
-                            LastNameEn = item.LastNameEn ?? string.Empty,
-                            FirstNameEn = item.FirstNameEn ?? string.Empty,
-                            BirthYear = item.BirthYear ?? 0
-                        };
-                        _db.Swimmers.Add(swimmer);
-                        await _db.SaveChangesAsync();
-                        AddBySpelling(swimmersBySpelling, swimmer);
-                    }
-
-                    swimmerCache[swimmerKey] = swimmer;
-                    swimmerCacheByFullName.TryAdd(
-                        SwimmerFullNameKey(swimmer.LastName, swimmer.FirstName, swimmer.BirthYear), swimmer);
-                }
-
-                // Страж тёзок: тот же пловец уже плыл в ЭТОМ соревновании за другой клуб —
-                // значит это другой человек с тем же именем и годом рождения (инцидент И-11).
-                // Сравниваем канонические клубы: у склеенных клубов остаётся «надгробие»
-                // (MergedIntoId), и без канонизации один и тот же клуб выглядел бы как два.
-                if (!isAnonymousSwimmer && item.IsRelay != true && club != null && swimmer.Id != 0)
-                {
-                    var canonicalClubId = club.MergedIntoId ?? club.Id;
-                    var namesakeKey = (competition.Id, swimmerKey, canonicalClubId);
-
-                    if (namesakeByClub.TryGetValue(namesakeKey, out var namesake))
-                    {
-                        swimmer = namesake;
-                    }
-                    else if (seenClubInCompetition.TryGetValue((competition.Id, swimmer.Id), out var seenClub)
-                             && seenClub != canonicalClubId)
-                    {
-                        swimmer = new Swimmer
-                        {
-                            LastName = item.LastName ?? string.Empty,
-                            FirstName = item.FirstName ?? string.Empty,
-                            LastNameEn = item.LastNameEn ?? string.Empty,
-                            FirstNameEn = item.FirstNameEn ?? string.Empty,
-                            BirthYear = item.BirthYear ?? 0
-                        };
-                        _db.Swimmers.Add(swimmer);
-                        await _db.SaveChangesAsync();
-                        namesakeByClub[namesakeKey] = swimmer;
-                        diagnosticLog.Add(
-                            $"Тёзки: '{item.LastName} {item.FirstName}' ({item.BirthYear}) выступают за разные клубы "
-                            + $"в одном соревновании — заведена отдельная запись #{swimmer.Id} для '{club.Name}'");
-                    }
-
-                    seenClubInCompetition[(competition.Id, swimmer.Id)] = canonicalClubId;
-                }
+                // 5. Swimmer — ImportSwimmerResolver: поиск карточки, новая карточка, страж тёзок.
+                var (swimmer, swimmerKeyEn) = await swimmers.ResolveAsync(item, club, competition.Id);
 
                 // Дополнение данных спортсмена из результата (Gender, ClubId, CountryId)
                 EnrichSwimmerFromResult(swimmer, item.EventStyleGender, club, country);
 
                 // Дозаполнение пустых EN-имён у существующего пловца (двуязычный импорт)
-                if (swimmerKeyEn != null && string.IsNullOrWhiteSpace(swimmer.LastNameEn))
-                {
-                    swimmer.LastNameEn = item.LastNameEn ?? string.Empty;
-                    swimmer.FirstNameEn = item.FirstNameEn ?? string.Empty;
-                    swimmerCacheEn.TryAdd(swimmerKeyEn, swimmer);
-                }
+                swimmers.FillEnglishName(swimmer, item, swimmerKeyEn);
 
                 // 6. Relay — created but NOT saved yet; will be inserted via ResultRecord.Relay navigation.
                 // Структурный состав ног (RelayMembers) резолвим по именам легов из парсера —
@@ -732,8 +577,7 @@ public class JsonImportService : IImportService
                         TeamName = item.RelayTeamName,
                         SwimmersName = item.RelaySwimmersName
                     };
-                    relay.Members = await ResolveRelayMembersAsync(
-                        item.RelaySwimmers, swimmerCache, swimmersBySpelling, club, diagnosticLog);
+                    relay.Members = await swimmers.ResolveRelayMembersAsync(item.RelaySwimmers, club);
                     if (item.RelaySwimmers?.Any(l => !string.IsNullOrWhiteSpace(l.SplitTime)) == true)
                         competitionsWithSplits.Add(competition.Id);
                 }
@@ -776,7 +620,7 @@ public class JsonImportService : IImportService
                     // upsert это не ломает: ResultMatcher.KeyGender считает none и mixed одним.
                     Gender = relay != null
                         ? RelayGender.Resolve(item.EventStyleGender, relay.Members.Select(m =>
-                            swimmerCache.Values.FirstOrDefault(s => s.Id == m.SwimmerId)?.Gender))
+                            swimmers.GenderOf(m.SwimmerId)))
                         : ResolveResultGender(item.EventStyleGender, swimmer, false),
                     AgeGroup = item.AgeGroup ?? string.Empty,
                     EventStyleAge = item.EventStyleAge ?? string.Empty,
@@ -1424,120 +1268,6 @@ public class JsonImportService : IImportService
     }
 
     /// <summary>
-    /// Запасной ключ ноги эстафеты: английское имя + год. Нужен, когда протокол пишет пловца
-    /// латиницей не так, как лежит его карточка: у Shirli Ben Shoham в карточке «SHOHAM BEN»
-    /// (латиница в ивритском поле, обратный порядок), а loglig печатает «BEN SHOHAM» — совпадает
-    /// с её английским именем. Без запасного ключа каждый переимпорт заводил ей новую карточку
-    /// (19.09.2026, comp 64). Регистр не важен; берём только ОДНОЗНАЧНОЕ совпадение — двое
-    /// с тем же латинским именем и годом значит, что гадать нельзя, и заводится новая карточка.
-    /// </summary>
-    /// <summary>
-    /// Нога, записанная с ДРУГОЙ границей между именем и фамилией: ищем по всем словам
-    /// полного имени и году рождения (<see cref="SwimmerFullNameKey"/>). Неоднозначность
-    /// (двое под одним ключом) — не матчим: лучше тень, чем чужие результаты в профиле.
-    /// </summary>
-    private async Task<Swimmer?> FindLegByFullNameAsync(RelaySwimmerJson leg)
-    {
-        var year = leg.BirthYear ?? 0;
-        if (year == 0) return null;
-
-        var key = SwimmerFullNameKey(leg.LastName, leg.FirstName, year);
-        var sameYear = await _db.Swimmers.Where(s => s.BirthYear == year).ToListAsync();
-        var hits = sameYear
-            .Where(s => SwimmerFullNameKey(s.LastName, s.FirstName, s.BirthYear) == key)
-            .ToList();
-        return hits.Count == 1 ? hits[0] : null;
-    }
-
-    private Task<Swimmer?> FindLegByEnglishNameAsync(RelaySwimmerJson leg) =>
-        FindByEnglishNameAsync(leg.LastName, leg.FirstName, leg.BirthYear);
-
-    /// <summary>
-    /// Карточка, чьё АНГЛИЙСКОЕ имя совпало с данным (регистр не важен) при том же годе.
-    /// Только однозначное совпадение: двое — гадать нельзя, вызывающий заводит новую карточку.
-    /// Общий для ноги эстафеты и личной строки, напечатанной латиницей.
-    /// </summary>
-    private async Task<Swimmer?> FindByEnglishNameAsync(string? lastName, string? firstName, int? birthYear)
-    {
-        var last = (lastName ?? "").Trim().ToUpperInvariant();
-        var first = (firstName ?? "").Trim().ToUpperInvariant();
-        if (last.Length == 0 || birthYear is not int year || year == 0) return null;
-
-        var found = await _db.Swimmers
-            .Where(s => s.BirthYear == year
-                        && s.LastNameEn.ToUpper() == last
-                        && s.FirstNameEn.ToUpper() == first)
-            .Take(2)
-            .ToListAsync();
-        return found.Count == 1 ? found[0] : null;
-    }
-
-    /// <summary>
-    /// Резолвит ноги эстафеты (леги из парсера) в <see cref="RelayMember"/>: каждое имя —
-    /// в Swimmer тем же матчингом, что и обычный пловец (кэш → БД → заглушка). Анонимные
-    /// леги (без имени) пропускаем — членство им не атрибутировать. Дубли SwimmerId внутри
-    /// одной эстафеты схлопываем (уникальный индекс RelayId+SwimmerId).
-    /// </summary>
-    private async Task<List<RelayMember>> ResolveRelayMembersAsync(
-        List<RelaySwimmerJson>? legs, Dictionary<string, Swimmer> swimmerCache,
-        Dictionary<string, List<Swimmer>> swimmersBySpelling, Club? club, List<string> diagnosticLog)
-    {
-        var members = new List<RelayMember>();
-        if (legs == null || legs.Count == 0) return members;
-
-        var seen = new HashSet<int>();
-        foreach (var leg in legs)
-        {
-            var normLast = SwimmerDedupService.Normalize(leg.LastName ?? "");
-            var normFirst = SwimmerDedupService.Normalize(leg.FirstName ?? "");
-            if (normLast == string.Empty && normFirst == string.Empty)
-                continue; // анонимная нога
-
-            var key = SwimmerMatchKey(leg.LastName, leg.FirstName, leg.BirthYear);
-            if (!swimmerCache.TryGetValue(key, out var swimmer))
-            {
-                swimmer = await _db.Swimmers.FirstOrDefaultAsync(s =>
-                    s.LastName == (leg.LastName ?? "") &&
-                    s.FirstName == (leg.FirstName ?? "") &&
-                    s.BirthYear == (leg.BirthYear ?? 0));
-
-                // Та же нога, разрезанная на имя и фамилию иначе (протокол гадает границу,
-                // loglig берёт её из колонок) — не новый пловец, см. SwimmerFullNameKey.
-                swimmer ??= await FindLegByFullNameAsync(leg);
-                swimmer ??= await FindLegByEnglishNameAsync(leg);
-                // Нога плывёт за клуб команды — тот же фоллбек написания, что у личной строки.
-                swimmer ??= FindBySpelling(swimmersBySpelling, leg.LastName, leg.FirstName, leg.BirthYear,
-                    club, diagnosticLog);
-
-                if (swimmer == null)
-                {
-                    swimmer = new Swimmer
-                    {
-                        LastName = leg.LastName ?? string.Empty,
-                        FirstName = leg.FirstName ?? string.Empty,
-                        LastNameEn = string.Empty,
-                        FirstNameEn = string.Empty,
-                        BirthYear = leg.BirthYear ?? 0
-                    };
-                    _db.Swimmers.Add(swimmer);
-                    await _db.SaveChangesAsync();
-                    AddBySpelling(swimmersBySpelling, swimmer);
-                }
-                swimmerCache[key] = swimmer;
-            }
-
-            if (!seen.Add(swimmer.Id)) continue;
-            members.Add(new RelayMember
-            {
-                SwimmerId = swimmer.Id,
-                LegOrder = leg.Order ?? 0,
-                SplitTime = leg.SplitTime,
-            });
-        }
-        return members;
-    }
-
-    /// <summary>
     /// Upsert (Р4): обновляет Relay существующего результата на месте (сохраняя Relay.Id), либо
     /// привязывает новую Relay-навигацию, если у старого результата её ещё не было.
     /// </summary>
@@ -1637,112 +1367,6 @@ public class JsonImportService : IImportService
     }
 
     /// <summary>
-    /// Ключ матчинга пловца для кэша/поиска — нормализует фамилию и имя по правилам
-    /// <see cref="SwimmerDedupService.Normalize"/> (гереш/апостроф, регистр, пробелы),
-    /// чтобы не плодить дублей из-за непоследовательной пунктуации в протоколах isr.org.il.
-    /// Хранимые Swimmer.LastName/FirstName нормализацию НЕ проходят.
-    /// </summary>
-    /// <summary>Имя целиком латиницей: есть буквы, и все буквы — a–z / A–Z.</summary>
-    private static bool IsLatinName(string? last, string? first)
-    {
-        var letters = $"{last}{first}".Where(char.IsLetter).ToList();
-        return letters.Count > 0 && letters.All(char.IsAsciiLetter);
-    }
-
-    private static string SwimmerMatchKey(string? last, string? first, int? year) =>
-        $"{SwimmerDedupService.Normalize(last ?? "")}|{SwimmerDedupService.Normalize(first ?? "")}|{year ?? 0}";
-
-    /// <summary>
-    /// Ключ пловца, НЕ ЗАВИСЯЩИЙ от того, где прошла граница между именем и фамилией:
-    /// все слова полного имени по алфавиту + год рождения.
-    ///
-    /// Зачем: границу знает не каждый источник. Основной протокол даёт ногу эстафеты плоской
-    /// строкой «Фамилия… Имя Год» и вынужден гадать — <c>ParseRelaySwimmerLine</c> отдаёт имени
-    /// ровно одно слово, поэтому «בניסים שרה רוז 2015» превращается в фамилию «בניסים שרה» и
-    /// имя «רוז». У PDF промежуточных loglig имя и фамилия лежат в РАЗНЫХ КОЛОНКАХ, и тот же
-    /// человек разрезан правильно. Обычный ключ «фамилия|имя|год» на этих двух написаниях
-    /// разный, и импорт заводит пловца-тень рядом с настоящим: 20.09.2026 так появилось
-    /// 50 дублей за один прогон (docs/data-integrity.md, И-28).
-    ///
-    /// ⚠ ПОРЯДОК СЛОВ ЗНАЧИМ: склеиваем «фамилия + имя» как есть, без пробелов. «שני עידו» и
-    /// «עידו שני» остаются РАЗНЫМИ людьми — решение зафиксировано тестом
-    /// <c>Import_NameSurnameSwap_NotMerged</c>: в иврите обе половины бывают и именем, и
-    /// фамилией, и перестановка склеила бы двух разных детей. Сдвиг границы при этом ловится:
-    /// «בניסים שרה»+«רוז» и «בניסים»+«שרה רוז» дают одну и ту же склейку.
-    /// ⚠ Это ФОЛЛБЕК, а не основной ключ: сначала пробуем точное совпадение, и только если его
-    /// нет — этот. Сторож тёзок по клубам (И-11) работает после и не отключается.
-    /// </summary>
-    /// <summary>
-    /// Ключ написания: полное имя без «י», «ו», дефисов, апострофов и пробелов + год рождения.
-    ///
-    /// Зачем: иврит пишет одно и то же имя то полным письмом, то неполным (כתיב מלא/חסר), а
-    /// протоколы ещё и ставят дефис в двойной фамилии через раз. «יוקליס עמליה» и
-    /// «יוקלס עמליה» (#61745), «בן-בסט יובל» и «בן בסט יובל» (#60127) — одни и те же люди, но
-    /// точный ключ у них разный, и каждый переимпорт заводил новую карточку (склеивали 06.10 и
-    /// снова 07.10; решение Влада 07.10.2026 — Р79 в docs/data-integrity.md).
-    ///
-    /// Ключ слабый (у разных людей скелет может совпасть), поэтому сам по себе он не решает —
-    /// см. <see cref="FindBySpelling"/>: нужны ещё тот же клуб и единственный кандидат.
-    /// null — в имени нет иврита (латиница так не пишется) или нет года.
-    /// </summary>
-    internal static string? SwimmerSpellingKey(string? last, string? first, int? year)
-    {
-        var full = $"{last} {first}";
-        if (year is not > 0 || !full.Any(c => c is >= 'א' and <= 'ת')) return null;
-
-        var skeleton = new string(SwimmerDedupService.Normalize(full)
-            .Where(c => c is not ('י' or 'ו' or '-' or '־' or ' ' or '\'' or '"'))
-            .ToArray());
-        return skeleton.Length == 0 ? null : $"{skeleton}|{year}";
-    }
-
-    private static void AddBySpelling(Dictionary<string, List<Swimmer>> index, Swimmer swimmer)
-    {
-        // Пловец группы (Р71) — не кандидат: его заводил тренер, и чужой протокол не должен
-        // попадать в его карточку (тот же принцип, что в SwimmerDedupService).
-        if (swimmer.PrivateHubGroupId != null) return;
-        if (SwimmerSpellingKey(swimmer.LastName, swimmer.FirstName, swimmer.BirthYear) is not { } key) return;
-        if (!index.TryGetValue(key, out var list)) index[key] = list = [];
-        list.Add(swimmer);
-    }
-
-    /// <summary>
-    /// Карточка того же человека, записанного другим написанием (<see cref="SwimmerSpellingKey"/>):
-    /// тот же год, ТОТ ЖЕ КЛУБ (клуб строки или его канон после склейки — у карточки клуб
-    /// последнего старта) и ровно один такой кандидат. Иначе null — вызывающий заводит новую
-    /// карточку, а сомнительную пару покажет проверка дублей в Health, решать будет человек.
-    /// </summary>
-    private static Swimmer? FindBySpelling(
-        Dictionary<string, List<Swimmer>> index, string? last, string? first, int? year,
-        Club? club, List<string> diagnosticLog)
-    {
-        if (club is null || SwimmerSpellingKey(last, first, year) is not { } key) return null;
-        if (!index.TryGetValue(key, out var candidates)) return null;
-
-        var clubIds = new[] { club.Id, club.MergedIntoId ?? club.Id };
-        var sameClub = candidates.Where(s => s.ClubId is int c && clubIds.Contains(c)).Take(2).ToList();
-        if (sameClub.Count != 1) return null;
-
-        var found = sameClub[0];
-        diagnosticLog.Add(
-            $"Другое написание: '{last} {first}' ({year}) узнан как #{found.Id} '{found.LastName} {found.FirstName}' "
-            + $"(тот же год и клуб «{club.Name}»)");
-        return found;
-    }
-
-    private static string SwimmerFullNameKey(string? last, string? first, int? year)
-    {
-        var glued = $"{SwimmerDedupService.Normalize(last ?? "")}{SwimmerDedupService.Normalize(first ?? "")}"
-            .Replace(" ", string.Empty);
-        return $"{glued}|{year ?? 0}";
-    }
-
-    /// <summary>
-    /// Дополняет данные спортсмена полями из результатов:
-    /// Gender (из event_style_gender), ClubId (FK на клуб) и CountryId (FK на страну).
-    /// Обновляет только пустые поля — не перезаписывает уже заполненные.
-    /// </summary>
-    /// <summary>
     /// Пол заплыва, у которого его нет в шапке протокола («none» — смешанные заплывы вроде
     /// «שומרי שבת»), берём с самого пловца: его пол известен по другим заплывам. Если и там
     /// пусто — оставляем пустым, такие строки видны в «дырах данных» (Admin/Results).
@@ -1766,6 +1390,11 @@ public class JsonImportService : IImportService
         || gender.Equals("mix", StringComparison.OrdinalIgnoreCase)
         || gender.Equals("mixed", StringComparison.OrdinalIgnoreCase); // смешанная эстафета — не пол пловца (Э4)
 
+    /// <summary>
+    /// Дополняет данные спортсмена полями из результатов:
+    /// Gender (из event_style_gender), ClubId (FK на клуб) и CountryId (FK на страну).
+    /// Обновляет только пустые поля — не перезаписывает уже заполненные.
+    /// </summary>
     private static void EnrichSwimmerFromResult(Swimmer swimmer, string? gender, Club? club, Country? country)
     {
         // «none»/«mix» — это отсутствие пола в шапке, а не пол пловца: записав его в Swimmer,

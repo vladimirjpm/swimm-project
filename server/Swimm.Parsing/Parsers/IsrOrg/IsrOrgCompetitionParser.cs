@@ -363,12 +363,61 @@ public static class IsrOrgCompetitionParser
     private static string NormalizeIfHe(string s, bool isHE) =>
         isHE ? HebrewTextHelper.NormalizeHebrewLine(s) : s;
 
+    /// <summary>
+    /// Шапка страницы loglig: название соревнования (первая строка страницы) и строка с датой
+    /// («09/05/2026», «27/12/2025 - 23/12/2025»). У последней команды страницы ног бывает меньше
+    /// четырёх (NS, DQ, loglig не знает состава) — недобранный состав уходит на следующую страницу,
+    /// и раньше шапка шла в ноги: в названии «… חורף 2025» и в дате есть четыре цифры, сходившие за
+    /// год рождения. Так в базе завелись пловцы «חורף מוקדמות», «09/05/2026», «ובוגרים | אליפות
+    /// ישראל…» (И-49, проверено по PDF loglig 11792, 14575, 13606, 13627).
+    /// </summary>
+    internal static bool IsPageHeaderLine(string line, IReadOnlyList<string> pageLines, bool isHE)
+    {
+        if (Regex.IsMatch(line, @"\b\d{1,2}/\d{1,2}/\d{4}\b")) return true;
+        if (pageLines.Count == 0) return false;
+        string Norm(string s) => isHE ? HebrewTextHelper.NormalizeHebrewLine(s.Trim()) : s.Trim();
+        // Первая строка — название, только если у страницы есть шапка («תוצאות» / «Results»):
+        // страница-продолжение начинается прямо с ноги (14575 стр. 23: «קאושינסק / י 2012»).
+        bool hasHeader = pageLines.Take(6).Select(Norm).Any(s => s is "תוצאות" or "Results");
+        var title = Norm(pageLines[0]);
+        return hasHeader && title.Length > 0 && string.Equals(line.Trim(), title, StringComparison.Ordinal);
+    }
+
     // Строка-фрагмент перенесённой фамилии: одно "слово" из букв (латиница/иврит),
     // без цифр и пробелов — т.е. не заголовок, не строка результата, не дата.
     private static bool IsNameFragment(string s)
     {
         s = s.Trim();
         return s.Length > 0 && Regex.IsMatch(s, @"^[\p{L}][\p{L}'\-]*$");
+    }
+
+    /// <summary>
+    /// Склейка имени, перенесённого в ячейке на две строки (И-48). loglig переносит ПО ПРОБЕЛУ
+    /// («KIDRON» / «MERIDOR», «HEN» / «ROSENTAL», «שלמה» / «איתן») и ПОСРЕДИ СЛОВА, когда слово
+    /// длиннее ячейки («KOMMISARCHI» / «K», «GERSHKOV» / «ICH»). Посреди слова — первая часть
+    /// заполнила ячейку (≥ 8 букв), а хвост короткий (≤ 3); на двух протоколах (loglig 14218,
+    /// 14220) правило верно на всех 60 переносах. До 08.10.2026 склеивали всегда без пробела —
+    /// в базе копились «SASONTASHKENT», «HENROSENTAL», «גנדלריזהר». В паре HE+EN пробел
+    /// уточняет <see cref="IsrOrgParser.ResolveWrappedEnName"/> по числу слов ивритского поля.
+    /// </summary>
+    internal static string JoinWrappedName(string before, string after) =>
+        before.Length >= 8 && after.Length <= 3 ? before + after : before + " " + after;
+
+    // Неявка (NS/DNS без времени) пловца, который уже стоит в событии в том же заплыве на той же
+    // дорожке, — повтор стартового листа (И-46). Без номера заплыва/дорожки не судим: тогда
+    // «тот же пловец дважды» неотличим от законного NS в склеенном финале.
+    internal static bool IsNoShowRepeat(IReadOnlyList<IsrOrgResult> eventResults, IsrOrgResult res)
+    {
+        if (res.IsRelay == true || !string.IsNullOrWhiteSpace(res.Time)) return false;
+        if (res.TimeFailNote is not ("NS" or "DNS")) return false;
+        if (res.Heat <= 0 || res.Lane <= 0) return false;
+
+        return eventResults.Any(r =>
+            r.IsRelay != true
+            && r.Heat == res.Heat && r.Lane == res.Lane
+            && r.BirthYear == res.BirthYear
+            && string.Equals(r.LastName, res.LastName, StringComparison.Ordinal)
+            && string.Equals(r.FirstName, res.FirstName, StringComparison.Ordinal));
     }
 
     private static IEnumerable<IsrOrgCompetitionResult> ParseCompetitionsInternal(Stream pdfStream, string language)
@@ -651,8 +700,8 @@ public static class IsrOrgCompetitionParser
                 }
             }
 
-            string last = (lastPrefix + (lastCore ?? "") + lastSuffix).Trim();
-            string first = (firstPrefix + (firstCore ?? "") + firstSuffix).Trim();
+            string last = JoinLegNameParts(lastPrefix, lastCore ?? "", lastSuffix);
+            string first = JoinLegNameParts(firstPrefix, firstCore ?? "", firstSuffix);
 
             if (last.Length == 0 || first.Length == 0) continue;
 
@@ -682,6 +731,34 @@ public static class IsrOrgCompetitionParser
 
         return final;
     }
+
+    /// <summary>
+    /// Склейка колонки ноги из кусков «над строкой / на строке года / под строкой» (сверху вниз =
+    /// логический порядок). Латиница — как была: подряд без пробела («LERNE»+«R»). Ивритский кусок
+    /// PdfPig отдаёт ВИЗУАЛЬНО — буквы задом наперёд, а строку потом целиком переворачивает
+    /// <see cref="HebrewTextHelper.NormalizeHebrewLine"/>. Склейка сырых кусков ставила хвост
+    /// переноса В НАЧАЛО («סבלסוגוב»+«יק» → «קיבוגוסלבס» вместо «בוגוסלבסקי») и не знала пробела
+    /// («יזהר»/«גנדלר» → «גנדלריזהר»): 70 теней в базе, И-49. Теперь ивритские куски — в логический
+    /// порядок, стык по <see cref="HebrewTextHelper.IsMidWordWrap"/> (как в PDF промежуточных), и
+    /// обратно в визуальный вид целиком, чтобы переворот строки дал нужное.
+    /// </summary>
+    private static string JoinLegNameParts(params string[] rawParts)
+    {
+        var parts = rawParts.Where(p => p.Length > 0).ToList();
+        if (!parts.Any(p => p.Any(IsHebrewChar))) return string.Concat(parts).Trim();
+
+        var logical = "";
+        foreach (var raw in parts)
+        {
+            var part = raw.Any(IsHebrewChar) ? new string(raw.Reverse().ToArray()) : raw;
+            if (logical.Length == 0) logical = part;
+            else if (HebrewTextHelper.IsMidWordWrap(logical, part)) logical += part;
+            else logical += " " + part;
+        }
+        return new string(logical.Reverse().ToArray()).Trim();
+    }
+
+    private static bool IsHebrewChar(char c) => c is >= (char)0x0590 and <= (char)0x05FF;
 
     /// <summary>
     /// Пытается объяснить ВСЮ соседнюю Y-группу (1 или 2 слова) как обрывок(и)
@@ -915,6 +992,13 @@ public static class IsrOrgCompetitionParser
                 {
                     bool isNewHeader = headerRx.IsMatch(line) || (isHE && IsAnyEventHeaderHE(line));
                     bool isNewTeam = RelayTeamLineRxHE.IsMatch(line);
+
+                    if (!isNewHeader && !isNewTeam && pendingSwimmers.Count < currentRelayLegs
+                        && IsPageHeaderLine(line, lines, isHE))
+                    {
+                        Log($"  -> Шапка страницы — не нога эстафеты: '{line}'");
+                        continue;
+                    }
 
                     if (!isNewHeader && !isNewTeam && pendingSwimmers.Count < currentRelayLegs)
                     {
@@ -2016,23 +2100,33 @@ public static class IsrOrgCompetitionParser
                             {
                                 var res = IsrOrgResultLineParser.ParseResultLine(entry, knownClubs, Log);
 
-                                // Перенос длинной фамилии: PDF иногда разносит её на соседние
-                                // строки (напр. "TSCHERKOWS" / данные / "KI"), и в строке данных
-                                // фамилия пустая. Восстанавливаем из соседних строк-фрагментов
-                                // (только буквы) в той же ориентации, склеивая prev+next.
+                                // Перенос имени в ячейке: PDF разносит его на соседние строки
+                                // (напр. "TSCHERKOWS" / данные / "KI"), и в строке данных одно имя
+                                // вместо двух. Восстанавливаем из соседних строк-фрагментов (только
+                                // буквы) в той же ориентации. Склейка — JoinWrappedName (перенос
+                                // посреди слова или по пробелу, И-48). Кладём в фамилию, но это
+                                // может быть и перенесённое ИМЯ — колонки в строке уже не видно;
+                                // в паре HE+EN поле выбирает MergeBilingual по ивритской строке.
                                 if (string.IsNullOrWhiteSpace(res.LastName))
                                 {
                                     string Prep(string s) => useNormFinal ? NormalizeIfHe(s, isHE) : s;
                                     var prevFrag = resultLineIdx - 1 >= 0 ? Prep(lines[resultLineIdx - 1].Trim()) : string.Empty;
                                     var nextFrag = i + 1 < lines.Count ? Prep(lines[i + 1].Trim()) : string.Empty;
+                                    var hasPrev = IsNameFragment(prevFrag);
+                                    var hasNext = IsNameFragment(nextFrag);
 
-                                    var recovered = string.Empty;
-                                    if (IsNameFragment(prevFrag)) recovered += prevFrag;
-                                    if (IsNameFragment(nextFrag)) recovered += nextFrag;
+                                    var recovered = hasPrev && hasNext ? JoinWrappedName(prevFrag, nextFrag)
+                                        : hasPrev ? prevFrag
+                                        : hasNext ? nextFrag
+                                        : string.Empty;
 
                                     if (recovered.Length > 0)
                                     {
-                                        res = res with { LastName = recovered };
+                                        res = res with
+                                        {
+                                            LastName = recovered,
+                                            NameWrap = hasPrev && hasNext ? new IsrOrgNameWrap(prevFrag, nextFrag) : null,
+                                        };
                                         Log($"  -> Recovered wrapped surname: '{recovered}' (prev='{prevFrag}', next='{nextFrag}')");
                                     }
                                 }
@@ -2045,6 +2139,20 @@ public static class IsrOrgCompetitionParser
                                 if (current.Results.Count > 0 && current.Results[^1] == res)
                                 {
                                     Log($"  -> WARN exact duplicate row skipped (source printed it twice): '{entry}'");
+                                    continue;
+                                }
+
+                                // Стартовый лист, повторённый целиком как NS, — сбой экспорта
+                                // loglig (И-46): за местами 1…59 и настоящими NS идут ВСЕ
+                                // заплывы ещё раз, у каждого «NS», включая проплывших. Живой
+                                // случай — comp 1720 (loglig 12369), 164 лишние строки.
+                                // Узко: только неявка, и только если тот же пловец УЖЕ стоит в
+                                // событии в том же заплыве на той же дорожке (И10). Финал,
+                                // склеенный с утренними заплывами (MergedSessionsCheck), идёт
+                                // другим заплывом/дорожкой — его законное NS не трогаем.
+                                if (IsNoShowRepeat(current.Results, res))
+                                {
+                                    Log($"  -> WARN no-show repeat skipped (swimmer already in heat {res.Heat}, lane {res.Lane}): '{entry}'");
                                     continue;
                                 }
 

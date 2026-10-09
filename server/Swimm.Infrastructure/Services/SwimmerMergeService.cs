@@ -174,6 +174,44 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
             foreach (var t in trainings) t.SwimmerId = canonical.Id;
             Note(res, "Sys_TrainingResults", trainings.Count);
 
+            // Заявки стартового протокола: FK Restrict — без переноса удаление дубля падало
+            // (08.10.2026, И-49: тень с привязкой к loglig уже набрала заявки). Уникальный ключ —
+            // заплыв × дорожка × пловец: у канонического та же клетка — его строка главнее.
+            var dupEntries = await db.CompetitionEntries.Where(e => e.SwimmerId == duplicate.Id).ToListAsync(ct);
+            var canonSlots = (await db.CompetitionEntries
+                .Where(e => e.SwimmerId == canonical.Id)
+                .Select(e => new { e.OrgDisciplineId, e.Heat, e.Lane }).ToListAsync(ct))
+                .Select(s => (s.OrgDisciplineId, s.Heat, s.Lane)).ToHashSet();
+            foreach (var e in dupEntries)
+            {
+                if (canonSlots.Contains((e.OrgDisciplineId, e.Heat, e.Lane)))
+                {
+                    db.CompetitionEntries.Remove(e);
+                    res.Actions.Add($"CompetitionEntries: заявка {e.Id} удалена (canonical уже в той же клетке)");
+                }
+                else e.SwimmerId = canonical.Id;
+            }
+            Note(res, "CompetitionEntries", dupEntries.Count);
+
+            // Ответы «иду / не приду» за пловца группы (Ш2): FK каскад — без переноса удаление дубля
+            // МОЛЧА уносило ответы. Один ответ на занятие (частичный UNIQUE) — у канонического уже
+            // есть ответ на то же занятие — главнее его.
+            var dupRsvps = await db.HubGroupTrainingRsvps.Where(r => r.SwimmerId == duplicate.Id).ToListAsync(ct);
+            var canonSessions = (await db.HubGroupTrainingRsvps
+                .Where(r => r.SwimmerId == canonical.Id)
+                .Select(r => new { r.HubGroupId, r.SessionDate, r.SessionStart }).ToListAsync(ct))
+                .Select(s => (s.HubGroupId, s.SessionDate, s.SessionStart)).ToHashSet();
+            foreach (var r in dupRsvps)
+            {
+                if (canonSessions.Contains((r.HubGroupId, r.SessionDate, r.SessionStart)))
+                {
+                    db.HubGroupTrainingRsvps.Remove(r);
+                    res.Actions.Add($"Sys_HubGroupTrainingRsvps: ответ на занятие {r.SessionDate} {r.SessionStart} удалён (у canonical свой)");
+                }
+                else r.SwimmerId = canonical.Id;
+            }
+            Note(res, "Sys_HubGroupTrainingRsvps", dupRsvps.Count);
+
             // Уровни и планы дорожек (docs/plans/lane-plans-plan.md): SwimmerId — часть первичного
             // ключа, править его на месте EF не даёт, поэтому строка дубля пересоздаётся на
             // канонического. У их FK каскад: без переноса удаление дубля молча унесло бы уровень

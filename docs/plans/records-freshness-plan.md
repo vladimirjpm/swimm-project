@@ -9,7 +9,7 @@
 ## 1. Что есть сегодня — не перепроверять
 
 - **Источники** (`IRecordSourceProvider`, ключ `Source`), порядок применения — САМО
-  ПРАВИЛО (решение Влада 24.08, И-13), живёт в `Program.cs` у `--records-refresh`:
+  ПРАВИЛО (решение Влада 24.08, И-13), живёт в `server/Swimm.API/Cli/RecordsCli.cs` у `--records-refresh`:
   `worldrecords` (WR + NR World Aquatics, XLSX) → `wa-masters` (PDF WA) → `isrorg-age` →
   `isrorg-masters` (PDF федерации). `wa-junior` (21.09.2026) стоит за `wa-masters`, до федерации.
 - **Прогон:** `dotnet run -- --records-refresh [--dry-run]` — fetch → дифф

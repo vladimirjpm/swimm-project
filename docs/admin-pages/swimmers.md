@@ -20,6 +20,13 @@ Rejected — живая привязка дубля её вытесняет (п�
 профилей этот человек, решает админ. Уникальный индекс `IX_Swimmers_LogligId` проходит одним
 SaveChanges — `SwimmerMergeLogligPgTests` (живой Postgres).
 
+**Заявки и ответы на занятия при склейке (08.10.2026, И-49).** Склейка не переносила
+`CompetitionEntries` (FK Restrict — merge дубля с заявками падал целиком) и
+`Sys_HubGroupTrainingRsvps` (FK каскад — ответы «иду / не приду» за пловца исчезали молча). Теперь
+переносятся; у канонического та же клетка (заплыв × дорожка) или ответ на то же занятие — остаётся
+его строка. `SwimmerMergeEntriesPgTests` (живой Postgres), `Merge_MovesTrainingRsvps_…`. Правило на
+будущее: новая таблица с FK на `Swimmers` — сразу ветка в `SwimmerMergeService`.
+
 ## Сироты: критерий
 
 Единственное место — `SwimmerDedupService.OrphanQuery()`; и список на странице, и

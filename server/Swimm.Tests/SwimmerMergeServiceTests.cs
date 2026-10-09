@@ -279,6 +279,34 @@ public class SwimmerMergeServiceTests
             places.Select(p => (p.PlanId, p.SwimmerId, p.LaneNo, p.OrderNo)));
     }
 
+    [Fact]
+    public async Task Merge_MovesTrainingRsvps_CanonicalAnswerWinsOnSameSession()
+    {
+        // FK ответов на пловца — каскад: без переноса удаление дубля молча уносило ответы (И-49).
+        await using var db = CreateDb(nameof(Merge_MovesTrainingRsvps_CanonicalAnswerWinsOnSameSession));
+        var canon = NewSwimmer("כהן", "דן");
+        var dup = NewSwimmer("כהן", "דן");
+        var g = new HubGroup { Name = "G", Slug = "g" };
+        db.AddRange(canon, dup, g);
+        await db.SaveChangesAsync();
+
+        var mon = new DateOnly(2026, 10, 12);
+        var tue = new DateOnly(2026, 10, 13);
+        db.HubGroupTrainingRsvps.AddRange(
+            new HubGroupTrainingRsvp { HubGroupId = g.Id, SessionDate = mon, SessionStart = "17:00", SwimmerId = canon.Id, Answer = "yes" },
+            new HubGroupTrainingRsvp { HubGroupId = g.Id, SessionDate = mon, SessionStart = "17:00", SwimmerId = dup.Id, Answer = "no" },  // то же занятие
+            new HubGroupTrainingRsvp { HubGroupId = g.Id, SessionDate = tue, SessionStart = "17:00", SwimmerId = dup.Id, Answer = "maybe" }); // переносится
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db)
+            .MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("merged", report.Pairs.Single().Status);
+        var rsvps = await db.HubGroupTrainingRsvps.OrderBy(r => r.SessionDate).ToListAsync();
+        Assert.Equal([(mon, canon.Id, "yes"), (tue, canon.Id, "maybe")],
+            rsvps.Select(r => (r.SessionDate, r.SwimmerId!.Value, r.Answer)));
+    }
+
     // ── A2: пересекающиеся пары отклоняются целиком, до любых изменений в БД ────
 
     [Fact]
