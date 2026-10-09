@@ -21,15 +21,21 @@
 client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 ```
 
-`MyMedia` (my-media.tsx:23) — гейт авторизации: пока `auth.loading` — пустой экран;
+`MyMedia` (my-media.tsx) — гейт авторизации: пока `auth.loading` — пустой экран;
 неавторизованному — заглушка с кнопкой Sign in; иначе рендерит `MyMediaContent` —
-собственно страницу. Весь стейт живёт локально в `MyMediaContent` (useState/useMemo),
-никакого Redux — фича не завязана на `store/store.ts`. Тёмная палитра в стиле
+собственно страницу. Весь стейт живёт локально в `MyMediaContent` и его хуках рядом
+(useState/useMemo, см. список файлов ниже), никакого Redux — фича не завязана на `store/store.ts`. Тёмная палитра в стиле
 `groups.html`/`home.html` — осознанное решение (см. §9 Footguns).
 
 Ключевые файлы клиента:
-- `client/src/projects/my-media-project/my-media.tsx` — оркестратор экрана: фильтры,
-  модалы, реакции, share/withdraw, добавление/удаление.
+- `client/src/projects/my-media-project/my-media.tsx` — оркестратор экрана: оверлеи и
+  модалы, добавление/удаление, связка панели фильтров с полосой, разметка. Логика — в хуках
+  рядом (с 10.10.2026, рефакторинг 9б): `use-my-swims-season.ts` (сезон + агрегат заплывов),
+  `use-like-overrides.ts` (реакции ❤), `use-media-summary.ts` (публикации по медиа, сводка,
+  группы «Shared with» — всё, что не зависит от фильтров), `use-swim-filters.ts` (состояние
+  фильтров и что после них видно; там же `swimBelongsTo`), `use-share-dialog.ts`
+  (share/withdraw, `publishTo`; разметка модала — `components/share-dialog.tsx`),
+  `use-profile-swimmers.ts` (пловцы панели и пикера Add link).
 - `client/src/projects/my-media-project/components/add-link-modal.tsx` — попап добавления
   ссылки (3 шага/single-step, см. §5).
 - `client/src/projects/my-media-project/components/swim-list.tsx` — список заплывов,
@@ -185,7 +191,7 @@ mobile; `swimmers` = полный список (favorites + «has media»), бе
    (строка эстафеты принадлежит владельцу + всем ногам — см. `docs/relays.md`).
    `MemberSwimmerIds` донасыщается отдельным запросом — нужен клиенту для чип-фильтра
    («заплыв принадлежит пловцу, если он владелец строки ИЛИ нога эстафеты», `swimBelongsTo`
-   в `my-media.tsx`).
+   в `use-swim-filters.ts`).
 4. **Метки достижений — общий словарь продукта, локальных правил тут НЕТ.**
    • `PB` — личный рекорд: лучшее время пловца за всё время на (стиль, дистанция),
      индивидуальные незасчитанные-DSQ заплывы. Считает `MySwimsRepository` (`IsPb`).
@@ -240,10 +246,12 @@ mobile; `swimmers` = полный список (favorites + «has media»), бе
 6. Реакции: ❤ (`Sys_UserReactions`, `Kind="like"`, `MediaId`) по медиа юзера, 🎉
    (`Kind="congrats"`, `ResultId`) по заплывам сезона — групповые счётчики + флаг «мой».
 
-На клиенте `my-media.tsx` держит **оптимистичные оверрайды** поверх ответа `/api/me/swims`
-(`likeOverrides`/`cheerOverrides`, Map по id) — тоггл сразу меняет счётчик локально, сервер
-подтверждает/поправляет асинхронно (`toggleLike`/`toggleCheer` из `use-my-swims.ts`,
-идемпотентные, возвращают итоговый `{count, mine}`).
+На клиенте `use-like-overrides.ts` держит **оптимистичные оверрайды** ❤ поверх ответа
+`/api/me/swims` (`likeOverrides`, Map по id медиа) — тоггл сразу меняет счётчик локально, сервер
+подтверждает/поправляет асинхронно (`toggleLike` из `use-my-swims.ts`, идемпотентный,
+возвращает итоговый `{count, mine}`). 🎉 на странице только показывается (`CheerChip` в
+`swim-list.tsx`); `toggleCheer` в `use-my-swims.ts` есть, но страница его не зовёт, и
+оверрайдов для 🎉 нет (сверено 10.10.2026).
 
 ### Светлая тема: две роли только для неё
 
@@ -339,7 +347,7 @@ mobile; `swimmers` = полный список (favorites + «has media»), бе
 если у подающего есть привилегия в целевой группе (владелец/админ группы/site-admin),
 заявка сразу `approved` и сбрасывает общий кэш (публичная витрина группы читает
 Publications через кэшируемый payload). Смена уровня уже поданной pending/approved
-публикации не поддержана напрямую — клиент (`handlePublish` в `my-media.tsx`) сначала
+публикации не поддержана напрямую — клиент (`publishTo` в `use-share-dialog.ts`) сначала
 делает `withdraw`, затем подаёт заново с новым `level`. Полная модель ролей/статусов —
 в `docs/favorites-media-phase2-design.md` и `docs/hubgroups-architecture.md`, здесь не
 дублируется.
@@ -378,10 +386,10 @@ Publications через кэшируемый payload). Смена уровня �
 `publish-targets` (пловца убрали из ростера), а публикация осталась — опция дописывается
 вручную, иначе селект показал бы пустоту. Кнопка зовётся `Update` вместо `Share`, когда в
 выбранной группе публикация уже есть, и гаснет, если менять нечего. Сама смена уровня идёт
-через `publishTo` в `my-media.tsx` — единственное место, где живёт правило «сервер отвергает
+через `publishTo` в `use-share-dialog.ts` — единственное место, где живёт правило «сервер отвергает
 переподачу в ту же группу, поэтому withdraw + резаявка»; модал и инлайн-строка зовут его оба.
 
-**Фильтр «Shared with»** (`groupFilter` в `my-media.tsx`) — второй ряд чипов под чипами
+**Фильтр «Shared with»** (`groupFilter` в `use-swim-filters.ts`) — второй ряд чипов под чипами
 пловцов: `All` · по чипу на каждую группу, куда юзер что-то подавал · `Not shared` (медиа
 без единой заявки). Источник списка — `useMyMediaPublications` (публикации по ВСЕМУ моему
 медиа, все сезоны), поэтому чип может показывать `· 0`: страница сезонная, а публикация
@@ -403,7 +411,7 @@ rejected`; статус карточки выводит `derivedCardStatus` (`st
 и не откроешь шторку. Привязка снята: статус есть у ЛЮБОГО медиа, «private» (нет ни одной
 публикации) для фото значит ровно то же, что для видео. Вместе с привязкой убрана и внутренняя
 резка по `media_type === 'video'`, а сам фильтр, как и «Shared with», теперь действует на все
-три списка (`mediaVisible` в `my-media.tsx`) — иначе выбранный статус сужал бы только верх
+три списка (`mediaVisible` в `use-swim-filters.ts`) — иначе выбранный статус сужал бы только верх
 страницы, молча оставляя карточки соревнований и Unlinked нетронутыми.
 
 ## 8. Здоровье ссылок

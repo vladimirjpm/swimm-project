@@ -5,29 +5,31 @@ import './my-media.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useFavorites } from '../../hooks/useFavorites';
-import { sortByFavoriteRank } from '../../utils/helpers/favorites-order';
-import {
-  parseTargetKey, targetKey, useMyMediaPublications, type PublishTargetRef,
-} from '../../hooks/useUserMedia';
+import { useMyMediaPublications, type PublishTargetRef } from '../../hooks/useUserMedia';
 import { useMyHubGroups } from '../hub-groups-project/use-my-hub-groups';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
-import { useAllMyMedia, type PublishTargetDto, AllUserMediaDto, AddMediaInput } from './use-all-my-media';
-import { useMySwims, MySwimDto, SwimMediaDto, seasonLabel, toggleLike } from './use-my-swims';
+import { useAllMyMedia, AllUserMediaDto, AddMediaInput } from './use-all-my-media';
+import { MySwimDto, SwimMediaDto, seasonLabel } from './use-my-swims';
 import { useMyMediaModeration } from './use-my-media-moderation';
+import { useMySwimsSeason } from './use-my-swims-season';
+import { useLikeOverrides } from './use-like-overrides';
+import { useMediaSummary } from './use-media-summary';
+import { useSwimFilters, swimBelongsTo } from './use-swim-filters';
+import { useShareDialog } from './use-share-dialog';
+import { useProfileSwimmers } from './use-profile-swimmers';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_SwimmerGallery from '../components/mix/swimmer-gallery/swimmer-gallery';
 import { routes } from '../../utils/routes';
-import HelperSwimmer from '../../utils/helpers/helper-swimmer';
-import { seasonStartYear } from '../../utils/helpers/season-helper';
 import { GalleryItem } from '../../utils/interfaces/results';
 import MediaCard from './components/media-card';
-import AddLinkModal, { AddLinkSwimmerOption } from './components/add-link-modal';
+import AddLinkModal from './components/add-link-modal';
+import ShareDialog from './components/share-dialog';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import ModerationPanel from './components/moderation-panel';
 import SwimList from './components/swim-list';
 import MyMediaFilterPanel, {
   DEFAULT_OPEN_CARDS,
-  type Seg, type StatusFilter, type GroupFilter, type MediaCardKey,
+  type GroupFilter, type MediaCardKey,
 } from './components/my-media-filter-panel';
 import FilterBar, { type FilterBarChip } from '../components/filter-section/filter-bar';
 import FiltersFab from '../components/filter-section/filters-fab';
@@ -35,12 +37,17 @@ import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-ic
 import { useMyMediaFilterHost, type MyMediaHostState } from './my-media-filter-host';
 import MobileFiltersDrawer from '../components/filter-section/mobile-filters-drawer';
 import {
-  chipClass, derivedCardStatus, visibilityLabel, hpCardCls, STATUS_COLORS, type CardStatus,
+  hpCardCls, STATUS_COLORS, type CardStatus,
 } from './components/status-styles';
 
 // Страница «My media» v3 (swim-centric) — README design_handoff_my_swims_v3,1.
 // Палитра — тема deep (light + dark), как у страниц пловца, клуба и /season-best: вёрстка
 // просит роли `--t-*`, карта ролей на `--deep-*` живёт в my-media.css (Ф5).
+//
+// Логика — в хуках рядом: сезон и агрегат заплывов (use-my-swims-season), реакции
+// (use-like-overrides), сводки без фильтров (use-media-summary), фильтры и что после них
+// видно (use-swim-filters), публикация в группу (use-share-dialog), пловцы профиля
+// (use-profile-swimmers). Здесь — оверлеи, связка панели фильтров с полосой и разметка.
 
 function MyMedia() {
   const auth = useAuth();
@@ -95,19 +102,32 @@ function MyMediaContent({ deep }: { deep: string }) {
 
   const [tab, setTab] = useState<'media' | 'moderation'>('media');
 
+  // Порядок: агрегат заплывов (эффект с запросом) стоит там же, где стоял до деления —
+  // после модерации, до остальных хуков страницы.
+  const {
+    setSeason, data, loading, reload,
+    effectiveSeason, seasonChoices, carouselSeason, pickSeason, seasonOptions,
+  } = useMySwimsSeason();
+  const { swims, competitionMedia, unlinkedMedia, onToggleLike } = useLikeOverrides(data);
+  const { publicationsByMedia, competitionOptions, mediaStats, groupOptions } = useMediaSummary({
+    swims, competitionMedia, unlinkedMedia, publications,
+  });
+
   // ── Фильтры ────────────────────────────────────────────────────────────────
-  // null → сервер выберет витринный сезон; 'all' → все сезоны сразу.
-  const [season, setSeason] = useState<number | 'all' | null>(null);
-  const { data, loading, reload } = useMySwims(season);
-  const [swimmerFilter, setSwimmerFilter] = useState<number | 'all'>('all');
-  const [seg, setSeg] = useState<Seg>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
-  const [competitionFilter, setCompetitionFilter] = useState<number | 'all'>('all');
-  const [styleFilter, setStyleFilter] = useState<string | 'all'>('all');
-  const [distanceFilter, setDistanceFilter] = useState<string | 'all'>('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const {
+    swimmerFilter, setSwimmerFilter,
+    seg, setSeg,
+    statusFilter, setStatusFilter,
+    groupFilter, setGroupFilter,
+    competitionFilter, setCompetitionFilter,
+    styleFilter, setStyleFilter,
+    distanceFilter, setDistanceFilter,
+    dateFrom, setDateFrom,
+    dateTo, setDateTo,
+    bySwimmer, segCount, filtered,
+    visibleCompetitionMedia, visibleUnlinkedMedia,
+    activeFilterCount, clearAll,
+  } = useSwimFilters({ swims, competitionMedia, unlinkedMedia, publicationsByMedia });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [unlinkedOpen, setUnlinkedOpen] = useState(false);
 
@@ -116,14 +136,8 @@ function MyMediaContent({ deep }: { deep: string }) {
   const [addVideoSwim, setAddVideoSwim] = useState<MySwimDto | null>(null);
   const [addCompTarget, setAddCompTarget] = useState<{ id: number; name: string } | null>(null);
   const [linkSwimTarget, setLinkSwimTarget] = useState<AllUserMediaDto | null>(null);
-  const [shareTarget, setShareTarget] = useState<AllUserMediaDto | null>(null);
-  const [shareTargets, setShareTargets] = useState<PublishTargetDto[] | null>(null);
-  // Ключ цели строкой («group:17» / «club:438»): у `<select>` значение всегда строка, а
-  // цель теперь пара (тип, id) — числом её не выразить.
-  const [shareTargetKey, setShareTargetKey] = useState<string>('');
-  const [shareLevel, setShareLevel] = useState<'members' | 'public'>('members');
-  const [shareBusy, setShareBusy] = useState(false);
-  const [shareError, setShareError] = useState<string | null>(null);
+  const share = useShareDialog({ publicationsByMedia, submitPublication, withdrawPublication });
+  const { openShare, submitInlineShare } = share;
 
   const [lightboxItems, setLightboxItems] = useState<GalleryItem[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -135,187 +149,12 @@ function MyMediaContent({ deep }: { deep: string }) {
     mobileFiltersOpen || addOpen || lightboxIndex !== null ||
     addVideoSwim !== null || addCompTarget !== null || linkSwimTarget !== null;
 
-  // ── Реакции: оптимистичные оверрайды поверх ответа /api/me/swims ─────────
-  const [likeOverrides, setLikeOverrides] = useState<Map<number, { count: number; mine: boolean }>>(new Map());
-
-  const applyMediaOverride = (m: SwimMediaDto): SwimMediaDto => {
-    const o = likeOverrides.get(m.id);
-    return o ? { ...m, likes_count: o.count, my_like: o.mine } : m;
-  };
-
-  const swims: MySwimDto[] = useMemo(
-    () => data.swims.map((s) => ({ ...s, media: s.media.map(applyMediaOverride) })),
-    [data.swims, likeOverrides] // eslint-disable-line react-hooks/exhaustive-deps
-  );
-  const competitionMedia = useMemo(
-    () => data.competition_media.map(applyMediaOverride),
-    [data.competition_media, likeOverrides] // eslint-disable-line react-hooks/exhaustive-deps
-  );
-  const unlinkedMedia = useMemo(
-    () => data.unlinked_media.map(applyMediaOverride),
-    [data.unlinked_media, likeOverrides] // eslint-disable-line react-hooks/exhaustive-deps
-  );
-
-  const publicationsByMedia = useMemo(() => {
-    const map = new Map<number, typeof publications>();
-    for (const p of publications) {
-      const list = map.get(p.user_media_id) ?? [];
-      list.push(p);
-      map.set(p.user_media_id, list);
-    }
-    return map;
-  }, [publications]);
-
   const swimmerNames = useMemo(() => new Map(data.swimmers.map((s) => [s.id, s.name])), [data.swimmers]);
-
-  // ── Справочники фильтров (из заплывов сезона) ─────────────────────────────
-  const competitionOptions = useMemo(() => {
-    const byId = new Map<number, string>();
-    for (const s of swims) if (!byId.has(s.competition_id)) byId.set(s.competition_id, s.competition_name);
-    return Array.from(byId.entries()).map(([id, name]) => ({ id, name }));
-  }, [swims]);
-  const styleOptions = useMemo(() => Array.from(new Set(swims.map((s) => s.style))).sort(), [swims]);
-  const distanceOptions = useMemo(
-    () => Array.from(new Set(swims.map((s) => s.distance))).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b)),
-    [swims]
-  );
-
-  // ── Группы: «куда я поднял медиа» ─────────────────────────────────────────
-  // Публикации приходят по ВСЕМУ моему медиа (все сезоны), а страница сезонная,
-  // поэтому список чипов берём из публикаций, а счётчики — по медиа этой страницы.
-  const pageMediaIds = useMemo(() => {
-    const ids: number[] = [];
-    for (const sw of swims) for (const m of sw.media) ids.push(m.id);
-    for (const m of competitionMedia) ids.push(m.id);
-    for (const m of unlinkedMedia) ids.push(m.id);
-    return ids;
-  }, [swims, competitionMedia, unlinkedMedia]);
-
-  /**
-   * Сводка «что у меня есть» — карточка-инфо в шапке панели, слева от баннера модерации.
-   * Считается по ВСЕМУ медиа страницы, а не по видимому: списки сужают фильтры, а сводка
-   * должна стоять на месте — иначе выбранный «pending» покажет сам себя и нули во всём
-   * остальном. Дедуп по id: одно медиа висит на нескольких заплывах эстафеты (docs/relays.md).
-   */
-  const mediaStats = useMemo(() => {
-    const byId = new Map<number, SwimMediaDto>();
-    for (const s of swims) for (const m of s.media) byId.set(m.id, m);
-    for (const m of competitionMedia) byId.set(m.id, m);
-    for (const m of unlinkedMedia) byId.set(m.id, m);
-    const status: Record<CardStatus, number> = { private: 0, pending: 0, published: 0, rejected: 0 };
-    let videos = 0;
-    for (const m of byId.values()) {
-      if (m.media_type === 'video') videos += 1;
-      status[derivedCardStatus(publicationsByMedia.get(m.id) ?? [])] += 1;
-    }
-    return { total: byId.size, videos, photos: byId.size - videos, status };
-  }, [swims, competitionMedia, unlinkedMedia, publicationsByMedia]);
-
-  const groupOptions = useMemo(() => {
-    const names = new Map<number, string>();
-    for (const p of publications) if (!names.has(p.target_id)) names.set(p.target_id, p.target_name);
-    const counts = new Map<number, number>();
-    let notShared = 0;
-    for (const id of pageMediaIds) {
-      const pubs = publicationsByMedia.get(id) ?? [];
-      if (pubs.length === 0) { notShared += 1; continue; }
-      const seen = new Set<number>();
-      for (const p of pubs) {
-        if (seen.has(p.target_id)) continue;
-        seen.add(p.target_id);
-        counts.set(p.target_id, (counts.get(p.target_id) ?? 0) + 1);
-      }
-    }
-    const groups = Array.from(names, ([id, name]) => ({ id, name, count: counts.get(id) ?? 0 }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-    return { groups, notShared, total: pageMediaIds.length };
-  }, [publications, publicationsByMedia, pageMediaIds]);
-
-  // Медиа «в группе» при любом статусе заявки (pending/approved/rejected) — статус сужает отдельный фильтр.
-  const mediaMatchesGroup = (mediaId: number) => {
-    if (groupFilter === 'all') return true;
-    const pubs = publicationsByMedia.get(mediaId) ?? [];
-    if (groupFilter === 'none') return pubs.length === 0;
-    return pubs.some((p) => p.target_id === groupFilter);
-  };
-
-  /**
-   * Статус ЛЮБОГО медиа, а не только видео (09.09.2026, запрос Влада «отвяжи от with video»).
-   * Раньше фильтр жил под сегментом «With video» и внутри ещё раз резал по `media_type`, из-за
-   * чего «private» — то есть «нет ни одной публикации» — нельзя было спросить про фото, хотя
-   * для фото это ровно такой же осмысленный статус.
-   */
-  const mediaMatchesStatus = (mediaId: number) =>
-    statusFilter === 'all'
-    || derivedCardStatus(publicationsByMedia.get(mediaId) ?? []) === statusFilter;
 
   const pickGroup = (v: GroupFilter) => {
     setGroupFilter(v);
     // Медиа без заплыва тоже фильтруется — иначе выбранная группа «пропадает» в свёрнутой секции.
     if (v !== 'all') setUnlinkedOpen(true);
-  };
-
-  // ── Фильтрация ────────────────────────────────────────────────────────────
-  // Принадлежность заплыва пловцу — ТОЛЬКО через канон-хелпер (docs/relays.md: «новый
-  // фильтр/счётчик по пловцу — зови это, не сравнивай swimmer_id сам»): у эстафеты
-  // swimmer_id это одна нога, остальные ноги теряются.
-  const swimBelongsTo = (s: MySwimDto, id: number) => HelperSwimmer.resultBelongsToSwimmer(s, id);
-  const bySwimmer = swimmerFilter === 'all' ? swims : swims.filter((s) => swimBelongsTo(s, swimmerFilter));
-
-  const segCount = (k: Seg) =>
-    bySwimmer.filter((s) => {
-      const v = s.media.some((m) => m.media_type === 'video');
-      return k === 'all' || (k === 'with' ? v : !v);
-    }).length;
-
-  const filtered = bySwimmer.filter((s) => {
-    const hasVideo = s.media.some((m) => m.media_type === 'video');
-    if (seg === 'with' && !hasVideo) return false;
-    if (seg === 'without' && hasVideo) return false;
-    if (competitionFilter !== 'all' && s.competition_id !== competitionFilter) return false;
-    if (styleFilter !== 'all' && s.style !== styleFilter) return false;
-    if (distanceFilter !== 'all' && s.distance !== distanceFilter) return false;
-    if (groupFilter !== 'all' && !s.media.some((m) => mediaMatchesGroup(m.id))) return false;
-    if (dateFrom && s.date < dateFrom) return false;
-    if (dateTo && s.date > dateTo) return false;
-    if (statusFilter !== 'all' && !s.media.some((m) => mediaMatchesStatus(m.id))) return false;
-    return true;
-  });
-
-  // Оба списка слушают ТЕ ЖЕ фильтры, что и заплывы: иначе выбранный «pending» сужал бы
-  // верхнюю часть страницы и молча оставлял нетронутыми карточки соревнований и Unlinked.
-  const mediaVisible = (id: number) => mediaMatchesGroup(id) && mediaMatchesStatus(id);
-  const visibleCompetitionMedia = competitionMedia.filter((m) => mediaVisible(m.id));
-  const visibleUnlinkedMedia = unlinkedMedia.filter((m) => mediaVisible(m.id));
-
-  // Сколько фильтров ПАНЕЛИ сужают выборку: цифра на кнопке «Filters» и признак для кнопки
-  // сброса. Пловец и сезон не в счёт — они живут наверху страницы и всегда на виду.
-  const activeFilterCount =
-    [competitionFilter, styleFilter, distanceFilter].filter((v) => v !== 'all').length +
-    (dateFrom || dateTo ? 1 : 0) +
-    (seg !== 'all' ? 1 : 0) +
-    (groupFilter !== 'all' ? 1 : 0) +
-    (statusFilter !== 'all' ? 1 : 0);
-
-  // Пловца и сезон сброс НЕ трогает (хендофф): это не сужение выборки, а ответ на вопрос
-  // «чьи заплывы и за какой сезон я смотрю» — сбросить их значит показать чужое.
-  const clearAll = () => {
-    setSeg('all');
-    setStatusFilter('all');
-    setGroupFilter('all');
-    setCompetitionFilter('all');
-    setStyleFilter('all');
-    setDistanceFilter('all');
-    setDateFrom('');
-    setDateTo('');
-  };
-
-  // ── Реакции ───────────────────────────────────────────────────────────────
-  const onToggleLike = async (m: SwimMediaDto) => {
-    const next = !m.my_like;
-    setLikeOverrides((prev) => new Map(prev).set(m.id, { count: m.likes_count + (next ? 1 : -1), mine: next }));
-    const state = await toggleLike(m.id, next);
-    if (state) setLikeOverrides((prev) => new Map(prev).set(m.id, state));
   };
 
   // ── Лайтбокс ──────────────────────────────────────────────────────────────
@@ -343,102 +182,13 @@ function MyMediaContent({ deep }: { deep: string }) {
     if (ok) await reload();
   };
 
-  // ── Share (модал — mobile и Unlinked; inline share живёт в SwimList) ─────
-  const openShare = async (item: AllUserMediaDto) => {
-    setShareTarget(item);
-    setShareTargets(null);
-    setShareError(null);
-    const active = (publicationsByMedia.get(item.id) ?? []).find(
-      (p) => p.status === 'pending' || p.status === 'approved'
-    );
-    setShareTargetKey(active ? targetKey({ type: active.target_type, id: active.target_id }) : '');
-    setShareLevel(active ? active.level : 'members');
-    try {
-      const r = await fetch(`/api/me/media/${item.id}/publish-targets`, { credentials: 'include' });
-      setShareTargets(r.ok ? await r.json() : []);
-    } catch {
-      setShareTargets([]);
-    }
-  };
-
-  // Одно место на модал и на инлайн-строку заплыва: сервер запрещает переподачу, пока
-  // публикация в этой группе pending/approved («publication already exists»), поэтому
-  // смена уровня (members ↔ everyone) идёт через withdraw + резаявку.
-  const publishTo = async (
-    mediaId: number, target: PublishTargetRef, level: 'members' | 'public'
-  ): Promise<{ ok: boolean; error?: string }> => {
-    const active = (publicationsByMedia.get(mediaId) ?? []).find(
-      (p) => p.target_type === target.type && p.target_id === target.id
-             && (p.status === 'pending' || p.status === 'approved')
-    );
-    if (active) {
-      if (active.level === level) return { ok: true }; // менять нечего
-      await withdrawPublication(mediaId, target);
-    }
-    return submitPublication(mediaId, target, level);
-  };
-
-  const handlePublish = async () => {
-    const target = parseTargetKey(shareTargetKey);
-    if (shareTarget == null || target == null) return;
-    setShareBusy(true);
-    setShareError(null);
-    const res = await publishTo(shareTarget.id, target, shareLevel);
-    setShareBusy(false);
-    if (res.ok) setShareTarget(null);
-    else setShareError(res.error ?? 'Could not submit the request');
-  };
-
-  const submitInlineShare = async (mediaId: number, target: PublishTargetRef, level: 'members' | 'public'): Promise<boolean> => {
-    const res = await publishTo(mediaId, target, level);
-    return res.ok;
-  };
-
-  // Пловцы профиля в порядке Me → семья → остальные (family-favorites-plan.md) — так их
-  // показывают и панель фильтра, и пикер Add link.
-  const orderedSwimmers = useMemo(
-    () => sortByFavoriteRank(data.swimmers, (s) => s.id, favorites.primarySwimmerId, favorites.familySwimmerIds),
-    [data.swimmers, favorites.primarySwimmerId, favorites.familySwimmerIds],
-  );
-
-  // ── Add link: пловцы для пикера ───────────────────────────────────────────
-  const addLinkSwimmers: AddLinkSwimmerOption[] = useMemo(() => {
-    const byId = new Map<number, AddLinkSwimmerOption>();
-    for (const s of orderedSwimmers) {
-      byId.set(s.id, { id: s.id, name: s.name, hint: s.is_primary ? 'primary swimmer' : 'favorite' });
-    }
-    for (const f of favorites.favorites) {
-      if (f.target_type !== 'swimmer' || f.swimmer_id == null || byId.has(f.swimmer_id)) continue;
-      byId.set(f.swimmer_id, { id: f.swimmer_id, name: f.swimmer_name || `#${f.swimmer_id}`, hint: 'favorite' });
-    }
-    for (const m of allMedia) {
-      if (!byId.has(m.swimmer_id)) byId.set(m.swimmer_id, { id: m.swimmer_id, name: m.swimmer_name, hint: 'has media' });
-    }
-    return Array.from(byId.values());
-  }, [orderedSwimmers, favorites.favorites, allMedia]);
+  const { orderedSwimmers, addLinkSwimmers } = useProfileSwimmers(data.swimmers, favorites, allMedia);
 
   const totalCount = bySwimmer.length;
   const pendingModCount = moderation.rows.filter((r) => r.status === 'pending').length;
-  const effectiveSeason = data.season || new Date().getFullYear();
-  // Выбранный сезон обязан быть в списке: иначе <select> показывает чужую подпись — так
-  // страница и «залипала» на пустом 2026/27, когда данные есть только за 2025/26.
-  const seasonChoices = useMemo(() => {
-    const years = new Set<number>(data.seasons);
-    years.add(effectiveSeason);
-    // Новый (календарный) сезон в списке есть всегда, даже пока стартов в нём нет — по
-    // общему правилу витрины: «новый сезон в селекторе есть, но по умолчанию не выбран»
-    // (docs/season-boundary-rule.md). Выбирает же дефолт сервер — витринным сезоном.
-    years.add(seasonStartYear());
-    return Array.from(years).sort((a, b) => b - a);
-  }, [data.seasons, effectiveSeason]);
-  // Карусель говорит числом-годом или null (∞ «все сезоны»). Состояние страницы шире:
-  // null в нём означает «сезон выбирает сервер» (витринный), поэтому наружу отдаём уже
-  // посчитанный `effectiveSeason`, а не сырой null — иначе карусель встала бы на ∞.
-  const carouselSeason = season === 'all' || data.all_seasons ? null : season ?? effectiveSeason;
   // Выбран чип пловца — имя должно быть видно и вне чипа: в строках оно скрыто (фильтр же
   // один на всех), и экран переставал отвечать на вопрос «чьи это заплывы».
   const selectedSwimmerName = swimmerFilter === 'all' ? null : swimmerNames.get(swimmerFilter) ?? null;
-  const pickSeason = (v: number | null) => setSeason(v === null ? 'all' : v);
 
   // Через общий шов идут только стиль и дистанция — единственные фильтры кабинета, для
   // которых в общей модели есть поля (см. `my-media-filter-host.ts`).
@@ -579,10 +329,6 @@ function MyMediaContent({ deep }: { deep: string }) {
     },
   ];
 
-  const seasonOptions = useMemo(
-    () => seasonChoices.map((y) => ({ season: y, label: seasonLabel(y) })),
-    [seasonChoices],
-  );
 
   const filterPanel = (
     <MyMediaFilterPanel
@@ -934,75 +680,7 @@ function MyMediaContent({ deep }: { deep: string }) {
         />
       )}
 
-      {/* Share with a group — модал (mobile actions sheet + Unlinked) */}
-      {shareTarget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--t-scrim)] backdrop-blur-[4px]" onClick={() => setShareTarget(null)}>
-          <div
-            className="w-[420px] max-w-[calc(100vw-40px)] rounded-[16px] border border-[var(--t-border)] bg-[var(--t-surface-strong)] p-5 text-[var(--t-text)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="m-0 mb-3 text-[15px] font-black">Share with a group or club</h3>
-            {shareTargets != null && shareTargets.length === 0 && (
-              <p className="text-[12px] text-[var(--t-text-2)]">
-                No eligible targets — for a group the swimmer must be in its roster and you must be
-                a member; the swimmer's club appears here on its own.
-              </p>
-            )}
-            {shareTargets != null && shareTargets.length > 0 && (
-              <div className="flex flex-col gap-2.5">
-                <select
-                  value={shareTargetKey}
-                  onChange={(e) => {
-                    setShareTargetKey(e.target.value);
-                    // У клуба нет аккаунтов-участников, значит и уровня members: сервер такую
-                    // заявку отвергнет, поэтому не даём выбрать её и в интерфейсе.
-                    if (parseTargetKey(e.target.value)?.type === 'club') setShareLevel('public');
-                  }}
-                  className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
-                >
-                  <option value="">— group or club —</option>
-                  {shareTargets.map((t) => (
-                    <option key={targetKey(t)} value={targetKey(t)}>
-                      {t.type === 'club' ? `${t.name} (club)` : t.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={shareLevel}
-                  onChange={(e) => setShareLevel(e.target.value as 'members' | 'public')}
-                  title={parseTargetKey(shareTargetKey)?.type === 'club' ? 'Clubs have no member accounts — publishing to a club is always public' : undefined}
-                  className="rounded-[8px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2.5 py-2 text-[12px] text-[var(--t-text)]"
-                >
-                  <option
-                    value="members"
-                    disabled={parseTargetKey(shareTargetKey)?.type === 'club'}
-                  >
-                    Group members
-                  </option>
-                  <option value="public">Public (visible to everyone)</option>
-                </select>
-                {shareLevel === 'public' && (
-                  <p className="m-0 text-[11px] text-[var(--t-warn)]">Public = visible to everyone on the internet after approval.</p>
-                )}
-                {shareError && <div className="text-[11.5px] text-[var(--t-danger)]">{shareError}</div>}
-                <div className="flex justify-end gap-2">
-                  <button type="button" onClick={() => setShareTarget(null)} className="hp-mono rounded-[8px] border border-[var(--t-border)] bg-transparent px-3 py-[7px] text-[11.5px] font-extrabold text-[var(--t-accent-dim)]">
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={shareBusy || parseTargetKey(shareTargetKey) == null}
-                    onClick={handlePublish}
-                    className="hp-mono rounded-[8px] border-none bg-[var(--t-accent)] px-3 py-[7px] text-[11.5px] font-extrabold text-[var(--t-accent-ink)] disabled:opacity-50"
-                  >
-                    Submit for approval
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <ShareDialog share={share} />
 
       {/* Link to a swim — композиция add+remove (PATCH-а нет: пересоздаём с result_id). */}
       {linkSwimTarget && (
