@@ -1,6 +1,6 @@
 # /Admin/Import — импорт данных
 
-Файлы: `Pages/Admin/Import.cshtml`; API: `/api/admin/import` (+`/status/{id}`,
+Файлы: `Pages/Admin/Import.cshtml`, скрипт `wwwroot/js/admin/import.js`; API: `/api/admin/import` (+`/status/{id}`,
 `/clear`), `/api/admin/parse-pdf`, `/api/admin/import-parsed`,
 `/api/admin/records/fetch`, `/api/admin/records/apply`,
 `/api/admin/records/links?source=…`, `/api/admin/clearable-tables`;

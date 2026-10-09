@@ -45,6 +45,14 @@ layout `_Layout.cshtml`, сайдбар — `Shared/AdminUi.cs` (массив `A
 DevAdminBypass (синтетический админ без логина). CSS — общий Tailwind-бандл
 `wwwroot/css/admin.min.css` (`npm run css:build` при новых классах).
 
+Большой скрипт страницы — отдельным файлом `wwwroot/js/admin/<страница>.js` (с 09.10.2026:
+Competitions, Import, Dashboard; остальные пока inline). Подключение —
+`<script src="~/js/admin/….js" asp-append-version="true">` в `@section Scripts`; значения из
+Razor (`@Model…`) — маленьким inline-скриптом ПЕРЕД ним или data-атрибутами. Классический
+скрипт, не модуль: функции из `onclick` разметки остаются глобальными. Tailwind видит классы
+в этих файлах через `@source` в `Styles/admin.css`; CI (job «Бандл админки пересобран»)
+прогоняет по ним `node --check` — синтаксическая ошибка гасит весь скрипт страницы молча.
+
 Пагинация списков — общий партиал `Shared/_Pagination.cshtml` (модель
 `PaginationModel(Page, TotalPages, PrevUrl, NextUrl)`; URL соседних страниц
 считает сам список, т.к. параметры фильтров у всех разные). Используется на

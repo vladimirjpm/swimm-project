@@ -1,6 +1,7 @@
 # /Admin/Competitions — соревнования (справочник БД + входящие isr.org.il)
 
-Файлы: `Pages/Admin/Competitions/Index.cshtml(.cs)`, `Edit.cshtml`. Данные списка —
+Файлы: `Pages/Admin/Competitions/Index.cshtml(.cs)`, `Edit.cshtml`; скрипт списка —
+`wwwroot/js/admin/competitions-index.js` (Razor-данные `window.__DISC` — inline перед ним). Данные списка —
 `ICompetitionAdminRepository.GetUnifiedAsync` (реализация `CompetitionAdminRepository`);
 CRUD — тот же репозиторий; каскадное удаление — `IImportService.DeleteCompetition(Event)Async`.
 Действия входящих — API `DiscoveryAdminController` (`/api/admin/discovery/*`) + сервисы

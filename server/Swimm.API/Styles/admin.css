@@ -5,6 +5,8 @@
 @source "../Pages/Admin/**/*.cshtml";
 @source "../Pages/Admin/**/*.cs";
 @source "../wwwroot/admin-home.html";
+/* Скрипты страниц админки (вынесены из .cshtml) строят разметку строками — классы и там. */
+@source "../wwwroot/js/admin/**/*.js";
 
 /* Dark-first тема админки (независима от client-тем training/competition). */
 @theme {

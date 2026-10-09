@@ -118,3 +118,11 @@ jobs:
             echo "::error file=server/Swimm.API/wwwroot/css/admin.min.css::Бандл админки устарел. Выполни: npm --prefix server/Swimm.API run css:build — и закоммить результат."
             exit 1
           fi
+
+      # Скрипты страниц админки — обычные .js без сборки: синтаксическая ошибка гасит ВЕСЬ
+      # скрипт страницы молча (так /Admin/Import две недели жил без JS: перевод строки внутри
+      # '…', найдено 09.10.2026 при выносе из .cshtml).
+      - name: Скрипты админки разбираются
+        working-directory: server/Swimm.API
+        run: |
+          for f in wwwroot/js/admin/*.js; do node --check "$f" || { echo "::error file=server/Swimm.API/$f::Синтаксическая ошибка в скрипте админки"; exit 1; }; done
