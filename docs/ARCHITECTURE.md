@@ -190,7 +190,7 @@ Redis — нет); сброс — по метке, не перебором кл�
 2. Следы CRA (`reportWebVitals`, `react-app-env.d.ts`, `setupTests.ts`) — удалить.
 3. `data-helper2.js` и прочий JS среди TS — типизировать при первом же касании.
 4. Поле стора `debigConfig` (опечатка) — переименовать одним атомарным PR со всеми ссылками.
-5. `loadFromApi` в `filter-data-source-ddl.tsx` качает все страницы в цикле — заменить на
+5. `loadFromApi` в `filter-data-source-ddl/use-results-loader.ts` качает все страницы в цикле — заменить на
    серверную фильтрацию (фаза 3).
 6. ~~Дублированные `using` в `Program.cs` (Swimm.API)~~ — **закрыто 08.10.2026** вместе с выносом
    консольных команд: 35 блоков `if (args.Contains(…))` переехали из `Program.cs` (1808 → 582 строки)

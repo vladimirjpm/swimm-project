@@ -85,8 +85,9 @@ npm --prefix client run build      # prebuild авто-генерит club-icons
 
 **Идёт перевод данных со статики на серверный API** (бэкенд в `server/`). Уже на API:
 - очки клубов — `club-points-helper.ts` → `GET /api/club-points` (вместо `config/club-points-config.json`).
-- список/результаты соревнований — `filter-data-source-ddl.tsx` → `GET /api/competitions` + постранично
-  `GET /api/results` (`sources-config*.json` удалён, был мёртвым кодом).
+- список/результаты соревнований — селектор `filter-data-source-ddl/` → `GET /api/competitions`
+  (`use-competition-list.ts`) + постранично `GET /api/results` (`use-results-loader.ts`)
+  (`sources-config*.json` удалён, был мёртвым кодом).
 - name/badge категорий — `category-helper.ts` (`CategoryHelper`) → `GET /api/categories` (кэш + fallback,
   по образцу `ClubPointsHelper`). Сами канонические ключи категорий (`all`/`young8_11`/`junior`/`masters`,
   URL-контракт, темы оформления) остаются **client-only** в `results-categories.ts` — в БД их нет
