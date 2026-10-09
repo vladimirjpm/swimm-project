@@ -1,86 +1,34 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import './filter-data-source-ddl.css';
-import {
-  rootActions,
-  useAppDispatch,
-  useAppSelector,
-} from '../../../store/store';
-import { Result } from '../../../utils/interfaces/results';
-import { routes, parseRoute } from '../../../utils/routes';
+import { useAppSelector } from '../../../store/store';
+import { routes } from '../../../utils/routes';
 import { seasonLabel, seasonStartYear } from '../../../utils/helpers/season-helper';
-import { ResultsPaging } from '../../../store/store';
-import {
-  RESULTS_CATEGORIES,
-  resolveCategoryKey,
-  ResultsCategory,
-} from '../../../utils/constants/results-categories';
-import CategoryHelper, { CategoryDisplay } from '../../../utils/helpers/category-helper';
-import ResultsLoadModeHelper from '../../../utils/helpers/results-load-mode';
-import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
-import {
-  PAGED_PAGE_SIZE,
-  buildResultsFilterParams,
-  fetchResultsPage,
-} from '../../../utils/helpers/results-api';
+import { ResultsCategory } from '../../../utils/constants/results-categories';
 import {
   CompetitionSource,
   parseDate,
   dateLabel,
   monthLabel,
-  sourceUrlParam,
   isChampionshipSource,
 } from '../../../utils/helpers/competition-source';
+import { useIsMobile } from './use-is-mobile';
+import { useCompetitionCategories } from './use-competition-categories';
+import { useSelectorPanel } from './use-selector-panel';
+import { useCompetitionSources, useCompetitionList } from './use-competition-list';
+import { useResultsLoader } from './use-results-loader';
+import { useUrlInit } from './use-url-init';
 
 // ── Категорийный селектор соревнований ──────────────────────────────────────
 // База: design_handoff_category_selector (табы + поиск + сезон + live/upcoming +
 // месячные группы + архив). Дельта design_handoff_selector_all: выбор сворачивает
 // селектор в акцентную шапку; «Change» открывает панель как дропдаун (desktop)
 // или bottom sheet (mobile, <640px); deep-link ?category= рендерит панель inline.
-
-// Загрузка результатов с серверного API (/api/results).
-// Поля ResultDto совпадают с клиентским Result — конвертация не нужна.
-// В dev работает через Vite-прокси /api → http://localhost:5078.
 //
-// Режим загрузки (админ-настройка ResultsLoadMode + ?loadMode=, см. ResultsLoadModeHelper):
-//   'full'  — качаем ВСЕ страницы соревнования, фильтрация — на клиенте (ResultsTable);
-//   'paged' — этап 3.2 роадмапа: фильтры уходят на сервер query-параметрами (buildResultsFilterParams,
-//             контракт §2), грузится только одна страница за раз.
-const loadFromApi = async (
-  sourceParams: Record<string, string> = {},
-  filterParams: Record<string, string> = {},
-): Promise<{ results: Result[]; paging?: ResultsPaging }> => {
-  const mode = await ResultsLoadModeHelper.getMode();
-  if (mode === 'paged') {
-    return await fetchResultsPage(sourceParams, filterParams, 1, PAGED_PAGE_SIZE);
-  }
-  const all: Result[] = [];
-  let page = 1;
-  const pageSize = 500; // максимум, отдаваемый сервером
-  for (;;) {
-    const qs = new URLSearchParams({
-      ...sourceParams,
-      page: String(page),
-      pageSize: String(pageSize),
-    });
-    const resp = await fetch(`/api/results?${qs}`, { credentials: 'same-origin' });
-    if (!resp.ok) throw new Error(`API /api/results returned ${resp.status}`);
-    const json = await resp.json();
-    all.push(...((json.data ?? []) as Result[]));
-    if (!json.hasMore) break;
-    page += 1;
-  }
-  return { results: all };
-};
-
-// Архив: завершённые старше начала прошлого месяца прячутся за «Show N earlier».
-const isArchived = (src: CompetitionSource, now: Date): boolean => {
-  if (src.status !== 'done') return false;
-  const d = parseDate(src.date);
-  if (!d) return false;
-  const boundary = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  return d < boundary;
-};
+// Логика — в хуках рядом: категории (use-competition-categories), список и его фильтры
+// (use-competition-list), панель «Change» (use-selector-panel), загрузка результатов в
+// store (use-results-loader), начальное состояние из адреса (use-url-init). Здесь —
+// выбор источника/категории и разметка.
 
 // Обновляем только свои параметры, не трогая чужие. id и category взаимоисключающие.
 const writeUrl = (
@@ -103,34 +51,6 @@ const writeUrl = (
   window.history.replaceState(null, '', qs ? `${pathname}?${qs}` : pathname);
 };
 
-// Брейкпоинт дропдаун ↔ bottom sheet: <640px (Tailwind sm)
-const useIsMobile = () => {
-  const [mobile, setMobile] = React.useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches,
-  );
-  React.useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)');
-    const onChange = () => setMobile(mq.matches);
-    // Синхронизируемся сразу: между вычислением начального состояния и подпиской
-    // ширина могла измениться, и тогда состояние осталось бы навсегда неверным.
-    onChange();
-    mq.addEventListener('change', onChange);
-    // Подписка на resize — страховка: при программной смене метрик вьюпорта (devtools,
-    // эмуляция устройства) событие change у matchMedia приходит не всегда, и селектор
-    // рисовал мобильный sheet на десктопе (эталон — useIsSmUp в gender-age-table).
-    window.addEventListener('resize', onChange);
-    return () => {
-      mq.removeEventListener('change', onChange);
-      window.removeEventListener('resize', onChange);
-    };
-  }, []);
-  return mobile;
-};
-
-// Компонент может монтироваться несколько раз — грузить данные
-// по URL-параметрам должен только один инстанс.
-let urlLoadTriggered = false;
-
 interface DataSourceDDLProps {
   /**
    * Кастомная шапка вместо встроенной (шапка соревнования с табами,
@@ -149,80 +69,49 @@ interface DataSourceDDLProps {
    * откладывается, пока не пришёл Overview или пока юзер не открыл таб Swims. Когда false,
    * при выборе источника мы только «праймим» шапку (title/sourceParams/флаги из
    * CompetitionSource), но не тянем результаты; фетч случится, когда флаг станет true.
-   * Undefined/true → прежнее поведение (грузим сразу). См. pendingSourceRef ниже.
+   * Undefined/true → прежнее поведение (грузим сразу). См. use-results-loader.
    */
   canLoadResults?: boolean;
 }
 
 const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResults = true }) => {
-  const dispatch = useAppDispatch();
-  const filters = useAppSelector((s) => s.filterSelected);
   // Выбранная строка — из store (title = имя источника): синхронизирует инстансы.
   const selectedTitle = useAppSelector((s) => s.dataSourceSelected?.title);
   const isMobile = useIsMobile();
 
-  const [sources, setSources] = React.useState<CompetitionSource[]>([]);
-  const [loaded, setLoaded] = React.useState(false);
-  const [cat, setCat] = React.useState<string>('all');
-  const [search, setSearch] = React.useState('');
-  const [season, setSeason] = React.useState<number | 'all' | null>(null);
-  const [seasonTouched, setSeasonTouched] = React.useState(false);
-  const [archiveOpen, setArchiveOpen] = React.useState(false);
-  // Тумблер «🏆 Championships» — показывать только чемпионаты Израиля.
-  const [champOnly, setChampOnly] = React.useState(false);
-  // Панель поверх контента при выбранном соревновании (кнопка «Change» в шапке)
-  const [panelOpen, setPanelOpen] = React.useState(false);
-  // Мобильное меню категорий (вариант 9b: строка «Category: … ▾» вместо табов)
-  const [catMenuOpen, setCatMenuOpen] = React.useState(false);
-  // name/badge категорий из /api/categories (БД). Ключи: канонические ('kids8_11' и т.п.,
-  // маппинг внутри CategoryHelper) + сырые ключи кастомных категорий (result-maccabiah…).
-  // Пусто до первой загрузки — тогда используется статичный RESULTS_CATEGORIES.label.
-  const [liveCategoryLabels, setLiveCategoryLabels] = React.useState<Record<string, CategoryDisplay>>({});
-  // Кастомные категории из Admin/Categories — отдельные табы после статичных.
-  const [customCategories, setCustomCategories] = React.useState<ResultsCategory[]>([]);
-  const [categoriesLoaded, setCategoriesLoaded] = React.useState(false);
+  // Порядок хуков ниже = порядок эффектов в прежнем едином компоненте (категории →
+  // панель → список → загрузка → адрес); переставлять без нужды не стоит.
+  const { liveCategoryLabels, allCategories, categoriesLoaded, categoryLabel } =
+    useCompetitionCategories();
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const touchStartY = React.useRef<number | null>(null);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    Promise.all([CategoryHelper.getCanonicalMap(), CategoryHelper.getAll()]).then(([map, all]) => {
-      if (cancelled) return;
-      const customs = all
-        .filter((c) => !CategoryHelper.SYSTEM_DB_KEYS.has(c.key))
-        .sort((a, b) => a.display_order - b.display_order);
-      const labels: Record<string, CategoryDisplay> = { ...map };
-      customs.forEach((c) => {
-        labels[c.key] = { name: c.name, badge: c.badge };
-      });
-      setLiveCategoryLabels(labels);
-      setCustomCategories(
-        customs.map((c) => ({
-          key: c.key,
-          label: c.name,
-          title: c.name,
-          competitionTheme: 'competition-emerald',
-        })),
-      );
-      setCategoriesLoaded(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Статичные канонические табы + кастомные категории из БД.
-  const allCategories = React.useMemo(
-    () => [...RESULTS_CATEGORIES, ...customCategories],
-    [customCategories],
-  );
-
-  // Живой name+badge из БД (Admin/Categories), пока не загружен — статичный label.
-  const categoryLabel = (c: ResultsCategory): string => {
-    const live = liveCategoryLabels[c.key];
-    if (!live) return c.label;
-    return live.badge ? `${live.badge} ${live.name}` : live.name;
-  };
+  const { panelOpen, setPanelOpen, catMenuOpen, setCatMenuOpen, dropBox } =
+    useSelectorPanel(isMobile, wrapRef);
+  const { sources, loaded } = useCompetitionSources();
+  const {
+    cat, setCat,
+    search, setSearch,
+    season, setSeason,
+    seasonTouched, setSeasonTouched,
+    archiveOpen, setArchiveOpen,
+    champOnly, setChampOnly,
+    seasons, activeSeason,
+    visible, champCount, nowItems, archivedItems, monthGroups,
+    catCount,
+  } = useCompetitionList(sources);
+  const { requestSource, loadDirect } = useResultsLoader(canLoadResults);
+  useUrlInit({
+    loaded,
+    sources,
+    cat,
+    setCat,
+    setSeason,
+    setSeasonTouched,
+    categoriesLoaded,
+    allCategories,
+    requestSource,
+    loadDirect,
+  });
 
   // Бейдж-кружок (буква из БД) + название — для табов/строк селектора категорий.
   // Кружок не завязан на active/неактивный вариант пилюли отдельными цветами (у tabsRow
@@ -246,388 +135,13 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
     );
   };
 
-  // Закрытие по Esc (всегда) и по клику вне (только desktop-дропдаун —
-  // у мобильного sheet эту роль играет backdrop).
-  React.useEffect(() => {
-    if (!panelOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (isMobile) return;
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setPanelOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPanelOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [panelOpen, isMobile]);
-
-  // Панель закрылась → сворачиваем и меню категорий
-  React.useEffect(() => {
-    if (!panelOpen) setCatMenuOpen(false);
-  }, [panelOpen]);
-
-  /**
-   * Геометрия десктопного дропдауна в координатах ВЬЮПОРТА (см. комментарий у разметки).
-   *
-   * `top` — под тем, что реально занимает верх экрана: под hero шапки, пока он виден, и
-   * под липкой шапкой (`--comp-sticky-chrome-h`, её публикует компакт-бар соревнования),
-   * когда hero уехал. Hero ищем по `data-comp-hero`, а не по «первому ребёнку»: разметку
-   * шапки даёт чужой компонент через renderHeader, и опираться на её структуру нельзя.
-   *
-   * Пересчитываем на скролл и resize, пока панель открыта: она висит над страницей, и её
-   * место меняется вместе с шапкой.
-   */
-  const [dropBox, setDropBox] = React.useState<
-    { top: number; left: number; width: number; maxHeight: number } | null
-  >(null);
-  React.useLayoutEffect(() => {
-    if (!panelOpen || isMobile) { setDropBox(null); return undefined; }
-    const measure = () => {
-      const wrap = wrapRef.current;
-      if (!wrap) return;
-      const wrapRect = wrap.getBoundingClientRect();
-      const hero = wrap.querySelector('[data-comp-hero]');
-      const heroBottom = hero ? hero.getBoundingClientRect().bottom : wrapRect.bottom;
-      const chrome = parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue('--comp-sticky-chrome-h'),
-      ) || 0;
-      const top = Math.max(heroBottom, chrome) + 10;
-      setDropBox({
-        top,
-        left: wrapRect.left,
-        width: wrapRect.width,
-        // Нижний отступ 16px — чтобы панель не липла к краю экрана. Пол в 240px: на совсем
-        // низком окне лучше дать панели вылезти, чем схлопнуть её в полоску.
-        maxHeight: Math.max(240, window.innerHeight - top - 16),
-      });
-    };
-    measure();
-    window.addEventListener('scroll', measure, { passive: true });
-    window.addEventListener('resize', measure);
-    return () => {
-      window.removeEventListener('scroll', measure);
-      window.removeEventListener('resize', measure);
-    };
-  }, [panelOpen, isMobile]);
-
-  // Body scroll lock, пока открыт мобильный sheet
-  React.useEffect(() => {
-    if (!(panelOpen && isMobile)) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [panelOpen, isMobile]);
-
-  React.useEffect(() => {
-    const load = async () => {
-      try {
-        const resp = await fetch('/api/competitions', { credentials: 'same-origin' });
-        setSources(resp.ok ? ((await resp.json()) as CompetitionSource[]) : []);
-      } catch (e) {
-        console.error('Error loading /api/competitions', e);
-        setSources([]);
-      }
-      setLoaded(true);
-    };
-    load();
-  }, []);
-
-  // Ключ последнего paged-фетча (source+фильтры) — чтобы эффект синхронизации фильтров
-  // (ниже) не задвоил запрос сразу после loadSource (тот тоже меняет filterSelected: date/date_str).
-  const lastPagedFetchKeyRef = React.useRef<string | null>(null);
-  const pagedFetchKey = (sourceParams: Record<string, string>, filterParams: Record<string, string>) =>
-    JSON.stringify({ sourceParams, filterParams });
-
-  // Источник, у которого «зашита» шапка, но результаты ещё не загружены (ленивый Swims).
-  // Заполняется, когда canLoadResults=false на момент выбора; эффект ниже дотягивает
-  // результаты, как только флаг откроется (пришёл Overview / открыт таб Swims).
-  const pendingSourceRef = React.useRef<CompetitionSource | null>(null);
-
-  // «Прайм» шапки без результатов: title/sourceParams/флаги берём из CompetitionSource
-  // (/api/competitions), чтобы шапка соревнования и ✓ в списке появились сразу, а тяжёлый
-  // фетч /api/results отложился. is_masters известен из category; is_award/show_combine
-  // уточнятся, когда придут результаты (в loadSource). НЕ трогаем lastPagedFetchKeyRef,
-  // чтобы paged-эффект синхронизации, разблокировавшись, честно дотянул страницу 1.
-  const primeSource = (src: CompetitionSource) => {
-    const [k, v] = sourceUrlParam(src);
-    const sourceParams = { [k]: v };
-    lastPagedFetchKeyRef.current = null;
-    dispatch(
-      rootActions.updateState({
-        dataSourceSelected: {
-          results: [],
-          title: src.name,
-          is_masters: src.category === 'masters',
-          is_award: false,
-          sourceParams,
-          day_dates: src.day_dates,
-        },
-      }),
-    );
-  };
-
-  // Загрузка результатов выбранного соревнования в store.
-  // Флаги датасета (is_masters/is_award/show_combine) берём из самих результатов —
-  // ResultDto несёт их денормализованно per-competition. category соревнования из /api/competitions
-  // определяет isMasters ДО загрузки — нужно для маппинга фильтра Age в paged-режиме (contract §2).
-  const loadSource = async (src: CompetitionSource) => {
-    const [k, v] = sourceUrlParam(src);
-    const sourceParams = { [k]: v };
-    // event_date — фильтр КОНКРЕТНОГО источника: день Maccabiah бессмыслен для другого
-    // соревнования (в paged сервер честно вернёт 0 строк, в full клиентский фильтр так же
-    // опустошит таблицу) — при смене источника сбрасываем.
-    const effectiveFilters = { ...filters, event_date: 'all' };
-    const filterParams = buildResultsFilterParams(effectiveFilters, src.category === 'masters');
-    let data: Result[];
-    let paging: ResultsPaging | undefined;
-    try {
-      ({ results: data, paging } = await loadFromApi(sourceParams, filterParams));
-    } catch (e) {
-      console.error('Error loading data source', e);
-      return;
-    }
-    lastPagedFetchKeyRef.current = pagedFetchKey(sourceParams, filterParams);
-
-    const showCombine =
-      data.length > 0 && data.every((r) => r.show_combine_all_results === true);
-    const isMasters = data.some((r) => r.is_masters === true);
-    const isAward = data.some((r) => r.is_award === true);
-
-    const dates = data.map((r) => r.date).filter(Boolean) as string[];
-    const maxDate = dates.length
-      ? dates.reduce((max, curr) =>
-          (parseDate(curr)?.getTime() ?? 0) > (parseDate(max)?.getTime() ?? 0) ? curr : max,
-        )
-      : '';
-    const [d, m, y] = maxDate.split('/');
-    const iso = maxDate ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : '';
-
-    dispatch(
-      rootActions.updateState({
-        dataSourceSelected: {
-          results: data,
-          title: src.name,
-          is_masters: isMasters,
-          is_award: isAward,
-          sourceParams,
-          day_dates: src.day_dates,
-        },
-        showCombineAllResults: showCombine,
-        resultsPaging: paging,
-        filterSelected: maxDate
-          ? { ...effectiveFilters, date: maxDate, date_str: iso }
-          : effectiveFilters,
-      }),
-    );
-  };
-
-  // Paged-режим: смена любого серверного фильтра → рефетч страницы 1 с новыми query-параметрами
-  // (контракт 3.2 §4). lastPagedFetchKeyRef защищает от повторного фетча тех же параметров —
-  // срабатывает и на самостоятельный вызов loadSource (тот уже обновил ref), и на «пустые»
-  // изменения filterSelected (date/date_str), которые в query не участвуют.
-  const mode = useResultsLoadMode();
-  const dataSourceSelected = useAppSelector((s) => s.dataSourceSelected);
-  const filtersKey = JSON.stringify(filters);
-  React.useEffect(() => {
-    if (mode !== 'paged') return;
-    if (!canLoadResults) return; // ленивый Swims: не тянем страницу, пока гейт закрыт
-    const sourceParams = dataSourceSelected?.sourceParams;
-    if (!sourceParams) return;
-
-    const filterParams = buildResultsFilterParams(filters, !!dataSourceSelected?.is_masters);
-    const key = pagedFetchKey(sourceParams, filterParams);
-    if (key === lastPagedFetchKeyRef.current) return;
-    lastPagedFetchKeyRef.current = key;
-
-    (async () => {
-      try {
-        const { results, paging } = await fetchResultsPage(sourceParams, filterParams, 1, PAGED_PAGE_SIZE);
-        dispatch(
-          rootActions.updateState({
-            dataSourceSelected: { ...dataSourceSelected, results, sourceParams },
-            resultsPaging: paging,
-          }),
-        );
-      } catch (e) {
-        console.error('Error refetching paged results', e);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, canLoadResults, dataSourceSelected?.sourceParams, filtersKey]);
-
-  // Ленивый Swims (full-режим): дотягиваем отложенный источник, когда гейт открылся.
-  // В paged-режиме отложенный фетч делает эффект синхронизации выше (по sourceParams),
-  // поэтому здесь только full — иначе был бы двойной запрос.
-  React.useEffect(() => {
-    if (!canLoadResults || mode === 'paged') return;
-    const src = pendingSourceRef.current;
-    if (!src) return;
-    pendingSourceRef.current = null;
-    void loadSource(src);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canLoadResults, mode]);
-
-  // Выбор источника: если результаты грузить рано (Overview ещё не пришёл, таб не Swims) —
-  // «праймим» шапку и откладываем; иначе тянем сразу (прежнее поведение).
+  // Выбор источника из списка: адрес, закрыть панель, результаты — сейчас или по гейту
+  // ленивого Swims (решает useResultsLoader).
   const selectSource = (src: CompetitionSource) => {
     writeUrl({ source: src, season: seasonTouched ? season : null });
     setPanelOpen(false);
-    if (canLoadResults) {
-      void loadSource(src);
-    } else {
-      pendingSourceRef.current = src;
-      primeSource(src);
-    }
+    requestSource(src);
   };
-
-  // Инициализация из URL: ?category= (легаси ?cat=) активирует таб;
-  // ?competitionId=<id|last> / ?eventId=<id> грузит соревнование сразу.
-  const initializedRef = React.useRef(false);
-  React.useEffect(() => {
-    if (!loaded || initializedRef.current) return;
-    initializedRef.current = true;
-
-    const params = new URLSearchParams(window.location.search);
-    const seasonRaw = params.get('season');
-    if (seasonRaw === 'all') {
-      setSeason('all');
-      setSeasonTouched(true);
-    } else if (Number(seasonRaw)) {
-      setSeason(Number(seasonRaw));
-      setSeasonTouched(true);
-    }
-
-    const competitionId = parseRoute().competitionId ?? params.get('competitionId');
-    const eventId = params.get('eventId');
-
-    let target: CompetitionSource | undefined;
-    if (competitionId === 'last') {
-      target = sources[0]; // /api/competitions отсортирован по дате desc
-    } else if (eventId) {
-      target = sources.find((s) => s.kind === 'event' && String(s.id) === eventId);
-    } else if (competitionId) {
-      target = sources.find((s) => s.kind === 'competition' && String(s.id) === competitionId);
-    }
-
-    if (target) {
-      setCat(target.category ?? 'all');
-      if (!urlLoadTriggered) {
-        urlLoadTriggered = true;
-        // Ленивый Swims: на старте дефолт — таб Overview, поэтому обычно праймим шапку
-        // и откладываем результаты (эффект дотягивания сработает по гейту).
-        if (canLoadResults) {
-          void loadSource(target);
-        } else {
-          pendingSourceRef.current = target;
-          primeSource(target);
-        }
-      }
-      return;
-    }
-    // Конкретный id вне списка (например, день события) — грузим напрямую, таб не трогаем.
-    // Флаги датасета обязательны и здесь: без is_award медали соревнования не считаются.
-    // category соревнования тут неизвестна заранее (нет в CompetitionSource-списке) —
-    // Age-фильтр в paged-режиме мапится как non-masters (birthYear); край-кейс direct-link.
-    if (competitionId || eventId) {
-      if (!urlLoadTriggered) {
-        urlLoadTriggered = true;
-        const sourceParams: Record<string, string> = eventId ? { eventId } : { competitionId: competitionId! };
-        const filterParams = buildResultsFilterParams(filters, false);
-        void loadFromApi(sourceParams, filterParams).then(({ results: data, paging }) => {
-          if (!data.length) return;
-          lastPagedFetchKeyRef.current = pagedFetchKey(sourceParams, filterParams);
-          dispatch(
-            rootActions.updateState({
-              dataSourceSelected: {
-                results: data,
-                title: data[0].competition,
-                is_masters: data.some((r) => r.is_masters === true),
-                is_award: data.some((r) => r.is_award === true),
-                sourceParams,
-              },
-              showCombineAllResults:
-                data.length > 0 && data.every((r) => r.show_combine_all_results === true),
-              resultsPaging: paging,
-            }),
-          );
-        });
-      }
-      return;
-    }
-
-    // resolveCategoryKey сводит неизвестные ключи к 'all' — кастомные категории из БД
-    // (result-maccabiah и т.п.) пропускаем как есть: их таб появится после /api/categories,
-    // а мусорный ключ сбросит валидация ниже.
-    const rawCat = params.get('category') ?? params.get('cat');
-    const staticKey = resolveCategoryKey(rawCat);
-    setCat(staticKey === 'all' && rawCat && rawCat !== 'all' ? rawCat : staticKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, sources]);
-
-  // Ключ из URL, которого нет ни среди статичных, ни среди кастомных категорий → 'all'.
-  React.useEffect(() => {
-    if (!categoriesLoaded) return;
-    if (cat !== 'all' && !allCategories.some((c) => c.key === cat)) setCat('all');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoriesLoaded, allCategories]);
-
-  // ── Производные списки ──
-  // Сезон, а НЕ календарный год: старт 31/10/2025 принадлежит сезону 2025/26 вместе с
-  // февральскими стартами 2026. По getFullYear() он уезжал в «Season 2025» отдельно от
-  // своего же сезона (docs/season-boundary-rule.md).
-  const seasons = React.useMemo(() => {
-    const years = new Set(
-      sources
-        .map((s) => {
-          const d = parseDate(s.date);
-          return d ? seasonStartYear(d) : null;
-        })
-        .filter((y) => y !== null) as number[],
-    );
-    return [...years].sort((a, b) => b - a);
-  }, [sources]);
-  const activeSeason = season ?? seasons[0] ?? seasonStartYear();
-
-  const now = new Date();
-  // Канонический таб матчится по category, кастомный — по членству в categories
-  // (одно соревнование может быть в нескольких: Maccabiah Masters = Masters + Maccabiah).
-  const inCat = (s: CompetitionSource) =>
-    cat === 'all' || s.category === cat || (s.categories?.includes(cat) ?? false);
-  const inSeason = (s: CompetitionSource) => {
-    if (activeSeason === 'all') return true;
-    const d = parseDate(s.date);
-    return d ? seasonStartYear(d) === activeSeason : false;
-  };
-  const matchesSearch = (s: CompetitionSource) =>
-    !search.trim() || s.name.toLowerCase().includes(search.trim().toLowerCase());
-
-  const isChamp = (s: CompetitionSource) => isChampionshipSource(s);
-
-  const visible = sources.filter(
-    (s) => inCat(s) && inSeason(s) && matchesSearch(s) && (!champOnly || isChamp(s)),
-  );
-  const champCount = sources.filter((s) => inCat(s) && inSeason(s) && matchesSearch(s) && isChamp(s)).length;
-  const nowItems = visible.filter((s) => s.status !== 'done');
-  const doneItems = visible.filter((s) => s.status === 'done');
-  const archivedItems = doneItems.filter((s) => isArchived(s, now));
-  const shownDone = archiveOpen ? doneItems : doneItems.filter((s) => !isArchived(s, now));
-
-  const monthGroups: { label: string; items: CompetitionSource[] }[] = [];
-  shownDone.forEach((s) => {
-    const label = monthLabel(s);
-    let g = monthGroups.find((x) => x.label === label);
-    if (!g) {
-      g = { label, items: [] };
-      monthGroups.push(g);
-    }
-    g.items.push(s);
-  });
 
   const activeCategory = allCategories.find((c) => c.key === cat);
   const activeCatLabel = activeCategory ? categoryLabel(activeCategory) : 'All';
@@ -657,7 +171,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
               ✓
             </span>
           )}
-          {isChamp(s) && (
+          {isChampionshipSource(s) && (
             <span className="shrink-0 text-sm" title="Israeli championship" aria-label="Israeli championship">
               🏆
             </span>
@@ -709,11 +223,6 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
       </button>
     );
   };
-
-  const catCount = (key: string) =>
-    key === 'all'
-      ? sources.length
-      : sources.filter((s) => s.category === key || (s.categories?.includes(key) ?? false)).length;
 
   const selectCat = (key: string) => {
     setCat(key);
