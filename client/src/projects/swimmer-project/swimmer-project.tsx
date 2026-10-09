@@ -24,10 +24,15 @@ import SwimmerMediaPanel from './components/swimmer-media-panel';
 import Popup from '../components/popup/popup';
 import { useAppSelector } from '../../store/store';
 import SwimmerUpcomingStarts from './components/swimmer-upcoming-starts';
+import { holdsSeasonBest, PanelEmpty } from './components/swimmer-panels';
+import { SeasonPanel } from './components/panels/season-panel';
 import {
-  H2HPanel, holdsSeasonBest, PanelEmpty, PersonalBestsPanel, ProgressPanel, ResultsFilters,
-  ResultsPanel, SeasonBestPanel, SeasonPanel, UnderReviewPanel, type ResultsView,
-} from './components/swimmer-panels';
+  ResultsFilters, ResultsPanel, UnderReviewPanel, type ResultsView,
+} from './components/panels/results-panel';
+import { SeasonBestPanel } from './components/panels/season-best-panel';
+import { PersonalBestsPanel } from './components/panels/personal-bests-panel';
+import { ProgressPanel } from './components/panels/progress-panel';
+import { H2HPanel } from './components/panels/h2h-panel';
 
 /**
  * Страница спортсмена `/swimmers/{id}` — вариант 2a «Card DNA»
