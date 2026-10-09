@@ -1,0 +1,1421 @@
+[
+  {
+    "Heat": 1,
+    "Lane": 5,
+    "Time": "01:49.82",
+    "Club": "מתנ\"ס רמת הנגב",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "כובס",
+        "first_name": "אוהד",
+        "birth_year": 1983,
+        "club": null,
+        "split_time": "00:26.15"
+      },
+      {
+        "order": 2,
+        "last_name": "שצ'וקין",
+        "first_name": "אלכסיי",
+        "birth_year": 2005,
+        "club": null,
+        "split_time": "00:27.32"
+      },
+      {
+        "order": 3,
+        "last_name": "חוזמן",
+        "first_name": "גבריאל",
+        "birth_year": 1997,
+        "club": null,
+        "split_time": "00:27.97"
+      },
+      {
+        "order": 4,
+        "last_name": "נמץ",
+        "first_name": "ליאון",
+        "birth_year": 1988,
+        "club": null,
+        "split_time": "00:28.38"
+      }
+    ],
+    "Band": "120-159",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 2,
+    "Time": "01:53.29",
+    "Club": "מכבי כפר המכביה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "בראון",
+        "first_name": "איתן",
+        "birth_year": 2000,
+        "club": null,
+        "split_time": "00:26.66"
+      },
+      {
+        "order": 2,
+        "last_name": "לב",
+        "first_name": "בני",
+        "birth_year": 1974,
+        "club": null,
+        "split_time": "00:28.65"
+      },
+      {
+        "order": 3,
+        "last_name": "שולקוב",
+        "first_name": "בוריס",
+        "birth_year": 1989,
+        "club": null,
+        "split_time": "00:30.49"
+      },
+      {
+        "order": 4,
+        "last_name": "קשת",
+        "first_name": "עידו",
+        "birth_year": 1992,
+        "club": null,
+        "split_time": "00:27.49"
+      }
+    ],
+    "Band": "120-159",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 5,
+    "Time": "02:08.08",
+    "Club": "הפועל אולימפ נתניה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "אטלס",
+        "first_name": "בוריס",
+        "birth_year": 1999,
+        "club": null,
+        "split_time": "00:27.85"
+      },
+      {
+        "order": 2,
+        "last_name": "יהודיאן",
+        "first_name": "גיא",
+        "birth_year": 1976,
+        "club": null,
+        "split_time": "00:40.37"
+      },
+      {
+        "order": 3,
+        "last_name": "יופה",
+        "first_name": "אנטון",
+        "birth_year": 1990,
+        "club": null,
+        "split_time": "00:32.29"
+      },
+      {
+        "order": 4,
+        "last_name": "אלבז",
+        "first_name": "ים",
+        "birth_year": 2005,
+        "club": null,
+        "split_time": "00:27.57"
+      }
+    ],
+    "Band": "120-159",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 4,
+    "Time": null,
+    "Club": "מכבי כפר המכביה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "שריקר",
+        "first_name": "ניב",
+        "birth_year": 1995,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 2,
+        "last_name": "ארנון",
+        "first_name": "אבירם",
+        "birth_year": 1989,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 3,
+        "last_name": "קגן רם",
+        "first_name": "ארקדי",
+        "birth_year": 1988,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 4,
+        "last_name": "מרגולין",
+        "first_name": "דניאל",
+        "birth_year": 1992,
+        "club": null,
+        "split_time": null
+      }
+    ],
+    "Band": "120-159",
+    "Status": "NS",
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 3,
+    "Time": "01:49.27",
+    "Club": "מכבי עולם המים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "זוסמן",
+        "first_name": "ערן",
+        "birth_year": 1985,
+        "club": null,
+        "split_time": "00:26.01"
+      },
+      {
+        "order": 2,
+        "last_name": "שי",
+        "first_name": "וייזר",
+        "birth_year": 1981,
+        "club": null,
+        "split_time": "00:26.94"
+      },
+      {
+        "order": 3,
+        "last_name": "פרייסלר",
+        "first_name": "ערן",
+        "birth_year": 1982,
+        "club": null,
+        "split_time": "00:27.82"
+      },
+      {
+        "order": 4,
+        "last_name": "הר-שי",
+        "first_name": "לירון",
+        "birth_year": 1980,
+        "club": null,
+        "split_time": "00:28.50"
+      }
+    ],
+    "Band": "160-199",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 3,
+    "Time": "01:53.41",
+    "Club": "מאסטרס רחובות",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "פודה",
+        "first_name": "דן",
+        "birth_year": 1979,
+        "club": null,
+        "split_time": "00:28.12"
+      },
+      {
+        "order": 2,
+        "last_name": "כהן",
+        "first_name": "קובי",
+        "birth_year": 1982,
+        "club": null,
+        "split_time": "00:29.45"
+      },
+      {
+        "order": 3,
+        "last_name": "קלר",
+        "first_name": "אילן",
+        "birth_year": 1988,
+        "club": null,
+        "split_time": "00:27.99"
+      },
+      {
+        "order": 4,
+        "last_name": "דאון",
+        "first_name": "ברק",
+        "birth_year": 1989,
+        "club": null,
+        "split_time": "00:27.85"
+      }
+    ],
+    "Band": "160-199",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 5,
+    "Time": "01:53.65",
+    "Club": "הפועל בת ים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "קובילינסקי",
+        "first_name": "דניס",
+        "birth_year": 1990,
+        "club": null,
+        "split_time": "00:27.84"
+      },
+      {
+        "order": 2,
+        "last_name": "סידורוב",
+        "first_name": "יבגני",
+        "birth_year": 1992,
+        "club": null,
+        "split_time": "00:28.36"
+      },
+      {
+        "order": 3,
+        "last_name": "שקד",
+        "first_name": "נדב",
+        "birth_year": 1981,
+        "club": null,
+        "split_time": "00:30.53"
+      },
+      {
+        "order": 4,
+        "last_name": "גולובטי",
+        "first_name": "יורי",
+        "birth_year": 1973,
+        "club": null,
+        "split_time": "00:26.92"
+      }
+    ],
+    "Band": "160-199",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 7,
+    "Time": "01:55.80",
+    "Club": "מכבי עולם המים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "אשלגי",
+        "first_name": "ישי",
+        "birth_year": 1979,
+        "club": null,
+        "split_time": "00:29.20"
+      },
+      {
+        "order": 2,
+        "last_name": "לוטן",
+        "first_name": "אלון",
+        "birth_year": 1971,
+        "club": null,
+        "split_time": "00:29.50"
+      },
+      {
+        "order": 3,
+        "last_name": "פרידמן",
+        "first_name": "ערן",
+        "birth_year": 1981,
+        "club": null,
+        "split_time": "00:28.88"
+      },
+      {
+        "order": 4,
+        "last_name": "האן",
+        "first_name": "תובל",
+        "birth_year": 1977,
+        "club": null,
+        "split_time": "00:28.22"
+      }
+    ],
+    "Band": "160-199",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 3,
+    "Time": "02:00.59",
+    "Club": "אקוותיקים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "שחם",
+        "first_name": "עידן",
+        "birth_year": 1995,
+        "club": null,
+        "split_time": "00:28.82"
+      },
+      {
+        "order": 2,
+        "last_name": "גזית",
+        "first_name": "עידו",
+        "birth_year": 1983,
+        "club": null,
+        "split_time": "00:32.98"
+      },
+      {
+        "order": 3,
+        "last_name": "לוריא",
+        "first_name": "נבות",
+        "birth_year": 1978,
+        "club": null,
+        "split_time": "00:31.0"
+      },
+      {
+        "order": 4,
+        "last_name": "קאופשטיין",
+        "first_name": "עידו",
+        "birth_year": 1969,
+        "club": null,
+        "split_time": "00:27.79"
+      }
+    ],
+    "Band": "160-199",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 6,
+    "Time": "02:02.24",
+    "Club": "מכבי חיפה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "לוין",
+        "first_name": "יורי",
+        "birth_year": 1987,
+        "club": null,
+        "split_time": "00:33.86"
+      },
+      {
+        "order": 2,
+        "last_name": "האס",
+        "first_name": "יוחאי",
+        "birth_year": 1972,
+        "club": null,
+        "split_time": "00:30.27"
+      },
+      {
+        "order": 3,
+        "last_name": "שבתאי",
+        "first_name": "אורן",
+        "birth_year": 1983,
+        "club": null,
+        "split_time": "00:28.10"
+      },
+      {
+        "order": 4,
+        "last_name": "כץ",
+        "first_name": "אמנון",
+        "birth_year": 1963,
+        "club": null,
+        "split_time": "00:30.01"
+      }
+    ],
+    "Band": "160-199",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 9,
+    "Time": "02:08.98",
+    "Club": "Brazil",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "ABADI",
+        "first_name": "Moti",
+        "birth_year": 1971,
+        "club": null,
+        "split_time": "00:33.34"
+      },
+      {
+        "order": 2,
+        "last_name": "COHEN",
+        "first_name": "Daniel",
+        "birth_year": 1981,
+        "club": null,
+        "split_time": "00:31.65"
+      },
+      {
+        "order": 3,
+        "last_name": "MESTER",
+        "first_name": "Fabio",
+        "birth_year": 1972,
+        "club": null,
+        "split_time": "00:32.23"
+      },
+      {
+        "order": 4,
+        "last_name": "TENENB AUM",
+        "first_name": "Andre",
+        "birth_year": 1982,
+        "club": null,
+        "split_time": "00:31.76"
+      }
+    ],
+    "Band": "160-199",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 8,
+    "Time": "02:19.08",
+    "Club": "MIX Maccabiah",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "KARIKA",
+        "first_name": "Kristof",
+        "birth_year": 1991,
+        "club": null,
+        "split_time": "00:29.72"
+      },
+      {
+        "order": 2,
+        "last_name": "RIMON",
+        "first_name": "Arje",
+        "birth_year": 1970,
+        "club": null,
+        "split_time": "00:38.70"
+      },
+      {
+        "order": 3,
+        "last_name": "LANIS",
+        "first_name": "Claudio",
+        "birth_year": 1965,
+        "club": null,
+        "split_time": "00:40.92"
+      },
+      {
+        "order": 4,
+        "last_name": "BODAY",
+        "first_name": "Gabor",
+        "birth_year": 2000,
+        "club": null,
+        "split_time": "00:29.74"
+      }
+    ],
+    "Band": "160-199",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 0,
+    "Time": null,
+    "Club": "בית הלוחם תל אביב",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "אוהב ציון",
+        "first_name": "עידן",
+        "birth_year": 1988,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 2,
+        "last_name": "סימן טוב",
+        "first_name": "עמיר",
+        "birth_year": 1972,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 3,
+        "last_name": "זנזורי",
+        "first_name": "שלום שלי",
+        "birth_year": 1995,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 4,
+        "last_name": "זוליטרבסקי",
+        "first_name": "דניאל",
+        "birth_year": 1982,
+        "club": null,
+        "split_time": null
+      }
+    ],
+    "Band": "160-199",
+    "Status": "NS",
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 4,
+    "Time": null,
+    "Club": "מכבי פ.מ. רעות",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "אייזן",
+        "first_name": "דויד",
+        "birth_year": 1966,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 2,
+        "last_name": "בן יהודה",
+        "first_name": "ירדן",
+        "birth_year": 2004,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 3,
+        "last_name": "לינדנפלד",
+        "first_name": "רן",
+        "birth_year": 1979,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 4,
+        "last_name": "רודמן",
+        "first_name": "מיכאל",
+        "birth_year": 1983,
+        "club": null,
+        "split_time": null
+      }
+    ],
+    "Band": "160-199",
+    "Status": "NS",
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 0,
+    "Time": null,
+    "Club": "MIX Maccabiah",
+    "Legs": [],
+    "Band": "160-199",
+    "Status": "NS",
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 4,
+    "Time": "01:51.04",
+    "Club": "מכבי שוהם",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "סמרקיס",
+        "first_name": "ויאצסלב",
+        "birth_year": 1972,
+        "club": null,
+        "split_time": "00:27.59"
+      },
+      {
+        "order": 2,
+        "last_name": "טיטינשניידר",
+        "first_name": "רומן",
+        "birth_year": 1972,
+        "club": null,
+        "split_time": "00:27.49"
+      },
+      {
+        "order": 3,
+        "last_name": "שמואלי",
+        "first_name": "גיא",
+        "birth_year": 1974,
+        "club": null,
+        "split_time": "00:28.88"
+      },
+      {
+        "order": 4,
+        "last_name": "גולדברג",
+        "first_name": "גידי",
+        "birth_year": 1973,
+        "club": null,
+        "split_time": "00:27.08"
+      }
+    ],
+    "Band": "200-239",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 9,
+    "Time": "01:52.93",
+    "Club": "MIX Maccabiah",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "SCHERER",
+        "first_name": "Elliot",
+        "birth_year": 1976,
+        "club": null,
+        "split_time": "00:27.29"
+      },
+      {
+        "order": 2,
+        "last_name": "WEISLE DER",
+        "first_name": "Rodney",
+        "birth_year": 1971,
+        "club": null,
+        "split_time": "00:28.29"
+      },
+      {
+        "order": 3,
+        "last_name": "APPELB OOM",
+        "first_name": "Michael",
+        "birth_year": 1964,
+        "club": null,
+        "split_time": "00:30.50"
+      },
+      {
+        "order": 4,
+        "last_name": "GOLER",
+        "first_name": "Jonathan",
+        "birth_year": 1980,
+        "club": null,
+        "split_time": "00:26.85"
+      }
+    ],
+    "Band": "200-239",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 1,
+    "Time": "01:56.03",
+    "Club": "מכבי עולם המים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "קודיש",
+        "first_name": "שי",
+        "birth_year": 1974,
+        "club": null,
+        "split_time": "00:28.21"
+      },
+      {
+        "order": 2,
+        "last_name": "לוין",
+        "first_name": "הדר",
+        "birth_year": 1972,
+        "club": null,
+        "split_time": "00:31.29"
+      },
+      {
+        "order": 3,
+        "last_name": "ברייטנר",
+        "first_name": "שי",
+        "birth_year": 1977,
+        "club": null,
+        "split_time": "00:27.86"
+      },
+      {
+        "order": 4,
+        "last_name": "סלע",
+        "first_name": "אורי",
+        "birth_year": 1973,
+        "club": null,
+        "split_time": "00:28.67"
+      }
+    ],
+    "Band": "200-239",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 6,
+    "Time": "01:58.29",
+    "Club": "אקוותיקים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "אלסברג",
+        "first_name": "מעוז",
+        "birth_year": 1968,
+        "club": null,
+        "split_time": "00:29.54"
+      },
+      {
+        "order": 2,
+        "last_name": "סלע",
+        "first_name": "עופרי",
+        "birth_year": 1965,
+        "club": null,
+        "split_time": "00:30.05"
+      },
+      {
+        "order": 3,
+        "last_name": "טלמון",
+        "first_name": "ארד",
+        "birth_year": 1966,
+        "club": null,
+        "split_time": "00:29.85"
+      },
+      {
+        "order": 4,
+        "last_name": "אביגדור",
+        "first_name": "אלדד",
+        "birth_year": 1969,
+        "club": null,
+        "split_time": "00:28.85"
+      }
+    ],
+    "Band": "200-239",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 7,
+    "Time": "02:07.28",
+    "Club": "מועדון אילות תל אביב",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "ג'קרד פרקש",
+        "first_name": "אדוארדו",
+        "birth_year": 1971,
+        "club": null,
+        "split_time": "00:33.30"
+      },
+      {
+        "order": 2,
+        "last_name": "קריינר",
+        "first_name": "ברונו",
+        "birth_year": 1964,
+        "club": null,
+        "split_time": "00:32.85"
+      },
+      {
+        "order": 3,
+        "last_name": "ורדג'יסקי",
+        "first_name": "אנגל",
+        "birth_year": 1961,
+        "club": null,
+        "split_time": "00:31.93"
+      },
+      {
+        "order": 4,
+        "last_name": "סלובודקין",
+        "first_name": "רן",
+        "birth_year": 1976,
+        "club": null,
+        "split_time": "00:29.20"
+      }
+    ],
+    "Band": "200-239",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 6,
+    "Time": "02:07.32",
+    "Club": "מאסטרס רחובות",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "לרנר",
+        "first_name": "אהוד",
+        "birth_year": 1971,
+        "club": null,
+        "split_time": "00:30.63"
+      },
+      {
+        "order": 2,
+        "last_name": "שיראז",
+        "first_name": "אריק",
+        "birth_year": 1985,
+        "club": null,
+        "split_time": "00:32.86"
+      },
+      {
+        "order": 3,
+        "last_name": "שראל",
+        "first_name": "חנן",
+        "birth_year": 1966,
+        "club": null,
+        "split_time": "00:34.15"
+      },
+      {
+        "order": 4,
+        "last_name": "ברנדל",
+        "first_name": "גיל",
+        "birth_year": 1980,
+        "club": null,
+        "split_time": "00:29.68"
+      }
+    ],
+    "Band": "200-239",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 5,
+    "Time": "02:19.39",
+    "Club": "מכבי כפר המכביה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "מקובסקי",
+        "first_name": "ניר",
+        "birth_year": 1974,
+        "club": null,
+        "split_time": "00:36.10"
+      },
+      {
+        "order": 2,
+        "last_name": "קארב",
+        "first_name": "פבל",
+        "birth_year": 1959,
+        "club": null,
+        "split_time": "00:38.79"
+      },
+      {
+        "order": 3,
+        "last_name": "באשי",
+        "first_name": "משה",
+        "birth_year": 1977,
+        "club": null,
+        "split_time": "00:33.83"
+      },
+      {
+        "order": 4,
+        "last_name": "פשינסקי",
+        "first_name": "אסף",
+        "birth_year": 1974,
+        "club": null,
+        "split_time": "00:30.67"
+      }
+    ],
+    "Band": "200-239",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 1,
+    "Time": "02:35.65",
+    "Club": "Brazil",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "WAISWOL",
+        "first_name": "Jairo",
+        "birth_year": 1965,
+        "club": null,
+        "split_time": "00:41.78"
+      },
+      {
+        "order": 2,
+        "last_name": "LEVI",
+        "first_name": "Maurice",
+        "birth_year": 1969,
+        "club": null,
+        "split_time": "00:35.87"
+      },
+      {
+        "order": 3,
+        "last_name": "KRAUSZ",
+        "first_name": "Rubens",
+        "birth_year": 1962,
+        "club": null,
+        "split_time": "00:41.05"
+      },
+      {
+        "order": 4,
+        "last_name": "LEWEN SZTAJN",
+        "first_name": "Marcio",
+        "birth_year": 1976,
+        "club": null,
+        "split_time": "00:36.95"
+      }
+    ],
+    "Band": "200-239",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 8,
+    "Time": null,
+    "Club": "הפועל סיידמן-חיגר הוד השרון",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "פורן",
+        "first_name": "רותם",
+        "birth_year": 1976,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 2,
+        "last_name": "חורש",
+        "first_name": "אסף",
+        "birth_year": 1977,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 3,
+        "last_name": "רוזנבאום",
+        "first_name": "ירון",
+        "birth_year": 1974,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 4,
+        "last_name": "גולדשטיין",
+        "first_name": "אורי",
+        "birth_year": 1967,
+        "club": null,
+        "split_time": null
+      }
+    ],
+    "Band": "200-239",
+    "Status": "NS",
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 2,
+    "Time": "01:54.29",
+    "Club": "מכבי שוהם",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "אורן",
+        "first_name": "אייל",
+        "birth_year": 1967,
+        "club": null,
+        "split_time": "00:29.31"
+      },
+      {
+        "order": 2,
+        "last_name": "אביב",
+        "first_name": "איתן",
+        "birth_year": 1971,
+        "club": null,
+        "split_time": "00:28.87"
+      },
+      {
+        "order": 3,
+        "last_name": "מור",
+        "first_name": "ברק",
+        "birth_year": 1967,
+        "club": null,
+        "split_time": "00:28.19"
+      },
+      {
+        "order": 4,
+        "last_name": "קרבקוב",
+        "first_name": "איגור",
+        "birth_year": 1958,
+        "club": null,
+        "split_time": "00:27.92"
+      }
+    ],
+    "Band": "240-279",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 3,
+    "Time": "01:56.03",
+    "Club": "מכבי חיפה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "קרמן",
+        "first_name": "רון",
+        "birth_year": 1958,
+        "club": null,
+        "split_time": "00:30.82"
+      },
+      {
+        "order": 2,
+        "last_name": "נבון",
+        "first_name": "גיא",
+        "birth_year": 1965,
+        "club": null,
+        "split_time": "00:28.50"
+      },
+      {
+        "order": 3,
+        "last_name": "סגל",
+        "first_name": "עדי",
+        "birth_year": 1966,
+        "club": null,
+        "split_time": "00:29.25"
+      },
+      {
+        "order": 4,
+        "last_name": "פרקיס",
+        "first_name": "צפריר",
+        "birth_year": 1971,
+        "club": null,
+        "split_time": "00:27.46"
+      }
+    ],
+    "Band": "240-279",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 1,
+    "Time": "02:07.03",
+    "Club": "מאסטרס רחובות",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "גרין",
+        "first_name": "אילן",
+        "birth_year": 1956,
+        "club": null,
+        "split_time": "00:34.12"
+      },
+      {
+        "order": 2,
+        "last_name": "ברושי",
+        "first_name": "עפר",
+        "birth_year": 1955,
+        "club": null,
+        "split_time": "00:32.96"
+      },
+      {
+        "order": 3,
+        "last_name": "מזרחי",
+        "first_name": "גבריאל שלמה",
+        "birth_year": 1966,
+        "club": null,
+        "split_time": "00:31.02"
+      },
+      {
+        "order": 4,
+        "last_name": "ניסנבאום",
+        "first_name": "חנן",
+        "birth_year": 1973,
+        "club": null,
+        "split_time": "00:28.93"
+      }
+    ],
+    "Band": "240-279",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 9,
+    "Time": "02:10.75",
+    "Club": "USA",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "GREEN BERG",
+        "first_name": "Russell",
+        "birth_year": 1957,
+        "club": null,
+        "split_time": "00:34.80"
+      },
+      {
+        "order": 2,
+        "last_name": "SCHER",
+        "first_name": "Sandor",
+        "birth_year": 1974,
+        "club": null,
+        "split_time": "00:34.44"
+      },
+      {
+        "order": 3,
+        "last_name": "KURTZ",
+        "first_name": "John",
+        "birth_year": 1962,
+        "club": null,
+        "split_time": "00:35.28"
+      },
+      {
+        "order": 4,
+        "last_name": "BERLINER",
+        "first_name": "Mitchell",
+        "birth_year": 1948,
+        "club": null,
+        "split_time": "00:26.23"
+      }
+    ],
+    "Band": "240-279",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 2,
+    "Time": "02:19.19",
+    "Club": "מכבי עולם המים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "אברמסון",
+        "first_name": "איליה",
+        "birth_year": 1968,
+        "club": null,
+        "split_time": "00:30.45"
+      },
+      {
+        "order": 2,
+        "last_name": "גבע",
+        "first_name": "עופר",
+        "birth_year": 1958,
+        "club": null,
+        "split_time": "00:41.35"
+      },
+      {
+        "order": 3,
+        "last_name": "אליעזרי",
+        "first_name": "זהר",
+        "birth_year": 1961,
+        "club": null,
+        "split_time": "00:35.24"
+      },
+      {
+        "order": 4,
+        "last_name": "ברוטמן",
+        "first_name": "רז׳יס",
+        "birth_year": 1971,
+        "club": null,
+        "split_time": "00:32.15"
+      }
+    ],
+    "Band": "240-279",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 7,
+    "Time": "02:19.57",
+    "Club": "מכבי שוהם",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "שוורצמן",
+        "first_name": "בועז",
+        "birth_year": 1962,
+        "club": null,
+        "split_time": "00:37.31"
+      },
+      {
+        "order": 2,
+        "last_name": "שקדי",
+        "first_name": "ארז",
+        "birth_year": 1962,
+        "club": null,
+        "split_time": "00:36.99"
+      },
+      {
+        "order": 3,
+        "last_name": "פישר",
+        "first_name": "ליאור",
+        "birth_year": 1964,
+        "club": null,
+        "split_time": "00:32.60"
+      },
+      {
+        "order": 4,
+        "last_name": "נאור",
+        "first_name": "חן",
+        "birth_year": 1971,
+        "club": null,
+        "split_time": "00:32.67"
+      }
+    ],
+    "Band": "240-279",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 4,
+    "Time": "02:21.48",
+    "Club": "אקוותיקים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "הריס",
+        "first_name": "אלון",
+        "birth_year": 1959,
+        "club": null,
+        "split_time": "00:32.75"
+      },
+      {
+        "order": 2,
+        "last_name": "הולצמן",
+        "first_name": "רמי",
+        "birth_year": 1961,
+        "club": null,
+        "split_time": "00:34.55"
+      },
+      {
+        "order": 3,
+        "last_name": "שחף",
+        "first_name": "עמי",
+        "birth_year": 1953,
+        "club": null,
+        "split_time": "00:39.38"
+      },
+      {
+        "order": 4,
+        "last_name": "כהן",
+        "first_name": "משה",
+        "birth_year": 1961,
+        "club": null,
+        "split_time": "00:34.80"
+      }
+    ],
+    "Band": "240-279",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 0,
+    "Time": "02:44.37",
+    "Club": "Brazil",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "COHEN",
+        "first_name": "Pinhas",
+        "birth_year": 1948,
+        "club": null,
+        "split_time": "00:44.03"
+      },
+      {
+        "order": 2,
+        "last_name": "KOCHEN",
+        "first_name": "Mauro",
+        "birth_year": 1961,
+        "club": null,
+        "split_time": "00:45.11"
+      },
+      {
+        "order": 3,
+        "last_name": "FINGER",
+        "first_name": "Harry",
+        "birth_year": 1957,
+        "club": null,
+        "split_time": "00:39.26"
+      },
+      {
+        "order": 4,
+        "last_name": "COHEN",
+        "first_name": "Roberto",
+        "birth_year": 1980,
+        "club": null,
+        "split_time": "00:35.97"
+      }
+    ],
+    "Band": "240-279",
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 4,
+    "Lane": 8,
+    "Time": null,
+    "Club": "אקוותיקים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "טוביס",
+        "first_name": "אילון",
+        "birth_year": 1950,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 2,
+        "last_name": "לנדאו",
+        "first_name": "יאיר",
+        "birth_year": 1944,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 3,
+        "last_name": "זרחי",
+        "first_name": "דוד",
+        "birth_year": 1951,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 4,
+        "last_name": "אלומה",
+        "first_name": "צבי",
+        "birth_year": 1953,
+        "club": null,
+        "split_time": null
+      }
+    ],
+    "Band": "280-319",
+    "Status": "NS",
+    "LegsBorrowed": false,
+    "LegNames": null
+  }
+]

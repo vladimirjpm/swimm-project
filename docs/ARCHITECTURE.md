@@ -200,8 +200,10 @@ Redis — нет); сброс — по метке, не перебором кл�
    один HE) и завела тень пловца (И-46). Тем же днём поиск пловца по строке протокола вынесен
    из `JsonImportService` (2667 → 2296 строк) в `ImportSwimmerResolver` — индексы, фоллбеки,
    страж тёзок, ноги эстафет; правила тестируются по одному (`ImportSwimmerResolverTests`).
-   Дальше: обработка строки результата из `IsrOrgCompetitionParser.ParseLines` (~1350 строк,
-   19 точек выдачи события) — только с побайтовой сверкой JSON всех фикстур до/после.
+   09.10: `SwimmDbContext.OnModelCreating` → классы `IEntityTypeConfiguration` в
+   `Infrastructure/Data/Configurations/`; `IsrOrgCompetitionParser.ParseLines` (1350 строк) →
+   вложенный `LineParser` с цепочкой методов `Try…` под эталонами `ParserGoldenTests`. Остальное —
+   `docs/plans/refactor-handoff.md`.
 7. `Gallery`/`GalleryItem` (импортные медиа заплыва) НЕ смешивать с `Sys_UserMedia`
    (пользовательские ссылки) — это разные вещи по владению и приватности.
 8. ~~Соревнование сопоставляется с источником по названию~~ — закрыто фазой Д2
