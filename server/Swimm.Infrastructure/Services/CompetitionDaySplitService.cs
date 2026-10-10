@@ -28,9 +28,18 @@ public sealed class CompetitionDaySplitService(
         var comp = await db.Competitions.AsNoTracking().FirstOrDefaultAsync(c => c.Id == competitionId, ct);
         if (comp == null)
             return CompetitionDaySplitReport.Refused(competitionId, "", logligId, "соревнование не найдено");
+        // Событие уже есть. Если в нём другие дни — соревнование уже разделено (или собрано из
+        // дней), делить нечего. Если оно ЕДИНСТВЕННЫЙ день своего события — событие заведено
+        // импортом на один день, а дни слиплись (Маккабиада-мастерс #1482, событие #5, 10.10.2026):
+        // делим, переиспользуя это событие, а не заводя второе.
+        int? reuseEvent = null;
         if (comp.EventId is int existingEvent)
-            return CompetitionDaySplitReport.Refused(comp.Id, comp.Name, logligId,
-                $"уже день события #{existingEvent} — делить нечего");
+        {
+            if (await db.Competitions.AnyAsync(c => c.EventId == existingEvent && c.Id != comp.Id, ct))
+                return CompetitionDaySplitReport.Refused(comp.Id, comp.Name, logligId,
+                    $"уже день события #{existingEvent} — делить нечего");
+            reuseEvent = existingEvent;
+        }
 
         var loglig = logligId ?? await ResolveLogligIdAsync(comp, ct);
         if (loglig is not int resolved)
@@ -82,7 +91,7 @@ public sealed class CompetitionDaySplitService(
         if (!apply)
             return new CompetitionDaySplitReport(comp.Id, comp.Name, resolved, days, unresolved, null, false, null);
 
-        var (eventId, applied) = await ApplyAsync(comp.Id, plan, keep, ct);
+        var (eventId, applied) = await ApplyAsync(comp.Id, plan, keep, reuseEvent, ct);
 
         // Производные величины — по дню (клубный зачёт строится на день; объединённые места и
         // пара-очки пересчёт сам берёт по всему событию).
@@ -93,7 +102,7 @@ public sealed class CompetitionDaySplitService(
     }
 
     private async Task<(int EventId, List<CompetitionDaySplitDay> Days)> ApplyAsync(
-        int competitionId, DayPlan plan, DateOnly keep, CancellationToken ct)
+        int competitionId, DayPlan plan, DateOnly keep, int? reuseEvent, CancellationToken ct)
     {
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -101,14 +110,25 @@ public sealed class CompetitionDaySplitService(
             await using var tx = await db.Database.BeginTransactionAsync(ct);
 
             var comp = await db.Competitions.FirstAsync(c => c.Id == competitionId, ct);
-            var ev = new CompetitionEvent
+            CompetitionEvent ev;
+            if (reuseEvent is int existing)
             {
-                Name = comp.Name,
-                OrgCompId = comp.OrgCompId,
-                StartDate = plan.ByDay.Keys.Min(),
-                EndDate = plan.ByDay.Keys.Max(),
-            };
-            db.CompetitionEvents.Add(ev);
+                // Имя и compID события не трогаем — их ставил импорт; растягиваем только даты.
+                ev = await db.CompetitionEvents.FirstAsync(e => e.Id == existing, ct);
+                ev.StartDate = plan.ByDay.Keys.Min();
+                ev.EndDate = plan.ByDay.Keys.Max();
+            }
+            else
+            {
+                ev = new CompetitionEvent
+                {
+                    Name = comp.Name,
+                    OrgCompId = comp.OrgCompId,
+                    StartDate = plan.ByDay.Keys.Min(),
+                    EndDate = plan.ByDay.Keys.Max(),
+                };
+                db.CompetitionEvents.Add(ev);
+            }
             await db.SaveChangesAsync(ct);
 
             var subName = comp.SubName ?? comp.Name;

@@ -197,10 +197,47 @@ public class CompetitionDaySplitServiceTests
         Assert.Equal(1, await db.Competitions.CountAsync());
         Assert.Empty(await db.CompetitionEvents.ToListAsync());
 
-        // Уже день события — повторный прогон ничего не делает.
+        // Уже разделено (в событии есть другой день) — повторный прогон ничего не делает.
+        var ev = new CompetitionEvent { Name = w.Comp.Name };
+        db.CompetitionEvents.Add(ev);
+        await db.SaveChangesAsync();
         var comp = await db.Competitions.SingleAsync();
-        comp.EventId = 99;
+        comp.EventId = ev.Id;
+        db.Competitions.Add(new Competition { Name = comp.Name, Date = "03/01/2025", PoolType = "25", EventId = ev.Id });
         await db.SaveChangesAsync();
         Assert.Contains("уже день события", (await svc(TwoDays()).SplitAsync(w.Comp.Id, null, apply: true)).Refusal);
+    }
+
+    /// <summary>
+    /// Событие на ОДИН день завёл импорт, а дни слиплись (Маккабиада-мастерс #1482, событие #5,
+    /// 10.10.2026): делим, переиспользуя событие — второго не заводим, имя и compID не трогаем,
+    /// даты события растягиваются на дни.
+    /// </summary>
+    [Fact]
+    public async Task SoleDayOfEvent_SplitsIntoThatEvent()
+    {
+        var w = await SeedAsync(nameof(SoleDayOfEvent_SplitsIntoThatEvent));
+        await using var db = w.Db;
+        var ev = new CompetitionEvent { Name = "Maccabiah 2026 Masters", OrgCompId = 16743, StartDate = Day2, EndDate = Day2 };
+        db.CompetitionEvents.Add(ev);
+        await db.SaveChangesAsync();
+        var comp = await db.Competitions.SingleAsync();
+        comp.EventId = ev.Id;
+        comp.DayNumber = 1;
+        await db.SaveChangesAsync();
+
+        var report = await new CompetitionDaySplitService(db, new FakeDates(TwoDays()), new RecalcSpy())
+            .SplitAsync(w.Comp.Id, null, apply: true);
+
+        Assert.Null(report.Refusal);
+        Assert.Equal(ev.Id, report.EventId);
+        var only = await db.CompetitionEvents.AsNoTracking().SingleAsync();
+        Assert.Equal((ev.Id, "Maccabiah 2026 Masters", (int?)16743, Day1, Day2),
+            (only.Id, only.Name, only.OrgCompId, only.StartDate, only.EndDate));
+
+        var days = await db.Competitions.AsNoTracking().OrderBy(c => c.DayNumber).ToListAsync();
+        Assert.Equal([(1, "03/01/2025"), (2, "04/01/2025")], days.Select(d => (d.DayNumber ?? 0, d.Date)));
+        Assert.All(days, d => Assert.Equal(ev.Id, d.EventId));
+        Assert.Equal(w.Comp.Id, days[1].Id);
     }
 }
