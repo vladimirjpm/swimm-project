@@ -144,6 +144,26 @@ public class LogligStartListParserTests
         Assert.DoesNotContain(grid, r => r.DisciplineId == 14208);
     }
 
+    /// <summary>
+    /// Фильтр дня у loglig (10.10.2026, 16849 / loglig 15687). Страница по умолчанию выбирает
+    /// в фильтре СЕГОДНЯШНЕЕ число и отдаёт один заплыв из четырёх — поэтому адрес программы
+    /// идёт с <c>dateFilter=הכל</c>, а сетка обязана разбирать и такую, частичную, вьюху.
+    /// Заготовка программы: у двух заплывов даты ещё нет вовсе.
+    /// </summary>
+    [Fact]
+    public void Grid_AllDatesPartialView_SeesWholeProgramme()
+    {
+        var today = LogligStartListParser.ParseDisciplineGrid(Fixture("disciplines-15687-today.html"));
+        Assert.Equal([84483], today.Select(r => r.DisciplineId));
+
+        var all = LogligStartListParser.ParseDisciplineGrid(Fixture("disciplines-15687-alldates.html"));
+        Assert.Equal([84484, 84483, 84486, 84485], all.Select(r => r.DisciplineId));
+        Assert.Equal([1, 2, 3, 4], all.Select(r => r.EventNumber));
+        Assert.Equal(new DateTime(2026, 10, 15, 18, 15, 0), all[0].StartAtLocal);
+        Assert.Null(all[2].StartAtLocal);
+        Assert.All(all, r => Assert.Equal(0, r.Registered));
+    }
+
     [Fact]
     public void Grid_CountsRegisteredAndParticipants()
     {

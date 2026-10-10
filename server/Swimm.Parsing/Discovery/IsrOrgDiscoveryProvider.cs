@@ -21,9 +21,19 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
 {
     private const string ListUrl = "https://isr.org.il/competitions.asp";
     private const string DetailsUrl = "https://isr.org.il/comp.asp?compID=";
-    /// <summary>Страница событий соревнования у loglig (в comp.asp она зашита в iframe).</summary>
+    /// <summary>
+    /// Страница событий соревнования у loglig (в comp.asp она зашита в iframe), ВСЕ дни.
+    ///
+    /// <c>dateFilter=הכל</c> обязателен: без него loglig сам выбирает в фильтре СЕГОДНЯШНЕЕ
+    /// число, если в программе есть заплыв на сегодня, и отдаёт только этот день. Поймано
+    /// 10.10.2026 на 16849 (loglig 15687): заготовка заплыва стояла на 10.10, страница по
+    /// умолчанию показала 1 заплыв из 4. В день многодневного старта то же самое спрятало бы
+    /// остальные дни от забора заявок и от импорта. С фильтром приходит частичная вьюха —
+    /// одна таблица, без шапки и скриптов страницы; обоим разборам (сетка, id событий) её
+    /// хватает. <c>seasonId</c> и регламент берутся с полной страницы в <c>LogligClient</c>.
+    /// </summary>
     private const string EventListUrlTemplate =
-        "https://loglig.com:2053/LeagueTable/AthleticsDisciplines/{0}";
+        "https://loglig.com:2053/LeagueTable/AthleticsDisciplines/{0}?dateFilter=%D7%94%D7%9B%D7%9C";
 
     /// <summary>Результаты одного события. showCategories=True добавляет подзаголовки секций
     /// («גמר ישיר - בנות 14»), из которых берётся раунд и категория.</summary>
