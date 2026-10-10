@@ -78,6 +78,68 @@ public class LogligRelaySplitParserTests
         Assert.Equal(new[] { "00:26.18", "00:29.23", "00:35.91", "00:27.11" }, team.Legs.Select(l => l.SplitTime));
     }
 
+    // ── Этапы длиннее 50 м (10.10.2026, docs/relays.md) ──────────────────────
+    // Фикстуры — טריילז "ארנה" קיץ 2026, loglig 14561: 4×100 вольным ж (82498) и м (82495),
+    // 4×200 вольным ж (82500). Левое время строки ноги у них — последний 50-метровый отрезок,
+    // а этап — разность нарастающих.
+
+    [Fact]
+    public void Freestyle4x100_LegIsWholeHundred_NotLastFifty()
+    {
+        var women = Parse("loglig-split-relay-14561-82498-women-free-4x100.pdf");
+        var shoham = Assert.Single(women, t => t.Time == "04:21.81");
+        Assert.Equal("מכבי שוהם", shoham.Club);
+        // Отрезки по PDF: 30.38 + 32.77 | 31.06 + 35.0 | 32.21 + 34.48 | 31.30 + 34.61.
+        Assert.Equal(new[] { "01:03.15", "01:06.06", "01:06.69", "01:05.91" }, shoham.Legs.Select(l => l.SplitTime));
+
+        var men = Parse("loglig-split-relay-14561-82495-men-free-4x100.pdf");
+        var weisgal = Assert.Single(men, t => t.Time == "03:32.69");
+        Assert.Equal(new[] { "00:53.66", "00:55.64", "00:51.88", "00:51.51" }, weisgal.Legs.Select(l => l.SplitTime));
+    }
+
+    [Fact]
+    public void Freestyle4x200_WrappedCumulativeCell_DoesNotBreakLegTime()
+    {
+        // Узкая колонка «нарастающее 150» переносит цифру на строку ниже: «01:33.6» + «3».
+        var team = Assert.Single(Parse("loglig-split-relay-14561-82500-women-free-4x200.pdf"), t => t.Time == "08:21.11");
+        Assert.Equal(new[] { "02:07.97", "02:05.83", "02:04.67", "02:02.64" }, team.Legs.Select(l => l.SplitTime));
+    }
+
+    [Fact]
+    public void BrokenSourceRows_LegsWithoutTimes_NoGuessing()
+    {
+        // Зимний чемпионат 2025, loglig 13627, 4×100 вольным ж (72979): loglig напечатал
+        // отрицательные отрезки («-1.-29:00») и перепутал нарастающие. Ноги остаются (имена
+        // нужны), времён нет — угадывать порядок колонок не беремся.
+        // Испорчены строки у 21 команды из 22 (22-я снята) — разность нарастающих при этом
+        // всё равно складывается в итог, и прежний сторож «сумма = итог» пропускал этапы
+        // вроде 00:00.28.
+        var teams = Parse("loglig-split-relay-13627-72979-women-free-4x100-broken.pdf");
+        var bialik = Assert.Single(teams, t => t.Time == "03:45.08");
+        Assert.Equal(4, bialik.Legs.Count);
+        Assert.All(teams, t => Assert.All(t.Legs, l => Assert.Null(l.SplitTime)));
+
+        // В 4×200 испорчены 10 команд из 20 («-7.-36:00» у второго этапа 08:56.94) — пустые
+        // ровно они, остальные этапы получают.
+        var long200 = Parse("loglig-split-relay-14561-82500-women-free-4x200.pdf");
+        Assert.All(Assert.Single(long200, t => t.Time == "08:56.94").Legs, l => Assert.Null(l.SplitTime));
+        Assert.Equal(10, long200.Count(t => t.Legs.Count == 4 && t.Legs.All(l => l.SplitTime != null)));
+    }
+
+    [Theory]
+    [InlineData("loglig-split-relay-14561-82498-women-free-4x100.pdf")]
+    [InlineData("loglig-split-relay-14561-82495-men-free-4x100.pdf")]
+    [InlineData("loglig-split-relay-14561-82500-women-free-4x200.pdf")]
+    public void LongLegs_SumToTeamTime(string fixture)
+    {
+        // Этапы обязаны складываться в итог команды — у каждой команды с промежуточными.
+        var teams = Parse(fixture).Where(t => t.Time != null && t.Legs.All(l => l.SplitTime != null)).ToList();
+        Assert.NotEmpty(teams);
+        Assert.All(teams, t => Assert.Equal(
+            Swimm.Application.Mapping.SwimTime.ParseToMs(t.Time),
+            t.Legs.Sum(l => Swimm.Application.Mapping.SwimTime.ParseToMs(l.SplitTime))));
+    }
+
     [Fact]
     public void DisqualifiedOrSplitlessTeams_HaveLegsWithoutSplits()
     {

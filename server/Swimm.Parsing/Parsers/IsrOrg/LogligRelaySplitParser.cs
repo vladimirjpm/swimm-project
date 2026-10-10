@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Swimm.Application.Mapping;
 using Swimm.Parsing.Helpers;
 using Swimm.Parsing.Models;
 using UglyToad.PdfPig;
@@ -177,8 +178,49 @@ public static class LogligRelaySplitParser
         return new RelaySwimmerDraft(
             last, first,
             int.Parse(year.Text, CultureInfo.InvariantCulture),
-            times.Count >= 2 ? times[0].Text : null);
+            times.Select(t => t.Text).ToList());
     }
+
+    /// <summary>
+    /// Время этапа из времён строки ноги. Строка печатает пары «отрезок · нарастающее у команды»
+    /// на каждые 50 м, слева — последняя: у 4×50 пара одна, и левое время и есть этап; у 4×100
+    /// их две, у 4×200 — четыре, и левое — только ПОСЛЕДНИЙ отрезок (так и хранилось до
+    /// 10.10.2026: 00:32.77 у этапа за 01:03.15, docs/relays.md).
+    ///
+    /// Этап — разность нарастающих на концах этапов (второе слева время; у первого этапа — само
+    /// нарастающее). Разности одной верить нельзя: loglig печатает и сломанные строки
+    /// (отрицательный отрезок «-1.-29:00», нарастающие переставлены — loglig 13627); такая
+    /// ячейка не время, колонки съезжают, а разность по построению всё равно складывается в
+    /// итог команды. Поэтому три сторожа:
+    /// - нарастающее на конце — САМОЕ большое время строки (в сломанной это не так);
+    /// - этап не короче своего последнего отрезка (левое время);
+    /// - если отрезки разобрались все (чётное число времён), их сумма равна разности.
+    /// Чётность бывает нарушена и в целой строке: узкая колонка «нарастающее 150» переносит
+    /// цифру на строку ниже («01:33.6» + «3»), и PdfPig уносит обрывок в другую строку —
+    /// тогда хватает первых двух сторожей.
+    /// </summary>
+    private static string? LegTime(IReadOnlyList<string> times, IReadOnlyList<string>? previous, bool isFirst)
+    {
+        if (times.Count < 2) return null;
+        if (times.Count == 2) return times[0];
+
+        var ms = times.Select(SwimTime.ParseToMs).ToList();
+        if (ms.Any(t => t is null)) return null;
+        var end = ms[1]!.Value;
+        if (ms.Max() != end) return null;
+
+        int? start = isFirst ? 0 : previous is { Count: >= 2 } ? SwimTime.ParseToMs(previous[1]) : null;
+        if (start is not int s) return null;
+        var leg = end - s;
+        if (leg <= 0 || leg < ms[0]!.Value) return null;
+
+        if (times.Count % 2 == 0 && ms.Where((_, i) => i % 2 == 0).Sum(t => t!.Value) != leg) return null;
+        return FormatLegTime(leg);
+    }
+
+    /// <summary>Как в источнике: «01:03.15» (минуты двумя цифрами, сотые).</summary>
+    private static string FormatLegTime(int ms) =>
+        string.Format(CultureInfo.InvariantCulture, "{0:D2}:{1:D2}.{2:D2}", ms / 60000, ms / 1000 % 60, ms % 1000 / 10);
 
     /// <summary>Собирает имя из строк (сверху вниз), каждое слово — в логическом порядке.</summary>
     private static string JoinName(IEnumerable<IEnumerable<Word>> lines)
@@ -207,7 +249,8 @@ public static class LogligRelaySplitParser
 
     private sealed record Row(double Y, List<Word> Words);
 
-    private sealed record RelaySwimmerDraft(string LastName, string FirstName, int BirthYear, string? Split);
+    /// <param name="Times">Времена строки ноги слева направо (см. <see cref="LegTime"/>).</param>
+    private sealed record RelaySwimmerDraft(string LastName, string FirstName, int BirthYear, IReadOnlyList<string> Times);
 
     private sealed class TeamDraft
     {
@@ -246,10 +289,30 @@ public static class LogligRelaySplitParser
 
         public SplitRelayTeam Build()
         {
-            IReadOnlyList<RelaySwimmer> legs = Legs.Count == 4
-                ? Legs.Select((l, i) => new RelaySwimmer(i + 1, l.LastName, l.FirstName, l.BirthYear, null, l.Split)).ToList()
-                : Array.Empty<RelaySwimmer>();
+            if (Legs.Count != 4)
+                return new SplitRelayTeam(Heat, Lane, Time, Club, Array.Empty<RelaySwimmer>(), Band, Status);
+
+            var times = Legs.Select((l, i) => LegTime(l.Times, i > 0 ? Legs[i - 1].Times : null, isFirst: i == 0)).ToList();
+            if (!LongLegsAddUp(times)) times = times.Select(_ => (string?)null).ToList();
+
+            var legs = Legs.Select((l, i) => new RelaySwimmer(i + 1, l.LastName, l.FirstName, l.BirthYear, null, times[i])).ToList();
             return new SplitRelayTeam(Heat, Lane, Time, Club, legs, Band, Status);
+        }
+
+        /// <summary>
+        /// Сторож этапов длиннее 50 м: они обязаны сложиться в итог команды. Источник бывает
+        /// сломан сам — у зимнего чемпионата 2025 (loglig 13627, 4×100) loglig напечатал
+        /// отрицательные отрезки («-1.-29:00») и перепутал нарастающие местами; такая ячейка не
+        /// время, колонки строки съезжают, и разность берёт не те числа. Угадывать порядок не
+        /// беремся — у команды тогда промежуточных нет. 4×50 (пара времён) не проверяем: там
+        /// этап напечатан прямо, вычислять нечего. Неполный набор у длинных этапов тоже не
+        /// годится: разность берётся от соседней строки, и проверить её нечем.
+        /// </summary>
+        private bool LongLegsAddUp(IReadOnlyList<string?> times)
+        {
+            if (Legs.All(l => l.Times.Count <= 2)) return true;
+            if (times.Any(t => t is null) || SwimTime.ParseToMs(Time) is not int team) return false;
+            return times.Sum(t => SwimTime.ParseToMs(t)!.Value) == team;
         }
     }
 }

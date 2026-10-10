@@ -56,7 +56,11 @@ public class ParserGoldenTests
         "loglig-split-relay-13805-73027-men-freestyle.pdf",
         "loglig-split-relay-13805-73037-mixed-medley.pdf",
         "loglig-split-relay-13805-73056-women-medley.pdf",
+        "loglig-split-relay-13627-72979-women-free-4x100-broken.pdf",
         "loglig-split-relay-14032-75021-openwater-mixed.pdf",
+        "loglig-split-relay-14561-82495-men-free-4x100.pdf",
+        "loglig-split-relay-14561-82498-women-free-4x100.pdf",
+        "loglig-split-relay-14561-82500-women-free-4x200.pdf",
         "loglig-split-relay-15155-82534-men-free.pdf",
         "loglig-split-relay-15155-82535-men-medley.pdf",
     };
