@@ -1,7 +1,8 @@
 import { parseTargetKey, targetKey } from '../../../hooks/useUserMedia';
 import type { ShareDialogState } from '../use-share-dialog';
 
-/** Share with a group — модал (mobile actions sheet + Unlinked). Состояние и отправка — useShareDialog. */
+/** Share with a group — модал карточки раздела Unlinked (мобильная шторка действий удалена 08.09.2026,
+ *  e0fba073). Состояние и отправка — useShareDialog. */
 export default function ShareDialog({ share }: { share: ShareDialogState }) {
   const {
     shareTarget, setShareTarget,

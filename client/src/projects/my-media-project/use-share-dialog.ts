@@ -7,7 +7,7 @@ import type { AllUserMediaDto, PublishTargetDto } from './use-all-my-media';
 type Level = 'members' | 'public';
 
 /**
- * Публикация медиа в группу/клуб: модал «Share» (mobile и Unlinked; разметка — ShareDialog)
+ * Публикация медиа в группу/клуб: модал «Share» (карточка Unlinked; разметка — ShareDialog)
  * и инлайн-share строки заплыва (SwimList). Правило «withdraw + резаявка» — в `publishTo`,
  * одном месте на оба входа.
  */
@@ -27,7 +27,7 @@ export function useShareDialog(params: {
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
 
-  // ── Share (модал — mobile и Unlinked; inline share живёт в SwimList) ─────
+  // ── Share (модал — карточка Unlinked; inline share живёт в SwimList) ─────
   const openShare = async (item: AllUserMediaDto) => {
     setShareTarget(item);
     setShareTargets(null);
