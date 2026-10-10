@@ -158,6 +158,21 @@
       ],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "swimm-api-5084-admin",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "server/Swimm.API",
+        "--no-build",
+        "--",
+        "--urls",
+        "http://localhost:5084"
+      ],
+      "port": 5084,
+      "autoPort": false
     }
   ]
 }
