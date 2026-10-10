@@ -151,6 +151,8 @@ internal sealed class ImportSwimmerResolver
 
                 swimmer ??= FindBySpelling(_bySpelling, item.LastName, item.FirstName, item.BirthYear,
                     club, _diagnosticLog);
+                swimmer ??= FindBySwappedHalves(_bySpelling, item.LastName, item.FirstName, item.BirthYear,
+                    club, _diagnosticLog);
             }
 
             if (swimmer == null)
@@ -282,6 +284,8 @@ internal sealed class ImportSwimmerResolver
                 swimmer ??= await FindLegByEnglishNameAsync(leg);
                 // Нога плывёт за клуб команды — тот же фоллбек написания, что у личной строки.
                 swimmer ??= FindBySpelling(_bySpelling, leg.LastName, leg.FirstName, leg.BirthYear,
+                    club, _diagnosticLog);
+                swimmer ??= FindBySwappedHalves(_bySpelling, leg.LastName, leg.FirstName, leg.BirthYear,
                     club, _diagnosticLog);
 
                 if (swimmer == null)
@@ -432,6 +436,36 @@ internal sealed class ImportSwimmerResolver
         diagnosticLog.Add(
             $"Другое написание: '{last} {first}' ({year}) узнан как #{found.Id} '{found.LastName} {found.FirstName}' "
             + $"(тот же год и клуб «{club.Name}»)");
+        return found;
+    }
+
+    /// <summary>
+    /// Карточка того же человека, у которого протокол напечатал имя и фамилию ПЕРЕСТАВЛЕННЫМИ:
+    /// федерация хранит «גבריאל שלמה | מזרחי», а loglig и карточка — «מזרחי | גבריאל שלמה»
+    /// (#59052, Маккабиада-мастерс; так же близнецы יבסייב). Порядок слов входит во все прочие
+    /// ключи, и каждый перезалив заводил тень то из личных строк, то из ног эстафет.
+    ///
+    /// Решение Влада 10.10.2026 (Р83): переставленные половины — тот же человек, если совпадают
+    /// год и КЛУБ и кандидат ровно один. Без клуба и при двух кандидатах — нет: «שני עידו» и
+    /// «עידו שני» бывают разными детьми (<c>Import_NameSurnameSwap_NotMerged</c>, карточка без клуба).
+    /// Ключ — тот же «написания» (<see cref="SwimmerSpellingKey"/>) с половинами в обратном порядке.
+    /// </summary>
+    private static Swimmer? FindBySwappedHalves(
+        Dictionary<string, List<Swimmer>> index, string? last, string? first, int? year,
+        Club? club, List<string> diagnosticLog)
+    {
+        if (club is null || SwimmerSpellingKey(first, last, year) is not { } swapped) return null;
+        if (swapped == SwimmerSpellingKey(last, first, year)) return null;   // перестановка ничего не меняет
+        if (!index.TryGetValue(swapped, out var candidates)) return null;
+
+        var clubIds = new[] { club.Id, club.MergedIntoId ?? club.Id };
+        var sameClub = candidates.Where(s => s.ClubId is int c && clubIds.Contains(c)).Take(2).ToList();
+        if (sameClub.Count != 1) return null;
+
+        var found = sameClub[0];
+        diagnosticLog.Add(
+            $"Переставленные имя и фамилия: '{last} {first}' ({year}) узнан как #{found.Id} '{found.LastName} {found.FirstName}' "
+            + $"(тот же год и клуб «{club.Name}», Р83)");
         return found;
     }
 

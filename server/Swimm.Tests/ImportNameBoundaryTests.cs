@@ -39,7 +39,7 @@ public class ImportNameBoundaryTests
         public Task InvalidateAllAsync() => Task.CompletedTask;
     }
 
-    private static object Swim(string last, string first, string time, string competition = "Meet") => new
+    private static object Swim(string last, string first, string time, string competition = "Meet", string club = "מכבי") => new
     {
         country = "ISR",
         competition,
@@ -54,7 +54,7 @@ public class ImportNameBoundaryTests
         last_name = last,
         first_name = first,
         birth_year = 2015,
-        club = "מכבי",
+        club,
         time,
     };
 
@@ -117,18 +117,47 @@ public class ImportNameBoundaryTests
     }
 
     [Fact]
-    public async Task SwappedOrder_StaysDifferentPeople()
+    public async Task SwappedHalves_SameYearAndClub_SamePerson()
     {
-        // Порядок значим: «שני עידו» и «עידו שני» — разные люди (решение зафиксировано в
-        // Import_NameSurnameSwap_NotMerged: в иврите обе половины бывают и именем, и фамилией).
-        // Фоллбек по границе не должен это ломать.
-        await using var db = CreateDb(nameof(SwappedOrder_StaysDifferentPeople));
+        // Р83 (решение Влада 10.10.2026): протокол федерации печатает #59052 «גבריאל שלמה | מזרחי»,
+        // loglig и карточка — «מזרחי | גבריאל שלמה». Тот же год, тот же клуб, кандидат один — он.
+        await using var db = CreateDb(nameof(SwappedHalves_SameYearAndClub_SamePerson));
+        var import = new JsonImportService(db, new NullCache());
+
+        await import.ImportAsync(ToStream(new[] { Swim("מזרחי", "גבריאל שלמה", "00:35.00") }), "a.json");
+        var result = await import.ImportAsync(
+            ToStream(new[] { Swim("גבריאל שלמה", "מזרחי", "00:34.00", "Meet 2") }), "b.json");
+
+        Assert.Equal(1, await db.Swimmers.CountAsync());
+        Assert.Equal(2, await db.Results.CountAsync());
+        Assert.Contains(result.DiagnosticLog, l => l.Contains("Переставленные имя и фамилия"));
+    }
+
+    [Fact]
+    public async Task SwappedHalves_OtherClub_StayDifferentPeople()
+    {
+        // Без того же клуба перестановка — не улика: «שני עידו» и «עידו שני» бывают разными детьми.
+        await using var db = CreateDb(nameof(SwappedHalves_OtherClub_StayDifferentPeople));
         var import = new JsonImportService(db, new NullCache());
 
         await import.ImportAsync(ToStream(new[] { Swim("שני", "עידו", "00:35.00") }), "a.json");
-        await import.ImportAsync(ToStream(new[] { Swim("עידו", "שני", "00:34.00", "Meet 2") }), "b.json");
+        await import.ImportAsync(ToStream(new[] { Swim("עידו", "שני", "00:34.00", "Meet 2", club: "הפועל") }), "b.json");
 
         Assert.Equal(2, await db.Swimmers.CountAsync());
+    }
+
+    [Fact]
+    public async Task LegWithSwappedHalves_ReusesExistingSwimmer()
+    {
+        // Обратный случай #59052: карточка из личной строки, нога эстафеты — с другим порядком.
+        await using var db = CreateDb(nameof(LegWithSwappedHalves_ReusesExistingSwimmer));
+        var import = new JsonImportService(db, new NullCache());
+
+        await import.ImportAsync(ToStream(new[] { Swim("גבריאל שלמה", "מזרחי", "00:35.00") }), "meet.json");
+        await import.ImportAsync(ToStream(new[] { Relay("מזרחי", "גבריאל שלמה") }), "relay.json");
+
+        Assert.Equal(1, await db.Swimmers.CountAsync());
+        Assert.Equal((await db.Swimmers.SingleAsync()).Id, (await db.RelayMembers.SingleAsync()).SwimmerId);
     }
 
     [Fact]
