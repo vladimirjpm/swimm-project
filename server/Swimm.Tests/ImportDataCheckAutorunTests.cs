@@ -31,8 +31,11 @@ public class ImportDataCheckAutorunTests
         public Task InvalidateAllAsync() => Task.CompletedTask;
     }
 
-    /// <summary>Реестр-заглушка: запоминает триггер и отдаёт заданные счётчики.</summary>
-    private sealed class FakeRunner(int errors = 0, int warnings = 0, bool throws = false) : IDataCheckRunner
+    /// <summary>
+    /// Реестр-заглушка: запоминает триггер и отдаёт заданные ОТКРЫТЫЕ счётчики; <paramref name="accepted"/> —
+    /// принятые предупреждения, которые прогон тоже находит, но работой они уже не считаются.
+    /// </summary>
+    private sealed class FakeRunner(int errors = 0, int warnings = 0, int accepted = 0, bool throws = false) : IDataCheckRunner
     {
         public string? Trigger { get; private set; }
         public int Runs { get; private set; }
@@ -43,7 +46,7 @@ public class ImportDataCheckAutorunTests
             Runs++;
             if (throws) throw new InvalidOperationException("реестр упал");
             return Task.FromResult(new DataCheckRunDto(
-                1, DateTime.UtcNow, DateTime.UtcNow, trigger, errors, warnings, 0, 0));
+                1, DateTime.UtcNow, DateTime.UtcNow, trigger, errors, warnings + accepted, 0, 0));
         }
 
         public Task<IReadOnlyList<DataCheckGroupDto>> GetCurrentAsync(CancellationToken ct = default) =>
@@ -51,7 +54,12 @@ public class ImportDataCheckAutorunTests
         public Task<IReadOnlyList<DataCheckRunDto>> GetHistoryAsync(int limit = 20, CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<(DataCheckRunDto? LastRun, IReadOnlyList<DataCheckStateDto> States)> GetStateAsync(
-            CancellationToken ct = default) => throw new NotSupportedException();
+            CancellationToken ct = default) =>
+            Task.FromResult<(DataCheckRunDto?, IReadOnlyList<DataCheckStateDto>)>((null,
+            [
+                new("e", DataCheckSeverity.Error, errors, errors, false, 1, DateTime.UtcNow),
+                new("w", DataCheckSeverity.Warning, warnings + accepted, warnings + accepted, false, 1, DateTime.UtcNow, accepted),
+            ]));
         public Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default) =>
@@ -121,6 +129,33 @@ public class ImportDataCheckAutorunTests
             .ImportAsync(ToStream(new[] { Item("A", 1) }), "meet.json");
 
         Assert.Equal("Проверки данных: чисто.", result.DataChecks);
+    }
+
+    [Fact]
+    public async Task Import_AcceptedFindings_AreNotReportedAsWarnings()
+    {
+        // Перезалив Эйлата-2025 10.10.2026 напечатал «предупреждений — 31»: все 31 были приняты
+        // раньше, а строка читалась как «импорт что-то нашёл». Принятые — отдельным числом.
+        await using var db = CreateDb(nameof(Import_AcceptedFindings_AreNotReportedAsWarnings));
+
+        var result = await new JsonImportService(db, new NullCache(), null, new FakeRunner(accepted: 31))
+            .ImportAsync(ToStream(new[] { Item("A", 1) }), "meet.json");
+
+        Assert.Equal(0, result.DataCheckErrors);
+        Assert.Equal(0, result.DataCheckWarnings);
+        Assert.Equal("Проверки данных: открытых нет (принятых раньше — 31).", result.DataChecks);
+    }
+
+    [Fact]
+    public async Task Import_OpenAndAcceptedFindings_BothNamed()
+    {
+        await using var db = CreateDb(nameof(Import_OpenAndAcceptedFindings_BothNamed));
+
+        var result = await new JsonImportService(db, new NullCache(), null, new FakeRunner(warnings: 1, accepted: 4))
+            .ImportAsync(ToStream(new[] { Item("A", 1) }), "meet.json");
+
+        Assert.Equal(1, result.DataCheckWarnings);
+        Assert.Equal("Проверки данных: открытых ошибок — 0, предупреждений — 1; принятых раньше — 4.", result.DataChecks);
     }
 
     [Fact]

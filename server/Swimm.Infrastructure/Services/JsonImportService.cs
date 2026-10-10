@@ -1427,12 +1427,23 @@ public class JsonImportService : IImportService
                     // закоммичено, а DetectChanges на них стоил бы дороже самих проверок.
                     _db.ChangeTracker.Clear();
 
-                    var run = await _checks.RunAllAsync("import");
-                    dataCheckErrors = run.ErrorCount;
-                    dataCheckWarnings = run.WarningCount;
-                    dataChecksSummary = run.ErrorCount == 0 && run.WarningCount == 0
-                        ? "Проверки данных: чисто."
-                        : $"Проверки данных: ошибок — {run.ErrorCount}, предупреждений — {run.WarningCount}.";
+                    await _checks.RunAllAsync("import");
+
+                    // Счётчики прогона включают и ПРИНЯТЫЕ находки: «31 предупреждение» читалось
+                    // как «импорт что-то нашёл», хотя все 31 разобраны раньше. Открытые и принятые
+                    // берём из состояния реестра — те же числа, что у дашборда и /Admin/Health.
+                    var (_, states) = await _checks.GetStateAsync();
+                    dataCheckErrors = states.Where(s => s.Severity == DataCheckSeverity.Error).Sum(s => s.Open);
+                    dataCheckWarnings = states.Where(s => s.Severity == DataCheckSeverity.Warning).Sum(s => s.Open);
+                    var accepted = states.Sum(s => s.Accepted);
+                    var acceptedNote = accepted > 0 ? $"принятых раньше — {accepted}" : "";
+                    dataChecksSummary = (dataCheckErrors, dataCheckWarnings, accepted) switch
+                    {
+                        (0, 0, 0) => "Проверки данных: чисто.",
+                        (0, 0, _) => $"Проверки данных: открытых нет ({acceptedNote}).",
+                        _ => $"Проверки данных: открытых ошибок — {dataCheckErrors}, предупреждений — {dataCheckWarnings}" +
+                             (accepted > 0 ? $"; {acceptedNote}." : ".")
+                    };
                     diagnosticLog.Add(dataChecksSummary);
                 }
                 catch (Exception ex)
