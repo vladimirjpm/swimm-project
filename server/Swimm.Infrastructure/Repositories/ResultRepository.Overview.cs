@@ -59,7 +59,8 @@ public partial class ResultRepository
 
         // Клубный зачёт — переиспользуем GetClubSummaryAsync (свой кэш внутри);
         // по полу — тот же расчёт с Gender-фильтром. Значения в Results.Gender —
-        // "male"/"female" (плюс "none"), НЕ "M"/"F" (это формат Swimmer.Gender).
+        // "male"/"female" (плюс "mixed" у эстафет и "none"), НЕ "M"/"F"; у Swimmer.Gender
+        // те же "male"/"female" (сверено по базе 10.10.2026).
         var topClubs = (await GetClubSummaryAsync(filter)).Take(10).ToList();
         var appliedRules = await LoadAppliedClubRulesAsync(query);
         var clubPointsVerified = await LoadClubPointsVerifiedAsync(query);

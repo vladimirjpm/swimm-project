@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Repositories;
@@ -248,5 +249,125 @@ public class OverviewMostDecoratedTests
             .GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = f.Comp.Id });
 
         Assert.Empty(overview.TopMedalists);
+    }
+
+    /// <summary>
+    /// Общий финал «כללי» (Round = final-open) медали не даёт: зачётная единица — возрастная
+    /// ступень, там пловец свою медаль и получает (Р43). То же со swim-off («extra»).
+    /// </summary>
+    [Theory]
+    [InlineData(ResultRounds.FinalOpen, null)]
+    [InlineData(null, "extra")]
+    public async Task OpenFinalAndExtraHeat_AreNotMedals(string? round, string? heatType)
+    {
+        await using var db = CreateDb($"{nameof(OpenFinalAndExtraHeat_AreNotMedals)}-{round}-{heatType}");
+        var f = await SeedBaseAsync(db);
+
+        var swimmer = NewSwimmer("Open", "male");
+        db.Add(swimmer);
+        await db.SaveChangesAsync();
+
+        var row = Row(f, swimmer.Id, 1, heatType: heatType);
+        row.Round = round;
+        db.Results.Add(row);
+        await db.SaveChangesAsync();
+
+        var overview = await new ResultRepository(db, new NullCache())
+            .GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = f.Comp.Id });
+
+        Assert.Empty(overview.TopMedalists);
+    }
+
+    /// <summary>
+    /// «Мокдамот и финал»: ступень разыграна утром (прямой финал) и вечером (финал) —
+    /// медаль у ступени одна, по лучшему месту (И13). Клубных очков это не касается.
+    /// </summary>
+    [Fact]
+    public async Task TwoRoundsOfOneAgeStep_GiveOneMedal_ByBestPlace()
+    {
+        await using var db = CreateDb(nameof(TwoRoundsOfOneAgeStep_GiveOneMedal_ByBestPlace));
+        var f = await SeedBaseAsync(db);
+
+        var swimmer = NewSwimmer("Twice", "male");
+        db.Add(swimmer);
+        await db.SaveChangesAsync();
+
+        var morning = Row(f, swimmer.Id, 2);
+        morning.Round = ResultRounds.TimedFinal;
+        var evening = Row(f, swimmer.Id, 1);
+        evening.Round = ResultRounds.Final;
+        db.Results.AddRange(morning, evening);
+        await db.SaveChangesAsync();
+
+        var overview = await new ResultRepository(db, new NullCache())
+            .GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = f.Comp.Id });
+
+        var top = Assert.Single(overview.TopMedalists);
+        Assert.Equal(1, top.Gold);
+        Assert.Equal(0, top.Silver);
+    }
+
+    /// <summary>
+    /// Тоггл «Combine All Results» берёт объединённое место дисциплины — но только у
+    /// соревнования с <c>ShowCombineAllResults</c>; у остальных тоггл не действует.
+    /// Протокольное золото A с объединённым 4-м местом медалью в этом режиме не остаётся.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false, "A")]   // соревнование умеет combine, тоггл выключен → протокол
+    [InlineData(true, true, "B")]    // тоггл включён → объединённое место
+    [InlineData(false, true, "A")]   // соревнование combine не умеет → тоггл игнорируется
+    public async Task Combined_UsesCombinedPlace_OnlyWhereCompetitionShowsIt(
+        bool showCombine, bool combined, string expectedTop)
+    {
+        await using var db = CreateDb($"{nameof(Combined_UsesCombinedPlace_OnlyWhereCompetitionShowsIt)}-{showCombine}-{combined}");
+        var f = await SeedBaseAsync(db);
+        f.Comp.ShowCombineAllResults = showCombine;
+
+        var a = NewSwimmer("A", "male");
+        var b = NewSwimmer("B", "male");
+        db.AddRange(a, b);
+        await db.SaveChangesAsync();
+
+        var rowA = Row(f, a.Id, 1);
+        rowA.CombinedPlace = 4;
+        var rowB = Row(f, b.Id, 2);
+        rowB.CombinedPlace = 1;
+        db.Results.AddRange(rowA, rowB);
+        await db.SaveChangesAsync();
+
+        var overview = await new ResultRepository(db, new NullCache())
+            .GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = f.Comp.Id, Combined = combined });
+
+        var top = Assert.Single(overview.TopMedalists);
+        Assert.Equal(expectedTop == "A" ? a.Id : b.Id, top.SwimmerId);
+        Assert.Equal(1, top.Gold);
+    }
+
+    /// <summary>
+    /// Объединённое место, лежащее на prelim-строке (лучший заплыв был утром), медаль даёт:
+    /// prelim-исключение относится к протокольному месту сессии, а не к рейтингу дисциплины.
+    /// </summary>
+    [Fact]
+    public async Task Combined_PrelimRowWithCombinedPlace_IsAMedal()
+    {
+        await using var db = CreateDb(nameof(Combined_PrelimRowWithCombinedPlace_IsAMedal));
+        var f = await SeedBaseAsync(db);
+        f.Comp.ShowCombineAllResults = true;
+
+        var swimmer = NewSwimmer("Morning", "male");
+        db.Add(swimmer);
+        await db.SaveChangesAsync();
+
+        var row = Row(f, swimmer.Id, 1, heatType: "prelim");
+        row.CombinedPlace = 1;
+        db.Results.Add(row);
+        await db.SaveChangesAsync();
+
+        var repo = new ResultRepository(db, new NullCache());
+        var protocol = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = f.Comp.Id });
+        var combined = await repo.GetCompetitionOverviewAsync(new ResultFilter { CompetitionId = f.Comp.Id, Combined = true });
+
+        Assert.Empty(protocol.TopMedalists);
+        Assert.Equal(1, Assert.Single(combined.TopMedalists).Gold);
     }
 }

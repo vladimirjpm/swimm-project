@@ -13,6 +13,7 @@
 | Мозаика | `client/.../competition-header/overview2/competition-overview2.tsx` + `module-defs.ts` (порядок и ключи модулей) |
 | Карточки | `overview2/module-card-*.tsx` |
 | Типы клиента | `client/.../competition-header/types.ts` |
+| Тесты | `server/Swimm.Tests/`: `OverviewBestSwimCardTests`, `OverviewMostDecoratedTests`, `OverviewHighPointCardTests`, `OverviewTopClubsCardTests` (+ `OverviewClubPointsUnofficialTests`), `OverviewNewRecordsCardTests`, `OverviewOrgCompIdTests`; сводка, дни и базовые случаи карточек — `ResultRepositoryTests` (`Overview_*`). Общая посадка — `OverviewTestKit`. Меняешь правило карточки — тест рядом с её именем |
 
 **Общее для всех карточек**
 
