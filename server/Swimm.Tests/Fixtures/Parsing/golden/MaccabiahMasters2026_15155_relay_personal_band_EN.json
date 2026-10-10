@@ -1,0 +1,217 @@
+[
+  {
+    "Competition": "למאסטרס קיץ 2026 ARENA מכביה ואליפות ישראל",
+    "AgeGroup": "90-94",
+    "Date": "09/07/2026",
+    "Event": "4X50m Medley Relay",
+    "EventStyleName": "individual_medley",
+    "EventStyleLen": "4X50",
+    "EventStyleGender": "none",
+    "EventStyleAge": "90-94",
+    "PoolType": "25m",
+    "Results": [
+      {
+        "Country": "",
+        "Position": 1,
+        "Heat": 1,
+        "Lane": 6,
+        "LastName": "",
+        "FirstName": "",
+        "BirthYear": 0,
+        "Club": "Maccabi Olam Hamaim",
+        "Time": "01:52.53",
+        "TimeFailNote": null,
+        "InternationalPoints": 0,
+        "IsRelay": true,
+        "RelayTeamName": "Maccabi Olam Hamaim",
+        "RelaySwimmersName": null,
+        "RelaySwimmers": null,
+        "NameWrap": null
+      }
+    ]
+  },
+  {
+    "Competition": "למאסטרס קיץ 2026 ARENA מכביה ואליפות ישראל",
+    "AgeGroup": "120-159",
+    "Date": "09/07/2026",
+    "Event": "4X50m Medley Relay",
+    "EventStyleName": "individual_medley",
+    "EventStyleLen": "4X50",
+    "EventStyleGender": "none",
+    "EventStyleAge": "120-159",
+    "PoolType": "25m",
+    "Results": [
+      {
+        "Country": "",
+        "Position": 2,
+        "Heat": 3,
+        "Lane": 4,
+        "LastName": "",
+        "FirstName": "",
+        "BirthYear": 0,
+        "Club": "Macabbi Kiryat Biyalik",
+        "Time": "02:03.29",
+        "TimeFailNote": null,
+        "InternationalPoints": 0,
+        "IsRelay": true,
+        "RelayTeamName": "Macabbi Kiryat Biyalik",
+        "RelaySwimmersName": "Eyal MIYARA, Arthur RZBUR, Dan KUNIN, Yarin TURGEMAN",
+        "RelaySwimmers": [
+          {
+            "order": 1,
+            "last_name": "MIYARA",
+            "first_name": "Eyal",
+            "birth_year": 1980,
+            "club": null,
+            "split_time": null
+          },
+          {
+            "order": 2,
+            "last_name": "RZBUR",
+            "first_name": "Arthur",
+            "birth_year": 1987,
+            "club": null,
+            "split_time": null
+          },
+          {
+            "order": 3,
+            "last_name": "KUNIN",
+            "first_name": "Dan",
+            "birth_year": 2001,
+            "club": null,
+            "split_time": null
+          },
+          {
+            "order": 4,
+            "last_name": "TURGEMAN",
+            "first_name": "Yarin",
+            "birth_year": 2003,
+            "club": null,
+            "split_time": null
+          }
+        ],
+        "NameWrap": null
+      },
+      {
+        "Country": "",
+        "Position": 3,
+        "Heat": 1,
+        "Lane": 2,
+        "LastName": "",
+        "FirstName": "",
+        "BirthYear": 0,
+        "Club": "Maccabi Olam Hamaim",
+        "Time": "02:06.84",
+        "TimeFailNote": null,
+        "InternationalPoints": 0,
+        "IsRelay": true,
+        "RelayTeamName": "Maccabi Olam Hamaim",
+        "RelaySwimmersName": "Jonatan KOPELEV, Limor HAREL, Ido ISRAELI, Ronit PORAT",
+        "RelaySwimmers": [
+          {
+            "order": 1,
+            "last_name": "KOPELEV",
+            "first_name": "Jonatan",
+            "birth_year": 1991,
+            "club": null,
+            "split_time": null
+          },
+          {
+            "order": 2,
+            "last_name": "HAREL",
+            "first_name": "Limor",
+            "birth_year": 1982,
+            "club": null,
+            "split_time": null
+          },
+          {
+            "order": 3,
+            "last_name": "ISRAELI",
+            "first_name": "Ido",
+            "birth_year": 2000,
+            "club": null,
+            "split_time": null
+          },
+          {
+            "order": 4,
+            "last_name": "PORAT",
+            "first_name": "Ronit",
+            "birth_year": 1982,
+            "club": null,
+            "split_time": null
+          }
+        ],
+        "NameWrap": null
+      },
+      {
+        "Country": "",
+        "Position": 4,
+        "Heat": 1,
+        "Lane": 5,
+        "LastName": "",
+        "FirstName": "",
+        "BirthYear": 0,
+        "Club": "Maccabi Kfar Hamaccabbiah",
+        "Time": "02:08.31",
+        "TimeFailNote": null,
+        "InternationalPoints": 0,
+        "IsRelay": true,
+        "RelayTeamName": "Maccabi Kfar Hamaccabbiah",
+        "RelaySwimmersName": "Ariel DRUKMAN, Shachar KEIZMAN, Ido KESHET, Alon BARPELED",
+        "RelaySwimmers": [
+          {
+            "order": 1,
+            "last_name": "DRUKMAN",
+            "first_name": "Ariel",
+            "birth_year": 1982,
+            "club": null,
+            "split_time": null
+          },
+          {
+            "order": 2,
+            "last_name": "KEIZMAN",
+            "first_name": "Shachar",
+            "birth_year": 1983,
+            "club": null,
+            "split_time": null
+          },
+          {
+            "order": 3,
+            "last_name": "KESHET",
+            "first_name": "Ido",
+            "birth_year": 1992,
+            "club": null,
+            "split_time": null
+          },
+          {
+            "order": 4,
+            "last_name": "BARPELED",
+            "first_name": "Alon",
+            "birth_year": 1996,
+            "club": null,
+            "split_time": null
+          }
+        ],
+        "NameWrap": null
+      },
+      {
+        "Country": "",
+        "Position": 5,
+        "Heat": 1,
+        "Lane": 6,
+        "LastName": "",
+        "FirstName": "",
+        "BirthYear": 0,
+        "Club": "Maccabi Olam Hamaim",
+        "Time": "02:12.27",
+        "TimeFailNote": null,
+        "InternationalPoints": 0,
+        "IsRelay": true,
+        "RelayTeamName": "Maccabi Olam Hamaim",
+        "RelaySwimmersName": null,
+        "RelaySwimmers": null,
+        "NameWrap": null
+      }
+    ]
+  }
+]

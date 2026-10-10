@@ -125,10 +125,14 @@ public static class IsrOrgCompetitionParser
         @"^(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // Английский заголовок ЭСТАФЕТЫ без пола/возраста: "4X50m Medley Relay".
+    // Английский заголовок ЭСТАФЕТЫ без пола/возраста: "4X50m Medley Relay", и смешанной —
+    // "4X50m Medley Relay Mix". Хвост «Mix» раньше не пускали, чтобы зеркалить иврит, где
+    // «מיקס» не узнавался; иврит его давно узнаёт, а английский всё выбрасывал — у мастерс-зимы
+    // 2026 (#64) EN терял обе смешанные эстафеты, и пара HE+EN не склеивалась (10.10.2026).
+    // Пол смешанной ставит строка полосы «מאסטרס שליחות …» (none), как в HE.
     private static Regex? _relayHeaderEnInHE;
     private static Regex RelayHeaderEnInHE => _relayHeaderEnInHE ??= new Regex(
-        @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")\s+Relay$",
+        @"^(?<legs>\d+)\s*[Xx]\s*(?<len>\d+)m?\s+(?<style>" + EnStylePattern + @")\s+Relay(?:\s+Mix)?$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // После маркера срыва (DQ/DNS/NS) допускается заметка правила ("/ SW 7.1"):
@@ -1048,12 +1052,18 @@ public static class IsrOrgCompetitionParser
         // полоса НОВОГО личного заплыва, а признак currentIsRelay сбрасывается позже, при
         // создании личного события. Без этих двух условий все личные заплывы после
         // эстафет уезжали в событие эстафеты (поймано на полном PDF 6595, 06.10.2026).
+        //
+        // В АНГЛИЙСКОЙ версии протокола строки полос те же, ивритские (в сыром RTL-реверсе) —
+        // нормализуем, как TryEnglishHeaders. Раньше смена полосы была только в HE-ветке: EN
+        // складывал все полосы эстафеты в одно событие, события языков разъезжались, и пара
+        // HE+EN мастерс-зимы 2026 (#64, loglig 13805) не склеивалась (10.10.2026).
         private bool TryMastersRelayBandChange()
         {
-            if (isHE && current != null && currentIsRelay && pendingRelayLen == null && pendingEventLen == null)
+            if (current != null && currentIsRelay && pendingRelayLen == null && pendingEventLen == null)
             {
-                var bandRelay = MastersRelayAgeLineRxHE.Match(line);
-                var bandGendered = MastersAgeLineRxHE.Match(line);
+                var bandLine = isHE ? line : HebrewTextHelper.NormalizeHebrewLine(raw);
+                var bandRelay = MastersRelayAgeLineRxHE.Match(bandLine);
+                var bandGendered = MastersAgeLineRxHE.Match(bandLine);
                 if (bandGendered.Success && !IsRelaySumBand(bandGendered.Groups["age"].Value))
                     bandGendered = Match.Empty;
                 if (bandRelay.Success || bandGendered.Success)
@@ -1598,8 +1608,11 @@ public static class IsrOrgCompetitionParser
                 if (pendingRelayLen != null && (mAgeEn.Success || mRelayAgeEn.Success))
                 {
                     var ageEn = (mAgeEn.Success ? mAgeEn : mRelayAgeEn).Groups["age"].Value;
+                    // Тот же сторож, что в HE: «מאסטרס נ 90-94» над эстафетой — полоса личного
+                    // вида, её пол не берём (Маккабиада-мастерс 15155: женская полоса над мужской
+                    // командой; HE давал «none», EN — «female», 10.10.2026).
                     var genderEn = mAgeEn.Success
-                        ? HebrewTextHelper.NormalizeGenderHE(mAgeEn.Groups["gender"].Value.Trim())
+                        ? MastersRelayBandGender(mAgeEn.Groups["gender"].Value, ageEn)
                         : "none";
 
                     if (current != null) Emit(current);
