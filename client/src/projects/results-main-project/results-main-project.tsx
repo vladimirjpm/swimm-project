@@ -369,7 +369,9 @@ function ResultsMain() {
         filterSelected: {
           ...filters,
           style_name: swim.style_name,
-          style_len: Number(swim.distance) || 0,
+          // Строкой, как в filter_data («100», «4X100»): Number('4X100') — NaN, и эстафета
+          // открывалась без отбора по дистанции. Суффикс «m» — на случай формы справочника.
+          style_len: swim.distance.replace(/m$/i, '').toUpperCase() || 0,
           gender: 'all',
           age: 'all',
           club: 'all',
