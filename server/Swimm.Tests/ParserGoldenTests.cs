@@ -32,6 +32,8 @@ public class ParserGoldenTests
         ("Maccabiah-2026_IL_HE.pdf", "HE"),
         ("MastersWinter2025_6595_relay_then_individual_HE.pdf", "HE"),
         ("OpenLeague2Haifa2025_1658_doubled_rows_HE.pdf", "HE"),
+        ("OpenWaterEilat2025_6601_K_headers_EN.pdf", "EN"),
+        ("OpenWaterEilat2025_6601_K_headers_HE.pdf", "HE"),
         ("RodovskyNimri2025_1720_ns_startlist_HE.pdf", "HE"),
         ("isr-3km-2026.pdf", "HE"),
         ("isr-maccabi-spring-2026-senior-he.pdf", "HE"),

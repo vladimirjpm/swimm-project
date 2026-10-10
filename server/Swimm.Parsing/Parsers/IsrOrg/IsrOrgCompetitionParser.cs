@@ -83,8 +83,11 @@ public static class IsrOrgCompetitionParser
         @"^מאסטרס\s+שליח(?:ות|ים)?\s+(?<age>\d+(?:-\d+)?)$",
         RegexOptions.Compiled);
 
+    // Дистанция — метры («1600m») ИЛИ километры открытой воды («5K», «10K»), как у HeaderRxHE.
+    // Без «K» английский протокол Эйлата-2025 (loglig 12027) терял все четыре события 5K/10K,
+    // события двух языков разъезжались по номеру, и пара HE+EN не склеивалась целиком (10.10.2026).
     private static Regex HeaderRxEN => _headerRxEN ??= new Regex(
-        @"^(?<len>\d+m?)\s+(?<style>.+?)\s*-\s*(?<gender>female|male|girls|boys|women|men)\s+(?<age>\d+(-\d+)?)$",
+        @"^(?<len>\d+(?:m|K)?)\s+(?<style>.+?)\s*-\s*(?<gender>female|male|girls|boys|women|men)\s+(?<age>\d+(-\d+)?)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static Regex? _headerRxENinHE;
@@ -1767,14 +1770,14 @@ public static class IsrOrgCompetitionParser
                     Emit(current);
                 }
 
+                // Строка под заголовком — дата и время заплыва. Порядок слов у языков разный:
+                // ивритская (визуальный порядок PdfPig) — «10:45 06/03/2025», английская —
+                // «06/03/2025 10:45». Раньше брали второе слово, и английская ветка всегда падала
+                // в запасную дату: у многодневки дни слипались (Эйлат-2025, 10.10.2026), а склейка
+                // пары HE+EN берёт дату именно отсюда.
                 var next = i + 1 < lines.Count ? lines[i + 1].Trim() : string.Empty;
-                var dateParts = next.Split(' ');
-                var date = dateParts.Length > 1 ? dateParts[1] : string.Empty;
-
-                if (!Regex.IsMatch(date, @"^\d{2}/\d{2}/\d{4}$"))
-                {
-                    date = dat_relay;
-                }
+                var date = next.Split(' ').FirstOrDefault(p => Regex.IsMatch(p, @"^\d{2}/\d{2}/\d{4}$"))
+                           ?? dat_relay;
 
                 var len = NormalizeHeaderLen(m.Groups["len"].Value);
 
