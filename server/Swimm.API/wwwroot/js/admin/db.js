@@ -1,0 +1,210 @@
+// Скрипт страницы Pages/Admin/Db.cshtml. Вынесен из разметки как есть (10.10.2026):
+// классический скрипт, не модуль — функции из onclick в разметке остаются глобальными.
+// Tailwind-классы отсюда собирает @source в Styles/admin.css.
+(async function () {
+    const API = '/api/admin/db-schema';
+
+    async function loadSchema() {
+        const res = await fetch(API, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.json();
+    }
+
+    function formatType(col) {
+        let t = col.dataType;
+        if (col.maxLength) t += col.maxLength === -1 ? '(MAX)' : `(${col.maxLength})`;
+        return t;
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleDateString('ru-RU') + ' ' + new Date(iso).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'});
+    }
+
+    try {
+        const schema = await loadSchema();
+
+        document.getElementById('db-name').textContent = `Database: ${schema.database}`;
+
+        const rowMap = {};
+        (schema.rowCounts || []).forEach(r => rowMap[r.table] = r.rows);
+
+        const fkByTable = {};
+        const fkColumns = new Set();
+        (schema.foreignKeys || []).forEach(fk => {
+            if (!fkByTable[fk.table]) fkByTable[fk.table] = [];
+            fkByTable[fk.table].push(fk);
+            fkColumns.add(fk.table + '.' + fk.column);
+        });
+
+        const ixByTable = {};
+        (schema.indexes || []).forEach(ix => {
+            if (!ixByTable[ix.table]) ixByTable[ix.table] = [];
+            ixByTable[ix.table].push(ix);
+        });
+
+        const ckByTable = {};
+        (schema.checkConstraints || []).forEach(ck => {
+            if (!ckByTable[ck.table]) ckByTable[ck.table] = [];
+            ckByTable[ck.table].push(ck);
+        });
+
+        // --- Sidebar ---
+        const sidebar = document.getElementById('sidebar');
+        let sideHtml = '<h3>Tables</h3>';
+        schema.tables.forEach(t => {
+            const rows = rowMap[t.name] !== undefined ? Number(rowMap[t.name]).toLocaleString() : '';
+            const sysBadge = t.name.startsWith('Sys_') ? ' 🛡️' : '';
+            sideHtml += `<a href="#tbl-${esc(t.name)}">${esc(t.name)}${sysBadge} <span class="count">${rows}</span></a>`;
+        });
+        if (schema.storedProcedures.length) {
+            sideHtml += '<h3>Procedures</h3>';
+            schema.storedProcedures.forEach(p => {
+                sideHtml += `<a href="#sp-${esc(p.name)}">${esc(p.name)}</a>`;
+            });
+        }
+        if (schema.views.length) {
+            sideHtml += '<h3>Views</h3>';
+            schema.views.forEach(v => {
+                sideHtml += `<a href="#vw-${esc(v.name)}">${esc(v.name)}</a>`;
+            });
+        }
+        sideHtml += '<h3>Other</h3>';
+        sideHtml += '<a href="#sec-deps">Dependencies</a>';
+        sidebar.innerHTML = sideHtml;
+
+        // --- Content ---
+        const content = document.getElementById('content');
+        let html = '';
+
+        schema.tables.forEach(t => {
+            const rows = rowMap[t.name] !== undefined ? Number(rowMap[t.name]).toLocaleString() + ' rows' : '';
+            const tableIcon = t.name.startsWith('Sys_') ? '🛡️' : '📋';
+            html += `<div class="section" id="tbl-${esc(t.name)}">`;
+            html += `<h2 class="text-[#4fc3f7] text-lg mb-4 flex items-center gap-2">${tableIcon} ${esc(t.name)} <span class="rows-badge">${rows}</span></h2>`;
+
+            html += `<table class="col-table"><thead><tr>
+                <th>#</th><th>Column</th><th>Type</th><th>Nullable</th><th>Default</th>
+            </tr></thead><tbody>`;
+            t.columns.forEach(c => {
+                const isFk = fkColumns.has(t.name + '.' + c.column);
+                const nameClass = c.isPk ? 'text-[#ffd54f] font-bold' : isFk ? 'text-[#81c784]' : '';
+                const pkLabel = c.isPk ? ' 🔑' : '';
+                const fkLabel = isFk ? ' 🔗' : '';
+                const idLabel = c.isIdentity ? '<span class="identity-tag">IDENTITY</span>' : '';
+                const defVal = c.defaultValue ? `<span class="default-tag">${esc(c.defaultValue)}</span>` : '';
+                html += `<tr>
+                    <td>${c.position}</td>
+                    <td><span class="${nameClass}">${esc(c.column)}</span>${pkLabel}${fkLabel}${idLabel}</td>
+                    <td><span class="type-tag">${esc(formatType(c))}</span></td>
+                    <td>${c.nullable ? '<span class="nullable">YES</span>' : 'NO'}</td>
+                    <td>${defVal}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+
+            const fks = fkByTable[t.name];
+            if (fks && fks.length) {
+                html += '<div class="sub-section"><h4 class="text-[#90a4ae] text-[0.8rem] mb-1.5 uppercase">🔗 Foreign Keys</h4>';
+                fks.forEach(fk => {
+                    html += `<div class="sub-item">
+                        <code>${esc(fk.column)}</code>
+                        <span class="arrow">→</span>
+                        <code>${esc(fk.referencedTable)}.${esc(fk.referencedColumn)}</code>
+                        <span class="on-delete">ON DELETE ${esc(fk.onDelete)}</span>
+                        <span class="default-tag" style="margin-left:.5rem">${esc(fk.name)}</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            const ixs = ixByTable[t.name];
+            if (ixs && ixs.length) {
+                html += '<div class="sub-section"><h4 class="text-[#90a4ae] text-[0.8rem] mb-1.5 uppercase">📇 Indexes</h4>';
+                ixs.forEach(ix => {
+                    const uniq = ix.isUnique ? ' UNIQUE' : '';
+                    html += `<div class="sub-item">
+                        <code>${esc(ix.name)}</code>
+                        <span class="type-tag" style="margin-left:.5rem">${esc(ix.type)}${uniq}</span>
+                        <span style="margin-left:.5rem">( ${esc(ix.columns)} )</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            const cks = ckByTable[t.name];
+            if (cks && cks.length) {
+                html += '<div class="sub-section"><h4 class="text-[#90a4ae] text-[0.8rem] mb-1.5 uppercase">✅ Check Constraints</h4>';
+                cks.forEach(ck => {
+                    html += `<div class="sub-item">
+                        <code>${esc(ck.name)}</code>
+                        <span style="margin-left:.5rem;color:#b0bec5">${esc(ck.definition)}</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
+        });
+
+        if (schema.storedProcedures.length) {
+            schema.storedProcedures.forEach((sp, i) => {
+                html += `<div class="obj-block" id="sp-${esc(sp.name)}">
+                    <h3>⚙️ ${esc(sp.name)}
+                        <button class="toggle-btn" onclick="toggleDef('sp-def-${i}')">Show SQL</button>
+                    </h3>
+                    <div class="meta">Created: ${formatDate(sp.createdAt)} &nbsp;|&nbsp; Modified: ${formatDate(sp.modifiedAt)}</div>
+                    <pre id="sp-def-${i}" style="display:none">${esc(sp.definition)}</pre>
+                </div>`;
+            });
+        }
+
+        if (schema.views.length) {
+            schema.views.forEach((vw, i) => {
+                html += `<div class="obj-block view-block" id="vw-${esc(vw.name)}">
+                    <h3>👁️ ${esc(vw.name)}
+                        <button class="toggle-btn" onclick="toggleDef('vw-def-${i}')">Show SQL</button>
+                    </h3>
+                    <div class="meta">Created: ${formatDate(vw.createdAt)} &nbsp;|&nbsp; Modified: ${formatDate(vw.modifiedAt)}</div>
+                    <pre id="vw-def-${i}" style="display:none">${esc(vw.definition)}</pre>
+                </div>`;
+            });
+        }
+
+        html += `<div class="section dep-section" id="sec-deps">`;
+        html += `<h2 class="text-[#4fc3f7] text-lg mb-4 flex items-center gap-2">🔀 Table Dependencies (FK Graph)</h2>`;
+        html += `<table class="dep-table"><thead><tr>
+            <th>Table</th><th>Depends On</th><th>Via</th><th>On Delete</th>
+        </tr></thead><tbody>`;
+        (schema.foreignKeys || []).forEach(fk => {
+            html += `<tr>
+                <td>${esc(fk.table)}</td>
+                <td>${esc(fk.referencedTable)}</td>
+                <td><code>${esc(fk.column)}</code> → <code>${esc(fk.referencedColumn)}</code></td>
+                <td><span class="on-delete">${esc(fk.onDelete)}</span></td>
+            </tr>`;
+        });
+        html += '</tbody></table></div>';
+
+        content.innerHTML = html;
+
+    } catch (e) {
+        console.error('DB schema load failed', e);
+        document.getElementById('content').innerHTML =
+            '<div class="empty-msg" style="color:#ef5350">Failed to load DB schema. Check Admin access.</div>';
+    }
+})();
+
+function toggleDef(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const btn = el.previousElementSibling?.querySelector('.toggle-btn')
+             || el.parentElement?.querySelector('.toggle-btn');
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        if (btn) btn.textContent = 'Hide SQL';
+    } else {
+        el.style.display = 'none';
+        if (btn) btn.textContent = 'Show SQL';
+    }
+}

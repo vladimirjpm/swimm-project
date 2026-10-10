@@ -1,0 +1,473 @@
+// Скрипт страницы Pages/Admin/Api.cshtml. Вынесен из разметки как есть (10.10.2026):
+// классический скрипт, не модуль — функции из onclick в разметке остаются глобальными.
+// Tailwind-классы отсюда собирает @source в Styles/admin.css.
+(async function () {
+    const adminTabBtn = document.getElementById('admin-tab-btn');
+
+    // --- Tabs ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.disabled) return;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    // --- Check admin role ---
+    try {
+        const res = await fetch('/auth/me', { credentials: 'same-origin' });
+        const data = await res.json();
+        if (data.isAuthenticated && (data.roles || []).includes('Admin')) {
+            adminTabBtn.disabled = false;
+            document.getElementById('competitions-tab-btn').disabled = false;
+        }
+    } catch (e) { /* ignore */ }
+})();
+
+// ======================== FILTER HINTS (Results tab) ========================
+async function fetchFilterHints(field, q, limit = 20) {
+    try {
+        const p = new URLSearchParams({ field, limit });
+        if (q) p.set('q', q);
+        const r = await fetch('/api/admin/results/filter-hints?' + p, { credentials: 'same-origin' });
+        return r.ok ? await r.json() : [];
+    } catch { return []; }
+}
+
+function fillDatalist(id, values) {
+    const dl = document.getElementById(id);
+    if (!dl) return;
+    dl.innerHTML = values.map(v => `<option value="${esc(v)}"></option>`).join('');
+}
+
+// loadOnFocus=true: при фокусе/очистке подгружает список с q='';
+// для name оставляем false — подсказки только при вводе.
+(function () {
+    function setupHints(inputId, datalistId, field, loadOnFocus) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        let timer;
+
+        async function loadFor(q) {
+            fillDatalist(datalistId, await fetchFilterHints(field, q));
+        }
+
+        if (loadOnFocus) {
+            input.addEventListener('focus', () => {
+                if (input.value.trim() === '') loadFor('');
+            });
+        }
+
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            const q = input.value.trim();
+            if (q.length < 1) {
+                if (loadOnFocus) timer = setTimeout(() => loadFor(''), 150);
+                else document.getElementById(datalistId).innerHTML = '';
+                return;
+            }
+            timer = setTimeout(() => loadFor(q), 250);
+        });
+    }
+
+    setupHints('rf-name',        'dl-name',        'name',        false);
+    setupHints('rf-competition',  'dl-competition', 'competition', true);
+    setupHints('rf-club',         'dl-club',        'club',        true);
+    setupHints('rf-style',        'dl-style',       'style',       true);
+    setupHints('rf-distance',     'dl-distance',    'distance',    true);
+})();
+
+async function runApi(btn, method, urlTemplate, paramMap, defaultMode) {
+    const card = btn.closest('.api-card') || btn.closest('[class*="rounded-lg"]');
+    const inputs = card.querySelectorAll('[data-param]');
+    const responseArea = card.querySelector('.response-area');
+    const statusEl = card.querySelector('.response-status');
+    const preEl = card.querySelector('pre');
+
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    let url = urlTemplate;
+    const queryParams = [];
+    const bodyObj = {};
+
+    inputs.forEach(input => {
+        const name = input.dataset.param;
+        const val = input.value.trim();
+        if (!val) return;
+
+        const isPath = input.dataset.path === 'true' || (paramMap && paramMap[name] === 'path');
+        const isBody = input.dataset.body === 'true' || (paramMap && paramMap[name] === 'body');
+
+        if (isPath) {
+            url = url.replace(`{${name}}`, encodeURIComponent(val));
+        } else if (isBody) {
+            if (val === 'true') bodyObj[name] = true;
+            else if (val === 'false') bodyObj[name] = false;
+            else bodyObj[name] = val;
+        } else {
+            queryParams.push(`${encodeURIComponent(name)}=${encodeURIComponent(val)}`);
+        }
+    });
+
+    if (queryParams.length > 0) {
+        url += '?' + queryParams.join('&');
+    }
+
+    try {
+        const opts = { method, credentials: 'same-origin' };
+        if (Object.keys(bodyObj).length > 0) {
+            opts.headers = { 'Content-Type': 'application/json' };
+            opts.body = JSON.stringify(bodyObj);
+        }
+
+        const res = await fetch(url, opts);
+        const contentType = res.headers.get('content-type') || '';
+        let text;
+        if (contentType.includes('application/json')) {
+            const json = await res.json();
+            text = JSON.stringify(json, null, 2);
+        } else {
+            text = await res.text();
+        }
+
+        statusEl.textContent = `${res.status} ${res.statusText}`;
+        statusEl.className = 'response-status ' + (res.ok ? 'status-ok' : 'status-err');
+        preEl.textContent = text;
+        responseArea.classList.remove('hidden');
+
+    } catch (e) {
+        statusEl.textContent = 'Error';
+        statusEl.className = 'response-status status-err';
+        preEl.textContent = e.message;
+        responseArea.classList.remove('hidden');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Run';
+}
+
+// ======================== RESULTS TAB ========================
+(function () {
+    let currentPage = 1;
+    const pageSize = 50;
+
+    const body = document.getElementById('results-body');
+    const statusEl = document.getElementById('results-status');
+    const pageInfo = document.getElementById('rf-page-info');
+    const prevBtn = document.getElementById('rf-prev');
+    const nextBtn = document.getElementById('rf-next');
+    const searchBtn = document.getElementById('rf-search');
+
+    function fmtDate(iso) {
+        if (!iso) return '';
+        // API хранит дату как DD/MM/YYYY — возвращаем как есть, без переконвертации через Date
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(iso)) return iso;
+        // ISO-формат (YYYY-MM-DD) — конвертируем
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        return `${dd}/${mm}/${d.getFullYear()}`;
+    }
+
+    async function loadResults(page) {
+        currentPage = page;
+        const params = new URLSearchParams();
+        params.set('page', page);
+        params.set('pageSize', pageSize);
+
+        const name = document.getElementById('rf-name').value.trim();
+        const comp = document.getElementById('rf-competition').value.trim();
+        const club = document.getElementById('rf-club').value.trim();
+        const style = document.getElementById('rf-style').value.trim();
+        const dist = document.getElementById('rf-distance').value.trim();
+        const gender = document.getElementById('rf-gender').value;
+        const pool = document.getElementById('rf-pool').value;
+
+        if (name) params.set('name', name);
+        if (comp) params.set('competition', comp);
+        if (club) params.set('club', club);
+        if (style) params.set('styleName', style);
+        if (dist) params.set('distance', dist);
+        if (gender) params.set('gender', gender);
+        if (pool) params.set('poolType', pool);
+
+        statusEl.textContent = 'Загрузка...';
+        statusEl.classList.remove('hidden');
+        body.innerHTML = '';
+
+        try {
+            const res = await fetch('/api/results?' + params.toString(), { credentials: 'same-origin' });
+            if (!res.ok) { statusEl.textContent = `Ошибка: ${res.status}`; return; }
+            const json = await res.json();
+            const rows = json.data || [];
+
+            if (rows.length === 0) {
+                statusEl.textContent = 'Нет результатов.';
+                pageInfo.textContent = '';
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+                return;
+            }
+
+            statusEl.classList.add('hidden');
+            pageInfo.textContent = `Страница ${page}`;
+            prevBtn.disabled = page <= 1;
+            nextBtn.disabled = !json.hasMore;
+
+            rows.forEach((r, i) => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-white/5 hover:bg-white/5 transition-colors';
+                const pos = (page - 1) * pageSize + i + 1;
+                const swimmer = (r.last_name || '') + ' ' + (r.first_name || '');
+                const swimmerEn = (r.last_name_en || '') + ' ' + (r.first_name_en || '');
+                const displayName = swimmer.trim() || swimmerEn.trim();
+                const clubName = r.club || r.club_en || '';
+                const time = r.time_fail ? (r.time_fail_note || 'DNF') : (r.time || '');
+
+                tr.innerHTML =
+                    `<td class="py-1.5 px-2 text-[#546e7a]">${pos}</td>` +
+                    `<td class="py-1.5 px-2 whitespace-nowrap">${fmtDate(r.date)}</td>` +
+                    `<td class="py-1.5 px-2">${esc(displayName)}</td>` +
+                    `<td class="py-1.5 px-2 text-[#90a4ae]">${r.birth_year || ''}</td>` +
+                    `<td class="py-1.5 px-2 text-[#90a4ae]">${esc(clubName)}</td>` +
+                    `<td class="py-1.5 px-2">${esc(r.event_style_len || r.distance || '')}</td>` +
+                    `<td class="py-1.5 px-2">${esc(r.event_style_name || r.style_name || '')}</td>` +
+                    `<td class="py-1.5 px-2 font-semibold text-[#c5e1a5]">${esc(time)}</td>` +
+                    `<td class="py-1.5 px-2 text-center">${r.position != null ? r.position : ''}</td>` +
+                    `<td class="py-1.5 px-2 text-[#90a4ae] max-w-[200px] truncate" title="${esc(r.competition || '')}">${esc(r.competition || '')}</td>` +
+                    `<td class="py-1.5 px-2 text-[#546e7a]">${esc(r.pool_type || '')}</td>`;
+                body.appendChild(tr);
+            });
+
+        } catch (e) {
+            statusEl.textContent = 'Ошибка: ' + e.message;
+        }
+    }
+
+    searchBtn.addEventListener('click', () => loadResults(1));
+    prevBtn.addEventListener('click', () => { if (currentPage > 1) loadResults(currentPage - 1); });
+    nextBtn.addEventListener('click', () => loadResults(currentPage + 1));
+
+    document.getElementById('results-filters').addEventListener('keydown', e => {
+        if (e.key === 'Enter') loadResults(1);
+    });
+})();
+
+// ======================== COMPETITIONS TAB ========================
+(function () {
+    const list = document.getElementById('comp-list');
+    const emptyMsg = document.getElementById('comp-empty');
+    const statusEl = document.getElementById('comp-status');
+
+    let allCategories = []; // [{ key, name, display_order }]
+
+    function fmtDate(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleString('ru-RU', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+    }
+
+    function fmtCompDate(s) { return s || '—'; }
+
+    function parseDmy(s) {
+        const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || '');
+        if (!m) return null;
+        return new Date(+m[3], +m[2] - 1, +m[1]);
+    }
+
+    async function ensureCategories() {
+        if (allCategories.length) return;
+        try {
+            const cats = await api('/api/categories');
+            allCategories = Array.isArray(cats) ? cats : [];
+        } catch { allCategories = []; }
+    }
+
+    async function loadCompetitions() {
+        statusEl.textContent = 'Загрузка...';
+        try {
+            await ensureCategories();
+            const data = await api('/api/admin/competitions');
+            renderList(data);
+            statusEl.textContent = `Всего: ${data.length}`;
+        } catch (e) {
+            statusEl.textContent = 'Ошибка: ' + e.message;
+        }
+    }
+
+    function statusBadge(c) {
+        if (!c.hasImportHistory) return '<span class="text-[#546e7a] italic text-xs">—</span>';
+        return c.approved
+            ? '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(102,187,106,0.2)] text-[#66bb6a]">✓ Подтверждён</span>'
+            : '<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold bg-[rgba(239,154,154,0.2)] text-[#ef9a9a]">✗ Ожидает</span>';
+    }
+
+    // Чекбокс с подписью.
+    function chkLabel(id, val, label, color) {
+        return `<label class="inline-flex items-center gap-1 text-xs ${color} cursor-pointer select-none whitespace-nowrap">`
+            + `<input type="checkbox" id="${id}" class="w-3.5 h-3.5 cursor-pointer" ${val ? 'checked' : ''}>${esc(label)}</label>`;
+    }
+
+    function flagChecks(c) {
+        // Masters-флага здесь нет: он производен от категории Masters (сервер выставляет сам).
+        return chkLabel(`chk-award-${c.id}`,    c.isAward,                'Awards',  'text-[#ffd180]')
+             + chkLabel(`chk-combine-${c.id}`,  c.showCombineAllResults,  'Combine', 'text-[#ffd180]');
+    }
+
+    function categoryChecks(c) {
+        const have = new Set(c.categories || []);
+        if (!allCategories.length) return '<span class="text-[#546e7a] text-xs italic">нет категорий</span>';
+        return allCategories.map(cat =>
+            chkLabel(`cat-${cat.key}-${c.id}`, have.has(cat.key), cat.name, 'text-[#90caf9]')
+        ).join('');
+    }
+
+    function actions(c, label) {
+        return `<div class="flex gap-1.5">
+            <button onclick="saveCompetition(${c.id})"
+                class="py-1 px-3 rounded text-xs font-semibold cursor-pointer transition-colors bg-[rgba(79,195,247,0.15)] text-[#4fc3f7] hover:bg-[rgba(79,195,247,0.25)]">Сохранить</button>
+            <button onclick="deleteCompetition(${c.id}, '${esc(label)}')"
+                class="py-1 px-3 rounded text-xs font-semibold cursor-pointer transition-colors bg-[rgba(239,154,154,0.15)] text-[#ef9a9a] hover:bg-[rgba(239,154,154,0.25)]">Удалить</button>
+        </div>`;
+    }
+
+    // Карточка соревнования (2 яруса). opts.isDay — день внутри события.
+    function compCard(c, opts) {
+        const isDay = !!(opts && opts.isDay);
+        const title = isDay ? (c.subName || '(без названия)') : c.name;
+        const label = isDay ? (c.subName || c.name) : c.name;
+        const dayBadge = isDay
+            ? `<span class="inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold bg-[rgba(102,187,106,0.18)] text-[#66bb6a]">День ${c.dayNumber ?? '?'}</span>`
+            : '';
+        return `
+        <div class="rounded-lg border border-white/10 ${isDay ? 'bg-black/20' : 'bg-white/[.04]'} px-3 py-2" data-comp-id="${c.id}">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2">
+                <span class="text-[#546e7a] text-xs">#${c.id}</span>
+                ${dayBadge}
+                <span class="font-semibold ${isDay ? 'text-[#b0bec5]' : 'text-[#e0e0e0]'} max-w-[340px] truncate" title="${esc(title)}">${esc(title)}</span>
+                <span class="text-[#90a4ae] text-xs whitespace-nowrap">📅 ${fmtCompDate(c.date)}</span>
+                <span class="text-[#90a4ae] text-xs whitespace-nowrap">⬇ ${fmtDate(c.importDate)}</span>
+                <span class="text-[#90a4ae] text-xs whitespace-nowrap">${c.resultCount ?? 0} строк</span>
+                ${statusBadge(c)}
+            </div>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <div class="flex items-center gap-x-3">${flagChecks(c)}</div>
+                <span class="w-px h-4 bg-white/15"></span>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">${categoryChecks(c)}</div>
+                <div class="ml-auto">${actions(c, label)}</div>
+            </div>
+        </div>`;
+    }
+
+    // Свёрнутая карточка-событие (1 ярус, кликабельна).
+    function eventSummary(eventId, eventName, days) {
+        const dates = days.map(d => parseDmy(d.date)).filter(Boolean).sort((a, b) => a - b);
+        let range = '—';
+        if (dates.length) {
+            const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+            const a = fmt(dates[0]), b = fmt(dates[dates.length - 1]);
+            range = a === b ? a : `${a} – ${b}`;
+        }
+        const totalResults = days.reduce((s, d) => s + (d.resultCount || 0), 0);
+        const withHistory = days.filter(d => d.hasImportHistory).length;
+        const approved = days.filter(d => d.hasImportHistory && d.approved).length;
+        const statusOk = withHistory > 0 && approved === withHistory;
+        const statusHtml = withHistory === 0
+            ? '<span class="text-[#546e7a] italic text-xs">—</span>'
+            : `<span class="inline-block py-0.5 px-2 rounded text-xs font-semibold ${statusOk ? 'bg-[rgba(102,187,106,0.2)] text-[#66bb6a]' : 'bg-[rgba(255,167,38,0.2)] text-[#ffa726]'}">✓ ${approved}/${withHistory}</span>`;
+
+        return `
+        <div class="rounded-lg border border-[rgba(102,187,106,0.3)] bg-[rgba(102,187,106,0.08)] hover:bg-[rgba(102,187,106,0.13)] cursor-pointer px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1"
+             onclick="toggleEvent(${eventId})" data-event-summary="${eventId}">
+            <span class="chevron text-[#66bb6a] w-3 inline-block">▸</span>
+            <span class="font-semibold text-[#e0e0e0] max-w-[340px] truncate" title="${esc(eventName)}">${esc(eventName)}</span>
+            <span class="text-[#90a4ae] text-xs whitespace-nowrap">${days.length} дн.</span>
+            <span class="text-[#90a4ae] text-xs whitespace-nowrap">📅 ${range}</span>
+            <span class="text-[#90a4ae] text-xs whitespace-nowrap">${totalResults} строк</span>
+            ${statusHtml}
+            <span class="ml-auto text-[#546e7a] text-xs">раскрыть</span>
+        </div>`;
+    }
+
+    function renderList(data) {
+        if (!data.length) {
+            list.innerHTML = '';
+            emptyMsg.classList.remove('hidden');
+            return;
+        }
+        emptyMsg.classList.add('hidden');
+
+        // Группируем дни по событию, сохраняя порядок прихода с сервера.
+        const groups = [];
+        const idx = new Map();
+        const items = [];
+        data.forEach(c => {
+            if (c.eventId == null) {
+                items.push({ type: 'single', comp: c });
+            } else if (idx.has(c.eventId)) {
+                groups[idx.get(c.eventId)].days.push(c);
+            } else {
+                idx.set(c.eventId, groups.length);
+                const g = { eventId: c.eventId, eventName: c.eventName || c.name, days: [c] };
+                groups.push(g);
+                items.push({ type: 'event', group: g });
+            }
+        });
+
+        list.innerHTML = items.map(it => {
+            if (it.type === 'single') return compCard(it.comp, {});
+            const g = it.group;
+            const dayCards = g.days.map(d => compCard(d, { isDay: true })).join('');
+            return eventSummary(g.eventId, g.eventName, g.days)
+                 + `<div class="ev-${g.eventId} hidden flex flex-col gap-2 pl-5">${dayCards}</div>`;
+        }).join('');
+    }
+
+    window.toggleEvent = function (eventId) {
+        const box = document.querySelector(`.ev-${eventId}`);
+        const summary = document.querySelector(`[data-event-summary="${eventId}"]`);
+        const chevron = summary ? summary.querySelector('.chevron') : null;
+        if (!box) return;
+        const willShow = box.classList.contains('hidden');
+        box.classList.toggle('hidden', !willShow);
+        if (chevron) chevron.textContent = willShow ? '▾' : '▸';
+    };
+
+    window.saveCompetition = async function (id) {
+        const isAward = document.getElementById(`chk-award-${id}`)?.checked ?? false;
+        const showCombineAllResults = document.getElementById(`chk-combine-${id}`)?.checked ?? false;
+        const categories = allCategories
+            .filter(cat => document.getElementById(`cat-${cat.key}-${id}`)?.checked)
+            .map(cat => cat.key);
+        try {
+            await api(`/api/admin/competitions/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isAward, showCombineAllResults, categories })
+            });
+            toast('Сохранено');
+        } catch (e) {
+            toast('Ошибка: ' + e.message);
+        }
+    };
+
+    window.deleteCompetition = async function (id, name) {
+        if (!confirm(`Удалить соревнование «${name}» и все его результаты?`)) return;
+        try {
+            await api(`/api/admin/import/competition/${id}`, { method: 'DELETE' });
+            toast('Удалено');
+            await loadCompetitions();
+        } catch (e) {
+            toast('Ошибка: ' + e.message);
+        }
+    };
+
+    document.getElementById('comp-refresh').addEventListener('click', loadCompetitions);
+    document.querySelector('[data-tab="competitions"]').addEventListener('click', loadCompetitions);
+})();

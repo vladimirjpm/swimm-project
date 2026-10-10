@@ -1,6 +1,6 @@
 # /Admin/Swimmers — дубли пловцов
 
-Файлы: `Pages/Admin/Swimmers/Index.cshtml`; API `SwimmersAdminController`
+Файлы: `Pages/Admin/Swimmers/Index.cshtml`, скрипт `wwwroot/js/admin/swimmers.js`; API `SwimmersAdminController`
 (`/api/admin/swimmers`): dedup-candidates, merge (dry-run/apply), dedup-ignore
 (+remove/список), orphans/delete, attention-summary.
 Сервисы: `SwimmerDedupService`, `SwimmerMergeService`, `DedupIgnoreService`.

@@ -1,6 +1,6 @@
 # /Admin/PointsRules — правила начисления очков
 
-Файлы: `Pages/Admin/PointsRules/Index.cshtml(.cs)`, `Edit.cshtml(.cs)`;
+Файлы: `Pages/Admin/PointsRules/Index.cshtml(.cs)` (скрипт `wwwroot/js/admin/pointsrules.js`), `Edit.cshtml(.cs)`;
 порт `IPointRulesAdminRepository` (`PointRulesAdminRepository`);
 парсер шкалы — `Swimm.Application/Validation/PointRuleScaleText.cs`.
 

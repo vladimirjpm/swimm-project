@@ -1,6 +1,7 @@
 ﻿# /Admin/Health — здоровье данных
 
-Файлы: `Pages/Admin/Health.cshtml(.cs)`; API `DataChecksAdminController`
+Файлы: `Pages/Admin/Health.cshtml(.cs)`, скрипт `wwwroot/js/admin/health.js` (Razor-данные
+`window.__HEALTH` — inline перед ним); API `DataChecksAdminController`
 (`/api/admin/data-checks`): GET (находки + история), `run`, `{id}/accept`, `{id}/reopen`.
 Сервис `DataCheckRunner`, проверки — `Services/DataChecks/*` (реализации `IDataCheck`).
 Консоль: `dotnet run --project server/Swimm.API -- --check-data`.

@@ -1,6 +1,6 @@
 # /Admin/Settings — параметры приложения
 
-Файлы: `Pages/Admin/Settings.cshtml`; API `/api/admin/settings`
+Файлы: `Pages/Admin/Settings.cshtml`, скрипт `wwwroot/js/admin/settings.js`; API `/api/admin/settings`
 (`AdminSettingsService` — in-memory, перечитываются фоновыми джобами каждый тик).
 
 Ключевые ключи: DiscoveryEnabled/DiscoveryIntervalHours,
