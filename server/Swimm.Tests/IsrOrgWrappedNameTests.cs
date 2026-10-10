@@ -46,6 +46,17 @@ public class IsrOrgWrappedNameTests
     }
 
     [Fact]
+    public void Resolve_TwoHebrewWords_ButWrapMidWord_Glues()
+    {
+        // Маккабиада-мастерс 15155: «קנטרביץ ארליך» — двойная фамилия, а EN печатает одну
+        // KANTAREVICH, перенесённую посреди слова. Хвост «CH» ни на что не похож, склейка ложится
+        // на «קנטרביץ» — пробела нет (было «KANTAREVI CH», 10.10.2026).
+        var en = Row("KANTAREVICH", "INBAR", new IsrOrgNameWrap("KANTAREVI", "CH"));
+        var he = Row("קנטרביץ ארליך", "ענבר");
+        Assert.Equal(("KANTAREVICH", "INBAR"), IsrOrgParser.ResolveWrappedEnName(en, he));
+    }
+
+    [Fact]
     public void Resolve_WrappedFirstName_GoesToFirstName()
     {
         // Перенесено ИМЯ: парсер положил его в фамилию, а фамилию строки данных — в имя.

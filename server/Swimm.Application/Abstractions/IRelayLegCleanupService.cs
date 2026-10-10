@@ -19,5 +19,9 @@ public sealed record RelayLegCleanupReport(
 public interface IRelayLegCleanupService
 {
     /// <param name="apply">false — сухой прогон.</param>
-    Task<RelayLegCleanupReport> RunAsync(bool apply, CancellationToken ct = default);
+    /// <param name="competitionIds">Только эстафеты этих соревнований (null — вся база). Так его зовёт
+    /// импорт: сборка мастерских эстафет кладёт этапы ног в обход доклейки, и перезалив
+    /// #1482 10.10.2026 вернул только что обнулённый этап 00:00.69.</param>
+    Task<RelayLegCleanupReport> RunAsync(
+        bool apply, IReadOnlyCollection<int>? competitionIds = null, CancellationToken ct = default);
 }

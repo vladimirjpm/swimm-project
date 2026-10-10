@@ -137,4 +137,50 @@ public class ImportDataCheckAutorunTests
         Assert.Equal("", result.DataChecks);
         Assert.Contains(result.DiagnosticLog, l => l.Contains("Проверки данных не выполнены"));
     }
+
+    /// <summary>Сторож невозможных этапов-заглушка: запоминает область и отдаёт одну команду.</summary>
+    private sealed class FakeLegCleanup(bool throws = false) : IRelayLegCleanupService
+    {
+        public IReadOnlyCollection<int>? Scope { get; private set; }
+        public bool? Applied { get; private set; }
+
+        public Task<RelayLegCleanupReport> RunAsync(
+            bool apply, IReadOnlyCollection<int>? competitionIds = null, CancellationToken ct = default)
+        {
+            if (throws) throw new InvalidOperationException("сторож упал");
+            (Applied, Scope) = (apply, competitionIds);
+            return Task.FromResult(new RelayLegCleanupReport(apply, 1,
+                [new RelayLegCleanupRow(7, 1, "4X50", "freestyle", "02:42.64", "нога 2: …", ["00:39.92", "00:00.69"])], 2));
+        }
+    }
+
+    [Fact]
+    public async Task Import_ClearsImplausibleLegs_OfItsOwnCompetitions()
+    {
+        // Р82: сборка мастерских эстафет кладёт этапы ног в обход доклейки — перезалив #1482
+        // 10.10.2026 вернул обнулённый этап 00:00.69. Импорт обязан прогнать сторож по СВОИМ дням.
+        await using var db = CreateDb(nameof(Import_ClearsImplausibleLegs_OfItsOwnCompetitions));
+        var legs = new FakeLegCleanup();
+
+        var result = await new JsonImportService(db, new NullCache(), legCleanup: legs)
+            .ImportAsync(ToStream(new[] { Item("A", 1) }), "meet.json");
+
+        var compId = (await db.Competitions.SingleAsync()).Id;
+        Assert.True(legs.Applied);
+        Assert.Equal([compId], legs.Scope);
+        Assert.Contains(result.DiagnosticLog, l => l.Contains("невозможный этап у 1") && l.Contains("обнулено 2"));
+    }
+
+    [Fact]
+    public async Task LegCleanupFailure_DoesNotBreakImport()
+    {
+        await using var db = CreateDb(nameof(LegCleanupFailure_DoesNotBreakImport));
+
+        var result = await new JsonImportService(db, new NullCache(), legCleanup: new FakeLegCleanup(throws: true))
+            .ImportAsync(ToStream(new[] { Item("A", 1) }), "meet.json");
+
+        Assert.Empty(result.ErrorMessages);
+        Assert.Equal(1, result.Created);
+        Assert.Contains(result.DiagnosticLog, l => l.Contains("Этапы эстафет: проверка не удалась"));
+    }
 }

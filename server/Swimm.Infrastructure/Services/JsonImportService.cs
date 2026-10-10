@@ -26,6 +26,7 @@ public class JsonImportService : IImportService
     private readonly IStartListStitchService? _stitch;
     private readonly IHubGroupClubSubscriptionService? _clubSync;
     private readonly ISuspectResultService? _suspects;
+    private readonly IRelayLegCleanupService? _legCleanup;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -50,12 +51,18 @@ public class JsonImportService : IImportService
     /// переимпорта 19.09 отсечка 50 м вместо финиша дала 117 333 очка FINA и «лучший заплыв».
     /// Необязателен по той же причине, что и <paramref name="recalc"/>.
     /// </param>
+    /// <param name="legCleanup">
+    /// Сторож невозможных этапов эстафет (Р82): сборка мастерских эстафет кладёт этапы ног сама,
+    /// в обход доклейки, и перезалив #1482 10.10.2026 вернул обнулённый этап 00:00.69.
+    /// Необязателен по той же причине, что и <paramref name="recalc"/>.
+    /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null,
         IDataCheckRunner? checks = null,
         IStartListStitchService? stitch = null,
         IHubGroupClubSubscriptionService? clubSync = null,
-        ISuspectResultService? suspects = null)
+        ISuspectResultService? suspects = null,
+        IRelayLegCleanupService? legCleanup = null)
     {
         _db    = db;
         _cache = cache;
@@ -64,6 +71,7 @@ public class JsonImportService : IImportService
         _stitch = stitch;
         _clubSync = clubSync;
         _suspects = suspects;
+        _legCleanup = legCleanup;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -131,6 +139,7 @@ public class JsonImportService : IImportService
         private readonly IStartListStitchService? _stitch;
         private readonly IHubGroupClubSubscriptionService? _clubSync;
         private readonly ISuspectResultService? _suspects;
+        private readonly IRelayLegCleanupService? _legCleanup;
 
         // Аргументы ImportAsync.
         private readonly Stream jsonStream;
@@ -207,6 +216,7 @@ public class JsonImportService : IImportService
             _stitch = svc._stitch;
             _clubSync = svc._clubSync;
             _suspects = svc._suspects;
+            _legCleanup = svc._legCleanup;
             this.jsonStream = jsonStream;
             this.fileName = fileName;
             this.categoryKeys = categoryKeys;
@@ -256,6 +266,7 @@ public class JsonImportService : IImportService
                 // После коммита — шаги-приборы: каждый в своём try/catch, уронить загруженное не вправе.
                 await RecalcCombinedAsync();
                 await ScanQualityAsync();
+                await ClearImplausibleLegsAsync();
                 await ReconcileWithFileAsync();
                 await AlignGendersAsync();
                 await RerankOpenWaterAsync();
@@ -1212,6 +1223,27 @@ public class JsonImportService : IImportService
                         $"Качество: скан не удался ({ex.GetType().Name}: {ex.Message}). " +
                         "Импорт сохранён; выполните `dotnet run -- --quality-scan <eventId>`.");
                 }
+            }
+        }
+
+        // Невозможные этапы эстафет (Р82) по импортированным дням — тем же правилом, что доклейка и
+        // чистка. Сборка мастерских эстафет кладёт этапы ног в обход доклейки, так что без этого шага
+        // каждый перезалив возвращал сбои касания. После коммита и в try/catch, как скан качества.
+        private async Task ClearImplausibleLegsAsync()
+        {
+            if (_legCleanup is null || touchedCompetitionKeys.Count == 0) return;
+            try
+            {
+                var ids = touchedCompetitionKeys.Select(k => competitionCache[k].Id).Distinct().ToList();
+                var report = await _legCleanup.RunAsync(apply: true, ids);
+                if (report.Rows.Count > 0)
+                    diagnosticLog.Add($"Этапы эстафет: невозможный этап у {report.Rows.Count} команд — " +
+                                      $"обнулено {report.LegsCleared} ног (Р82, аудит relay.splits-clear)");
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add($"Этапы эстафет: проверка не удалась ({ex.GetType().Name}: {ex.Message}). " +
+                                  "Импорт сохранён; выполните `dotnet run -- --clear-implausible-legs --apply`.");
             }
         }
 

@@ -21,11 +21,20 @@ public sealed class RelayLegCleanupService(SwimmDbContext db, ILogger<RelayLegCl
 
     private static readonly JsonSerializerOptions AuditJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-    public async Task<RelayLegCleanupReport> RunAsync(bool apply, CancellationToken ct = default)
+    public async Task<RelayLegCleanupReport> RunAsync(
+        bool apply, IReadOnlyCollection<int>? competitionIds = null, CancellationToken ct = default)
     {
         var floor = await RelayLegFloorSource.LoadAsync(db, ct);
 
+        // Область: эстафеты выбранных соревнований (импорт) или вся база (консоль).
+        var scope = competitionIds is null
+            ? null
+            : await db.Results.AsNoTracking()
+                .Where(r => r.RelayId != null && competitionIds.Contains(r.CompetitionId))
+                .Select(r => r.RelayId!.Value).Distinct().ToListAsync(ct);
+
         var legs = await db.RelayMembers.AsNoTracking()
+            .Where(m => scope == null || scope.Contains(m.RelayId))
             .Where(m => db.RelayMembers.Any(x => x.RelayId == m.RelayId && x.SplitTime != null))
             .Select(m => new { m.RelayId, m.Id, m.LegOrder, m.Swimmer.BirthYear, m.Swimmer.Gender, m.SplitTime })
             .ToListAsync(ct);
@@ -62,14 +71,15 @@ public sealed class RelayLegCleanupService(SwimmDbContext db, ILogger<RelayLegCl
         }
 
         if (apply && toClear.Count > 0)
-            await WriteAsync(rows, toClear, legs.ToDictionary(l => l.Id, l => (l.RelayId, l.LegOrder, l.SplitTime)), ct);
+            await WriteAsync(rows, toClear, legs.ToDictionary(l => l.Id, l => (l.RelayId, l.LegOrder, l.SplitTime)),
+                competitionIds is null ? "cli --clear-implausible-legs" : "import", ct);
 
         return new RelayLegCleanupReport(apply, owners.Count, rows, toClear.Count);
     }
 
     private async Task WriteAsync(
         List<RelayLegCleanupRow> rows, List<int> memberIds,
-        Dictionary<int, (int RelayId, int LegOrder, string? SplitTime)> legOf, CancellationToken ct)
+        Dictionary<int, (int RelayId, int LegOrder, string? SplitTime)> legOf, string actor, CancellationToken ct)
     {
         var strategy = db.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
@@ -82,7 +92,7 @@ public sealed class RelayLegCleanupService(SwimmDbContext db, ILogger<RelayLegCl
             {
                 db.AdminAudits.Add(new AdminAudit
                 {
-                    ActorName = "cli --clear-implausible-legs",
+                    ActorName = actor,
                     Action = AuditAction,
                     EntityType = "Relay",
                     EntityId = r.RelayId.ToString(),

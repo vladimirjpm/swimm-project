@@ -595,8 +595,19 @@ public class IsrOrgParser : IFormatParser
 
         // Иврит только ДОБАВЛЯЕТ пробел: одно ивритское слово не значит, что английских тоже одно
         // («יהונתן» ↔ «YONATHAN SHLOMO», «בן» ↔ «BEN BENJAMIN» — второе имя есть только в EN).
-        string JoinFor(string heField) =>
-            HebrewWordCount(heField) >= 2 ? $"{wrap.Before} {wrap.After}" : en.LastName;
+        // Но и два ивритских слова не значат, что перенос пришёлся МЕЖДУ словами: «קנטרביץ ארליך» ↔
+        // «KANTAREVI» / «CH» — перенос посреди слова, а второй фамилии в EN нет вовсе (Маккабиада-
+        // мастерс 15155, 10.10.2026: записалось «KANTAREVI CH»). Пробел — только если хвост сам
+        // похож на ивритское слово; не похож, а склейка ложится на слово — склеиваем.
+        string JoinFor(string heField)
+        {
+            if (HebrewWordCount(heField) < 2) return en.LastName;
+            var heWords = heField.Split([' ', '-', '־'], StringSplitOptions.RemoveEmptyEntries);
+            bool Fits(string latin) => heWords.Any(w => NameTransliteration.Similarity(w, latin) >= 0.6);
+            return !Fits(wrap.After) && Fits(wrap.Before + wrap.After)
+                ? wrap.Before + wrap.After
+                : $"{wrap.Before} {wrap.After}";
+        }
 
         var single = en.FirstName;
         var asLast = (Last: JoinFor(he.LastName), First: single);
