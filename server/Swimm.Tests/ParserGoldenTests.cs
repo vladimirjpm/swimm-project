@@ -26,6 +26,8 @@ public class ParserGoldenTests
     {
         ("ArenaCenterBoys2026_57_wrapped_names_EN.pdf", "EN"),
         ("ArenaCenterBoys2026_57_wrapped_names_HE.pdf", "HE"),
+        ("ArenaSouthSummer2026_1486_wrapped_name_and_club_EN.pdf", "EN"),
+        ("ArenaSouthSummer2026_1486_wrapped_name_and_club_HE.pdf", "HE"),
         ("Maccabiah-2026_IL_EN.pdf", "EN"),
         ("Maccabiah-2026_IL_HE.pdf", "HE"),
         ("MastersWinter2025_6595_relay_then_individual_HE.pdf", "HE"),

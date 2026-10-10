@@ -395,6 +395,19 @@ public static class IsrOrgCompetitionParser
     }
 
     /// <summary>
+    /// Ведущие слова ЗАГЛАВНОЙ латиницей из строки-обрывка, где за ними идёт кусок клуба
+    /// («EVEN CHEN Hapoel Jerusalem Swim» → «EVEN CHEN», «NEUBAUER club» → «NEUBAUER»). Пусто,
+    /// если заглавных слов нет или строка ими исчерпывается — второе уже чистый обрывок имени
+    /// (<see cref="IsNameFragment"/>) либо что-то другое, не наш случай.
+    /// </summary>
+    internal static string LeadingUpperLatinWords(string s)
+    {
+        var words = s.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var name = words.TakeWhile(w => Regex.IsMatch(w, @"^[A-Z][A-Z'\-]*$")).ToList();
+        return name.Count > 0 && name.Count < words.Length ? string.Join(' ', name) : string.Empty;
+    }
+
+    /// <summary>
     /// Склейка имени, перенесённого в ячейке на две строки (И-48). loglig переносит ПО ПРОБЕЛУ
     /// («KIDRON» / «MERIDOR», «HEN» / «ROSENTAL», «שלמה» / «איתן») и ПОСРЕДИ СЛОВА, когда слово
     /// длиннее ячейки («KOMMISARCHI» / «K», «GERSHKOV» / «ICH»). Посреди слова — первая часть
@@ -2289,6 +2302,22 @@ public static class IsrOrgCompetitionParser
                                 var nextFrag = i + 1 < lines.Count ? Prep(lines[i + 1].Trim()) : string.Empty;
                                 var hasPrev = IsNameFragment(prevFrag);
                                 var hasNext = IsNameFragment(nextFrag);
+
+                                // Переносятся сразу имя И клуб: строки над и под данными несут
+                                // куски обеих колонок («EVEN CHEN Hapoel Jerusalem Swim» / данные /
+                                // «NEUBAUER club», comp 1486, 10.10.2026). Имя в EN-экспорте набрано
+                                // заглавными, клуб — нет: берём ведущие заглавные слова. Только
+                                // когда такой кусок есть с ОБЕИХ сторон — одиночная строка
+                                // заглавными (шапка листа) в фамилию не попадёт.
+                                if (!isHE && !hasPrev && !hasNext)
+                                {
+                                    var prevName = LeadingUpperLatinWords(prevFrag);
+                                    var nextName = LeadingUpperLatinWords(nextFrag);
+                                    if (prevName.Length > 0 && nextName.Length > 0)
+                                    {
+                                        (prevFrag, nextFrag, hasPrev, hasNext) = (prevName, nextName, true, true);
+                                    }
+                                }
 
                                 var recovered = hasPrev && hasNext ? JoinWrappedName(prevFrag, nextFrag)
                                     : hasPrev ? prevFrag

@@ -98,4 +98,40 @@ public class IsrOrgWrappedNameTests
         // Ивритская граница неверна («ויזן אדם | דניאל»), EN-поля — как у loglig.
         Assert.Equal(("VIZEN", "ADAM DANIEL"), En("ויזן אדם", "דניאל"));
     }
+
+    /// <summary>
+    /// Переносятся сразу имя И клуб (10.10.2026, comp 1486, loglig 15157, 100 на спине мальчики
+    /// 10): над строкой данных «EVEN CHEN Hapoel Jerusalem Swim», под ней «NEUBAUER club». Обрывком
+    /// имени такие строки не считались — английская фамилия терялась, и в EN-поле уезжал иврит.
+    /// Строка неявки здесь та самая, у которой в июле имена соседей съехали (И-47).
+    /// </summary>
+    [Fact]
+    public void RealPair_NameAndClubWrapTogether_NameRecovered()
+    {
+        var dir = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Parsing");
+        using var he = File.OpenRead(Path.Combine(dir, "ArenaSouthSummer2026_1486_wrapped_name_and_club_HE.pdf"));
+        using var en = File.OpenRead(Path.Combine(dir, "ArenaSouthSummer2026_1486_wrapped_name_and_club_EN.pdf"));
+        var rows = new IsrOrgParser()
+            .Parse(new ParseRequest(he, "x-he.pdf", en, "x-en.pdf", Language: "he"))
+            .ToList();
+
+        (string, string) En(string heLast, string heFirst) =>
+            rows.Where(r => r.LastName == heLast && r.FirstName == heFirst).Select(r => (r.LastNameEn, r.FirstNameEn)).Distinct().Single();
+
+        Assert.Equal(("EVEN CHEN NEUBAUER", "EYTAN"), En("אבן חן נויבואר", "איתן"));   // NS, перенос фамилии
+        Assert.Equal(("BRUTMAN", "MICHEL LEIB"), En("ברוטמן", "מיכאל"));                // перенесено ИМЯ
+        // Соседи неявки — свои имена, без сдвига на строку.
+        Assert.Equal(("WEISS", "AMICHAI"), En("ווייס", "עמיחי"));
+        Assert.Equal(("ELKIN", "DANIEL"), En("אלקין", "דניאל"));
+        Assert.DoesNotContain(rows, r => r.LastNameEn.Any(c => c is >= '֐' and <= '׿'));
+    }
+
+    [Theory]
+    [InlineData("EVEN CHEN Hapoel Jerusalem Swim", "EVEN CHEN")]
+    [InlineData("NEUBAUER club", "NEUBAUER")]
+    [InlineData("NEUBAUER", "")]                         // чистый обрывок — это IsNameFragment
+    [InlineData("Hapoel Jerusalem Swim", "")]
+    [InlineData("ISRAEL SWIMMING ASSOCIATION", "")]     // одни заглавные — не наш случай
+    public void LeadingUpperLatinWords_SplitsNameFromClub(string line, string expected) =>
+        Assert.Equal(expected, IsrOrgCompetitionParser.LeadingUpperLatinWords(line));
 }

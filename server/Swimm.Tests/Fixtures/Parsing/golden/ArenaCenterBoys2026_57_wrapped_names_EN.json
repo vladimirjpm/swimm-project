@@ -33,7 +33,7 @@
         "Position": 2,
         "Heat": 1,
         "Lane": 3,
-        "LastName": "",
+        "LastName": "MATAN ILAN",
         "FirstName": "KAPTA",
         "BirthYear": 2016,
         "Club": "",
@@ -44,7 +44,10 @@
         "RelayTeamName": null,
         "RelaySwimmersName": null,
         "RelaySwimmers": null,
-        "NameWrap": null
+        "NameWrap": {
+          "Before": "MATAN",
+          "After": "ILAN"
+        }
       },
       {
         "Country": "",
