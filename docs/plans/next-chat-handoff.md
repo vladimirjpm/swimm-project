@@ -19,8 +19,8 @@
 - **Тесты** — полный прогон 10.10 поздно вечером: **3016, из них 3014 зелёных**, 2 известных падения:
   `TrainingResultsPrivacyTests.TrainingResults_ReadOnlyInTheAllowedPlaces` (сканер ловит файлы вне
   дерева — не регрессия) и нестабильный `ClubMergeServiceTests.DryRun…` (отдельно проходит).
-- **Реестр проверок** — `--check-data` #271: ошибок 0; открыты `swimmers.en-name-mismatch` — 2 (без
-  карточки, руками: #59011, #59019) и `swimmers.dedup-sure` — 1 (старый «Shams Aldeen» #62266 ← #59577).
+- **Реестр проверок** — `--check-data` #272 (10.10, ночь): **открытых находок 0** во всём реестре
+  (хвосты EN-имён и дубль «Shams Aldeen» закрыты решениями Влада — И-50, «Хвосты»).
 - **Рабочая копия общая**: незакоммиченные `CLAUDE.md`, `docs/ROADMAP.md`, `docs/data-integrity.md`
   (чужая правка про `OrphanQuery`), `docs/ui-components.md`, `docs/design-handoff-season-best.md`,
   файлы тренировок и темы `deep/*`, `use-group-trainings-mark.ts`, `SwimmerDedupService.cs` с тестом,
@@ -59,9 +59,8 @@
    - хостинг Azure — открыты В4–В10 (`azure-deploy-plan.md` §10);
    - хвосты 8.15 (`entity-hero-roles-handoff.md` §2); кэш К4б.7/К6 — только с прод-замером.
 3. **Хвосты данных (мелкие, по желанию Влада):**
-   - EN-имена: #61279 (в иврите не хватает имени, правка меняет склейку ключа), #5787 (граница
-     «פקטה | מתן אילן»), #59011 / #59019 (нет карточки loglig) — `en-names-handoff.md` §6;
-   - дубль «Shams Aldeen» #62266 ← #59577 на Health — ждёт решения с 08.10;
+   - ~~EN-имена #5787 / #59011 / #59019, дубль «Shams Aldeen»~~ — закрыты 10.10 ночью (бэкап
+     `…-before-en-tails-shams-merge.dump`); #61279 решено оставить (`en-names-handoff.md` §6);
    - Ширли: перезалив ОДНИМ ивритом старых #64 / #1679 (там она латиницей «SHOHAM BEN») заведёт её
      дубль — `FindByEnglishNameAsync` сравнивает порядок слов; перезалив парой HE+EN — безопасен.
 4. **Мелочь, только глазами:** выбор статуса пробелом в Firefox (меню Following) — встроенный браузер на
