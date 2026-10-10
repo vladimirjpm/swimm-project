@@ -147,4 +147,51 @@ public class ImportSwimmerResolverTests
         Assert.Equal("YEHONATAN", s1.FirstNameEn);
         Assert.Equal(("LASRI", "ORI"), (s2.LastNameEn, s2.FirstNameEn));
     }
+
+    // ── Сторож EN-имени (10.10.2026, comp 1486): чужое или ивритское в EN-поля не пишем ──
+
+    [Fact]
+    public async Task NewCard_HebrewInEnglishFields_LeftEmpty()
+    {
+        // EN-строка потеряла фамилию — пара HE+EN подставила ивритскую.
+        var (db, club, _) = await SeedClubsAsync();
+        var log = new List<string>();
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, log);
+
+        var (s, _) = await resolver.ResolveAsync(Row("ברוטמן", "מיכאל", 2016, "ברוטמן", "BRUTMAN"), club, 1);
+
+        Assert.Equal(("", ""), (s.LastNameEn, s.FirstNameEn));
+        Assert.Contains(log, l => l.Contains("иврит в латинском поле"));
+    }
+
+    [Fact]
+    public async Task FillEnglishName_NeighboursName_NotWritten()
+    {
+        // EN-строка съехала на соседа по блоку неявок: у «פוגל דודוביץ איתן» — «ELKIN DANIEL».
+        var (db, club, _) = await SeedClubsAsync();
+        var card = new Swimmer { LastName = "פוגל דודוביץ", FirstName = "איתן", BirthYear = 2016 };
+        db.Add(card);
+        await db.SaveChangesAsync();
+        var log = new List<string>();
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, log);
+
+        var row = Row("פוגל דודוביץ", "איתן", 2016, "ELKIN", "DANIEL");
+        var (s, key) = await resolver.ResolveAsync(row, club, 1);
+        resolver.FillEnglishName(s, row, key);
+
+        Assert.Same(card, s);
+        Assert.Equal(("", ""), (s.LastNameEn, s.FirstNameEn));
+        Assert.Contains(log, l => l.Contains("«ELKIN» не похоже"));
+    }
+
+    [Fact]
+    public async Task NewCard_ItsOwnEnglishName_Written()
+    {
+        var (db, club, _) = await SeedClubsAsync();
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, []);
+
+        var (s, _) = await resolver.ResolveAsync(Row("אבן חן נויבואר", "איתן", 2016, "EVEN CHEN NEUBAUER", "EYTAN"), club, 1);
+
+        Assert.Equal(("EVEN CHEN NEUBAUER", "EYTAN"), (s.LastNameEn, s.FirstNameEn));
+    }
 }

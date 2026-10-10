@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using Swimm.Application.Mapping;
 using Swimm.Parsing.Helpers;
 using Swimm.Parsing.Parsers;
 using Swimm.Parsing.Parsers.IsrOrg;

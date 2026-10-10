@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Swimm.Parsing.Models;
 using Swimm.Domain;
 using Swimm.Parsing.Helpers;
+using Swimm.Application.Mapping;
 
 namespace Swimm.Parsing.Parsers.IsrOrg;
 

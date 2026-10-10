@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace Swimm.Parsing.Helpers;
+namespace Swimm.Application.Mapping;
 
 /// <summary>
 /// Грубое сравнение ивритского и латинского написания одного имени — по скелету согласных

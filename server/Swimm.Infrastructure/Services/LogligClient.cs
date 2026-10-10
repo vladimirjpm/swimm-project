@@ -75,6 +75,42 @@ public partial class LogligClient : ILogligClient
         }
     }
 
+    /// <summary>
+    /// Английский заголовок карточки. Язык loglig выбирает по куке <c>_culture</c>, а без
+    /// <c>DetailsPageVisited</c> карточка уходит в бесконечный редирект (проверено 10.10.2026).
+    /// Клиент свой, «loglig-en», без контейнера кук: у общего «loglig» контейнер один на все
+    /// запросы, и английская кука переключила бы на английский всё остальное — разбор
+    /// карточек, протоколов, зачёта, которые ждут иврит.
+    /// </summary>
+    public async Task<string?> GetPlayerEnglishNameAsync(int logligId, CancellationToken ct = default)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient(EnglishClientName);
+            using var request = new HttpRequestMessage(HttpMethod.Get, BuildPublicProfileUrl(logligId));
+            request.Headers.Add("Cookie", "_culture=en-US; DetailsPageVisited=visited");
+            using var response = await client.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("loglig: английская карточка {LogligId} недоступна, статус {StatusCode}",
+                    logligId, (int)response.StatusCode);
+                return null;
+            }
+
+            var match = NameRx().Match(await response.Content.ReadAsStringAsync(ct));
+            var name = match.Success ? WebUtility.HtmlDecode(match.Groups[1].Value).Trim() : null;
+            return string.IsNullOrEmpty(name) ? null : name;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "loglig: ошибка запроса английской карточки {LogligId}", logligId);
+            return null;
+        }
+    }
+
+    /// <summary>Имя HttpClient для английских карточек (регистрация — DependencyInjection).</summary>
+    public const string EnglishClientName = "loglig-en";
+
     // ── Официальный клубный зачёт соревнования ─────────────────────────────────
 
     /// <summary>

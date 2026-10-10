@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -105,10 +106,9 @@ internal sealed class ImportSwimmerResolver
             {
                 LastName = item.LastName ?? string.Empty,
                 FirstName = item.FirstName ?? string.Empty,
-                LastNameEn = item.LastNameEn ?? string.Empty,
-                FirstNameEn = item.FirstNameEn ?? string.Empty,
                 BirthYear = item.BirthYear ?? 0
             };
+            SetEnglishName(swimmer, item);
             _db.Swimmers.Add(swimmer);
             await _db.SaveChangesAsync();
         }
@@ -125,8 +125,7 @@ internal sealed class ImportSwimmerResolver
                 {
                     swimmer.LastName = item.LastName ?? string.Empty;
                     swimmer.FirstName = item.FirstName ?? string.Empty;
-                    swimmer.LastNameEn = item.LastNameEn ?? string.Empty;
-                    swimmer.FirstNameEn = item.FirstNameEn ?? string.Empty;
+                    SetEnglishName(swimmer, item);
                 }
             }
             else if (_byFullName.TryGetValue(
@@ -160,10 +159,9 @@ internal sealed class ImportSwimmerResolver
                 {
                     LastName = item.LastName ?? string.Empty,
                     FirstName = item.FirstName ?? string.Empty,
-                    LastNameEn = item.LastNameEn ?? string.Empty,
-                    FirstNameEn = item.FirstNameEn ?? string.Empty,
                     BirthYear = item.BirthYear ?? 0
                 };
+                SetEnglishName(swimmer, item);
                 _db.Swimmers.Add(swimmer);
                 await _db.SaveChangesAsync();
                 AddBySpelling(_bySpelling, swimmer);
@@ -194,10 +192,9 @@ internal sealed class ImportSwimmerResolver
                 {
                     LastName = item.LastName ?? string.Empty,
                     FirstName = item.FirstName ?? string.Empty,
-                    LastNameEn = item.LastNameEn ?? string.Empty,
-                    FirstNameEn = item.FirstNameEn ?? string.Empty,
                     BirthYear = item.BirthYear ?? 0
                 };
+                SetEnglishName(swimmer, item);
                 _db.Swimmers.Add(swimmer);
                 await _db.SaveChangesAsync();
                 _namesakeByClub[namesakeKey] = swimmer;
@@ -215,12 +212,38 @@ internal sealed class ImportSwimmerResolver
     /// <summary>Дозаполнение пустых EN-имён у существующего пловца (двуязычный импорт).</summary>
     public void FillEnglishName(Swimmer swimmer, ResultJsonItem item, string? keyEn)
     {
-        if (keyEn != null && string.IsNullOrWhiteSpace(swimmer.LastNameEn))
-        {
-            swimmer.LastNameEn = item.LastNameEn ?? string.Empty;
-            swimmer.FirstNameEn = item.FirstNameEn ?? string.Empty;
+        if (keyEn != null && string.IsNullOrWhiteSpace(swimmer.LastNameEn) && SetEnglishName(swimmer, item))
             _byKeyEn.TryAdd(keyEn, swimmer);
+    }
+
+    /// <summary>
+    /// Пишет пловцу EN-имя строки — только если оно ЕГО (10.10.2026, docs/plans/en-names-handoff.md).
+    /// Двуязычный импорт кладёт в EN-поля всё, что дала пара HE+EN, а она ошибается двумя
+    /// способами: EN-фамилия потерялась, и вместо неё подставлен иврит («ברוטמן | BRUTMAN»), или
+    /// EN-строка съехала на соседа («פוגל דודוביץ איתן» ↔ «ELKIN DANIEL», comp 1486). Оба случая
+    /// узнаёт <see cref="EnglishNameFit"/>; тогда EN-поля остаются пустыми — витрина покажет
+    /// иврит, а пустое поле дозаполнит следующий протокол или <c>--fix-en-names</c>. Пустое
+    /// лучше чужого: чужое никто не перезапишет, импорт трогает только пустые.
+    /// Ноль сравнимых имён (EN-протокол, анонимная нога) — пишем как есть.
+    /// </summary>
+    /// <returns>true — имя записано.</returns>
+    private bool SetEnglishName(Swimmer swimmer, ResultJsonItem item)
+    {
+        var (lastEn, firstEn) = (item.LastNameEn ?? string.Empty, item.FirstNameEn ?? string.Empty);
+        var (verdict, word, _) = EnglishNameFit.Assess(swimmer.LastName, swimmer.FirstName, lastEn, firstEn);
+        if (verdict is EnglishNameVerdict.HebrewInLatin or EnglishNameVerdict.Foreign)
+        {
+            _diagnosticLog.Add(
+                $"EN-имя «{lastEn} | {firstEn}» не записано пловцу '{swimmer.LastName} {swimmer.FirstName}' "
+                + $"({swimmer.BirthYear}): {(verdict == EnglishNameVerdict.HebrewInLatin ? "иврит в латинском поле" : $"«{word}» не похоже ни на одно ивритское слово")}");
+            swimmer.LastNameEn = string.Empty;
+            swimmer.FirstNameEn = string.Empty;
+            return false;
         }
+
+        swimmer.LastNameEn = lastEn;
+        swimmer.FirstNameEn = firstEn;
+        return true;
     }
 
     /// <summary>Пол карточки, известной этому импорту (для пола эстафеты по составу, Э4).</summary>

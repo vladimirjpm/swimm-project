@@ -30,6 +30,7 @@ internal static class CliCommands
         (args => args.Contains("--seed-personas"), SeedCli.SeedPersonasAsync),
         (args => args.Contains("--audit-imports"), DiscoveryCli.AuditImportsAsync),
         (args => args.Contains("--check-data"), DataChecksCli.CheckDataAsync),
+        (args => args.Contains("--fix-en-names"), DataChecksCli.FixEnglishNamesAsync),
         (args => args.Contains("--merge-same-name-clubs"), MergeCli.MergeSameNameClubsAsync),
         (args => args.Contains("--delete-empty-clubs"), MergeCli.DeleteEmptyClubsAsync),
         (args => args.Contains("--attach-splits"), LogligCli.AttachSplitsAsync),

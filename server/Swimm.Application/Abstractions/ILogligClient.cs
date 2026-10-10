@@ -14,6 +14,14 @@ public interface ILogligClient
     Task<LogligPlayerCard?> GetPlayerCardAsync(
         int logligId, int? seasonId = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Английское имя игрока одной строкой («MICHEL LEIB BRUTMAN», бывает и фамилия первой)
+    /// — заголовок карточки на английском. null — карточка недоступна или не распозналась.
+    /// Источник английских имён пловцов (И-47, docs/plans/en-names-handoff.md).
+    /// </summary>
+    Task<string?> GetPlayerEnglishNameAsync(int logligId, CancellationToken ct = default) =>
+        Task.FromResult<string?>(null);
+
     /// <summary>Публичный URL карточки игрока (с актуальным seasonId — без него страница
     /// отдаёт 500, на старом сезоне — урезанную таблицу). Единый источник сборки URL.</summary>
     string BuildPublicProfileUrl(int logligId, int? seasonId = null, bool resultsTab = false);
