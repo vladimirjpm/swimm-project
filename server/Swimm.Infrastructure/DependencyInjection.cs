@@ -242,6 +242,7 @@ public static class DependencyInjection
         services.AddScoped<ISwimmerMergeService, SwimmerMergeService>();
         services.AddScoped<IRelayMemberBackfillService, RelayMemberBackfillService>();
         services.AddScoped<ISplitAttachService, SplitAttachService>();
+        services.AddScoped<IRelayLegCleanupService, RelayLegCleanupService>();
         services.AddScoped<ISwimmerDedupService, SwimmerDedupService>();
 
         // Склейка клубов-дублей (docs/tasks/club-merge-plan.md, фаза B)

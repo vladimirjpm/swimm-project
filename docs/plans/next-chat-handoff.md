@@ -89,6 +89,7 @@ Firefox (меню Following) не проверен; модал Share в `my-medi
 | проверка `swimmers.en-name-mismatch` | на `/Admin/Health` и в `--check-data`: иврит в латинице или чужое EN-имя |
 | `EnglishNameFit` / `EnglishNameRepairPlanner` (`Swimm.Application/Mapping`) | правило «EN подходит к ивритскому» и выбор починки — чистые функции, покрыты тестами |
 | `ILogligClient.GetPlayerEnglishNameAsync` | английский заголовок карточки, отдельный клиент `loglig-en` |
+| `RelayLegFloor` + `--clear-implausible-legs [--apply]` | этап эстафеты быстрее рекорда возраста — сбой касания, у команды этапов нет (Р82, И-51); доклейка судит тем же правилом; чистка 10.10 — 33 команды, 130 ног |
 
 ## 5. Грабли (уже в памяти, повторяю, чтобы не наступить)
 

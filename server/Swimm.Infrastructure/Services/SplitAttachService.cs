@@ -77,7 +77,10 @@ public class SplitAttachService : ISplitAttachService
             return SplitAttachResult.Failed($"промежуточные не прочитаны: {ex.Message}");
         }
 
-        var plan = SplitAttachMatcher.Build(relayRows, swimRows, source.Teams, source.Swims);
+        var floor = await RelayLegFloorSource.LoadAsync(_db, ct);
+        var plan = SplitAttachMatcher.Build(relayRows, swimRows, source.Teams, source.Swims, floor);
+        foreach (var team in plan.ImplausibleTeams)
+            _logger.LogWarning("Промежуточные loglig {LogligId}: невозможный этап, команда без этапов — {Team}", loglig, team);
 
         // Разбивка по дням — по картам «нога/строка → день»: сам матчер про дни не знает
         // и знать не должен.
@@ -109,6 +112,7 @@ public class SplitAttachService : ISplitAttachService
             {
                 r.Id, r.CompetitionId, RelayId = r.RelayId!.Value,
                 Style = r.Style.Name, r.Distance, r.Heat, r.Lane, r.TimeOriginal,
+                r.CompetitionDate.Year, r.Competition.PoolType,
             })
             .ToListAsync(ct);
         if (rows.Count == 0) return ([], []);
@@ -116,17 +120,17 @@ public class SplitAttachService : ISplitAttachService
         var relayIds = rows.Select(r => r.RelayId).Distinct().ToList();
         var legs = (await _db.RelayMembers.AsNoTracking()
                 .Where(m => relayIds.Contains(m.RelayId))
-                .Select(m => new { m.RelayId, m.Id, m.LegOrder, m.Swimmer.BirthYear, m.SplitTime })
+                .Select(m => new { m.RelayId, m.Id, m.LegOrder, m.Swimmer.BirthYear, m.SplitTime, m.Swimmer.Gender })
                 .ToListAsync(ct))
             .GroupBy(m => m.RelayId)
             .ToDictionary(g => g.Key, g => g
-                .Select(m => new RelayLegRow(m.Id, m.LegOrder, m.BirthYear, m.SplitTime))
+                .Select(m => new RelayLegRow(m.Id, m.LegOrder, m.BirthYear, m.SplitTime, m.Gender))
                 .ToList());
 
         var built = rows
             .Select(r => new RelayRow(
                 r.Id, r.RelayId, r.Style, r.Distance, r.Heat, r.Lane, r.TimeOriginal,
-                legs.GetValueOrDefault(r.RelayId, [])))
+                legs.GetValueOrDefault(r.RelayId, []), r.Year, r.PoolType))
             .ToList();
         var legDay = rows
             .SelectMany(r => legs.GetValueOrDefault(r.RelayId, []).Select(l => (l.MemberId, r.CompetitionId)))

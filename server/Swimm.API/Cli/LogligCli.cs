@@ -71,6 +71,42 @@ internal static class LogligCli
         return;
     }
 
+    // Чистка невозможных этапов эстафет, записанных до сторожа RelayLegFloor (решение Влада
+    // 10.10.2026, docs/relays.md «Невозможный этап»):
+    //   dotnet run -- --clear-implausible-legs [--apply] [--report <файл.tsv>]
+    // Без --apply — сухой прогон. С --apply — одна транзакция, аудит relay.splits-clear на команду.
+    // Доклейка (--attach-splits) судит этапы тем же правилом и сама их уже не пишет.
+    internal static async Task ClearImplausibleLegsAsync(WebApplication app, string[] args)
+    {
+        var apply = args.Contains("--apply");
+        var reportIndex = Array.IndexOf(args, "--report") + 1;
+        var reportPath = reportIndex > 0 && reportIndex < args.Length ? args[reportIndex] : null;
+
+        using var scope = app.Services.CreateScope();
+        var cleanup = scope.ServiceProvider.GetRequiredService<IRelayLegCleanupService>();
+        Console.WriteLine(apply
+            ? "Невозможные этапы эстафет — ЗАПИСЬ…"
+            : "Невозможные этапы эстафет — СУХОЙ ПРОГОН (база не меняется)…");
+        var report = await cleanup.RunAsync(apply);
+
+        foreach (var r in report.Rows)
+            Console.WriteLine($"  relay #{r.RelayId} comp {r.CompetitionId} {r.Distance} {r.Style} итог {r.Time}: "
+                              + $"{r.Reason} | этапы {string.Join(" / ", r.OldSplits.Select(s => s ?? "—"))}");
+        Console.WriteLine($"\nЭстафет с этапами {report.RelaysChecked}; невозможный этап у {report.Rows.Count}, "
+                          + $"ног {(report.Applied ? "обнулено" : "к обнулению")} {report.LegsCleared}");
+        if (!report.Applied && report.LegsCleared > 0)
+            Console.WriteLine("Повтори с --apply, чтобы записать. Сделай бэкап базы перед этим.");
+
+        if (reportPath != null)
+        {
+            await File.WriteAllLinesAsync(reportPath, report.Rows
+                .Select(r => string.Join('\t', r.RelayId, r.CompetitionId, r.Distance, r.Style, r.Time, r.Reason,
+                    string.Join(";", r.OldSplits.Select(s => s ?? ""))))
+                .Prepend("relay_id\tcompetition_id\tdistance\tstyle\ttime\treason\told_splits"));
+            Console.WriteLine($"Отчёт: {reportPath}");
+        }
+    }
+
     // Разведка пособытийного источника loglig (шаг 3 «склеенных сессий», data-integrity §10):
     //   dotnet run -- --pull-events <discoveredId> [--import]
     // Только читает и отчитывается: сколько событий, строк, по каким раундам, какие имена не

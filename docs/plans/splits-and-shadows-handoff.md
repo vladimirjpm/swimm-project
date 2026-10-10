@@ -36,6 +36,8 @@ dotnet run -c Release --no-build --no-launch-profile --project server/Swimm.API 
   --attach-splits <competitionId> [--loglig <id>] [--dry-run]
 ```
 
+- команда с этапом быстрее рекорда возраста (сбой касания) остаётся без этапов, записанные
+  раньше обнуляются — `RelayLegFloor`, Р82 (10.10.2026, `relays.md` «Невозможный этап»);
 - пишет РОВНО два поля: `RelayMembers.SplitTime`, `Results.TimeSplit`; строк не создаёт и не
   удаляет, мест/пола/категории не трогает, ключ upsert не участвует;
 - прогон идёт по ВСЕМ дням события, какой бы день ни передали; отчёт — с разбивкой по дням;

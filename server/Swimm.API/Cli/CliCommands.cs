@@ -34,6 +34,7 @@ internal static class CliCommands
         (args => args.Contains("--merge-same-name-clubs"), MergeCli.MergeSameNameClubsAsync),
         (args => args.Contains("--delete-empty-clubs"), MergeCli.DeleteEmptyClubsAsync),
         (args => args.Contains("--attach-splits"), LogligCli.AttachSplitsAsync),
+        (args => args.Contains("--clear-implausible-legs"), LogligCli.ClearImplausibleLegsAsync),
         (args => args.Contains("--split-days"), MultidayCli.SplitDaysAsync),
         (args => args.Contains("--join-days"), MultidayCli.JoinDaysAsync),
         (args => args.Contains("--collapsed-days"), MultidayCli.CollapsedDaysAsync),
