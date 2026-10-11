@@ -19,9 +19,11 @@ public partial class LogligClient : ILogligClient
 {
     private const string BaseUrl = "https://loglig.com:2053";
 
-    /// <summary>Без валидного seasonId карточка отдаёт 500; старый сезон — урезанную таблицу
-    /// результатов. Значение сезона меняется раз в год — переопределяется конфигом Loglig:SeasonId.</summary>
-    private const int DefaultSeasonId = 1715; // сезон 2025/26
+    /// <summary>Без валидного seasonId карточка отдаёт 500; старый сезон открывает вкладку
+    /// результатов прошлого сезона (таблица личных рекордов, по которой идёт сверка, от сезона не
+    /// зависит — проверено 11.10.2026). Значение меняется раз в год — переопределяется конфигом
+    /// Loglig:SeasonId; второе место с тем же умолчанием — Pages/Admin/Swimmers/Loglig.cshtml.cs.</summary>
+    private const int DefaultSeasonId = 1786; // сезон 2026/27 (2025/26 = 1715)
 
     /// <summary>Какую долю голосов должно набрать значение очков, чтобы попасть в шкалу.</summary>
     private const int ScaleVoteThresholdPercent = 60;

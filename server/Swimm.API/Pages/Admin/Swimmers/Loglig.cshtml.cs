@@ -13,6 +13,6 @@ public class LogligModel(IConfiguration configuration) : PageModel
 
     public void OnGet()
     {
-        SeasonId = configuration.GetValue("Loglig:SeasonId", 1715);
+        SeasonId = configuration.GetValue("Loglig:SeasonId", 1786); // 2026/27; то же умолчание — LogligClient
     }
 }
