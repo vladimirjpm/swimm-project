@@ -16,7 +16,9 @@ public class UserMediaRepositoryTests
 {
     private static DbContextOptions<SwimmDbContext> BuildOptions(string name) =>
         new DbContextOptionsBuilder<SwimmDbContext>()
-            .UseInMemoryDatabase(name)
+            // Префикс класса: InMemory-базы общие на процесс, а у UserFavoriteRepositoryTests есть
+            // одноимённые тесты (GetForUser_EmptySet_…, RemoveAsync_WrongUserId_…).
+            .UseInMemoryDatabase($"{nameof(UserMediaRepositoryTests)}.{name}")
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
