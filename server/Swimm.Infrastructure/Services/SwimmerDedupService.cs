@@ -160,12 +160,20 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
     /// Без этой строки чистка сирот удаляла бы ровно тех новичков, ради родителей которых
     /// фича и делается (docs/plans/start-list-plan.md §2, вариант C).
     ///
+    /// ⚠ Уровни, дорожки, перерывы и RSVP группы — опаснее остальных: у их FK на пловца
+    /// CASCADE, а не RESTRICT, так что удаление «сироты» не упадёт, а молча сотрёт данные
+    /// группы (И-36, 2026-10-02). Новая таблица со ссылкой на пловца — строкой сюда же.
+    ///
+    /// Пловец группы (Р71, <c>PrivateHubGroupId</c>) — не сирота никогда: им владеет группа,
+    /// и удалять его — дело группы, а не чистки (та же причина, что в FindCandidatesAsync).
+    ///
     /// ⚠ Держателей рекордов этот запрос НЕ видит: ссылки на карточку у рекорда нет, связь —
     /// по имени. Их отсекает <see cref="OrphansAsync"/> — пользоваться надо им, а не запросом
     /// напрямую.</summary>
     private IQueryable<Swimm.Domain.Entities.Swimmer> OrphanQuery() =>
         db.Swimmers.AsNoTracking()
             .Where(s => s.SwimmerOrgId == null || !s.SwimmerOrgId.StartsWith("SYNTH-"))
+            .Where(s => s.PrivateHubGroupId == null)
             .Where(s => !db.Results.Any(r => r.SwimmerId == s.Id)
                 && !db.RelayMembers.Any(m => m.SwimmerId == s.Id)
                 && !db.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
@@ -175,7 +183,11 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
                 && !db.HubGroupMedia.Any(m => m.SwimmerId == s.Id)
                 && !db.TrainingResults.Any(t => t.SwimmerId == s.Id)
                 && !db.CompetitionEntries.Any(e => e.SwimmerId == s.Id)
-                && !db.AppUsers.Any(u => u.SwimmerId == s.Id));
+                && !db.AppUsers.Any(u => u.SwimmerId == s.Id)
+                && !db.HubGroupSwimmerLevels.Any(l => l.SwimmerId == s.Id)
+                && !db.LanePlanSwimmers.Any(p => p.SwimmerId == s.Id)
+                && !db.HubGroupBreaks.Any(b => b.SwimmerId == s.Id)
+                && !db.HubGroupTrainingRsvps.Any(r => r.SwimmerId == s.Id));
 
     /// <summary>
     /// Сироты для отчёта и для удаления — ОДИН список: <see cref="OrphanQuery"/> минус

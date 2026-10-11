@@ -372,4 +372,86 @@ public class SwimmerDedupServiceTests
         var c = Assert.Single(report.Candidates);
         Assert.False(c.Sure); // BirthYear=0 в «уверенные» не попадает
     }
+
+    // И-36: у этих четырёх FK на пловца CASCADE — без проверки в OrphanQuery удаление «сироты»
+    // не падает, а молча стирает уровни, дорожки, перерывы и RSVP группы.
+    [Theory]
+    [InlineData("level")]
+    [InlineData("lane")]
+    [InlineData("break")]
+    [InlineData("rsvp")]
+    public async Task Orphans_SwimmerOnlyInGroupTables_NeitherListedNorDeleted(string table)
+    {
+        await using var db = CreateDb(nameof(Orphans_SwimmerOnlyInGroupTables_NeitherListedNorDeleted) + table);
+        var group = new HubGroup { Name = "Group", Slug = "group-" + table };
+        var swimmer = S("Только", "Группа", 2012);
+        var realOrphan = S("Настоящая", "Сирота", 2012);
+        db.AddRange(group, swimmer, realOrphan);
+        await db.SaveChangesAsync();
+        object row = table switch
+        {
+            "level" => new HubGroupSwimmerLevel { HubGroupId = group.Id, SwimmerId = swimmer.Id, LevelId = 1 },
+            "lane" => new LanePlanSwimmer { PlanId = 1, SwimmerId = swimmer.Id },
+            "break" => new HubGroupBreak { HubGroupId = group.Id, SwimmerId = swimmer.Id },
+            "rsvp" => new HubGroupTrainingRsvp { HubGroupId = group.Id, SwimmerId = swimmer.Id, SessionStart = "07:00" },
+            _ => throw new ArgumentOutOfRangeException(nameof(table)),
+        };
+        db.Add(row);
+        await db.SaveChangesAsync();
+
+        var service = new SwimmerDedupService(db);
+        var found = await service.FindCandidatesAsync();
+        var deleted = await service.DeleteOrphansAsync(null);
+
+        Assert.Equal(realOrphan.Id, Assert.Single(found.Orphans).Id);
+        Assert.Equal([realOrphan.Id], deleted.DeletedIds);
+        Assert.Equal(1, await db.Swimmers.CountAsync(s => s.Id == swimmer.Id));
+    }
+
+    [Fact]
+    public async Task Orphans_PrivateGroupSwimmer_NeitherListedNorDeleted()
+    {
+        // Пловцом группы (Р71) владеет группа — даже без единой ссылки он не сирота.
+        await using var db = CreateDb(nameof(Orphans_PrivateGroupSwimmer_NeitherListedNorDeleted));
+        var group = new HubGroup { Name = "Group", Slug = "group-private" };
+        db.Add(group);
+        await db.SaveChangesAsync();
+        var privateSwimmer = S("Пловец", "Группы", 2013);
+        privateSwimmer.PrivateHubGroupId = group.Id;
+        db.Add(privateSwimmer);
+        await db.SaveChangesAsync();
+
+        var service = new SwimmerDedupService(db);
+        var found = await service.FindCandidatesAsync();
+        var deleted = await service.DeleteOrphansAsync(null);
+
+        Assert.Empty(found.Orphans);
+        Assert.Equal(0, deleted.Deleted);
+    }
+
+    /// <summary>
+    /// Сторож критерия сироты: каждая таблица со ссылкой на пловца обязана быть проверена в
+    /// <c>OrphanQuery</c>. Дважды забывали (И-2 — RelayMembers, И-36 — четыре таблицы групп).
+    /// Упал тест — допиши проверку в OrphanQuery И тип сюда.
+    /// </summary>
+    [Fact]
+    public void OrphanQuery_CoversEveryTableReferencingSwimmer()
+    {
+        using var db = CreateDb(nameof(OrphanQuery_CoversEveryTableReferencingSwimmer));
+        Type[] covered =
+        [
+            typeof(ResultRecord), typeof(RelayMember), typeof(HubGroupMember), typeof(HubGroupUserMember),
+            typeof(UserFavorite), typeof(UserMedia), typeof(HubGroupMedia), typeof(TrainingResult),
+            typeof(CompetitionEntry), typeof(AppUser), typeof(HubGroupSwimmerLevel), typeof(LanePlanSwimmer),
+            typeof(HubGroupBreak), typeof(HubGroupTrainingRsvp),
+        ];
+
+        var referencing = db.Model.GetEntityTypes()
+            .Where(t => t.GetForeignKeys().Any(fk => fk.PrincipalEntityType.ClrType == typeof(Swimmer)))
+            .Select(t => t.ClrType)
+            .Where(t => t != typeof(Swimmer)) // Swimmer → HubGroup (PrivateHubGroupId) — не ссылка на пловца
+            .ToList();
+
+        Assert.Empty(referencing.Except(covered).Select(t => t.Name));
+    }
 }
