@@ -1,4 +1,6 @@
 import React from 'react';
+import UI_Markdown, { splitDocument } from '../markdown/markdown';
+import { contentLanguages, useContent } from '../../../content/content';
 
 /**
  * Модальная «объяснялка» с языковыми вкладками — общий компонент для всего проекта.
@@ -12,24 +14,18 @@ import React from 'react';
  * Вкладки ru/he нужны там, где текст объясняет данные родителям и тренерам, а не
  * разработчику. Выбор запоминается на весь сайт (localStorage) — человек, переключившийся
  * на иврит в одном попапе, не хочет делать это снова в следующем.
+ *
+ * Текст — ТОЛЬКО ключом контента (`src/content/<ключ>/{en,ru,he}.md`, решение Влада
+ * 11.10.2026): заголовок `# …`, тело, сноска ниже строки `---`. Объектов `{ en, ru, he }` в
+ * коде больше нет — длинный текст в tsx не вычитать и не разметить.
  */
 export type InfoLang = 'en' | 'ru' | 'he';
-
-/** Текст на трёх языках. Пустая строка = вкладка отключена (нечего показывать). */
-export interface InfoText {
-  en: string;
-  ru: string;
-  he: string;
-}
 
 interface InfoPopupProps {
   open: boolean;
   onClose: () => void;
-  /** Заголовок — тоже на трёх языках, чтобы шапка не спорила с телом. */
-  title: InfoText;
-  body: InfoText;
-  /** Необязательная сноска мелким шрифтом (источник, ссылка на правило). */
-  footnote?: InfoText;
+  /** Ключ контента, например `popups/swim-quality-protocol`. */
+  contentKey: string;
 }
 
 const LANGS: { key: InfoLang; label: string }[] = [
@@ -100,8 +96,39 @@ export const UI_LangTabs: React.FC<{
   </div>
 );
 
-const UI_InfoPopup: React.FC<InfoPopupProps> = ({ open, onClose, title, body, footnote }) => {
-  const [lang, pickLang] = useInfoLang();
+/** Тело попапа — отдельно, чтобы текст грузился только у ОТКРЫТОГО попапа (их на странице десятки). */
+const InfoPopupText: React.FC<{ contentKey: string }> = ({ contentKey }) => {
+  const [pickedLang, pickLang] = useInfoLang();
+  const content = useContent(contentKey, pickedLang);
+  const langs = contentLanguages(contentKey);
+  const doc = content.markdown != null ? splitDocument(content.markdown) : null;
+  // Иврит — RTL; выравнивание тоже, иначе текст читается «наизнанку».
+  const isRtl = content.lang === 'he';
+
+  return (
+    <>
+      <UI_LangTabs lang={content.lang} onPick={pickLang}
+        available={{ en: langs.en ? 'x' : '', ru: langs.ru ? 'x' : '', he: langs.he ? 'x' : '' }} />
+
+      <div dir={isRtl ? 'rtl' : 'ltr'} lang={content.lang} style={{ textAlign: isRtl ? 'right' : 'left' }}>
+        {doc == null ? (
+          <div className="h-24" aria-busy="true" />
+        ) : (
+          <>
+            {doc.title && <div className="mb-2 pr-6 text-[15px] font-bold">{doc.title}</div>}
+            <UI_Markdown source={doc.body} variant="popup" className="text-[13px]" />
+            {doc.footnote && (
+              <UI_Markdown source={doc.footnote} variant="popup"
+                className="mt-3 text-[11px] text-[var(--theme-mode-text-muted)]" />
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+};
+
+const UI_InfoPopup: React.FC<InfoPopupProps> = ({ open, onClose, contentKey }) => {
 
   React.useEffect(() => {
     if (!open) return;
@@ -113,9 +140,6 @@ const UI_InfoPopup: React.FC<InfoPopupProps> = ({ open, onClose, title, body, fo
   }, [open, onClose]);
 
   if (!open) return null;
-
-  // Иврит — RTL; выравнивание тоже, иначе текст читается «наизнанку».
-  const isRtl = lang === 'he';
 
   return (
     <div
@@ -131,7 +155,8 @@ const UI_InfoPopup: React.FC<InfoPopupProps> = ({ open, onClose, title, body, fo
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-[min(92vw,34rem)] max-h-[80vh] overflow-y-auto rounded-2xl border p-5
+        // font-normal: попап стоит в DOM внутри ячейки времени (font-bold) и наследовал бы жирный.
+        className="relative w-[min(92vw,34rem)] max-h-[80vh] overflow-y-auto rounded-2xl border p-5 font-normal
                    bg-[var(--theme-mode-surface)] text-[var(--theme-mode-text)]
                    border-[var(--theme-mode-modal-border)]"
         style={{ boxShadow: 'var(--theme-mode-modal-shadow)' }}
@@ -145,15 +170,7 @@ const UI_InfoPopup: React.FC<InfoPopupProps> = ({ open, onClose, title, body, fo
           ✕
         </button>
 
-        <UI_LangTabs lang={lang} onPick={pickLang} available={body} />
-
-        <div dir={isRtl ? 'rtl' : 'ltr'} style={{ textAlign: isRtl ? 'right' : 'left' }}>
-          <div className="mb-2 pr-6 text-[15px] font-bold">{title[lang]}</div>
-          <div className="whitespace-pre-line text-[13px] leading-relaxed">{body[lang]}</div>
-          {footnote?.[lang] && (
-            <div className="mt-3 text-[11px] text-[var(--theme-mode-text-muted)]">{footnote[lang]}</div>
-          )}
-        </div>
+        <InfoPopupText contentKey={contentKey} />
       </div>
     </div>
   );
