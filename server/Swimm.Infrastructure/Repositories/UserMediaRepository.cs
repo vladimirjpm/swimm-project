@@ -58,6 +58,7 @@ public class UserMediaRepository : IUserMediaRepository
                     : null,
                 // Денормализация для клиентских фильтров My media (сезон клиент выводит из даты).
                 CompetitionName = m.Competition != null ? m.Competition.Name : null,
+                ModerationState = m.ModerationState,
                 CompetitionDate = m.Competition != null ? m.Competition.Date : null,
                 ClubName = m.ResultRecord != null ? m.ResultRecord.Club.Name : null
             })
@@ -99,7 +100,8 @@ public class UserMediaRepository : IUserMediaRepository
 
     public async Task<UserMediaDto?> AddAsync(int userId, AddUserMediaRequest request)
     {
-        var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == request.SwimmerId);
+        // Пловец группы (Р71) — не адресат личного медиа: оно публикуется наружу.
+        var swimmerExists = await _db.Swimmers.AnyAsync(s => s.Id == request.SwimmerId && s.PrivateHubGroupId == null);
         if (!swimmerExists) return null;
 
         // Уровень выводим сами из привязок — клиенту не доверяем.

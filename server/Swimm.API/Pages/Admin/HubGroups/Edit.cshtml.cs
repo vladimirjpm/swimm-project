@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.API.Pages.Admin.Shared;
 
 namespace Swimm.API.Pages.Admin.HubGroups;
 
@@ -12,7 +13,14 @@ public class EditModel : PageModel
 {
     private readonly IHubGroupAdminService _service;
 
-    public EditModel(IHubGroupAdminService service) => _service = service;
+    public EditModel(IHubGroupAdminService service, IConfiguration config, IWebHostEnvironment env)
+    {
+        _service = service;
+        PublicSiteBaseUrl = PublicSite.BaseUrl(config, env);
+    }
+
+    /// <summary>База ссылки «группа на сайте ↗» — <see cref="PublicSite.BaseUrl"/>.</summary>
+    public string PublicSiteBaseUrl { get; }
 
     [BindProperty(SupportsGet = true)]
     public int? Id { get; set; }
@@ -57,6 +65,8 @@ public class EditModel : PageModel
         public bool IsPublic { get; set; } = true;
         /// <summary>Тестовая группа — видят только site-админ и utest-аккаунты (test-personas-plan.md).</summary>
         public bool IsTest { get; set; }
+        /// <summary>Флаг «Trusted» (Р56) — public-медиа группы видны всем в протоколе и на карточке.</summary>
+        public bool IsTrusted { get; set; }
         public string? LinkWhatsapp { get; set; }
         public string? LinkTelegram { get; set; }
         public string? LinkInstagram { get; set; }
@@ -167,6 +177,7 @@ public class EditModel : PageModel
             ClubId = d.ClubId,
             IsPublic = d.IsPublic,
             IsTest = d.IsTest,
+            IsTrusted = d.IsTrusted,
             LinkWhatsapp = Find("whatsapp"),
             LinkTelegram = Find("telegram"),
             LinkInstagram = Find("instagram"),
@@ -200,6 +211,7 @@ public class EditModel : PageModel
             ClubId = f.ClubId,
             IsPublic = f.IsPublic,
             IsTest = f.IsTest,
+            IsTrusted = f.IsTrusted,
             Links = links,
         };
     }

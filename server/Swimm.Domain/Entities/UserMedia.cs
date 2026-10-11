@@ -65,4 +65,15 @@ public class UserMedia
     /// <summary>Краткая причина, если ссылка битая (обрезано до 200 символов).</summary>
     [MaxLength(200)]
     public string? LinkError { get; set; }
+
+    /// <summary>
+    /// Модерация по жалобам «Report» (Р62, docs/data-integrity.md): null — обычное медиа;
+    /// <c>under_review</c> — открытых жалоб набралось до порога, медиа спрятано со ВСЕХ витрин до
+    /// решения админа сайта; <c>removed</c> — админ снял его (публикации отклонены, новые подать
+    /// нельзя). Владелец своё видит всегда. Флаг на строке медиа, а не подсчёт жалоб на лету:
+    /// кэш витрины группы следит за строками <c>Sys_UserMedia</c>, и смена флага его сбрасывает.
+    /// Значения — <c>MediaReportRules</c>.
+    /// </summary>
+    [MaxLength(20)]
+    public string? ModerationState { get; set; }
 }

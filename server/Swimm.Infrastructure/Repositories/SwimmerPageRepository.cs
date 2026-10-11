@@ -378,7 +378,8 @@ public class SwimmerPageRepository : ISwimmerPageRepository
 
         async Task<List<SwimmerSearchHitDto>> LoadAsync()
         {
-            var swimmers = _read.Swimmers.AsNoTracking();
+            // Пловцы группы (Р71) в публичном поиске не находятся.
+            var swimmers = _read.Swimmers.AsNoTracking().Where(s => s.PrivateHubGroupId == null);
             foreach (var word in words)
             {
                 var pattern = $"%{word}%";
@@ -690,7 +691,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             PositionAgeGroup = r.PositionAgeGroup,
             HeatType = r.HeatType,
             Round = r.Round,
-            InternationalPoints = r.InternationalPoints,
+            InternationalPoints = r.IsParaPoints ? 0 : r.InternationalPoints,  // пара-очки — не FINA (Р67)
             TimeOriginal = r.TimeOriginal,
             TimeSplit = r.TimeSplit,
             EventId = r.Competition.EventId,

@@ -49,6 +49,13 @@ public class HubGroup
     public string? CoverImageUrl { get; set; }
 
     /// <summary>
+    /// Фото шапки для ТЕЛЕФОНА (4:3). Необязательно: null — на телефоне полоса из
+    /// <see cref="CoverImageUrl"/>. Как у клуба (<see cref="Club.CoverImageMobileUrl"/>).
+    /// </summary>
+    [MaxLength(1000)]
+    public string? CoverImageMobileUrl { get; set; }
+
+    /// <summary>
     /// Настройки ОТОБРАЖЕНИЯ страницы (JSON) — разбирает <see cref="EntityDisplaySettings"/>,
     /// руками колонку не читать. Пусто = дефолты. Общие с клубом: группа и клуб — два вида
     /// одного (коллектив пловцов), и настройки страницы у них одинаковые.
@@ -101,6 +108,16 @@ public class HubGroup
     /// среди официальных групп (partial unique index по ClubId).
     /// </summary>
     public bool IsOfficial { get; set; }
+
+    /// <summary>
+    /// Доверенная группа (Р56, docs/data-integrity.md): её одобренные <c>public</c>-медиа видны
+    /// всем и вне страниц группы — в протоколе и на карточке пловца. Без флага такое медиа видно
+    /// всем только на страницах самой группы, а в протоколе и на карточке — лишь её участникам
+    /// (как <c>members</c>). Ставит только админ сайта в Admin/HubGroups, один раз на группу, не
+    /// на каждое медиа. Официальная группа клуба доверенная и без флага — правило
+    /// <c>HubGroupTrustRules</c> (Swimm.Application), руками «IsTrusted || IsOfficial» не писать.
+    /// </summary>
+    public bool IsTrusted { get; set; }
 
     /// <summary>
     /// Тестовая группа (docs/plans/test-personas-plan.md, решение 24.09.2026): её видят только

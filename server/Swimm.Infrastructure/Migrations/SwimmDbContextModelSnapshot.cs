@@ -321,6 +321,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("CountryId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("CoverImageMobileUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("CoverImageUrl")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -1199,6 +1203,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("CountryId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("CoverImageMobileUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("CoverImageUrl")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -1224,6 +1232,9 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsTest")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsTrusted")
                         .HasColumnType("boolean");
 
                     b.Property<string>("JoinPolicy")
@@ -1286,6 +1297,26 @@ namespace Swimm.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupAccountLevel", b =>
+                {
+                    b.Property<int>("HubGroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LevelId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("HubGroupId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("HubGroupId", "LevelId");
+
+                    b.ToTable("Sys_HubGroupAccountLevels", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupAdmin", b =>
                 {
                     b.Property<int>("Id")
@@ -1316,6 +1347,60 @@ namespace Swimm.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Sys_HubGroupAdmins", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupBreak", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EndedByRsvp")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("HubGroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("SetByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("Since")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("SwimmerId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("Until")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SetByUserId");
+
+                    b.HasIndex("SwimmerId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("HubGroupId", "SwimmerId")
+                        .IsUnique()
+                        .HasFilter("\"EndedAt\" IS NULL AND \"SwimmerId\" IS NOT NULL");
+
+                    b.HasIndex("HubGroupId", "UserId")
+                        .IsUnique()
+                        .HasFilter("\"EndedAt\" IS NULL AND \"UserId\" IS NOT NULL");
+
+                    b.ToTable("Sys_HubGroupBreaks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_HubGroupBreaks_Subject", "(\"UserId\" IS NULL) <> (\"SwimmerId\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupClubRequest", b =>
@@ -1553,9 +1638,9 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.ToTable("HubGroupMembers", null, t =>
                         {
-                            t.HasCheckConstraint("CK_HubGroupMembers_ExcludedOnlyClub", "NOT \"IsExcluded\" OR \"Source\" = 'club'");
+                            t.HasCheckConstraint("CK_HubGroupMembers_ExcludedOnlyClub", "NOT \"IsExcluded\" OR \"Source\" IN ('club', 'private')");
 
-                            t.HasCheckConstraint("CK_HubGroupMembers_Source", "\"Source\" IN ('manual', 'club')");
+                            t.HasCheckConstraint("CK_HubGroupMembers_Source", "\"Source\" IN ('manual', 'club', 'private')");
                         });
                 });
 
@@ -1577,6 +1662,60 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasIndex("HubGroupId", "LevelId");
 
                     b.ToTable("Sys_HubGroupSwimmerLevels", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupTrainingRsvp", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<int>("HubGroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateOnly>("SessionDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("SessionStart")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<int?>("SetByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SetByUserId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("HubGroupId", "SessionDate", "SessionStart", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("Sys_HubGroupTrainingRsvps", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_HubGroupTrainingRsvps_Answer", "\"Answer\" IN ('yes', 'maybe', 'no')");
+
+                            t.HasCheckConstraint("CK_HubGroupTrainingRsvps_Note", "\"Note\" IS NULL OR \"Note\" IN ('late', 'first-hour', 'leaving-early')");
+                        });
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupUserMember", b =>
@@ -1800,6 +1939,62 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_LanePlanSwimmers", null, t =>
                         {
                             t.HasCheckConstraint("CK_LanePlanSwimmers_LaneNo", "\"LaneNo\" IS NULL OR \"LaneNo\" >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.MediaReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DecidedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("ReporterUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("UserMediaId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReporterUserId");
+
+                    b.HasIndex("Status", "UserMediaId");
+
+                    b.HasIndex("UserMediaId", "ReporterUserId")
+                        .IsUnique();
+
+                    b.ToTable("Sys_MediaReports", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_MediaReports_OtherNeedsComment", "\"Reason\" <> 'other' OR (\"Comment\" IS NOT NULL AND length(btrim(\"Comment\")) > 0)");
+
+                            t.HasCheckConstraint("CK_MediaReports_Reason", "\"Reason\" IN ('wrong_swimmer', 'inappropriate', 'spam', 'privacy', 'other')");
+
+                            t.HasCheckConstraint("CK_MediaReports_Status", "\"Status\" IN ('open', 'kept', 'removed')");
                         });
                 });
 
@@ -2699,6 +2894,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<bool?>("IsBestResult")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsParaPoints")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Lane")
                         .HasColumnType("integer");
 
@@ -2977,6 +3175,9 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("character varying(10)")
                         .HasDefaultValue("isr");
 
+                    b.Property<int?>("PrivateHubGroupId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("SwimmerOrgId")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
@@ -2990,6 +3191,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasIndex("LogligId")
                         .IsUnique()
                         .HasFilter("\"LogligId\" IS NOT NULL");
+
+                    b.HasIndex("PrivateHubGroupId")
+                        .HasFilter("\"PrivateHubGroupId\" IS NOT NULL");
 
                     b.HasIndex("LastName", "FirstName");
 
@@ -3314,6 +3518,10 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("ModerationState")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<long?>("ResultId")
                         .HasColumnType("bigint");
 
@@ -3351,6 +3559,8 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_UserMedia", null, t =>
                         {
                             t.HasCheckConstraint("CK_UserMedia_Level", "\"Level\" IN ('swimmer', 'competition', 'result')");
+
+                            t.HasCheckConstraint("CK_UserMedia_ModerationState", "\"ModerationState\" IS NULL OR \"ModerationState\" IN ('under_review', 'removed')");
 
                             t.HasCheckConstraint("CK_UserMedia_Visibility", "\"Visibility\" IN ('private', 'public')");
                         });
@@ -3421,7 +3631,7 @@ namespace Swimm.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_UserMediaPublications_Target", "\"TargetType\" IN ('group', 'club')");
 
-                            t.HasCheckConstraint("CK_UserMediaPublications_TargetShape", "(\"TargetType\" = 'group' AND \"HubGroupId\" IS NOT NULL AND \"ClubId\" IS NULL)\r\n                  OR (\"TargetType\" = 'club' AND \"ClubId\" IS NOT NULL AND \"HubGroupId\" IS NULL)");
+                            t.HasCheckConstraint("CK_UserMediaPublications_TargetShape", "(\"TargetType\" = 'group' AND \"HubGroupId\" IS NOT NULL AND \"ClubId\" IS NULL)\n                  OR (\"TargetType\" = 'club' AND \"ClubId\" IS NOT NULL AND \"HubGroupId\" IS NULL)");
                         });
                 });
 
@@ -3776,6 +3986,34 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Owner");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupAccountLevel", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
+                        .WithMany()
+                        .HasForeignKey("HubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.HubGroupLevel", "Level")
+                        .WithMany()
+                        .HasForeignKey("HubGroupId", "LevelId")
+                        .HasPrincipalKey("HubGroupId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("HubGroup");
+
+                    b.Navigation("Level");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupAdmin", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.AppUser", "GrantedBy")
@@ -3799,6 +4037,38 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("GrantedBy");
 
                     b.Navigation("HubGroup");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupBreak", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
+                        .WithMany()
+                        .HasForeignKey("HubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "SetBy")
+                        .WithMany()
+                        .HasForeignKey("SetByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Swimm.Domain.Entities.Swimmer", "Swimmer")
+                        .WithMany()
+                        .HasForeignKey("SwimmerId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("HubGroup");
+
+                    b.Navigation("SetBy");
+
+                    b.Navigation("Swimmer");
 
                     b.Navigation("User");
                 });
@@ -3954,6 +4224,32 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Swimmer");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupTrainingRsvp", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
+                        .WithMany()
+                        .HasForeignKey("HubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "SetBy")
+                        .WithMany()
+                        .HasForeignKey("SetByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("HubGroup");
+
+                    b.Navigation("SetBy");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupUserMember", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.AppUser", "AddedBy")
@@ -4062,6 +4358,25 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Plan");
 
                     b.Navigation("Swimmer");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.MediaReport", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "Reporter")
+                        .WithMany()
+                        .HasForeignKey("ReporterUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.UserMedia", "Media")
+                        .WithMany()
+                        .HasForeignKey("UserMediaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Media");
+
+                    b.Navigation("Reporter");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.PointRuleClubsEntry", b =>
@@ -4184,9 +4499,16 @@ namespace Swimm.Infrastructure.Migrations
                         .HasForeignKey("CountryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "PrivateHubGroup")
+                        .WithMany()
+                        .HasForeignKey("PrivateHubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.Navigation("Club");
 
                     b.Navigation("Country");
+
+                    b.Navigation("PrivateHubGroup");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.TrainingResult", b =>

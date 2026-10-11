@@ -14,6 +14,7 @@ import type {
   HubGroupMediaInput,
   JoinedHubGroup,
   MyHubGroupRow,
+  PrivateSwimmerInput,
   SaveResult,
   SwimmerResultOption,
   SwimmerSearchResult,
@@ -238,6 +239,18 @@ export function useMyHubGroupEdit(id: number | null) {
     return result;
   }, [id, reload]);
 
+  /** Завести пловца группы (Р71) — человека без аккаунта и без loglig; виден только своим. */
+  const addPrivateSwimmer = useCallback(async (input: PrivateSwimmerInput): Promise<SaveResult> => {
+    if (id == null) return { success: false, error: 'No group' };
+    const r = await apiFetch(`/api/me/hub-groups/${id}/private-swimmers`, {
+      method: 'POST',
+      body: JSON.stringify({ ...input, gender: input.gender || null }),
+    });
+    const result = await saveResultFrom(r);
+    if (result.success) await reload();
+    return result;
+  }, [id, reload]);
+
   const updateMember = useCallback(async (memberId: number, role: string, sortOrder: number): Promise<SaveResult> => {
     if (id == null) return { success: false, error: 'No group' };
     const r = await apiFetch(`/api/me/hub-groups/${id}/members/${memberId}`, {
@@ -360,7 +373,7 @@ export function useMyHubGroupEdit(id: number | null) {
 
   return {
     data, admins, clubRequest, loading, forbidden,
-    update, searchSwimmers, getClubSwimmers, addMember, updateMember, removeMember,
+    update, searchSwimmers, getClubSwimmers, addMember, addPrivateSwimmer, updateMember, removeMember,
     previewClubSubscription, subscribeToClub, unsubscribeFromClub, setMemberExcluded,
     addAdmin, removeAdmin, submitClubRequest, addUserMember, approveUserMember, removeUserMember, setUserMemberLabel,
   };

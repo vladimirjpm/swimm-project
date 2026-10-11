@@ -10,7 +10,7 @@ namespace Swimm.Infrastructure.Services;
 /// <summary>
 /// Склейка пловцов-дублей. Перевешивает на канонического: Results, Sys_UserFavorites,
 /// HubGroupMembers, Sys_HubGroupUserMembers, Sys_UserMedia, Sys_HubGroupMedia,
-/// Sys_TrainingResults, Sys_HubGroupSwimmerLevels, Sys_LanePlanSwimmers, Sys_AppUsers.SwimmerId;
+/// Sys_TrainingResults, Sys_HubGroupSwimmerLevels, Sys_HubGroupBreaks, Sys_LanePlanSwimmers, Sys_AppUsers.SwimmerId;
 /// пустые поля канонического дозаполняет
 /// из дубля; дубль удаляет. Конфликты (общий заплыв, membership/favorite уже есть у
 /// канонического — последние решаются удалением строки дубля) — см. по месту.
@@ -186,6 +186,20 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
                 });
             }
             Note(res, "Sys_HubGroupSwimmerLevels", dupLevels.Count);
+
+            // «On break» пловца (Ш3.1) — тоже каскад по пловцу: переносим на канонического вместе с
+            // историей. Открытый перерыв у канонического в той же группе уже есть — открытый дубля
+            // закрываем: открытый у субъекта один (частичный UNIQUE).
+            var dupBreaks = await db.HubGroupBreaks.Where(b => b.SwimmerId == duplicate.Id).ToListAsync(ct);
+            var canonOpenGroups = await db.HubGroupBreaks
+                .Where(b => b.SwimmerId == canonical.Id && b.EndedAt == null)
+                .Select(b => b.HubGroupId).ToListAsync(ct);
+            foreach (var b in dupBreaks)
+            {
+                if (b.EndedAt == null && canonOpenGroups.Contains(b.HubGroupId)) b.EndedAt = DateTime.UtcNow;
+                b.SwimmerId = canonical.Id;
+            }
+            Note(res, "Sys_HubGroupBreaks", dupBreaks.Count);
 
             var dupPlaces = await db.LanePlanSwimmers.Where(p => p.SwimmerId == duplicate.Id).ToListAsync(ct);
             var canonPlans = await db.LanePlanSwimmers

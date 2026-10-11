@@ -213,6 +213,7 @@
                     { v: me.broken, label: 'Битые ссылки', sub: 'LinkOk = false', tone: 'danger', href: '/Admin/Media?filter=broken-links' },
                     { v: me.unchecked, label: 'Не проверялось', sub: 'LinkCheckedAt is null', tone: 'gray', href: '/Admin/Media?filter=unchecked' },
                     { v: me.moderationPending, label: 'На модерации', sub: 'pending visibility — очередь', tone: 'warn', href: '/Admin/Media?filter=moderation-pending' },
+                    { v: me.reportsOpen, label: 'Жалобы', sub: `ждут решения · спрятано ${fmtN(me.reportsHidden)}`, tone: 'danger', href: '/Admin/MediaReports' },
                 ],
             },
             {

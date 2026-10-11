@@ -1,5 +1,6 @@
 @page
 @model Swimm.API.Pages.Admin.HubGroups.IndexModel
+@using Swimm.API.Pages.Admin.Shared
 @{
     ViewData["Title"] = "HubGroups";
     ViewData["PageSubtitle"] = "Группы (SwimHub) — неформальные объединения пловцов";
@@ -113,8 +114,16 @@ else
                                 <span class="ml-1.5 admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning"
                                       title="Тестовая группа: видят только site-админ и utest-аккаунты, в каталоге её нет">TEST</span>
                             }
+                            @if (g.IsTrusted)
+                            {
+                                <span class="ml-1.5 admin-badge border-admin-success/30 bg-admin-success/15 text-admin-success"
+                                      title="Доверенная группа: её public-медиа видны всем в протоколе и на карточке пловца">TRUSTED</span>
+                            }
                         </td>
-                        <td class="font-mono text-xs text-admin-text-muted">@g.Slug</td>
+                        <td class="font-mono text-xs">
+                            <a href="@(Model.PublicSiteBaseUrl + PublicSite.GroupPath(g.Slug))" target="_blank" rel="noopener"
+                               class="text-admin-accent hover:underline" title="Открыть страницу группы на сайте">@g.Slug ↗</a>
+                        </td>
                         <td>@(g.ClubName ?? "—")</td>
                         <td class="text-right tabular-nums">@g.MemberCount</td>
                         <td>

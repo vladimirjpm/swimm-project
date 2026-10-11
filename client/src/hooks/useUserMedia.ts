@@ -38,6 +38,30 @@ export interface PublishTargetRef {
 /** Ключ строкой — для `value` у `<select>` и для сравнения целей. */
 export const targetKey = (t: { type: PublishTargetType; id: number }): string => `${t.type}:${t.id}`;
 
+/**
+ * «Группа только следит; публичное — только Trusted» (Р65, docs/data-integrity.md). У недоверенной
+ * группы уровня «Everyone 🌐» нет — только Members. Один текст на все места, где выбирают или
+ * одобряют уровень: подсказка у погашенного пункта, строка в inbox-е, карточка в табе Admin.
+ */
+export const EVERYONE_TRUSTED_ONLY =
+  '“Everyone 🌐” is only for Trusted groups — here photos and videos are shared with group members.';
+
+/** Статус доверенной группы — зелёная строка в табе Admin (Р56). */
+export const TRUSTED_NOTE =
+  '✓ Trusted — this group can share photos and videos with “Everyone 🌐”: they show in results and on swimmer pages.';
+
+/** Подсказка «как получить Trusted» — для таба Admin группы. */
+export const TRUSTED_HOW_TO =
+  'Ask the site admin to mark the group Trusted. Your club’s official group is trusted automatically.';
+
+/**
+ * Можно ли выбрать «Everyone 🌐» для этой цели (Р65): клуб — всегда (решает админ сайта), группа —
+ * только доверенная. Цель не выбрана или признак не пришёл — не гасим: окончательно решает сервер.
+ */
+export const canShareWithEveryone = (
+  target: { type: PublishTargetType; trusted?: boolean } | null | undefined,
+): boolean => target == null || target.type === 'club' || target.trusted !== false;
+
 /** Разбор ключа обратно; мусор → null. */
 export function parseTargetKey(raw: string): PublishTargetRef | null {
   const [type, id] = raw.split(':');
@@ -78,6 +102,69 @@ async function fetchAntiforgeryToken(): Promise<string | null> {
 
 function invalidateTokenCache() {
   cachedToken = null;
+}
+
+// ── Жалоба «Report» на чужое медиа (Р62) ─────────────────────────────────────
+
+/** Коды причин — зеркало MediaReportRules.Reasons на сервере; подписи — здесь (UI на английском). */
+export const MEDIA_REPORT_REASONS = [
+  { code: 'wrong_swimmer', label: 'Wrong swimmer' },
+  { code: 'inappropriate', label: 'Inappropriate content' },
+  { code: 'spam', label: 'Spam or advertising' },
+  { code: 'privacy', label: 'Shouldn’t be public (privacy)' },
+  { code: 'other', label: 'Other' },
+] as const;
+
+export type MediaReportReason = (typeof MEDIA_REPORT_REASONS)[number]['code'];
+
+/**
+ * Строка для тренера / модератора группы: состояние медиа и открытые жалобы — только причины и
+ * число, без имён (Р62: кто пожаловался, видит лишь админ сайта). null — сказать нечего.
+ * Пример: «Hidden — under review · 3 reports: Wrong swimmer ×2, Other ×1».
+ */
+export function mediaReportsSummary(
+  state: 'under_review' | 'removed' | null | undefined,
+  openReports: Record<string, number> | null | undefined,
+): string | null {
+  const parts: string[] = [];
+  if (state === 'under_review') parts.push('Hidden — under review');
+  if (state === 'removed') parts.push('Removed by the site admin');
+  const entries = Object.entries(openReports ?? {}).filter(([, n]) => n > 0);
+  if (entries.length > 0) {
+    const total = entries.reduce((sum, [, n]) => sum + n, 0);
+    const label = (code: string) => MEDIA_REPORT_REASONS.find((r) => r.code === code)?.label ?? code;
+    parts.push(`${total} report${total === 1 ? '' : 's'}: ${entries.map(([c, n]) => `${label(c)} ×${n}`).join(', ')}`);
+  }
+  return parts.length > 0 ? `⚑ ${parts.join(' · ')}` : null;
+}
+
+/** Предел текста «Other» — зеркало MediaReportRules.MaxCommentLength. */
+export const MEDIA_REPORT_MAX_COMMENT = 500;
+
+/**
+ * POST /api/media/{id}/report. Ответ не говорит, спрятано ли медиа: «спасибо» одинаковое.
+ * Ошибка — текст с сервера ({ error }) или общий.
+ */
+export async function reportMedia(
+  mediaId: number, reason: MediaReportReason, comment: string,
+): Promise<{ ok: true; alreadyReported: boolean } | { ok: false; error: string }> {
+  const token = await fetchAntiforgeryToken();
+  if (!token) return { ok: false, error: 'Sign in to report' };
+  try {
+    const r = await fetch(`/api/media/${mediaId}/report`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token },
+      body: JSON.stringify({ reason, comment: comment.trim() || null }),
+    });
+    if (r.status === 401 || r.status === 403) invalidateTokenCache();
+    if (r.status === 429) return { ok: false, error: 'Too many reports — try again in a minute' };
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: data?.error ?? 'Could not send the report' };
+    return { ok: true, alreadyReported: Boolean(data?.already_reported) };
+  } catch {
+    return { ok: false, error: 'Could not send the report' };
+  }
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────

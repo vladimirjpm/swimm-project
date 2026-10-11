@@ -54,7 +54,7 @@ function GroupCard({ group, href }: { group: HubGroupListItem; href: string }) {
       )}
       <div className="flex items-center justify-between">
         <span className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] px-2 py-[3px] text-[11px] font-extrabold text-[var(--t-accent)]">
-          {group.member_count} · swimmers
+          {group.member_count} · following
         </span>
         <span className="inline-flex min-w-0 items-center gap-1.5 truncate pl-3 text-[12px] font-bold text-[var(--t-text-2)]">
           {group.country && <UI_FlagEmoji countryCode={group.country} size="16x12" />}

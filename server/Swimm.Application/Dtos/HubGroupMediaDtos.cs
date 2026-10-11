@@ -21,6 +21,14 @@ public sealed class HubGroupMediaDto
 
     [JsonPropertyName("caption")]
     public string? Caption { get; set; }
+
+    /// <summary>
+    /// Id пользовательского медиа (Sys_UserMedia) — только у строк-публикаций участников
+    /// (<see cref="Id"/> &lt; 0): на него жалуются «Report» (Р62). У медиа тренера
+    /// (HubGroupMedia) null — оно не пользовательское, жаловаться не на что.
+    /// </summary>
+    [JsonPropertyName("media_id")]
+    public int? MediaId { get; set; }
 }
 
 /// <summary>

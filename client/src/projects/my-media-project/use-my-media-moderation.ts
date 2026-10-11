@@ -18,6 +18,10 @@ export interface ModerationRowDto {
   level: 'members' | 'public';
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
+  /** Жалобы «Report» (Р62): null | under_review | removed. */
+  moderation_state?: 'under_review' | 'removed' | null;
+  /** Открытые жалобы: причина → сколько, без имён. */
+  open_reports?: Record<string, number>;
 }
 
 // ── Antiforgery token cache ──────────────────────────────────────────────────

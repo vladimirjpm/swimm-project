@@ -64,6 +64,14 @@ public class SubmitPublicationRequest
 /// </summary>
 public class VisibleResultMediaDto
 {
+    /// <summary>Id медиа (Sys_UserMedia) — для жалобы «Report» из лайтбокса.</summary>
+    [JsonPropertyName("media_id")]
+    public int MediaId { get; set; }
+
+    /// <summary>Своё медиа зрителя: на своём кнопки «Report» нет. Ответ per-viewer, общего кэша нет.</summary>
+    [JsonPropertyName("is_mine")]
+    public bool IsMine { get; set; }
+
     /// <summary>null — медиа уровня «соревнование» (не привязано к заплыву).</summary>
     [JsonPropertyName("result_id")]
     public long? ResultId { get; set; }
@@ -94,6 +102,14 @@ public class PublishTargetDto
 
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Доверенный источник (Р56): «Everyone 🌐» отсюда видно всем и в протоколе, и на карточке
+    /// пловца. false — только на странице группы, а в протоколе и на карточке лишь участникам:
+    /// клиент показывает сообщение Р58. У клуба всегда true — его заявки решает админ сайта.
+    /// </summary>
+    [JsonPropertyName("trusted")]
+    public bool Trusted { get; set; }
 }
 
 /// <summary>Решение админа группы по заявке.</summary>
@@ -148,6 +164,23 @@ public class GroupPublicationInboxItemDto
     [JsonPropertyName("owner_user_id")]
     public int OwnerUserId { get; set; }
 
+    /// <summary>Id медиа (Sys_UserMedia) — ключ жалоб.</summary>
+    [JsonPropertyName("media_id")]
+    public int MediaId { get; set; }
+
+    /// <summary>
+    /// Модерация по жалобам (Р62): null | under_review (спрятано до решения админа сайта) | removed.
+    /// </summary>
+    [JsonPropertyName("moderation_state")]
+    public string? ModerationState { get; set; }
+
+    /// <summary>
+    /// Открытые жалобы: причина → сколько. Тренеру — только число и причины, БЕЗ имён
+    /// пожаловавшихся и без текста (Р62: имена и текст видит только админ сайта).
+    /// </summary>
+    [JsonPropertyName("open_reports")]
+    public Dictionary<string, int> OpenReports { get; set; } = [];
+
     [JsonPropertyName("owner_email")]
     public string? OwnerEmail { get; set; }
 
@@ -182,8 +215,16 @@ public class GroupPublicationInboxItemDto
 /// </summary>
 public class PublishedMediaItemDto
 {
+    /// <summary>Id ПУБЛИКАЦИИ (не медиа).</summary>
     [JsonPropertyName("id")]
     public int Id { get; set; }
+
+    /// <summary>
+    /// Id медиа (Sys_UserMedia) — для жалобы «Report» из лайтбокса. Признака «своё» здесь нет
+    /// сознательно: лента общая на всех (кэш), свою жалобу отклоняет сервер.
+    /// </summary>
+    [JsonPropertyName("media_id")]
+    public int MediaId { get; set; }
 
     [JsonPropertyName("media_type")]
     public string MediaType { get; set; } = string.Empty;

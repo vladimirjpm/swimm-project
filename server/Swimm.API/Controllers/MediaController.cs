@@ -23,17 +23,20 @@ public class MediaController : ControllerBase
     private readonly IMySwimsRepository _mySwims;
     private readonly IUserMediaPublicationService _publications;
     private readonly IHubGroupPermissionService _groupPermissions;
+    private readonly IMediaReportService _reports;
 
     public MediaController(
         IUserMediaRepository media,
         IMySwimsRepository mySwims,
         IUserMediaPublicationService publications,
-        IHubGroupPermissionService groupPermissions)
+        IHubGroupPermissionService groupPermissions,
+        IMediaReportService reports)
     {
         _media = media;
         _mySwims = mySwims;
         _publications = publications;
         _groupPermissions = groupPermissions;
+        _reports = reports;
     }
 
     private int? CurrentUserId()
@@ -209,7 +212,11 @@ public class MediaController : ControllerBase
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
 
+        // Жалобы на медиа уходят каскадом — след для админа сайта снимаем ДО удаления, а пишем
+        // только после успешного (Р62). Владельцу про жалобы не говорим (решение 29.09.2026).
+        var trail = await _reports.CaptureBeforeOwnerDeleteAsync(userId.Value, id);
         var ok = await _media.RemoveAsync(userId.Value, id);
+        if (ok && trail != null) await _reports.LogOwnerDeleteAsync(trail);
         return ok ? NoContent() : NotFound(new { error = "Media not found" });
     }
 }

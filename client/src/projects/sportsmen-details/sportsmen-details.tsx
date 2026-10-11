@@ -6,11 +6,11 @@ import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useAthleteCareer, AthleteCareer } from '../../hooks/useAthleteCareer';
 import {
   useUserMedia, useMyMediaPublications, UserMediaDto, parseTargetKey, targetKey,
-  type PublishTargetType,
+  canShareWithEveryone, EVERYONE_TRUSTED_ONLY, type PublishTargetType,
 } from '../../hooks/useUserMedia';
 
 /** Цель подачи из /publish-targets: группа или клуб пловца. */
-interface PublishTarget { type: PublishTargetType; id: number; name: string }
+interface PublishTarget { type: PublishTargetType; id: number; name: string; trusted?: boolean }
 import { useLogligStatus } from '../../hooks/useLogligStatus';
 import Helper from '../../utils/helpers/data-helper'
 import { HelperMedia } from '../../utils/helpers';
@@ -737,6 +737,9 @@ function MyMediaSection({
                 setPubGroupId(e.target.value);
                 // У клуба нет аккаунтов-участников, значит и уровня members.
                 if (parseTargetKey(e.target.value)?.type === 'club') setPubLevel('public');
+                // У недоверенной группы нет Everyone (Р65) — переключаем на участников.
+                else if (!canShareWithEveryone((publishTargets ?? []).find((t) => targetKey(t) === e.target.value)))
+                  setPubLevel('members');
               }}
               className="rounded-lg px-2 py-1.5 text-xs"
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
@@ -758,7 +761,9 @@ function MyMediaSection({
               style={{ background: 'var(--theme-mode-input-bg)', color: 'var(--theme-mode-text)', border: '1px solid var(--theme-mode-border)' }}
             >
               <option value="members" disabled={parseTargetKey(pubGroupId)?.type === 'club'}>group members</option>
-              <option value="public">public (visible to everyone)</option>
+              <option value="public" disabled={!canShareWithEveryone((publishTargets ?? []).find((t) => targetKey(t) === pubGroupId))}>
+                public (visible to everyone)
+              </option>
             </select>
             <button
               type="button"
@@ -770,6 +775,9 @@ function MyMediaSection({
               Submit
             </button>
           </div>
+          {!canShareWithEveryone((publishTargets ?? []).find((t) => targetKey(t) === pubGroupId)) && (
+            <div className="text-[10px]" style={{ color: 'var(--theme-mode-text-muted)' }}>{EVERYONE_TRUSTED_ONLY}</div>
+          )}
           {pubError && <div className="text-[10px]" style={{ color: '#e23b5a' }}>{pubError}</div>}
 
           {/* Заявки этого медиа */}
@@ -876,30 +884,38 @@ function TopResultsTabs({
     );
   }
 
-  const currentResults = activeTab === 'training' ? trainingResults : competitionRows;
-  const showCareerNote = competitionFromCareer && activeTab === 'competition';
+  // Тренировок нет — таба Training нет вовсе (Влад, 29.09.2026). Гостю и постороннему сервер
+  // тренировки не отдаёт (Р57), и пустой «Training (0)» читался как «тренировки есть, но скрыты».
+  // Один таб — полосы табов нет, сразу соревнования.
+  const hasTraining = trainingResults.length > 0;
+  const tabs = hasTraining ? (['training', 'competition'] as const) : (['competition'] as const);
+  const shownTab = hasTraining ? activeTab : 'competition';
+  const currentResults = shownTab === 'training' ? trainingResults : competitionRows;
+  const showCareerNote = competitionFromCareer && shownTab === 'competition';
 
   return (
     <div>
       {/* Табы — pill-группа */}
-      <div className="flex gap-1 w-fit rounded-[10px] p-[3px] mb-3" style={{ background: 'var(--theme-mode-surface-alt)' }}>
-        {(['training', 'competition'] as const).map((tab) => {
-          const active = activeTab === tab;
-          const count = tab === 'training' ? trainingResults.length : competitionRows.length;
-          return (
-            <button
-              key={tab}
-              className="text-xs font-bold px-3 py-[5px] rounded-lg capitalize transition-colors"
-              style={active
-                ? { background: 'var(--theme-primary)', color: '#fff' }
-                : { background: 'transparent', color: 'var(--theme-mode-text-secondary)' }}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab} ({count})
-            </button>
-          );
-        })}
-      </div>
+      {tabs.length > 1 && (
+        <div className="flex gap-1 w-fit rounded-[10px] p-[3px] mb-3" style={{ background: 'var(--theme-mode-surface-alt)' }}>
+          {tabs.map((tab) => {
+            const active = shownTab === tab;
+            const count = tab === 'training' ? trainingResults.length : competitionRows.length;
+            return (
+              <button
+                key={tab}
+                className="text-xs font-bold px-3 py-[5px] rounded-lg capitalize transition-colors"
+                style={active
+                  ? { background: 'var(--theme-primary)', color: '#fff' }
+                  : { background: 'transparent', color: 'var(--theme-mode-text-secondary)' }}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Подпись: строки не из этого источника, а карьерные (иначе непонятно, откуда они) */}
       {showCareerNote && (
@@ -919,7 +935,7 @@ function TopResultsTabs({
           showCompetition={showCareerNote}
         />
       ) : (
-        <div className="text-[var(--theme-mode-text-muted)] italic p-4">No {activeTab} results</div>
+        <div className="text-[var(--theme-mode-text-muted)] italic p-4">No {shownTab} results</div>
       )}
     </div>
   );
@@ -951,7 +967,9 @@ function ResultsTable({
   return (
     <ul className="flex flex-col gap-2.5">
       {results.map((res, index) => {
+        // Пара-очки (Р67) числом FINA не показываем — сервер отдаёт вместо них 0.
         const hasPoints =
+          !res.para_points &&
           res.international_points !== undefined &&
           res.international_points !== null &&
           !isNaN(Number(res.international_points));

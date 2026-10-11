@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ModerationRowDto } from '../use-my-media-moderation';
+import { mediaReportsSummary } from '../../../hooks/useUserMedia';
 import UI_SwimmerGallery from '../../components/mix/swimmer-gallery/swimmer-gallery';
 import { GalleryItem } from '../../../utils/interfaces/results';
 import { chipClass, segmentClass } from './status-styles';
@@ -94,6 +95,9 @@ function ModerationPanel({ rows, onDecide }: Props) {
                 <div className="min-w-0 flex-[1.3]">
                   <div dir="auto" className="truncate text-[13.5px] font-extrabold text-[var(--t-text)]">{r.swimmer_name}</div>
                   {r.result_label && <div className="text-[11.5px] text-[var(--t-text-2)]">{r.result_label}</div>}
+                  {mediaReportsSummary(r.moderation_state, r.open_reports) && (
+                    <div className="text-[11px] font-bold text-[var(--t-warn)]">{mediaReportsSummary(r.moderation_state, r.open_reports)}</div>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--t-text-2)]">{r.owner_email}</div>
                 <div dir="rtl" className="min-w-0 flex-[0.8] truncate text-left text-[12px] font-bold text-[var(--t-text-2)]">{r.target_name}</div>

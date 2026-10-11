@@ -25,6 +25,8 @@ public static class AdminNav
         new("Points rules", "calculator", "/Admin/PointsRules", "Data"),
         new("HubGroups", "users", "/Admin/HubGroups", "Data"),
         new("Club requests", "inbox", "/Admin/HubGroupClubRequests", "Data"),
+        // Жалобы «Report» на медиа (Р62): очередь решений админа сайта.
+        new("Media reports", "alert-triangle", "/Admin/MediaReports", "Data"),
         new("Import", "download", "/Admin/Import", "Data"),
         new("Swimmers", "users", "/Admin/Swimmers", "Data"),
         new("Loglig ID", "users", "/Admin/Swimmers/Loglig", "Data"),

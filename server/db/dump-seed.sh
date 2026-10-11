@@ -56,6 +56,27 @@ else
   docker exec -i "$CONTAINER" pg_dump -U "$PGUSER" -d "$PGDATABASE" "${ARGS[@]}" > "$OUT"
 fi
 
+# Пловцы групп (Р71, Swimmers.PrivateHubGroupId) в прод не едут: их группы не переносятся
+# (HubGroups — см. seed-tables.txt), а вне своей группы такого пловца не существует. Иначе
+# восстановление упало бы на внешнем ключе PrivateHubGroupId -> HubGroups. pg_dump строки не
+# фильтрует, поэтому вырезаем их из блока COPY "Swimmers" по имени колонки из заголовка.
+FILTERED="$OUT.tmp"
+awk -F'\t' '
+  /^COPY public\."Swimmers" \(/ {
+    inblk = 1; hdr = $0
+    sub(/^COPY public\."Swimmers" \(/, "", hdr); sub(/\) FROM stdin;$/, "", hdr)
+    n = split(hdr, cols, ", "); idx = 0
+    for (i = 1; i <= n; i++) { c = cols[i]; gsub(/"/, "", c); if (c == "PrivateHubGroupId") idx = i }
+    print; next
+  }
+  inblk && /^\\\.$/ { inblk = 0; print; next }
+  inblk && idx > 0 && $idx != "\\N" { dropped++; next }
+  { print }
+  END { printf "%d", dropped + 0 > "/dev/stderr" }
+' "$OUT" > "$FILTERED" 2> "$OUT.dropped"
+PRIVATE_DROPPED="$(cat "$OUT.dropped")"
+mv "$FILTERED" "$OUT"; rm -f "$OUT.dropped"
+
 # Сторож: в дампе не должно быть ни одной таблицы с персональными данными.
 # Дешевле поймать здесь, чем обнаружить в проде.
 LEAKED="$(grep -oE 'COPY public\."(Sys_(AppUsers|AppUserRoles|UserExternalLogins|UserLocalCredentials|UserSecurityTokens|UserLoginHistory|UserFavorites|UserMedia|UserMediaPublications|UserReactions|AdminAudit|HubGroup[A-Za-z]*|Training[A-Za-z]*))"' "$OUT" || true)"
@@ -70,5 +91,6 @@ ROWS="$(grep -c '^COPY public\.' "$OUT" || true)"
 echo "Готово: $OUT"
 echo "  размер:        $(du -h "$OUT" | cut -f1)"
 echo "  секций COPY:   $ROWS из ${#TABLES[@]} (пустые таблицы pg_dump тоже выводит)"
+echo "  пловцов групп вырезано (Р71): ${PRIVATE_DROPPED:-0}"
 echo ""
 echo "Дальше на проде: 01-roles.sql -> --migrate -> 02-grants.sql -> restore-seed.sh"

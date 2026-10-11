@@ -29,6 +29,11 @@ export interface HubGroupMember {
   role: 'member' | 'captain' | 'coach';
   /** Админ группы, чей аккаунт привязан к этому пловцу (сервер: HubGroupRosterOrder) — чип «admin». */
   is_admin?: boolean;
+  /**
+   * Пловец группы (Р71): завёл тренер, в федерации его нет, виден только своим. Приходит
+   * отдельным личным запросом `/private-members`, страницы пловца у него нет — без ссылки.
+   */
+  is_private?: boolean;
 }
 
 export interface HubGroupBest {
@@ -43,6 +48,8 @@ export interface HubGroupBest {
   swimmer_id: number;
   swimmer_name: string;
   swimmer_name_en: string;
+  /** День старта, где поставлен рекорд (Competitions.Id). */
+  competition_id?: number;
   competition_name: string;
   date: string; // dd/MM/yyyy
   points: number;
@@ -99,6 +106,26 @@ export interface HubGroupLastStart {
 }
 
 /**
+ * Строка списка стартов группы (таб Results, чип «Results»): турнир целиком — дни
+ * многодневки сложены сервером, эстафеты по членству. Свежие сверху.
+ */
+export interface HubGroupCompetition {
+  /** Последний день старта, в который плыл ростер. */
+  competition_id: number;
+  event_id?: number | null;
+  name: string;
+  date_from: string; // dd/MM/yyyy
+  date_to: string;
+  swimmers: number;
+  swims: number;
+  golds: number;
+  silvers: number;
+  bronzes: number;
+  /** Действующие рекорды группы, поставленные на этом старте. */
+  records: number;
+}
+
+/**
  * Карточка ленты хайлайтов шапки группы (design_handoff_group_header).
  * Дискриминированный union по type; состав и порядок задаёт сервер
  * (HubGroupHighlightsBuilder) — клиент рендерит массив как есть.
@@ -146,10 +173,23 @@ export interface GroupTrainingSchedule {
   place?: string | null;
   pool_type?: string | null;
   note?: string | null;
+  /** Сколько дорожек обычно (1..12) — вид по дорожкам без плана (Ш3). */
+  usual_lanes?: number | null;
+  /** auto — план, иначе раскладка на лету; plan — только план; off — вида нет. */
+  lane_view?: LaneViewMode | null;
+  /** members — имена «кто идёт» видят все участники; coach — только управляющие. */
+  who_is_coming?: WhoIsComing | null;
+  /** Режим «сверху» (Ш4): не ответившему участнику «Are you coming?» над фото. */
+  rsvp_top?: boolean | null;
 }
+
+export type LaneViewMode = 'auto' | 'plan' | 'off';
+export type WhoIsComing = 'members' | 'coach';
 
 /** Ближайшее занятие — СЧИТАЕТ СЕРВЕР в поясе Израиля, клиент только рисует. */
 export interface NextTraining {
+  /** Ключ занятия `yyyy-MM-dd-HHmm` — адрес ответов (`/api/hub-groups/{id}/rsvp/{id}`). */
+  id?: string;
   /** yyyy-MM-dd */
   date: string;
   start: string;
@@ -173,6 +213,12 @@ export interface GroupPublicationItem {
   url: string;
   owner_user_id: number;
   owner_email: string;
+  /** Id медиа (Sys_UserMedia). */
+  media_id?: number;
+  /** Жалобы «Report» (Р62): null | under_review (спрятано до решения админа сайта) | removed. */
+  moderation_state?: 'under_review' | 'removed' | null;
+  /** Открытые жалобы: причина → сколько. Без имён и текста — их видит только админ сайта. */
+  open_reports?: Record<string, number>;
   swimmer_id?: number | null;
   swimmer_name?: string | null;
   result_id?: number | null;
@@ -186,7 +232,10 @@ export interface GroupPublicationItem {
  * (public и members). Без владельца медиа — кто подал, знают только модераторы.
  */
 export interface PublishedMediaItem {
+  /** Id ПУБЛИКАЦИИ (не медиа). */
   id: number;
+  /** Id медиа (Sys_UserMedia) — для жалобы «Report» (Р62). */
+  media_id?: number;
   media_type: HubGroupMediaItem['media_type'];
   source_type: HubGroupMediaItem['source_type'];
   url: string;
@@ -222,16 +271,29 @@ export interface HubGroupDetails {
   cover_image_url?: string | null;
   /** Фото шапки, УЖЕ разрешённое сервером (указатель hero.mediaId → обложка). */
   hero_image_url?: string | null;
+  /** Фото шапки для телефона (4:3), УЖЕ разрешённое сервером; null — полоса из десктопного. */
+  hero_image_mobile_url?: string | null;
+  /** Сырой url мобильного фото (колонка) — его правит форма Admin. */
+  cover_image_mobile_url?: string | null;
+  /** Какое медиа помечено мобильным фото шапки; null — берётся колонка. */
+  hero_mobile_media_id?: number | null;
   /** Показывать блок фото (настройка hero.show). */
   show_hero_image?: boolean;
   /** Какое медиа помечено фото шапки; null — берётся обложка. */
   hero_media_id?: number | null;
+  /** Id Sys_UserMedia фото шапки, если оно из публикации участника, — для «Report» в лайтбоксе. */
+  hero_user_media_id?: number | null;
   location?: string | null;
   /** Alpha-3 код страны группы (ISR…), null — не задана. Флаг — через UI_FlagEmoji. */
   country?: string | null;
   club_name?: string | null;
   /** Официальная группа клуба (одобрена админом) — не путать с составом-watchlist. */
   is_official: boolean;
+  /**
+   * Доверенная группа (Р56: флаг «Trusted» или официальная): её public-медиа видны всем и в
+   * протоколе, и на карточке пловца. false — таб Admin показывает управляющим сообщение Р58.
+   */
+  is_trusted?: boolean;
   /** open | approval — политика самозаписи (кнопка «Вступить» vs «Подать заявку»). */
   join_policy?: 'open' | 'approval';
   /** Группа только для участников (§6-6). Участник видит её целиком, с пометкой. */
@@ -257,6 +319,10 @@ export interface HubGroupDetails {
   /** Последний старт целиком; null — ростер ещё не плыл. */
   last_start?: HubGroupLastStart | null;
   bests: HubGroupBest[];
+  /** Лучшее по той же оси, но за текущий сезон (`season_label`). Старый сервер не шлёт. */
+  season_bests?: HubGroupBest[];
+  /** Все старты ростера, свежие сверху. Старый сервер поля не шлёт — отсюда `?`. */
+  competitions?: HubGroupCompetition[];
   season_label: string;
   standings: HubGroupStanding[];
   /** Публичная галерея группы (HubGroupMedia с TrainingId == null). */
@@ -282,6 +348,8 @@ export interface HubGroupLevel {
   color?: string | null;
   /** Пловцов состава на этом уровне. */
   swimmerCount: number;
+  /** Аккаунтов-участников на этом уровне (Ш3.1). */
+  accountCount?: number;
 }
 
 export interface HubGroupLevelSwimmer {
@@ -295,9 +363,19 @@ export interface HubGroupLevelSwimmer {
   levelId: number | null;
 }
 
+/** Активный участник-аккаунт со своим уровнем — действует, когда у него нет пловца на дорожке. */
+export interface HubGroupLevelAccount {
+  userId: number;
+  name: string;
+  /** Метка тренера (за какого пловца аккаунт); null — не привязан. */
+  swimmerId: number | null;
+  levelId: number | null;
+}
+
 export interface HubGroupLevels {
   levels: HubGroupLevel[];
   swimmers: HubGroupLevelSwimmer[];
+  accounts?: HubGroupLevelAccount[];
 }
 
 // ── План дорожек (docs/plans/lane-plans-plan.md, L2–L3) ──────────────────────
@@ -329,6 +407,8 @@ export interface LanePlanSwimmer {
   level_id?: number | null;
   /** Ушёл из состава — в плане остался (план — снимок). */
   left_group?: boolean;
+  /** На перерыве в день плана (Ш3.1): в Unassigned новой раскладки не кладётся. */
+  on_break?: boolean;
 }
 
 export interface LanePlanLane {
@@ -363,4 +443,101 @@ export interface LanePlanInput {
   lanes: { lane_no: number; level_id: number | null; workout: string | null }[];
   /** Порядок в массиве = порядок внутри дорожки; кого нет — «Not today». */
   swimmers: { swimmer_id: number; lane_no: number | null }[];
+}
+
+// ── Ответы «иду / не приду» (docs/plans/entity-hero-roles-plan.md, Ш2) ──────────
+// GET/PUT /api/hub-groups/{id}/rsvp/{session} — личный ответ, только участникам и управляющим.
+
+export type RsvpAnswer = 'yes' | 'maybe' | 'no';
+export type RsvpNote = 'late' | 'first-hour' | 'leaving-early';
+
+export interface TrainingRsvpPerson {
+  user_id: number;
+  name: string;
+  gender?: 'male' | 'female' | null;
+  /** null — не ответил. */
+  answer: RsvpAnswer | null;
+  note?: RsvpNote | null;
+  set_by_coach: boolean;
+  /** На перерыве в день занятия (Ш3.1). */
+  on_break?: boolean;
+  /** Сам вернулся с перерыва недавно — сколько дней был на нём. */
+  back_after_days?: number | null;
+}
+
+/** Человек в бассейне вида по дорожкам (Ш3.2). Поля null — имя скрыто («Who's coming: coach»). */
+export interface TrainingLanePerson {
+  user_id: number | null;
+  swimmer_id: number | null;
+  name: string | null;
+  gender: 'male' | 'female' | null;
+  /** «не уверен» тоже занимает место — рисуется пунктиром. */
+  answer: 'yes' | 'maybe';
+  note?: RsvpNote | null;
+  is_me: boolean;
+  /** Сколько аккаунтов называют себя этим пловцом; 2+ — «2 claim». */
+  claims: number;
+}
+
+export interface TrainingLane {
+  lane_no: number;
+  level: LanePlanLevel | null;
+  workout?: string | null;
+  people: TrainingLanePerson[];
+}
+
+export interface TrainingLaneView {
+  /** plan — план тренера; auto — раскладка на лету; water — дорожек не знаем, одна «вода». */
+  source: 'plan' | 'auto' | 'water';
+  lane_count: number;
+  lanes: TrainingLane[];
+  no_lane: TrainingLanePerson[];
+  names_hidden: boolean;
+}
+
+export interface TrainingRsvp {
+  session_id: string;
+  /** yyyy-MM-dd */
+  date: string;
+  start: string;
+  end?: string | null;
+  yes: number;
+  maybe: number;
+  no: number;
+  /** Активные участники-аккаунты — знаменатель полосы. */
+  total: number;
+  mine: { answer: RsvpAnswer; note?: RsvpNote | null; set_by_coach: boolean } | null;
+  is_member: boolean;
+  can_manage: boolean;
+  can_answer: boolean;
+  /** Только управляющему. */
+  people: TrainingRsvpPerson[] | null;
+  /** Зритель на перерыве в день занятия: «Going» его снимет. */
+  on_break?: boolean;
+  /** yyyy-MM-dd — последний день перерыва зрителя; null — бессрочно. */
+  break_until?: string | null;
+  /** Вид по дорожкам (Ш3.2); null — выключен у группы или «только план», а плана нет. */
+  lane_view?: TrainingLaneView | null;
+}
+
+// ── «On break» (Ш3.1) — GET/PUT /api/hub-groups/{id}/breaks, личное ──────────────
+
+export interface HubGroupBreak {
+  user_id: number | null;
+  swimmer_id: number | null;
+  name: string;
+  /** yyyy-MM-dd */
+  since: string;
+  /** yyyy-MM-dd — последний день; null — бессрочно. */
+  until: string | null;
+  set_by_coach: boolean;
+  back_after_days?: number | null;
+}
+
+export interface HubGroupBreaks {
+  mine: HubGroupBreak | null;
+  /** Только управляющему. */
+  breaks: HubGroupBreak[] | null;
+  returns: HubGroupBreak[] | null;
+  can_manage: boolean;
 }

@@ -1,26 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import DeepEntityPage from '../components/deep/entity-page';
 import type {
   EntityPageStatus, EntityTabNav, EntityTabSpec,
 } from '../components/deep/entity-page-types';
-import { routes } from '../../utils/routes';
 import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from './use-my-hub-groups';
 import GroupHero from './components/group-hero';
+import { GroupIcon } from './components/group-bits';
+import { GroupResultsTab, GROUP_RESULTS_VIEWS, type GroupResultsView } from './components/group-competitions';
+import GroupTrainingsTab from './components/group-trainings-tab';
+import { formatNextDate, scheduleDaysLabel } from './components/group-training-slots';
+import { readViewParam, rewriteLegacyTab, writeViewParam } from '../components/deep/view-chips';
+import { useTrainingRsvp } from './use-training-rsvp';
+import { rsvpStickyChip } from './components/group-rsvp';
+import GroupRsvpBanner, { showRsvpBanner } from './components/group-rsvp-banner';
 import GroupMembersOnly from './components/group-members-only';
 import {
   GroupLastStartCard, GroupMembersCard, GroupMembersDigest, GroupRecentSwimsCard,
-  GroupRecordsCard, GroupRecordsDigest, GroupStandingsCard,
+  GroupRecordsDigest, GroupStandingsCard,
 } from './components/group-cards';
 import {
   FromMembersGallery, GroupGallery, MembersPublications, MembersReviews,
 } from './components/group-media';
-import PublicationsInbox from './components/group-admin';
+import PublicationsInbox, { GroupTrustCard } from './components/group-admin';
 import GroupJoinPolicyCard from './components/group-join-policy';
 import GroupScheduleEditor from './components/group-schedule-editor';
 import GroupLevelsCard from './components/group-levels';
-import GroupLanes from './components/group-lanes';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
-import type { HubGroupDetails } from './types';
+import type { HubGroupDetails, HubGroupMember, TrainingRsvp } from './types';
 
 /**
  * Страница группы `/groups/{slug}` — ТРЕТИЙ потребитель общего каркаса
@@ -28,26 +34,58 @@ import type { HubGroupDetails } from './types';
  *
  * Группа и клуб — не разные сущности, а два вида одного: коллектив пловцов (решение Влада
  * 09.09.2026). Поэтому устройство страницы то же самое, что у клуба, и словарь табов тот же
- * (`Season · Records · Swimmers · Media`); своё у группы — только шапка и два таба, которых
- * у клуба быть не может: тренировки и админский инбокс.
+ * (`Overview · Season · Results · Swimmers · Media`); своё у группы — только шапка и два
+ * таба, которых у клуба быть не может: тренировки и управление.
+ *
+ * Табы по ролям (хендофф group-club-changes §3): гостю и участнику — шесть в ряд (Trainings
+ * гостю под замком); управляющему — пять сверху, а Trainings и Admin — «Coach tools»
+ * (на телефоне панелью у низа экрана). Где у управляющего правка (Team — уровни, Media —
+ * галерея), таб фиолетовый с ✎.
  *
  * Список групп `/groups` живёт отдельно (`groups.tsx`) и остаётся в семье hp: это витрина,
  * а не страница сущности.
  */
 
-type GroupTab = 'overview' | 'season' | 'records' | 'swimmers' | 'media' | 'trainings' | 'lanes' | 'admin';
+type GroupTab = 'overview' | 'season' | 'results' | 'following' | 'media' | 'trainings' | 'admin';
 
 function GroupPage({ slug }: { slug: string }) {
-  const [group, setGroup] = useState<HubGroupDetails | null>(null);
+  const [loadedGroup, setGroup] = useState<HubGroupDetails | null>(null);
+  // Пловцы группы (Р71): только своим, личным запросом — общий ответ страницы их не несёт.
+  const [privateMembers, setPrivateMembers] = useState<HubGroupMember[]>([]);
+  const group = useMemo(
+    () => (loadedGroup && privateMembers.length > 0
+      ? { ...loadedGroup, members: [...loadedGroup.members, ...privateMembers] }
+      : loadedGroup),
+    [loadedGroup, privateMembers],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<'not-found' | 'failed' | null>(null);
 
   // Решение в инбоксе меняет оба published-списка — форсируем их рефетч ремаунтом по ключу.
   const [publicationsReloadKey, setPublicationsReloadKey] = useState(0);
 
+  // Вид таба Results живёт здесь, а не в табе: дайджест Overview уводит сразу на чип
+  // Records («All 20 records →»).
+  const [resultsView, setResultsView] = useState<GroupResultsView>(() => {
+    // Легаси-табы стали видами: `?tab=records` → Results·Records, `?tab=lanes` →
+    // Trainings·Lanes. Переписываем до того, как каркас прочтёт `?tab=`.
+    rewriteLegacyTab({
+      records: { tab: 'results', view: 'records' },
+      lanes: { tab: 'trainings', view: 'lanes' },
+      swimmers: { tab: 'following' }, // Р65, 29.09.2026
+    });
+    return readViewParam(GROUP_RESULTS_VIEWS, 'results');
+  });
+  const pickResultsView = (next: GroupResultsView) => {
+    setResultsView(next);
+    writeViewParam(next, 'results');
+  };
+
   const { isAuthenticated, isAdmin } = useCurrentIdentity();
   const { groups: myGroups } = useMyHubGroups(isAuthenticated);
-  const { joined } = useHubGroupMembership();
+  // ОДИН экземпляр членства на страницу: от него зависят и чип «✓ Member» в шапке, и замок
+  // табов, — после «Join» таб Trainings должен открыться без перезагрузки.
+  const { joined, join, leave } = useHubGroupMembership();
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +134,46 @@ function GroupPage({ slug }: { slug: string }) {
   // Приватная группа, зритель не участник (§6-6): сервер прислал заглушку без данных — табов нет.
   const membersOnly = group?.members_only === true;
 
+  // Ответы на ближайшее занятие (Ш2): запрос только своим — участнику и управляющему; сервер
+  // ответил бы остальным 403. Один экземпляр — его читают шапка, липкая полоса и Trainings.
+  const rsvp = useTrainingRsvp(
+    real ? group!.id : null,
+    group?.next_training?.id,
+    real && (manages || isMember) && !membersOnly,
+  );
+
+  // Пловцы группы (Р71) — тем же гейтом, что ответы на занятие: сервер ответил бы остальным 403.
+  const insiderSlug = real && (manages || isMember) && !membersOnly ? group!.slug : null;
+  useEffect(() => {
+    if (!insiderSlug) { setPrivateMembers([]); return undefined; }
+    let alive = true;
+    fetch(`/api/hub-groups/${encodeURIComponent(insiderSlug)}/private-members`, { credentials: 'include' })
+      .then((r) => (r.ok ? (r.json() as Promise<HubGroupMember[]>) : []))
+      .then((data) => { if (alive) setPrivateMembers(data); })
+      .catch(() => { if (alive) setPrivateMembers([]); });
+    return () => { alive = false; };
+  }, [insiderSlug]);
+
+  const membershipStatus = group == null
+    ? null
+    : (joined.find((j) => j.id === group.id)?.status ?? null) as 'active' | 'pending' | null;
+
+  // «· 3 new» на Admin — ждущие заявки на публикацию. Тот же эндпоинт, что у инбокса;
+  // перечитываем после решения в инбоксе (тот же ключ, что у соседних списков).
+  const groupId = group?.id ?? 0;
+  const [pendingPublications, setPendingPublications] = useState(0);
+  useEffect(() => {
+    if (!real || !manages) { setPendingPublications(0); return undefined; }
+    let cancelled = false;
+    fetch(`/api/hub-groups/${groupId}/media/publications`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: Array<{ status?: string }>) => {
+        if (!cancelled) setPendingPublications(rows.filter((x) => x.status === 'pending').length);
+      })
+      .catch(() => { if (!cancelled) setPendingPublications(0); });
+    return () => { cancelled = true; };
+  }, [real, manages, groupId, publicationsReloadKey]);
+
   const tabs: EntityTabSpec<GroupTab>[] = group == null || membersOnly ? [] : ([
     {
       // Дайджест — витрина соседних табов, а не шестой набор данных: те же `bests` и
@@ -104,9 +182,18 @@ function GroupPage({ slug }: { slug: string }) {
       id: 'overview' as const,
       icon: '▦',
       label: 'Overview',
+      shortLabel: 'Home',
       sub: 'last start · records',
       cards: (nav: EntityTabNav<GroupTab>) => [
-        { id: 'records-digest', render: () => <GroupRecordsDigest group={group} onMore={() => nav.go('records')} /> },
+        {
+          id: 'records-digest',
+          render: () => (
+            <GroupRecordsDigest
+              group={group}
+              onMore={() => { pickResultsView('records'); nav.go('results'); }}
+            />
+          ),
+        },
         {
           id: 'last-start',
           span: 'half' as const,
@@ -115,7 +202,7 @@ function GroupPage({ slug }: { slug: string }) {
         {
           id: 'members-digest',
           span: 'half' as const,
-          render: () => <GroupMembersDigest group={group} onMore={() => nav.go('swimmers')} />,
+          render: () => <GroupMembersDigest group={group} onMore={() => nav.go('following')} />,
         },
       ],
     },
@@ -130,24 +217,35 @@ function GroupPage({ slug }: { slug: string }) {
       ],
     },
     {
-      id: 'records' as const,
+      // Records и Season bests — чипы ВНУТРИ Results, как у пловца (хендофф §3).
+      id: 'results' as const,
       icon: '⏱',
-      label: 'Records',
-      sub: `${group.bests.length} best times`,
-      cards: () => [{ id: 'records', render: () => <GroupRecordsCard group={group} /> }],
+      label: 'Results',
+      sub: 'results · records · SB',
+      cards: () => [{
+        id: 'results',
+        render: () => <GroupResultsTab group={group} view={resultsView} onView={pickResultsView} />,
+      }],
     },
     {
-      id: 'swimmers' as const,
+      // «Группа только следит» (Р65): состав — те, за кем группа следит, а не «кто у нас плавает».
+      // Старый адрес ?tab=swimmers переписывается сюда (rewriteLegacyTab выше).
+      id: 'following' as const,
       icon: '🏊',
-      label: 'Swimmers',
-      sub: `${group.members.length} in the roster`,
-      cards: () => [{ id: 'members', render: () => <GroupMembersCard group={group} /> }],
+      label: 'Following',
+      shortLabel: 'Following',
+      sub: real && manages ? `${group.members.length} · levels` : `${group.members.length} swimmers`,
+      editable: real && manages,
+      // Управляющему — выпадашка уровня у каждого пловца (docs/plans/lane-plans-plan.md).
+      cards: () => [{ id: 'members', render: () => <GroupMembersCard group={group} editLevels={real && manages} /> }],
     },
     real && {
       id: 'media' as const,
       icon: '▶',
       label: 'Media',
       sub: 'gallery · from members',
+      // Галерея группы правится управляющим; заявки на публикацию — в Admin.
+      editable: manages,
       cards: () => [
         // ⚠ `gallery` из API — это СВОИ медиа группы ПЛЮС одобренные public-публикации
         // участников (сервер домешивает их с отрицательными id, HubGroupsController).
@@ -173,51 +271,25 @@ function GroupPage({ slug }: { slug: string }) {
       id: 'trainings' as const,
       icon: '◷',
       label: 'Trainings',
-      sub: '🔒 members only',
-      // Таблица тренировок живёт на ДРУГОМ экране (`/groups/{slug}/results?tab=trainings`),
-      // поэтому таб — переход туда, а не панель. Непайщику показываем замок, а не прячем
-      // таб (правило каркаса: locked ≠ «не класть»).
+      shortLabel: 'Train',
+      sub: manages || isMember ? 'sessions · lanes' : '🔒 members only',
+      // Управляющему — инструмент (Coach tools), участнику — обычный таб. Непайщику замок, а
+      // не пропажа таба (правило каркаса: locked ≠ «не класть»). Внутри — Sessions | Lanes:
+      // план дорожек был отдельным табом (docs/plans/lane-plans-plan.md).
+      pinned: manages,
       locked: !(manages || isMember),
       lockNotice: (
-        <div className="deep-card text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-          Training sessions are visible to group members only.
+        <div
+          className="rounded-[12px] border border-dashed p-3.5 text-[13px] font-bold"
+          style={{ borderColor: 'var(--deep-card-border)', color: 'var(--deep-text-mute)' }}
+        >
+          🔒 Trainings and lane plans are visible to group members only.
         </div>
       ),
       cards: () => [{
-        id: 'trainings-link',
-        render: () => (
-          <section className="deep-card mb-4">
-            <div className="deep-card-title">Trainings</div>
-            <div className="deep-card-sub mt-1">private — group members and admins</div>
-            <a
-              href={`${routes.groupResults(group.slug)}?tab=trainings`}
-              className="hp-mono mt-4 inline-block rounded-[10px] border px-4 py-2 text-[13px] font-extrabold no-underline"
-              style={{
-                borderColor: 'var(--deep-accent-border)',
-                background: 'var(--deep-accent-chip)',
-                color: 'var(--deep-accent)',
-              }}
-            >
-              🔒 Open training log →
-            </a>
-          </section>
-        ),
+        id: 'trainings',
+        render: () => <GroupTrainingsTab group={group} manages={manages} rsvp={rsvp} />,
       }],
-    },
-    // План дорожек на дату (docs/plans/lane-plans-plan.md): видят управляющие и активные
-    // участники — та же аудитория, что у тренировок; остальным замок, а не пропажа таба.
-    real && {
-      id: 'lanes' as const,
-      icon: '≡',
-      label: 'Lanes',
-      sub: '🔒 who swims where',
-      locked: !(manages || isMember),
-      lockNotice: (
-        <div className="deep-card text-[13px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
-          Lane plans are visible to group members only.
-        </div>
-      ),
-      cards: () => [{ id: 'lanes', render: () => <GroupLanes groupId={group.id} manages={manages} /> }],
     },
     // Управление — только управляющим, и не показывается вовсе остальным (план §3.8):
     // постороннему незачем знать, что у группы есть инбокс.
@@ -226,6 +298,8 @@ function GroupPage({ slug }: { slug: string }) {
       icon: '⚙',
       label: 'Admin',
       sub: 'display · schedule · levels · joining',
+      pinned: true,
+      badge: pendingPublications > 0 ? `${pendingPublications} new` : undefined,
       cards: () => [
         {
           id: 'display-settings',
@@ -236,6 +310,8 @@ function GroupPage({ slug }: { slug: string }) {
               coverImageUrl={group.cover_image_url}
               showHeroImage={group.show_hero_image !== false}
               heroMediaId={group.hero_media_id}
+              coverImageMobileUrl={group.cover_image_mobile_url}
+              heroMobileMediaId={group.hero_mobile_media_id}
               // Пикер «взять фото из медиа» стоит ЗДЕСЬ, а не кнопкой на карточках таба
               // Media: управление сущностью живёт в одном месте (план §3.8), а лента
               // `gallery` — единственный список, где свои медиа и одобренные публикации
@@ -268,6 +344,11 @@ function GroupPage({ slug }: { slug: string }) {
           ),
         },
         {
+          // Сообщение Р58: без «Trusted» public-медиа группы видны всем только здесь.
+          id: 'trust',
+          render: () => <GroupTrustCard group={group} />,
+        },
+        {
           id: 'publications-inbox',
           render: () => (
             <PublicationsInbox
@@ -285,7 +366,33 @@ function GroupPage({ slug }: { slug: string }) {
       topbarActive="groups"
       status={status}
       messages={{ notfound: 'Group not found', error: 'Could not load this group' }}
-      hero={group ? (membersOnly ? <GroupMembersOnly group={group} /> : <GroupHero group={group} />) : null}
+      hero={group ? (membersOnly ? <GroupMembersOnly group={group} /> : (nav: EntityTabNav<GroupTab>) => {
+        // Режим «сверху» (Ш4): не ответившему участнику — баннер над фото, NEXT в шапке прячется.
+        const banner = showRsvpBanner(group, rsvp);
+        return (
+          <>
+            {banner && <GroupRsvpBanner group={group} rsvp={rsvp} />}
+            <GroupHero
+              group={group}
+              insider={manages || isMember}
+              membership={{ isAuthenticated, status: membershipStatus, join, leave }}
+              rsvp={rsvp}
+              onWhosComing={() => nav.go('trainings')}
+              hideTraining={banner}
+            />
+          </>
+        );
+      }) : null}
+      sticky={group && !membersOnly ? {
+        avatar: <GroupIcon iconUrl={group.icon_url} name={group.name_en || group.name} size="xs" />,
+        name: group.name,
+        nameEn: group.name_en,
+        // Расписания нет — чипа нет вовсе (а не пустой контейнер справа).
+        status: scheduleDaysLabel(group.training_schedule)
+          ? <GroupStickyStatus group={group} insider={manages || isMember} rsvp={rsvp.rsvp} />
+          : null,
+      } : undefined}
+      toolsLabel="Coach tools"
       beforeTabs={group?.is_private && !membersOnly ? (
         // Участник видит приватную группу целиком — пусть знает, что остальным она закрыта.
         <p className="mb-4 text-[12px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
@@ -296,6 +403,48 @@ function GroupPage({ slug }: { slug: string }) {
       tabsAriaLabel="Group sections"
       tabs={tabs}
     />
+  );
+}
+
+/**
+ * Чип справа в липкой полосе (хендофф §5): своему — ответ на ближайшее занятие (или
+ * «going?», или счётчики тренеру); пока ответы не приехали — ближайшее занятие; постороннему —
+ * дни расписания.
+ */
+function GroupStickyStatus({
+  group, insider, rsvp,
+}: {
+  group: HubGroupDetails;
+  insider: boolean;
+  rsvp: TrainingRsvp | null;
+}) {
+  const days = scheduleDaysLabel(group.training_schedule);
+  const next = group.next_training;
+  if (!days) return null;
+  // Приехали ответы — чип говорит о них: свой ответ заливкой, «going?» не ответившему,
+  // тренеру — счётчики (хендофф §5).
+  if (insider && next && rsvp && rsvp.session_id === next.id) {
+    const chip = rsvpStickyChip(rsvp, formatNextDate(next.date).split(' ')[0]);
+    return (
+      <span
+        className="hp-mono flex h-7 items-center rounded-[8px] border px-2.5 text-[11px] font-extrabold min-[960px]:h-[30px] min-[960px]:rounded-[9px] min-[960px]:px-3 min-[960px]:text-[12px]"
+        style={chip.style}
+      >
+        {chip.label}
+      </span>
+    );
+  }
+  // «Tue 20:00» — день недели из той же даты, что в шапке, без числа и месяца.
+  const nextLabel = insider && next ? `Next · ${formatNextDate(next.date).split(' ')[0]} ${next.start}` : null;
+  return (
+    <span
+      className="hp-mono flex h-7 items-center rounded-[8px] border px-2.5 text-[11px] font-extrabold min-[960px]:h-[30px] min-[960px]:rounded-[9px] min-[960px]:px-3 min-[960px]:text-[12px]"
+      style={nextLabel
+        ? { borderColor: 'var(--deep-live-border)', background: 'var(--deep-card-bg)', color: 'var(--deep-live)' }
+        : { borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg)', color: 'var(--deep-text-mute)' }}
+    >
+      {nextLabel ?? days}
+    </span>
   );
 }
 

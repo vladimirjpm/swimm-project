@@ -41,6 +41,7 @@ public class PointRulesRecalcOnEditTests
         }
 
         public Task<int> RecalculateAllCombinedAsync(CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> RecalculateAllParaPointsAsync(CancellationToken ct = default) => Task.FromResult(0);
     }
 
     private static PointRuleClubs Rule(int id, string version, DateOnly? from = null, params int[] points) => new()

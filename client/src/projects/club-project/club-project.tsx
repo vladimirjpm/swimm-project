@@ -21,7 +21,9 @@ import DeepDigestCard from '../components/deep/digest-card';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
 import { useAuth } from '../../hooks/useAuth';
 import ClubAvatar from './components/club-avatar';
+import UI_ClubLogo from '../components/mix/club-logo/club-logo';
 import ClubCacheCard from './components/club-cache-card';
+import DeepViewChips, { readViewParam, rewriteLegacyTab, writeViewParam } from '../components/deep/view-chips';
 import type {
   EntityPageStatus, EntityTabNav, EntityTabSpec,
 } from '../components/deep/entity-page-types';
@@ -41,8 +43,16 @@ import type {
  * Тема — токены `--deep-*` из дизайн-хендоффа (deep-theme.css): класс .theme-deep или
  * .theme-deep-light навешивает каркас по глобальному режиму light/dark.
  */
-/** Табы страницы клуба (TABS.md 3a). Компонент плиток и корпус папки — в каркасе. */
-type ClubTab = 'overview' | 'season' | 'records' | 'swimmers' | 'media' | 'history' | 'admin';
+/**
+ * Табы страницы клуба (TABS.md 3a). Компонент плиток и корпус папки — в каркасе.
+ * Словарь общий с группой (хендофф group-club-changes §3): Records стал чипом внутри
+ * Results — как у пловца. `records` в адресе (`?tab=records`) — легаси-алиас Results.
+ */
+type ClubTab = 'overview' | 'season' | 'results' | 'swimmers' | 'media' | 'history' | 'admin';
+
+/** Вид таба Results (`?view=`): стена рекордов или лучшие за сезон. */
+type ClubResultsView = 'records' | 'season-best';
+const CLUB_RESULTS_VIEWS: readonly ClubResultsView[] = ['records', 'season-best'];
 
 function ClubProject() {
   const clubId = useMemo<number | null>(() => parseRoute().clubId, []);
@@ -58,6 +68,16 @@ function ClubProject() {
   });
 
   const { data, loading, error } = useClubOverview(clubId, scope);
+
+  const [resultsView, setResultsView] = useState<ClubResultsView>(() => {
+    // Легаси `?tab=records` → Results; до того, как каркас прочтёт `?tab=`.
+    rewriteLegacyTab({ records: { tab: 'results' } });
+    return readViewParam(CLUB_RESULTS_VIEWS, 'records');
+  });
+  const pickResultsView = (next: ClubResultsView) => {
+    setResultsView(next);
+    writeViewParam(next, 'records');
+  };
 
   // Плашку загрузки показываем ТОЛЬКО пока данных нет вовсе. При смене сезона/зачёта данные
   // остаются на экране и обновляются на месте: иначе плашка вставлялась над контентом и вся
@@ -84,6 +104,7 @@ function ClubProject() {
       id: 'overview',
       icon: '▦',
       label: 'Overview',
+      shortLabel: 'Home',
       sub: 'latest meets · top swimmers',
       cards: (nav: EntityTabNav<ClubTab>) => [
         {
@@ -182,7 +203,7 @@ function ClubProject() {
     },
     {
       id: 'season',
-      icon: '▦',
+      icon: '🗓',
       label: 'Season',
       sub: 'grid · standings',
       cards: () => [
@@ -223,37 +244,60 @@ function ClubProject() {
       ],
     },
     {
-      // Число рекордов знает сама карточка (свой эндпоинт с фильтром пула),
-      // страница его не грузит — цифру не выдумываем.
-      id: 'records',
+      // Records и Season bests — чипы внутри Results (хендофф §3), как у пловца и группы.
+      // Времена разные по природе: Records — официальный справочник рекордов (сезона у него
+      // нет), Season bests — наши протоколы за ТЕКУЩИЙ сезон по возрастным ступеням
+      // (глобальный фильтр сезона не слушают — см. club-records.tsx). Форма общая.
+      id: 'results',
       icon: '⏱',
-      label: 'Records',
-      sub: 'wall · best season',
+      label: 'Results',
+      sub: 'records · season bests',
       // Ростер и рекорды — отдельные пагинируемые эндпоинты (K4.2), им нужен уже-резолвленный
       // clubId (гарантирован здесь: табы собираются только при непустых data и clubId).
       cards: () => [
-        // Времена парой: Season best — наши протоколы за ТЕКУЩИЙ сезон по возрастным ступеням
-        // (глобальный фильтр сезона не слушает — см. club-records.tsx), Record wall —
-        // официальный справочник рекордов (сезона у него нет). Данные разные, форма общая.
-        { id: 'record-wall', span: 'half' as const, render: () => <ClubRecordWall clubId={clubId} /> },
-        { id: 'season-best', span: 'half' as const, render: () => <ClubRecords clubId={clubId} /> },
-        // Best season из макета — карточки ещё нет (нужен сезонный агрегат по клубу).
         {
-          id: 'best-season',
+          id: 'results-view',
           render: () => (
-            <ClubSoonCard
-              title="Best season"
-              sub="The club's strongest season by rank and medals"
-              text="Not built yet — needs a per-season aggregate on the API side."
+            <DeepViewChips<ClubResultsView>
+              ariaLabel="Results view"
+              active={resultsView}
+              onSelect={pickResultsView}
+              chips={[
+                {
+                  id: 'records', icon: '🏅', label: 'Records', badge: data.kpi.records,
+                  caption: 'official records held by club swimmers · in force',
+                },
+                {
+                  id: 'season-best', icon: '☀', label: 'Season bests',
+                  caption: 'best time per event this season, by age step',
+                },
+              ]}
             />
           ),
         },
+        ...(resultsView === 'season-best'
+          ? [{ id: 'season-best', render: () => <ClubRecords clubId={clubId} /> }]
+          : [
+            { id: 'record-wall', render: () => <ClubRecordWall clubId={clubId} /> },
+            // Best season из макета — карточки ещё нет (нужен сезонный агрегат по клубу).
+            {
+              id: 'best-season',
+              render: () => (
+                <ClubSoonCard
+                  title="Best season"
+                  sub="The club's strongest season by rank and medals"
+                  text="Not built yet — needs a per-season aggregate on the API side."
+                />
+              ),
+            },
+          ]),
       ],
     },
     {
       id: 'swimmers',
       icon: '🏊',
       label: 'Swimmers',
+      shortLabel: 'Team',
       sub: `${data.club.swimmer_count} · coaches`,
       cards: () => [
         // Люди клуба парой: слева выжимка «кто тащит», справа полный ростер.
@@ -282,17 +326,20 @@ function ClubProject() {
     },
     {
       id: 'history',
-      icon: '🗓',
+      icon: '⌛',
       label: 'History',
       sub: `${data.timeline.length} competitions`,
       cards: () => [{ id: 'timeline', render: () => <ClubTimeline timeline={data.timeline} /> }],
     },
-    // Управление — отдельным табом и только админу сайта; остальным его нет вовсе.
+    // Управление — отдельным табом и только админу сайта; остальным его нет вовсе. Страница
+    // клуба только для чтения (хендофф §4b), но настройки показа (фото шапки) и сброс кэша
+    // ставит админ сайта здесь (решение Влада 28.09.2026) — инструментом, как у тренера группы.
     isAdmin && {
       id: 'admin' as const,
       icon: '⚙',
       label: 'Admin',
       sub: 'page display, cache',
+      pinned: true,
       cards: () => [{
         id: 'display-settings',
         render: () => (
@@ -301,6 +348,7 @@ function ClubProject() {
             entityId={data.club.id}
             coverImageUrl={data.club.cover_image_url}
             showHeroImage={data.club.show_hero_image}
+            coverImageMobileUrl={data.club.cover_image_mobile_url}
             // Пикера «взять из медиа» у клуба нет: клубной медиа-ленты не существует
             // (план §3.10) — рисовать пустой выбор было бы враньём.
           />
@@ -317,7 +365,26 @@ function ClubProject() {
     <DeepEntityPage<ClubTab>
       status={status}
       messages={{ notfound: 'Club not found', error: 'Could not load this club' }}
-      hero={data ? <ClubHero club={data.club} kpi={data.kpi} /> : null}
+      hero={data ? (nav: EntityTabNav<ClubTab>) => (
+        <ClubHero
+          club={data.club}
+          kpi={data.kpi}
+          competitions={data.timeline.length}
+          scopeLabel={scopeLabel}
+          onCompetitions={() => nav.go('history')}
+        />
+      ) : null}
+      sticky={data ? {
+        avatar: (
+          <>
+            <span className="min-[960px]:hidden"><UI_ClubLogo clubName={data.club.name} size={28} /></span>
+            <span className="hidden min-[960px]:block"><UI_ClubLogo clubName={data.club.name} size={32} /></span>
+          </>
+        ),
+        name: data.club.name,
+        nameEn: data.club.name_en,
+      } : undefined}
+      toolsLabel="Club admin"
       beforeTabs={
         data ? (
           /* Полоса сезонов стоит МЕЖДУ шапкой и табами и действует на всю страницу

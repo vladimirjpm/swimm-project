@@ -67,6 +67,11 @@ export interface ResultWrap {
     time_fail: boolean;
     time_fail_note: string | null;
     international_points: number;
+    /**
+     * Очки источника — пара-шкала (Р67): `international_points` тогда 0, строка пишет «para»
+     * вместо числа (`HelperResults.pointsLabel`). С FINA такие очки не сравниваются.
+     */
+    para_points?: boolean;
     note?:string;
 
     /**
@@ -140,7 +145,15 @@ export interface GalleryItem {
 
   sourceType?: 'youtube' | 'vimeo' | 'other';
   url?: string;
-  code?: string;  
+  code?: string;
+  /**
+   * Id медиа пользователя (Sys_UserMedia) — есть только у пользовательских медиа, пришедших с
+   * сервера. Задан и не `isMine` — лайтбокс показывает «Report» (Р62). У медиа группы от тренера
+   * (HubGroupMedia) и статики его нет — жаловаться там не на что.
+   */
+  mediaId?: number;
+  /** Своё медиа зрителя — «Report» не показываем. Неизвестно (общие ленты) — решает сервер. */
+  isMine?: boolean;
 }
 
 // Канонический wire-контракт медиа группы/тренировки (HubGroupMediaDto, snake_case).
@@ -151,6 +164,8 @@ export interface HubGroupMediaItem {
   source_type: 'youtube' | 'vimeo' | 'album' | 'other';
   url: string;
   caption?: string | null;
+  /** Id Sys_UserMedia — только у публикаций участников (id < 0) в `group.gallery`; для «Report». */
+  media_id?: number | null;
 }
 
 /** Алиас для контекста тренировок (TrainingInfo.media) — форма та же. */

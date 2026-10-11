@@ -62,6 +62,7 @@ public class FavoritesController : ControllerBase
                 code = FavoritesRules.LimitErrorCode,
                 limit = result.Limit
             }),
+            AddFavoriteStatus.NotFound => NotFound(new { error = "Swimmer not found" }),
             _ => Conflict(new { error = "Already in favorites" }),
         };
     }

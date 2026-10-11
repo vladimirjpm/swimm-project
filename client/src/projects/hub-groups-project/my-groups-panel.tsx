@@ -6,7 +6,7 @@ import DeleteGroupDialog from './components/delete-group-dialog';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import type {
   ClubSubscriptionPreview, GroupCreationPolicy, HubGroupInput, HubGroupLinkInput, HubGroupMediaInput,
-  HubGroupMemberRow, MyHubGroupRow,
+  HubGroupMemberRow, MyHubGroupRow, PrivateSwimmerInput, SaveResult,
 } from './my-groups-types';
 import type { HubGroupMediaItem } from '../../utils/interfaces/results';
 import { routes } from '../../utils/routes';
@@ -282,10 +282,16 @@ function MemberLine({ m, edit, action, showRole = true }: {
   showRole?: boolean;
 }) {
   return (
-    <li className="flex items-center justify-between gap-2">
+    <li className="flex flex-wrap items-center justify-between gap-2">
       <span className="min-w-0 truncate text-[13px] text-[var(--t-text)]">
         <bdi>{m.swimmerName || m.swimmerNameEn}</bdi>
         {m.birthYear > 0 && <span className="ml-1.5 text-[11px] text-[var(--t-text-3)]">{m.birthYear}</span>}
+        {m.isPrivate && (
+          <span className="ml-1.5 rounded-[6px] bg-[var(--t-accent-soft)] px-1.5 py-[1px] text-[10px] font-extrabold uppercase text-[var(--t-accent-dim)]"
+            title="Added by the group — visible only inside this group">
+            group only
+          </span>
+        )}
       </span>
       <div className="flex shrink-0 items-center gap-2">
         {showRole && (
@@ -299,6 +305,90 @@ function MemberLine({ m, edit, action, showRole = true }: {
         {action}
       </div>
     </li>
+  );
+}
+
+/**
+ * «Удалить насовсем» у неактивного пловца группы (Р71): вне группы его нет и поиском не вернуть,
+ * поэтому это удаление вместе с временами тренировок. Подтверждение здесь же, вторым нажатием.
+ */
+function RemovePrivateSwimmerButton({ onConfirm }: { onConfirm: () => void }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return <button type="button" className={btnDangerCls} title="Delete for good, with training times" onClick={() => setAsking(true)}>✕</button>;
+  }
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap text-[11.5px] text-[var(--t-danger)]"
+      title="The swimmer exists only in this group: removing deletes them and their training times">
+      Delete for good?
+      <button type="button" className={btnDangerCls} onClick={() => { setAsking(false); onConfirm(); }}>Delete</button>
+      <button type="button" className={btnCls} onClick={() => setAsking(false)}>Keep</button>
+    </span>
+  );
+}
+
+/**
+ * «Добавить пловца не из loglig» (Р71): человек без аккаунта и без профиля в федерации, чтобы
+ * ставить его на дорожки и писать времена тренировок. Такой пловец виден только внутри
+ * группы — поэтому и имя проверяется лишь санитарно (длина), а не по списку слов.
+ */
+function AddPrivateSwimmerForm({ onAdd }: { onAdd: (input: PrivateSwimmerInput) => Promise<SaveResult> }) {
+  const empty: PrivateSwimmerInput = { firstName: '', lastName: '', gender: '', birthYear: null };
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState<PrivateSwimmerInput>(empty);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const result = await onAdd(input);
+    setBusy(false);
+    if (result.success) { setInput(empty); setOpen(false); } else setError(result.error ?? 'Could not add the swimmer');
+  };
+
+  if (!open) {
+    return (
+      <button type="button" className={`${btnCls} self-start`} onClick={() => setOpen(true)}>
+        + Add a swimmer who isn’t on loglig
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-2 rounded-[10px] border border-[var(--t-accent-border)] p-3">
+      <p className="m-0 text-[12px] text-[var(--t-text-2)]">
+        For someone who trains with the group but has no account and no loglig profile. Visible only
+        inside this group — no public page, not in search.
+      </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <input id="private-swimmer-first" className={inputCls} placeholder="First name" dir="auto" maxLength={50}
+          value={input.firstName} onChange={(e) => setInput({ ...input, firstName: e.target.value })} />
+        <input id="private-swimmer-last" className={inputCls} placeholder="Last name" dir="auto" maxLength={50}
+          value={input.lastName} onChange={(e) => setInput({ ...input, lastName: e.target.value })} />
+        <select id="private-swimmer-gender" className={inputCls} value={input.gender}
+          onChange={(e) => setInput({ ...input, gender: e.target.value as PrivateSwimmerInput['gender'] })}>
+          <option value="">Gender — not set</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+        <input id="private-swimmer-year" className={inputCls} placeholder="Birth year (optional)" inputMode="numeric"
+          value={input.birthYear ?? ''}
+          onChange={(e) => {
+            const digits = e.target.value.replace(/\D/g, '').slice(0, 4);
+            setInput({ ...input, birthYear: digits ? Number(digits) : null });
+          }} />
+      </div>
+      {error && <p className="m-0 text-[12px] font-bold text-[var(--t-danger)]" role="alert">{error}</p>}
+      <div className="flex gap-2">
+        <button type="submit" className={btnCls}
+          disabled={busy || !input.firstName.trim() || !input.lastName.trim()}>
+          {busy ? 'Adding…' : 'Add to the group'}
+        </button>
+        <button type="button" className={btnCls} onClick={() => { setOpen(false); setError(null); }}>Cancel</button>
+      </div>
+    </form>
   );
 }
 
@@ -322,6 +412,7 @@ function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
   const [showFromClub, setShowFromClub] = useState(false);
   const [clubFilter, setClubFilter] = useState('');
   const [showHidden, setShowHidden] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
 
   if (!edit.data) return null;
 
@@ -336,9 +427,11 @@ function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
   };
 
   const subscription = edit.data.clubSubscription ?? null;
-  const manual = edit.data.members.filter((m) => m.source !== 'club');
+  const manual = edit.data.members.filter((m) => m.source !== 'club' && !m.isExcluded);
   const fromClub = edit.data.members.filter((m) => m.source === 'club' && !m.isExcluded);
-  const hidden = edit.data.members.filter((m) => m.isExcluded);
+  const hidden = edit.data.members.filter((m) => m.source === 'club' && m.isExcluded);
+  // Неактивные пловцы группы (Р71): вне состава и дорожек, времена целы — отсюда Restore.
+  const inactive = edit.data.members.filter((m) => m.source === 'private' && m.isExcluded);
 
   const filter = clubFilter.trim().toLowerCase();
   const fromClubShown = filter.length === 0
@@ -357,7 +450,15 @@ function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {manual.map((m) => (
           <MemberLine key={m.id} m={m} edit={edit}
-            action={<button type="button" className={btnDangerCls} onClick={() => edit.removeMember(m.id)}>✕</button>} />
+            action={m.isPrivate
+              ? (
+                <button type="button" className={btnCls}
+                  title="Take off the roster and lanes — training times are kept, restore any time"
+                  onClick={() => edit.setMemberExcluded(m.id, true)}>
+                  Deactivate
+                </button>
+              )
+              : <button type="button" className={btnDangerCls} onClick={() => edit.removeMember(m.id)}>✕</button>} />
         ))}
         {edit.data.members.length === 0 && (
           <p className="text-[12.5px] text-[var(--t-text-2)]">The roster is empty.</p>
@@ -390,6 +491,30 @@ function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
                 )}
               </ul>
             </>
+          )}
+        </div>
+      )}
+
+      {inactive.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <button type="button" className={subHeaderCls} aria-expanded={showInactive}
+            onClick={() => setShowInactive((v) => !v)}>
+            {showInactive ? '▾' : '▸'} Inactive · {inactive.length}
+          </button>
+          {showInactive && (
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {inactive.map((m) => (
+                <MemberLine key={m.id} m={m} edit={edit} showRole={false}
+                  action={(
+                    <span className="flex items-center gap-2">
+                      <button type="button" className={btnCls} onClick={() => edit.setMemberExcluded(m.id, false)}>
+                        Restore
+                      </button>
+                      <RemovePrivateSwimmerButton onConfirm={() => edit.removeMember(m.id)} />
+                    </span>
+                  )} />
+              ))}
+            </ul>
           )}
         </div>
       )}
@@ -432,6 +557,8 @@ function MembersEditor({ hubGroupId, clubId, onRosterChanged }: {
           </ul>
         )}
       </div>
+
+      <AddPrivateSwimmerForm onAdd={edit.addPrivateSwimmer} />
 
       {/* Ручной подбор из справочника клуба — только пока нет подписки: с ней клуб и так весь в составе. */}
       {clubId && !subscription && (

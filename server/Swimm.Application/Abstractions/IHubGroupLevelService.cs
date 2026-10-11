@@ -28,4 +28,10 @@ public interface IHubGroupLevelService
     /// из этой же группы; null снимает.
     /// </summary>
     Task<HubGroupMemberSaveResult> SetSwimmerLevelAsync(int hubGroupId, int swimmerId, int? levelId);
+
+    /// <summary>
+    /// Поставить/снять уровень АККАУНТУ-участнику (Ш3.1) — тому, кто стоит на дорожке без
+    /// пловца. Аккаунт должен быть активным участником, уровень — из этой же группы; null снимает.
+    /// </summary>
+    Task<HubGroupMemberSaveResult> SetAccountLevelAsync(int hubGroupId, int userId, int? levelId);
 }

@@ -3,6 +3,7 @@ import './deep-theme.css';
 import AppTopbar from '../app-topbar/app-topbar';
 import UI_ModeToggle from '../mix/mode-toggle/mode-toggle';
 import DeepTabs from './tabs';
+import DeepStickyBar, { useEntitySticky } from './sticky-bar';
 import { useDeepThemeClass } from './use-deep-theme-class';
 import type {
   DeepEntityPageProps, EntityCardSpec, EntityTabNav, EntityTabSpec,
@@ -22,9 +23,10 @@ import type {
 
 function DeepEntityPage<T extends string>({
   topbarActive, status, messages, hero, beforeTabs, tabsAriaLabel, tabs, defaultTabId,
-  activeTabId, onTabChange, noticeClassName,
+  activeTabId, onTabChange, noticeClassName, toolsLabel, sticky,
 }: DeepEntityPageProps<T>) {
   const themeClass = useDeepThemeClass();
+  const stickyState = useEntitySticky(status === 'ready' && sticky != null);
   const fallbackId = defaultTabId ?? tabs[0]?.id;
   const folderRef = useRef<HTMLDivElement>(null);
 
@@ -61,16 +63,38 @@ function DeepEntityPage<T extends string>({
     go: (next) => {
       handleTab(next);
       const top = folderRef.current?.getBoundingClientRect().top;
-      if (top != null) window.scrollTo({ top: window.scrollY + top - 12, behavior: 'smooth' });
+      // Верх папки встаёт под липкую зону — топбар и (если она есть) полосу сущности, которая
+      // к этому моменту уже выедет: иначе ряд табов уходил бы под них.
+      const chrome = stickyState.top + (sticky ? 52 : 0) + 8;
+      if (top != null) window.scrollTo({ top: window.scrollY + top - chrome, behavior: 'smooth' });
     },
   };
 
-  return (
-    <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
-      <AppTopbar active={topbarActive} />
+  // Инструменты управляющего на телефоне — закреплённая панель у низа экрана; странице
+  // тогда нужен отступ снизу, чтобы последняя карточка не уходила под панель.
+  const hasTools = tabs.some((t) => t.pinned);
 
-      <main className="mx-auto max-w-[1180px] px-4 py-6" style={{ color: 'var(--deep-text)' }}>
-        <div className="mb-4 flex justify-end">
+  return (
+    <div
+      className={themeClass}
+      style={{
+        background: 'var(--deep-page-bg)',
+        minHeight: '100vh',
+        // Куда липнет ряд табов: под топбар или под выехавшую полосу сущности.
+        ['--deep-sticky-top' as string]: `${stickyState.stickyTop}px`,
+      }}
+    >
+      <AppTopbar active={topbarActive} />
+      {status === 'ready' && sticky && (
+        <DeepStickyBar bar={sticky} shown={stickyState.shown} top={stickyState.top} />
+      )}
+
+      {/* На телефоне отступов у края нет — ни по бокам, ни сверху: шапка встаёт вплотную
+          к топбару, блоки от края до края (`.deep-entity-main` в deep-theme.css). Места и так
+          мало, а своих паддингов у карточек хватает. Строка кнопки темы пустая (кнопка
+          `fixed`), поэтому и её отступ на телефоне снят. */}
+      <main className={`deep-entity-main${hasTools ? ' deep-entity-main--dock' : ''} mx-auto max-w-[1180px] px-0 pt-0 pb-6 sm:px-4 sm:pt-6`} style={{ color: 'var(--deep-text)' }}>
+        <div className="flex justify-end sm:mb-4">
           <UI_ModeToggle />
         </div>
 
@@ -86,7 +110,7 @@ function DeepEntityPage<T extends string>({
 
         {status === 'ready' && (
           <>
-            {hero}
+            {typeof hero === 'function' ? hero(nav) : hero}
             {beforeTabs}
 
             {/* «Папка» (TABS.md 3a folder-tab): плитки и панель контента — один корпус,
@@ -99,15 +123,34 @@ function DeepEntityPage<T extends string>({
                   ariaLabel={tabsAriaLabel}
                   active={activeTab.id}
                   onSelect={handleTab}
-                  tabs={tabs.map(({ id, icon, label, shortLabel, sub }) => ({
-                    id, icon, label, shortLabel, sub,
+                  toolsLabel={toolsLabel}
+                  tabs={tabs.map(({
+                    id, icon, label, shortLabel, sub, editable, locked, pinned, badge,
+                  }) => ({
+                    id, icon, label, shortLabel, sub, editable: editable || pinned, locked, pinned, badge,
                   }))}
                 />
 
-                <div className="deep-tabs-panel">
+                <div
+                  className={[
+                    'deep-tabs-panel',
+                    activeTab.editable || activeTab.pinned ? 'deep-tabs-panel--edit' : '',
+                    activeTab.pinned ? 'deep-tabs-panel--tool' : '',
+                  ].filter(Boolean).join(' ')}
+                >
                   {activeTab.locked
                     ? activeTab.lockNotice
-                    : <EntityPanel cards={activeTab.cards(nav)} />}
+                    : (
+                      <>
+                        {/* Фиолетовый — только вместе с подписью (правило хендоффа §3). */}
+                        {(activeTab.editable || activeTab.pinned) && (
+                          <div className="deep-panel-row mb-3 flex justify-end">
+                            <span className="deep-edit-chip">✎ You can edit</span>
+                          </div>
+                        )}
+                        <EntityPanel cards={activeTab.cards(nav)} />
+                      </>
+                    )}
                 </div>
               </div>
             )}

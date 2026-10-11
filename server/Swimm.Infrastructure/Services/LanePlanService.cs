@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
@@ -53,6 +54,7 @@ public class LanePlanService : ILanePlanService
         var roster = await LoadRosterAsync(hubGroupId);
         var levels = await LoadSwimmerLevelsAsync(hubGroupId);
         var rosterById = roster.ToDictionary(r => r.SwimmerId);
+        var onBreak = await HubGroupBreakQuery.LoadAsync(_db, hubGroupId, plan.Date);
 
         // Ушедшие из состава остаются в снимке — имена берём из справочника пловцов.
         var departedIds = plan.Swimmers.Select(s => s.SwimmerId).Where(id => !rosterById.ContainsKey(id)).ToList();
@@ -82,6 +84,7 @@ public class LanePlanService : ILanePlanService
                 BirthYear = row?.BirthYear ?? 0,
                 LevelId = levels.TryGetValue(swimmerId, out var levelId) ? levelId : null,
                 LeftGroup = !inRoster,
+                OnBreak = onBreak.SwimmerIds.Contains(swimmerId),
             };
         }
 
@@ -260,7 +263,7 @@ public class LanePlanService : ILanePlanService
         // в плане: раскладываем и его (в конец порядка), выкидывать молча нельзя.
         var sortKeys = roster.ToDictionary(r => r.SwimmerId, r => r.SortKey);
         var present = input.SwimmerIds == null
-            ? roster.Select(r => r.SwimmerId).ToList()
+            ? await PresentByDefaultAsync(hubGroupId, roster)
             : input.SwimmerIds.Distinct().ToList();
 
         var placements = LaneDistribution.Distribute(
@@ -292,7 +295,7 @@ public class LanePlanService : ILanePlanService
         // Кто пришёл — как в Distribute: весь состав или названные (ушедший, но стоявший в плане, — в конец).
         var sortKeys = roster.ToDictionary(r => r.SwimmerId, r => r.SortKey);
         var present = input.SwimmerIds == null
-            ? roster.Select(r => r.SwimmerId).ToList()
+            ? await PresentByDefaultAsync(hubGroupId, roster)
             : input.SwimmerIds.Distinct().ToList();
         var swimmers = present.Select(id => new LaneDistribution.Swimmer(
             id,
@@ -334,6 +337,17 @@ public class LanePlanService : ILanePlanService
         _db.LanePlans.Remove(plan);
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    /// <summary>
+    /// «Кто пришёл», когда редактор не назвал: весь видимый состав, кроме тех, кто сегодня на
+    /// перерыве (Ш3.1). Названных руками не фильтруем — тренер решил сам.
+    /// </summary>
+    private async Task<List<int>> PresentByDefaultAsync(int hubGroupId, List<RosterRow> roster)
+    {
+        var today = DateOnly.FromDateTime(IsraelTime.ToLocal(DateTime.UtcNow));
+        var onBreak = await HubGroupBreakQuery.LoadAsync(_db, hubGroupId, today);
+        return roster.Select(r => r.SwimmerId).Where(id => !onBreak.SwimmerIds.Contains(id)).ToList();
     }
 
     /// <summary>Видимый состав в порядке группы: SortOrder, затем имя (скрытых клубных нет).</summary>

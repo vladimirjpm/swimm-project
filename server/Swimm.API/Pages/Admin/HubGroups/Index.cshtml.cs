@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.API.Pages.Admin.Shared;
 
 
 namespace Swimm.API.Pages.Admin.HubGroups;
@@ -13,11 +14,15 @@ public class IndexModel : PageModel
     private readonly IHubGroupAdminService _service;
     private readonly IDataQualityService _quality;
 
-    public IndexModel(IHubGroupAdminService service, IDataQualityService quality)
+    public IndexModel(IHubGroupAdminService service, IDataQualityService quality, IConfiguration config, IWebHostEnvironment env)
     {
         _service = service;
         _quality = quality;
+        PublicSiteBaseUrl = PublicSite.BaseUrl(config, env);
     }
+
+    /// <summary>База ссылок «группа на сайте ↗» — <see cref="PublicSite.BaseUrl"/>.</summary>
+    public string PublicSiteBaseUrl { get; }
 
     public IReadOnlyList<HubGroupAdminRowDto> Groups { get; private set; } = [];
 

@@ -66,6 +66,8 @@ public enum AddFavoriteStatus
     Duplicate,
     /// <summary>Лимит типа выбран (422 с кодом <c>FavoritesRules.LimitErrorCode</c>).</summary>
     LimitReached,
+    /// <summary>Пловца нет — или это пловец группы (Р71), которого снаружи нет (404).</summary>
+    NotFound,
 }
 
 /// <summary>
@@ -81,6 +83,7 @@ public sealed record AddFavoriteResult(
 {
     public static AddFavoriteResult Added(FavoriteDto favorite) => new(AddFavoriteStatus.Added, favorite);
     public static AddFavoriteResult Duplicate() => new(AddFavoriteStatus.Duplicate);
+    public static AddFavoriteResult NotFound() => new(AddFavoriteStatus.NotFound);
     public static AddFavoriteResult LimitReached(int limit, string message) =>
         new(AddFavoriteStatus.LimitReached, Limit: limit, Message: message);
 }

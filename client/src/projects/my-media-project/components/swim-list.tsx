@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { UserMediaPublicationDto } from '../../../hooks/useUserMedia';
 import { fetchPublishTargets, PublishTargetDto } from '../use-all-my-media';
-import { parseTargetKey, targetKey, type PublishTargetRef } from '../../../hooks/useUserMedia';
+import {
+  canShareWithEveryone, EVERYONE_TRUSTED_ONLY, parseTargetKey, targetKey, type PublishTargetRef,
+} from '../../../hooks/useUserMedia';
 import { MySwimDto, SwimMediaDto } from '../use-my-swims';
 import { STATUS_COLORS, CardStatus, derivedCardStatus, visibilityLabel, hpCardCls } from './status-styles';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
@@ -346,6 +348,9 @@ function MediaLine({
     (p) => p.target_type === chosen.type && p.target_id === chosen.id
            && (p.status === 'pending' || p.status === 'approved')) ?? null;
   const unchanged = current != null && current.level === level;
+  // «Everyone 🌐» — только у доверенной группы (Р65); у клуба — всегда.
+  const everyoneAllowed = canShareWithEveryone(
+    chosen == null ? null : options.find((t) => t.type === chosen.type && t.id === chosen.id));
 
   const share = async () => {
     if (chosen == null || busy || unchanged) return;
@@ -363,15 +368,30 @@ function MediaLine({
     <div className="flex flex-wrap items-center gap-2 py-[6px]">
       <SourceChip m={m} onPlay={() => cb.onPlay(m)} onToggleLike={() => cb.onToggleLike(m)} />
       <span className="min-w-0"><StatusPill status={status} isPublic={isPublic} pubs={pubs} /></span>
+      {m.moderation_state && (
+        // Жалобы (Р62): владелец видит, что медиа спрятано, и почему поделиться нельзя.
+        <span
+          className="hp-mono rounded-[6px] border border-[var(--t-warn-border)] bg-[var(--t-warn-soft)] px-[8px] py-[2px] text-[10.5px] font-extrabold text-[var(--t-warn)]"
+          title={m.moderation_state === 'removed'
+            ? 'The site admin removed this after reports. It is visible only to you and can’t be shared again.'
+            : 'Hidden from everyone after reports, until the site admin reviews it. You still see it here.'}
+        >
+          {m.moderation_state === 'removed' ? '⚑ Removed by admin' : '⚑ Hidden — under review'}
+        </span>
+      )}
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
-        {targets != null && options.length > 0 && (
+        {targets != null && options.length > 0 && !m.moderation_state && (
           <>
             <select
               value={group}
               onChange={(e) => {
                 setGroup(e.target.value);
+                const next = parseTargetKey(e.target.value);
                 // У клуба нет аккаунтов-участников, значит и уровня members.
-                if (parseTargetKey(e.target.value)?.type === 'club') setLevel('public');
+                if (next?.type === 'club') setLevel('public');
+                // У недоверенной группы нет Everyone (Р65) — переключаем на Members.
+                else if (!canShareWithEveryone(next && options.find((t) => t.type === next.type && t.id === next.id)))
+                  setLevel('members');
               }}
               className="rounded-[7px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-1.5 py-[3px] text-[11px] text-[var(--t-text)]"
             >
@@ -387,15 +407,16 @@ function MediaLine({
               onChange={(e) => setLevel(e.target.value as 'members' | 'public')}
               // Почему Members гаснет на клубе — сказать вслух: у погашенного пункта нет
               // способа объясниться, и это читается как поломка (спрошено 09.09.2026).
-              title={chosen?.type === 'club' ? 'Clubs have no member accounts — publishing to a club is always public' : undefined}
+              title={chosen?.type === 'club' ? 'Clubs have no member accounts — publishing to a club is always public'
+                : !everyoneAllowed ? EVERYONE_TRUSTED_ONLY : undefined}
               className="rounded-[7px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-1.5 py-[3px] text-[11px] text-[var(--t-text)]"
             >
               <option value="members" disabled={chosen?.type === 'club'}>Members</option>
-              <option value="public">Everyone 🌐</option>
+              <option value="public" disabled={!everyoneAllowed}>Everyone 🌐{everyoneAllowed ? '' : ' — Trusted groups only'}</option>
             </select>
             <button
               type="button"
-              disabled={chosen == null || busy || unchanged}
+              disabled={chosen == null || busy || unchanged || (level === 'public' && !everyoneAllowed)}
               onClick={share}
               title={unchanged ? 'Already shared with this group at this level' : undefined}
               className="hp-mono rounded-[7px] border-none px-2.5 py-[4px] text-[10.5px] font-extrabold disabled:opacity-40"

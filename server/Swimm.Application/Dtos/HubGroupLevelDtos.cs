@@ -12,6 +12,25 @@ public sealed class HubGroupLevelsDto
 
     /// <summary>Видимый состав группы (без скрытых клубных) — у каждого уровень или null.</summary>
     public List<HubGroupLevelSwimmerDto> Swimmers { get; set; } = [];
+
+    /// <summary>
+    /// Активные участники-аккаунты со своим уровнем (Ш3.1): он действует, когда у аккаунта нет
+    /// пловца на дорожке. <c>SwimmerId</c> — метка тренера, если стоит.
+    /// </summary>
+    public List<HubGroupLevelAccountDto> Accounts { get; set; } = [];
+}
+
+public sealed class HubGroupLevelAccountDto
+{
+    public int UserId { get; set; }
+
+    /// <summary>Имя аккаунта — его видят только управляющие.</summary>
+    public string Name { get; set; } = "";
+
+    /// <summary>Пловец по метке тренера (HubGroupUserMember.SwimmerId); null — не привязан.</summary>
+    public int? SwimmerId { get; set; }
+
+    public int? LevelId { get; set; }
 }
 
 public sealed class HubGroupLevelDto
@@ -24,6 +43,9 @@ public sealed class HubGroupLevelDto
 
     /// <summary>Сколько пловцов СОСТАВА на этом уровне — для подтверждения удаления.</summary>
     public int SwimmerCount { get; set; }
+
+    /// <summary>Сколько аккаунтов-участников на этом уровне (Ш3.1) — тоже для подтверждения удаления.</summary>
+    public int AccountCount { get; set; }
 }
 
 public sealed class HubGroupLevelSwimmerDto

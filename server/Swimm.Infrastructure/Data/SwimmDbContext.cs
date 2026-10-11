@@ -92,6 +92,7 @@ public class SwimmDbContext : DbContext
 
     /* === Реакции (лайки на медиа, поздравления на заплывы) === */
     public DbSet<UserReaction> UserReactions => Set<UserReaction>();
+    public DbSet<MediaReport> MediaReports => Set<MediaReport>();
 
     /* === Группы (SwimHub) === */
     public DbSet<HubGroup> HubGroups => Set<HubGroup>();
@@ -119,6 +120,9 @@ public class SwimmDbContext : DbContext
     public DbSet<LanePlan> LanePlans => Set<LanePlan>();
     public DbSet<LanePlanLane> LanePlanLanes => Set<LanePlanLane>();
     public DbSet<LanePlanSwimmer> LanePlanSwimmers => Set<LanePlanSwimmer>();
+    public DbSet<HubGroupTrainingRsvp> HubGroupTrainingRsvps => Set<HubGroupTrainingRsvp>();
+    public DbSet<HubGroupBreak> HubGroupBreaks => Set<HubGroupBreak>();
+    public DbSet<HubGroupAccountLevel> HubGroupAccountLevels => Set<HubGroupAccountLevel>();
 
     /* === Пользователи и доступ === */
     public DbSet<AppUser> AppUsers => Set<AppUser>();
@@ -217,6 +221,14 @@ public class SwimmDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.ClubId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Пловец группы (Р71) живёт и умирает с группой: SetNull сделал бы его публичным.
+            entity.HasOne(e => e.PrivateHubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.PrivateHubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => e.PrivateHubGroupId)
+                .HasFilter("\"PrivateHubGroupId\" IS NOT NULL");
 
             entity.HasOne(e => e.Country)
                 .WithMany()
@@ -922,6 +934,11 @@ public class SwimmDbContext : DbContext
             entity.HasCheckConstraint(
                 "CK_UserMedia_Visibility",
                 @"""Visibility"" IN ('private', 'public')");
+
+            // Жалобы «Report» (Р62): null — обычное медиа; значения — MediaReportRules.
+            entity.HasCheckConstraint(
+                "CK_UserMedia_ModerationState",
+                @"""ModerationState"" IS NULL OR ""ModerationState"" IN ('under_review', 'removed')");
         });
 
         // Публикации личного медиа в группы (этап 2 media-visibility-model) — заявки/решения,
@@ -1014,6 +1031,38 @@ public class SwimmDbContext : DbContext
             // вручную в миграции через migrationBuilder.Sql (UX_UserReactions_Like/Congrats).
         });
 
+        // Жалобы «Report» на медиа (Р62). Sys_: кто пожаловался, видит только админ сайта.
+        modelBuilder.Entity<MediaReport>(entity =>
+        {
+            entity.ToTable("Sys_MediaReports");
+
+            entity.HasOne(e => e.Media)
+                .WithMany()
+                .HasForeignKey(e => e.UserMediaId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Reporter)
+                .WithMany()
+                .HasForeignKey(e => e.ReporterUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Одна жалоба на медиа от аккаунта: иначе один человек добивал бы порог сам.
+            entity.HasIndex(e => new { e.UserMediaId, e.ReporterUserId }).IsUnique();
+            // Очередь админки и подсчёт порога: открытые жалобы медиа.
+            entity.HasIndex(e => new { e.Status, e.UserMediaId });
+
+            entity.HasCheckConstraint(
+                "CK_MediaReports_Reason",
+                @"""Reason"" IN ('wrong_swimmer', 'inappropriate', 'spam', 'privacy', 'other')");
+            entity.HasCheckConstraint(
+                "CK_MediaReports_Status",
+                @"""Status"" IN ('open', 'kept', 'removed')");
+            // «Other» без текста — не жалоба, а случайный клик.
+            entity.HasCheckConstraint(
+                "CK_MediaReports_OtherNeedsComment",
+                @"""Reason"" <> 'other' OR (""Comment"" IS NOT NULL AND length(btrim(""Comment"")) > 0)");
+        });
+
         // --- Группы (SwimHub) ---
 
         modelBuilder.Entity<HubGroup>(entity =>
@@ -1076,13 +1125,14 @@ public class SwimmDbContext : DbContext
 
             entity.HasCheckConstraint(
                 "CK_HubGroupMembers_Source",
-                @"""Source"" IN ('manual', 'club')");
+                @"""Source"" IN ('manual', 'club', 'private')");
 
-            // Скрыть можно только клубного: ручного владелец убирает удалением, а «ручной и
-            // скрытый» — противоречие, которое читатели состава трактовали бы по-разному.
+            // Скрыть можно клубного и пловца группы (Р71, «неактивен»): ручного владелец убирает
+            // удалением, а «ручной и скрытый» — противоречие, которое читатели состава трактовали
+            // бы по-разному. Скрытую строку все читатели состава и так пропускают (!IsExcluded).
             entity.HasCheckConstraint(
                 "CK_HubGroupMembers_ExcludedOnlyClub",
-                @"NOT ""IsExcluded"" OR ""Source"" = 'club'");
+                @"NOT ""IsExcluded"" OR ""Source"" IN ('club', 'private')");
         });
 
         // Подписка группы на клуб (docs/plans/hubgroup-club-subscription-plan.md) — бизнес-
@@ -1346,6 +1396,97 @@ public class SwimmDbContext : DbContext
         // План дорожек на дату — ПРИВАТНЫЕ данные группы, Sys_-таблицы БЕЗ grant swimm_ro
         // (docs/plans/lane-plans-plan.md, L2). План — снимок: удаление уровня только снимает
         // подпись с дорожки (SET NULL), уход пловца из состава план не трогает.
+        // Ответы «иду / не приду» на занятие — ПРИВАТНЫЕ, Sys_ без grant swimm_ro
+        // (docs/plans/entity-hero-roles-plan.md, Ш2). Занятие — пара «дата + начало слота»:
+        // расписание регулярное, строк занятий нет. Один ответ человека на занятие.
+        modelBuilder.Entity<HubGroupTrainingRsvp>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupTrainingRsvps");
+            entity.HasIndex(e => new { e.HubGroupId, e.SessionDate, e.SessionStart, e.UserId }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.SetBy)
+                .WithMany()
+                .HasForeignKey(e => e.SetByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Answer", @"""Answer"" IN ('yes', 'maybe', 'no')");
+            entity.HasCheckConstraint("CK_HubGroupTrainingRsvps_Note",
+                @"""Note"" IS NULL OR ""Note"" IN ('late', 'first-hour', 'leaving-early')");
+        });
+
+        // «On break» (Ш3.1) — ПРИВАТНЫЕ данные, Sys_ БЕЗ grant swimm_ro. Субъект — ровно одно из
+        // двух (аккаунт или пловец); открытый перерыв у субъекта один — частичные UNIQUE.
+        modelBuilder.Entity<HubGroupBreak>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupBreaks");
+            entity.HasIndex(e => new { e.HubGroupId, e.UserId })
+                .IsUnique()
+                .HasFilter(@"""EndedAt"" IS NULL AND ""UserId"" IS NOT NULL");
+            entity.HasIndex(e => new { e.HubGroupId, e.SwimmerId })
+                .IsUnique()
+                .HasFilter(@"""EndedAt"" IS NULL AND ""SwimmerId"" IS NOT NULL");
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Swimmer)
+                .WithMany()
+                .HasForeignKey(e => e.SwimmerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.SetBy)
+                .WithMany()
+                .HasForeignKey(e => e.SetByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasCheckConstraint("CK_HubGroupBreaks_Subject",
+                @"(""UserId"" IS NULL) <> (""SwimmerId"" IS NULL)");
+        });
+
+        // Уровень аккаунта без пловца (Ш3.1) — пара к Sys_HubGroupSwimmerLevels, тот же составной
+        // FK на уровень этой же группы; удаление уровня → «без уровня» (cascade).
+        modelBuilder.Entity<HubGroupAccountLevel>(entity =>
+        {
+            entity.ToTable("Sys_HubGroupAccountLevels");
+            entity.HasKey(e => new { e.HubGroupId, e.UserId });
+            entity.HasIndex(e => new { e.HubGroupId, e.LevelId });
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.HubGroup)
+                .WithMany()
+                .HasForeignKey(e => e.HubGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Level)
+                .WithMany()
+                .HasForeignKey(e => new { e.HubGroupId, e.LevelId })
+                .HasPrincipalKey(l => new { l.HubGroupId, l.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<LanePlan>(entity =>
         {
             entity.ToTable("Sys_LanePlans");

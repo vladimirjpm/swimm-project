@@ -13,6 +13,11 @@ import React from 'react';
  *
  * Порог 960px — тот же, что у пары «грид + зачёт» на странице клуба: уже него правая колонка
  * в 380px не оставляет левой места на имя и KPI.
+ *
+ * Уже порога колонки встают друг под другом, и `aside` идёт ПЕРВЫМ — на телефоне шапка
+ * начинается с фото (решение Влада 27.09.2026). На телефоне `aside` (`.deep-hero-band__lead`)
+ * ещё и выходит из паддинга полосы — во всю ширину экрана, вплотную к верху; правило рядом с
+ * остальным «от края до края» в deep-theme.css.
  */
 
 interface Props {
@@ -24,7 +29,7 @@ interface Props {
 function DeepHeroBand({ children, aside }: Props) {
   return (
     <section
-      className="mb-4 rounded-2xl border p-6"
+      className="deep-hero-band mb-4 rounded-2xl border p-6"
       style={{
         background: 'var(--deep-hero-grad)',
         borderColor: 'var(--deep-card-border)',
@@ -35,7 +40,7 @@ function DeepHeroBand({ children, aside }: Props) {
       ) : (
         <div className="grid grid-cols-1 items-stretch gap-6 min-[960px]:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0">{children}</div>
-          <div className="min-w-0">{aside}</div>
+          <div className="deep-hero-band__lead order-first min-w-0 min-[960px]:order-none">{aside}</div>
         </div>
       )}
     </section>

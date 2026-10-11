@@ -17,4 +17,8 @@ public interface ICompetitionRecalculationService
 
     /// <summary>Пересчитывает все соревнования с ShowCombineAllResults — бэкфилл и разовые прогоны.</summary>
     Task<int> RecalculateAllCombinedAsync(CancellationToken ct = default);
+
+    /// <summary>Флаг пара-очков (Р67) по всем соревнованиям — бэкфилл после миграции
+    /// <c>AddResultIsParaPoints</c> и аварийный прогон. Возвращает число изменённых строк.</summary>
+    Task<int> RecalculateAllParaPointsAsync(CancellationToken ct = default);
 }

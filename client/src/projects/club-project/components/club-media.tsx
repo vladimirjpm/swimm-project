@@ -16,7 +16,10 @@ import { HelperMedia } from '../../../utils/helpers';
  */
 
 interface ClubMediaItem {
+  /** Id публикации. */
   id: number;
+  /** Id медиа (Sys_UserMedia) — для «Report» (Р62). */
+  media_id?: number;
   media_type: 'image' | 'video' | 'album';
   source_type: 'youtube' | 'vimeo' | 'album' | 'other';
   url: string;
@@ -46,6 +49,7 @@ function ClubMedia({ clubId }: { clubId: number }) {
         type: m.media_type === 'video' ? 'video' : 'image',
         sourceType: m.source_type === 'album' ? undefined : (m.source_type as GalleryItem['sourceType']),
         url: m.url,
+        mediaId: m.media_id,
       })),
       indexById: new Map(list.map((m, i) => [m.id, i])),
     };

@@ -16,8 +16,11 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
 {
     public async Task<SwimmerDedupReport> FindCandidatesAsync(CancellationToken ct = default)
     {
+        // Пловцы группы (Р71) — не кандидаты: тренер мог завести «Горбенко», и склейка с
+        // настоящим отдала бы чужому человеку тренировки группы (или сделала их публичными).
         var swimmers = await db.Swimmers.AsNoTracking()
             .Where(s => s.SwimmerOrgId == null || !s.SwimmerOrgId.StartsWith("SYNTH-"))
+            .Where(s => s.PrivateHubGroupId == null)
             .Select(s => new
             {
                 s.Id, s.LastName, s.FirstName, s.LastNameEn, s.FirstNameEn,

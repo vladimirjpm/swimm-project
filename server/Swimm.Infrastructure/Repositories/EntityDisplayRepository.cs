@@ -26,6 +26,7 @@ public class EntityDisplayRepository : IEntityDisplayRepository
         if (club is null) return false;
 
         club.CoverImageUrl = Normalize(input.CoverImageUrl);
+        club.CoverImageMobileUrl = Normalize(input.CoverImageMobileUrl);
         club.DisplaySettings = Apply(club.DisplaySettings, input);
         await _db.SaveChangesAsync(ct);
         return true;
@@ -37,6 +38,7 @@ public class EntityDisplayRepository : IEntityDisplayRepository
         if (group is null) return false;
 
         group.CoverImageUrl = Normalize(input.CoverImageUrl);
+        group.CoverImageMobileUrl = Normalize(input.CoverImageMobileUrl);
         group.DisplaySettings = Apply(group.DisplaySettings, input);
         group.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
@@ -56,6 +58,7 @@ public class EntityDisplayRepository : IEntityDisplayRepository
         var settings = EntityDisplaySettings.Parse(current);
         settings.Hero.Show = input.ShowHeroImage;
         settings.Hero.MediaId = input.HeroMediaId;
+        settings.Hero.MobileMediaId = input.HeroMobileMediaId;
         return settings.ToJson();
     }
 }

@@ -216,8 +216,9 @@ public class HubGroupClubSubscriptionService : IHubGroupClubSubscriptionService
             return HubGroupMemberSaveResult.Fail("Member not found.");
 
         // Ручного не прячут — его удаляют: «ручной и скрытый» запрещён и в БД
-        // (CK_HubGroupMembers_ExcludedOnlyClub).
-        if (member.Source != HubGroupMemberSource.Club)
+        // (CK_HubGroupMembers_ExcludedOnlyClub). Пловца группы (Р71) прячут — это «неактивен»:
+        // удаление стёрло бы его времена тренировок.
+        if (member.Source != HubGroupMemberSource.Club && member.Source != HubGroupMemberSource.Private)
             return HubGroupMemberSaveResult.Fail("Only swimmers from the club subscription can be hidden — remove this swimmer instead.");
 
         if (member.IsExcluded == excluded) return HubGroupMemberSaveResult.Ok();

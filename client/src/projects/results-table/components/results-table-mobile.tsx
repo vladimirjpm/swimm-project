@@ -194,7 +194,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 {hasInternationalPoints && (
                   <div className="text-sm">
                     <span className="text-[var(--theme-mode-text-muted)]">Points: </span>
-                    <span className="text-[var(--theme-mode-text)]">{res.international_points ?? ''}</span>
+                    <span className="text-[var(--theme-mode-text)]">{HelperResults.pointsLabel(res)}</span>
                   </div>
                 )}
               </div>

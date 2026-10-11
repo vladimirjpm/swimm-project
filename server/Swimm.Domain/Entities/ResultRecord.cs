@@ -126,7 +126,21 @@ public class ResultRecord
     [MaxLength(100)]
     public string? TimeFailNote { get; set; }
 
+    /// <summary>
+    /// Очки как пришли из источника. ⚠ Не всегда FINA: см. <see cref="IsParaPoints"/> — наружу как
+    /// международные очки их отдают только через <c>ResultPoints.Fina</c>.
+    /// </summary>
     public int InternationalPoints { get; set; }
+
+    /// <summary>
+    /// Очки источника посчитаны по ПАРА-шкале (класс спортсмена), а не по FINA (решение Влада
+    /// 29.09.2026, Р67). Loglig так считает пара-пловцам и в общем заплыве («бугрим»: 1:22.76 на
+    /// 100 в/с → 931), где отдельной пара-программы нет. Такие очки с обычными не сравниваются:
+    /// Best swim, High Point, «лучший FINA», суммы — везде 0. Флаг ПРОИЗВОДНЫЙ, руками не ставится:
+    /// его пишет пересчёт соревнования (<c>ParaPointsDetector</c>) — пара-программа Маккабиады
+    /// (<see cref="EventCategory"/> = para) и пловцы, чьи очки не бьются со временем.
+    /// </summary>
+    public bool IsParaPoints { get; set; }
 
     // ── Объединённый зачёт «Combine All Results» ────────────────────────────
     // Заполняется ТОЛЬКО у соревнований с Competition.ShowCombineAllResults; у остальных null.

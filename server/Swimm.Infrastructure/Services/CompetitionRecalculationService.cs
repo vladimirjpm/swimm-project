@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -43,6 +44,10 @@ public class CompetitionRecalculationService : ICompetitionRecalculationService
             ? await ApplyCombinedAsync(competitionIds, ct)
             : await ClearCombinedAsync(competitionIds, ct);
 
+        // Пара-очки (Р67) — до зачёта не нужны (он по местам), но пересчёт один на все
+        // производные величины: импорт, правка результата, переимпорт.
+        updated += await ApplyParaPointsAsync(competitionIds, ct);
+
         await _clubStandings.RebuildForCompetitionAsync(comp.Id, ct);
         return updated;
     }
@@ -67,6 +72,47 @@ public class CompetitionRecalculationService : ICompetitionRecalculationService
         }
 
         return total;
+    }
+
+    public async Task<int> RecalculateAllParaPointsAsync(CancellationToken ct = default)
+    {
+        // По дню за раз: эталон детектора — дисциплина одного дня, а вся таблица в память не лезет.
+        var ids = await _db.Competitions.AsNoTracking().Select(c => c.Id).OrderBy(id => id).ToListAsync(ct);
+        var total = 0;
+        foreach (var id in ids)
+            total += await ApplyParaPointsAsync([id], ct);
+        return total;
+    }
+
+    /// <summary>
+    /// Флаг <see cref="ResultRecord.IsParaPoints"/> — производный: выставляется ровно по
+    /// <see cref="ParaPointsDetector"/> (и снимается, если данные поменялись). Пишутся только
+    /// изменившиеся строки — через трекер, чтобы кэш сбросил перехватчик сохранения (К4).
+    /// </summary>
+    private async Task<int> ApplyParaPointsAsync(IReadOnlyCollection<int> competitionIds, CancellationToken ct)
+    {
+        var rows = await _db.Results.AsNoTracking()
+            .Where(r => competitionIds.Contains(r.CompetitionId))
+            .Select(r => new
+            {
+                Row = new ParaPointsDetector.Row(
+                    r.Id, r.CompetitionId, r.SwimmerId, r.StyleId, r.Distance, r.Gender, r.EventCategory,
+                    r.InternationalPoints, r.TimeMillisecond, r.TimeFail, r.RelayId != null),
+                r.IsParaPoints,
+            })
+            .ToListAsync(ct);
+        if (rows.Count == 0) return 0;
+
+        var para = ParaPointsDetector.Detect(rows.Select(x => x.Row).ToList());
+        var changedIds = rows.Where(x => x.IsParaPoints != para.Contains(x.Row.ResultId))
+            .Select(x => x.Row.ResultId).ToList();
+        if (changedIds.Count == 0) return 0;
+
+        var changed = await _db.Results.Where(r => changedIds.Contains(r.Id)).ToListAsync(ct);
+
+        foreach (var entity in changed) entity.IsParaPoints = !entity.IsParaPoints;
+        await _db.SaveChangesAsync(ct);
+        return changed.Count;
     }
 
     private async Task<int> ApplyCombinedAsync(IReadOnlyCollection<int> competitionIds, CancellationToken ct)

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import DeepViewChips from '../../components/deep/view-chips';
 import UI_SwimTime from '../../components/mix/swim-time/swim-time';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import SwimmerResultRow, { type ResultRowData } from './swimmer-result-row';
@@ -265,32 +266,20 @@ export function ResultsFilters({
   onView: (next: ResultsView) => void;
   recordsHeld?: number | null;
 }) {
-  const hasRecords = (recordsHeld ?? 0) > 0;
-  const active = RESULTS_VIEWS.find((v) => v.id === view) ?? RESULTS_VIEWS[0];
-
   return (
-    <div className="deep-filters">
-      <div className="deep-filter-row" role="group" aria-label="Results view">
-        {RESULTS_VIEWS.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            onClick={() => onView(v.id)}
-            aria-pressed={view === v.id}
-            className={`deep-filter-chip${view === v.id ? ' deep-filter-chip--active' : ''}`}
-          >
-            <span aria-hidden="true">{v.icon}</span>
-            <span className="deep-filter-chip__label">
-              {v.id === 'records' ? recordsViewLabel(recordsHeld) : v.label}
-            </span>
-            {v.id === 'records' && hasRecords && (
-              <span className="deep-filter-chip__badge">{recordsHeld}</span>
-            )}
-          </button>
-        ))}
-      </div>
-      <div className="deep-filter-caption">{active.caption}</div>
-    </div>
+    <DeepViewChips<ResultsView>
+      ariaLabel="Results view"
+      active={view}
+      onSelect={onView}
+      chips={RESULTS_VIEWS.map((v) => ({
+        id: v.id,
+        icon: v.icon,
+        label: v.id === 'records' ? recordsViewLabel(recordsHeld) : v.label,
+        // Бейдж — только у «Records & PB» и только когда рекорды есть.
+        badge: v.id === 'records' ? recordsHeld : null,
+        caption: v.caption,
+      }))}
+    />
   );
 }
 

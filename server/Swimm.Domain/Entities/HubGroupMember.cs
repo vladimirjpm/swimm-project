@@ -14,6 +14,17 @@ public static class HubGroupMemberSource
 
     /// <summary>Пришёл из подписки группы на клуб; пересборка состава его добавляет и убирает.</summary>
     public const string Club = "club";
+
+    /// <summary>
+    /// Пловец группы (Р71), заведённый тренером. Как ручной, подписку на клуб не слушает (пересборка
+    /// трогает только <see cref="Club"/>) и идёт в потолок ручных строк. Отличие — его можно сделать
+    /// неактивным (<see cref="HubGroupMember.IsExcluded"/>) вместо удаления: он есть только в этой
+    /// группе, и удаление стёрло бы его времена тренировок (решение Влада 29.09.2026).
+    /// </summary>
+    public const string Private = "private";
+
+    /// <summary>Строки, которые считаются в потолок ручного состава.</summary>
+    public static bool CountsAsManual(string source) => source is Manual or Private;
 }
 
 /// <summary>

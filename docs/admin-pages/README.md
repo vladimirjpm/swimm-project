@@ -25,6 +25,7 @@
 | /Admin/PointsRules | [pointsrules.md](pointsrules.md) | Правила начисления очков: клубный зачёт и High Point (CRUD, шкалы, клонирование версий) |
 | /Admin/HubGroups | [hubgroups.md](hubgroups.md) | Группы SwimHub |
 | /Admin/HubGroupClubRequests | [hubgroupclubrequests.md](hubgroupclubrequests.md) | Заявки групп на статус клуба |
+| /Admin/MediaReports | [mediareports.md](mediareports.md) | Жалобы «Report» на фото/видео: кто, почему; «Оставить» / «Снять» |
 | /Admin/Import | [import.md](import.md) | Импорт соревнований (JSON/PDF) и рекордов |
 | /Admin/ImportHistory | [importhistory.md](importhistory.md) | История импортов |
 | /Admin/Media | [media.md](media.md) | Проверка живости ссылок UserMedia (битые 404) |

@@ -51,10 +51,14 @@ Sys_StartListPulls           # журнал заборов стартового 
 # Аккаунты и всё, что на них висит — в проде заводятся заново:
 #   Sys_AppUsers, Sys_AppUserRoles, Sys_UserExternalLogins, Sys_UserLocalCredentials,
 #   Sys_UserSecurityTokens, Sys_UserLoginHistory, Sys_UserFavorites, Sys_UserMedia,
-#   Sys_UserMediaPublications, Sys_UserReactions, Sys_UserStartListPlans
+#   Sys_UserMediaPublications, Sys_UserReactions, Sys_UserStartListPlans, Sys_MediaReports
 #
 # Журнал действий администраторов (ActorName / ActorUserId / IpAddress):
 #   Sys_AdminAudit
+#
+# Swimmers едет БЕЗ пловцов групп (Р71, Swimmers.PrivateHubGroupId не пуст): их группы в прод
+#   не переносятся, а вне своей группы такого пловца нет. dump-seed.sh вырезает эти строки
+#   из COPY "Swimmers" сам (иначе restore упал бы на FK PrivateHubGroupId -> HubGroups).
 #
 # HubGroups и HubGroupMembers — ЕДИНСТВЕННАЯ FK через границу:
 #   HubGroups.OwnerUserId NOT NULL → Sys_AppUsers. Без владельца группа не вставится.
@@ -67,6 +71,8 @@ Sys_StartListPulls           # журнал заборов стартового 
 #   Sys_TrainingSessions, Sys_TrainingResults
 #   И уровни пловцов групп и планы дорожек (висят на HubGroups, docs/plans/lane-plans-plan.md):
 #   Sys_HubGroupLevels, Sys_HubGroupSwimmerLevels, Sys_LanePlans, Sys_LanePlanLanes, Sys_LanePlanSwimmers
+#   И ответы на занятия, перерывы и уровни аккаунтов (8.15, docs/plans/entity-hero-roles-plan.md):
+#   Sys_HubGroupTrainingRsvps, Sys_HubGroupBreaks, Sys_HubGroupAccountLevels
 #
 # Заполняются кодом при старте — перенос дал бы конфликт первичных ключей:
 #   Sys_AppRoles, Sys_DebugOptions

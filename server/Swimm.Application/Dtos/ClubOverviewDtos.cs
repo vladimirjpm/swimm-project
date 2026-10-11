@@ -85,6 +85,14 @@ public sealed class ClubProfileDto
     [JsonPropertyName("hero_image_url")]
     public string? HeroImageUrl { get; set; }
 
+    /// <summary>СЫРОЙ URL мобильного фото (колонка) — его правит форма настроек.</summary>
+    [JsonPropertyName("cover_image_mobile_url")]
+    public string? CoverImageMobileUrl { get; set; }
+
+    /// <summary>Мобильное фото шапки (4:3); null — телефон показывает полосу из десктопного.</summary>
+    [JsonPropertyName("hero_image_mobile_url")]
+    public string? HeroImageMobileUrl { get; set; }
+
     /// <summary>Показывать блок фото шапки (настройка hero.show). false — колонка схлопнута.</summary>
     [JsonPropertyName("show_hero_image")]
     public bool ShowHeroImage { get; set; } = true;

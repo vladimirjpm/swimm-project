@@ -146,7 +146,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
 
       {hasInternationalPoints && (
         <div className="col-span-1 text-center">
-          {res.international_points ?? ''}
+          {HelperResults.pointsLabel(res)}
           {/* {clubPoints && clubPoints > 0 ? ` / ${clubPoints}` : ''} */}
         </div>
       )}

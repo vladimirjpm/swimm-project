@@ -14,13 +14,16 @@ export function useSwimmerMedia(swimmerId: number | null): GalleryItem[] {
     let cancelled = false;
     fetch(`/api/swimmers/${swimmerId}/media`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
-      .then((list: { media_type: string; source_type: string; url: string }[]) => {
+      .then((list: { media_id?: number; is_mine?: boolean; media_type: string; source_type: string; url: string }[]) => {
         if (cancelled) return;
         setItems(
           list.map((i) => ({
             type: i.media_type === 'image' ? 'image' : 'video',
             sourceType: i.source_type as GalleryItem['sourceType'],
             url: i.url,
+            // Для «Report» в лайтбоксе (Р62).
+            mediaId: i.media_id,
+            isMine: i.is_mine,
           })),
         );
       })

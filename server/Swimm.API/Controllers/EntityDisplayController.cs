@@ -53,8 +53,7 @@ public class EntityDisplayController : ControllerBase
 
         if (!await _display.UpdateClubAsync(id, input)) return NotFound(new { error = "club not found" });
 
-        await _audit.LogAsync("club.display-settings", "Club", id.ToString(),
-            $"hero: show={input.ShowHeroImage}, mediaId={input.HeroMediaId?.ToString() ?? "—"}", input);
+        await _audit.LogAsync("club.display-settings", "Club", id.ToString(), AuditSummary(input), input);
         return NoContent();
     }
 
@@ -71,8 +70,12 @@ public class EntityDisplayController : ControllerBase
 
         if (!await _display.UpdateGroupAsync(id, input)) return NotFound(new { error = "group not found" });
 
-        await _audit.LogAsync("hub-group.display-settings", "HubGroup", id.ToString(),
-            $"hero: show={input.ShowHeroImage}, mediaId={input.HeroMediaId?.ToString() ?? "—"}", input);
+        await _audit.LogAsync("hub-group.display-settings", "HubGroup", id.ToString(), AuditSummary(input), input);
         return NoContent();
     }
+
+    private static string AuditSummary(EntityDisplayInputDto input) =>
+        $"hero: show={input.ShowHeroImage}, mediaId={input.HeroMediaId?.ToString() ?? "—"}, "
+        + $"mobileMediaId={input.HeroMobileMediaId?.ToString() ?? "—"}, "
+        + $"mobile={(string.IsNullOrWhiteSpace(input.CoverImageMobileUrl) ? "—" : "set")}";
 }

@@ -66,7 +66,28 @@ public class HubGroupLevelService : IHubGroupLevelService
             .ToDictionary(g => g.Key, g => g.Count());
         foreach (var level in levels) level.SwimmerCount = counts.GetValueOrDefault(level.Id);
 
-        return new HubGroupLevelsDto { Levels = levels, Swimmers = swimmers };
+        // Аккаунты-участники (Ш3.1): уровень — на тот случай, когда у человека нет пловца на
+        // дорожке. Как и у пловцов, считаем только нынешних активных.
+        var accounts = await _db.HubGroupUserMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId && m.Status == HubGroupUserMemberStatus.Active)
+            .OrderBy(m => m.User!.DisplayName).ThenBy(m => m.UserId)
+            .Select(m => new HubGroupLevelAccountDto
+            {
+                UserId = m.UserId,
+                Name = m.User!.DisplayName,
+                SwimmerId = m.SwimmerId,
+                LevelId = _db.HubGroupAccountLevels
+                    .Where(l => l.HubGroupId == hubGroupId && l.UserId == m.UserId)
+                    .Select(l => (int?)l.LevelId)
+                    .FirstOrDefault(),
+            })
+            .ToListAsync();
+        var accountCounts = accounts.Where(a => a.LevelId != null)
+            .GroupBy(a => a.LevelId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+        foreach (var level in levels) level.AccountCount = accountCounts.GetValueOrDefault(level.Id);
+
+        return new HubGroupLevelsDto { Levels = levels, Swimmers = swimmers, Accounts = accounts };
     }
 
     public async Task<HubGroupMemberSaveResult> SaveLevelsAsync(int hubGroupId, HubGroupLevelsInputDto input)
@@ -97,6 +118,9 @@ public class HubGroupLevelService : IHubGroupLevelService
                     .Where(s => s.HubGroupId == hubGroupId && removedIds.Contains(s.LevelId))
                     .ToListAsync();
                 _db.HubGroupSwimmerLevels.RemoveRange(assignments);
+                _db.HubGroupAccountLevels.RemoveRange(await _db.HubGroupAccountLevels
+                    .Where(a => a.HubGroupId == hubGroupId && removedIds.Contains(a.LevelId))
+                    .ToListAsync());
 
                 // Дорожки планов теряют подпись (в базе это SET NULL) — план остаётся снимком.
                 var lanes = await _db.LanePlanLanes
@@ -151,6 +175,42 @@ public class HubGroupLevelService : IHubGroupLevelService
             else if (row.LevelId != levelId.Value)
             {
                 // Часть ключа FK на уровень — обычное поле, не PK строки: правится на месте.
+                row.LevelId = levelId.Value;
+            }
+
+            await _db.SaveChangesAsync();
+            return HubGroupMemberSaveResult.Ok();
+        });
+    }
+
+    public async Task<HubGroupMemberSaveResult> SetAccountLevelAsync(int hubGroupId, int userId, int? levelId)
+    {
+        var isMember = await _db.HubGroupUserMembers.AnyAsync(m =>
+            m.HubGroupId == hubGroupId && m.UserId == userId && m.Status == HubGroupUserMemberStatus.Active);
+        if (!isMember) return HubGroupMemberSaveResult.Fail("This person is not an active member of the group.");
+
+        return await InGroupTransactionAsync(hubGroupId, async () =>
+        {
+            if (levelId is int id
+                && !await _db.HubGroupLevels.AnyAsync(l => l.HubGroupId == hubGroupId && l.Id == id))
+                return HubGroupMemberSaveResult.Fail("Levels were changed elsewhere. Reload and try again.");
+
+            var row = await _db.HubGroupAccountLevels
+                .FirstOrDefaultAsync(a => a.HubGroupId == hubGroupId && a.UserId == userId);
+
+            if (levelId == null)
+            {
+                if (row != null) _db.HubGroupAccountLevels.Remove(row);
+            }
+            else if (row == null)
+            {
+                _db.HubGroupAccountLevels.Add(new HubGroupAccountLevel
+                {
+                    HubGroupId = hubGroupId, UserId = userId, LevelId = levelId.Value,
+                });
+            }
+            else if (row.LevelId != levelId.Value)
+            {
                 row.LevelId = levelId.Value;
             }
 

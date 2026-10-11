@@ -191,6 +191,8 @@ function publicationsLightbox(items: PublishedMediaItem[]) {
       type: g.media_type === 'video' ? 'video' : 'image',
       sourceType: g.source_type === 'album' ? undefined : (g.source_type as GalleryItem['sourceType']),
       url: g.url,
+      // «Report» (Р62). «Своё» лента общая (кэш) не знает — свою жалобу отклонит сервер.
+      mediaId: g.media_id,
     })),
     indexById: new Map(lightboxItems.map((g, i) => [g.id, i])),
   };

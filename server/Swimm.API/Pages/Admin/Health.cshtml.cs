@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.API.Pages.Admin.Shared;
 
 namespace Swimm.API.Pages.Admin;
 
@@ -13,14 +14,7 @@ namespace Swimm.API.Pages.Admin;
 [Authorize(Roles = "Admin")]
 public class HealthModel(IConfiguration config, IWebHostEnvironment env, IPointRulesAdminRepository rules) : PageModel
 {
-    /// <summary>
-    /// База для ссылок «смотреть на сайте». В проде клиент лежит на том же origin, что и
-    /// админка, поэтому пусто = относительные ссылки. В Development клиент крутится на своём
-    /// Vite-порту, и по умолчанию это :5173 — иначе ссылка вела бы в админку, где публичных
-    /// страниц нет. Переопределяется настройкой <c>PublicSite:BaseUrl</c> (без завершающего «/»).
-    ///
-    /// Хранить базу в самой находке нельзя: dev-адрес осел бы в БД и уехал в прод.
-    /// </summary>
+    /// <summary>База для ссылок «смотреть на сайте» — <see cref="PublicSite.BaseUrl"/>.</summary>
     public string PublicSiteBaseUrl { get; private set; } = "";
 
     /// <summary>Правила клубных очков — для селекта в находке «без правила клубных очков».
@@ -29,9 +23,7 @@ public class HealthModel(IConfiguration config, IWebHostEnvironment env, IPointR
 
     public async Task OnGetAsync()
     {
-        PublicSiteBaseUrl = (config["PublicSite:BaseUrl"]
-            ?? (env.IsDevelopment() ? "http://localhost:5173" : ""))
-            .TrimEnd('/');
+        PublicSiteBaseUrl = PublicSite.BaseUrl(config, env);
         ClubRules = await rules.GetAllAsync(PointRuleKind.Clubs);
     }
 }

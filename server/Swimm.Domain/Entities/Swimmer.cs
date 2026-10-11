@@ -42,6 +42,19 @@ public class Swimmer
     [MaxLength(10)]
     public string Origin { get; set; } = "isr";
 
+    /// <summary>
+    /// Пловец ТОЛЬКО этой группы (Р71, решение Влада 29.09.2026): человек без аккаунта и без
+    /// loglig, которого завёл тренер, чтобы ставить на дорожки и писать времена тренировок.
+    /// Виден только внутри группы — админу сайта, управляющим и активным участникам
+    /// (<c>PrivateSwimmerRules</c>); для всех остальных его нет: ни страницы, ни поиска, ни
+    /// состава группы в общем ответе, ни клуба, ни избранного. Так никто не заведёт публично
+    /// «Горбенко» или имя с матом. null — обычный пловец. Удаляется вместе с группой.
+    /// </summary>
+    public int? PrivateHubGroupId { get; set; }
+
+    [ForeignKey(nameof(PrivateHubGroupId))]
+    public HubGroup? PrivateHubGroup { get; set; }
+
     /// <summary>ID спортсмена в федерации</summary>
     [MaxLength(50)]
     public string? SwimmerOrgId { get; set; }
