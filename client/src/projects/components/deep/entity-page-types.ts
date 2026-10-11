@@ -1,5 +1,6 @@
 import React from 'react';
 import type { TopbarActivePage } from '../app-topbar/app-topbar';
+import type { DeepTabDot } from './tabs';
 
 /**
  * Типы каркаса страницы сущности (`entity-page.tsx`).
@@ -71,6 +72,8 @@ export interface EntityTabSpec<T extends string = string> {
   badge?: string;
   /** `danger` — бейдж красной пилюлей (число не ответивших у тренера). */
   badgeTone?: 'danger';
+  /** Метка внимания точкой — у любого таба (золотая / акцентная у Trainings группы). */
+  dot?: DeepTabDot;
   /**
    * Карточки панели. Функция, а не готовый JSX: тело считается только у активного таба.
    * `nav` нужен дайджесту — карточке-витрине, которая уводит на «свой» таб.

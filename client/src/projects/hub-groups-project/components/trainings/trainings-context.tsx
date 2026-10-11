@@ -127,13 +127,18 @@ export function useTrainingsTab(): TrainingsTabState {
 }
 
 export function TrainingsTabProvider({
-  group, manages, rsvp, openSchedule, onNextTrainingsChanged, children,
+  group, manages, rsvp, openSchedule, onNextTrainingsChanged, onMarksChange, children,
 }: {
   group: HubGroupDetails;
   manages: boolean;
   rsvp?: TrainingRsvpState | null;
   openSchedule?: () => void;
   onNextTrainingsChanged?: () => void;
+  /**
+   * Метки видов — наверх, для таба группы: пока таб открыт, гашение «увидел» и правки плана видны
+   * на табе сразу, без перечитывания. Зовётся, только когда лента и план ближайшего занятия пришли.
+   */
+  onMarksChange?: (marks: TrainingMarks) => void;
   children: React.ReactNode;
 }) {
   const reloadNextTrainings = useCallback(() => { onNextTrainingsChanged?.(); }, [onNextTrainingsChanged]);
@@ -227,6 +232,13 @@ export function TrainingsTabProvider({
   const marks = useTrainingMarks({
     rsvp: r ?? null, manages, nextPlan, sessions: sessions.data, trainingsSeen, lanesSeen,
   });
+
+  // Наверх — только посчитанное по пришедшим данным: пустые метки до ответа погасили бы таб группы.
+  // План ближайшего занятия «пришёл», когда ключ даты есть (404 — тоже ответ, `null`).
+  const marksReady = sessions.data != null && (nextDate == null || nextDate in upcomingPlans);
+  useEffect(() => {
+    if (marksReady) onMarksChange?.(marks);
+  }, [marksReady, marks, onMarksChange]);
 
   // Гашение «нового» — один раз за монтирование таба (флаги в ref), не на каждое переключение видов.
   // Лента на экране: телефон — вид Trainings, десктоп — правая колонка (всё, кроме Lanes).

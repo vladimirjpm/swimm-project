@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Archivo+Black&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e6edf2;font-family:'Inter',system-ui,sans-serif;color:#04283e;--bg:#f4f9fc;--hero:linear-gradient(160deg,#dceff7 0%,#f0f8fc 55%,#f4f9fc 100%);--card:#fff;--raised:#f9fbfd;--border:#e0ecf2;--div:#eef4f8;--text:#04283e;--mute:#7b95a3;--faint:#9db0bb;--ghost:#b8c7d0;--acc:#0e7490;--acc-chip:rgba(14,116,144,.10);--acc-border:rgba(14,116,144,.45);--live:#0f7a52;--live-border:rgba(15,122,82,.35);--gold:#b17d11;--panel-border:rgba(14,116,144,.45);--nav:#1b1d3a;--ow:#7c3aed;--ow-chip:rgba(124,58,237,.08);--ow-border:rgba(124,58,237,.45);--disp:'Archivo Black',sans-serif;--mono:'JetBrains Mono',monospace}
+a{color:#0e7490;text-decoration:none}a:hover{color:#0c6379}
+button{font-family:inherit;cursor:pointer}
+*{scrollbar-width:none}::-webkit-scrollbar{display:none}
+</style>
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:20px;padding:48px 48px 24px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">КЛУБ · МОБАЙЛ · ШАПКА</div>
+<div style="font-family:var(--disp);font-size:28px">Following + Official group: три варианта</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">Сейчас в <a href="#6a">6a</a> две крупные кнопки занимают ~80px, а название группы ломается в две строки. Во всех вариантах имя группы больше не стоит в кнопке целиком.</div>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap">
+
+<div id="7a" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">7a</span><span style="font-size:13px;font-weight:700">Following под логотипом</span><span style="font-size:11px;font-weight:800;color:#fff;background:var(--live);padding:2px 8px;border-radius:999px">выбрано → в 6a</span></div>
+<div style="width:390px;border-radius:20px;overflow:hidden;background:var(--hero);box-shadow:0 10px 40px rgba(8,60,84,.12);padding:16px;box-sizing:border-box">
+<div style="display:flex;align-items:flex-start;gap:14px">
+<div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:none;width:84px">
+<img src="assets/club-logo.png" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;display:block">
+<span style="height:26px;width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:4px;border-radius:8px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:10.5px;font-weight:800;color:var(--acc)">✓ Following</span>
+</div>
+<div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:4px;padding-top:4px">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:22px;line-height:1.2;text-align:left;overflow-wrap:anywhere">הפועל דולפין נתניה</h1>
+<div style="font-size:12px;font-weight:700;color:var(--mute)">Hapoel Dolphine Netanya · 🇮🇱 Israel · since 2024</div>
+<a href="#7a" style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;font-weight:800;color:var(--acc)"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:9px;display:flex;align-items:center;justify-content:center">D</span>Official group →</a>
+</div>
+</div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--mute)"><b style="color:var(--text)">Самый компактный.</b> Кнопка Following сидит под логотипом, в колонке, которая всё равно пустая. Тап по ней открывает меню с Unfollow. Официальная группа — текстовая ссылка с мини-аватаром группы, без рамки. Шапка не выше, чем без кнопок.</div>
+</div>
+
+<div id="7b" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">7b</span><span style="font-size:13px;font-weight:700">Иконка-переключатель у имени</span></div>
+<div style="width:390px;border-radius:20px;overflow:hidden;background:var(--hero);box-shadow:0 10px 40px rgba(8,60,84,.12);padding:16px;box-sizing:border-box">
+<div style="display:flex;align-items:flex-start;gap:14px">
+<img src="assets/club-logo.png" alt="" style="width:72px;height:72px;flex:none;border-radius:50%;object-fit:cover;display:block">
+<div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:4px;padding-top:4px">
+<div style="display:flex;align-items:flex-start;gap:10px">
+<h1 dir="rtl" style="flex:1;min-width:0;margin:0;font-family:var(--disp);font-weight:400;font-size:22px;line-height:1.2;text-align:left;overflow-wrap:anywhere">הפועל דולפין נתניה</h1>
+<span title="Following" style="width:36px;height:36px;flex:none;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;box-shadow:0 2px 8px rgba(14,116,144,.3)">★</span>
+</div>
+<div style="font-size:12px;font-weight:700;color:var(--mute)">Hapoel Dolphine Netanya · 🇮🇱 Israel · since 2024</div>
+<div style="font-size:12px;font-weight:700;color:var(--mute);margin-top:2px">Official group: <a href="#7b" style="font-weight:800;color:var(--acc)"><bdi>Dolphin Netanya Masters</bdi> →</a></div>
+</div>
+</div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--mute)"><b style="color:var(--text)">Как избранное.</b> Following — круглая звезда справа от имени: заливка, если клуб в избранном, контур, если нет. Тап переключает сразу, без меню, а снятие подтверждается тостом с «Undo». Официальная группа — третья строка меты с полным названием ссылкой. Минус: звезда без подписи, поэтому гостю при первом тапе нужна подсказка.</div>
+</div>
+
+<div id="7c" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">7c</span><span style="font-size:13px;font-weight:700">Две компактные кнопки в ряд</span></div>
+<div style="width:390px;border-radius:20px;overflow:hidden;background:var(--hero);box-shadow:0 10px 40px rgba(8,60,84,.12);padding:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:flex-start;gap:14px">
+<img src="assets/club-logo.png" alt="" style="width:72px;height:72px;flex:none;border-radius:50%;object-fit:cover;display:block">
+<div style="min-width:0;flex:1;padding-top:4px">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:22px;line-height:1.2;text-align:left;overflow-wrap:anywhere">הפועל דולפין נתניה</h1>
+<div style="font-size:12px;font-weight:700;color:var(--mute);margin-top:2px">Hapoel Dolphine Netanya · 🇮🇱 Israel · since 2024</div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+<span style="height:36px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">✓ Following <span style="opacity:.6">▾</span></span>
+<span style="height:36px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-size:12px;font-weight:800;color:var(--text)"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:9px;display:flex;align-items:center;justify-content:center">D</span>Official group →</span>
+</div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--mute)"><b style="color:var(--text)">Ровный ряд.</b> Два действия одинакового размера в одну строку на всю ширину: «✓ Following ▾» (меню с Unfollow) и «Official group →» с мини-аватаром группы. Полное название группы видно на её странице. Понятнее всех, но это +48px к высоте.</div>
+</div>
+
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px;padding:48px 48px 24px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">КЛУБ · ТОТ ЖЕ КАРКАС</div>
+<div style="font-family:var(--disp);font-size:28px">Страница клуба: мобайл и десктоп</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">Те же решения, что у группы (<a href="#2a">2a</a> / <a href="#4a">4a</a>): имя в 2 строки, кнопка статуса с ⋯ под именем, плитки KPI со ссылкой, табы с Results и чипами, фиолетовые инструменты админа. Отличия клуба: страница только для чтения, блока тренировок нет, есть полоса сезона, вместо «Member» — «Following», вместо Competitions — History.</div>
+<div style="font-size:13px;font-weight:700;color:var(--text);padding:10px 14px;border:1px solid var(--acc-border);background:var(--acc-chip);border-radius:10px;max-width:760px">Клуб — страница только для чтения: админов и тренеров у неё нет, фиолетовых инструментов нет. Всё управляемое (тренеры, тренировки, RSVP, админка) живёт в официальной группе клуба, куда ведёт «Official group →».</div>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap">
+
+<div id="6a" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">6a</span><span style="font-size:13px;font-weight:700">Клуб · мобайл</span></div>
+<div style="position:relative;width:390px;height:844px;border-radius:24px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12);display:flex;flex-direction:column">
+<div style="height:48px;flex:none;background:var(--nav);display:flex;align-items:center;justify-content:space-between;padding:0 14px"><div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:8px;background:#5b5fc7;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center">S</span><span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#eef1f6">SWIM<span style="color:#8b8fe8">HUB</span></span></div><div style="display:flex;align-items:center;gap:16px"><sc-if value="{{ cLogged }}" hint-placeholder-val="{{ true }}"><span style="width:28px;height:28px;border-radius:50%;background:#5b5fc7;color:#fff;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center">V</span></sc-if><sc-if value="{{ cIsGuest }}" hint-placeholder-val="{{ false }}"><span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;border:1px solid rgba(238,241,246,.4);color:#eef1f6;font-size:12px;font-weight:800">Sign in</span></sc-if><span style="display:flex;flex-direction:column;gap:5px;align-items:flex-end"><span style="width:20px;height:2px;background:#eef1f6;border-radius:2px"></span><span style="width:14px;height:2px;background:#eef1f6;border-radius:2px"></span></span></div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding-bottom:{{ cDockPad }}px">
+<div style="background:var(--hero);padding:16px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid var(--border)">
+<div style="display:flex;align-items:flex-start;gap:14px">
+<div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;flex:none;width:84px">
+<img src="assets/club-logo.png" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;display:block">
+<sc-if value="{{ cIsGuest }}" hint-placeholder-val="{{ false }}"><span style="height:26px;width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--acc);font-family:var(--mono);font-size:10.5px;font-weight:800;color:#fff">+ Follow</span></sc-if>
+<sc-if value="{{ cLogged }}" hint-placeholder-val="{{ true }}"><button onClick="{{ cToggleMenu }}" style="height:26px;width:100%;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:10.5px;font-weight:800;color:var(--acc);padding:0">✓ Following</button></sc-if>
+<sc-if value="{{ cMenu }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:110px;left:0;z-index:5;width:160px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(8,60,84,.16);padding:6px"><button onClick="{{ cToggleMenu }}" style="width:100%;text-align:left;padding:10px;border:0;border-radius:8px;background:rgba(178,59,59,.08);color:#b23b3b;font-size:13px;font-weight:800">Unfollow</button></div></sc-if>
+</div>
+<div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:4px;padding-top:4px">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:22px;line-height:1.2;text-align:left;overflow-wrap:anywhere">הפועל דולפין נתניה</h1>
+<div style="font-size:12px;font-weight:700;color:var(--mute)">Hapoel Dolphine Netanya · 🇮🇱 Israel · since 2024</div>
+<a href="#6a" title="Dolphin Netanya Masters" style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;font-weight:800;color:var(--acc)"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:9px;display:flex;align-items:center;justify-content:center">D</span>Official group →</a>
+</div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
+<sc-for list="{{ cKpi }}" as="k" hint-placeholder-count="5"><div style="padding:10px 10px 9px"><div style="font-family:var(--disp);font-size:24px;line-height:1;color:{{ k.color }}">{{ k.v }}</div><div style="margin-top:4px;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">{{ k.l }}</div><div style="font-size:9.5px;font-weight:700;color:var(--ghost)">{{ k.h }}</div></div></sc-for>
+<div style="padding:10px 10px 9px;border-radius:12px;border:1px solid var(--acc-border);background:var(--acc-chip)"><div style="font-family:var(--disp);font-size:24px;line-height:1;color:var(--acc)">28</div><div style="margin-top:4px;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--acc)">Competitions →</div><div style="font-size:9.5px;font-weight:700;color:var(--acc);opacity:.7">history</div></div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;background:#f0f6fa;border-bottom:1px solid var(--border)">
+<span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)">Season</span>
+<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px">
+<span style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:12px">‹</span>
+<span style="width:52px;text-align:center;font-family:var(--disp);font-size:13px;color:var(--faint)">24/25</span>
+<span style="width:52px;text-align:center;font-family:var(--disp);font-size:13px;color:var(--mute)">25/26</span>
+<span style="width:52px;text-align:center;font-family:var(--disp);font-size:24px;line-height:1;color:var(--acc)">∞</span>
+<span style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--ghost);font-size:12px">›</span>
+</div>
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:999px;border:1px solid var(--acc-border);background:var(--acc-chip);font-size:11.5px;font-weight:800;color:var(--acc)">All</span>
+</div>
+<div style="position:sticky;top:0;z-index:3;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px;padding:8px 8px 0;border-bottom:1px solid {{ cLine }};background:var(--bg)">
+<sc-for list="{{ cTabs }}" as="t" hint-placeholder-count="6"><button onClick="{{ t.pick }}" style="position:relative;height:52px;margin-bottom:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid {{ t.bc }};border-bottom:0;border-radius:12px 12px 0 0;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:17px;line-height:1">{{ t.icon }}</span><span style="font-size:10px;font-weight:800">{{ t.label }}</span><span style="position:absolute;top:4px;right:5px;font-size:9px;line-height:1">{{ t.mark }}</span></button></sc-for>
+</div>
+<div style="background:#fff;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:420px;border-top:3px solid {{ cPanelTop }}">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><div style="font-family:var(--disp);font-size:16px">{{ cTitle }}</div><sc-if value="{{ cEdit }}" hint-placeholder-val="{{ false }}"><span style="height:22px;display:flex;align-items:center;padding:0 8px;border-radius:999px;border:1px solid var(--ow-border);background:var(--ow-chip);color:var(--ow);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">✎ you can edit</span></sc-if></div>
+<sc-if value="{{ cIsResults }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ resChips }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.pick }}" style="min-height:36px;display:flex;align-items:center;gap:6px;padding:0 12px;border-radius:999px;border:1px solid {{ c.bc }};background:{{ c.bg }};color:{{ c.fg }};font-size:12px;font-weight:800"><span>{{ c.icon }}</span>{{ c.label }}</button></sc-for></div></sc-if>
+<sc-for list="{{ cRows }}" as="p" hint-placeholder-count="3"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--raised)"><div style="min-width:0"><div dir="auto" style="font-size:13px;font-weight:800;text-align:left">{{ p.a }}</div><div style="font-size:11px;font-weight:700;color:var(--mute)">{{ p.b }}</div></div><span style="flex:none;height:28px;display:flex;align-items:center;padding:0 10px;border-radius:8px;border:1px solid {{ p.cbc }};color:{{ p.cfg }};font-size:11.5px;font-weight:800">{{ p.c }}</span></div></sc-for>
+</div>
+</div>
+<sc-if value="{{ cIsStaff }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);border-top:1px solid var(--ow-border);box-shadow:0 -6px 20px rgba(76,29,149,.10);padding:8px 10px 14px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ow);padding-left:4px">Club admin</div>
+<button onClick="{{ cAdminPick }}" style="height:46px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--ow-border);border-radius:12px;background:{{ cAdminBg }};color:{{ cAdminFg }};font-size:13px;font-weight:800"><span style="font-size:16px">⚙</span>Admin<span style="font-size:10.5px;font-weight:700;opacity:.75">· display · cache</span></button>
+</div>
+</sc-if>
+</div>
+</div>
+
+<div id="6b" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">6b</span><span style="font-size:13px;font-weight:700">Клуб · десктоп (фото нет → колонка схлопнута)</span></div>
+<div style="width:1180px;border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12);display:flex;flex-direction:column">
+<header style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:var(--nav)">
+<div style="display:flex;align-items:center;gap:8px"><span style="width:28px;height:28px;border-radius:8px;background:#5b5fc7;color:#fff;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center">S</span><span style="font-size:12px;font-weight:900;letter-spacing:.22em;color:#eef1f6">SWIM<span style="color:#8b8fe8">HUB</span></span></div>
+<nav style="display:flex;gap:28px;font-size:14px;font-weight:700;color:rgba(238,241,246,.55)"><span>Home</span><span>Competitions</span><span>Groups</span><span>Head to head</span><span>Normatives</span><span>Records</span><span>About</span></nav>
+<span style="width:30px;height:30px;border-radius:50%;background:#5b5fc7;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center">V</span>
+</header>
+<div style="padding:24px 28px 32px;display:flex;flex-direction:column;gap:16px">
+<div style="background:var(--hero);border:1px solid var(--border);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;align-items:flex-start;gap:20px">
+<div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;flex:none;width:112px">
+<img src="assets/club-logo.png" alt="" style="width:96px;height:96px;border-radius:50%;object-fit:cover;display:block">
+<sc-if value="{{ cIsGuest }}" hint-placeholder-val="{{ false }}"><span style="height:30px;width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--acc);font-family:var(--mono);font-size:12px;font-weight:800;color:#fff">+ Follow</span></sc-if>
+<sc-if value="{{ cLogged }}" hint-placeholder-val="{{ true }}"><button onClick="{{ cToggleMenu }}" style="height:30px;width:100%;display:flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc);padding:0">✓ Following</button></sc-if>
+<sc-if value="{{ cMenu }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:142px;left:0;z-index:5;width:170px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(8,60,84,.16);padding:6px"><button onClick="{{ cToggleMenu }}" style="width:100%;text-align:left;padding:10px;border:0;border-radius:8px;background:rgba(178,59,59,.08);color:#b23b3b;font-size:13px;font-weight:800">Unfollow</button></div></sc-if>
+</div>
+<div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:6px;padding-top:6px">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:40px;line-height:1.12;text-align:left;overflow-wrap:anywhere">הפועל דולפין נתניה</h1>
+<div style="font-size:13px;font-weight:700;color:var(--mute)">Hapoel Dolphine Netanya · 🇮🇱 Israel · since 2024</div>
+<a href="#6b" title="Dolphin Netanya Masters" style="display:flex;align-items:center;gap:7px;margin-top:2px;font-size:13px;font-weight:800;color:var(--acc)"><span style="width:20px;height:20px;border-radius:6px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:10px;display:flex;align-items:center;justify-content:center">D</span>Official group →</a>
+</div>
+</div>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-end;flex-wrap:wrap">
+<sc-for list="{{ cKpi }}" as="k" hint-placeholder-count="5"><div><div style="font-family:var(--disp);font-size:34px;line-height:1;color:{{ k.color }}">{{ k.v }}</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">{{ k.l }}</div><div style="font-size:10.5px;font-weight:700;color:var(--ghost)">{{ k.h }}</div></div></sc-for>
+<div style="padding:8px 12px;margin:-8px -12px;border-radius:12px;border:1px solid var(--acc-border);background:var(--acc-chip)"><div style="font-family:var(--disp);font-size:34px;line-height:1;color:var(--acc)">28</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--acc)">Competitions →</div><div style="font-size:10.5px;font-weight:700;color:var(--acc);opacity:.7">history</div></div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:8px 16px;border:1px solid var(--border);border-radius:14px;background:#f0f6fa">
+<span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)">Season</span>
+<div style="display:flex;align-items:center;gap:4px">
+<span style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:12px">‹</span>
+<span style="width:60px;text-align:center;font-family:var(--disp);font-size:14px;color:var(--ghost)">23/24</span>
+<span style="width:60px;text-align:center;font-family:var(--disp);font-size:14px;color:var(--faint)">24/25</span>
+<span style="width:60px;text-align:center;font-family:var(--disp);font-size:14px;color:var(--mute)">25/26</span>
+<span style="width:60px;text-align:center;font-family:var(--disp);font-size:26px;line-height:1;color:var(--acc)">∞</span>
+<span style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--ghost);font-size:12px">›</span>
+</div>
+<span style="height:28px;display:flex;align-items:center;padding:0 14px;border-radius:999px;border:1px solid var(--acc-border);background:var(--acc-chip);font-size:12px;font-weight:800;color:var(--acc)">All seasons</span>
+</div>
+<div style="display:flex;align-items:flex-end;gap:6px">
+<sc-for list="{{ cTabs }}" as="t" hint-placeholder-count="6"><button onClick="{{ t.pick }}" style="flex:1;min-width:0;height:64px;margin-bottom:-1px;padding:10px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;border:1px solid {{ t.dbc }};border-bottom:0;border-radius:14px 14px 0 0;background:{{ t.dbg }};text-align:left;position:relative;z-index:1"><span style="display:flex;align-items:center;gap:8px;min-width:0;max-width:100%"><span style="width:22px;height:22px;flex:none;border-radius:6px;background:{{ t.ibg }};color:{{ t.ifg }};font-size:12px;display:flex;align-items:center;justify-content:center">{{ t.icon }}</span><span style="font-size:13px;font-weight:700;color:{{ t.dfg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.full }}</span><span style="font-size:10px;color:{{ t.dfg }}">{{ t.mark }}</span></span><span style="font-size:10.5px;font-weight:800;color:{{ t.sfg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">{{ t.sub }}</span></button></sc-for>
+<sc-if value="{{ cIsStaff }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:4px;margin-left:10px;padding-left:12px;border-left:2px dashed var(--ow-border);flex:0 0 170px">
+<span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ow)">Club admin</span>
+<button onClick="{{ cAdminPick }}" style="height:48px;margin-bottom:-1px;padding:0 12px;display:flex;align-items:center;gap:8px;border:1px solid var(--ow-border);border-bottom:{{ cAdminBb }};border-radius:14px 14px 0 0;background:{{ cAdminDbg }};color:var(--ow);font-size:13px;font-weight:800;position:relative;z-index:1"><span style="font-size:15px">⚙</span>Admin</button>
+</div>
+</sc-if>
+</div>
+<div style="background:#fff;border:1px solid {{ cPanelBorder }};border-radius:0 0 16px 16px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;min-height:240px">
+<div style="display:flex;align-items:center;gap:12px"><div style="font-family:var(--disp);font-size:19px">{{ cTitle }}</div><sc-if value="{{ cEdit }}" hint-placeholder-val="{{ false }}"><span style="height:24px;display:flex;align-items:center;padding:0 10px;border-radius:999px;border:1px solid var(--ow-border);background:var(--ow-chip);color:var(--ow);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">✎ you can edit</span></sc-if></div>
+<sc-if value="{{ cIsResults }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ resChips }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.pick }}" style="min-height:36px;display:flex;align-items:center;gap:6px;padding:0 14px;border-radius:999px;border:1px solid {{ c.bc }};background:{{ c.bg }};color:{{ c.fg }};font-size:12.5px;font-weight:800"><span>{{ c.icon }}</span>{{ c.label }}</button></sc-for></div></sc-if>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+<sc-for list="{{ cRows }}" as="p" hint-placeholder-count="3"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--raised)"><div style="min-width:0"><div dir="auto" style="font-size:13.5px;font-weight:800;text-align:left">{{ p.a }}</div><div style="font-size:11.5px;font-weight:700;color:var(--mute)">{{ p.b }}</div></div><span style="flex:none;height:30px;display:flex;align-items:center;padding:0 12px;border-radius:8px;border:1px solid {{ p.cbc }};color:{{ p.cfg }};font-size:12px;font-weight:800">{{ p.c }}</span></div></sc-for>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;font-size:12.5px;line-height:1.6;color:var(--text);max-width:1610px">
+<div><b>Общее с группой.</b> <span style="color:var(--mute)">Имя 22 / 40px в 2 строки без обрезки, логотип 72 / 96px, одна кнопка статуса с ⋯ под именем (Following → Unfollow), плитка-ссылка в конце KPI, табы Overview · Season · Results · Swimmers · Media + History, Results с чипами.</span></div>
+<div><b>Своё у клуба.</b> <span style="color:var(--mute)">Нет блока тренировок и RSVP. KPI 5 + плитка «28 Competitions →» (ведёт в History), на мобайле сетка 3 × 2. Полоса сезона 44px между шапкой и табами. Фото нет: на мобайле блока нет, на десктопе левая колонка на всю ширину (заглушки нет вовсе).</span></div>
+<div><b>Только чтение.</b> <span style="color:var(--mute)">Нет роли админа или тренера, нет таба Admin, нет ✎ и фиолетового. Чип «Official group: … →» ведёт в официальную группу клуба: там тренеры, тренировки, RSVP и управление (<a href="#2a">2a</a>). Настройки отображения клуба (фото, кэш) остаются только у админа сайта, в служебной админке, а не на странице.</span></div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:24px;padding:48px 48px 24px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">ДЕСКТОП · КНОПКИ ШАПКИ</div>
+<div style="font-family:var(--disp);font-size:28px">Кнопки не должны теснить имя</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">Сейчас в <a href="#4a">4a</a> три кнопки (~330px) стоят в одной строке с именем и съедают ширину под длинное ивритское название. Три способа это исправить. Показан верх шапки.</div>
+</div>
+
+<div id="5a" style="display:flex;flex-direction:column;gap:10px;width:1180px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">5a</span><span style="font-size:13px;font-weight:700">Переместить: кнопки под имя, в строку меты</span></div>
+<div style="background:var(--hero);border:1px solid var(--border);border-radius:16px;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px">
+<div style="display:flex;align-items:flex-start;gap:18px;min-width:0">
+<span style="width:80px;height:80px;flex:none;border-radius:18px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:32px;display:flex;align-items:center;justify-content:center">D</span>
+<div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:10px">
+<div>
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:34px;line-height:1.15;text-align:left;overflow-wrap:anywhere">דולפין נתניה מסטרס</h1>
+<div style="font-size:13px;font-weight:700;color:var(--mute);margin-top:4px">Dolphin Netanya Masters · 🇮🇱 <bdi>נתניה</bdi></div>
+</div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+<span style="height:34px;display:flex;align-items:center;padding:0 14px;border-radius:10px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:12.5px;font-weight:800;color:var(--acc)">Competitions →</span>
+<span style="height:34px;display:flex;align-items:center;padding:0 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-family:var(--mono);font-size:12.5px;font-weight:800;color:var(--mute)">✓ Member</span>
+<span style="width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--mute);font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center">⋯</span>
+</div>
+</div>
+</div>
+<img src="assets/group-photo.png" alt="" style="width:100%;height:190px;object-fit:cover;border-radius:16px;display:block;border:1px solid var(--border)">
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--mute);max-width:900px"><b style="color:var(--text)">Минимальная правка.</b> Имя получает всю ширину колонки, кнопки встают строкой под подзаголовком. Та же раскладка, что на мобайле (1a), поэтому код шапки один. Шапка становится выше примерно на 44px.</div>
+</div>
+
+<div id="5b" style="display:flex;flex-direction:column;gap:10px;width:1180px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">5b</span><span style="font-size:13px;font-weight:700">Переместить: кнопки на фото</span></div>
+<div style="background:var(--hero);border:1px solid var(--border);border-radius:16px;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px">
+<div style="display:flex;align-items:flex-start;gap:18px;min-width:0">
+<span style="width:80px;height:80px;flex:none;border-radius:18px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:32px;display:flex;align-items:center;justify-content:center">D</span>
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:34px;line-height:1.15;text-align:left;overflow-wrap:anywhere">דולפין נתניה מסטרס</h1>
+<div style="font-size:13px;font-weight:700;color:var(--mute);margin-top:4px">Dolphin Netanya Masters · 🇮🇱 <bdi>נתניה</bdi></div>
+</div>
+</div>
+<div style="position:relative;height:190px;border-radius:16px;overflow:hidden;border:1px solid var(--border)">
+<img src="assets/group-photo.png" alt="" style="width:100%;height:100%;object-fit:cover;display:block">
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,40,62,.55) 0%,rgba(4,40,62,0) 45%)"></div>
+<div style="position:absolute;top:10px;right:10px;display:flex;gap:6px">
+<span style="height:32px;display:flex;align-items:center;padding:0 12px;border-radius:999px;background:rgba(4,40,62,.55);border:1px solid rgba(255,255,255,.4);font-family:var(--mono);font-size:12px;font-weight:800;color:#fff">✓ Member</span>
+<span style="width:32px;height:32px;border-radius:50%;background:rgba(4,40,62,.55);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center">⋯</span>
+</div>
+<span style="position:absolute;left:10px;bottom:10px;height:34px;display:flex;align-items:center;padding:0 14px;border-radius:10px;background:#fff;font-family:var(--mono);font-size:12.5px;font-weight:800;color:var(--acc);box-shadow:0 4px 14px rgba(4,40,62,.25)">Competitions →</span>
+</div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--mute);max-width:900px"><b style="color:var(--text)">Высота не растёт.</b> Статус участника и ⋯ стоят в углу фото (так делают на страницах групп в соцсетях), Competitions — белая кнопка в нижнем углу фото. Минус: если фото нет или оно выключено, кнопкам нужно запасное место, тогда работает раскладка 5a. Белый текст на фото держится только за счёт затемнения сверху.</div>
+</div>
+
+<div id="5c" style="display:flex;flex-direction:column;gap:10px;width:1180px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">5c</span><span style="font-size:13px;font-weight:700">Переделать: кнопок нет, у каждой функции своё место</span><span style="font-size:11px;font-weight:800;color:#fff;background:var(--live);padding:2px 8px;border-radius:999px">выбрано → в 4a</span></div>
+<div style="background:var(--hero);border:1px solid var(--border);border-radius:16px;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px">
+<div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+<div style="display:flex;align-items:flex-start;gap:18px">
+<span style="width:80px;height:80px;flex:none;border-radius:18px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:32px;display:flex;align-items:center;justify-content:center">D</span>
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:34px;line-height:1.15;text-align:left;overflow-wrap:anywhere">דולפין נתניה מסטרס</h1>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:13px;font-weight:700;color:var(--mute)">
+<span>Dolphin Netanya Masters · 🇮🇱 <bdi>נתניה</bdi></span>
+<span style="display:flex;gap:6px"><span style="height:32px;display:flex;align-items:center;padding:0 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-family:var(--mono);font-size:12px;font-weight:800;color:var(--mute)">✓ Member</span><span style="width:32px;height:32px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--mute);font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center">⋯</span></span>
+</div>
+</div>
+</div>
+<div style="display:flex;gap:32px;align-items:flex-end">
+<div><div style="font-family:var(--disp);font-size:34px;line-height:1">23</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">Swimmers</div></div>
+<div><div style="font-family:var(--disp);font-size:34px;line-height:1">20</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">Records</div></div>
+<div style="padding:8px 12px;margin:-8px -12px;border-radius:12px;border:1px solid var(--acc-border);background:var(--acc-chip)"><div style="font-family:var(--disp);font-size:34px;line-height:1;color:var(--acc)">28</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--acc)">Competitions →</div></div>
+</div>
+</div>
+<img src="assets/group-photo.png" alt="" style="width:100%;height:190px;object-fit:cover;border-radius:16px;display:block;border:1px solid var(--border)">
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--mute);max-width:900px"><b style="color:var(--text)">Самый чистый вариант.</b> Членство — не действие, а статус, поэтому «✓ Member» и ⋯ (в меню Leave group) стоят в строке меты рядом с подзаголовком. У гостя на этом месте «+ Join group». Competitions стал плиткой в ряду KPI с числом соревнований и стрелкой: по нему переходят на экран соревнований. В строке имени не остаётся ничего, кроме имени.</div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px;padding:48px 48px 24px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">ДЕСКТОП · 1180px</div>
+<div style="font-family:var(--disp);font-size:28px">Страница группы на десктопе</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">То же, что в <a href="#2a">2a</a>, разложенное на ширину. Переключатели роли и режима ответа общие с мобайлом. Прокрути артборд, чтобы увидеть липкую шапку.</div>
+</div>
+<div id="4a" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">4a</span>
+<div style="display:grid;grid-template-columns:repeat(3,auto);gap:3px;padding:3px;border-radius:12px;background:#fff;border:1px solid var(--border)">
+<sc-for list="{{ roles }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.pick }}" style="height:32px;padding:0 14px;border:0;border-radius:9px;background:{{ r.bg }};color:{{ r.fg }};font-size:12px;font-weight:800">{{ r.label }}</button></sc-for>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2,auto);gap:3px;padding:3px;border-radius:12px;background:#fff;border:1px solid var(--border)">
+<sc-for list="{{ rsvpModes }}" as="r" hint-placeholder-count="2"><button onClick="{{ r.pick }}" style="height:32px;padding:0 14px;border:0;border-radius:9px;background:{{ r.bg }};color:{{ r.fg }};font-size:12px;font-weight:800">{{ r.label }}</button></sc-for>
+</div>
+</div>
+<div style="position:relative;width:1180px;height:900px;border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12);display:flex;flex-direction:column">
+<header style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:var(--nav)">
+<div style="display:flex;align-items:center;gap:8px"><span style="width:28px;height:28px;border-radius:8px;background:#5b5fc7;color:#fff;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center">S</span><span style="font-size:12px;font-weight:900;letter-spacing:.22em;color:#eef1f6">SWIM<span style="color:#8b8fe8">HUB</span></span></div>
+<nav style="display:flex;gap:28px;font-size:14px;font-weight:700;color:rgba(238,241,246,.55)"><span>Home</span><span>Competitions</span><span style="color:#eef1f6">Groups</span><span>Head to head</span><span>Normatives</span><span>Records</span><span>About</span></nav>
+<sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:10px"><span style="width:30px;height:30px;border-radius:50%;background:#5b5fc7;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center">V</span><span style="font-size:13px;font-weight:800;color:#eef1f6">Vladimir Barentsev</span></div></sc-if>
+<sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}"><span style="height:32px;display:flex;align-items:center;padding:0 14px;border-radius:8px;border:1px solid rgba(238,241,246,.4);color:#eef1f6;font-size:13px;font-weight:800">Sign in</span></sc-if>
+</header>
+<sc-if value="{{ stuckD }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:54px;left:0;right:0;z-index:4;height:52px;display:flex;align-items:center;gap:12px;padding:0 28px;background:rgba(244,249,252,.97);border-bottom:1px solid var(--border);box-shadow:0 4px 14px rgba(8,60,84,.08)">
+<span style="width:32px;height:32px;flex:none;border-radius:9px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:15px;display:flex;align-items:center;justify-content:center">D</span>
+<div dir="rtl" style="min-width:0;font-family:var(--disp);font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">דולפין נתניה מסטרס</div>
+<span style="font-size:12px;font-weight:700;color:var(--mute)">Dolphin Netanya Masters</span>
+<span style="margin-left:auto;height:30px;display:flex;align-items:center;padding:0 12px;border-radius:9px;border:1px solid {{ stickyBc }};background:{{ stickyBg }};color:{{ stickyFg }};font-family:var(--mono);font-size:12px;font-weight:800">{{ stickyLabel }}</span>
+</div>
+</sc-if>
+<div onScroll="{{ onScrollD }}" style="flex:1;min-height:0;overflow-y:auto;padding:24px 28px 40px;display:flex;flex-direction:column;gap:16px">
+<sc-if value="{{ bannerOn }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:20px;padding:14px 18px;border-radius:14px;background:#fff;border:1px solid var(--live-border);box-shadow:inset 4px 0 0 var(--live)">
+<span style="width:10px;height:10px;flex:none;border-radius:50%;background:var(--live);box-shadow:0 0 0 4px rgba(15,122,82,.14)"></span>
+<div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)">Next training · tomorrow</span>
+<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span style="font-family:var(--mono);font-size:16px;font-weight:800">Tue 29 Sep · 20:00</span><span style="font-size:13px;font-weight:700;color:var(--mute)">📍 <bdi>חוף ירוק</bdi> · {{ rsvpYes }} going</span></div>
+</div>
+<span style="margin-left:auto;font-size:14px;font-weight:800">Are you coming?</span>
+<div style="display:flex;gap:8px">
+<button onClick="{{ rsvpGo }}" style="height:40px;padding:0 18px;border-radius:10px;border:1px solid {{ goBc }};background:{{ goBg }};color:{{ goFg }};font-size:13px;font-weight:800">✓ Going</button>
+<button onClick="{{ rsvpMaybeFn }}" style="height:40px;padding:0 18px;border-radius:10px;border:1px solid {{ maybeBc }};background:{{ maybeBg }};color:{{ maybeFg }};font-size:13px;font-weight:800">? Not sure</button>
+<button onClick="{{ rsvpSkip }}" style="height:40px;padding:0 18px;border-radius:10px;border:1px solid {{ skipBc }};background:{{ skipBg }};color:{{ skipFg }};font-size:13px;font-weight:800">✕ Can't come</button>
+</div>
+</div>
+</sc-if>
+<div style="background:var(--hero);border:1px solid var(--border);border-radius:16px;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;flex:none">
+<div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+<div style="display:flex;align-items:flex-start;gap:18px">
+<span style="width:80px;height:80px;flex:none;border-radius:18px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:32px;display:flex;align-items:center;justify-content:center">D</span>
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:34px;line-height:1.15;text-align:left;overflow-wrap:anywhere">דולפין נתניה מסטרס</h1>
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px"><span style="font-size:13px;font-weight:700;color:var(--mute)">Dolphin Netanya Masters · 🇮🇱 <bdi>נתניה</bdi></span>
+<div style="position:relative;display:flex;gap:6px">
+<span style="height:32px;display:flex;align-items:center;padding:0 12px;border-radius:10px;border:1px solid {{ joinBc }};background:{{ joinBg }};font-family:var(--mono);font-size:12px;font-weight:800;color:{{ joinFg }}">{{ joinLabel }}</span>
+<sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}"><button onClick="{{ toggleDots }}" aria-label="More" style="width:32px;height:32px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--mute);font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center">⋯</button></sc-if>
+<sc-if value="{{ dotsOpen }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:38px;left:0;z-index:5;width:180px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(8,60,84,.16);padding:6px"><button onClick="{{ toggleDots }}" style="width:100%;text-align:left;padding:10px;border:0;border-radius:8px;background:rgba(178,59,59,.08);color:#b23b3b;font-size:13px;font-weight:800">Leave group</button></div></sc-if>
+</div>
+</div>
+</div>
+
+</div>
+<sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--border);border-radius:12px;background:var(--card)">
+<span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)">Trainings</span>
+<div style="display:flex;gap:16px;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--mute)"><span><b style="color:var(--text)">Tue</b> 20:00–21:00</span><span><b style="color:var(--text)">Sat</b> 10:00–12:00</span><span><b style="color:var(--text)">Sun</b> 20:00–21:00</span></div>
+<span style="font-size:13px;font-weight:700;color:var(--mute)">📍 <bdi style="color:var(--text);font-weight:800">חוף ירוק</bdi> · 25m pool</span>
+</div>
+</sc-if>
+<sc-if value="{{ heroNext }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px 24px;align-items:center;padding:14px 16px;border:1px solid var(--live-border);border-radius:12px;background:var(--card)">
+<div style="display:flex;align-items:center;gap:10px;min-width:0">
+<span style="width:9px;height:9px;flex:none;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px rgba(15,122,82,.14)"></span>
+<div style="min-width:0"><div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)">Next</span><span style="font-family:var(--mono);font-size:15px;font-weight:800">Tue 29 Sep · 20:00</span><span style="font-size:12.5px;font-weight:700;color:var(--mute)">tomorrow</span></div><div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--mute);margin-top:3px">Tue · Sat · Sun · <bdi>חוף ירוק</bdi> · 25m</div></div>
+</div>
+<sc-if value="{{ isMemberOnly }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;gap:6px">
+<button onClick="{{ rsvpGo }}" style="height:38px;padding:0 14px;border-radius:10px;border:1px solid {{ goBc }};background:{{ goBg }};color:{{ goFg }};font-size:12.5px;font-weight:800">✓ Going</button>
+<button onClick="{{ rsvpMaybeFn }}" style="height:38px;padding:0 14px;border-radius:10px;border:1px solid {{ maybeBc }};background:{{ maybeBg }};color:{{ maybeFg }};font-size:12.5px;font-weight:800">? Not sure</button>
+<button onClick="{{ rsvpSkip }}" style="height:38px;padding:0 14px;border-radius:10px;border:1px solid {{ skipBc }};background:{{ skipBg }};color:{{ skipFg }};font-size:12.5px;font-weight:800">✕ Can't come</button>
+</div>
+</sc-if>
+<sc-if value="{{ isStaff }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:10px">
+<div style="display:flex"><sc-for list="{{ goingAv }}" as="a" hint-placeholder-count="5"><span style="width:26px;height:26px;margin-right:-7px;border-radius:50%;border:2px solid #fff;background:{{ a.bg }};color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ a.l }}</span></sc-for></div>
+<span style="margin-left:6px;font-size:12px;font-weight:700;color:var(--mute)">+9</span>
+<span style="height:34px;display:flex;align-items:center;padding:0 12px;border-radius:9px;border:1px solid var(--ow-border);background:var(--ow-chip);color:var(--ow);font-size:12.5px;font-weight:800">Who's coming →</span>
+</div>
+</sc-if>
+<div style="grid-column:1 / -1;display:flex;align-items:center;gap:16px">
+<div style="flex:1;display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--div)"><span style="width:{{ rsvpYesPct }}%;background:var(--live)"></span><span style="width:{{ rsvpMaybePct }}%;background:#d9a420"></span><span style="width:{{ rsvpNoPct }}%;background:#b23b3b;opacity:.75"></span></div>
+<div style="display:flex;gap:14px;font-family:var(--mono);font-size:12px;font-weight:800;flex:none">
+<span style="color:var(--live)">● {{ rsvpYes }} going</span><span style="color:#b17d11">● {{ rsvpMaybe }} not sure</span><span style="color:#b23b3b">● {{ rsvpNo }} not going</span>
+</div>
+</div>
+</div>
+</sc-if>
+<div style="display:flex;gap:32px;margin-top:auto">
+<div><div style="font-family:var(--disp);font-size:34px;line-height:1">23</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">Swimmers</div><div style="font-size:10.5px;font-weight:700;color:var(--ghost)">in the roster</div></div>
+<div><div style="font-family:var(--disp);font-size:34px;line-height:1">20</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">Records</div><div style="font-size:10.5px;font-weight:700;color:var(--ghost)">best in the group</div></div>
+<a href="#4a" style="display:block;padding:8px 12px;margin:-8px -12px;border-radius:12px;border:1px solid var(--acc-border);background:var(--acc-chip);text-decoration:none"><div style="font-family:var(--disp);font-size:34px;line-height:1;color:var(--acc)">28</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--acc)">Competitions →</div><div style="font-size:10.5px;font-weight:700;color:var(--acc);opacity:.7">all meets</div></a>
+</div>
+</div>
+<img src="assets/group-photo.png" alt="" style="width:100%;height:100%;min-height:300px;object-fit:cover;border-radius:16px;display:block;border:1px solid var(--border)">
+</div>
+<div style="position:sticky;top:0;z-index:3;display:flex;align-items:flex-end;gap:6px;background:var(--bg);padding-top:{{ tabsPadD }}px;margin-top:{{ tabsMarD }}px">
+<sc-for list="{{ topTabsD }}" as="t" hint-placeholder-count="5">
+<button onClick="{{ t.pick }}" style="flex:1;min-width:0;height:64px;margin-bottom:-1px;padding:10px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;border:1px solid {{ t.dbc }};border-bottom:0;border-radius:14px 14px 0 0;background:{{ t.dbg }};text-align:left;position:relative;z-index:1"><span style="display:flex;align-items:center;gap:8px;min-width:0;max-width:100%"><span style="width:22px;height:22px;flex:none;border-radius:6px;background:{{ t.ibg }};color:{{ t.ifg }};font-size:12px;display:flex;align-items:center;justify-content:center">{{ t.icon }}</span><span style="font-size:13px;font-weight:700;color:{{ t.dfg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.full }}</span><span style="font-size:10px;color:{{ t.dfg }}">{{ t.mark }}</span></span><span style="font-size:10.5px;font-weight:800;color:{{ t.sfg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">{{ t.sub }}</span></button>
+</sc-for>
+<sc-if value="{{ isStaff }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:4px;margin-left:10px;padding-left:12px;border-left:2px dashed var(--ow-border);flex:0 0 330px">
+<span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ow)">Coach tools</span>
+<div style="display:flex;gap:6px">
+<sc-for list="{{ dockTabsD }}" as="t" hint-placeholder-count="2">
+<button onClick="{{ t.pick }}" style="flex:1;min-width:0;height:48px;margin-bottom:-1px;padding:0 12px;display:flex;align-items:center;gap:8px;border:1px solid var(--ow-border);border-bottom:{{ t.bb }};border-radius:14px 14px 0 0;background:{{ t.bg }};color:{{ t.fg }};font-size:13px;font-weight:800;position:relative;z-index:1"><span style="font-size:15px">{{ t.icon }}</span>{{ t.label }}<span style="margin-left:auto;font-size:10.5px;font-weight:800;opacity:.8">{{ t.sub }}</span></button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+<div style="background:#fff;border:1px solid {{ panelBorderD }};border-radius:0 0 16px 16px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;min-height:1000px;flex:none">
+<div style="display:flex;align-items:center;gap:12px"><div style="font-family:var(--disp);font-size:19px">{{ panelTitle }}</div><sc-if value="{{ panelEditable }}" hint-placeholder-val="{{ false }}"><span style="height:24px;display:flex;align-items:center;padding:0 10px;border-radius:999px;border:1px solid var(--ow-border);background:var(--ow-chip);color:var(--ow);font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">✎ you can edit</span></sc-if></div>
+<sc-if value="{{ showResChips }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ resChips }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.pick }}" style="min-height:36px;display:flex;align-items:center;gap:6px;padding:0 14px;border-radius:999px;border:1px solid {{ c.bc }};background:{{ c.bg }};color:{{ c.fg }};font-size:12.5px;font-weight:800"><span>{{ c.icon }}</span>{{ c.label }}<sc-if value="{{ c.hasN }}" hint-placeholder-val="{{ false }}"><span style="min-width:18px;height:18px;padding:0 5px;border-radius:999px;border:1px solid currentColor;font-size:10px;font-weight:900;display:inline-flex;align-items:center;justify-content:center">{{ c.n }}</span></sc-if></button></sc-for></div>
+<span style="font-size:12px;font-weight:700;color:var(--faint)">{{ resCaption }}</span>
+</div>
+</sc-if>
+<sc-if value="{{ showLock }}" hint-placeholder-val="{{ false }}"><div style="padding:16px;border-radius:12px;border:1px dashed var(--border);font-size:13.5px;font-weight:700;color:var(--mute)">🔒 Trainings and lane plans are visible to group members only.</div></sc-if>
+<sc-if value="{{ showTrainSeg }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:2px;padding:3px;border-radius:10px;background:var(--div);align-self:flex-start"><sc-for list="{{ subTabs }}" as="s" hint-placeholder-count="2"><button onClick="{{ s.pick }}" style="padding:7px 16px;border:0;border-radius:8px;background:{{ s.bg }};color:{{ s.fg }};font-size:12.5px;font-weight:800">{{ s.label }}</button></sc-for></div></sc-if>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+<sc-for list="{{ panelRows }}" as="p" hint-placeholder-count="4">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--raised)"><div style="min-width:0"><div dir="auto" style="font-size:13.5px;font-weight:800;text-align:left">{{ p.a }}</div><div style="font-size:11.5px;font-weight:700;color:var(--mute)">{{ p.b }}</div></div><span style="flex:none;height:30px;display:flex;align-items:center;padding:0 12px;border-radius:8px;border:1px solid {{ p.cbc }};color:{{ p.cfg }};font-size:12px;font-weight:800">{{ p.c }}</span></div>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;font-size:12.5px;line-height:1.6;color:var(--text)">
+<div><b>Блок тренировок.</b> <span style="color:var(--mute)">На ширине NEXT и кнопки стоят в одну строку, полоса со счётчиками под ними. Незалогиненный видит только расписание. Режим «сверху» даёт полосу на всю ширину над шапкой.</span></div>
+<div><b>Табы тренера.</b> <span style="color:var(--mute)">Нижней панели на десктопе нет: Trainings и Admin стоят в конце ряда табов, отделены пунктиром и подписью «Coach tools», фиолетовые. Team и Media у тренера тоже фиолетовые с ✎.</span></div>
+<div><b>Липкая шапка.</b> <span style="color:var(--mute)">После прокрутки сверху полоса 52px: аватар, имя, английское имя и справа статус ответа (у тренера счётчики). Ряд табов прилипает под ней.</span></div>
+</div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:28px;padding:48px 48px 24px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--live)">NEXT TRAINING · АЛЬТЕРНАТИВЫ</div>
+<div style="font-family:var(--disp);font-size:28px">Ещё два подхода к ответу</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">Основной вариант в <a href="#2a">2a</a> оставлен как есть. Эти два для сравнения, оба для залогиненного участника. Можно нажимать.</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+<div id="3a" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--live);color:#fff">3a</span><span style="font-size:13px;font-weight:700">Неделя одной лентой</span></div>
+<div style="width:390px;border-radius:20px;overflow:hidden;background:var(--hero);box-shadow:0 10px 40px rgba(8,60,84,.12);padding:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+<span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)">Trainings this week</span>
+<button onClick="{{ weekAllYes }}" style="height:28px;padding:0 10px;border-radius:8px;border:1px solid var(--live-border);background:#fff;color:var(--live);font-size:11.5px;font-weight:800">✓ I'm in for all</button>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+<sc-for list="{{ week }}" as="d" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;border-radius:14px;border:{{ d.border }};background:#fff;overflow:hidden">
+<div style="padding:10px 10px 8px;display:flex;flex-direction:column;gap:2px">
+<span style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:{{ d.tagFg }}">{{ d.tag }}</span>
+<span style="font-family:var(--disp);font-size:20px;line-height:1.1">{{ d.day }}</span>
+<span style="font-family:var(--mono);font-size:11.5px;font-weight:800;color:var(--text)">{{ d.time }}</span>
+<span style="font-size:10.5px;font-weight:700;color:var(--mute);margin-top:4px">{{ d.count }}</span>
+</div>
+<button onClick="{{ d.cycle }}" style="height:40px;border:0;border-top:1px solid {{ d.btnLine }};background:{{ d.btnBg }};color:{{ d.btnFg }};font-size:12px;font-weight:800">{{ d.btn }}</button>
+</div>
+</sc-for>
+</div>
+<div style="font-size:11px;font-weight:700;color:var(--faint);line-height:1.5">Тап по кнопке дня: ✓ → ? → ✕ → без ответа. <bdi>חוף ירוק</bdi> · 25m</div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--text);display:flex;flex-direction:column;gap:4px">
+<div>Отвечаешь сразу за всю неделю, а не только за ближайшую тренировку.</div>
+<div style="color:var(--mute)">Идея из TeamSnap: там участник может проставить ответ сразу на все события без отметки. У регулярной группы три тренировки в неделю, и возвращаться на страницу перед каждой лишнее. Ближайшая выделена зелёной рамкой. Три состояния сидят на одной кнопке, это компактно, но менее очевидно, чем три отдельные кнопки.</div>
+</div>
+</div>
+
+<div id="3b" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--live);color:#fff">3b</span><span style="font-size:13px;font-weight:700">Бассейн по дорожкам</span><span style="font-size:11px;font-weight:800;color:var(--live);padding:2px 7px;border-radius:999px;border:1px solid var(--live-border)">→ в табе Trainings</span></div>
+<div style="width:390px;border-radius:20px;overflow:hidden;background:var(--hero);box-shadow:0 10px 40px rgba(8,60,84,.12);padding:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+<span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)">Next</span>
+<span style="font-family:var(--mono);font-size:14px;font-weight:800">Tue 29 Sep · 20:00</span>
+<span style="font-size:11.5px;font-weight:700;color:var(--mute)">tomorrow · <bdi>חוף ירוק</bdi></span>
+</div>
+<div style="border-radius:14px;overflow:hidden;border:1px solid #b9dcea;background:linear-gradient(180deg,#e3f3fa,#d3ecf6)">
+<sc-for list="{{ lanes }}" as="l" hint-placeholder-count="4">
+<div style="position:relative;height:40px;display:flex;align-items:center;gap:6px;padding:0 10px;border-top:{{ l.rope }}">
+<span style="width:46px;flex:none;font-family:var(--mono);font-size:9.5px;font-weight:800;color:#5b8aa0">{{ l.name }}</span>
+<sc-for list="{{ l.people }}" as="p" hint-placeholder-count="3"><span style="width:26px;height:26px;flex:none;border-radius:50%;border:{{ p.border }};background:{{ p.bg }};color:{{ p.fg }};font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:{{ p.shadow }}">{{ p.l }}</span></sc-for>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;font-weight:800">
+<span style="color:var(--live)">{{ poolYes }} in the water</span><span style="color:#b17d11">{{ poolMaybe }} maybe</span><span style="color:#b23b3b">{{ poolNo }} out</span>
+</div>
+<div style="position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));height:44px;padding:3px;border-radius:12px;background:#fff;border:1px solid var(--border)">
+<span style="position:absolute;top:3px;bottom:3px;left:{{ thumbLeft }};width:calc((100% - 6px) / 3);border-radius:9px;background:{{ thumbBg }};opacity:{{ thumbOp }};transition:left .2s ease,background .2s ease"></span>
+<sc-for list="{{ poolOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.pick }}" style="position:relative;border:0;background:transparent;color:{{ o.fg }};font-size:12.5px;font-weight:800">{{ o.label }}</button></sc-for>
+</div>
+<sc-if value="{{ poolAnswered }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ poolNotes }}" as="n" hint-placeholder-count="3"><button onClick="{{ n.pick }}" style="height:30px;padding:0 10px;border-radius:999px;border:1px solid {{ n.bc }};background:{{ n.bg }};color:{{ n.fg }};font-size:11.5px;font-weight:800">{{ n.label }}</button></sc-for>
+</div>
+</sc-if>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--text);display:flex;flex-direction:column;gap:4px">
+<div>Ответ показан местом в воде: после «Going» твой кружок V появляется на дорожке из плана Lanes.</div>
+<div style="color:var(--mute)">Сплошной кружок — идёт, пунктир — не уверен. Видно не только сколько, но и как будут загружены дорожки, а это и есть вопрос тренера. После ответа появляются быстрые приписки («late ~10 min», «1st hour only»). Идея из Heja, где к ответу можно оставить комментарий, например что опоздаешь. Недостаток: при 20+ пловцах дорожки переполняются, нужен «+5».</div>
+</div>
+</div>
+
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:28px;padding:48px 48px 24px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--ow)">ТАБЫ · РОЛИ · ТЕСТ</div>
+<div style="font-family:var(--disp);font-size:28px">Табы по ролям</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">Lanes теперь внутри Trainings. У админа и тренера табы Trainings и Admin закреплены внизу экрана. Фиолетовый цвет (токены <span style="font-family:var(--mono)">--deep-ow-*</span>, уже есть в теме) означает «здесь можно менять». Верхние табы с редактируемым содержимым тоже фиолетовые и помечены ✎.</div>
+</div>
+<div id="2a" style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--ow);color:#fff">2a</span><span style="font-size:13px;font-weight:700">Переключатель роли</span></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;padding:3px;border-radius:12px;background:#fff;border:1px solid var(--border)">
+<sc-for list="{{ roles }}" as="r" hint-placeholder-count="3">
+<button onClick="{{ r.pick }}" style="height:36px;border:0;border-radius:9px;background:{{ r.bg }};color:{{ r.fg }};font-size:12px;font-weight:800">{{ r.label }}</button>
+</sc-for>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:3px;border-radius:12px;background:#fff;border:1px solid var(--border)">
+<sc-for list="{{ rsvpModes }}" as="r" hint-placeholder-count="2">
+<button onClick="{{ r.pick }}" style="height:32px;border:0;border-radius:9px;background:{{ r.bg }};color:{{ r.fg }};font-size:11.5px;font-weight:800">{{ r.label }}</button>
+</sc-for>
+</div>
+<div style="position:relative;width:390px;height:760px;border-radius:24px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12);display:flex;flex-direction:column">
+<div style="height:48px;flex:none;background:var(--nav);display:flex;align-items:center;justify-content:space-between;padding:0 14px"><div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:8px;background:#5b5fc7;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center">S</span><span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#eef1f6">SWIM<span style="color:#8b8fe8">HUB</span></span></div><div style="display:flex;align-items:center;gap:16px"><sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}"><span style="width:28px;height:28px;border-radius:50%;background:#5b5fc7;color:#fff;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center">V</span></sc-if><sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}"><span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:8px;border:1px solid rgba(238,241,246,.4);color:#eef1f6;font-size:12px;font-weight:800">Sign in</span></sc-if><span style="display:flex;flex-direction:column;gap:5px;align-items:flex-end"><span style="width:20px;height:2px;background:#eef1f6;border-radius:2px"></span><span style="width:14px;height:2px;background:#eef1f6;border-radius:2px"></span></span></div></div>
+<sc-if value="{{ stuck }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:48px;left:0;right:0;z-index:4;height:48px;display:flex;align-items:center;gap:10px;padding:0 14px;background:rgba(244,249,252,.97);border-bottom:1px solid var(--border);box-shadow:0 4px 14px rgba(8,60,84,.08)">
+<span style="width:28px;height:28px;flex:none;border-radius:8px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:13px;display:flex;align-items:center;justify-content:center">D</span>
+<div dir="rtl" style="flex:1;min-width:0;font-family:var(--disp);font-size:15px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">דולפין נתניה מסטרס</div>
+<span style="flex:none;height:28px;display:flex;align-items:center;gap:5px;padding:0 9px;border-radius:8px;border:1px solid {{ stickyBc }};background:{{ stickyBg }};color:{{ stickyFg }};font-family:var(--mono);font-size:11px;font-weight:800">{{ stickyLabel }}</span>
+</div>
+</sc-if>
+<div onScroll="{{ onScroll }}" style="flex:1;min-height:0;overflow-y:auto;padding-bottom:{{ dockPad }}px">
+<sc-if value="{{ bannerOn }}" hint-placeholder-val="{{ false }}">
+<div style="background:#fff;border-bottom:1px solid var(--live-border);padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 3px 0 var(--live)">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:8px;height:8px;flex:none;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px rgba(15,122,82,.14)"></span>
+<span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)">Next training · tomorrow</span>
+<span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--faint)">{{ rsvpYes }} going</span>
+</div>
+<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><span style="font-family:var(--mono);font-size:15px;font-weight:800">Tue 29 Sep · 20:00</span><span style="font-size:12px;font-weight:700;color:var(--mute)">📍 <bdi>חוף ירוק</bdi></span></div>
+<div style="font-size:13px;font-weight:700;color:var(--text)">Are you coming?</div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
+<button onClick="{{ rsvpGo }}" style="height:42px;border-radius:10px;border:1px solid {{ goBc }};background:{{ goBg }};color:{{ goFg }};font-size:12.5px;font-weight:800">✓ Going</button>
+<button onClick="{{ rsvpMaybeFn }}" style="height:42px;border-radius:10px;border:1px solid {{ maybeBc }};background:{{ maybeBg }};color:{{ maybeFg }};font-size:12.5px;font-weight:800">? Not sure</button>
+<button onClick="{{ rsvpSkip }}" style="height:42px;border-radius:10px;border:1px solid {{ skipBc }};background:{{ skipBg }};color:{{ skipFg }};font-size:12.5px;font-weight:800">✕ Can't come</button>
+</div>
+</div>
+</sc-if>
+<img src="assets/group-photo.png" alt="" style="width:100%;height:180px;object-fit:cover;display:block">
+<div style="background:var(--hero);padding:14px 16px 14px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid var(--border)">
+<div style="display:flex;align-items:flex-start;gap:14px">
+<span style="width:72px;height:72px;flex:none;border-radius:18px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:32px;display:flex;align-items:center;justify-content:center">D</span>
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:22px;line-height:1.2;text-align:left;overflow-wrap:anywhere">דולפין נתניה מסטרס</h1>
+<div style="font-size:12px;font-weight:700;color:var(--mute);margin-top:2px">Dolphin Netanya Masters · 🇮🇱 <bdi>נתניה</bdi></div>
+<div style="margin-top:8px;position:relative;display:flex"><sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}"><span style="height:32px;display:flex;align-items:center;padding:0 12px;border-radius:10px;border:1px solid {{ joinBc }};background:{{ joinBg }};font-family:var(--mono);font-size:12px;font-weight:800;color:{{ joinFg }}">{{ joinLabel }}</span></sc-if><sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}"><button onClick="{{ toggleDots }}" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 6px 0 12px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-family:var(--mono);font-size:12px;font-weight:800;color:var(--mute)">✓ Member<span style="width:22px;height:22px;border-radius:6px;background:var(--div);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1">⋯</span></button></sc-if><sc-if value="{{ dotsOpen }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:38px;left:0;z-index:5;width:170px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(8,60,84,.16);padding:6px"><button onClick="{{ toggleDots }}" style="width:100%;text-align:left;padding:10px;border:0;border-radius:8px;background:rgba(178,59,59,.08);color:#b23b3b;font-size:13px;font-weight:800">Leave group</button></div></sc-if></div>
+</div>
+</div>
+<sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid var(--border);border-radius:12px;background:var(--card);padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)">Trainings</div>
+<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--mute)"><span><b style="color:var(--text)">Tue</b> 20:00–21:00</span><span><b style="color:var(--text)">Sat</b> 10:00–12:00</span><span><b style="color:var(--text)">Sun</b> 20:00–21:00</span></div>
+<div style="font-size:12px;font-weight:700;color:var(--mute)">📍 <bdi style="color:var(--text);font-weight:800">חוף ירוק</bdi> · 25m pool</div>
+</div>
+</sc-if>
+<sc-if value="{{ heroNext }}" hint-placeholder-val="{{ true }}">
+<div style="border:1px solid var(--live-border);border-radius:12px;background:var(--card);padding:10px 12px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;gap:10px">
+<span style="width:8px;height:8px;flex:none;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px rgba(15,122,82,.14)"></span>
+<div style="flex:1;min-width:0"><div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap"><span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)">Next</span><span style="font-family:var(--mono);font-size:13px;font-weight:800">Tue 29 Sep · 20:00</span><span style="font-size:11.5px;font-weight:700;color:var(--mute)">tomorrow</span></div><div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--mute);margin-top:3px">Tue · Sat · Sun · <bdi>חוף ירוק</bdi> · 25m</div></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--div)"><span style="width:{{ rsvpYesPct }}%;background:var(--live)"></span><span style="width:{{ rsvpMaybePct }}%;background:#d9a420"></span><span style="width:{{ rsvpNoPct }}%;background:#b23b3b;opacity:.75"></span></div>
+<div style="display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:11.5px;font-weight:800">
+<span style="display:flex;align-items:center;gap:5px;color:var(--live)"><span style="width:7px;height:7px;border-radius:50%;background:var(--live)"></span>{{ rsvpYes }} going</span>
+<span style="display:flex;align-items:center;gap:5px;color:#b17d11"><span style="width:7px;height:7px;border-radius:50%;background:#d9a420"></span>{{ rsvpMaybe }} not sure</span><span style="display:flex;align-items:center;gap:5px;color:#b23b3b"><span style="width:7px;height:7px;border-radius:50%;background:#b23b3b"></span>{{ rsvpNo }} not going</span>
+
+</div>
+</div>
+<sc-if value="{{ isMemberOnly }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
+<button onClick="{{ rsvpGo }}" style="height:40px;border-radius:10px;border:1px solid {{ goBc }};background:{{ goBg }};color:{{ goFg }};font-size:12.5px;font-weight:800">✓ Going</button>
+<button onClick="{{ rsvpMaybeFn }}" style="height:40px;border-radius:10px;border:1px solid {{ maybeBc }};background:{{ maybeBg }};color:{{ maybeFg }};font-size:12.5px;font-weight:800">? Not sure</button>
+<button onClick="{{ rsvpSkip }}" style="height:40px;border-radius:10px;border:1px solid {{ skipBc }};background:{{ skipBg }};color:{{ skipFg }};font-size:12.5px;font-weight:800">✕ Can't come</button>
+</div>
+</sc-if>
+<sc-if value="{{ isStaff }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:8px;padding-top:8px;border-top:1px solid var(--div)">
+<div style="display:flex">
+<sc-for list="{{ goingAv }}" as="a" hint-placeholder-count="5"><span style="width:24px;height:24px;margin-right:-6px;border-radius:50%;border:2px solid #fff;background:{{ a.bg }};color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ a.l }}</span></sc-for>
+</div>
+<span style="margin-left:8px;flex:1;font-size:11.5px;font-weight:700;color:var(--mute)">+9</span>
+<span style="height:30px;display:flex;align-items:center;padding:0 10px;border-radius:9px;border:1px solid var(--ow-border);background:var(--ow-chip);color:var(--ow);font-size:12px;font-weight:800">Who's coming →</span>
+</div>
+</sc-if>
+</div>
+</sc-if>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
+<div style="padding:10px 10px 9px"><div style="font-family:var(--disp);font-size:24px;line-height:1">23</div><div style="margin-top:4px;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">Swimmers</div><div style="font-size:9.5px;font-weight:700;color:var(--ghost)">in the roster</div></div>
+<div style="padding:10px 10px 9px"><div style="font-family:var(--disp);font-size:24px;line-height:1">20</div><div style="margin-top:4px;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">Records</div><div style="font-size:9.5px;font-weight:700;color:var(--ghost)">best in the group</div></div>
+<a href="#2a" style="display:block;padding:10px 10px 9px;border-radius:12px;border:1px solid var(--acc-border);background:var(--acc-chip);text-decoration:none"><div style="font-family:var(--disp);font-size:24px;line-height:1;color:var(--acc)">28</div><div style="margin-top:4px;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--acc)">Competitions →</div><div style="font-size:9.5px;font-weight:700;color:var(--acc);opacity:.7">all meets</div></a>
+</div>
+</div>
+<div style="position:sticky;top:48px;z-index:3;display:grid;grid-template-columns:repeat({{ topCount }},minmax(0,1fr));gap:2px;padding:8px 8px 0;border-bottom:1px solid {{ topLine }};background:var(--bg)">
+<sc-for list="{{ topTabs }}" as="t" hint-placeholder-count="6">
+<button onClick="{{ t.pick }}" style="position:relative;height:52px;margin-bottom:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid {{ t.bc }};border-bottom:0;border-radius:12px 12px 0 0;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:17px;line-height:1">{{ t.icon }}</span><span style="font-size:10px;font-weight:800">{{ t.label }}</span><span style="position:absolute;top:4px;right:5px;font-size:9px;line-height:1;color:{{ t.fg }}">{{ t.mark }}</span></button>
+</sc-for>
+</div>
+<div style="background:#fff;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:560px;border-top:3px solid {{ panelTop }}">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><div style="font-family:var(--disp);font-size:16px">{{ panelTitle }}</div><sc-if value="{{ panelEditable }}" hint-placeholder-val="{{ false }}"><span style="height:22px;display:flex;align-items:center;padding:0 8px;border-radius:999px;border:1px solid var(--ow-border);background:var(--ow-chip);color:var(--ow);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">✎ you can edit</span></sc-if></div>
+<sc-if value="{{ showResChips }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ resChips }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.pick }}" style="min-height:36px;display:flex;align-items:center;gap:6px;padding:0 12px;border-radius:999px;border:1px solid {{ c.bc }};background:{{ c.bg }};color:{{ c.fg }};font-size:12px;font-weight:800"><span>{{ c.icon }}</span>{{ c.label }}<sc-if value="{{ c.hasN }}" hint-placeholder-val="{{ false }}"><span style="min-width:18px;height:18px;padding:0 5px;border-radius:999px;border:1px solid currentColor;font-size:10px;font-weight:900;display:inline-flex;align-items:center;justify-content:center">{{ c.n }}</span></sc-if></button></sc-for>
+</div>
+<div style="font-size:11px;font-weight:700;color:var(--faint)">{{ resCaption }}</div>
+</sc-if>
+<sc-if value="{{ showLock }}" hint-placeholder-val="{{ false }}"><div style="padding:14px;border-radius:12px;border:1px dashed var(--border);font-size:13px;font-weight:700;color:var(--mute)">🔒 Trainings and lane plans are visible to group members only.</div></sc-if>
+<sc-if value="{{ showTrainSeg }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:2px;padding:3px;border-radius:10px;background:var(--div);align-self:flex-start">
+<sc-for list="{{ subTabs }}" as="s" hint-placeholder-count="2"><button onClick="{{ s.pick }}" style="padding:6px 14px;border:0;border-radius:8px;background:{{ s.bg }};color:{{ s.fg }};font-size:12px;font-weight:800">{{ s.label }}</button></sc-for>
+</div>
+</sc-if>
+<sc-for list="{{ panelRows }}" as="p" hint-placeholder-count="3">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--raised)"><div style="min-width:0"><div dir="auto" style="font-size:13px;font-weight:800;text-align:left">{{ p.a }}</div><div style="font-size:11px;font-weight:700;color:var(--mute)">{{ p.b }}</div></div><span style="flex:none;height:28px;display:flex;align-items:center;padding:0 10px;border-radius:8px;border:1px solid {{ p.cbc }};color:{{ p.cfg }};font-size:11.5px;font-weight:800">{{ p.c }}</span></div>
+</sc-for>
+</div>
+</div>
+<sc-if value="{{ isStaff }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);border-top:1px solid var(--ow-border);box-shadow:0 -6px 20px rgba(76,29,149,.10);padding:8px 10px 14px;display:flex;flex-direction:column;gap:6px">
+<div style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ow);padding-left:4px">{{ staffLabel }}</div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+<sc-for list="{{ dockTabs }}" as="t" hint-placeholder-count="2">
+<button onClick="{{ t.pick }}" style="height:46px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid {{ t.bc }};border-radius:12px;background:{{ t.bg }};color:{{ t.fg }};font-size:13px;font-weight:800"><span style="font-size:16px">{{ t.icon }}</span>{{ t.label }}<span style="font-size:10.5px;font-weight:700;opacity:.75">{{ t.sub }}</span></button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:14px;max-width:420px;font-size:13px;line-height:1.6;color:var(--text)">
+<div><b>Табы.</b> <span style="color:var(--mute)">Home · Season · Results · Team · Media. Results устроен как у пловца (<span style="font-family:var(--mono)">?tab=results</span>): внутри чипы Results · Records · Season bests, стиль <span style="font-family:var(--mono)">.deep-filter-chip</span>, перенос строк без скролла. Records и Season bests больше не отдельные табы.</span></div>
+<div><b>Вариант «сверху».</b> <span style="color:var(--mute)">Второй переключатель. Если участник ещё не ответил, карточка «Are you coming?» стоит над фото (под топбаром), а в шапке блока NEXT нет, чтобы не дублировать. После ответа карточка уходит, и NEXT со счётчиками и нажатой кнопкой возвращается в шапку. Тренеру и незалогиненному карточка не показывается.</span></div>
+<div><b>Липкая шапка.</b> <span style="color:var(--mute)">Прокрути телефон вниз: после ~300px сверху появляется компактная полоса 48px (аватар, имя в одну строку, справа твой ответ или счётчики для тренера), и под ней прилипают табы. Тап по полосе возвращает наверх.</span></div>
+<div><b>Ответ.</b> <span style="color:var(--mute)">Три кнопки: Going / Not sure / Can't come. Выбранная остаётся закрашенной, повторный тап снимает ответ. Счётчики: going · not sure · not going, серый остаток полосы — те, кто не ответил.</span></div>
+<div><b>Блок тренировок.</b> <span style="color:var(--mute)">Посетитель видит только расписание и место, без NEXT. Участник видит NEXT, счётчики «going / not going / no answer» с полосой и кнопки «✓ I'm going» / «✕ Can't come» (повторный тап снимает ответ). Тренер и админ видят NEXT и счётчики, а вместо кнопок — аватары отметившихся и «Who's coming →» к полному списку.</span></div>
+<div><b>Посетитель.</b> <span style="color:var(--mute)">6 табов, Trainings с замком. Вместо Member кнопка «+ Join group», по нажатию открывается вход.</span></div>
+<div><b>Участник.</b> <span style="color:var(--mute)">Те же 6 табов, Trainings открыт. Внутри переключатель Sessions / Lanes (Lanes больше не отдельный таб).</span></div>
+<div><b>Админ / тренер.</b> <span style="color:var(--mute)">Сверху 5 табов, Trainings и Admin закреплены внизу экрана фиолетовой панелью, контент под неё не уходит (отступ снизу). Team (уровни) и Media (галерея, публикации) фиолетовые с ✎. Цифра на Admin — ожидающие заявки.</span></div>
+<div><b>More.</b> <span style="color:var(--mute)">Включается, только если верхних табов больше 6: видны 5, остальные в шторке (<a href="#1e">1e</a>). При таком наборе шторка пока не нужна.</span></div>
+<div><b>Правило цвета.</b> <span style="color:var(--mute)">Бирюзовый — просмотр, фиолетовый — управление. Фиолетовый появляется только у тех, кто может менять, и всегда вместе со значком ✎ или подписью, а не одним цветом.</span></div>
+</div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:28px;padding:48px 48px 24px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">ГРУППА · МОБАЙЛ · 390px</div>
+<div style="font-family:var(--disp);font-size:28px">Шапка группы: три варианта</div>
+<div style="font-size:14px;line-height:1.55;color:var(--text);text-wrap:pretty;padding:10px 14px;border:1px solid var(--acc-border);background:var(--acc-chip);border-radius:10px"><b>Фото на мобайле.</b> Если загружено отдельное мобильное фото (4:3), оно показывается в полную высоту (292px). Если нет, берётся десктопное и ужимается до полосы 180px (в 1b до 210px), обрезка по центру. Фото на макете только пример, у каждой группы своё. Переключатель: Tweaks → «Mobile photo uploaded». Размеры — в <span style="font-family:var(--mono)">design_handoff_entity_hero/HERO-PHOTO.md</span>.</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">Общее во всех трёх вариантах: имя переносится на 2 строки (сейчас оно обрезается с начала из-за <span style="font-family:var(--mono)">truncate</span> + RTL), флаг и город переехали в подзаголовок, четыре чипа расписания собраны в одну строку Next, «Gold 0» скрыт, а Leave group перенесён в чип «✓ Member» (так же, как «✓ Following» у клуба). Пунктир показывает видимую область телефона.</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:#7b95a3;color:#fff">now</span><span style="font-size:13px;font-weight:700;color:var(--mute)">Сейчас: ~780px до табов</span></div>
+<div style="width:390px;border-radius:24px;overflow:hidden;background:#fff;box-shadow:0 10px 40px rgba(8,60,84,.12)"><img src="uploads/pasted-1790576926275-0.png" alt="" style="width:100%;display:block"><img src="uploads/pasted-1790576950741-0.png" alt="" style="width:100%;display:block"></div>
+</div>
+
+<div id="1a" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">1a</span><span style="font-size:13px;font-weight:700">Компактная: фото {{ photoA }}px</span></div>
+<div style="position:relative;width:390px;height:844px;border-radius:24px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12)">
+<div style="height:48px;background:var(--nav);display:flex;align-items:center;justify-content:space-between;padding:0 14px"><div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:8px;background:#5b5fc7;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center">S</span><span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#eef1f6">SWIM<span style="color:#8b8fe8">HUB</span></span></div><div style="display:flex;align-items:center;gap:16px"><span style="width:28px;height:28px;border-radius:50%;background:#5b5fc7;color:#fff;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center">V</span><span style="display:flex;flex-direction:column;gap:5px;align-items:flex-end"><span style="width:20px;height:2px;background:#eef1f6;border-radius:2px"></span><span style="width:14px;height:2px;background:#eef1f6;border-radius:2px"></span></span></div></div>
+<div style="position:relative"><img src="assets/group-photo.png" alt="" style="width:100%;height:{{ photoA }}px;object-fit:cover;object-position:center 40%;display:block"><span style="position:absolute;left:8px;bottom:8px;font-family:var(--mono);font-size:9.5px;font-weight:800;color:#fff;background:rgba(4,40,62,.6);padding:2px 6px;border-radius:5px">{{ photoLabel }}</span></div>
+<div style="background:var(--hero);padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid var(--border)">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="width:44px;height:44px;flex:none;border-radius:12px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:20px;display:flex;align-items:center;justify-content:center">D</span>
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:22px;line-height:1.2;text-align:left;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">דולפין נתניה מסטרס</h1>
+<div style="font-size:12px;font-weight:700;color:var(--mute);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Dolphin Netanya Masters · 🇮🇱 <bdi>נתניה</bdi></div>
+</div>
+</div>
+<div style="border:1px solid var(--live-border);border-radius:12px;background:var(--card);padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:10px">
+<span style="width:8px;height:8px;flex:none;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px rgba(15,122,82,.14)"></span>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap"><span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)">Next</span><span style="font-family:var(--mono);font-size:13px;font-weight:800">Tue 29 Sep · 20:00</span><span style="font-size:11.5px;font-weight:700;color:var(--mute)">tomorrow</span></div>
+<div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Tue · Sat · Sun · <bdi>חוף ירוק</bdi> · 25m</div>
+</div>
+<button onClick="{{ toggleExp }}" aria-label="Schedule" style="width:32px;height:32px;flex:none;border-radius:8px;border:1px solid var(--border);background:var(--raised);color:var(--acc);font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center">{{ expIcon }}</button>
+</div>
+<sc-if value="{{ exp1a }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 14px;padding:8px 0 2px 18px;border-top:1px solid var(--div);font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--mute)">
+<span>Tue</span><span style="color:var(--text)">20:00–21:00</span>
+<span>Sat</span><span style="color:var(--text)">10:00–12:00</span>
+<span>Sun</span><span style="color:var(--text)">20:00–21:00</span>
+<span>Pool</span><span style="color:var(--text)"><bdi>חוף ירוק</bdi> · 25m</span>
+</div>
+</sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;gap:16px">
+<div style="display:flex;align-items:baseline;gap:5px"><span style="font-family:var(--disp);font-size:20px;line-height:1">23</span><span style="font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">swimmers</span></div>
+<div style="display:flex;align-items:baseline;gap:5px"><span style="font-family:var(--disp);font-size:20px;line-height:1">20</span><span style="font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">records</span></div>
+</div>
+<div style="position:relative;display:flex;gap:6px">
+<a href="#1a" style="flex:1;justify-content:center;height:34px;display:flex;align-items:center;padding:0 10px;border-radius:10px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">Competitions →</a>
+<span style="height:34px;display:flex;align-items:center;padding:0 10px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-family:var(--mono);font-size:12px;font-weight:800;color:var(--mute)">✓ Member</span><button onClick="{{ toggleMem }}" style="width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--mute);font-size:16px;font-weight:900;line-height:1;display:flex;align-items:center;justify-content:center">⋯</button>
+<sc-if value="{{ mem1a }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:40px;right:0;z-index:5;width:180px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(8,60,84,.16);padding:6px;display:flex;flex-direction:column">
+<button style="text-align:left;padding:10px;border:0;border-radius:8px;background:rgba(178,59,59,.08);color:#b23b3b;font-size:13px;font-weight:800">Leave group</button>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+<div style="display:flex;gap:2px;overflow-x:auto;padding:8px 10px 0;border-bottom:1px solid var(--panel-border);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)">
+<sc-for list="{{ tabsA }}" as="t" hint-placeholder-count="8">
+<button onClick="{{ t.pick }}" style="flex:none;width:60px;height:52px;margin-bottom:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid {{ t.bc }};border-bottom:0;border-radius:12px 12px 0 0;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:17px;line-height:1">{{ t.icon }}</span><span style="font-size:10px;font-weight:800">{{ t.label }}</span></button>
+</sc-for>
+</div>
+<div style="background:#fff;padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="font-family:var(--disp);font-size:16px">Members</div>
+<div style="font-size:11.5px;font-weight:700;color:var(--mute)">23 in the roster · 1 coach</div>
+<sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--raised)"><div style="min-width:0"><div dir="rtl" style="font-size:13px;font-weight:800;text-align:left">{{ m.name }}</div><div style="font-size:11px;font-weight:700;color:var(--mute)">{{ m.meta }}</div></div><span style="font-family:var(--mono);font-size:11px;font-weight:800;color:var(--faint)">{{ m.year }}</span></div>
+</sc-for>
+</div>
+<div style="position:absolute;left:0;right:0;top:664px;border-top:2px dashed rgba(178,59,59,.45);pointer-events:none"><span style="position:absolute;right:8px;top:-20px;font-family:var(--mono);font-size:10px;font-weight:800;color:#b23b3b;background:rgba(255,255,255,.85);padding:1px 5px;border-radius:4px">first screen</span></div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--text);display:flex;flex-direction:column;gap:4px">
+<div>Табы начинаются примерно на 460px (сейчас на ~780px).</div>
+<div style="color:var(--mute)">Строка Next всегда видна; кнопка ▾ раскрывает часы по дням и бассейн. KPI стали строкой в одну линию, а не плитками по 3 строки. Leave group убран в меню ⋯ рядом с «✓ Member».</div>
+</div>
+</div>
+
+<div id="1b" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">1b</span><span style="font-size:13px;font-weight:700">Имя на фото</span></div>
+<div style="position:relative;width:390px;height:844px;border-radius:24px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12)">
+<div style="height:48px;background:var(--nav);display:flex;align-items:center;justify-content:space-between;padding:0 14px"><div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:8px;background:#5b5fc7;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center">S</span><span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#eef1f6">SWIM<span style="color:#8b8fe8">HUB</span></span></div><div style="display:flex;align-items:center;gap:16px"><span style="width:28px;height:28px;border-radius:50%;background:#5b5fc7;color:#fff;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center">V</span><span style="display:flex;flex-direction:column;gap:5px;align-items:flex-end"><span style="width:20px;height:2px;background:#eef1f6;border-radius:2px"></span><span style="width:14px;height:2px;background:#eef1f6;border-radius:2px"></span></span></div></div>
+<div style="position:relative;height:{{ photoB }}px">
+<img src="assets/group-photo.png" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center 40%;display:block">
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,40,62,0) 30%,rgba(4,40,62,.9) 100%)"></div>
+<span style="position:absolute;top:12px;right:12px;height:30px;display:flex;align-items:center;padding:0 10px;border-radius:999px;background:rgba(4,40,62,.5);border:1px solid rgba(255,255,255,.35);font-family:var(--mono);font-size:11.5px;font-weight:800;color:#fff">✓ Member</span><span style="width:34px;height:34px;flex:none;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--mute);font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center">⋯</span>
+<div style="position:absolute;left:16px;right:16px;bottom:14px;display:flex;align-items:flex-end;gap:12px">
+<span style="width:42px;height:42px;flex:none;border-radius:12px;background:linear-gradient(160deg,#0e7490,#0a4f61);border:2px solid rgba(255,255,255,.7);color:#fff;font-family:var(--disp);font-size:19px;display:flex;align-items:center;justify-content:center">D</span>
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:22px;line-height:1.2;text-align:left;color:#fff;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">דולפין נתניה מסטרס</h1>
+<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.82);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Dolphin Netanya Masters · 🇮🇱 <bdi>נתניה</bdi></div>
+</div>
+</div>
+</div>
+<div style="background:var(--hero);padding:12px 16px 14px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--border)">
+<div style="border:1px solid var(--live-border);border-radius:12px;background:var(--card);padding:9px 12px;display:flex;align-items:center;gap:10px">
+<span style="width:8px;height:8px;flex:none;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px rgba(15,122,82,.14)"></span>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap"><span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)">Next</span><span style="font-family:var(--mono);font-size:13px;font-weight:800">Tue 29 Sep · 20:00</span><span style="font-size:11.5px;font-weight:700;color:var(--mute)">tomorrow</span></div>
+<div style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--mute);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Tue · Sat · Sun · <bdi>חוף ירוק</bdi> · 25m</div>
+</div>
+<span style="color:var(--acc);font-size:14px;font-weight:900">›</span>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--mute)"><b style="color:var(--text);font-weight:800">23</b> swimmers · <b style="color:var(--text);font-weight:800">20</b> records</div>
+<a href="#1b" style="height:32px;display:flex;align-items:center;padding:0 12px;border-radius:10px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">Competitions →</a>
+</div>
+</div>
+<div style="display:flex;gap:2px;overflow-x:auto;padding:8px 10px 0;border-bottom:1px solid var(--panel-border);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)">
+<sc-for list="{{ tabsB }}" as="t" hint-placeholder-count="8">
+<button onClick="{{ t.pick }}" style="flex:none;width:60px;height:52px;margin-bottom:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid {{ t.bc }};border-bottom:0;border-radius:12px 12px 0 0;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:17px;line-height:1">{{ t.icon }}</span><span style="font-size:10px;font-weight:800">{{ t.label }}</span></button>
+</sc-for>
+</div>
+<div style="background:#fff;padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="font-family:var(--disp);font-size:16px">Members</div>
+<div style="font-size:11.5px;font-weight:700;color:var(--mute)">23 in the roster · 1 coach</div>
+<sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--raised)"><div style="min-width:0"><div dir="rtl" style="font-size:13px;font-weight:800;text-align:left">{{ m.name }}</div><div style="font-size:11px;font-weight:700;color:var(--mute)">{{ m.meta }}</div></div><span style="font-family:var(--mono);font-size:11px;font-weight:800;color:var(--faint)">{{ m.year }}</span></div>
+</sc-for>
+</div>
+<div style="position:absolute;left:0;right:0;top:664px;border-top:2px dashed rgba(178,59,59,.45);pointer-events:none"><span style="position:absolute;right:8px;top:-20px;font-family:var(--mono);font-size:10px;font-weight:800;color:#b23b3b;background:rgba(255,255,255,.85);padding:1px 5px;border-radius:4px">first screen</span></div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--text);display:flex;flex-direction:column;gap:4px">
+<div>Фото крупнее, а табы всё равно выше, чем в <a href="#1a">1a</a>, примерно на 420px.</div>
+<div style="color:var(--mute)">Имя лежит на затемнённом низу фото. Нужен вариант без фото: тогда шапка выглядит как в <a href="#1c">1c</a>. Недостаток: белый текст на фото зависит от снимка, поэтому скрим обязателен.</div>
+</div>
+</div>
+
+<div id="1c" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">1c</span><span style="font-size:13px;font-weight:700">Без большого фото</span></div>
+<div style="position:relative;width:390px;height:844px;border-radius:24px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12)">
+<div style="height:48px;background:var(--nav);display:flex;align-items:center;justify-content:space-between;padding:0 14px"><div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:8px;background:#5b5fc7;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center">S</span><span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#eef1f6">SWIM<span style="color:#8b8fe8">HUB</span></span></div><div style="display:flex;align-items:center;gap:16px"><span style="width:28px;height:28px;border-radius:50%;background:#5b5fc7;color:#fff;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center">V</span><span style="display:flex;flex-direction:column;gap:5px;align-items:flex-end"><span style="width:20px;height:2px;background:#eef1f6;border-radius:2px"></span><span style="width:14px;height:2px;background:#eef1f6;border-radius:2px"></span></span></div></div>
+<div style="background:var(--hero);padding:16px 16px 14px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid var(--border)">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="position:relative;width:60px;height:60px;flex:none;border-radius:14px;overflow:hidden;border:1px solid var(--border)"><img src="assets/group-photo.png" alt="" style="width:100%;height:100%;object-fit:cover;display:block"><span style="position:absolute;right:3px;bottom:3px;width:18px;height:18px;border-radius:6px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:10px;display:flex;align-items:center;justify-content:center">D</span></span>
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:22px;line-height:1.2;text-align:left;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">דולפין נתניה מסטרס</h1>
+<div style="font-size:12px;font-weight:700;color:var(--mute);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Dolphin Netanya Masters · 🇮🇱 <bdi>נתניה</bdi></div>
+<div style="font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--mute);margin-top:3px"><b style="color:var(--text);font-weight:800">23</b> swimmers · <b style="color:var(--text);font-weight:800">20</b> records</div>
+</div>
+</div>
+<div style="display:flex;gap:6px;overflow-x:auto;margin:0 -16px;padding:0 16px">
+<span style="flex:none;height:30px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:9px;border:1px solid var(--live-border);background:var(--card);font-family:var(--mono);font-size:11.5px;font-weight:800;color:var(--text)"><span style="width:7px;height:7px;border-radius:50%;background:var(--live)"></span>Tue 20:00 · tomorrow</span>
+<span style="flex:none;height:30px;display:flex;align-items:center;padding:0 10px;border-radius:9px;border:1px solid var(--border);font-family:var(--mono);font-size:11.5px;font-weight:800;color:var(--mute)">Tue · Sat · Sun</span>
+<span style="flex:none;height:30px;display:flex;align-items:center;padding:0 10px;border-radius:9px;border:1px solid var(--border);font-family:var(--mono);font-size:11.5px;font-weight:800;color:var(--mute)">📍 <bdi>חוף ירוק</bdi> · 25m</span>
+</div>
+<div style="display:flex;gap:8px">
+<a href="#1c" style="flex:1;height:36px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:12.5px;font-weight:800;color:var(--acc)">Competitions →</a>
+<span style="height:36px;display:flex;align-items:center;padding:0 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-family:var(--mono);font-size:12.5px;font-weight:800;color:var(--mute)">✓ Member</span><span style="width:34px;height:34px;flex:none;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--mute);font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center">⋯</span>
+</div>
+</div>
+<div style="display:flex;gap:2px;overflow-x:auto;padding:8px 10px 0;border-bottom:1px solid var(--panel-border);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)">
+<sc-for list="{{ tabsC }}" as="t" hint-placeholder-count="8">
+<button onClick="{{ t.pick }}" style="flex:none;width:60px;height:52px;margin-bottom:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid {{ t.bc }};border-bottom:0;border-radius:12px 12px 0 0;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:17px;line-height:1">{{ t.icon }}</span><span style="font-size:10px;font-weight:800">{{ t.label }}</span></button>
+</sc-for>
+</div>
+<div style="background:#fff;padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="font-family:var(--disp);font-size:16px">Members</div>
+<div style="font-size:11.5px;font-weight:700;color:var(--mute)">23 in the roster · 1 coach</div>
+<sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--raised)"><div style="min-width:0"><div dir="rtl" style="font-size:13px;font-weight:800;text-align:left">{{ m.name }}</div><div style="font-size:11px;font-weight:700;color:var(--mute)">{{ m.meta }}</div></div><span style="font-family:var(--mono);font-size:11px;font-weight:800;color:var(--faint)">{{ m.year }}</span></div>
+</sc-for>
+</div>
+<div style="position:absolute;left:0;right:0;top:664px;border-top:2px dashed rgba(178,59,59,.45);pointer-events:none"><span style="position:absolute;right:8px;top:-20px;font-family:var(--mono);font-size:10px;font-weight:800;color:#b23b3b;background:rgba(255,255,255,.85);padding:1px 5px;border-radius:4px">first screen</span></div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--text);display:flex;flex-direction:column;gap:4px">
+<div>Самый короткий вариант: табы примерно на 290px, контент виден сразу.</div>
+<div style="color:var(--mute)">Фото уменьшено до миниатюры 60px вместо аватара (по тапу открывается целиком), буква группы стоит бейджем в углу. Расписание идёт строкой чипов с горизонтальной прокруткой.</div>
+</div>
+</div>
+
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:28px;padding:40px 48px 24px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">ТАБЫ · МОБАЙЛ</div>
+<div style="font-family:var(--disp);font-size:28px">8 табов в 390px</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">Сейчас 8 колонок по ~45px, подписи на пределе. У клуба 7 табов, у группы с Admin 8. Можно нажимать.</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+<div id="1d" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">1d</span><span style="font-size:13px;font-weight:700">Прокручиваемая полоса</span></div>
+<div style="width:390px;border-radius:18px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12)">
+<div style="display:flex;gap:2px;overflow-x:auto;padding:10px 10px 0;border-bottom:1px solid var(--panel-border);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)">
+<sc-for list="{{ tabsD }}" as="t" hint-placeholder-count="8">
+<button onClick="{{ t.pick }}" style="flex:none;width:60px;height:52px;margin-bottom:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid {{ t.bc }};border-bottom:0;border-radius:12px 12px 0 0;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:17px;line-height:1">{{ t.icon }}</span><span style="font-size:10px;font-weight:800">{{ t.label }}</span></button>
+</sc-for>
+</div>
+<div style="background:#fff;height:120px;padding:16px"><div style="font-family:var(--disp);font-size:16px">{{ tabDTitle }}</div></div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--mute)">Колонки фиксированной ширины 60px, «папка» сохраняется, край справа затухает, давая понять, что полоса прокручивается. Активный таб при заходе подкручивается в видимую зону. Скроллбар скрыт (<span style="font-family:var(--mono)">scrollbar-width:none</span> + <span style="font-family:var(--mono)">::-webkit-scrollbar</span>), это же правило нужно в проде. <span style="color:var(--text);font-weight:700">Рекомендую:</span> меньше всего кода, ничего не прячется.</div>
+</div>
+
+<div id="1e" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">1e</span><span style="font-size:13px;font-weight:700">5 + More</span></div>
+<div style="position:relative;width:390px;height:330px;border-radius:18px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12)">
+<div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px;padding:10px 8px 0;border-bottom:1px solid var(--panel-border)">
+<sc-for list="{{ tabsE }}" as="t" hint-placeholder-count="5">
+<button onClick="{{ t.pick }}" style="height:52px;margin-bottom:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid {{ t.bc }};border-bottom:0;border-radius:12px 12px 0 0;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:17px;line-height:1">{{ t.icon }}</span><span style="font-size:10px;font-weight:800">{{ t.label }}</span></button>
+</sc-for>
+<button onClick="{{ toggleMore }}" style="height:52px;margin-bottom:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid {{ moreTab.bc }};border-bottom:0;border-radius:12px 12px 0 0;background:{{ moreTab.bg }};color:{{ moreTab.fg }}"><span style="font-size:17px;line-height:1">{{ moreTab.icon }}</span><span style="font-size:10px;font-weight:800">{{ moreTab.label }}</span></button>
+</div>
+<div style="background:#fff;height:250px;padding:16px"><div style="font-family:var(--disp);font-size:16px">{{ tabETitle }}</div></div>
+<sc-if value="{{ more }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ toggleMore }}" style="position:absolute;inset:0;background:rgba(4,40,62,.35)"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:8px 12px 14px;display:flex;flex-direction:column;gap:2px">
+<span style="align-self:center;width:36px;height:4px;border-radius:2px;background:var(--border);margin-bottom:8px"></span>
+<sc-for list="{{ tabsEMore }}" as="t" hint-placeholder-count="3">
+<button onClick="{{ t.pick }}" style="height:48px;display:flex;align-items:center;gap:12px;padding:0 12px;border:0;border-radius:10px;background:{{ t.rowBg }};color:{{ t.fg2 }};font-size:14px;font-weight:800;text-align:left"><span style="font-size:17px;width:22px">{{ t.icon }}</span><span style="flex:1">{{ t.full }}</span><span style="font-size:11px;font-weight:700;color:var(--faint)">{{ t.sub }}</span></button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--mute)">Всегда видны 5 основных табов, колонки по ~62px. Train, Lanes и Admin открываются из шторки. Если активный таб лежит в шторке, на месте More показывается его имя. Недостаток: закрытые табы (Train, Lanes) становится ещё труднее найти.</div>
+</div>
+
+<div id="1f" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">1f</span><span style="font-size:13px;font-weight:700">Сетка 4 × 2</span></div>
+<div style="width:390px;border-radius:18px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12)">
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:10px 12px">
+<sc-for list="{{ tabsF }}" as="t" hint-placeholder-count="8">
+<button onClick="{{ t.pick }}" style="height:44px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid {{ t.bc }};border-radius:10px;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:15px;line-height:1">{{ t.icon }}</span><span style="font-size:11.5px;font-weight:800">{{ t.label }}</span></button>
+</sc-for>
+</div>
+<div style="background:#fff;height:120px;padding:16px;border-top:1px solid var(--border)"><div style="font-family:var(--disp);font-size:16px">{{ tabFTitle }}</div></div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--mute)">Все табы видны сразу, у каждого крупная зона нажатия. Цена: вторая строка (+50px) и потеря «папки», потому что верхний ряд не может срастись с панелью.</div>
+</div>
+
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:28px;padding:40px 48px 24px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">КЛУБ · МОБАЙЛ</div>
+<div style="font-family:var(--disp);font-size:28px">Тот же каркас на клубе</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">Шапка собрана по схеме <a href="#1a">1a</a>. Фото у клуба нет, поэтому заглушку на мобайле не показываем (посетителю она ничего не даёт).</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+<div style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:#7b95a3;color:#fff">now</span><span style="font-size:13px;font-weight:700;color:var(--mute)">Сейчас</span></div>
+<div style="width:390px;border-radius:24px;overflow:hidden;background:#fff;box-shadow:0 10px 40px rgba(8,60,84,.12)"><img src="uploads/pasted-1790577033034-0.png" alt="" style="width:100%;display:block"></div>
+</div>
+
+<div id="1g" style="display:flex;flex-direction:column;gap:12px;width:390px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">1g</span><span style="font-size:13px;font-weight:700">Клуб, компактно</span></div>
+<div style="position:relative;width:390px;height:760px;border-radius:24px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12)">
+<div style="height:48px;background:var(--nav);display:flex;align-items:center;justify-content:space-between;padding:0 14px"><div style="display:flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:8px;background:#5b5fc7;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center">S</span><span style="font-size:11px;font-weight:900;letter-spacing:.22em;color:#eef1f6">SWIM<span style="color:#8b8fe8">HUB</span></span></div><div style="display:flex;align-items:center;gap:16px"><span style="width:28px;height:28px;border-radius:50%;background:#5b5fc7;color:#fff;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center">V</span><span style="display:flex;flex-direction:column;gap:5px;align-items:flex-end"><span style="width:20px;height:2px;background:#eef1f6;border-radius:2px"></span><span style="width:14px;height:2px;background:#eef1f6;border-radius:2px"></span></span></div></div>
+<div style="background:var(--hero);padding:16px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid var(--border)">
+<div style="display:flex;align-items:center;gap:12px">
+<img src="assets/club-logo.png" alt="" style="width:60px;height:60px;flex:none;border-radius:50%;object-fit:cover;display:block">
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:22px;line-height:1.2;text-align:left;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">הפועל דולפין נתניה</h1>
+<div style="font-size:12px;font-weight:700;color:var(--mute);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Hapoel Dolphine Netanya · 🇮🇱 Israel · since 2024</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:8px">
+<span style="height:32px;display:flex;align-items:center;padding:0 12px;border-radius:999px;border:1px solid var(--acc-border);background:var(--acc-chip);font-size:11.5px;font-weight:800;color:var(--acc)">Official group →</span>
+<span style="margin-left:auto;height:32px;display:flex;align-items:center;padding:0 12px;border-radius:10px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">✓ Following</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.6)">
+<sc-for list="{{ clubKpi }}" as="k" hint-placeholder-count="5">
+<div style="padding:9px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;border-left:1px solid {{ k.sep }}"><span style="font-family:var(--disp);font-size:19px;line-height:1;color:{{ k.color }}">{{ k.v }}</span><span style="font-size:8.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);text-align:center;line-height:1.2">{{ k.l }}</span></div>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;background:#f0f6fa;border-bottom:1px solid var(--border)">
+<span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)">Season</span>
+<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px">
+<span style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:12px">‹</span>
+<span style="width:52px;text-align:center;font-family:var(--disp);font-size:13px;color:var(--faint)">24/25</span>
+<span style="width:52px;text-align:center;font-family:var(--disp);font-size:13px;color:var(--mute)">25/26</span>
+<span style="width:52px;text-align:center;font-family:var(--disp);font-size:24px;line-height:1;color:var(--acc)">∞</span>
+<span style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--ghost);font-size:12px">›</span>
+</div>
+<span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:999px;border:1px solid var(--acc-border);background:var(--acc-chip);font-size:11.5px;font-weight:800;color:var(--acc)">All</span>
+</div>
+<div style="display:flex;gap:2px;overflow-x:auto;padding:8px 10px 0;border-bottom:1px solid var(--panel-border);-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)">
+<sc-for list="{{ tabsG }}" as="t" hint-placeholder-count="7">
+<button onClick="{{ t.pick }}" style="flex:none;width:60px;height:52px;margin-bottom:-1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid {{ t.bc }};border-bottom:0;border-radius:12px 12px 0 0;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:17px;line-height:1">{{ t.icon }}</span><span style="font-size:10px;font-weight:800">{{ t.label }}</span></button>
+</sc-for>
+</div>
+<div style="background:#fff;padding:16px;display:flex;flex-direction:column;gap:10px">
+<div style="font-family:var(--disp);font-size:16px">Latest championships</div>
+<div style="font-size:11.5px;font-weight:700;color:var(--mute)">rank and medals · all seasons</div>
+<div style="height:54px;border-radius:12px;background:var(--raised)"></div>
+<div style="height:54px;border-radius:12px;background:var(--raised)"></div>
+</div>
+<div style="position:absolute;left:0;right:0;top:664px;border-top:2px dashed rgba(178,59,59,.45);pointer-events:none"><span style="position:absolute;right:8px;top:-20px;font-family:var(--mono);font-size:10px;font-weight:800;color:#b23b3b;background:rgba(255,255,255,.85);padding:1px 5px;border-radius:4px">first screen</span></div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--text);display:flex;flex-direction:column;gap:4px">
+<div>Пять KPI стоят в одну полосу вместо рваной раскладки 3+2.</div>
+<div style="color:var(--mute)">Подписи KPI сокращены, подсказки («all time», «in force») остаются в тултипе и на десктопе. Страна и год основания переехали в подзаголовок. Полоса сезона стала одной строкой высотой 44px: карусель по центру, All справа.</div>
+</div>
+</div>
+
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:28px;padding:40px 48px 64px">
+<div style="display:flex;flex-direction:column;gap:6px;max-width:900px">
+<div style="font-family:var(--mono);font-size:12px;font-weight:800;color:var(--acc)">ДЕСКТОП · 1180px</div>
+<div style="font-family:var(--disp);font-size:28px">Точечные правки десктопа</div>
+<div style="font-size:14px;line-height:1.55;color:var(--mute);text-wrap:pretty">Каркас десктопа остаётся прежним. Правки те же, что на мобайле, чтобы код шапки был один.</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:48px;align-items:flex-start">
+
+<div id="1h" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">1h</span><span style="font-size:13px;font-weight:700">Группа</span></div>
+<div style="width:1180px;border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12);padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px">
+<div style="background:var(--hero);border:1px solid var(--border);border-radius:16px;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px">
+<div style="display:flex;flex-direction:column;gap:18px;min-width:0">
+<div style="display:flex;align-items:flex-start;gap:18px">
+<span style="width:80px;height:80px;flex:none;border-radius:18px;background:linear-gradient(160deg,#0e7490,#0a4f61);color:#fff;font-family:var(--disp);font-size:32px;display:flex;align-items:center;justify-content:center">D</span>
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:34px;line-height:1.15;text-align:left;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">דולפין נתניה מסטרס</h1>
+<div style="font-size:13px;font-weight:700;color:var(--mute);margin-top:4px">Dolphin Netanya Masters · 🇮🇱 <bdi>נתניה</bdi></div>
+</div>
+<div style="display:flex;gap:8px;flex:none">
+<a href="#1h" style="height:38px;display:flex;align-items:center;padding:0 16px;border-radius:10px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:13px;font-weight:800;color:var(--acc)">Competitions →</a>
+<span style="height:38px;display:flex;align-items:center;padding:0 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);font-family:var(--mono);font-size:13px;font-weight:800;color:var(--mute)">✓ Member</span><span style="width:34px;height:34px;flex:none;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--mute);font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center">⋯</span>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:stretch;gap:8px">
+<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border:1px solid var(--live-border);border-radius:12px;background:var(--card)"><span style="width:8px;height:8px;border-radius:50%;background:var(--live);box-shadow:0 0 0 3px rgba(15,122,82,.14)"></span><span style="font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--live)">Next</span><span style="font-family:var(--mono);font-size:13px;font-weight:800">Tue 29 Sep · 20:00</span><span style="font-size:12px;font-weight:700;color:var(--mute)">tomorrow</span></div>
+<div style="display:flex;align-items:center;gap:14px;padding:8px 14px;border:1px solid var(--border);border-radius:12px;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--mute)"><span><b style="color:var(--text)">Tue</b> 20–21</span><span><b style="color:var(--text)">Sat</b> 10–12</span><span><b style="color:var(--text)">Sun</b> 20–21</span><span style="width:1px;align-self:stretch;background:var(--border)"></span><span>📍 <bdi>חוף ירוק</bdi> · 25m</span></div>
+</div>
+<div style="display:flex;gap:32px;margin-top:auto">
+<div><div style="font-family:var(--disp);font-size:34px;line-height:1">23</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">Swimmers</div><div style="font-size:10.5px;font-weight:700;color:var(--ghost)">in the roster</div></div>
+<div><div style="font-family:var(--disp);font-size:34px;line-height:1">20</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">Records</div><div style="font-size:10.5px;font-weight:700;color:var(--ghost)">best in the group</div></div>
+</div>
+</div>
+<img src="assets/group-photo.png" alt="" style="width:100%;height:280px;object-fit:cover;border-radius:16px;display:block;border:1px solid var(--border)">
+</div>
+<div style="display:flex;gap:6px">
+<sc-for list="{{ tabsH }}" as="t" hint-placeholder-count="8">
+<button onClick="{{ t.pick }}" style="flex:1;min-width:0;height:66px;margin-bottom:-17px;padding:10px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;border:1px solid {{ t.dbc }};border-bottom:0;border-radius:14px 14px 0 0;background:{{ t.dbg }};text-align:left;position:relative;z-index:1"><span style="display:flex;align-items:center;gap:8px;min-width:0;max-width:100%"><span style="width:22px;height:22px;flex:none;border-radius:6px;background:{{ t.ibg }};color:{{ t.ifg }};font-size:12px;display:flex;align-items:center;justify-content:center">{{ t.icon }}</span><span style="font-size:13px;font-weight:700;color:{{ t.dfg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.full }}</span></span><span style="font-size:10.5px;font-weight:800;color:{{ t.sfg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">{{ t.sub }}</span></button>
+</sc-for>
+</div>
+<div style="border:1px solid var(--panel-border);border-radius:0 0 16px 16px;background:#fff;padding:20px 24px;height:70px"><div style="font-family:var(--disp);font-size:18px">{{ tabHTitle }}</div></div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--text);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;max-width:1180px">
+<div><b>Имя.</b> <span style="color:var(--mute)">Вместо <span style="font-family:var(--mono)">truncate</span> перенос до двух строк с <span style="font-family:var(--mono)">dir="rtl"</span>; флаг и город в подзаголовке.</span></div>
+<div><b>Расписание.</b> <span style="color:var(--mute)">Два блока вместо четырёх чипов: Next (живой, зелёная рамка) и компактная строка дней + бассейн.</span></div>
+<div><b>KPI и табы.</b> <span style="color:var(--mute)">KPI с нулём не показываются. Подписи табов в одну строку с многоточием, высота всех табов одинаковая.</span></div>
+</div>
+</div>
+
+<div id="1i" style="display:flex;flex-direction:column;gap:12px;width:1180px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:12px;font-weight:800;padding:3px 8px;border-radius:6px;background:var(--acc);color:#fff">1i</span><span style="font-size:13px;font-weight:700">Клуб, фото нет, посетитель</span></div>
+<div style="width:1180px;border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:0 10px 40px rgba(8,60,84,.12);padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px">
+<div style="background:var(--hero);border:1px solid var(--border);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;align-items:center;gap:20px">
+<img src="assets/club-logo.png" alt="" style="width:96px;height:96px;flex:none;border-radius:50%;object-fit:cover;display:block">
+<div style="min-width:0;flex:1">
+<h1 dir="rtl" style="margin:0;font-family:var(--disp);font-weight:400;font-size:40px;line-height:1.12;text-align:left;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">הפועל דולפין נתניה</h1>
+<div style="font-size:13px;font-weight:700;color:var(--mute);margin-top:4px">Hapoel Dolphine Netanya · 🇮🇱 Israel · since 2024</div>
+<div style="display:flex;gap:8px;margin-top:10px"><span style="height:28px;display:flex;align-items:center;padding:0 12px;border-radius:999px;border:1px solid var(--acc-border);background:var(--acc-chip);font-size:11.5px;font-weight:800;color:var(--acc)">Official group →</span></div>
+</div>
+<span style="align-self:flex-start;height:38px;display:flex;align-items:center;padding:0 16px;border-radius:10px;border:1px solid var(--acc-border);background:var(--acc-chip);font-family:var(--mono);font-size:13px;font-weight:800;color:var(--acc)">✓ Following</span>
+</div>
+<div style="display:flex;gap:40px;flex-wrap:wrap">
+<sc-for list="{{ clubKpiD }}" as="k" hint-placeholder-count="5">
+<div><div style="font-family:var(--disp);font-size:34px;line-height:1;color:{{ k.color }}">{{ k.v }}</div><div style="margin-top:4px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)">{{ k.full }}</div><div style="font-size:10.5px;font-weight:700;color:var(--ghost)">{{ k.hint }}</div></div>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:8px 16px;border:1px solid var(--border);border-radius:14px;background:#f0f6fa">
+<span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)">Season</span>
+<div style="display:flex;align-items:center;gap:4px">
+<span style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:12px">‹</span>
+<span style="width:60px;text-align:center;font-family:var(--disp);font-size:14px;color:var(--ghost)">23/24</span>
+<span style="width:60px;text-align:center;font-family:var(--disp);font-size:14px;color:var(--faint)">24/25</span>
+<span style="width:60px;text-align:center;font-family:var(--disp);font-size:14px;color:var(--mute)">25/26</span>
+<span style="width:60px;text-align:center;font-family:var(--disp);font-size:26px;line-height:1;color:var(--acc)">∞</span>
+<span style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--ghost);font-size:12px">›</span>
+</div>
+<span style="height:28px;display:flex;align-items:center;padding:0 14px;border-radius:999px;border:1px solid var(--acc-border);background:var(--acc-chip);font-size:12px;font-weight:800;color:var(--acc)">All seasons</span>
+</div>
+<div style="display:flex;gap:6px">
+<sc-for list="{{ tabsI }}" as="t" hint-placeholder-count="7">
+<button onClick="{{ t.pick }}" style="flex:1;min-width:0;height:66px;margin-bottom:-17px;padding:10px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;border:1px solid {{ t.dbc }};border-bottom:0;border-radius:14px 14px 0 0;background:{{ t.dbg }};text-align:left;position:relative;z-index:1"><span style="display:flex;align-items:center;gap:8px;min-width:0;max-width:100%"><span style="width:22px;height:22px;flex:none;border-radius:6px;background:{{ t.ibg }};color:{{ t.ifg }};font-size:12px;display:flex;align-items:center;justify-content:center">{{ t.icon }}</span><span style="font-size:13px;font-weight:700;color:{{ t.dfg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.full }}</span></span><span style="font-size:10.5px;font-weight:800;color:{{ t.sfg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">{{ t.sub }}</span></button>
+</sc-for>
+</div>
+<div style="border:1px solid var(--panel-border);border-radius:0 0 16px 16px;background:#fff;padding:20px 24px;height:70px"><div style="font-family:var(--disp);font-size:18px">{{ tabITitle }}</div></div>
+</div>
+<div style="font-size:12.5px;line-height:1.6;color:var(--text);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;max-width:1180px">
+<div><b>Заглушка фото.</b> <span style="color:var(--mute)">Посетителю пустая рамка не показывается, и колонка схлопывается. Админ видит её как сейчас. Меняется правило §3.9: заглушка только для управляющих.</span></div>
+<div><b>Полоса сезона.</b> <span style="color:var(--mute)">Высота 44px вместо ~110px, всё прижато влево, «SEASON» стоит подписью слева, а не над ∞.</span></div>
+<div><b>Шапка.</b> <span style="color:var(--mute)">Страна и год ушли в подзаголовок, KPI в один ряд с ровным шагом. Following стоит справа от имени, как Member у группы.</span></div>
+</div>
+</div>
+
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;mobilePhoto&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;label&quot;:&quot;Mobile photo uploaded&quot;}}">
+class Component extends DCLogic {
+  state = { exp1a: false, mem1a: false, more: false, t: { a: 'team', b: 'team', c: 'team', d: 'home', e: 'home', f: 'home', g: 'home', h: 'team', i: 'home' } };
+  G = [
+    ['home', '▦', 'Home', 'Overview', 'last start · records'],
+    ['season', '🗓', 'Season', 'Season', '2026/27 · standings'],
+    ['results', '⏱', 'Results', 'Results', 'results · records · SB'],
+    ['team', '🏊', 'Team', 'Swimmers', '23 in the roster'],
+    ['media', '▶', 'Media', 'Media', 'gallery · from members'],
+    ['train', '◷', 'Train', 'Trainings', '🔒 sessions · lanes'],
+    ['admin', '⚙', 'Admin', 'Admin', 'display · schedule · levels · joining'],
+  ];
+  C = [
+    ['home', '▦', 'Home', 'Overview', 'latest meets · top swimmers'],
+    ['season', '🗓', 'Season', 'Season', 'grid · standings'],
+    ['results', '⏱', 'Results', 'Results', 'results · records · SB'],
+    ['team', '🏊', 'Team', 'Swimmers', '193 · coaches'],
+    ['media', '▶', 'Media', 'Media', 'from swimmers'],
+    ['history', '🗓', 'History', 'History', '28 competitions'],
+    ['admin', '⚙', 'Admin', 'Admin', 'page display, cache'],
+  ];
+  roleVals() {
+    const OW = '#7c3aed', OWC = 'rgba(124,58,237,.08)', OWB = 'rgba(124,58,237,.45)', ACC = '#0e7490', ACB = 'rgba(14,116,144,.45)';
+    const role = this.state.role || 'member', staff = role === 'staff', guest = role === 'guest';
+    const cur = this.state.rt || 'team', sub = this.state.sub || 'sessions';
+    const setT = id => this.setState({ rt: id });
+    const top = [['home', '▦', 'Home'], ['season', '🗓', 'Season'], ['results', '⏱', 'Results'], ['team', '🏊', 'Team', true], ['media', '▶', 'Media', true]];
+    const rv = this.state.rv || 'results';
+    if (!staff) top.push(['train', '◷', 'Train']);
+    const dockIds = ['train', 'admin'];
+    const active = staff ? cur : (cur === 'admin' ? 'team' : cur);
+    const topTabs = top.map(([id, icon, label, ed]) => {
+      const on = active === id, edit = staff && ed;
+      const col = edit ? OW : ACC;
+      return { icon, label, pick: () => setT(id), mark: edit ? '✎' : (guest && id === 'train' ? '🔒' : ''),
+        bg: on ? '#ffffff' : 'transparent', bc: on ? (edit ? OWB : ACB) : 'transparent', fg: on || edit ? col : '#7b95a3' };
+    });
+    const dockTabs = [['train', '◷', 'Trainings', 'sessions · lanes'], ['admin', '⚙', 'Admin', '3']].map(([id, icon, label, s]) => {
+      const on = active === id;
+      return { icon, label, sub: id === 'admin' ? '· 3 new' : '', pick: () => setT(id), bg: on ? OW : OWC, bc: OWB, fg: on ? '#ffffff' : OW };
+    });
+    const topEdit = staff && (active === 'team' || active === 'media');
+    const inDock = staff && dockIds.includes(active);
+    const editable = staff && (topEdit || inDock);
+    const titles = { home: 'Overview', season: 'Season 2026/27', results: 'Results', team: 'Swimmers', media: 'Media', train: 'Trainings', admin: 'Admin' };
+    const g = (a, b, c, e) => ({ a, b, c, cbc: e ? OWB : '#e0ecf2', cfg: e ? OW : '#7b95a3' });
+    let rows;
+    if (active === 'team') rows = [g('גוסטמלסקי אניה', '1981 · coach', staff ? 'Level A ▾' : 'coach', staff), g('איזבקוב פיטר', '1979', staff ? 'Level B ▾' : '—', staff), g('ברנצב ולדימיר', '1978', staff ? 'No level ▾' : '—', staff)];
+    else if (active === 'media') rows = [g('Relay 4×50 free', 'Netanya Open · 09/07', staff ? 'Hide' : '▶', staff), g('Publication request', 'from Peter I. · 100 fly', staff ? 'Review' : '▶', staff)];
+    else if (active === 'train' && !guest) rows = sub === 'lanes'
+      ? [g('Lane 1 · fast', 'Peter, Vladimir, Anya', staff ? 'Edit' : '', staff), g('Lane 2 · medium', 'Maxim, Olga', staff ? 'Edit' : '', staff)]
+      : [g('Tue 29 Sep · 20:00', '14 going', staff ? 'Edit' : 'I’m going', staff), g('Sat 3 Oct · 10:00', '6 going', staff ? 'Edit' : 'I’m going', staff)];
+    else if (active === 'admin') rows = [g('Publication requests', '3 waiting', 'Open', true), g('Training schedule', 'Tue · Sat · Sun', 'Edit', true), g('Hero photo', 'desktop · mobile', 'Edit', true), g('Joining', 'approval required', 'Edit', true)];
+    else if (active === 'results') rows = rv === 'records'
+      ? [g('50 free · ♂', 'Barentsev V. · 09/07/2026', '25.84', false), g('100 breast · ♀', 'Gustmalsky A. · 12/03/2026', '1:32.10', false), g('200 IM · ♂', 'Izbakov P. · 21/11/2025', '2:41.07', false)]
+      : rv === 'sb'
+        ? [g('50 free · ♂', 'Barentsev V. · season 2026/27', '26.02', false), g('50 fly · ♂', 'Shustin M. · season 2026/27', '29.88', false)]
+        : [g('Netanya Masters Open', '09/07/2026 · 3 swimmers · 11 swims', '3 gold', false), g('Israel Masters Winter', '14/02/2026 · 7 swimmers · 19 swims', '5 gold', false)];
+    else if (active === 'train') rows = [];
+    else rows = [g('…', 'content', '', false), g('…', 'content', '', false)];
+    rows = rows.map(r => ({ ...r, cbc: r.c ? r.cbc : 'transparent' }));
+    const roleLabels = [['guest', 'Не залогинен'], ['member', 'Залогинен'], ['staff', 'Админ / тренер']];
+    return {
+      roles: roleLabels.map(([id, label]) => ({ label, pick: () => this.setState({ role: id }), bg: role === id ? (id === 'staff' ? OW : ACC) : 'transparent', fg: role === id ? '#ffffff' : '#7b95a3' })),
+      ...(() => {
+        const r = this.state.rsvp || null, roster = 23;
+        const yes = 13 + (r === 'yes' ? 1 : 0), maybe = 2 + (r === 'maybe' ? 1 : 0), no = 3 + (r === 'no' ? 1 : 0);
+        const set = v => this.setState(s => ({ rsvp: s.rsvp === v ? null : v }));
+        const pct = n => (n / roster * 100).toFixed(1);
+        const st = staff ? { l: `${yes} ✓ · ${maybe} ? · ${no} ✕`, bg: 'rgba(124,58,237,.08)', bc: 'rgba(124,58,237,.45)', fg: '#7c3aed' }
+          : guest ? { l: 'Tue · Sat · Sun', bg: '#ffffff', bc: '#e0ecf2', fg: '#7b95a3' }
+          : r === 'yes' ? { l: '✓ Going · Tue 20:00', bg: '#0f7a52', bc: '#0f7a52', fg: '#ffffff' }
+          : r === 'maybe' ? { l: '? Not sure · Tue', bg: '#d9a420', bc: '#d9a420', fg: '#ffffff' }
+          : r === 'no' ? { l: '✕ Can\u2019t · Tue', bg: '#b23b3b', bc: '#b23b3b', fg: '#ffffff' }
+          : { l: 'Tue 20:00 · going?', bg: '#ffffff', bc: 'rgba(15,122,82,.35)', fg: '#0f7a52' };
+        const top = !!this.state.topRsvp;
+        const bannerOn = top && role === 'member' && !r;
+        return {
+          bannerOn, heroNext: !guest && !bannerOn,
+          rsvpModes: [[false, 'Ответ: в шапке'], [true, 'Ответ: сверху, если не отметил']].map(([v, label]) => ({ label, pick: () => this.setState({ topRsvp: v }), bg: top === v ? '#0f7a52' : 'transparent', fg: top === v ? '#ffffff' : '#7b95a3' })),
+          stuck: !!this.state.stuck,
+          onScroll: e => { const s = e.currentTarget.scrollTop > 300; if (s !== !!this.state.stuck) this.setState({ stuck: s }); },
+          stickyLabel: st.l, stickyBg: st.bg, stickyBc: st.bc, stickyFg: st.fg,
+          rsvpYes: yes, rsvpMaybe: maybe, rsvpNo: no, rsvpYesPct: pct(yes), rsvpMaybePct: pct(maybe), rsvpNoPct: pct(no),
+          rsvpGo: () => set('yes'), rsvpSkip: () => set('no'), rsvpMaybeFn: () => set('maybe'),
+          maybeBg: r === 'maybe' ? '#d9a420' : '#ffffff', maybeBc: r === 'maybe' ? '#d9a420' : 'rgba(178,125,17,.35)', maybeFg: r === 'maybe' ? '#ffffff' : '#b17d11',
+          goBg: r === 'yes' ? '#0f7a52' : '#ffffff', goBc: r === 'yes' ? '#0f7a52' : 'rgba(15,122,82,.35)', goFg: r === 'yes' ? '#ffffff' : '#0f7a52',
+          skipBg: r === 'no' ? '#b23b3b' : '#ffffff', skipBc: r === 'no' ? '#b23b3b' : 'rgba(178,59,59,.3)', skipFg: r === 'no' ? '#ffffff' : '#b23b3b',
+          isMemberOnly: role === 'member',
+          goingAv: [['P', '#1d4ed8'], ['A', '#be185d'], ['V', '#1d4ed8'], ['M', '#1d4ed8'], ['O', '#be185d']].map(([l, bg]) => ({ l, bg })),
+        };
+      })(),
+      stuckD: !!this.state.stuckD,
+      onScrollD: e => { const s = e.currentTarget.scrollTop > 200; if (s !== !!this.state.stuckD) this.setState({ stuckD: s }); },
+      tabsPadD: this.state.stuckD ? 60 : 8, tabsMarD: this.state.stuckD ? -52 : 0,
+      topTabsD: top.map(([id, icon, label, ed]) => {
+        const FULL = { home: ['Overview', 'last start · records'], season: ['Season', '2026/27 · standings'], results: ['Results', 'results · records · SB'], team: ['Swimmers', staff ? '23 · levels' : '23 in the roster'], media: ['Media', staff ? 'gallery · 1 request' : 'gallery · from members'], train: ['Trainings', guest ? '🔒 members only' : 'sessions · lanes'] }[id];
+        const on = active === id, edit = staff && ed, col = edit ? OW : ACC;
+        return { icon, full: FULL[0], sub: FULL[1], mark: edit ? '✎' : '', pick: () => setT(id),
+          dbg: on ? '#ffffff' : (edit ? 'rgba(124,58,237,.04)' : '#f9fbfd'), dbc: on ? (edit ? OWB : ACB) : (edit ? 'rgba(124,58,237,.25)' : '#e0ecf2'),
+          dfg: on || edit ? col : '#04283e', ibg: on ? col : (edit ? OWC : '#eef4f8'), ifg: on ? '#ffffff' : col, sfg: on ? col : '#9db0bb' };
+      }),
+      dockTabsD: [['train', '◷', 'Trainings', 'sessions · lanes'], ['admin', '⚙', 'Admin', '3 new']].map(([id, icon, label, sub]) => {
+        const on = active === id;
+        return { icon, label, sub, pick: () => setT(id), bg: on ? '#ffffff' : OWC, fg: OW, bb: on ? '0' : '1px solid rgba(124,58,237,.45)' };
+      }),
+      panelBorderD: inDock ? OWB : (topEdit ? OWB : ACB),
+      dotsOpen: !guest && !!this.state.dots, toggleDots: () => this.setState(s => ({ dots: !s.dots })),
+      loggedIn: !guest, isGuest: guest, isStaff: staff, staffLabel: 'Coach tools',
+      dockPad: staff ? 96 : 0,
+      joinLabel: guest ? '+ Join group' : '✓ Member', joinBg: guest ? 'rgba(14,116,144,.10)' : '#ffffff', joinBc: guest ? ACB : '#e0ecf2', joinFg: guest ? ACC : '#7b95a3',
+      topTabs, topCount: top.length, dockTabs,
+      topLine: inDock ? '#e0ecf2' : (topEdit ? OWB : ACB),
+      panelTop: inDock ? OW : 'transparent',
+      panelTitle: titles[active], panelEditable: editable,
+      showLock: guest && active === 'train', showTrainSeg: active === 'train' && !guest,
+      subTabs: [['sessions', 'Sessions'], ['lanes', 'Lanes']].map(([id, label]) => ({ label, pick: () => this.setState({ sub: id }), bg: sub === id ? (staff ? OW : ACC) : 'transparent', fg: sub === id ? '#ffffff' : '#7b95a3' })),
+      panelRows: rows,
+      showResChips: active === 'results',
+      resCaption: { results: 'meets and swims of the group, newest first', records: 'best time of the group per event · both pools', sb: 'best time per event this season' }[rv],
+      resChips: [['results', '≡', 'Results', ''], ['records', '🏅', 'Records', '20'], ['sb', '☀', 'Season bests', '']].map(([id, icon, label, n]) => {
+        const on = rv === id;
+        return { icon, label, n, hasN: !!n, pick: () => this.setState({ rv: id }), bg: on ? 'rgba(14,116,144,.10)' : '#f9fbfd', bc: on ? ACB : '#e0ecf2', fg: on ? ACC : '#7b95a3' };
+      }),
+    };
+  }
+  altVals() {
+    const G = '#0f7a52', Y = '#d9a420', RD = '#b23b3b';
+    const wk = this.state.wk || {};
+    const next = { undefined: 'yes', null: 'yes', yes: 'maybe', maybe: 'no', no: null };
+    const days = [['tue', 'Tomorrow', 'Tue 29', '20:00–21:00', 13], ['sat', 'Saturday', 'Sat 3', '10:00–12:00', 9], ['sun', 'Sunday', 'Sun 4', '20:00–21:00', 6]];
+    const week = days.map(([id, tag, day, time, n], i) => {
+      const s = wk[id] || null;
+      const look = s === 'yes' ? ['✓ Going', G, '#fff', G] : s === 'maybe' ? ['? Not sure', Y, '#fff', Y] : s === 'no' ? ['✕ Can’t', RD, '#fff', RD] : ['Tap to answer', '#f9fbfd', '#0e7490', '#e0ecf2'];
+      return { tag, day, time, count: `${n + (s === 'yes' ? 1 : 0)} going`, btn: look[0], btnBg: look[1], btnFg: look[2], btnLine: look[3],
+        border: i === 0 ? '1.5px solid rgba(15,122,82,.55)' : '1px solid #e0ecf2', tagFg: i === 0 ? G : '#9db0bb',
+        cycle: () => this.setState(st => ({ wk: { ...(st.wk || {}), [id]: next[String((st.wk || {})[id] ?? null)] } })) };
+    });
+    const pr = this.state.pr || null, note = this.state.note || null;
+    const P = (l, g) => ({ l, bg: g === 'f' ? '#be185d' : '#1d4ed8', fg: '#fff', border: '2px solid #fff', shadow: '0 1px 3px rgba(8,60,84,.18)' });
+    const me = pr === 'yes' ? { l: 'V', bg: '#0e7490', fg: '#fff', border: '2px solid #fff', shadow: '0 0 0 3px rgba(15,122,82,.45)' }
+      : pr === 'maybe' ? { l: 'V', bg: 'rgba(255,255,255,.7)', fg: '#b17d11', border: '2px dashed #d9a420', shadow: 'none' } : null;
+    const lanes = [
+      ['1 · fast', [P('P'), P('A', 'f'), P('M')]],
+      ['2 · med', [P('O', 'f'), P('D'), ...(me ? [me] : [])]],
+      ['3 · med', [P('S'), P('R', 'f'), P('E', 'f')]],
+      ['4 · easy', [P('L', 'f'), P('B'), P('N'), P('K', 'f')]],
+    ].map(([name, people], i) => ({ name, people, rope: i === 0 ? '0' : '2px dashed rgba(178,59,59,.35)' }));
+    const idx = { yes: 0, maybe: 1, no: 2 }[pr];
+    const thumbCol = { yes: G, maybe: Y, no: RD }[pr] || 'transparent';
+    return {
+      week, weekAllYes: () => this.setState({ wk: { tue: 'yes', sat: 'yes', sun: 'yes' } }),
+      lanes, poolYes: 13 + (pr === 'yes' ? 1 : 0), poolMaybe: 2 + (pr === 'maybe' ? 1 : 0), poolNo: 3 + (pr === 'no' ? 1 : 0),
+      thumbLeft: idx == null ? '3px' : `calc(3px + ${idx} * (100% - 6px) / 3)`, thumbBg: thumbCol, thumbOp: idx == null ? 0 : 1,
+      poolOpts: [['yes', '✓ Going', G], ['maybe', '? Not sure', '#b17d11'], ['no', '✕ Can’t', RD]].map(([id, label, c]) => ({ label, fg: pr === id ? '#fff' : c, pick: () => this.setState(st => ({ pr: st.pr === id ? null : id, note: null })) })),
+      poolAnswered: pr === 'yes' || pr === 'maybe',
+      poolNotes: ['Late ~10 min', '1st hour only', 'Leaving early'].map(label => ({ label, pick: () => this.setState(st => ({ note: st.note === label ? null : label })), bg: note === label ? 'rgba(14,116,144,.10)' : '#fff', bc: note === label ? 'rgba(14,116,144,.45)' : '#e0ecf2', fg: note === label ? '#0e7490' : '#7b95a3' })),
+    };
+  }
+  clubVals() {
+    const OW = '#7c3aed', OWC = 'rgba(124,58,237,.08)', OWB = 'rgba(124,58,237,.45)', ACC = '#0e7490', ACB = 'rgba(14,116,144,.45)';
+    const role = this.state.role || 'member', staff = false, guest = role === 'guest';
+    const cur = this.state.ct || 'home';
+    const list = [['home', '▦', 'Home', 'Overview', 'latest meets · top swimmers'], ['season', '🗓', 'Season', 'Season', 'grid · standings'], ['results', '⏱', 'Results', 'Results', 'results · records · SB'], ['team', '🏊', 'Team', 'Swimmers', '193 · coaches', true], ['media', '▶', 'Media', 'Media', 'from swimmers', true], ['history', '⌛', 'History', 'History', '28 competitions']];
+    const active = !staff && cur === 'admin' ? 'home' : cur;
+    const tabs = list.map(([id, icon, label, full, sub, ed]) => {
+      const on = active === id, edit = staff && ed, col = edit ? OW : ACC;
+      return { icon, label, full, sub, mark: edit ? '✎' : '', pick: () => this.setState({ ct: id }),
+        bg: on ? '#ffffff' : 'transparent', bc: on ? (edit ? OWB : ACB) : 'transparent', fg: on || edit ? col : '#7b95a3',
+        dbg: on ? '#ffffff' : (edit ? 'rgba(124,58,237,.04)' : '#f9fbfd'), dbc: on ? (edit ? OWB : ACB) : (edit ? 'rgba(124,58,237,.25)' : '#e0ecf2'),
+        dfg: on || edit ? col : '#04283e', ibg: on ? col : (edit ? OWC : '#eef4f8'), ifg: on ? '#ffffff' : col, sfg: on ? col : '#9db0bb' };
+    });
+    const adminOn = active === 'admin';
+    const edit = staff && (adminOn || active === 'team' || active === 'media');
+    const titles = { home: 'Latest championships', season: 'Season 2025/26', results: 'Results', team: 'Swimmers', media: 'Media', history: 'History', admin: 'Admin' };
+    const kpi = [['12', 'Championships', 'all time'], ['3', 'Wins', 'all time', 'gold'], ['52', 'Records', 'in force'], ['27', 'Season bests', 'season 2025/26'], ['193', 'Swimmers', 'current roster']]
+      .map(([v, l, h, g]) => ({ v, l, h, color: g ? '#b17d11' : '#04283e' }));
+    return {
+      cTabs: tabs, cKpi: kpi, cTitle: titles[active], cEdit: edit, cIsResults: active === 'results',
+      cFollowLabel: guest ? '+ Follow club' : '✓ Following', cIsGuest: guest, cLogged: !guest, cIsStaff: staff,
+      cMenu: !guest && !!this.state.cmenu, cToggleMenu: () => this.setState(s => ({ cmenu: !s.cmenu })),
+      cAdminPick: () => this.setState({ ct: 'admin' }),
+      cAdminBg: adminOn ? OW : OWC, cAdminFg: adminOn ? '#ffffff' : OW, cAdminDbg: adminOn ? '#ffffff' : OWC, cAdminBb: adminOn ? '0' : '1px solid rgba(124,58,237,.45)',
+      cLine: adminOn ? '#e0ecf2' : (edit ? OWB : ACB), cPanelTop: adminOn ? OW : 'transparent', cPanelBorder: edit ? OWB : ACB,
+      cDockPad: staff ? 90 : 0,
+      cRows: adminOn ? [['Page display', 'hero photo · sections'], ['Cache', 'last rebuilt 2h ago'], ['Official group', 'Dolphin Netanya Masters']].map(([a, b]) => ({ a, b, c: 'Edit', cbc: OWB, cfg: OW }))
+        : [['גביע ישראל מאסטרס 2026', '14/02/2026 · rank 2 · 11 medals'], ['אליפות ישראל חורף', '12/12/2025 · rank 1 · 19 medals'], ['Netanya Open', '09/07/2025 · rank 3 · 6 medals']].map(([a, b]) => ({ a, b, c: '→', cbc: '#e0ecf2', cfg: '#7b95a3' })),
+    };
+  }
+  pick(k, id) { this.setState(s => ({ t: { ...s.t, [k]: id }, more: k === 'e' ? false : s.more })); }
+  mk(list, k) {
+    const cur = this.state.t[k];
+    return list.map(([id, icon, label, full, sub]) => {
+      const on = cur === id;
+      return {
+        id, icon, label, full, sub, on, pick: () => this.pick(k, id),
+        bg: on ? '#ffffff' : 'transparent', bc: on ? 'rgba(14,116,144,.45)' : 'transparent', fg: on ? '#0e7490' : '#7b95a3',
+        dbg: on ? '#ffffff' : '#f9fbfd', dbc: on ? 'rgba(14,116,144,.45)' : '#e0ecf2', dfg: on ? '#0e7490' : '#04283e',
+        ibg: on ? '#0e7490' : '#eef4f8', ifg: on ? '#ffffff' : '#0e7490', sfg: on ? '#0e7490' : '#9db0bb',
+        rowBg: on ? 'rgba(14,116,144,.10)' : 'transparent', fg2: on ? '#0e7490' : '#04283e',
+      };
+    });
+  }
+  title(list, k) { return (list.find(x => x[0] === this.state.t[k]) || list[0])[3]; }
+  renderVals() {
+    const G = this.G, C = this.C;
+    const f = this.mk(G, 'f').map(t => ({ ...t, bg: t.on ? 'rgba(14,116,144,.10)' : '#ffffff', bc: t.on ? 'rgba(14,116,144,.45)' : '#e0ecf2', fg: t.on ? '#0e7490' : '#04283e' }));
+    const eAll = this.mk(G, 'e');
+    const inMore = eAll.slice(5).find(t => t.on);
+    const moreOn = !!inMore || this.state.more;
+    const kpi = [
+      { v: 12, l: 'Champs', full: 'Championships', hint: 'all time' },
+      { v: 3, l: 'Wins', full: 'Championship wins', hint: 'all time', gold: true },
+      { v: 52, l: 'Records', full: 'Records', hint: 'in force' },
+      { v: 27, l: 'SB 25/26', full: 'Season bests', hint: 'season 2025/26' },
+      { v: 193, l: 'Swimmers', full: 'Swimmers', hint: 'current roster' },
+    ].map((k, i) => ({ ...k, color: k.gold ? '#b17d11' : '#04283e', sep: i === 0 ? 'transparent' : '#e0ecf2' }));
+    const mob = this.props.mobilePhoto ?? false;
+    return {
+      ...this.roleVals(),
+      ...this.altVals(),
+      ...this.clubVals(),
+      photoA: mob ? 292 : 180, photoB: mob ? 292 : 210,
+      photoLabel: mob ? 'mobile photo · 4:3' : 'desktop photo · cropped',
+      exp1a: this.state.exp1a, expIcon: this.state.exp1a ? '▴' : '▾',
+      toggleExp: () => this.setState(s => ({ exp1a: !s.exp1a })),
+      mem1a: this.state.mem1a, toggleMem: () => this.setState(s => ({ mem1a: !s.mem1a })),
+      more: this.state.more, toggleMore: () => this.setState(s => ({ more: !s.more })),
+      tabsA: this.mk(G, 'a'), tabsB: this.mk(G, 'b'), tabsC: this.mk(G, 'c'),
+      tabsD: this.mk(G, 'd'), tabDTitle: this.title(G, 'd'),
+      tabsE: eAll.slice(0, 5), tabsEMore: eAll.slice(5), tabETitle: this.title(G, 'e'),
+      moreTab: { icon: inMore ? inMore.icon : '⋯', label: inMore ? inMore.label : 'More', bg: moreOn ? '#ffffff' : 'transparent', bc: moreOn ? 'rgba(14,116,144,.45)' : 'transparent', fg: moreOn ? '#0e7490' : '#7b95a3' },
+      tabsF: f, tabFTitle: this.title(G, 'f'),
+      tabsG: this.mk(C, 'g'),
+      tabsH: this.mk(G, 'h'), tabHTitle: this.title(G, 'h'),
+      tabsI: this.mk(C, 'i'), tabITitle: this.title(C, 'i'),
+      clubKpi: kpi, clubKpiD: kpi,
+      members: [
+        { name: 'גוסטמלסקי אניה', meta: 'מכבי עולם המים · coach', year: '1981' },
+        { name: 'איזבקוב פיטר', meta: 'הפועל דולפין נתניה', year: '1979' },
+        { name: 'ברנצב ולדימיר', meta: 'הפועל דולפין נתניה', year: '1978' },
+        { name: 'שוסטין מקסים', meta: 'הפועל דולפין נתניה', year: '1981' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

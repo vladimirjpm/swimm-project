@@ -46,7 +46,9 @@ public class ClubMergeServiceTests
     private static SwimmDbContext CreateDb(string name, ICacheService? cache = null)
     {
         var options = new DbContextOptionsBuilder<SwimmDbContext>()
-            .UseInMemoryDatabase(name)
+            // Имя базы — с префиксом класса: InMemory-базы общие на процесс, и одноимённый тест в
+            // CompetitionDaySplitServiceTests подмешивал своих пловцов (Single() падал в CI через раз).
+            .UseInMemoryDatabase($"{nameof(ClubMergeServiceTests)}.{name}")
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
         if (cache != null) options.AddInterceptors(new CacheInvalidationInterceptor(cache));
         return new(options.Options);

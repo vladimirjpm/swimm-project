@@ -125,9 +125,9 @@ function DeepEntityPage<T extends string>({
                   onSelect={handleTab}
                   toolsLabel={toolsLabel}
                   tabs={tabs.map(({
-                    id, icon, label, shortLabel, sub, editable, locked, pinned, badge, badgeTone,
+                    id, icon, label, shortLabel, sub, editable, locked, pinned, badge, badgeTone, dot,
                   }) => ({
-                    id, icon, label, shortLabel, sub, editable: editable || pinned, locked, pinned, badge, badgeTone,
+                    id, icon, label, shortLabel, sub, editable: editable || pinned, locked, pinned, badge, badgeTone, dot,
                   }))}
                 />
 

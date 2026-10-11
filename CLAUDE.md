@@ -32,6 +32,9 @@ Keep this file the single source of agent guidance; other agents are pointed her
   **«Почему у одного соревнования ДВА набора мест»**: протокольные места официальные
   (медали дают за каждый день), Combine All Results — сравнительный вид. Читай перед
   любым расчётом мест, медалей или очков.
+- [`docs/masters-records-rules.md`](docs/masters-records-rules.md) — **как признают мастерс-
+  рекорд** (MSW 5.3): какой старт годится, хронометраж, заявка за 60 дней, кто подаёт.
+  Отвечает на «почему быстрое время из протокола не стало рекордом».
 
 This file covers only what those don't: how to build, run, migrate, and test **in practice here**,
 plus repo-specific footguns.

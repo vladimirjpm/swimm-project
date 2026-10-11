@@ -459,6 +459,10 @@
    со знаком ✎ (`.deep-tab__mark`) или подписью — не одним цветом. Токены --deep-ow*
    исторически «open water», здесь это роль правки: второй фиолетовой пары в теме нет. */
 .deep-tab__mark { flex: none; font-size: 10px; line-height: 1; color: var(--deep-ow); }
+/* Метка внимания точкой (Trainings группы: золотая — план дорожек, акцентная — новые видео).
+   Цвет — inline ролью темы; у инструмента прижата вправо, как бейдж. */
+.deep-tab__dot { flex: none; width: 7px; height: 7px; border-radius: 999px; }
+.deep-tool-tab__dot { margin-left: auto; }
 .deep-tab--edit {
   background: var(--deep-ow-soft);
   border-color: color-mix(in srgb, var(--deep-ow) 25%, transparent);
@@ -671,6 +675,9 @@
   /* Знак ✎ / 🔒 — в углу плитки, а не в строке: колонка узкая, строки под него нет. */
   .deep-tab { position: relative; }
   .deep-tab__mark { position: absolute; top: 4px; right: 5px; font-size: 9px; }
+  /* Точка — у правого верхнего края иконки (иконка 17px по центру плитки), как значок
+     уведомления: угол плитки занят ✎ / 🔒, а левый угол узкой плитки читается как соседний таб. */
+  .deep-tab .deep-tab__dot { position: absolute; top: 4px; left: calc(50% + 8px); }
   .deep-tab--edit .deep-tab__icon,
   .deep-tab--edit.deep-tab--active .deep-tab__icon { background: none; color: var(--deep-ow); }
   .deep-tab--edit.deep-tab--active .deep-tab__name { text-shadow: none; }
@@ -703,6 +710,7 @@
   /* Красная пилюля — без точки-разделителя мобильной версии, непрозрачная. */
   .deep-tool-tab__badge--danger { font-weight: 800; opacity: 1; }
   .deep-tool-tab__badge--danger::before { content: none; }
+  .deep-tool-tab__dot { margin-left: 0; }
   .deep-entity-main--dock { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
   /* Открыт инструмент — у верхнего ряда нет активного язычка, и панель отбивает фиолетовая
      линия сверху: видно, откуда пришёл контент. */

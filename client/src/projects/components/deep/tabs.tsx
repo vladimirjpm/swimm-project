@@ -41,6 +41,22 @@ export interface DeepTabItem<T extends string> {
   badge?: string;
   /** `danger` — бейдж красной пилюлей с числом («нужен ответ»), а не серым «· 3 new». */
   badgeTone?: 'danger';
+  /**
+   * Метка внимания точкой 7px (у любого таба, не только `pinned`): цвет — роль темы, `label` —
+   * для читалок и подсказки. Рядом с `badge` не рисуется — бейдж уже говорит громче.
+   */
+  dot?: DeepTabDot;
+}
+
+export interface DeepTabDot {
+  color: string;
+  label: string;
+}
+
+function TabDot({ dot, className = '' }: { dot: DeepTabDot; className?: string }) {
+  return (
+    <span className={`deep-tab__dot ${className}`} style={{ background: dot.color }} role="img" aria-label={dot.label} title={dot.label} />
+  );
 }
 
 interface Props<T extends string> {
@@ -85,6 +101,7 @@ function DeepTabs<T extends string>({ tabs, active, onSelect, ariaLabel, toolsLa
               {tab.shortLabel && (
                 <span className="deep-tab__name sm:hidden" aria-hidden="true">{tab.shortLabel}</span>
               )}
+              {tab.dot && !tab.badge && <TabDot dot={tab.dot} />}
               {tab.editable && (
                 <span className="deep-tab__mark" title="You can edit this">✎</span>
               )}
@@ -119,6 +136,7 @@ function DeepTabs<T extends string>({ tabs, active, onSelect, ariaLabel, toolsLa
                     {tab.badge}
                   </span>
                 )}
+                {tab.dot && !tab.badge && <TabDot dot={tab.dot} className="deep-tool-tab__dot" />}
               </button>
             ))}
           </div>
