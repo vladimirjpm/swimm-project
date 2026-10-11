@@ -19,9 +19,11 @@ public partial class LogligClient : ILogligClient
 {
     private const string BaseUrl = "https://loglig.com:2053";
 
-    /// <summary>Без валидного seasonId карточка отдаёт 500; старый сезон — урезанную таблицу
-    /// результатов. Значение сезона меняется раз в год — переопределяется конфигом Loglig:SeasonId.</summary>
-    private const int DefaultSeasonId = 1715; // сезон 2025/26
+    /// <summary>Без валидного seasonId карточка отдаёт 500; старый сезон открывает вкладку
+    /// результатов прошлого сезона (таблица личных рекордов, по которой идёт сверка, от сезона не
+    /// зависит — проверено 11.10.2026). Значение меняется раз в год — переопределяется конфигом
+    /// Loglig:SeasonId; второе место с тем же умолчанием — Pages/Admin/Swimmers/Loglig.cshtml.cs.</summary>
+    private const int DefaultSeasonId = 1786; // сезон 2026/27 (2025/26 = 1715)
 
     /// <summary>Какую долю голосов должно набрать значение очков, чтобы попасть в шкалу.</summary>
     private const int ScaleVoteThresholdPercent = 60;
@@ -74,6 +76,42 @@ public partial class LogligClient : ILogligClient
             return null;
         }
     }
+
+    /// <summary>
+    /// Английский заголовок карточки. Язык loglig выбирает по куке <c>_culture</c>, а без
+    /// <c>DetailsPageVisited</c> карточка уходит в бесконечный редирект (проверено 10.10.2026).
+    /// Клиент свой, «loglig-en», без контейнера кук: у общего «loglig» контейнер один на все
+    /// запросы, и английская кука переключила бы на английский всё остальное — разбор
+    /// карточек, протоколов, зачёта, которые ждут иврит.
+    /// </summary>
+    public async Task<string?> GetPlayerEnglishNameAsync(int logligId, CancellationToken ct = default)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient(EnglishClientName);
+            using var request = new HttpRequestMessage(HttpMethod.Get, BuildPublicProfileUrl(logligId));
+            request.Headers.Add("Cookie", "_culture=en-US; DetailsPageVisited=visited");
+            using var response = await client.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("loglig: английская карточка {LogligId} недоступна, статус {StatusCode}",
+                    logligId, (int)response.StatusCode);
+                return null;
+            }
+
+            var match = NameRx().Match(await response.Content.ReadAsStringAsync(ct));
+            var name = match.Success ? WebUtility.HtmlDecode(match.Groups[1].Value).Trim() : null;
+            return string.IsNullOrEmpty(name) ? null : name;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "loglig: ошибка запроса английской карточки {LogligId}", logligId);
+            return null;
+        }
+    }
+
+    /// <summary>Имя HttpClient для английских карточек (регистрация — DependencyInjection).</summary>
+    public const string EnglishClientName = "loglig-en";
 
     // ── Официальный клубный зачёт соревнования ─────────────────────────────────
 

@@ -31,8 +31,11 @@ public class ImportDataCheckAutorunTests
         public Task InvalidateAllAsync() => Task.CompletedTask;
     }
 
-    /// <summary>Реестр-заглушка: запоминает триггер и отдаёт заданные счётчики.</summary>
-    private sealed class FakeRunner(int errors = 0, int warnings = 0, bool throws = false) : IDataCheckRunner
+    /// <summary>
+    /// Реестр-заглушка: запоминает триггер и отдаёт заданные ОТКРЫТЫЕ счётчики; <paramref name="accepted"/> —
+    /// принятые предупреждения, которые прогон тоже находит, но работой они уже не считаются.
+    /// </summary>
+    private sealed class FakeRunner(int errors = 0, int warnings = 0, int accepted = 0, bool throws = false) : IDataCheckRunner
     {
         public string? Trigger { get; private set; }
         public int Runs { get; private set; }
@@ -43,7 +46,7 @@ public class ImportDataCheckAutorunTests
             Runs++;
             if (throws) throw new InvalidOperationException("реестр упал");
             return Task.FromResult(new DataCheckRunDto(
-                1, DateTime.UtcNow, DateTime.UtcNow, trigger, errors, warnings, 0, 0));
+                1, DateTime.UtcNow, DateTime.UtcNow, trigger, errors, warnings + accepted, 0, 0));
         }
 
         public Task<IReadOnlyList<DataCheckGroupDto>> GetCurrentAsync(CancellationToken ct = default) =>
@@ -51,7 +54,12 @@ public class ImportDataCheckAutorunTests
         public Task<IReadOnlyList<DataCheckRunDto>> GetHistoryAsync(int limit = 20, CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<(DataCheckRunDto? LastRun, IReadOnlyList<DataCheckStateDto> States)> GetStateAsync(
-            CancellationToken ct = default) => throw new NotSupportedException();
+            CancellationToken ct = default) =>
+            Task.FromResult<(DataCheckRunDto?, IReadOnlyList<DataCheckStateDto>)>((null,
+            [
+                new("e", DataCheckSeverity.Error, errors, errors, false, 1, DateTime.UtcNow),
+                new("w", DataCheckSeverity.Warning, warnings + accepted, warnings + accepted, false, 1, DateTime.UtcNow, accepted),
+            ]));
         public Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<int?> FixSwimmerGenderAsync(int findingId, string gender, CancellationToken ct = default) =>
@@ -124,6 +132,33 @@ public class ImportDataCheckAutorunTests
     }
 
     [Fact]
+    public async Task Import_AcceptedFindings_AreNotReportedAsWarnings()
+    {
+        // Перезалив Эйлата-2025 10.10.2026 напечатал «предупреждений — 31»: все 31 были приняты
+        // раньше, а строка читалась как «импорт что-то нашёл». Принятые — отдельным числом.
+        await using var db = CreateDb(nameof(Import_AcceptedFindings_AreNotReportedAsWarnings));
+
+        var result = await new JsonImportService(db, new NullCache(), null, new FakeRunner(accepted: 31))
+            .ImportAsync(ToStream(new[] { Item("A", 1) }), "meet.json");
+
+        Assert.Equal(0, result.DataCheckErrors);
+        Assert.Equal(0, result.DataCheckWarnings);
+        Assert.Equal("Проверки данных: открытых нет (принятых раньше — 31).", result.DataChecks);
+    }
+
+    [Fact]
+    public async Task Import_OpenAndAcceptedFindings_BothNamed()
+    {
+        await using var db = CreateDb(nameof(Import_OpenAndAcceptedFindings_BothNamed));
+
+        var result = await new JsonImportService(db, new NullCache(), null, new FakeRunner(warnings: 1, accepted: 4))
+            .ImportAsync(ToStream(new[] { Item("A", 1) }), "meet.json");
+
+        Assert.Equal(1, result.DataCheckWarnings);
+        Assert.Equal("Проверки данных: открытых ошибок — 0, предупреждений — 1; принятых раньше — 4.", result.DataChecks);
+    }
+
+    [Fact]
     public async Task ChecksFailure_DoesNotBreakImport()
     {
         // Прибор не имеет права уронить импорт: результаты уже закоммичены.
@@ -136,5 +171,51 @@ public class ImportDataCheckAutorunTests
         Assert.Equal(1, result.Created);
         Assert.Equal("", result.DataChecks);
         Assert.Contains(result.DiagnosticLog, l => l.Contains("Проверки данных не выполнены"));
+    }
+
+    /// <summary>Сторож невозможных этапов-заглушка: запоминает область и отдаёт одну команду.</summary>
+    private sealed class FakeLegCleanup(bool throws = false) : IRelayLegCleanupService
+    {
+        public IReadOnlyCollection<int>? Scope { get; private set; }
+        public bool? Applied { get; private set; }
+
+        public Task<RelayLegCleanupReport> RunAsync(
+            bool apply, IReadOnlyCollection<int>? competitionIds = null, CancellationToken ct = default)
+        {
+            if (throws) throw new InvalidOperationException("сторож упал");
+            (Applied, Scope) = (apply, competitionIds);
+            return Task.FromResult(new RelayLegCleanupReport(apply, 1,
+                [new RelayLegCleanupRow(7, 1, "4X50", "freestyle", "02:42.64", "нога 2: …", ["00:39.92", "00:00.69"])], 2));
+        }
+    }
+
+    [Fact]
+    public async Task Import_ClearsImplausibleLegs_OfItsOwnCompetitions()
+    {
+        // Р82: сборка мастерских эстафет кладёт этапы ног в обход доклейки — перезалив #1482
+        // 10.10.2026 вернул обнулённый этап 00:00.69. Импорт обязан прогнать сторож по СВОИМ дням.
+        await using var db = CreateDb(nameof(Import_ClearsImplausibleLegs_OfItsOwnCompetitions));
+        var legs = new FakeLegCleanup();
+
+        var result = await new JsonImportService(db, new NullCache(), legCleanup: legs)
+            .ImportAsync(ToStream(new[] { Item("A", 1) }), "meet.json");
+
+        var compId = (await db.Competitions.SingleAsync()).Id;
+        Assert.True(legs.Applied);
+        Assert.Equal([compId], legs.Scope);
+        Assert.Contains(result.DiagnosticLog, l => l.Contains("невозможный этап у 1") && l.Contains("обнулено 2"));
+    }
+
+    [Fact]
+    public async Task LegCleanupFailure_DoesNotBreakImport()
+    {
+        await using var db = CreateDb(nameof(LegCleanupFailure_DoesNotBreakImport));
+
+        var result = await new JsonImportService(db, new NullCache(), legCleanup: new FakeLegCleanup(throws: true))
+            .ImportAsync(ToStream(new[] { Item("A", 1) }), "meet.json");
+
+        Assert.Empty(result.ErrorMessages);
+        Assert.Equal(1, result.Created);
+        Assert.Contains(result.DiagnosticLog, l => l.Contains("Этапы эстафет: проверка не удалась"));
     }
 }

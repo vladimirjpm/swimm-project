@@ -383,6 +383,8 @@ public class HubGroupUserService : IHubGroupUserService
             WhoIsComing = Clean(schedule?.WhoIsComing)?.ToLowerInvariant() is { } who && who != GroupWhoIsComing.Members ? who : null,
             // Выключено — по умолчанию: храним только включённое.
             RsvpTop = schedule?.RsvpTop == true ? true : null,
+            // members — по умолчанию: храним только «coach».
+            TrainingMedia = Clean(schedule?.TrainingMedia)?.ToLowerInvariant() is { } media && media != GroupTrainingMedia.Members ? media : null,
         };
 
         if (model.UsualLanes is int lanes && lanes is < LanePlanRules.MinLanes or > LanePlanRules.MaxLanes)
@@ -391,6 +393,8 @@ public class HubGroupUserService : IHubGroupUserService
             return HubGroupMemberSaveResult.Fail("Lane view must be auto, plan or off.");
         if (model.WhoIsComing != null && !GroupWhoIsComing.All.Contains(model.WhoIsComing))
             return HubGroupMemberSaveResult.Fail("Who's coming must be members or coach.");
+        if (model.TrainingMedia != null && !GroupTrainingMedia.All.Contains(model.TrainingMedia))
+            return HubGroupMemberSaveResult.Fail("Who adds training videos must be members or coach.");
 
         // Битые слоты не сохраняем: расписание — витрина, и «Ср :» в шапке хуже пустоты.
         // Валидность считает сам домен (день 1..7 + разбор HH:mm), второго мнения тут нет.

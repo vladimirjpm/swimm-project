@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Swimm.Parsing.Models;
 using Swimm.Domain;
 using Swimm.Parsing.Helpers;
+using Swimm.Application.Mapping;
 
 namespace Swimm.Parsing.Parsers.IsrOrg;
 
@@ -342,10 +343,8 @@ public class IsrOrgParser : IFormatParser
         var country = ResolveCountry(hebrewFileName, countryOverride);
         var langHe = ResolveLanguage(hebrewFileName, langOverride);
 
-        var isMastersFile = Path.GetFileNameWithoutExtension(hebrewFileName)
-                            .Contains("masters", StringComparison.OrdinalIgnoreCase);
-
-        var comps = IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHe);
+        var comps = IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHe).ToList();
+        var isMastersFile = IsMastersFile(hebrewFileName, comps);
         return MapHebrewOnly(comps, country, isMastersFile, isAward, poolOverride);
     }
 
@@ -422,6 +421,24 @@ public class IsrOrgParser : IFormatParser
         }
     }
 
+    /// <summary>
+    /// Мастерский ли протокол. Раньше — только по ИМЕНИ ФАЙЛА («…masters…»): у загруженного
+    /// руками файла так и было, а у затянутого с loglig имя — номер протокола, и мастерс-
+    /// чемпионат приезжал обычным (comp 6595, зима 2025: флаг Masters в превью не вставал).
+    /// Теперь ещё и по НАЗВАНИЮ соревнования из шапки PDF: «…למאסטרס…» / «…Masters…».
+    /// Строки полос «מאסטרס נ 60-64» внутри файла признаком НЕ считаются: мастерская секция
+    /// бывает и в открытом турнире (Маккабиада), и весь файл мастерским от неё не становится.
+    /// </summary>
+    internal static bool IsMastersFile(string fileName, IEnumerable<IsrOrgCompetitionResult> comps) =>
+        Path.GetFileNameWithoutExtension(fileName).Contains("masters", StringComparison.OrdinalIgnoreCase)
+        || comps.Any(c => IsMastersTitle(c.Competition));
+
+    /// <summary>Название соревнования мастерское: «מאסטרס» (в т.ч. «למאסטרס») или «masters».</summary>
+    internal static bool IsMastersTitle(string? title) =>
+        !string.IsNullOrEmpty(title)
+        && (title.Contains("מאסטרס", StringComparison.Ordinal)
+            || title.Contains("masters", StringComparison.OrdinalIgnoreCase));
+
     private static IEnumerable<Result> ParseBilingual(
         Stream englishPdfStream, string englishFileName,
         Stream hebrewPdfStream, string hebrewFileName,
@@ -432,11 +449,9 @@ public class IsrOrgParser : IFormatParser
         var langEn = ResolveLanguage(englishFileName, englishLang);
         var langHeSync = ResolveLanguage(hebrewFileName, hebrewLang);
 
-        var isMastersFile = Path.GetFileNameWithoutExtension(hebrewFileName)
-                            .Contains("masters", StringComparison.OrdinalIgnoreCase);
-
         var compsEn = IsrOrgCompetitionParser.ParseCompetitions(englishPdfStream, langEn).ToList();
         var compsHe = IsrOrgCompetitionParser.ParseCompetitions(hebrewPdfStream, langHeSync).ToList();
+        var isMastersFile = IsMastersFile(hebrewFileName, compsHe.Concat(compsEn));
 
         return MergeBilingual(compsEn, compsHe, countryEn, isMastersFile, isAward, poolOverride);
     }
@@ -518,6 +533,9 @@ public class IsrOrgParser : IFormatParser
 
                 var age = DetermineAge(eventYear, rEn.BirthYear, compEn.EventStyleAge);
                 var ageGroup = AgeGroupHelper.GetAgeGroup(age);
+                var (lastNameEn, firstNameEn) = ReferenceEquals(rEn, rHe)
+                    ? (rEn.LastName, rEn.FirstName)
+                    : ResolveWrappedEnName(rEn, rHe);
 
                 yield return new Result(
                     Country: countryEn,
@@ -537,8 +555,8 @@ public class IsrOrgParser : IFormatParser
                     Lane: rEn.Lane,
                     LastName: rHe.LastName,
                     FirstName: rHe.FirstName,
-                    LastNameEn: !string.IsNullOrWhiteSpace(rEn.LastName) ? rEn.LastName : rHe.LastName,
-                    FirstNameEn: !string.IsNullOrWhiteSpace(rEn.FirstName) ? rEn.FirstName : rHe.FirstName,
+                    LastNameEn: !string.IsNullOrWhiteSpace(lastNameEn) ? lastNameEn : rHe.LastName,
+                    FirstNameEn: !string.IsNullOrWhiteSpace(firstNameEn) ? firstNameEn : rHe.FirstName,
                     BirthYear: rEn.BirthYear,
                     Club: rHe.Club,
                     ClubEn: !string.IsNullOrWhiteSpace(rEn.Club) ? rEn.Club : rHe.Club,
@@ -557,6 +575,52 @@ public class IsrOrgParser : IFormatParser
             }
         }
     }
+
+    /// <summary>
+    /// EN-имя строки, у которой имя перенесено в ячейке на две строки (И-48). Парсер EN-файла
+    /// колонку переноса не видит: перенос всегда ложится в фамилию, а единственное имя строки
+    /// данных — в имя. Когда перенесено ИМЯ («OLEKSAND» / «R» над и под «MYKHALKIN»), EN-поля
+    /// выходят переставленными — так в базе появилось 34 карточки с «YEHONATAN» в фамилии.
+    ///
+    /// Здесь поле выбирает ивритская строка той же пары: какой вариант (перенос = фамилия или
+    /// перенос = имя) лучше сходится с ивритскими полями по скелету согласных
+    /// (<see cref="NameTransliteration"/>); без явного перевеса — как разобрал парсер. Склейку
+    /// частей решает парсер (<see cref="IsrOrgCompetitionParser.JoinWrappedName"/>), а ивритское
+    /// поле из двух и больше слов («ששון טשקנט») всегда даёт пробел — даже если первая часть
+    /// длинная, а вторая короткая.
+    /// </summary>
+    internal static (string LastName, string FirstName) ResolveWrappedEnName(IsrOrgResult en, IsrOrgResult he)
+    {
+        if (en.NameWrap is not { } wrap) return (en.LastName, en.FirstName);
+
+        // Иврит только ДОБАВЛЯЕТ пробел: одно ивритское слово не значит, что английских тоже одно
+        // («יהונתן» ↔ «YONATHAN SHLOMO», «בן» ↔ «BEN BENJAMIN» — второе имя есть только в EN).
+        // Но и два ивритских слова не значат, что перенос пришёлся МЕЖДУ словами: «קנטרביץ ארליך» ↔
+        // «KANTAREVI» / «CH» — перенос посреди слова, а второй фамилии в EN нет вовсе (Маккабиада-
+        // мастерс 15155, 10.10.2026: записалось «KANTAREVI CH»). Пробел — только если хвост сам
+        // похож на ивритское слово; не похож, а склейка ложится на слово — склеиваем.
+        string JoinFor(string heField)
+        {
+            if (HebrewWordCount(heField) < 2) return en.LastName;
+            var heWords = heField.Split([' ', '-', '־'], StringSplitOptions.RemoveEmptyEntries);
+            bool Fits(string latin) => heWords.Any(w => NameTransliteration.Similarity(w, latin) >= 0.6);
+            return !Fits(wrap.After) && Fits(wrap.Before + wrap.After)
+                ? wrap.Before + wrap.After
+                : $"{wrap.Before} {wrap.After}";
+        }
+
+        var single = en.FirstName;
+        var asLast = (Last: JoinFor(he.LastName), First: single);
+        var asFirst = (Last: single, First: JoinFor(he.FirstName));
+
+        double Score((string Last, string First) v) =>
+            NameTransliteration.Similarity(he.LastName, v.Last) + NameTransliteration.Similarity(he.FirstName, v.First);
+
+        return Score(asFirst) > Score(asLast) + 0.2 ? asFirst : asLast;
+    }
+
+    private static int HebrewWordCount(string s) =>
+        s.Split([' ', '-', '־'], StringSplitOptions.RemoveEmptyEntries).Length;
 
     private static readonly Regex AgeBandRx = new(@"^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$", RegexOptions.Compiled);
 

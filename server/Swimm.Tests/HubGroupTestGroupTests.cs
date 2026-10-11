@@ -67,6 +67,9 @@ public class HubGroupTestGroupTests
     [InlineData("UTest-Parent@swimm.test", true)]   // регистр не важен
     [InlineData("real.person@example.com", false)]
     [InlineData("someone@utest.com", false)]        // префикс — начало email, не домен
+    [InlineData("utest.someone@gmail.com", false)]  // префикс без зоны swimm.test — настоящий человек
+    [InlineData("utest-member@swimm.test.evil.com", false)]
+    [InlineData("someone@swimm.test", false)]       // зона без префикса — не персонаж
     [InlineData(null, false)]
     public void IsTestEmail_ByPrefix(string? email, bool expected) =>
         Assert.Equal(expected, TestAccountRules.IsTestEmail(email));

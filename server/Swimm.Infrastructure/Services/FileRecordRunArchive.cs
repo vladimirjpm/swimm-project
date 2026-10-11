@@ -37,6 +37,21 @@ public sealed class FileRecordRunArchive : IRecordRunArchive
         _now = now ?? (() => DateTime.UtcNow);
     }
 
+    /// <summary>
+    /// Папка архива из конфига <c>RecordsImport:SourceArchiveDir</c>; <c>null</c> — архив выключен.
+    /// Пусто — выключен. Относительный путь считается от ContentRoot и означает «корень
+    /// репозитория» (<c>'../..'</c> от server/Swimm.API) — он имеет смысл только в рабочей копии.
+    /// ⚠ Поэтому вне Development относительный путь = архив выключен: на App Service тот же
+    /// <c>'../..'</c> от <c>/home/site/wwwroot</c> молча копил бы CSV в <c>/home</c>, которые никто
+    /// не читает. Нужен архив в проде — абсолютный путь.
+    /// </summary>
+    public static string? ResolveDirectory(string? configured, string contentRoot, bool isDevelopment)
+    {
+        if (string.IsNullOrWhiteSpace(configured)) return null;
+        if (!Path.IsPathRooted(configured) && !isDevelopment) return null;
+        return Path.GetFullPath(Path.Combine(contentRoot, configured));
+    }
+
     public async Task<RecordArchiveResult> SaveCountryRunAsync(
         string source, IReadOnlyList<string>? scope, string csv, CancellationToken ct = default)
     {

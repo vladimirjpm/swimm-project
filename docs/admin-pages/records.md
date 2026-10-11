@@ -1,6 +1,7 @@
 # /Admin/Records — рекорды и нормативы
 
-Файлы: `Pages/Admin/Records/Index.cshtml`; API: `/api/admin/records`,
+Файлы: `Pages/Admin/Records/Index.cshtml`, скрипт `wwwroot/js/admin/records.js` (Razor-данные —
+маленький inline-скрипт выше по разметке); API: `/api/admin/records`,
 `/api/admin/normative-standards` (`RecordsAdminController`), diff/apply —
 `RecordDiffService`, сиды — `RecordsSeeder`.
 

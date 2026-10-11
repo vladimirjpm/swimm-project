@@ -181,10 +181,161 @@ export interface GroupTrainingSchedule {
   who_is_coming?: WhoIsComing | null;
   /** Режим «сверху» (Ш4): не ответившему участнику «Are you coming?» над фото. */
   rsvp_top?: boolean | null;
+  /** Кто добавляет видео к тренировкам (Е2): members — все участники; coach — только управляющие. */
+  training_media?: TrainingMediaPolicy | null;
 }
 
 export type LaneViewMode = 'auto' | 'plan' | 'off';
 export type WhoIsComing = 'members' | 'coach';
+export type TrainingMediaPolicy = 'members' | 'coach';
+
+// ── Тренировки группы как записи (docs/plans/group-events-media-plan.md, Е1–Е3) ──
+// GET/POST/PUT/DELETE /api/hub-groups/{id}/sessions — личное, управляющим и участникам.
+
+export interface TrainingSessionMedia {
+  id: number;
+  media_type: 'image' | 'video' | 'album';
+  source_type: 'youtube' | 'vimeo' | 'album' | 'other';
+  url: string;
+  caption?: string | null;
+  /** Добавил сам зритель. */
+  mine: boolean;
+  /** Своё — автор, любое — управляющий. */
+  can_delete: boolean;
+  /** Добавил другой после того, как зритель открывал ленту (не старше 14 дней) — «NEW» (Т1б). */
+  is_new?: boolean;
+  /** Кто на видео — метка тренера («Who's in it»); null — вся группа. Метка, не авторство: прав не даёт. */
+  swimmer?: TrainingMediaSwimmer | null;
+  /** Отмеченный пловец — «мой» для зрителя (сам или семья): только подсветка плитки. */
+  for_me?: boolean;
+}
+
+/** Пловец, отмеченный на видео тренировки; имя — иврит первым, `name_en` — фоллбек. */
+export interface TrainingMediaSwimmer {
+  id: number;
+  name: string;
+  name_en: string;
+}
+
+/** Показатели карточки тренировки (Т1а, Р2): объём ОДНОГО пловца и сколько записано. */
+export interface TrainingSessionStats {
+  /** Метры; клиент пишет `2.4 km`. */
+  meters: number;
+  swimmers: number;
+}
+
+/** Строка «You» (Т1а, Р4): мой быстрейший повтор в сете, помеченном тренером ★. */
+export interface TrainingMyKey {
+  set_no: number;
+  order_no: number;
+  swimmer_id: number;
+  kind: 'me' | 'family';
+  name: string;
+  name_en: string;
+  distance: string;
+  style: string;
+  /** Время как записано — тренировочный замер (И11 к нему не применяется). */
+  time: string;
+}
+
+/**
+ * Тип тренировки — фиксированный список сайта (решение Влада 01.10.2026), зеркало серверного
+ * `TrainingSessionType`. Подписи и значки — `components/trainings/training-types.ts`.
+ */
+export type TrainingType = 'swim' | 'technique' | 'dryland' | 'open-water' | 'test-set' | 'other';
+
+export interface TrainingSession {
+  id: number;
+  /** yyyy-MM-dd */
+  date: string;
+  /** «HH:mm»; null — не задано. */
+  start?: string | null;
+  /** Название от тренера («Underwater filming»). */
+  title?: string | null;
+  /** План из источника у залитых скриптом («200->2x100»). */
+  plan?: string | null;
+  note?: string | null;
+  pool_type?: string | null;
+  /** Тип; у ответов до 01.10.2026 поля нет — читать через `trainingTypeOf`. */
+  type?: TrainingType;
+  /** Записаны времена: дату и бассейн не поменять, удалить нельзя. */
+  has_results: boolean;
+  created_in_app: boolean;
+  media: TrainingSessionMedia[];
+  /** null — времён нет (карточка без показателей). */
+  stats?: TrainingSessionStats | null;
+  /** Ключевой сет — ★ тренера; null — не помечен. */
+  key_set_no?: number | null;
+  /** «Ask who's coming» (Р9): разовое занятие — тренировка в Next, на неё отвечают. */
+  asks_rsvp?: boolean;
+  /** null — ★ нет или моих повторов в сете нет: строки «You» нет. */
+  my_key?: TrainingMyKey | null;
+}
+
+export interface TrainingSessionList {
+  sessions: TrainingSession[];
+  can_manage: boolean;
+  can_add_media: boolean;
+  /** Медиа других после `PUT …/sessions/seen` зрителя (не старше 14 дней) — акцентная метка (Т1б). */
+  new_media_count?: number;
+}
+
+/** Строка «Sets & times»: `1.1 · имя · время · V3 · уровень` (5a #4). */
+export interface TrainingSetRow {
+  order_no: number;
+  swimmer_id: number;
+  name: string;
+  name_en: string;
+  distance: string;
+  style: string;
+  /** null — повтор без замера. */
+  time: string | null;
+  /** v1..v5; null — не задана. */
+  intensity: string | null;
+  level: { id: number; rank: number; name: string; color?: string | null } | null;
+  /** Мой пловец (сам или семья) — подсветка и фильтр «Me». */
+  mine: boolean;
+}
+
+export interface TrainingSet {
+  set_no: number;
+  /** Помечен тренером ★. */
+  is_key: boolean;
+  rows: TrainingSetRow[];
+}
+
+/** `GET /api/hub-groups/{id}/sessions/{sid}/sets` — лениво при раскрытии (Т1а). */
+export interface TrainingSessionSets {
+  session_id: number;
+  key_set_no: number | null;
+  /** Управляющий — может ставить ★. */
+  can_manage: boolean;
+  sets: TrainingSet[];
+}
+
+export interface TrainingSessionInput {
+  date: string;
+  title: string;
+  start?: string | null;
+  note?: string | null;
+  pool_type?: string | null;
+  /** Не прислали — при создании swim, при правке не меняется. */
+  type?: TrainingType;
+  /**
+   * «Ask who's coming» (Р9). Не прислали — при создании false, при правке не меняется. Поставить
+   * можно только тренировке с началом и датой не раньше сегодняшней; снять — всегда.
+   */
+  asks_rsvp?: boolean;
+}
+
+export interface TrainingSessionMediaInput {
+  media_type: TrainingSessionMedia['media_type'];
+  source_type: TrainingSessionMedia['source_type'];
+  url: string;
+  caption?: string | null;
+  /** «Who's in it» — только управляющий; null / не задан — вся группа. */
+  swimmer_id?: number | null;
+}
 
 /** Ближайшее занятие — СЧИТАЕТ СЕРВЕР в поясе Израиля, клиент только рисует. */
 export interface NextTraining {
@@ -196,6 +347,18 @@ export interface NextTraining {
   end?: string | null;
   place?: string | null;
   pool_type?: string | null;
+  // Р9 (разовые занятия и отмены) — только в приватном списке `GET /api/hub-groups/{id}/next-trainings`;
+  // в кэшируемом ответе страницы группы их нет.
+  /** Название разовой тренировки; у занятия по расписанию — нет. */
+  title?: string | null;
+  type?: TrainingType | null;
+  /** Id тренировки (`Sys_TrainingSessions`), если у занятия она есть. */
+  training_id?: number | null;
+  /** Занятие только разовое: такого слота в расписании нет. */
+  one_off?: boolean;
+  /** Отменено тренером: остаётся в списке с пометкой «Cancelled», ответить нельзя. */
+  cancelled?: boolean;
+  cancel_reason?: string | null;
 }
 
 /**
@@ -333,6 +496,8 @@ export interface HubGroupDetails {
   training_schedule?: GroupTrainingSchedule | null;
   /** Ближайшее занятие по расписанию (считает сервер). */
   next_training?: NextTraining | null;
+  /** До трёх ближайших занятий (первое = `next_training`) — вид Next таба Trainings (Т1б). */
+  next_trainings?: NextTraining[];
 }
 
 // ── Уровни пловцов группы (docs/plans/lane-plans-plan.md, L1) ─────────────────
@@ -434,7 +599,15 @@ export interface LanePlan {
    * «Мои» пловцы этого плана — карточка «Your lane». Только подсветка, прав не даёт:
    * `me` — сам зритель, `family` — за кого он смотрит. Сперва `me`.
    */
-  my_swimmers: { swimmer_id: number; kind: 'me' | 'family' }[];
+  my_swimmers: {
+    swimmer_id: number;
+    kind: 'me' | 'family';
+    /**
+     * С какой дорожки тренер перенёс пловца в опубликованном плане после того, как зритель
+     * открывал Lanes (`PUT …/lane-plans/seen`) — золотая метка (Т1б). null — не переносили / видел.
+     */
+    moved_from_lane?: number | null;
+  }[];
 }
 
 export interface LanePlanInput {
@@ -451,8 +624,11 @@ export interface LanePlanInput {
 export type RsvpAnswer = 'yes' | 'maybe' | 'no';
 export type RsvpNote = 'late' | 'first-hour' | 'leaving-early';
 
+/** Человек в списке тренера: аккаунт (`user_id`) или пловец группы без аккаунта (`swimmer_id`, Р73). */
 export interface TrainingRsvpPerson {
-  user_id: number;
+  user_id: number | null;
+  /** Пловец группы — за него отвечает только тренер. */
+  swimmer_id?: number | null;
   name: string;
   gender?: 'male' | 'female' | null;
   /** null — не ответил. */
@@ -461,6 +637,8 @@ export interface TrainingRsvpPerson {
   set_by_coach: boolean;
   /** На перерыве в день занятия (Ш3.1). */
   on_break?: boolean;
+  /** «Не тренируется с группой» (Р74): вне знаменателя, пока не ответит; ответ статус не снимает. */
+  not_training?: boolean;
   /** Сам вернулся с перерыва недавно — сколько дней был на нём. */
   back_after_days?: number | null;
 }
@@ -501,10 +679,16 @@ export interface TrainingRsvp {
   date: string;
   start: string;
   end?: string | null;
+  /** Занятие отменено тренером (Р9): ответить нельзя, ответы на месте. */
+  cancelled?: boolean;
+  cancel_reason?: string | null;
+  /** Название и тип разового занятия — для шапки; у занятия по расписанию нет. */
+  title?: string | null;
+  type?: TrainingType | null;
   yes: number;
   maybe: number;
   no: number;
-  /** Активные участники-аккаунты — знаменатель полосы. */
+  /** Активные участники-аккаунты и пловцы группы без аккаунта — знаменатель полосы. */
   total: number;
   mine: { answer: RsvpAnswer; note?: RsvpNote | null; set_by_coach: boolean } | null;
   is_member: boolean;
@@ -514,6 +698,8 @@ export interface TrainingRsvp {
   people: TrainingRsvpPerson[] | null;
   /** Зритель на перерыве в день занятия: «Going» его снимет. */
   on_break?: boolean;
+  /** Зритель «не тренируется с группой» (Р74): ответить может, статус останется. */
+  not_training?: boolean;
   /** yyyy-MM-dd — последний день перерыва зрителя; null — бессрочно. */
   break_until?: string | null;
   /** Вид по дорожкам (Ш3.2); null — выключен у группы или «только план», а плана нет. */
@@ -532,6 +718,8 @@ export interface HubGroupBreak {
   until: string | null;
   set_by_coach: boolean;
   back_after_days?: number | null;
+  /** break | not_training (Р74). */
+  kind?: 'break' | 'not_training';
 }
 
 export interface HubGroupBreaks {
@@ -539,5 +727,23 @@ export interface HubGroupBreaks {
   /** Только управляющему. */
   breaks: HubGroupBreak[] | null;
   returns: HubGroupBreak[] | null;
+  /** «Не тренируется с группой» (Р74) — всем своим: пометка серым в Following. */
+  not_training?: HubGroupBreak[];
   can_manage: boolean;
+}
+
+/**
+ * Статус человека в группе (Р74, Влад 30.09.2026): active — в строю, break — перерыв,
+ * not_training — в группе, но с ней не тренируется (только тренер). «Inactive» — не здесь: это
+ * скрытие строки состава (`…/members/by-swimmer/{id}/excluded`).
+ */
+export type PersonStatus = 'active' | 'break' | 'not_training';
+
+/** Запись статуса: `status` (новое) или старый флаг `on_break`; без субъекта — себе. */
+export interface BreakInput {
+  status?: PersonStatus;
+  on_break?: boolean;
+  until?: string | null;
+  user_id?: number | null;
+  swimmer_id?: number | null;
 }

@@ -144,6 +144,26 @@ public class LogligStartListParserTests
         Assert.DoesNotContain(grid, r => r.DisciplineId == 14208);
     }
 
+    /// <summary>
+    /// Фильтр дня у loglig (10.10.2026, 16849 / loglig 15687). Страница по умолчанию выбирает
+    /// в фильтре СЕГОДНЯШНЕЕ число и отдаёт один заплыв из четырёх — поэтому адрес программы
+    /// идёт с <c>dateFilter=הכל</c>, а сетка обязана разбирать и такую, частичную, вьюху.
+    /// Заготовка программы: у двух заплывов даты ещё нет вовсе.
+    /// </summary>
+    [Fact]
+    public void Grid_AllDatesPartialView_SeesWholeProgramme()
+    {
+        var today = LogligStartListParser.ParseDisciplineGrid(Fixture("disciplines-15687-today.html"));
+        Assert.Equal([84483], today.Select(r => r.DisciplineId));
+
+        var all = LogligStartListParser.ParseDisciplineGrid(Fixture("disciplines-15687-alldates.html"));
+        Assert.Equal([84484, 84483, 84486, 84485], all.Select(r => r.DisciplineId));
+        Assert.Equal([1, 2, 3, 4], all.Select(r => r.EventNumber));
+        Assert.Equal(new DateTime(2026, 10, 15, 18, 15, 0), all[0].StartAtLocal);
+        Assert.Null(all[2].StartAtLocal);
+        Assert.All(all, r => Assert.Equal(0, r.Registered));
+    }
+
     [Fact]
     public void Grid_CountsRegisteredAndParticipants()
     {
@@ -186,6 +206,38 @@ public class LogligStartListParserTests
         Assert.Equal("female", relay.Gender);
         Assert.Equal("8-9", relay.AgeBand);      // полоса пишется через тире БЕЗ пробелов
         Assert.Equal(new DateTime(2026, 2, 19, 12, 31, 0), relay.StartAtLocal);
+    }
+
+    /// <summary>
+    /// Микс-эстафета открытой воды «4X1500 שליחים מיקס» (Эйлат-2026, loglig 14032): «מיקס» —
+    /// состав, а не стиль. Раньше он оставался стилем, и доклейка составов из PDF промежуточных
+    /// не находила дисциплину — у 17 команд оставались порванные фамилии ног (07.10.2026).
+    /// </summary>
+    [Fact]
+    public void Grid_OpenWaterMixedRelay_IsFreestyle()
+    {
+        var grid = LogligStartListParser.ParseDisciplineGrid(Fixture("disciplines-14032-openwater.html"));
+
+        var relay = grid.Single(r => r.DisciplineId == 75021);
+        Assert.True(relay.IsRelay);
+        Assert.Equal("4X1500", relay.Distance);
+        Assert.Equal("freestyle", relay.StyleName);
+    }
+
+    /// <summary>
+    /// «5K חופשי» / «10K חופשי» — дистанция в метрах, как у наших строк: иначе ключ дня
+    /// «freestyle 5» не находил строк «5000», и обзор М4 считал Эйлат-2026 неоднозначным.
+    /// </summary>
+    [Fact]
+    public void Grid_OpenWaterKilometres_AreMetres()
+    {
+        var grid = LogligStartListParser.ParseDisciplineGrid(Fixture("disciplines-14032-openwater.html"));
+
+        var distances = grid.Where(r => !r.IsRelay).Select(r => (r.Distance, r.StyleName)).Distinct().ToList();
+        Assert.Contains(("5000", "freestyle"), distances);
+        Assert.Contains(("10000", "freestyle"), distances);
+        Assert.Contains(("1600", "freestyle"), distances);
+        Assert.DoesNotContain(distances, d => d.Distance is "5" or "10");
     }
 
     [Fact]

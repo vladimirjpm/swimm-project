@@ -272,9 +272,9 @@ public class MyHubGroupsController : ControllerBase
     }
 
     /// <summary>
-    /// Скрыть / вернуть клубного пловца (владелец/админ группы). Скрытый не возвращается
-    /// пересборкой и не виден ни на одной витрине; ручного так не прячут — его удаляют.
-    /// Пловца группы (Р71) так делают неактивным: вне состава и дорожек, времена целы.
+    /// Скрыть / вернуть пловца состава (владелец/админ группы) — «Inactive» / Restore. Скрытый не
+    /// возвращается пересборкой и не виден ни на одной витрине; строка любого вида (Р74):
+    /// клубный, ручной, пловец группы (Р71 — вне состава и дорожек, времена целы).
     /// </summary>
     [HttpPut("{id:int}/members/{memberId:int}/excluded")]
     public async Task<IActionResult> SetMemberExcluded(int id, int memberId, [FromBody] SetMemberExcludedRequest request)
@@ -285,6 +285,19 @@ public class MyHubGroupsController : ControllerBase
         if (!perms.CanEdit) return Forbid();
 
         var result = await _clubSubscriptions.SetExcludedAsync(id, memberId, request.Excluded);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>То же по пловцу — выпадашка статуса в Following (страница группы не знает id строки состава).</summary>
+    [HttpPut("{id:int}/members/by-swimmer/{swimmerId:int}/excluded")]
+    public async Task<IActionResult> SetSwimmerExcluded(int id, int swimmerId, [FromBody] SetMemberExcludedRequest request)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _clubSubscriptions.SetExcludedBySwimmerAsync(id, swimmerId, request.Excluded);
         return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 

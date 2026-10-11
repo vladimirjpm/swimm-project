@@ -153,6 +153,35 @@ public class RecordCsvDumpTests
         Assert.False(Directory.Exists(dir));
     }
 
+    /// <summary>
+    /// Относительный путь — «корень репозитория», он есть только в рабочей копии. Вне
+    /// Development (App Service) он выключает архив, иначе CSV молча копились бы в /home.
+    /// </summary>
+    [Theory]
+    [InlineData("../../!records-sources", true, true)]   // dev: корень репозитория
+    [InlineData("../../!records-sources", false, false)] // прод: репозитория нет — выключен
+    [InlineData("", true, false)]
+    [InlineData(null, false, false)]
+    public void ResolveDirectory_RelativePathOnlyInDevelopment(string? configured, bool isDev, bool expectOn)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "swimm", "server", "Swimm.API");
+
+        var dir = FileRecordRunArchive.ResolveDirectory(configured, root, isDev);
+
+        Assert.Equal(expectOn, dir != null);
+        if (expectOn)
+            Assert.Equal(Path.GetFullPath(Path.Combine(root, "../../!records-sources")), dir);
+    }
+
+    /// <summary>Абсолютный путь пишется в любом окружении — так архив включают в проде явно.</summary>
+    [Fact]
+    public void ResolveDirectory_AbsolutePath_WorksOutsideDevelopment()
+    {
+        var abs = Path.Combine(Path.GetTempPath(), "swimm-archive");
+
+        Assert.Equal(Path.GetFullPath(abs), FileRecordRunArchive.ResolveDirectory(abs, "/whatever", false));
+    }
+
     /// <summary>Пустой путь в конфиге = архив выключен, а не падение прогона.</summary>
     [Fact]
     public async Task Save_IsOff_WhenDirectoryNotConfigured()

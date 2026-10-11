@@ -107,7 +107,7 @@ public class HubGroupClubSubscriptionPgTests
     }
 
     [Fact]
-    public async Task CheckConstraints_RejectHiddenManualAndUnknownSource()
+    public async Task CheckConstraints_HiddenManualOk_UnknownSourceAndDatedNotTrainingRejected()
     {
         await using var probe = TryCreate();
         if (probe == null) return;
@@ -121,7 +121,8 @@ public class HubGroupClubSubscriptionPgTests
 
         try
         {
-            // «Ручной и скрытый» — противоречие, БД его не принимает (CK_HubGroupMembers_ExcludedOnlyClub).
+            // «Ручной и скрытый» — это «Inactive» (Р74, 30.09.2026): ограничение
+            // CK_HubGroupMembers_ExcludedOnlyClub снято, БД строку принимает.
             await using (var db = NewContext())
             {
                 db.HubGroupMembers.Add(new HubGroupMember
@@ -129,6 +130,22 @@ public class HubGroupClubSubscriptionPgTests
                     HubGroupId = group.Id, SwimmerId = swimmerId,
                     Source = HubGroupMemberSource.Manual, IsExcluded = true
                 });
+                await db.SaveChangesAsync();
+            }
+
+            // «Не тренируется» с датой окончания и неизвестный вид — отказ (CK_HubGroupBreaks_Kind).
+            await using (var db = NewContext())
+            {
+                db.HubGroupBreaks.Add(new HubGroupBreak
+                {
+                    HubGroupId = group.Id, SwimmerId = swimmerId,
+                    Kind = HubGroupBreakKind.NotTraining, Until = new DateOnly(2026, 12, 31),
+                });
+                await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+            }
+            await using (var db = NewContext())
+            {
+                db.HubGroupBreaks.Add(new HubGroupBreak { HubGroupId = group.Id, SwimmerId = swimmerId, Kind = "gone" });
                 await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
             }
 

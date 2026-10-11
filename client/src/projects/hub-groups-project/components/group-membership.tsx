@@ -14,6 +14,10 @@ import type { SaveResult } from '../my-groups-types';
  * от него зависят и табы (замок Trainings), и блок тренировок, — второй экземпляр хука
  * после «Join» оставил бы таб закрытым до перезагрузки.
  *
+ * Управляющий группой (владелец / админ ГРУППЫ — `manages`), который не участник, видит не
+ * «+ Join group», а неактивный чип «✓ Coach»: вступать в собственную группу бессмысленно (найдено
+ * на сверке Т10, 01.10.2026). Админ сайта без связи с группой — обычный пользователь, ему «Join».
+ *
  * Отказ сервера (группа заполнена, лимит заявок, самозапись закрыта — HubGroupQuotaRules,
  * rate limit) показывается строкой под чипом: раньше ответ выбрасывался и кнопка молча
  * «не работала».
@@ -23,6 +27,8 @@ export interface GroupMembershipState {
   isAuthenticated: boolean;
   /** Статус заявки зрителя; null — не участник. */
   status: 'active' | 'pending' | null;
+  /** Зритель управляет ЭТОЙ группой (владелец / админ группы, не админ сайта). */
+  manages?: boolean;
   join: (groupId: number) => Promise<SaveResult>;
   leave: (groupId: number) => Promise<SaveResult>;
 }
@@ -60,6 +66,20 @@ function GroupMembershipChip({ group, membership }: { group: HubGroupDetails; me
   // Гостю — та же кнопка, клик ведёт во вход: фича видна, но требует логина.
   if (!membership.isAuthenticated) {
     return <DeepCtaChip size="member" onClick={openLoginModal} title="Sign in to join this group">{joinLabel}</DeepCtaChip>;
+  }
+
+  // Управляет группой, но не участник: роль, а не призыв вступить. Участник-управляющий — ниже,
+  // обычный «✓ Member ⋯» (выйти из участников он может).
+  if (membership.manages && membership.status == null) {
+    return (
+      <span
+        className="hp-mono inline-flex h-8 items-center rounded-[10px] border px-3 text-[12px] font-extrabold"
+        style={{ borderColor: 'var(--deep-ow-border)', background: 'var(--deep-ow-chip)', color: 'var(--deep-ow)' }}
+        title="You manage this group"
+      >
+        ✓ Coach
+      </span>
+    );
   }
 
   if (membership.status === 'active') {

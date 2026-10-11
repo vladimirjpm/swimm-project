@@ -26,6 +26,47 @@ public class GroupTrainingScheduleTests
     // 2026-09-07 — понедельник, 2026-09-09 — среда.
 
     [Fact]
+    public void NextOccurrences_ThreeAcrossTheWeekWrap_StartedTodaySkipped()
+    {
+        // Среда 18:30 — сегодняшнее уже идёт: Пн 14, Ср 16, Пн 21.
+        var next = MonWed().NextOccurrences(new DateTime(2026, 9, 9, 18, 30, 0), 3);
+
+        Assert.Equal(
+            [new DateOnly(2026, 9, 14), new DateOnly(2026, 9, 16), new DateOnly(2026, 9, 21)],
+            next.Select(n => n.Date));
+    }
+
+    [Fact]
+    public void NextOccurrences_TwoSlotsADay_BothCount_DuplicateSlotOnce()
+    {
+        var schedule = new GroupTrainingSchedule
+        {
+            Slots =
+            [
+                new GroupTrainingSlot { Day = 6, Start = "10:00" },
+                new GroupTrainingSlot { Day = 6, Start = "08:00" },
+                new GroupTrainingSlot { Day = 6, Start = "08:00" },   // дубль — одно занятие
+            ],
+        };
+
+        // Суббота 12.09 в 07:00: оба занятия сегодня, третье — через неделю.
+        var next = schedule.NextOccurrences(new DateTime(2026, 9, 12, 7, 0, 0), 3);
+
+        Assert.Equal(
+            [(new DateOnly(2026, 9, 12), "08:00"), (new DateOnly(2026, 9, 12), "10:00"), (new DateOnly(2026, 9, 19), "08:00")],
+            next.Select(n => (n.Date, n.Slot.Start)));
+    }
+
+    [Fact]
+    public void NextOccurrences_NoSlots_Empty_FirstEqualsNextOccurrence()
+    {
+        Assert.Empty(new GroupTrainingSchedule().NextOccurrences(new DateTime(2026, 9, 7, 9, 0, 0), 3));
+
+        var now = new DateTime(2026, 9, 7, 9, 0, 0);
+        Assert.Equal(MonWed().NextOccurrence(now)!.Value.Date, MonWed().NextOccurrences(now, 3)[0].Date);
+    }
+
+    [Fact]
     public void NextOccurrence_TodayBeforeStart_ReturnsToday()
     {
         var next = MonWed().NextOccurrence(new DateTime(2026, 9, 7, 9, 0, 0));

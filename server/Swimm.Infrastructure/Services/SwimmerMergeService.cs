@@ -12,7 +12,7 @@ namespace Swimm.Infrastructure.Services;
 /// HubGroupMembers, Sys_HubGroupUserMembers, Sys_UserMedia, Sys_HubGroupMedia,
 /// Sys_TrainingResults, Sys_HubGroupSwimmerLevels, Sys_HubGroupBreaks, Sys_LanePlanSwimmers, Sys_AppUsers.SwimmerId;
 /// пустые поля канонического дозаполняет
-/// из дубля; дубль удаляет. Конфликты (общий заплыв, membership/favorite уже есть у
+/// из дубля (и привязку к loglig — <see cref="MoveLoglig"/>); дубль удаляет. Конфликты (общий заплыв, membership/favorite уже есть у
 /// канонического — последние решаются удалением строки дубля) — см. по месту.
 /// Все изменения — одним SaveChanges (одна транзакция); dry-run не пишет ничего.
 /// </summary>
@@ -83,6 +83,15 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
                 res.Status = "conflict";
                 res.Conflicts.AddRange(shared.Select(k =>
                     $"общий заплыв: competition {k.CompetitionId}, style {k.StyleId}, {k.Distance}"));
+                continue;
+            }
+
+            // Две живые привязки к loglig — два разных профиля: кто из них этот человек, решает
+            // админ (как «общий заплыв»). Rejected — не привязка, а метка «не он»: она не мешает.
+            if (IsLiveLoglig(canonical) && IsLiveLoglig(duplicate) && canonical.LogligId != duplicate.LogligId)
+            {
+                res.Status = "conflict";
+                res.Conflicts.Add($"у обоих привязка loglig: canonical {canonical.LogligId}, duplicate {duplicate.LogligId}");
                 continue;
             }
 
@@ -165,6 +174,44 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
             foreach (var t in trainings) t.SwimmerId = canonical.Id;
             Note(res, "Sys_TrainingResults", trainings.Count);
 
+            // Заявки стартового протокола: FK Restrict — без переноса удаление дубля падало
+            // (08.10.2026, И-49: тень с привязкой к loglig уже набрала заявки). Уникальный ключ —
+            // заплыв × дорожка × пловец: у канонического та же клетка — его строка главнее.
+            var dupEntries = await db.CompetitionEntries.Where(e => e.SwimmerId == duplicate.Id).ToListAsync(ct);
+            var canonSlots = (await db.CompetitionEntries
+                .Where(e => e.SwimmerId == canonical.Id)
+                .Select(e => new { e.OrgDisciplineId, e.Heat, e.Lane }).ToListAsync(ct))
+                .Select(s => (s.OrgDisciplineId, s.Heat, s.Lane)).ToHashSet();
+            foreach (var e in dupEntries)
+            {
+                if (canonSlots.Contains((e.OrgDisciplineId, e.Heat, e.Lane)))
+                {
+                    db.CompetitionEntries.Remove(e);
+                    res.Actions.Add($"CompetitionEntries: заявка {e.Id} удалена (canonical уже в той же клетке)");
+                }
+                else e.SwimmerId = canonical.Id;
+            }
+            Note(res, "CompetitionEntries", dupEntries.Count);
+
+            // Ответы «иду / не приду» за пловца группы (Ш2): FK каскад — без переноса удаление дубля
+            // МОЛЧА уносило ответы. Один ответ на занятие (частичный UNIQUE) — у канонического уже
+            // есть ответ на то же занятие — главнее его.
+            var dupRsvps = await db.HubGroupTrainingRsvps.Where(r => r.SwimmerId == duplicate.Id).ToListAsync(ct);
+            var canonSessions = (await db.HubGroupTrainingRsvps
+                .Where(r => r.SwimmerId == canonical.Id)
+                .Select(r => new { r.HubGroupId, r.SessionDate, r.SessionStart }).ToListAsync(ct))
+                .Select(s => (s.HubGroupId, s.SessionDate, s.SessionStart)).ToHashSet();
+            foreach (var r in dupRsvps)
+            {
+                if (canonSessions.Contains((r.HubGroupId, r.SessionDate, r.SessionStart)))
+                {
+                    db.HubGroupTrainingRsvps.Remove(r);
+                    res.Actions.Add($"Sys_HubGroupTrainingRsvps: ответ на занятие {r.SessionDate} {r.SessionStart} удалён (у canonical свой)");
+                }
+                else r.SwimmerId = canonical.Id;
+            }
+            Note(res, "Sys_HubGroupTrainingRsvps", dupRsvps.Count);
+
             // Уровни и планы дорожек (docs/plans/lane-plans-plan.md): SwimmerId — часть первичного
             // ключа, править его на месте EF не даёт, поэтому строка дубля пересоздаётся на
             // канонического. У их FK каскад: без переноса удаление дубля молча унесло бы уровень
@@ -240,6 +287,7 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
             { canonical.SwimmerOrgId = duplicate.SwimmerOrgId; res.Actions.Add("Swimmer.SwimmerOrgId ← дубль"); }
             if (string.IsNullOrEmpty(canonical.AvatarUrl) && !string.IsNullOrEmpty(duplicate.AvatarUrl))
             { canonical.AvatarUrl = duplicate.AvatarUrl; res.Actions.Add("Swimmer.AvatarUrl ← дубль"); }
+            MoveLoglig(canonical, duplicate, res);
 
             db.Swimmers.Remove(duplicate);
             res.Actions.Add($"Swimmer {duplicate.Id} удалён");
@@ -255,6 +303,43 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
 
         await db.SaveChangesAsync(ct); // один SaveChanges = одна транзакция
         return report;
+    }
+
+    /// <summary>Живая привязка к loglig: есть id и это не отклонённое предложение.</summary>
+    private static bool IsLiveLoglig(Swimm.Domain.Entities.Swimmer s) =>
+        s.LogligId != null && s.LogligIdStatus != "Rejected";
+
+    /// <summary>
+    /// Привязка к loglig дубля — каноническому, целиком (id, статус, источник, кто и когда).
+    /// Раньше склейка её не переносила, и подтверждённая привязка исчезала вместе с дублем
+    /// (02.10.2026: #7915 «רותם עין» и #7953 «שחר בית» — перенесли руками SQL-ом). Правило то же,
+    /// что у привязки в LogligLinkService: живая привязка вытесняет отклонённую (Rejected) метку;
+    /// Rejected дубля не переносится поверх чего-либо. Две живые — конфликт, отсечены выше.
+    /// Уникальный индекс IX_Swimmers_LogligId: значение уходит с удаляемой строки и встаёт на
+    /// каноническую одним SaveChanges — порядок команд EF выстраивает сам (проверено *PgTests).
+    /// </summary>
+    private static void MoveLoglig(
+        Swimm.Domain.Entities.Swimmer canonical, Swimm.Domain.Entities.Swimmer duplicate, SwimmerMergePairResult res)
+    {
+        if (duplicate.LogligId is not int dupId) return;
+
+        var take = canonical.LogligId == null
+                   || (canonical.LogligIdStatus == "Rejected" && duplicate.LogligIdStatus != "Rejected");
+        if (!take)
+        {
+            res.Actions.Add($"Swimmer.LogligId дубля ({dupId}, {duplicate.LogligIdStatus ?? "без статуса"}) не перенесён — " +
+                            $"у canonical {canonical.LogligId} ({canonical.LogligIdStatus ?? "без статуса"})");
+            return;
+        }
+
+        canonical.LogligId = dupId;
+        canonical.LogligIdStatus = duplicate.LogligIdStatus;
+        canonical.LogligIdSource = duplicate.LogligIdSource;
+        canonical.LogligIdSuggestedByUserId = duplicate.LogligIdSuggestedByUserId;
+        canonical.LogligIdSuggestedAt = duplicate.LogligIdSuggestedAt;
+        canonical.LogligIdVerifiedAt = duplicate.LogligIdVerifiedAt;
+        duplicate.LogligId = null;
+        res.Actions.Add($"Swimmer.LogligId ← дубль ({dupId}, {canonical.LogligIdStatus ?? "без статуса"})");
     }
 
     private static bool IsSynthetic(Swimm.Domain.Entities.Swimmer s) =>

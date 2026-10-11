@@ -5,6 +5,8 @@
 @source "../Pages/Admin/**/*.cshtml";
 @source "../Pages/Admin/**/*.cs";
 @source "../wwwroot/admin-home.html";
+/* Скрипты страниц админки (вынесены из .cshtml) строят разметку строками — классы и там. */
+@source "../wwwroot/js/admin/**/*.js";
 
 /* Dark-first тема админки (независима от client-тем training/competition). */
 @theme {
@@ -39,6 +41,23 @@
   }
   .admin-btn-ghost {
     @apply border-admin-border text-admin-text-muted hover:bg-admin-surface-hover hover:text-admin-text;
+  }
+
+  /* Колесико загрузки — одно на всю админку (было вписано руками в Import и на дашборде).
+     Цвет — текущий цвет текста (border-current), размер правится утилитой: size-5. */
+  .admin-spinner {
+    @apply inline-block size-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent;
+  }
+
+  /* Кнопка «занята»: aria-busy="true" — колесико перед текстом и курсор ожидания. Ставит и
+     снимает его adminBusy(btn, on) из _Layout. Объявлено ПОСЛЕ .admin-btn: у disabled та же
+     специфичность, и занятая кнопка не должна бледнеть до 50%, как просто недоступная. */
+  .admin-btn[aria-busy="true"] {
+    @apply cursor-wait opacity-80;
+  }
+  .admin-btn[aria-busy="true"]::before {
+    content: "";
+    @apply inline-block size-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent;
   }
 
   .admin-input {

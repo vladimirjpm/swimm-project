@@ -16,6 +16,16 @@ public static class MediaUrlValidator
         @"vimeo\.com/(\d+)",
         RegexOptions.Compiled);
 
+    // Зеркало HelperMedia.extractGoogleDriveFileId (client/src/utils/helpers/helper-media.ts):
+    // /file/d/<id>/… и старые формы open?id= / uc?id= / drive.usercontent…/download?id=.
+    private static readonly Regex DriveFileRx = new(
+        @"^https?://(?:drive|docs)\.google\.com/file/(?:u/\d+/)?d/([\w-]+)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex DriveIdParamRx = new(
+        @"^https?://(?:drive|docs|drive\.usercontent)\.google\.com/(?:open|uc|download)\?(?:[^#]*&)?id=([\w-]+)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     private static readonly HashSet<string> ValidSourceTypes = new() { "youtube", "vimeo", "other" };
     private static readonly HashSet<string> ValidMediaTypes = new() { "image", "video" };
 
@@ -66,5 +76,18 @@ public static class MediaUrlValidator
 
         error = null;
         return true;
+    }
+
+    /// <summary>
+    /// Ключ сравнения ссылок для запрета дубля (одна ссылка к одной цели дважды).
+    /// Пробелы по краям не в счёт; у Google Drive — только id файла, чтобы /view,
+    /// /view?usp=sharing и open?id= одного файла считались одной ссылкой.
+    /// </summary>
+    public static string DedupKey(string? url)
+    {
+        var trimmed = (url ?? string.Empty).Trim();
+        var drive = DriveFileRx.Match(trimmed);
+        if (!drive.Success) drive = DriveIdParamRx.Match(trimmed);
+        return drive.Success ? "gdrive:" + drive.Groups[1].Value : trimmed;
     }
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import type { CompetitionOverview, OverviewClub } from '../types';
 import { GENDER_CIRCLE } from '../overview-shared';
 import UI_ClubIcon from '../../../../components/mix/club-icon/club-icon';
+import UI_ClubPointsUnofficialChip from '../../../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
 import { rootActions, useAppDispatch } from '../../../../../store/store';
 import { Enums } from '../../../../../utils/interfaces/enums';
 
@@ -83,6 +84,8 @@ export default function ModuleCardClubs({
   // Официальные очки расходятся с нашими: у организатора ошибка, наш расчёт сверен вручную.
   // Без подписи расхождение читается как наш баг, поэтому говорим о нём прямо.
   const officialMismatch = overview.club_points_verified === 'mismatch';
+  // Официального зачёта нет — очки наша оценка, без подписи они читаются как официальные.
+  const unofficial = !!overview.club_points_unofficial;
 
   // Шкала очков — попапом: цифра очков без правила необъяснима, а разворачивать 24 места
   // прямо в карточке негде.
@@ -100,7 +103,8 @@ export default function ModuleCardClubs({
       {/* Список */}
       <div className="min-w-0 flex flex-col gap-3.5">
         <div className="min-w-0 flex flex-col">
-          <div className="mb-2 flex items-baseline gap-2.5">
+          {/* flex-wrap: с чипами (★ / Unofficial) строка шире телефона — переносится, а не вылезает. */}
+          <div className="mb-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
             <span className="ov2-card__title">Top clubs</span>
             <span className="text-[12px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}>
               club standings
@@ -128,6 +132,7 @@ export default function ModuleCardClubs({
                 ★ Differs from official — ours verified
               </span>
             )}
+            {unofficial && <UI_ClubPointsUnofficialChip />}
             <span className="flex-1" />
             <button type="button" onClick={() => onOpenTab('clubs')} className="ov2-card__link">
               Clubs tab →

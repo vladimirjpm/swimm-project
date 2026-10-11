@@ -1,4 +1,4 @@
-import type { HubGroupBreaks, HubGroupLevels, LanePlan, LanePlanInput, LanePlanSummary } from '../types';
+import type { BreakInput, HubGroupBreaks, HubGroupLevels, LanePlan, LanePlanInput, LanePlanSummary } from '../types';
 
 /**
  * Клиент плана дорожек группы (docs/plans/lane-plans-plan.md). Ручки —
@@ -74,6 +74,8 @@ export const lanePlansApi = {
   publish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/publish`),
   unpublish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/unpublish`),
   remove: (groupId: number, date: string) => request<void>('DELETE', `${base(groupId)}/${date}`),
+  /** Зритель открыл вид Lanes (Т1б): гаснет «тебя перенесли». GET плана метку не гасит. */
+  markSeen: (groupId: number) => request<void>('PUT', `${base(groupId)}/seen`),
   levels: (groupId: number) => request<HubGroupLevels>('GET', `/api/me/hub-groups/${groupId}/levels`),
   /** Уровень пловца: null — «без уровня». Тело camelCase, как у всей ручки уровней. */
   setSwimmerLevel: (groupId: number, swimmerId: number, levelId: number | null) =>
@@ -83,11 +85,12 @@ export const lanePlansApi = {
     request<void>('PUT', `/api/me/hub-groups/${groupId}/account-levels/${userId}`, { levelId }),
   /** «On break» (Ш3.1): свой перерыв; управляющему — все и недавние возвращения. */
   breaks: (groupId: number) => request<HubGroupBreaks>('GET', `/api/hub-groups/${groupId}/breaks`),
-  /** Поставить/снять перерыв: без субъекта — себе; `until` yyyy-MM-dd, null — бессрочно (тренер). */
-  setBreak: (
-    groupId: number,
-    input: { on_break: boolean; until?: string | null; user_id?: number | null; swimmer_id?: number | null },
-  ) => request<HubGroupBreaks>('PUT', `/api/hub-groups/${groupId}/breaks`, input),
+  /**
+   * Статус человека (перерыв / «не тренируется» / в строю, Р74): без субъекта — себе; `until`
+   * yyyy-MM-dd, null — бессрочно (тренер).
+   */
+  setBreak: (groupId: number, input: BreakInput) =>
+    request<HubGroupBreaks>('PUT', `/api/hub-groups/${groupId}/breaks`, input),
 };
 
 /** Сегодня по Израилю, yyyy-MM-dd: план — календарный день бассейна, не UTC. */

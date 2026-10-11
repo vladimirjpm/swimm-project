@@ -107,6 +107,91 @@ public class RecordCheckComparerTests
         Assert.Equal(RecordCheckVerdict.NotChecked, verdict);
     }
 
+    // ── И-40: совпадение с loglig не делает время настоящим ──────────────────
+
+    /// <summary>Справочник с рекордами, нужными тестам (женщины, 25 м, как в Records).</summary>
+    private static Swimm.Application.Mapping.WorldBestReference WorldBests() =>
+        Swimm.Application.Mapping.WorldBestReference.Build(
+        [
+            ("female", "freestyle", "50m", "25m", "22.83"),
+            ("female", "freestyle", "100m", "25m", "50.25"),
+            ("female", "backstroke", "50m", "25m", "25.23"),
+            ("female", "individual_medley", "200m", "25m", "2:01.63"),
+        ]);
+
+    [Fact]
+    public void Contradicts_WhenFasterThanWorldRecord_EvenIfCardHasTheSameTime()
+    {
+        // Живой случай: 00:20.49 на 50 вольным у 14-летней. Loglig показывает то же время —
+        // это тот же протокол, а не независимое подтверждение.
+        var (verdict, message) = RecordCheckComparer.Compare(
+            [Row("freestyle", "50", "00:20.49", 20_490)],
+            "freestyle", "50", "25m", "00:20.49", "female", WorldBests());
+
+        Assert.Equal(RecordCheckVerdict.Contradicts, verdict);
+        Assert.Contains("быстрее мирового рекорда (22.83)", message);
+    }
+
+    [Fact]
+    public void CheckWorldBest_WorksWithoutCard()
+    {
+        // Пловец без loglig-id: карточки нет, но мировой рекорд проверить можно.
+        var check = RecordCheckComparer.CheckWorldBest(
+            "freestyle", "50", "25m", "female", "00:20.49", WorldBests());
+
+        Assert.NotNull(check);
+        Assert.Equal(RecordCheckVerdict.Contradicts, check!.Value.Verdict);
+        Assert.Null(RecordCheckComparer.CheckWorldBest(
+            "freestyle", "50", "25m", "female", "00:24.40", WorldBests()));
+    }
+
+    [Fact]
+    public void Contradicts_WhenFarAboveSwimmersOwnLevel_EvenIfCardHasTheSameTime()
+    {
+        // Не быстрее мирового, но втрое выше всего, что пловчиха плавает в остальных
+        // дисциплинах (100 в/с 1:09.18 ≈ 380 очков, 50 на спине 0:33.00 ≈ 450).
+        var (verdict, message) = RecordCheckComparer.Compare(
+            [
+                Row("freestyle", "50", "00:23.50", 23_500),
+                Row("freestyle", "100", "01:09.18", 69_180),
+                Row("backstroke", "50", "00:33.00", 33_000),
+            ],
+            "freestyle", "50", "25m", "00:23.50", "female", WorldBests());
+
+        Assert.Equal(RecordCheckVerdict.Contradicts, verdict);
+        Assert.Contains("уровень заплыва", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Confirms_WhenTimeFitsSwimmersLevel()
+    {
+        // Сильная пловчиха: 50 в/с 0:25.00 (≈760) при 100 в/с 0:54.50 (≈780) — ровный уровень.
+        var (verdict, message) = RecordCheckComparer.Compare(
+            [
+                Row("freestyle", "50", "00:25.00", 25_000),
+                Row("freestyle", "100", "00:54.50", 54_500),
+                Row("individual_medley", "200", "02:15.00", 135_000),
+            ],
+            "freestyle", "50", "25m", "00:25.00", "female", WorldBests());
+
+        Assert.Equal(RecordCheckVerdict.Confirms, verdict);
+        Assert.DoesNotContain("настоящ", message);
+    }
+
+    [Fact]
+    public void PersonalLevel_NeedsAtLeastTwoOtherEvents()
+    {
+        // Одна чужая дисциплина — не «уровень»: специализацию от ошибки не отличить.
+        var (verdict, _) = RecordCheckComparer.Compare(
+            [
+                Row("freestyle", "50", "00:23.50", 23_500),
+                Row("freestyle", "100", "01:09.18", 69_180),
+            ],
+            "freestyle", "50", "25m", "00:23.50", "female", WorldBests());
+
+        Assert.Equal(RecordCheckVerdict.Confirms, verdict);
+    }
+
     [Fact]
     public void Verdict_IsSerializedAsString()
     {

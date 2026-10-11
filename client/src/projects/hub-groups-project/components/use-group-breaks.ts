@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { HubGroupBreaks } from '../types';
+import type { BreakInput, HubGroupBreaks } from '../types';
 import { lanePlansApi } from './lane-plans-api';
 
 /**
@@ -13,6 +13,9 @@ import { lanePlansApi } from './lane-plans-api';
 export function useGroupBreaks(groupId: number, enabled: boolean, onChanged?: () => void) {
   const [data, setData] = useState<HubGroupBreaks | null>(null);
   const [busy, setBusy] = useState(false);
+  const [version, setVersion] = useState(0);
+  /** Перечитать с сервера — после того, что меняет перерыв со стороны (ответ «Going» его снимает). */
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     if (!enabled) { setData(null); return undefined; }
@@ -21,12 +24,10 @@ export function useGroupBreaks(groupId: number, enabled: boolean, onChanged?: ()
       if (!cancelled && r.ok && r.data) setData(r.data);
     });
     return () => { cancelled = true; };
-  }, [groupId, enabled]);
+  }, [groupId, enabled, version]);
 
   /** Возвращает текст ошибки сервера или null. */
-  const setBreak = useCallback(async (
-    input: { on_break: boolean; until?: string | null; user_id?: number | null; swimmer_id?: number | null },
-  ): Promise<string | null> => {
+  const setBreak = useCallback(async (input: BreakInput): Promise<string | null> => {
     setBusy(true);
     const r = await lanePlansApi.setBreak(groupId, input);
     setBusy(false);
@@ -38,5 +39,5 @@ export function useGroupBreaks(groupId: number, enabled: boolean, onChanged?: ()
     return r.error ?? 'Could not save. Try again.';
   }, [groupId, onChanged]);
 
-  return { data, busy, setBreak };
+  return { data, busy, setBreak, reload };
 }

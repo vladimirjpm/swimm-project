@@ -1,6 +1,7 @@
 # /Admin/Swimmers/Loglig — привязка к loglig.com
 
-Файлы: `Pages/Admin/Swimmers/Loglig.cshtml(.cs — прокидывает Loglig:SeasonId)`;
+Файлы: `Pages/Admin/Swimmers/Loglig.cshtml(.cs — прокидывает Loglig:SeasonId)`, скрипт
+`wwwroot/js/admin/swimmers-loglig.js` (сезон — `window.__LOGLIG_SEASON` inline перед ним);
 API `LogligAdminController` (`/api/admin/loglig`): list (query/status/take),
 config (searchConfigured), find, set, unlink, batch (take≤200).
 Сервисы: `LogligLinkService` (оркестрация), `SerperCandidateSearchProvider` (поиск),

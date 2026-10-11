@@ -190,9 +190,23 @@ Redis — нет); сброс — по метке, не перебором кл�
 2. Следы CRA (`reportWebVitals`, `react-app-env.d.ts`, `setupTests.ts`) — удалить.
 3. `data-helper2.js` и прочий JS среди TS — типизировать при первом же касании.
 4. Поле стора `debigConfig` (опечатка) — переименовать одним атомарным PR со всеми ссылками.
-5. `loadFromApi` в `filter-data-source-ddl.tsx` качает все страницы в цикле — заменить на
+5. `loadFromApi` в `filter-data-source-ddl/use-results-loader.ts` качает все страницы в цикле — заменить на
    серверную фильтрацию (фаза 3).
-6. Дублированные `using` в `Program.cs` (Swimm.API) — косметика.
+6. ~~Дублированные `using` в `Program.cs` (Swimm.API)~~ — **закрыто 08.10.2026** вместе с выносом
+   консольных команд: 35 блоков `if (args.Contains(…))` переехали из `Program.cs` (1808 → 582 строки)
+   в `server/Swimm.API/Cli/*Cli.cs` по темам, реестр и порядок — `Cli/CliCommands.cs`. Новая команда —
+   метод в файле своей темы + строка в реестр. ⚠ Консольная команда зовёт ТЕ ЖЕ сервисы, что и
+   кнопка в админке, а не свою копию конвейера: копия `--repull` молча разошлась с кнопкой (парсила
+   один HE) и завела тень пловца (И-46). Тем же днём поиск пловца по строке протокола вынесен
+   из `JsonImportService` (2667 → 2296 строк) в `ImportSwimmerResolver` — индексы, фоллбеки,
+   страж тёзок, ноги эстафет; правила тестируются по одному (`ImportSwimmerResolverTests`).
+   09.10: `SwimmDbContext.OnModelCreating` → классы `IEntityTypeConfiguration` в
+   `Infrastructure/Data/Configurations/`; `IsrOrgCompetitionParser.ParseLines` (1350 строк) →
+   вложенный `LineParser` с цепочкой методов `Try…` под эталонами `ParserGoldenTests`;
+   `JsonImportService.ImportAsync` → вложенный `ImportRun`; обзор соревнования
+   (`/api/competition-overview`) — `ResultRepository.Overview.cs`, метод на карточку; JS больших
+   страниц админки — `wwwroot/js/admin/*.js` (правила — `docs/admin-pages/README.md`). Остальное —
+   `docs/plans/refactor-handoff.md`.
 7. `Gallery`/`GalleryItem` (импортные медиа заплыва) НЕ смешивать с `Sys_UserMedia`
    (пользовательские ссылки) — это разные вещи по владению и приватности.
 8. ~~Соревнование сопоставляется с источником по названию~~ — закрыто фазой Д2

@@ -25,16 +25,20 @@
 | пара-очки | `Results.IsParaPoints` + `ParaPointsDetector` («очки × время³» против медианы дисциплины дня); наружу как FINA — 0 везде, в протоколе «para» (Р67–Р68); CLI `--para-points-scan` | `6dcfbc77` |
 | качество | Скан качества сам после импорта/переимпорта; помеченные (`SuspectReason`) вне Best swim и High Point (Р69–Р70); CLI `--quality-scan <id> --competition` | `291bc878` |
 | карточка пловца | Нет тренировок — нет таба Training (гостю они не приходят) | `665f049c` |
-| пловцы группы | `Swimmer.PrivateHubGroupId` — человек без аккаунта и без loglig, видим только своей группе (Р71); кнопка тренера «+ Add a swimmer who isn’t on loglig»; Deactivate/Inactive/Restore (строка `Source = private`); 18 локальных Дельфина стали пловцами группы 17; дамп прода их вырезает | этот коммит |
+| пловцы группы | `Swimmer.PrivateHubGroupId` — человек без аккаунта и без loglig, видим только своей группе (Р71); кнопка тренера «+ Add a swimmer who isn’t on loglig»; Deactivate/Inactive/Restore (строка `Source = private`); 18 локальных Дельфина стали пловцами группы 17; дамп прода их вырезает | `4281402b` |
+| статус человека (Р74) | Active / On break / Doesn't train with us / Inactive: `Sys_HubGroupBreaks.Kind`, ручного можно сделать Inactive (ограничение `CK_HubGroupMembers_ExcludedOnlyClub` снято), выпадашка в Following и «кто идёт»; миграция `HubGroupPersonStatus` | этот коммит |
+| тренировки кнопкой + видео | Е1–Е3 [group-events-media-plan.md](group-events-media-plan.md): тренер заводит тренировку и без времён («Underwater filming»), участники и тренер цепляют ссылки (настройка «Only coaches»), карточка «Trainings & videos» в табе Trainings; миграции `TrainingSessionCreatedInApp`, `HubGroupMediaAuthorSetNull` | этот коммит |
+| ответ за пловца группы | `Sys_HubGroupTrainingRsvps.SwimmerId` (ровно одно из `UserId`/`SwimmerId`): «иду / не приду» за пловца группы ставит только тренер; он в полосе, списке тренера («no account»), «Who's coming» и на дорожках; Deactivate снимает будущие ответы (Р73). Решение по медалям помеченных строк — не трогаем (Р72) | этот коммит |
 
-Проверено: серверные тесты 2578/2578, `tsc` чистый, вживую на стенде 5183+5082 (гость, участник,
-тренер, админ). Проход [pre-push-rules.md](../pre-push-rules.md) — по каждому пушу.
+Проверено: серверные тесты 2583/2583, `tsc` чистый, вживую на стенде 5183+5082 (гость, участник,
+тренер, админ; ответ за пловца группы — тренер и участник). Проход [pre-push-rules.md](../pre-push-rules.md) — по каждому пушу.
 
 Миграции (по порядку): `AddHeroMobileImage`, `AddHubGroupTrainingRsvps`,
 `AddHubGroupBreaksAndAccountLevels`, `AddHubGroupIsTrusted`, `AddMediaReports`,
 **`AddResultIsParaPoints`** (+ бэкфилл `dotnet run -- --para-points-scan`, локально 77 строк),
 **`AddSwimmerPrivateHubGroup`** (бэкфилл в самой миграции), **`HubGroupMemberSourcePrivate`**
-(бэкфилл в миграции) — все применены к ЛОКАЛЬНОЙ базе (прода нет). На локальной базе ещё
+(бэкфилл в миграции), **`HubGroupTrainingRsvpSwimmer`**, **`TrainingSessionCreatedInApp`**,
+**`HubGroupMediaAuthorSetNull`**, **`HubGroupPersonStatus`** — все применены к ЛОКАЛЬНОЙ базе (прода нет). На локальной базе ещё
 прогнан `--quality-scan` события 13 (+19 пометок, отсечка 50 м на 400 в/с) и дня 1641 (+2).
 
 ## 2. Что дальше
@@ -42,16 +46,13 @@
 Хвосты 8.15 закрыты (кроме `Remind N` — ждёт прод-SMTP). «Отметку посещения после занятия»
 Влад решил не делать (29.09).
 
-1. **Влить PR #100** — делает Влад.
-2. **Пловцы группы, пункт 2** (не делали, ждёт решения): ответы «иду / не приду» ведутся только
-   по аккаунтам (`Sys_HubGroupTrainingRsvps.UserId`) — за пловца группы тренер ответить не может,
-   и в «Who's coming» / виде по дорожкам из ответов его нет (в плане дорожек, который тренер
-   раскладывает сам, он есть). Нужны ответы по пловцу, а не только по аккаунту.
-3. **Помеченные ошибки протокола и места/медали.** У 1512 ошибка протокола переставила места 1–7
-   заплыва; места официальные → клубный зачёт и медали по ним. Исключать ли помеченные строки
-   из медалей и клубных очков — решение Влада (Р69 закрыл только Best swim и High Point).
-4. **Памятка «Нужна ли вам группа?»** — копим примеры в
-   [group-creation-guide-draft.md](group-creation-guide-draft.md), потом делаем страницу.
+1. ~~Влить PR #100~~ — влит 11.10.2026 (merge-коммит `babe99f5`).
+2. ~~Ответ за пловца группы~~ — сделано 29.09 (Р73).
+3. ~~Помеченные ошибки протокола и места/медали~~ — решено 29.09: не трогаем (Р72).
+4. **Памятка «Нужна ли вам группа?»** — текст написан 11.10.2026 (RU для вычитки + EN для
+   страницы, источники каждого утверждения) в [group-creation-guide-draft.md](group-creation-guide-draft.md).
+   Страница сделана 11.10.2026: `/help/groups` (тексты — `client/src/content/help/groups/`),
+   ссылка «Do you need a group?» на `/groups`. Иврит стоит вычитать носителю.
 5. Вне 8.15: Azure (6 вопросов в `azure-deploy-plan.md` — без прода Trusted, жалобы, пловцы групп
    живут только локально), открытая вода (7 решений), 85 пловцов-теней из ног эстафет
    (`splits-and-shadows-handoff.md`), стартовый протокол С0 (октябрь).

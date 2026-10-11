@@ -37,9 +37,11 @@ public class IsrOrgCompetitionParserMaccabiahRealPdfTests
         var relay = allResults.Where(r => r.IsRelay == true).ToList();
         var indiv = allResults.Where(r => r.IsRelay != true).ToList();
 
-        Assert.Equal(851, indiv.Count);
+        // 850, а не 851: loglig напечатал ROSEN Natalie (50 брасс U17 девушки, 00:36.32) дважды —
+        // места 5, 5, дальше 7; вторую копию парсер теперь пропускает (И-39, IsrOrgExactDuplicateRowTests).
+        Assert.Equal(850, indiv.Count);
         Assert.Equal(64, relay.Count);
-        Assert.Equal(915, allResults.Count);
+        Assert.Equal(914, allResults.Count);
 
         // Реконструкция имён по X-колонкам Last/First должна восстанавливать
         // состав минимум для 62 из 64 эстафетных строк (было 52 до фикса
@@ -88,7 +90,7 @@ public class IsrOrgCompetitionParserMaccabiahRealPdfTests
         var comps = IsrOrgCompetitionParser.ParseCompetitions(fs, "he").ToList();
 
         Assert.Equal(91, comps.Count);
-        Assert.Equal(915, comps.Sum(c => c.Results.Count));
+        Assert.Equal(914, comps.Sum(c => c.Results.Count));   // без дубля ROSEN (И-39)
 
         // Para — отдельные события, не схлопнутые со взрослыми "- Men".
         var para = comps.Where(c => c.Event.EndsWith("Men Para", StringComparison.OrdinalIgnoreCase)).ToList();
@@ -175,9 +177,9 @@ public class IsrOrgCompetitionParserMaccabiahRealPdfTests
         var relay = allResults.Where(r => r.IsRelay == true).ToList();
         var indiv = allResults.Where(r => r.IsRelay != true).ToList();
 
-        Assert.Equal(851, indiv.Count);
+        Assert.Equal(850, indiv.Count);   // без дубля ROSEN (И-39)
         Assert.Equal(64, relay.Count);
-        Assert.Equal(915, allResults.Count);
+        Assert.Equal(914, allResults.Count);
 
         // Главная сигнатура регрессии: 4-значный год рождения, просочившийся в состав
         // как будто это имя пловца. Если роль-маппинг колонок сломан, это выглядит

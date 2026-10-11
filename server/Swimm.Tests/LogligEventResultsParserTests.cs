@@ -78,6 +78,39 @@ public class LogligEventResultsParserTests
     }
 
     /// <summary>
+    /// Мастерская эстафета (мастерс-зима 2025, loglig 11586, событие 58141): таблица из 8
+    /// колонок — нет «ניקוד אישי». Разбор ждал 9/10 и молча отдавал ноль строк, отчего ремонт
+    /// полос видел «у источника 0» при 132 наших. Настоящая полоса суммы возрастов — только в
+    /// подзаголовке секции («מאסטרס שליחות 100-119»), в шапке события — общая «21-99».
+    /// </summary>
+    [Fact]
+    public void MastersRelay_EightColumns_RowsAreRead()
+    {
+        var ev = LogligEventResultsParser.Parse(Fixture("event-58141-masters-relay-women.html"));
+
+        Assert.True(ev.IsRelay);
+        Assert.Equal("female", ev.Gender);
+        Assert.Equal("21-99", ev.AgeBand);
+        Assert.Equal(16, ev.Rows.Count);
+
+        var first = ev.Rows[0];
+        Assert.Equal(1, first.Position);
+        Assert.Equal("מכבי כפר המכביה", first.Club);
+        Assert.Equal(1, first.Heat);
+        Assert.Equal(7, first.Lane);
+        Assert.Equal("02:23.80", first.Time);
+        Assert.Equal(360, first.InternationalPoints);
+        Assert.Null(first.PersonalPoints);
+        Assert.Equal(24, first.ClubPoints);
+        Assert.Equal("מאסטרס שליחות 100-119", first.Category);
+
+        // Снятая команда: статус отдельно от времени, клубных очков нет (пустая ячейка).
+        var dq = Assert.Single(ev.Rows, r => r.FailNote == "DQ");
+        Assert.Null(dq.Time);
+        Assert.Null(dq.ClubPoints);
+    }
+
+    /// <summary>
     /// Статусы и «NMin» (норматив не выполнен): время у такой строки настоящее, а у DQ/NS
     /// его нет вовсе — иначе импорт записал бы статус в поле времени.
     /// </summary>

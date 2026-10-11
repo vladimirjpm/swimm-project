@@ -1,5 +1,5 @@
 import React from 'react';
-import UI_InfoPopup, { InfoText } from '../../info-popup/info-popup';
+import UI_InfoPopup from '../../info-popup/info-popup';
 
 /**
  * Время заплыва — ЕДИНСТВЕННЫЙ разрешённый способ вывести его в UI
@@ -51,69 +51,19 @@ export interface SwimQuality {
   reason?: string | null;
 }
 
-const TITLE: Record<SwimQualityKind, InfoText> = {
-  protocol: {
-    en: 'This result looks wrong',
-    ru: 'Результат выглядит ошибочным',
-    he: 'התוצאה נראית שגויה',
-  },
-  record: {
-    en: 'This official record looks wrong',
-    ru: 'Официальный рекорд выглядит ошибочным',
-    he: 'השיא הרשמי נראה שגוי',
-  },
+/**
+ * Объяснение пометки — файлы `src/content/popups/swim-quality-<kind>/{en,ru,he}.md`
+ * (заголовок, текст, сноска). В коде только ключ: тексты на трёх языках живут в content.
+ */
+const QUALITY_CONTENT: Record<SwimQualityKind, string> = {
+  protocol: 'popups/swim-quality-protocol',
+  record: 'popups/swim-quality-record',
 };
 
-const BODY: Record<SwimQualityKind, InfoText> = {
-  protocol: {
-    en:
-      'This swim does not fit the rest of the protocol — most likely a mistake in the official '
-      + 'results file itself, not in our data.\n\n'
-      + 'We keep the row exactly as published: our copy has to match the federation source. '
-      + 'But a flagged swim does not count towards records and is not shown as an achievement.',
-    ru:
-      'Этот заплыв не сходится с остальным протоколом — скорее всего, ошибка в самом '
-      + 'официальном файле результатов, а не в наших данных.\n\n'
-      + 'Мы оставляем строку ровно такой, какой её опубликовали: наша копия обязана совпадать '
-      + 'с источником федерации. Но помеченный заплыв не участвует в рекордах и не показывается '
-      + 'как достижение.',
-    he:
-      'השחייה הזו לא מסתדרת עם שאר הפרוטוקול — ככל הנראה טעות בקובץ התוצאות הרשמי עצמו, '
-      + 'ולא בנתונים שלנו.\n\n'
-      + 'אנחנו משאירים את השורה בדיוק כפי שפורסמה: העותק שלנו חייב להתאים למקור של ההתאחדות. '
-      + 'אבל שחייה מסומנת אינה נחשבת לשיאים ואינה מוצגת כהישג.',
-  },
-  record: {
-    en:
-      'This record is published by the federation as shown, but it does not add up — for '
-      + 'example it is faster than the record of an older age group.\n\n'
-      + 'We do not correct the source: our copy has to match the official list, otherwise the '
-      + 'next update would silently bring the error back. We flag it instead and report it.',
-    ru:
-      'Этот рекорд опубликован федерацией именно так, но он не сходится — например, быстрее '
-      + 'рекорда более старшей возрастной ступени.\n\n'
-      + 'Мы не правим источник: наша копия обязана совпадать с официальным списком, иначе '
-      + 'следующее обновление молча вернёт ошибку назад. Вместо этого мы её помечаем и сообщаем '
-      + 'о ней федерации.',
-    he:
-      'השיא הזה פורסם על ידי ההתאחדות בדיוק כך, אבל הוא לא מסתדר — למשל הוא מהיר יותר '
-      + 'מהשיא של קבוצת גיל מבוגרת יותר.\n\n'
-      + 'אנחנו לא מתקנים את המקור: העותק שלנו חייב להתאים לרשימה הרשמית, אחרת העדכון הבא '
-      + 'יחזיר את הטעות בשקט. במקום זאת אנחנו מסמנים אותה ומדווחים עליה.',
-  },
-};
-
-const FOOTNOTE: Record<SwimQualityKind, InfoText> = {
-  protocol: {
-    en: 'Flagged after review by an administrator.',
-    ru: 'Помечено администратором после разбора.',
-    he: 'סומן על ידי מנהל לאחר בדיקה.',
-  },
-  record: {
-    en: 'Source: official federation record list.',
-    ru: 'Источник: официальный список рекордов федерации.',
-    he: 'מקור: רשימת השיאים הרשמית של ההתאחדות.',
-  },
+/** Подпись кнопки-чипа для экранного чтеца — короткая подпись интерфейса, она английская. */
+const QUALITY_LABEL: Record<SwimQualityKind, string> = {
+  protocol: 'This result looks wrong',
+  record: 'This official record looks wrong',
 };
 
 /**
@@ -251,7 +201,7 @@ const UI_SwimTime: React.FC<SwimTimeProps> = ({
         <button
           type="button"
           onClick={openInfo}
-          aria-label={TITLE[quality.kind].en}
+          aria-label={QUALITY_LABEL[quality.kind]}
           className={`inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap rounded-full font-extrabold leading-none hover:opacity-80 ${
             chipSize === 'sm' ? 'px-[9px] py-[2px] text-[10px]' : 'px-[10px] py-[3px] text-[11px]'
           }`}
@@ -278,9 +228,7 @@ const UI_SwimTime: React.FC<SwimTimeProps> = ({
       <UI_InfoPopup
         open={open}
         onClose={() => setOpen(false)}
-        title={TITLE[quality.kind]}
-        body={BODY[quality.kind]}
-        footnote={FOOTNOTE[quality.kind]}
+        contentKey={QUALITY_CONTENT[quality.kind]}
       />
     </>
   );

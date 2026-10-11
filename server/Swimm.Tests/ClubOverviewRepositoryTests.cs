@@ -342,6 +342,92 @@ public class ClubOverviewRepositoryTests
         Assert.Equal(1, top.Gold);      // и медаль эстафеты личной не считается
     }
 
+    // ── Чип «Unofficial» (Р80) ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task LeagueWithoutOfficialStanding_MarkedUnofficial_InStandingsAndTimeline()
+    {
+        using var db = CreateDb(nameof(LeagueWithoutOfficialStanding_MarkedUnofficial_InStandingsAndTimeline));
+        var (us, kids) = await SeedAsync(db);
+        var league = new Competition
+        {
+            Name = "League 1", Date = "11/04/2025", PoolType = "25m", HasOfficialClubStanding = false
+        };
+        var champ = Championship("15/02/2025", "25m");
+        champ.HasOfficialClubStanding = true;
+        db.AddRange(league, champ);
+        Link(db, kids, league);
+        Link(db, kids, champ);
+        db.AddRange(Standing(league, us, rank: 1), Standing(champ, us, rank: 2));
+        await db.SaveChangesAsync();
+
+        var dto = await Repo(db).GetOverviewAsync(us.Id, us.Id, null, null, 3, league.Id);
+
+        Assert.True(dto!.Standings!.Unofficial);
+        Assert.True(dto.Timeline.Single(t => t.CompetitionId == league.Id).Unofficial);
+        Assert.False(dto.Timeline.Single(t => t.CompetitionId == champ.Id).Unofficial);
+    }
+
+    [Fact]
+    public async Task ExplicitRule_ChampionshipWithoutLogligTable_NotUnofficial()
+    {
+        // Зачёт чемпионата Kids на loglig не публикуется, но шкала привязана вручную по
+        // регламенту — это не наша оценка, чипа нет (решение Влада 08.10.2026).
+        using var db = CreateDb(nameof(ExplicitRule_ChampionshipWithoutLogligTable_NotUnofficial));
+        var (us, kids) = await SeedAsync(db);
+        var rule = new PointRuleClubs
+        {
+            Version = "test.40", EffectiveFrom = new DateOnly(2026, 1, 1), Scope = "all",
+            DefaultPoints = 0, MaxScoringPlace = 24, RelayMultiplier = 2, ManualOnly = true,
+            Entries = { new PointRuleClubsEntry { Place = 1, Points = 40 } }
+        };
+        db.Add(rule);
+        await db.SaveChangesAsync();
+        var champ = Championship("15/07/2026", "50m");
+        champ.HasOfficialClubStanding = false;
+        champ.PointRuleClubsId = rule.Id;
+        db.Add(champ);
+        Link(db, kids, champ);
+        db.Add(Standing(champ, us, rank: 8));
+        await db.SaveChangesAsync();
+
+        var dto = await Repo(db).GetOverviewAsync(us.Id, us.Id, null, null, 3, champ.Id);
+
+        Assert.False(dto!.Standings!.Unofficial);
+        Assert.False(Assert.Single(dto.Timeline).Unofficial);
+    }
+
+    [Fact]
+    public async Task EventUnit_UnofficialOnlyIfEveryDayIs()
+    {
+        // Зачётная единица события — первый день, а официальность решают все дни: зачёт,
+        // опубликованный на втором дне, делает сумму события официальной.
+        using var db = CreateDb(nameof(EventUnit_UnofficialOnlyIfEveryDayIs));
+        var (us, kids) = await SeedAsync(db);
+        var evt = new CompetitionEvent { Name = "Memorial" };
+        db.Add(evt);
+        await db.SaveChangesAsync();
+        var day1 = new Competition
+        {
+            Name = "Memorial", Date = "25/04/2025", PoolType = "50m", EventId = evt.Id, DayNumber = 1,
+            ClubPointsDisabled = true
+        };
+        var day2 = new Competition
+        {
+            Name = "Memorial", Date = "26/04/2025", PoolType = "50m", EventId = evt.Id, DayNumber = 2,
+            HasOfficialClubStanding = true
+        };
+        db.AddRange(day1, day2);
+        Link(db, kids, day1);
+        db.Add(Standing(day1, us, rank: 1));
+        await db.SaveChangesAsync();
+
+        var dto = await Repo(db).GetOverviewAsync(us.Id, us.Id, null, null, 3, day1.Id);
+
+        Assert.False(dto!.Standings!.Unofficial);
+        Assert.False(Assert.Single(dto.Timeline).Unofficial);
+    }
+
     [Fact]
     public async Task UnknownClub_ReturnsNull()
     {

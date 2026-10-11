@@ -86,14 +86,13 @@ public static class DependencyInjection
         services.AddSingleton<IRecordCountryRunQueue>(sp => sp.GetRequiredService<RecordCountryRunQueue>());
         // Архив источников: боевой прогон сам кладёт выгрузку разобранных строк в
         // !records-sources/ (правило 11 pre-push). Путь из конфига, относительный считается от
-        // ContentRoot; пустой — архив выключен.
+        // ContentRoot; пустой — архив выключен. Вне Development относительный путь тоже
+        // выключает архив — см. FileRecordRunArchive.ResolveDirectory.
         services.AddSingleton<IRecordRunArchive>(sp =>
         {
-            var configured = configuration["RecordsImport:SourceArchiveDir"];
-            var dir = string.IsNullOrWhiteSpace(configured)
-                ? null
-                : Path.GetFullPath(Path.Combine(
-                    sp.GetRequiredService<IHostEnvironment>().ContentRootPath, configured));
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            var dir = FileRecordRunArchive.ResolveDirectory(
+                configuration["RecordsImport:SourceArchiveDir"], env.ContentRootPath, env.IsDevelopment());
 
             return new FileRecordRunArchive(
                 dir, sp.GetRequiredService<ILogger<FileRecordRunArchive>>());
@@ -118,6 +117,12 @@ public static class DependencyInjection
         services.AddScoped<IPointRulesAdminRepository, PointRulesAdminRepository>();
         services.AddScoped<IResultAdminRepository, ResultAdminRepository>();
         services.AddScoped<IResultTransferService, ResultTransferService>();
+        // Деление схлопнутой многодневки по дням без переимпорта (multiday-split-plan, М2).
+        services.AddScoped<ICompetitionDaySplitService, CompetitionDaySplitService>();
+        // Обзор: кто ещё схлопнут и чьи дни не собраны в событие (multiday-split-plan, М4).
+        services.AddScoped<ICollapsedDaysReviewService, CollapsedDaysReviewService>();
+        // Сбор отдельных соревнований в событие — «дни есть, события нет» (там же, М4).
+        services.AddScoped<ICompetitionDayJoinService, CompetitionDayJoinService>();
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
         services.AddScoped<IClubPublicRepository, ClubPublicRepository>();
         services.AddScoped<IStartListPublicRepository, StartListPublicRepository>();
@@ -150,6 +155,7 @@ public static class DependencyInjection
         services.AddScoped<IHubGroupLevelService, HubGroupLevelService>();
         services.AddScoped<ILanePlanService, LanePlanService>();
         services.AddScoped<ITrainingRsvpService, TrainingRsvpService>();
+        services.AddScoped<ITrainingSessionService, TrainingSessionService>();
         services.AddScoped<IHubGroupBreakService, HubGroupBreakService>();
         services.AddScoped<IClubPointsRepository, ClubPointsRepository>();
         services.AddScoped<IClubStandingService, ClubStandingService>();
@@ -183,6 +189,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, EmptyClubCheck>();
         services.AddScoped<IDataCheck, MergedClubStillUsedCheck>();
         services.AddScoped<IDataCheck, SwimmerTwoClubsInCompetitionCheck>();
+        services.AddScoped<IDataCheck, SwimmerEnglishNameCheck>();
         services.AddScoped<IDataCheck, CompetitionWithoutClubPointRuleCheck>();
         services.AddScoped<IDataCheck, CountryDuplicateCheck>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
@@ -234,6 +241,7 @@ public static class DependencyInjection
         services.AddScoped<ISwimmerMergeService, SwimmerMergeService>();
         services.AddScoped<IRelayMemberBackfillService, RelayMemberBackfillService>();
         services.AddScoped<ISplitAttachService, SplitAttachService>();
+        services.AddScoped<IRelayLegCleanupService, RelayLegCleanupService>();
         services.AddScoped<ISwimmerDedupService, SwimmerDedupService>();
 
         // Склейка клубов-дублей (docs/tasks/club-merge-plan.md, фаза B)
@@ -285,6 +293,14 @@ public static class DependencyInjection
                 CookieContainer = new CookieContainer(),
                 AllowAutoRedirect = true,
             });
+        // Английские карточки: куку языка шлём заголовком, контейнера нет — иначе она
+        // переключила бы язык и у общего «loglig» (LogligClient.GetPlayerEnglishNameAsync).
+        services.AddHttpClient(LogligClient.EnglishClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                UseCookies = false,
+                AllowAutoRedirect = true,
+            });
         services.AddScoped<ILogligClient, LogligClient>();
         services.AddScoped<ILogligMatchService, LogligMatchService>();
         services.AddScoped<IOfficialClubStandingService, OfficialClubStandingService>();
@@ -300,6 +316,7 @@ public static class DependencyInjection
 
         // Loglig ID (шаг 6): краудсорс-предложения + ночная верификация.
         services.AddScoped<ILogligSuggestionService, LogligSuggestionService>();
+        services.AddScoped<IEnglishNameRepairService, EnglishNameRepairService>();
 
         // Сводка «Статус данных» для дашборда /Admin (docs/plans/admin-dashboard-status-cards-plan.md)
         services.AddScoped<IRecordQualityService, RecordQualityService>();

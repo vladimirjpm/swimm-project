@@ -1,6 +1,6 @@
 # /Admin/Results — ручная правка результата
 
-Файлы: `Pages/Admin/Results/Index.cshtml(.cs)` (переход по Id),
+Файлы: `Pages/Admin/Results/Index.cshtml(.cs)` (переход по Id; скрипт `wwwroot/js/admin/results.js`),
 `Edit.cshtml(.cs)` (форма); репозиторий `IResultAdminRepository`
 (`ResultAdminRepository`); парс времени — `SwimTime` (Application/Mapping).
 

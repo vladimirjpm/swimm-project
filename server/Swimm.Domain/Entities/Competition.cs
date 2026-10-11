@@ -151,6 +151,22 @@ public class Competition
   /// </summary>
   public bool? HasOfficialClubStanding { get; set; }
 
+  /// <summary>
+  /// Клубные очки этого соревнования — НАША оценка, а не официальный зачёт: loglig проверен
+  /// и таблицы нет (<see cref="HasOfficialClubStanding"/> = false) либо не проверялся, но стоит
+  /// пометка «зачёт не ведётся» (<see cref="ClubPointsDisabled"/>). Явное true главнее пометки.
+  /// Правило очков, привязанное ВРУЧНУЮ (<see cref="PointRuleClubsId"/>), снимает признак:
+  /// шкалу тогда выбрал регламент, а не автоподбор, — так у чемпионатов, чей зачёт на loglig не
+  /// публикуется (решение Влада 08.10.2026).
+  /// Витрина подписывает такие очки чипом «Unofficial» (решение Р80, docs/data-integrity.md).
+  /// Статический, чтобы звать на проекции запроса без загрузки сущности; выборка из нескольких
+  /// соревнований неофициальна, только если неофициально КАЖДОЕ.
+  /// </summary>
+  public static bool IsClubPointsUnofficial(
+      bool? hasOfficialClubStanding, bool clubPointsDisabled, int? pointRuleClubsId) =>
+      pointRuleClubsId == null
+      && (hasOfficialClubStanding == false || (hasOfficialClubStanding == null && clubPointsDisabled));
+
   /// <summary>Правило очков пловца (High Point). null — legacy-расчёт по FINA.</summary>
   public int? PointRuleSwimmersId { get; set; }
 

@@ -97,6 +97,14 @@ export interface ClubPointsRule {
   default_points: number;
   max_scoring_place: number | null;
   relay_multiplier: number;
+  /** Общая категория: абсолют по времени (все возрасты, внутри пола) — очки шкалы × вес. */
+  overall_multiplier?: number | null;
+  /** Минимум стартовавших в категории для очков. */
+  min_entrants?: number | null;
+  /** Зачётные дистанции через запятую («1600»); пусто — все. */
+  distances?: string | null;
+  /** Возрастные категории по году рождения («12-13,14-15»); пусто — из протокола. */
+  age_bands?: string | null;
   points_by_place: ClubPointsRuleEntry[];
 }
 
@@ -202,6 +210,10 @@ export interface CompetitionOverview {
    *  «место / по регламенту / начислено». Показывается в попапе «Points system».
    *  Приходит только вместе с 'mismatch'. */
   club_points_mismatch_note: CompetitionMismatchNote | null;
+  /** Официального клубного зачёта нет (loglig без таблицы / «зачёт не ведётся») — очки наша
+   *  оценка по шкале правила, витрина ставит чип «Unofficial». true — если так у ВСЕХ
+   *  соревнований выборки. */
+  club_points_unofficial?: boolean;
   top_clubs_men: OverviewClub[];
   top_clubs_women: OverviewClub[];
   /** Самые титулованные: при равном наборе медалей — все, а не первый попавшийся. */

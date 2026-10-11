@@ -1,0 +1,306 @@
+// Скрипт страницы Pages/Admin/Clubs/Index.cshtml. Вынесен из разметки как есть (10.10.2026):
+// классический скрипт, не модуль — функции из onclick в разметке остаются глобальными.
+// Tailwind-классы отсюда собирает @source в Styles/admin.css.
+(function () {
+    const API = '/api/admin/clubs';
+    let data = null;
+    let dryRunOkPairs = null; // пары, прошедшие dry-run без конфликтов/ошибок — только их можно merge'ить
+
+    // Deep-link фильтр из дашборда: ?filter=dedup-unsure|dedup-sure
+    const qsFilter = new URLSearchParams(location.search).get('filter');
+    let dedupFilter = qsFilter === 'dedup-sure' ? 'sure' : qsFilter === 'dedup-unsure' ? 'unsure' : null;
+
+    async function apiJson(url, opts = {}) {
+        opts.headers = { 'X-XSRF-TOKEN': _csrfToken, ...(opts.headers ?? {}) };
+        const res = await fetch(url, { credentials: 'same-origin', ...opts });
+        let body = null;
+        try { body = await res.json(); } catch { }
+        if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+        return body;
+    }
+
+    function heuristicLabel(c) {
+        switch (c.heuristic) {
+            case 'same-name': return 'Одинаковое имя';
+            case 'suffix': return 'Мусорный хвост';
+            case 'swimmers': return `Общие пловцы (${c.sharedSwimmers})`;
+            case 'levenshtein': return 'Опечатка';
+            default: return c.heuristic;
+        }
+    }
+
+    function sureBadge(sure) {
+        return sure
+            ? '<span class="admin-badge border-admin-success/30 bg-admin-success/15 text-[#81c784]">уверенная</span>'
+            : '<span class="admin-badge border-admin-border bg-admin-surface-hover text-admin-text-muted">спорная</span>';
+    }
+
+    function render() {
+        const tbody = document.getElementById('cand-body');
+        const allCands = data.candidates;
+        const cands = dedupFilter === 'sure' ? allCands.filter(c => c.sure)
+            : dedupFilter === 'unsure' ? allCands.filter(c => !c.sure)
+            : allCands;
+        document.getElementById('empty-msg').classList.toggle('hidden', cands.length > 0);
+        document.getElementById('info').innerHTML =
+            `Реальных клубов: ${data.realClubs}; кандидатов: ${cands.length}${dedupFilter ? ` из ${allCands.length}` : ''} (уверенных ${allCands.filter(c => c.sure).length})`
+            + (dedupFilter ? ` <button id="btn-clear-filter" class="ml-2 cursor-pointer rounded px-2 py-0.5 text-xs border border-admin-border text-admin-text-muted hover:text-admin-text">показать все ✕</button>` : '');
+        if (dedupFilter) {
+            document.getElementById('btn-clear-filter').addEventListener('click', () => {
+                dedupFilter = null;
+                render();
+            });
+        }
+
+        tbody.innerHTML = cands.map((c) => {
+            const i = allCands.indexOf(c);
+            return `
+            <tr class="border-b border-white/[.04] hover:bg-white/[.03]">
+                <td class="py-2 px-3"><input type="checkbox" class="pair-cb cursor-pointer" data-i="${i}"></td>
+                <td class="py-2 px-3" dir="rtl" style="text-align:left">
+                    <a href="/Admin/Clubs/Edit?id=${c.canonicalId}" target="_blank" class="text-admin-accent hover:underline" title="Открыть / переименовать">${esc(c.canonicalName)}</a>${c.canonicalNameEn ? ' <span class="text-[#546e7a]">(' + esc(c.canonicalNameEn) + ')</span>' : ''}
+                    <span class="text-[#546e7a]">#${c.canonicalId}</span> · <span class="text-[#90a4ae]">рез. ${c.canonicalResults}</span>
+                </td>
+                <td class="py-2 px-3" dir="rtl" style="text-align:left">
+                    <a href="/Admin/Clubs/Edit?id=${c.duplicateId}" target="_blank" class="text-admin-accent hover:underline" title="Открыть / переименовать">${esc(c.duplicateName)}</a>${c.duplicateNameEn ? ' <span class="text-[#546e7a]">(' + esc(c.duplicateNameEn) + ')</span>' : ''}
+                    <span class="text-[#546e7a]">#${c.duplicateId}</span> · <span class="text-[#90a4ae]">рез. ${c.duplicateResults}</span>
+                </td>
+                <td class="py-2 px-3 text-[#90a4ae]">${esc(heuristicLabel(c))}</td>
+                <td class="py-2 px-3">${sureBadge(c.sure)}</td>
+                <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${i}" title="Не дубли — скрыть пару навсегда">✕</button></td>
+            </tr>`;
+        }).join('');
+
+        // Любое изменение выбора инвалидирует прошлый dry-run
+        [...document.querySelectorAll('.pair-cb')].forEach(cb =>
+            cb.addEventListener('change', () => { dryRunOkPairs = null; document.getElementById('btn-merge').disabled = true; }));
+
+        // «Не дубли»: пара уходит в Sys_DedupIgnoredPairs и больше не всплывает.
+        [...document.querySelectorAll('.pair-hide')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                const c = data.candidates[+btn.dataset.i];
+                const ok = await adminConfirm({
+                    title: 'Скрыть пару как «не дубли»?',
+                    message: `«${c.canonicalName}» ↔ «${c.duplicateName}» больше не будет предлагаться. Вернуть можно из блока «Скрытые пары».`,
+                    confirmText: 'Скрыть',
+                });
+                if (!ok) return;
+                try {
+                    await apiJson(`${API}/dedup-ignore`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idA: c.canonicalId, idB: c.duplicateId })
+                    });
+                    toast('Пара скрыта', 3000);
+                    await load();
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+            }));
+    }
+
+    async function loadIgnored() {
+        const list = await apiJson(`${API}/dedup-ignore`);
+        const wrap = document.getElementById('ignored-wrap');
+        wrap.classList.toggle('hidden', list.length === 0);
+        document.getElementById('ignored-summary').textContent = `Скрытые пары (${list.length})`;
+        document.getElementById('ignored-body').innerHTML = list.map(p => `
+            <div class="mb-1">
+                <span dir="rtl">${esc(p.nameA)}</span> <span class="text-[#546e7a]">#${p.idA}</span> ↔
+                <span dir="rtl">${esc(p.nameB)}</span> <span class="text-[#546e7a]">#${p.idB}</span>
+                <button class="pair-unhide cursor-pointer ml-2 text-admin-accent hover:underline" data-a="${p.idA}" data-b="${p.idB}">вернуть</button>
+            </div>`).join('');
+        [...document.querySelectorAll('.pair-unhide')].forEach(btn =>
+            btn.addEventListener('click', async () => {
+                try {
+                    await apiJson(`${API}/dedup-ignore/remove`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idA: +btn.dataset.a, idB: +btn.dataset.b })
+                    });
+                    toast('Пара возвращена в кандидаты', 3000);
+                    await load();
+                } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+            }));
+    }
+
+    // keepStatus — не прятать строку статуса (после apply отчёт должен остаться на экране).
+    async function load(keepStatus) {
+        document.getElementById('info').textContent = 'Ищу кандидатов…';
+        try {
+            data = await apiJson(`${API}/dedup-candidates`);
+            dryRunOkPairs = null;
+            document.getElementById('btn-merge').disabled = true;
+            if (!keepStatus) document.getElementById('status-line').classList.add('hidden');
+            render();
+            await loadIgnored();
+        } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+    }
+
+    function selectedPairs() {
+        return [...document.querySelectorAll('.pair-cb:checked')].map(cb => {
+            const c = data.candidates[+cb.dataset.i];
+            return { canonicalId: c.canonicalId, duplicateId: c.duplicateId };
+        });
+    }
+
+    function showReport(report) {
+        const line = document.getElementById('status-line');
+        line.classList.remove('hidden');
+        document.getElementById('status-title').textContent = report.dryRun
+            ? 'Dry-run: план (БД не изменена)' : 'ПРИМЕНЕНО';
+
+        const merged = report.pairs.filter(p => p.status === 'merged').length;
+        const dryRunN = report.pairs.filter(p => p.status === 'dry-run').length;
+        const conflict = report.pairs.filter(p => p.status === 'conflict').length;
+        const error = report.pairs.filter(p => p.status === 'error').length;
+        document.getElementById('status-summary').textContent =
+            `Всего пар: ${report.pairs.length}` +
+            (merged ? `; merged: ${merged}` : '') +
+            (dryRunN ? `; dry-run: ${dryRunN}` : '') +
+            (conflict ? `; conflict: ${conflict}` : '') +
+            (error ? `; error: ${error}` : '');
+
+        document.getElementById('status-body').innerHTML = report.pairs.map(p => `
+            <details class="mb-2">
+                <summary class="cursor-pointer"><b>[${esc(p.status)}]</b> canonical #${p.canonicalId} ← duplicate #${p.duplicateId}</summary>
+                <ul class="list-disc pl-5 text-admin-text-muted">
+                    ${p.actions.map(a => `<li>${esc(a)}</li>`).join('')}
+                    ${p.conflicts.map(c => `<li class="text-[#ef9a9a]">!! ${esc(c)}</li>`).join('')}
+                </ul>
+            </details>`).join('');
+        line.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('btn-reload').addEventListener('click', () => load());
+
+    document.getElementById('btn-check-sure').addEventListener('click', () => {
+        [...document.querySelectorAll('.pair-cb')].forEach(cb => {
+            cb.checked = data.candidates[+cb.dataset.i].sure;
+        });
+        dryRunOkPairs = null;
+        document.getElementById('btn-merge').disabled = true;
+    });
+
+    document.getElementById('btn-dryrun').addEventListener('click', async () => {
+        const pairs = selectedPairs();
+        if (!pairs.length) { toast('Отметь хотя бы одну пару'); return; }
+        try {
+            const report = await apiJson(`${API}/merge`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pairs, apply: false })
+            });
+            showReport(report);
+            const bad = report.pairs.filter(p => p.status !== 'dry-run');
+            dryRunOkPairs = bad.length ? null : pairs;
+            document.getElementById('btn-merge').disabled = !dryRunOkPairs;
+            if (bad.length) toast(`Есть конфликты/ошибки (${bad.length}) — merge заблокирован`, 6000);
+        } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+    });
+
+    document.getElementById('btn-merge').addEventListener('click', async () => {
+        if (!dryRunOkPairs) return;
+        const ok = await adminConfirm({
+            title: 'Применить склейку клубов?',
+            message: `Будет применена склейка ${dryRunOkPairs.length} пар(ы). Дубли будут удалены НЕОБРАТИМО.`,
+            confirmText: 'Merge',
+            danger: true,
+        });
+        if (!ok) return;
+        try {
+            const report = await apiJson(`${API}/merge`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pairs: dryRunOkPairs, apply: true })
+            });
+            showReport(report);
+            toast('Склейка применена', 4000);
+            await load(true);
+        } catch (e) { toast('Ошибка применения: ' + e.message, 6000); }
+    });
+
+    // ── Качество данных (T3b, deep-link ?filter=no-swimmers|no-country): сворачиваемая секция,
+    // грузится лениво — только по deep-link или клику на заголовок/кнопку фильтра. ──
+    (function () {
+        const QAPI = '/api/admin/clubs/quality';
+        const wrap = document.getElementById('quality-wrap');
+        const body = document.getElementById('quality-body');
+        const delAllBtn = document.getElementById('btn-del-empty');
+
+        async function loadQuality(filter) {
+            body.textContent = 'Загружаю…';
+            try {
+                const r = await fetch(`${QAPI}?filter=${encodeURIComponent(filter)}`, { credentials: 'same-origin' });
+                const data = await r.json();
+                // Удалять предлагаем только в no-swimmers: там строки пусты по определению
+                // (0 пловцов и 0 результатов). В no-country клубы живые — им нужна страна, не нож.
+                const canDelete = filter === 'no-swimmers';
+                body.innerHTML = data.items.length === 0
+                    ? `<div class="italic py-2">Нет строк (показаны ${data.items.length} из ${data.total}).</div>`
+                    : `<div class="mb-1">Показаны ${data.items.length} из ${data.total}</div>
+                       <div class="overflow-x-auto"><table class="admin-table">
+                        <thead><tr><th>Id</th><th>Название</th><th>EN</th><th>CountryId</th>${canDelete ? '<th></th>' : ''}</tr></thead>
+                        <tbody>${data.items.map(c => `
+                            <tr data-club="${c.id}"><td>${c.id}</td>
+                                <td dir="rtl" style="text-align:left"><a href="/Admin/Clubs/Edit?id=${c.id}" class="text-admin-accent hover:underline">${esc(c.name)}</a></td>
+                                <td>${esc(c.nameEn ?? '')}</td><td>${c.countryId ?? '—'}</td>${canDelete
+                                    ? `<td><button class="club-del cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-id="${c.id}" data-name="${esc(c.name)}" title="Удалить пустой клуб">✕</button></td>`
+                                    : ''}</tr>`).join('')}</tbody>
+                       </table></div>`;
+
+                if (canDelete) [...body.querySelectorAll('.club-del')].forEach(btn =>
+                    btn.addEventListener('click', () => deleteEmpty(btn, filter)));
+
+                // «Удалить все» — только в no-swimmers и только когда есть что удалять.
+                // Считает по data.total: сервер чистит ВЕСЬ список, а не видимые топ-200.
+                delAllBtn.classList.toggle('hidden', !canDelete || data.total === 0);
+                delAllBtn.textContent = `Удалить все пустые (${data.total})`;
+                delAllBtn.dataset.total = data.total;
+            } catch (e) { body.textContent = 'Ошибка: ' + e.message; }
+        }
+
+        async function deleteEmpty(btn, filter) {
+            const id = btn.dataset.id;
+            const ok = await adminConfirm({
+                title: 'Удалить пустой клуб?',
+                message: `«${btn.dataset.name}» (#${id}) будет удалён из справочника НЕОБРАТИМО. Это безопасно только потому, что на клубе нет ни пловцов, ни результатов — сервер перепроверит это ещё раз.`,
+                confirmText: 'Удалить',
+                danger: true,
+            });
+            if (!ok) return;
+            try {
+                await apiJson(`${API}/${id}`, { method: 'DELETE' });
+                toast(`Клуб #${id} удалён`, 3000);
+                await loadQuality(filter);
+            } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+        }
+
+        delAllBtn.addEventListener('click', async () => {
+            const total = +delAllBtn.dataset.total || 0;
+            const ok = await adminConfirm({
+                title: 'Удалить все пустые клубы?',
+                message: `Будут удалены ВСЕ ${total} клуб(ов) без пловцов и результатов — НЕОБРАТИМО. Клубы с избранным или заявкой на статус останутся, сервер их пропустит и покажет причину.`,
+                confirmText: 'Удалить все',
+                danger: true,
+                requireText: 'удалить',
+            });
+            if (!ok) return;
+            try {
+                const res = await apiJson(`${API}/delete-empty`, { method: 'POST' });
+                toast(`Удалено ${res.deleted.length}, пропущено ${res.skipped.length}`, 5000);
+                await loadQuality('no-swimmers');
+                // После перерисовки списка — иначе loadQuality затрёт отчёт.
+                if (res.skipped.length) body.insertAdjacentHTML('afterbegin',
+                    `<div class="mb-2 text-[#ef9a9a]">Пропущены:<br>${res.skipped.map(esc).join('<br>')}</div>`);
+            } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+        });
+
+        document.querySelectorAll('[data-qfilter]').forEach(btn =>
+            btn.addEventListener('click', () => { wrap.open = true; loadQuality(btn.dataset.qfilter); }));
+
+        // Deep-link с дашборда: ?filter=no-swimmers|no-country — раскрыть и загрузить сразу.
+        const qf = qsFilter === 'no-swimmers' || qsFilter === 'no-country' ? qsFilter : null;
+        if (qf) {
+            wrap.open = true;
+            loadQuality(qf);
+            setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+        }
+    })();
+
+    load();
+})();

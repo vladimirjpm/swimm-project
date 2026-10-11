@@ -62,7 +62,7 @@ Sys_StartListPulls           # журнал заборов стартового 
 #
 # HubGroups и HubGroupMembers — ЕДИНСТВЕННАЯ FK через границу:
 #   HubGroups.OwnerUserId NOT NULL → Sys_AppUsers. Без владельца группа не вставится.
-#   Локально это одна тестовая группа на 19 участников — в проде создаётся заново
+#   Локально групп 4 (на 11.10; 2 из них тестовые, IsTest) — в проде создаются заново
 #   за минуту. Вместе с ними не едут и привязанные к пользователям:
 #   Sys_HubGroupAdmins, Sys_HubGroupUserMembers, Sys_HubGroupClubRequests, Sys_HubGroupMedia
 #   И подписки групп на клуб — HubGroupClubSubscriptions висит на HubGroups.
@@ -73,6 +73,10 @@ Sys_StartListPulls           # журнал заборов стартового 
 #   Sys_HubGroupLevels, Sys_HubGroupSwimmerLevels, Sys_LanePlans, Sys_LanePlanLanes, Sys_LanePlanSwimmers
 #   И ответы на занятия, перерывы и уровни аккаунтов (8.15, docs/plans/entity-hero-roles-plan.md):
 #   Sys_HubGroupTrainingRsvps, Sys_HubGroupBreaks, Sys_HubGroupAccountLevels
+#   И отмены занятий (Р9, docs/plans/trainings-tab-redesign-plan.md; FK на Sys_AppUsers):
+#   Sys_HubGroupTrainingCancellations
+#   И отметки «когда открывал» таба Trainings (метки внимания, docs/plans/trainings-tab-redesign-plan.md Т1б):
+#   Sys_HubGroupUserSeen
 #
 # Заполняются кодом при старте — перенос дал бы конфликт первичных ключей:
 #   Sys_AppRoles, Sys_DebugOptions

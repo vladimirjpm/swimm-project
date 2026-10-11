@@ -66,6 +66,38 @@ public class LogligIndividualSplitParserTests
         Assert.Null(rows[2]!["time_split"]);
     }
 
+    /// <summary>
+    /// 800 м (6595, loglig 11586 / 58161, 07.10.2026): 16 отметок, шапка в ДВЕ строки
+    /// («50…550» и «600…800»), времена второй полосы под теми же X, а отрезок 600 м не
+    /// напечатан. Раньше бралась только первая строка шапки — ни одного пловца из 24.
+    /// </summary>
+    [Fact]
+    public void Free800_HeaderInTwoRows_AllSixteenLaps()
+    {
+        var swims = Parse("loglig-split-indiv-11586-58161-men-800free.pdf");
+        Assert.Equal(23, swims.Count);
+
+        var own = Assert.Single(swims, s => s.Time == "09:25.48");
+        Assert.Equal(1992, own.BirthYear);
+        Assert.Equal(
+            ["31.01", "34.45", "34.82", "35.87", "35.46", "35.37", "35.77", "35.77",
+             "36.52", "36.01", "36.39", "36.41", "36.57", "36.54", "35.61", "32.91"],
+            own.Laps);
+        Assert.All(swims, s => Assert.Equal(16, s.Laps.Count));
+    }
+
+    /// <summary>
+    /// Время с ОДНОЙ цифрой после точки («00:45.0») не читалось — сумма не сходилась, и пловец
+    /// пропадал целиком (6595 / 58130: 27 из 29). Отрезки считаются разностью нарастающих.
+    /// </summary>
+    [Fact]
+    public void OneDecimalTime_DoesNotDropTheSwimmer()
+    {
+        var swims = Parse("loglig-split-indiv-11586-58130-men-100fly.pdf");
+        Assert.Equal(29, swims.Count);
+        Assert.Equal(["35.89", "45.00"], Assert.Single(swims, s => s.Time == "01:20.89").Laps);
+    }
+
     private static JsonObject Row(string time, int year, bool relay = false) => new()
     {
         ["is_relay"] = relay,

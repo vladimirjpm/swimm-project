@@ -26,6 +26,7 @@ public class JsonImportService : IImportService
     private readonly IStartListStitchService? _stitch;
     private readonly IHubGroupClubSubscriptionService? _clubSync;
     private readonly ISuspectResultService? _suspects;
+    private readonly IRelayLegCleanupService? _legCleanup;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -50,12 +51,18 @@ public class JsonImportService : IImportService
     /// переимпорта 19.09 отсечка 50 м вместо финиша дала 117 333 очка FINA и «лучший заплыв».
     /// Необязателен по той же причине, что и <paramref name="recalc"/>.
     /// </param>
+    /// <param name="legCleanup">
+    /// Сторож невозможных этапов эстафет (Р82): сборка мастерских эстафет кладёт этапы ног сама,
+    /// в обход доклейки, и перезалив #1482 10.10.2026 вернул обнулённый этап 00:00.69.
+    /// Необязателен по той же причине, что и <paramref name="recalc"/>.
+    /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null,
         IDataCheckRunner? checks = null,
         IStartListStitchService? stitch = null,
         IHubGroupClubSubscriptionService? clubSync = null,
-        ISuspectResultService? suspects = null)
+        ISuspectResultService? suspects = null,
+        IRelayLegCleanupService? legCleanup = null)
     {
         _db    = db;
         _cache = cache;
@@ -64,6 +71,7 @@ public class JsonImportService : IImportService
         _stitch = stitch;
         _clubSync = clubSync;
         _suspects = suspects;
+        _legCleanup = legCleanup;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -111,219 +119,372 @@ public class JsonImportService : IImportService
     }
 
     public async Task<ImportResult> ImportAsync(Stream jsonStream, string? fileName = null, IReadOnlyCollection<string>? categoryKeys = null, ImportEventOptions? eventOptions = null, int? orgCompId = null)
+        => await new ImportRun(this, jsonStream, fileName, categoryKeys, eventOptions, orgCompId).RunAsync();
+
+    /// <summary>
+    /// Один импорт файла — бывшее тело <see cref="ImportAsync"/> (1100 строк одним методом).
+    /// Состояние — поля, названные как бывшие локальные переменные, чтобы тела фаз переехали
+    /// без правок (refactor-handoff, шаг 6). ⚠ Транзакцию execution strategy при сбое связи
+    /// ПОВТОРЯЕТ (<see cref="RunAttemptAsync"/>): поля, объявленные раньше внутри её лямбды
+    /// (<c>targetEvent</c>, счётчики upsert, итоги сверки и проверок), переприсваиваются на
+    /// прежнем месте; объявленные до лямбды — общие для всех попыток, как и были.
+    /// </summary>
+    private sealed class ImportRun
     {
-        var options = CreateLenientOptions();
+        private readonly JsonImportService _svc;
+        private readonly SwimmDbContext _db;
+        private readonly ICompetitionRecalculationService? _recalc;
+        private readonly ICacheService _cache;
+        private readonly IDataCheckRunner? _checks;
+        private readonly IStartListStitchService? _stitch;
+        private readonly IHubGroupClubSubscriptionService? _clubSync;
+        private readonly ISuspectResultService? _suspects;
+        private readonly IRelayLegCleanupService? _legCleanup;
 
-        // Читаем весь поток в память для возможности двойной десериализации
-        using var ms = new MemoryStream();
-        await jsonStream.CopyToAsync(ms);
-        ms.Position = 0;
+        // Аргументы ImportAsync.
+        private readonly Stream jsonStream;
+        private readonly string? fileName;
+        private readonly IReadOnlyCollection<string>? categoryKeys;
+        private readonly ImportEventOptions? eventOptions;
+        private readonly int? orgCompId;
 
-        List<ResultJsonItem> items;
-        bool isMasters = false, isAward = false, showCombine = false;
-        List<string> wrapCategoryKeys = [];
-        var diagnosticLog = new List<string>();
+        // Файл.
+        private List<ResultJsonItem> items = [];
+        private bool isMasters = false, isAward = false, showCombine = false;
+        private List<string> wrapCategoryKeys = [];
+        private readonly List<string> diagnosticLog = new();
+        private List<string> effectiveCategoryKeys = [];
 
-        // Пробуем ResultWrap { results: [...] }, затем простой массив
-        try
+        // Справочники и индексы — заполняет LoadReferenceCachesAsync.
+        private Dictionary<string, Style> styleCache = null!;
+        private Dictionary<string, Country> countryCache = null!;
+        private Dictionary<string, Country> countryByName = null!;
+        private Dictionary<string, Competition> competitionCache = null!;
+        private Dictionary<string, Competition> linkedDaysByDate = null!;
+        private Dictionary<string, Club> clubCache = null!;
+        private ImportSwimmerResolver swimmers = null!;
+        private Dictionary<string, Category> categoryCache = null!;
+        private Dictionary<int, int> categoryNextOrder = null!;
+        private HashSet<int> verifiedNewCompetitions = null!;
+        private List<string> touchedCompetitionKeys = null!;
+        private HashSet<int> competitionsWithSplits = null!;
+        private HashSet<int> flagsAppliedTo = null!;
+        private HashSet<int> upsertCompetitionIds = null!;
+        private bool overwriteExisting;
+        private bool deleteMissing;
+        private bool preserveRelays;
+        private int created, skipped, errors;
+        private int suspectFlagged;
+        private Dictionary<(int CompetitionId, string EventKey), int> expectedByEvent = null!;
+        private List<string> errorMessages = null!;
+        private List<ResultRecord> resultBatch = null!;
+
+        // Текущая строка файла: шаги ImportRowAsync передают значения друг другу. Каждый шаг
+        // присваивает своё поле до чтения — значения прошлой строки до следующей не доживают.
+        // [NotNull]: внутри своего шага поле бывает null (промах кэша), к концу шага — всегда задано,
+        // поэтому чтение в следующих шагах считается ненулевым.
+        private string styleName = "";
+        [System.Diagnostics.CodeAnalysis.NotNull] private Style? style = null!;
+        private Country? country;
+        [System.Diagnostics.CodeAnalysis.NotNull] private Competition? competition = null!;
+        [System.Diagnostics.CodeAnalysis.NotNull] private Club? club = null!;
+        private Swimmer swimmer = null!;
+        private string? swimmerKeyEn;
+        private Relay? relay;
+        private Gallery? gallery;
+
+        // Попытка транзакции (переприсваиваются в каждой попытке).
+        private Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction tx = null!;
+        private CompetitionEvent? targetEvent;
+        private int nextDayNumber;
+        private int updatedCount, deletedCount, skippedWithMediaCount;
+        private HashSet<int> orphanCandidateSwimmerIds = null!;
+        private string reconciliationSummary = "";
+        private int reconciliationMismatches;
+        private string dataChecksSummary = "";
+        private int dataCheckErrors;
+        private int dataCheckWarnings;
+
+        public ImportRun(JsonImportService svc, Stream jsonStream, string? fileName,
+            IReadOnlyCollection<string>? categoryKeys, ImportEventOptions? eventOptions, int? orgCompId)
         {
-            var wrap = await JsonSerializer.DeserializeAsync<ResultWrap>(ms, options);
-            if (wrap?.Results is { Count: > 0 })
-            {
-                items = wrap.Results;
-                isMasters = wrap.IsMasters ?? false;
-                isAward = wrap.IsAward ?? false;
-                showCombine = wrap.ShowCombineAllResults ?? false;
-                wrapCategoryKeys = wrap.Categories ?? [];
-                diagnosticLog.Add("Format: ResultWrap");
-            }
-            else
-            {
-                ms.Position = 0;
-                items = await JsonSerializer.DeserializeAsync<List<ResultJsonItem>>(ms, options) ?? [];
-                diagnosticLog.Add("Format: Array");
-            }
+            _svc = svc;
+            _db = svc._db;
+            _recalc = svc._recalc;
+            _cache = svc._cache;
+            _checks = svc._checks;
+            _stitch = svc._stitch;
+            _clubSync = svc._clubSync;
+            _suspects = svc._suspects;
+            _legCleanup = svc._legCleanup;
+            this.jsonStream = jsonStream;
+            this.fileName = fileName;
+            this.categoryKeys = categoryKeys;
+            this.eventOptions = eventOptions;
+            this.orgCompId = orgCompId;
         }
-        catch (JsonException ex1)
+
+        public async Task<ImportResult> RunAsync()
         {
-            diagnosticLog.Add($"ResultWrap attempt failed: {ex1.Message}");
-            ms.Position = 0;
+            if (await ReadItemsAsync() is { } early) return early;
+            await LoadReferenceCachesAsync();
+
+            // Весь импорт выполняется в одной транзакции — при любой ошибке откатываем целиком.
+            // BeginTransactionAsync нельзя вызывать напрямую при включённом EnableRetryOnFailure —
+            // ручной транзакцией должна управлять execution strategy, иначе EF бросает исключение
+            // на каждой операции внутри транзакции.
+            var strategy = _db.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(() => RunAttemptAsync());
+        }
+
+        /// <summary>Одна попытка транзакции — тело бывшей лямбды execution strategy.</summary>
+        private async Task<ImportResult> RunAttemptAsync()
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            tx = transaction;
             try
             {
-                items = await JsonSerializer.DeserializeAsync<List<ResultJsonItem>>(ms, options) ?? [];
-                diagnosticLog.Add("Format: Array (fallback)");
+                await AttachToEventAsync();
+
+                foreach (var (item, idx) in items.Select((r, i) => (r, i)))
+                {
+                    if (await ImportRowAsync(item, idx) is { } aborted) return aborted;
+                }
+
+                if (await RollBackOnRowErrorsAsync() is { } rolledBack) return rolledBack;
+
+                await UpsertAsync();
+                await SaveBatchAsync();
+                await RemoveOrphanSwimmersAsync();
+                await UpdateEventDatesAsync();
+                await MarkSplitsAsync();
+                await StampOrgCompIdAsync();
+                await WriteImportHistoryAsync();
+
+                await tx.CommitAsync();
+
+                // После коммита — шаги-приборы: каждый в своём try/catch, уронить загруженное не вправе.
+                await RecalcCombinedAsync();
+                await ScanQualityAsync();
+                await ClearImplausibleLegsAsync();
+                await ReconcileWithFileAsync();
+                await AlignGendersAsync();
+                await RerankOpenWaterAsync();
+                await StitchStartListAsync();
+                await SyncClubGroupsAsync();
+                await RunDataChecksAsync();
+
+                return await FinishAsync();
             }
-            catch (JsonException ex2)
+            catch (Exception ex)
             {
-                diagnosticLog.Add($"Array attempt failed: {ex2.Message}");
-                ms.Position = 0;
-                diagnosticLog.AddRange(await DiagnoseJsonFieldsAsync(ms));
+                await tx.RollbackAsync();
+                // Разворачиваем цепочку inner-исключений: у EF/Npgsql реальная причина (нарушение
+                // constraint, null в NOT NULL и т.п.) лежит во вложенном исключении, а не в ex.Message.
+                var chain = new List<string>();
+                for (var e = ex; e != null; e = e.InnerException)
+                    chain.Add($"{e.GetType().Name}: {e.Message}");
                 return new ImportResult
                 {
-                    Message = "JSON deserialization failed",
-                    ErrorMessages = [$"{ex2.Message}"],
-                    DiagnosticLog = diagnosticLog
+                    TotalRows = items.Count,
+                    Created = 0,
+                    Errors = 1,
+                    ErrorMessages = ["Unexpected error, import rolled back: " + string.Join(" → ", chain)],
+                    DiagnosticLog = diagnosticLog,
+                    Message = "Import failed and was rolled back"
                 };
             }
         }
 
-        // Категории из UI имеют приоритет над JSON-обёрткой; применяются ко всем соревнованиям файла.
-        var effectiveCategoryKeys = categoryKeys is { Count: > 0 } ? categoryKeys.ToList() : wrapCategoryKeys;
+        private async Task<ImportResult?> ReadItemsAsync()
+        {
+            var options = CreateLenientOptions();
 
-        // Флаг Masters производен от категории: выбрана категория Masters ⇒ соревнование мастерское.
-        isMasters = isMasters || effectiveCategoryKeys.Contains(Category.MastersKey);
+            // Читаем весь поток в память для возможности двойной десериализации
+            using var ms = new MemoryStream();
+            await jsonStream.CopyToAsync(ms);
+            ms.Position = 0;
 
-        diagnosticLog.Add($"Items: {items.Count}, IsMasters(wrap): {isMasters}, IsAward(wrap): {isAward}, Categories: [{string.Join(", ", effectiveCategoryKeys)}]");
 
-        if (items.Count == 0)
-            return new ImportResult { Message = "JSON contains no results", DiagnosticLog = diagnosticLog };
+            // Пробуем ResultWrap { results: [...] }, затем простой массив
+            try
+            {
+                var wrap = await JsonSerializer.DeserializeAsync<ResultWrap>(ms, options);
+                if (wrap?.Results is { Count: > 0 })
+                {
+                    items = wrap.Results;
+                    isMasters = wrap.IsMasters ?? false;
+                    isAward = wrap.IsAward ?? false;
+                    showCombine = wrap.ShowCombineAllResults ?? false;
+                    wrapCategoryKeys = wrap.Categories ?? [];
+                    diagnosticLog.Add("Format: ResultWrap");
+                }
+                else
+                {
+                    ms.Position = 0;
+                    items = await JsonSerializer.DeserializeAsync<List<ResultJsonItem>>(ms, options) ?? [];
+                    diagnosticLog.Add("Format: Array");
+                }
+            }
+            catch (JsonException ex1)
+            {
+                diagnosticLog.Add($"ResultWrap attempt failed: {ex1.Message}");
+                ms.Position = 0;
+                try
+                {
+                    items = await JsonSerializer.DeserializeAsync<List<ResultJsonItem>>(ms, options) ?? [];
+                    diagnosticLog.Add("Format: Array (fallback)");
+                }
+                catch (JsonException ex2)
+                {
+                    diagnosticLog.Add($"Array attempt failed: {ex2.Message}");
+                    ms.Position = 0;
+                    diagnosticLog.AddRange(await DiagnoseJsonFieldsAsync(ms));
+                    return new ImportResult
+                    {
+                        Message = "JSON deserialization failed",
+                        ErrorMessages = [$"{ex2.Message}"],
+                        DiagnosticLog = diagnosticLog
+                    };
+                }
+            }
+
+            // Категории из UI имеют приоритет над JSON-обёрткой; применяются ко всем соревнованиям файла.
+            effectiveCategoryKeys = categoryKeys is { Count: > 0 } ? categoryKeys.ToList() : wrapCategoryKeys;
+
+            // Флаг Masters производен от категории: выбрана категория Masters ⇒ соревнование мастерское.
+            isMasters = isMasters || effectiveCategoryKeys.Contains(Category.MastersKey);
+
+            diagnosticLog.Add($"Items: {items.Count}, IsMasters(wrap): {isMasters}, IsAward(wrap): {isAward}, Categories: [{string.Join(", ", effectiveCategoryKeys)}]");
+
+            if (items.Count == 0)
+                return new ImportResult { Message = "JSON contains no results", DiagnosticLog = diagnosticLog };
+            return null;
+        }
 
         // === Pre-load all reference caches to avoid per-row DB queries ===
         // Styles: tracked (seed data, rarely new)
-        var styleCache = await _db.Styles.ToDictionaryAsync(s => s.Name);
-
-        // Countries: AsNoTracking — we only read their IDs, don't modify them.
-        // Второй индекс по имени — распознавание псевдоклубов (страна в графе клуба).
-        var countryCache = new Dictionary<string, Country>(StringComparer.OrdinalIgnoreCase);
-        var countryByName = new Dictionary<string, Country>(StringComparer.OrdinalIgnoreCase);
-        foreach (var c in await _db.Countries.AsNoTracking().ToListAsync())
+        private async Task LoadReferenceCachesAsync()
         {
-            countryCache.TryAdd(c.CountryCode, c);
-            countryByName.TryAdd(c.CountryName, c);
+            styleCache = await _db.Styles.ToDictionaryAsync(s => s.Name);
+
+            // Countries: AsNoTracking — we only read their IDs, don't modify them.
+            // Второй индекс по имени — распознавание псевдоклубов (страна в графе клуба).
+            countryCache = new Dictionary<string, Country>(StringComparer.OrdinalIgnoreCase);
+            countryByName = new Dictionary<string, Country>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in await _db.Countries.AsNoTracking().ToListAsync())
+            {
+                countryCache.TryAdd(c.CountryCode, c);
+                countryByName.TryAdd(c.CountryName, c);
+            }
+
+            // Competitions: AsNoTracking — we read IDs and check for duplicates. Индекс строится тем же
+            // правилом (Name-или-SubName+Date+PoolType), что и превью (ImportCompetitionMatcher) —
+            // раньше здесь был строгий Name-only ключ, из-за чего импорт промахивался мимо дней,
+            // переименованных при привязке к CompetitionEvent (Name=имя события, SubName=заголовок
+            // файла), и создавал дубль там, где превью репортило совпадение (инцидент Maccabiah).
+            competitionCache = ImportCompetitionMatcher.BuildIndex(
+                await _db.Competitions.AsNoTracking().ToListAsync(),
+                c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
+
+            // Идентичность по штампу сайта (Д2, docs/data-integrity.md). Если импорт знает compID,
+            // сначала ищем СВОИ дни по дате внутри связанного соревнования/события, и только потом
+            // падаем на матчинг по имени. Штамп живёт либо на одиночном соревновании
+            // (Competition.OrgCompId — альтернативный ключ), либо на событии (CompetitionEvent.OrgCompId).
+            linkedDaysByDate = new Dictionary<string, Competition>();
+            if (orgCompId is int linkOrgCompId)
+            {
+                var linkedDays = await CompetitionIdentity.ResolveDaysAsync(_db, linkOrgCompId);
+                linkedDaysByDate = ImportCompetitionMatcher.BuildDateIndex(linkedDays, c => c.Date);
+                if (linkedDaysByDate.Count > 0)
+                    diagnosticLog.Add($"Идентичность: compID {linkOrgCompId} → {linkedDaysByDate.Count} день(дней) в БД, матчинг по дате");
+            }
+
+            // Clubs: AsNoTracking — we only read their IDs.
+            // Склеенные (MergedIntoId) в кэш НЕ попадают: иначе импорт нашёл бы дубль по имени
+            // и повесил новые результаты на клуб, которого уже нет, — merge молча откатился бы.
+            clubCache = new Dictionary<string, Club>();
+            foreach (var c in await _db.Clubs.AsNoTracking().Where(c => c.MergedIntoId == null).ToListAsync())
+                clubCache.TryAdd($"{c.Name}|{c.NameEn}", c);
+
+            // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.
+            // Пловцы: строка протокола → карточка (точный ключ, фоллбеки, страж тёзок И-11) —
+            // ImportSwimmerResolver, один на импорт.
+            swimmers = await ImportSwimmerResolver.LoadAsync(_db, diagnosticLog);
+
+            // Categories: Key → Category (для привязки соревнований к категориям на импорте).
+            categoryCache = new Dictionary<string, Category>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in await _db.Categories.AsNoTracking().ToListAsync())
+                categoryCache.TryAdd(c.Key, c);
+
+            // Следующий DisplayOrder в каждой категории (новые членства дописываем в конец).
+            categoryNextOrder = await _db.CategoryCompetitions
+                .GroupBy(cc => cc.CategoryId)
+                .Select(g => new { CategoryId = g.Key, Max = g.Max(x => x.DisplayOrder) })
+                .ToDictionaryAsync(x => x.CategoryId, x => x.Max + 1);
+
+            // Competition IDs we've verified as having no existing results in this session
+            verifiedNewCompetitions = new HashSet<int>();
+            // Ordered list of competition keys touched in this import (for ImportHistory)
+            touchedCompetitionKeys = new List<string>();
+            // Соревнования, где у ног эстафет пришли промежуточные (флаг HasSplits). Отдельным
+            // набором, а не правкой сущности по месту: индекс соревнований AsNoTracking.
+            competitionsWithSplits = new HashSet<int>();
+            // Соревнования, которым уже применили флаги из превью (по одному разу на соревнование,
+            // а не на каждую строку файла).
+            flagsAppliedTo = new HashSet<int>();
+            // Соревнования, у которых уже были результаты в БД и импорт продолжен в upsert-режиме
+            // (ImportEventOptions.OverwriteExisting=true) — по ним после основного цикла запускаем
+            // матчинг/UPDATE/DELETE-с-защитой (import-upsert-plan.md, шаг 2).
+            upsertCompetitionIds = new HashSet<int>();
+            overwriteExisting = eventOptions?.OverwriteExisting ?? false;
+            // Удаление исчезнувших результатов — опт-ин поверх overwriteExisting (см. ImportModels.cs,
+            // DeleteMissing). Без него upsert только обновляет/вставляет и НИКОГДА не удаляет.
+            deleteMissing = overwriteExisting && (eventOptions?.DeleteMissing ?? false);
+            preserveRelays = eventOptions?.PreserveRelays ?? false;
+
+            created = 0; skipped = 0; errors = 0;
+            // Строк, легших сразу с ручной пометкой «недостоверно» (галочка в превью).
+            suspectFlagged = 0;
+
+            // Сверка Д1: что обещал файл. Копим в цикле, а не пересобираем потом из items —
+            // иначе пришлось бы повторить логику резолва соревнования и стиля второй копией
+            // (правило 1 в docs/data-integrity.md: предикат живёт в одном месте).
+            expectedByEvent = new Dictionary<(int CompetitionId, string EventKey), int>();
+            errorMessages = new List<string>();
+            // Batch of ResultRecords to insert at once at the end
+            resultBatch = new List<ResultRecord>(items.Count);
         }
 
-        // Competitions: AsNoTracking — we read IDs and check for duplicates. Индекс строится тем же
-        // правилом (Name-или-SubName+Date+PoolType), что и превью (ImportCompetitionMatcher) —
-        // раньше здесь был строгий Name-only ключ, из-за чего импорт промахивался мимо дней,
-        // переименованных при привязке к CompetitionEvent (Name=имя события, SubName=заголовок
-        // файла), и создавал дубль там, где превью репортило совпадение (инцидент Maccabiah).
-        var competitionCache = ImportCompetitionMatcher.BuildIndex(
-            await _db.Competitions.AsNoTracking().ToListAsync(),
-            c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
-
-        // Идентичность по штампу сайта (Д2, docs/data-integrity.md). Если импорт знает compID,
-        // сначала ищем СВОИ дни по дате внутри связанного соревнования/события, и только потом
-        // падаем на матчинг по имени. Штамп живёт либо на одиночном соревновании
-        // (Competition.OrgCompId — альтернативный ключ), либо на событии (CompetitionEvent.OrgCompId).
-        var linkedDaysByDate = new Dictionary<string, Competition>();
-        if (orgCompId is int linkOrgCompId)
-        {
-            var linkedDays = await CompetitionIdentity.ResolveDaysAsync(_db, linkOrgCompId);
-            linkedDaysByDate = ImportCompetitionMatcher.BuildDateIndex(linkedDays, c => c.Date);
-            if (linkedDaysByDate.Count > 0)
-                diagnosticLog.Add($"Идентичность: compID {linkOrgCompId} → {linkedDaysByDate.Count} день(дней) в БД, матчинг по дате");
-        }
-
-        // Clubs: AsNoTracking — we only read their IDs.
-        // Склеенные (MergedIntoId) в кэш НЕ попадают: иначе импорт нашёл бы дубль по имени
-        // и повесил новые результаты на клуб, которого уже нет, — merge молча откатился бы.
-        var clubCache = new Dictionary<string, Club>();
-        foreach (var c in await _db.Clubs.AsNoTracking().Where(c => c.MergedIntoId == null).ToListAsync())
-            clubCache.TryAdd($"{c.Name}|{c.NameEn}", c);
-
-        // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.
-        // Второй индекс по EN-имени — фоллбек-матчинг для двуязычных/EN-протоколов
-        // (Maccabiah-кейс: пловец известен под английским именем).
-        // Страж тёзок (инцидент И-11, docs/data-integrity.md). Ключ матчинга пловца —
-        // «фамилия|имя|годРождения», без клуба и без внешнего id, поэтому два ребёнка-тёзки
-        // одного года рождения склеивались в одну запись ВСЕГДА. Признак, что это разные
-        // люди: в ОДНОМ соревновании пловец не может выступать за два клуба.
-        //   seenClubInCompetition: (соревнование, пловец) → канонический клуб этого прогона;
-        //   namesakeByClub:        (соревнование, ключ имени, клуб) → выделенный тёзка.
-        var seenClubInCompetition = new Dictionary<(int CompetitionId, int SwimmerId), int>();
-        var namesakeByClub = new Dictionary<(int CompetitionId, string NameKey, int ClubId), Swimmer>();
-
-        var swimmerCache = new Dictionary<string, Swimmer>();
-        var swimmerCacheEn = new Dictionary<string, Swimmer>();
-        // Фоллбек «то же имя, другая граница фамилии» — см. SwimmerFullNameKey.
-        var swimmerCacheByFullName = new Dictionary<string, Swimmer>();
-        foreach (var s in await _db.Swimmers.ToListAsync())
-        {
-            swimmerCache.TryAdd(SwimmerMatchKey(s.LastName, s.FirstName, s.BirthYear), s);
-            swimmerCacheByFullName.TryAdd(SwimmerFullNameKey(s.LastName, s.FirstName, s.BirthYear), s);
-            if (!string.IsNullOrWhiteSpace(s.LastNameEn))
-                swimmerCacheEn.TryAdd(SwimmerMatchKey(s.LastNameEn, s.FirstNameEn, s.BirthYear), s);
-        }
-
-        // Categories: Key → Category (для привязки соревнований к категориям на импорте).
-        var categoryCache = new Dictionary<string, Category>(StringComparer.OrdinalIgnoreCase);
-        foreach (var c in await _db.Categories.AsNoTracking().ToListAsync())
-            categoryCache.TryAdd(c.Key, c);
-
-        // Следующий DisplayOrder в каждой категории (новые членства дописываем в конец).
-        var categoryNextOrder = await _db.CategoryCompetitions
-            .GroupBy(cc => cc.CategoryId)
-            .Select(g => new { CategoryId = g.Key, Max = g.Max(x => x.DisplayOrder) })
-            .ToDictionaryAsync(x => x.CategoryId, x => x.Max + 1);
-
-        // Competition IDs we've verified as having no existing results in this session
-        var verifiedNewCompetitions = new HashSet<int>();
-        // Ordered list of competition keys touched in this import (for ImportHistory)
-        var touchedCompetitionKeys = new List<string>();
-        // Соревнования, где у ног эстафет пришли промежуточные (флаг HasSplits). Отдельным
-        // набором, а не правкой сущности по месту: индекс соревнований AsNoTracking.
-        var competitionsWithSplits = new HashSet<int>();
-        // Соревнования, которым уже применили флаги из превью (по одному разу на соревнование,
-        // а не на каждую строку файла).
-        var flagsAppliedTo = new HashSet<int>();
-        // Соревнования, у которых уже были результаты в БД и импорт продолжен в upsert-режиме
-        // (ImportEventOptions.OverwriteExisting=true) — по ним после основного цикла запускаем
-        // матчинг/UPDATE/DELETE-с-защитой (import-upsert-plan.md, шаг 2).
-        var upsertCompetitionIds = new HashSet<int>();
-        var overwriteExisting = eventOptions?.OverwriteExisting ?? false;
-        // Удаление исчезнувших результатов — опт-ин поверх overwriteExisting (см. ImportModels.cs,
-        // DeleteMissing). Без него upsert только обновляет/вставляет и НИКОГДА не удаляет.
-        var deleteMissing = overwriteExisting && (eventOptions?.DeleteMissing ?? false);
-        var preserveRelays = eventOptions?.PreserveRelays ?? false;
-
-        int created = 0, skipped = 0, errors = 0;
-        // Строк, легших сразу с ручной пометкой «недостоверно» (галочка в превью).
-        int suspectFlagged = 0;
-
-        // Сверка Д1: что обещал файл. Копим в цикле, а не пересобираем потом из items —
-        // иначе пришлось бы повторить логику резолва соревнования и стиля второй копией
-        // (правило 1 в docs/data-integrity.md: предикат живёт в одном месте).
-        var expectedByEvent = new Dictionary<(int CompetitionId, string EventKey), int>();
-        var errorMessages = new List<string>();
-        // Batch of ResultRecords to insert at once at the end
-        var resultBatch = new List<ResultRecord>(items.Count);
-
-        // Весь импорт выполняется в одной транзакции — при любой ошибке откатываем целиком.
-        // BeginTransactionAsync нельзя вызывать напрямую при включённом EnableRetryOnFailure —
-        // ручной транзакцией должна управлять execution strategy, иначе EF бросает исключение
-        // на каждой операции внутри транзакции.
-        var strategy = _db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
-        {
-        await using var tx = await _db.Database.BeginTransactionAsync();
-        try
-        {
         // === Привязка к многодневному событию (создать новое / дописать к существующему) ===
         // targetEvent != null → все дни-соревнования этого импорта цепляются к событию:
         // Competition.Name = event.Name (общее имя), SubName = заголовок файла, DayNumber растёт.
-        CompetitionEvent? targetEvent = null;
-        var nextDayNumber = 1;
-        if (eventOptions?.EventId is int existingEventId)
+        private async Task AttachToEventAsync()
         {
-            targetEvent = await _db.CompetitionEvents.FindAsync(existingEventId);
-            if (targetEvent == null)
-                throw new InvalidOperationException($"Событие {existingEventId} не найдено");
+            targetEvent = null;
+            nextDayNumber = 1;
+            if (eventOptions?.EventId is int existingEventId)
+            {
+                targetEvent = await _db.CompetitionEvents.FindAsync(existingEventId);
+                if (targetEvent == null)
+                    throw new InvalidOperationException($"Событие {existingEventId} не найдено");
 
-            var maxDay = await _db.Competitions
-                .Where(c => c.EventId == targetEvent.Id)
-                .MaxAsync(c => (int?)c.DayNumber) ?? 0;
-            nextDayNumber = maxDay + 1;
-            diagnosticLog.Add($"Event: attach to #{targetEvent.Id} \"{targetEvent.Name}\", starting day {nextDayNumber}");
-        }
-        else if (!string.IsNullOrWhiteSpace(eventOptions?.NewEventName))
-        {
-            targetEvent = new CompetitionEvent { Name = eventOptions.NewEventName.Trim() };
-            _db.CompetitionEvents.Add(targetEvent);
-            await _db.SaveChangesAsync(); // нужен Id для привязки дней
-            diagnosticLog.Add($"Event: created new #{targetEvent.Id} \"{targetEvent.Name}\"");
+                var maxDay = await _db.Competitions
+                    .Where(c => c.EventId == targetEvent.Id)
+                    .MaxAsync(c => (int?)c.DayNumber) ?? 0;
+                nextDayNumber = maxDay + 1;
+                diagnosticLog.Add($"Event: attach to #{targetEvent.Id} \"{targetEvent.Name}\", starting day {nextDayNumber}");
+            }
+            else if (!string.IsNullOrWhiteSpace(eventOptions?.NewEventName))
+            {
+                targetEvent = new CompetitionEvent { Name = eventOptions.NewEventName.Trim() };
+                _db.CompetitionEvents.Add(targetEvent);
+                await _db.SaveChangesAsync(); // нужен Id для привязки дней
+                diagnosticLog.Add($"Event: created new #{targetEvent.Id} \"{targetEvent.Name}\"");
+            }
         }
 
-        foreach (var (item, idx) in items.Select((r, i) => (r, i)))
+        private async Task<ImportResult?> ImportRowAsync(ResultJsonItem item, int idx)
         {
             try
             {
@@ -332,472 +493,15 @@ public class JsonImportService : IImportService
                 if (string.IsNullOrWhiteSpace(item.EventStyleLen))
                     throw new InvalidOperationException("Обязательное поле event_style_len отсутствует или пустое");
 
-                // 1. Style
-                var styleName = NormalizeStyleName(item.EventStyleName);
-                if (!styleCache.TryGetValue(styleName, out var style))
-                {
-                    // Новый ключ вне канона — почти всегда мусор из шапки протокола
-                    // («מטר_חופשי» от «3000 МЕТРОВ вольным»). Такой стиль не покажет ни одна
-                    // витрина, а импорт раньше молчал, и соревнование пропадало незаметно.
-                    // Данные не подменяем — говорим вслух (docs/data-integrity.md §9).
-                    if (!Strokes.IsCanonical(styleName))
-                        diagnosticLog.Add(
-                            $"⚠ Style: новый неканонический ключ '{styleName}' (из '{item.EventStyleName}') — " +
-                            "витрины показывают только канонические стили, проверь заголовок протокола");
-
-                    style = new Style { Name = styleName };
-                    _db.Styles.Add(style);
-                    await _db.SaveChangesAsync(); // need ID immediately for ResultRecord.StyleId
-                    styleCache[styleName] = style;
-                }
-
-                // 2. Country
-                // Код нормализуем ДО поиска (CountryCodes.Normalize): alpha-2 «IL» из старых
-                // JSON заводил вторую запись Израиля рядом с «ISR», и рекорды 791 пловцу не
-                // находились вовсе (docs/data-integrity.md §14). Правило — alpha-3 в данных.
-                Country? country = null;
-                var countryCode = CountryCodes.Normalize(item.Country);
-                if (!string.IsNullOrEmpty(countryCode))
-                {
-                    if (!countryCache.TryGetValue(countryCode, out country))
-                    {
-                        country = await _db.Countries.FirstOrDefaultAsync(c => c.CountryCode == countryCode);
-                        if (country == null)
-                        {
-                            // Новую страну заводим, но не молча: незнакомый код — либо новый
-                            // синоним в CountryCodes.Aliases, либо опечатка в протоколе.
-                            // Данные не подменяем — говорим вслух (docs/data-integrity.md §9).
-                            if (!CountryCodes.LooksAlpha3(countryCode))
-                                diagnosticLog.Add(
-                                    $"⚠ Country: код '{countryCode}' не alpha-3 (из '{item.Country}') — " +
-                                    "заводится новая страна; если это второе имя уже известной, " +
-                                    "добавь синоним в CountryCodes.Aliases и склей записи");
-
-                            country = new Country { CountryCode = countryCode, CountryName = countryCode };
-                            _db.Countries.Add(country);
-                            await _db.SaveChangesAsync();
-                        }
-                        countryCache[countryCode] = country;
-                    }
-                }
-
-                // 3. Competition
-                // При привязке к событию дедуп и хранимое имя идут по ИМЕНИ СОБЫТИЯ (общее имя),
-                // чтобы дни одного события не плодили дубликаты и совпадали с unique-индексом
-                // (Name, Date, PoolType). Оригинальный заголовок файла уходит в SubName.
-                var displayName = targetEvent != null ? targetEvent.Name : (item.Competition ?? string.Empty);
-                // NormalizePoolType — как и в FindExistingCompetitionsAsync/ImportCompetitionMatcher:
-                // индекс построен по уже нормализованному Competition.PoolType из БД, а item.PoolType
-                // приходит из файла в сыром виде ("25"/"25m") — сравнивать нужно нормализованное с
-                // нормализованным, иначе тот же промах мимо кэша, что и с Name/SubName.
-                // Длина бассейна: решение из превью главнее распознанного парсером. Подменяем
-                // ДО ключа — бассейн входит в уникальный ключ соревнования, и правка «потом»
-                // означала бы второй Competition с тем же именем и датой.
-                var poolType = NormalizePoolType(eventOptions?.PoolType ?? item.PoolType);
-                var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, poolType);
-
-                // Д2: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
-                // разошлось. Кладём находку в кэш под именным ключом, чтобы весь дальнейший
-                // цикл (upsert-пометка, категории, touched) работал как обычно.
-                if (linkedDaysByDate.TryGetValue(item.Date ?? string.Empty, out var linkedDay))
-                    competitionCache.TryAdd(compKey, linkedDay);
-
-                // Соревнование уже есть (перезатягивание, дописывание дня): флаги из превью —
-                // свежее решение человека, применяем и к нему. Не заданные (null) не трогаем.
-                //
-                // ⚠ Индекс соревнований построен AsNoTracking (он для поиска дублей), и правка
-                // его сущностей НЕ сохранится. Поэтому берём отслеживаемую копию — по одному
-                // запросу на соревнование, а не на каждую из тысяч строк файла.
-                if (eventOptions != null
-                    && competitionCache.TryGetValue(compKey, out var existingComp)
-                    && existingComp.Id != 0
-                    && flagsAppliedTo.Add(existingComp.Id))
-                {
-                    var tracked = await _db.Competitions.FirstOrDefaultAsync(c => c.Id == existingComp.Id);
-                    if (tracked != null) ApplyCompetitionFlags(tracked, eventOptions);
-                }
-
-                if (!competitionCache.TryGetValue(compKey, out var competition))
-                {
-                    competition = new Competition
-                    {
-                        Name = displayName,
-                        CountryId = country?.Id,
-                        // Дисциплина по названию: протоколов артистического мы не грузим,
-                        // но если такой файл однажды заедет — он не притворится плаванием.
-                        Discipline = Disciplines.GuessFromName(displayName),
-                        Date = item.Date ?? string.Empty,
-                        PoolType = poolType,
-                        IsMasters = eventOptions?.IsMasters ?? (isMasters || (item.IsMasters ?? false)),
-                        IsAward = eventOptions?.IsAward ?? (isAward || (item.IsAward ?? false)),
-                        IsChampionship = eventOptions?.IsChampionship ?? false,
-                        ClubPointsDisabled = eventOptions?.ClubPointsDisabled ?? false,
-                        ShowCombineAllResults = showCombine,
-                        EventId = targetEvent?.Id,
-                        SubName = targetEvent != null ? (item.Competition ?? string.Empty) : null,
-                        DayNumber = targetEvent != null ? nextDayNumber++ : null,
-                        // Э5: правила очков из формы импорта. null = «Авто» (подбор по дате
-                        // и типу). Ставится каждому дню — правило живёт у соревнования, не у события.
-                        PointRuleClubsId = eventOptions?.PointRuleClubsId,
-                        PointRuleSwimmersId = eventOptions?.PointRuleSwimmersId
-                    };
-                    _db.Competitions.Add(competition);
-                    await _db.SaveChangesAsync();
-                    competitionCache[compKey] = competition;
-                    // Индексируем и по SubName (тем же правилом, что ImportCompetitionMatcher.BuildIndex),
-                    // чтобы последующие строки этого же импорта и повторный импорт того же файла
-                    // находили соревнование по обоим ключам.
-                    if (!string.IsNullOrWhiteSpace(competition.SubName))
-                        competitionCache.TryAdd(
-                            ImportCompetitionMatcher.Key(competition.SubName, competition.Date, competition.PoolType),
-                            competition);
-                    verifiedNewCompetitions.Add(competition.Id);
-                    touchedCompetitionKeys.Add(compKey);
-
-                    // Привязка нового соревнования к категориям (membership) из файла.
-                    // Дубли ключей игнорируем; неизвестные ключи пропускаем с заметкой в лог.
-                    foreach (var key in effectiveCategoryKeys.Distinct(StringComparer.OrdinalIgnoreCase))
-                    {
-                        if (!categoryCache.TryGetValue(key, out var cat))
-                        {
-                            diagnosticLog.Add($"Category key not found, skipped: {key}");
-                            continue;
-                        }
-                        var order = categoryNextOrder.TryGetValue(cat.Id, out var o) ? o : 0;
-                        _db.CategoryCompetitions.Add(new CategoryCompetition
-                        {
-                            CategoryId = cat.Id,
-                            CompetitionId = competition.Id,
-                            DisplayOrder = order
-                        });
-                        categoryNextOrder[cat.Id] = order + 1;
-                    }
-                }
-                else
-                {
-                    if (!touchedCompetitionKeys.Contains(compKey))
-                        touchedCompetitionKeys.Add(compKey);
-
-                    if (!verifiedNewCompetitions.Contains(competition.Id))
-                    {
-                        var hasResults = await _db.Results.AnyAsync(r => r.CompetitionId == competition.Id);
-                        if (hasResults)
-                        {
-                            if (!overwriteExisting)
-                            {
-                                await tx.RollbackAsync();
-                                return new ImportResult
-                                {
-                                    Message = $"Дубль: соревнование «{competition.Name}» ({competition.Date}) уже содержит результаты в БД. Удалите его через Admin → История импортов, затем импортируйте снова.",
-                                    ErrorMessages = [$"Competition ID {competition.Id} already has results"],
-                                    DiagnosticLog = diagnosticLog
-                                };
-                            }
-
-                            // Upsert-режим: не отбиваем, помечаем соревнование на пост-обработку
-                            // (матчинг старых/новых результатов) после основного цикла.
-                            upsertCompetitionIds.Add(competition.Id);
-                            diagnosticLog.Add($"Overwrite: competition ID {competition.Id} «{competition.Name}» already has results — will upsert");
-                        }
-                        verifiedNewCompetitions.Add(competition.Id);
-                    }
-                }
-
-                // Сверка Д1: строка файла учтена как ожидаемая. Считаем ДО остальных шагов —
-                // если строка дальше упадёт с ошибкой, расхождение это и покажет.
-                (int CompetitionId, string EventKey) reconKey = (competition.Id, ImportReconciler.EventKey(
-                    styleName, item.EventStyleLen, item.IsRelay == true, item.EventCategory));
-                expectedByEvent[reconKey] = expectedByEvent.GetValueOrDefault(reconKey) + 1;
-
-                // 4. Club
-                var clubName = (item.Club ?? string.Empty).Trim();
-                var clubNameEn = (item.ClubEn ?? string.Empty).Trim();
-                // Пустая графа клуба в протоколе → единый псевдоклуб «No club»
-                // (клуб у Results NOT NULL; пловцам он, как и сборные, не проставляется).
-                if (clubName.Length == 0 && clubNameEn.Length == 0)
-                {
-                    clubName = NoClubName;
-                    clubNameEn = NoClubName;
-                }
-                var clubKey = $"{clubName}|{clubNameEn}";
-                if (!clubCache.TryGetValue(clubKey, out var club))
-                {
-                    // Склеенные исключены и ЗДЕСЬ, а не только в фоллбеке ниже: у надгробия
-                    // NameEn обычно пустой, ивритский протокол его тоже не приносит — точная
-                    // пара «Name|''» попадала прямо в склеенный клуб, и merge молча
-                    // откатывался (инцидент И-13: 61 надгробие снова с результатами).
-                    club = await _db.Clubs.FirstOrDefaultAsync(
-                        c => c.MergedIntoId == null && c.Name == clubName && c.NameEn == clubNameEn);
-
-                    // Фоллбек по ОДНОМУ имени. Ивритский протокол не приносит NameEn, а у
-                    // канонического клуба он заполнен (следствие двуязычного импорта), — по паре
-                    // Name|NameEn матч промахивается и рождается клуб-дубль. 2026-08-03 так
-                    // появилось 59 клубов на 5141 результат при переимпорте пяти протоколов.
-                    // Совпадение имени = «уверенный» дубль и в дедупе клубов (эвристика same-name),
-                    // так что матчить по имени безопаснее, чем плодить двойников.
-                    // Склеенные исключены: иначе результаты уедут на клуб, которого уже нет.
-                    club ??= await _db.Clubs
-                        .Where(c => c.MergedIntoId == null && c.Name == clubName)
-                        .OrderBy(c => c.Id)
-                        .FirstOrDefaultAsync();
-
-                    // Нашли по имени и у нас есть английское название, которого в БД нет —
-                    // дозаполняем (тот же приём, что «Синхр. языки»).
-                    if (club != null && clubNameEn.Length > 0 && string.IsNullOrWhiteSpace(club.NameEn))
-                    {
-                        var tracked = await _db.Clubs.FirstAsync(c => c.Id == club.Id);
-                        tracked.NameEn = clubNameEn;
-                        await _db.SaveChangesAsync();
-                        club = tracked;
-                    }
-
-                    if (club == null)
-                    {
-                        club = new Club { Name = clubName, NameEn = clubNameEn, CountryId = country?.Id };
-
-                        // Псевдоклуб: в графе клуба страна/сборная (Maccabiah: "USA",
-                        // "Israel", "M25"). Метим флагом и привязываем страну по
-                        // справочнику Countries (имя или alpha-3 код).
-                        var pseudoCountry =
-                            countryByName.GetValueOrDefault(clubName.Trim())
-                            ?? countryByName.GetValueOrDefault(clubNameEn.Trim())
-                            ?? countryCache.GetValueOrDefault(clubName.Trim());
-                        if (pseudoCountry != null || PseudoTeamNames.Contains(clubName.Trim()) || clubName == NoClubName)
-                        {
-                            club.IsPseudo = true;
-                            club.CountryId ??= pseudoCountry?.Id;
-                            diagnosticLog.Add($"Pseudo club (country/team in club column): '{clubName}'");
-                        }
-
-                        _db.Clubs.Add(club);
-                        await _db.SaveChangesAsync();
-                    }
-                    clubCache[clubKey] = club;
-                }
-
-                // 5. Swimmer
-                var swimmerKey = SwimmerMatchKey(item.LastName, item.FirstName, item.BirthYear);
-                // EN-ключ значим, только если EN-имя реально отличается от основного
-                // (двуязычный парсер фоллбечит EN←HE при пустой английской строке).
-                var swimmerKeyEn = !string.IsNullOrWhiteSpace(item.LastNameEn)
-                    ? SwimmerMatchKey(item.LastNameEn, item.FirstNameEn, item.BirthYear)
-                    : null;
-                if (swimmerKeyEn == swimmerKey) swimmerKeyEn = null;
-
-                // Анонимные relay-леги (без имени/фамилии и без года рождения — например,
-                // DQ/NS-леги из протоколов, где парсер не смог восстановить личность) все
-                // нормализуются в один и тот же пустой ключ. Если пускать их через обычный
-                // dedup/кэш, несвязанные леги разных команд/стран схлопываются в один
-                // Swimmer (баг: swimmer_id 8243 переиспользовался для легов Israel, USA,
-                // Germany, Brazil и "Maccabiah MIX" в одном заезде). Поэтому для таких строк
-                // матчинг и кэш полностью пропускаем — каждая строка получает свою запись.
-                var isAnonymousSwimmer =
-                    SwimmerDedupService.Normalize(item.LastName ?? "") == string.Empty &&
-                    SwimmerDedupService.Normalize(item.FirstName ?? "") == string.Empty;
-
-                Swimmer swimmer;
-                if (isAnonymousSwimmer)
-                {
-                    swimmer = new Swimmer
-                    {
-                        LastName = item.LastName ?? string.Empty,
-                        FirstName = item.FirstName ?? string.Empty,
-                        LastNameEn = item.LastNameEn ?? string.Empty,
-                        FirstNameEn = item.FirstNameEn ?? string.Empty,
-                        BirthYear = item.BirthYear ?? 0
-                    };
-                    _db.Swimmers.Add(swimmer);
-                    await _db.SaveChangesAsync();
-                }
-                else if (!swimmerCache.TryGetValue(swimmerKey, out swimmer!))
-                {
-                    // Фоллбек по EN-имени: пловец с заполненными *En-полями либо созданный
-                    // из EN-протокола (английское имя в основных полях) — второй случай
-                    // канонизируем: HE в основные поля, EN в *En.
-                    if (swimmerKeyEn != null
-                        && (swimmerCacheEn.TryGetValue(swimmerKeyEn, out swimmer)
-                            || swimmerCache.TryGetValue(swimmerKeyEn, out swimmer)))
-                    {
-                        if (SwimmerMatchKey(swimmer.LastName, swimmer.FirstName, swimmer.BirthYear) == swimmerKeyEn)
-                        {
-                            swimmer.LastName = item.LastName ?? string.Empty;
-                            swimmer.FirstName = item.FirstName ?? string.Empty;
-                            swimmer.LastNameEn = item.LastNameEn ?? string.Empty;
-                            swimmer.FirstNameEn = item.FirstNameEn ?? string.Empty;
-                        }
-                    }
-                    else if (swimmerCacheByFullName.TryGetValue(
-                                 SwimmerFullNameKey(item.LastName, item.FirstName, item.BirthYear), out swimmer))
-                    {
-                        // Тот же человек, разрезанный на имя и фамилию иначе, — не новый пловец.
-                    }
-                    else
-                    {
-                        // Not in pre-loaded cache — may still exist if duplicate key collision was silenced
-                        swimmer = await _db.Swimmers.FirstOrDefaultAsync(s =>
-                            s.LastName == (item.LastName ?? "") &&
-                            s.FirstName == (item.FirstName ?? "") &&
-                            s.BirthYear == (item.BirthYear ?? 0));
-                    }
-
-                    if (swimmer == null)
-                    {
-                        swimmer = new Swimmer
-                        {
-                            LastName = item.LastName ?? string.Empty,
-                            FirstName = item.FirstName ?? string.Empty,
-                            LastNameEn = item.LastNameEn ?? string.Empty,
-                            FirstNameEn = item.FirstNameEn ?? string.Empty,
-                            BirthYear = item.BirthYear ?? 0
-                        };
-                        _db.Swimmers.Add(swimmer);
-                        await _db.SaveChangesAsync();
-                    }
-
-                    swimmerCache[swimmerKey] = swimmer;
-                    swimmerCacheByFullName.TryAdd(
-                        SwimmerFullNameKey(swimmer.LastName, swimmer.FirstName, swimmer.BirthYear), swimmer);
-                }
-
-                // Страж тёзок: тот же пловец уже плыл в ЭТОМ соревновании за другой клуб —
-                // значит это другой человек с тем же именем и годом рождения (инцидент И-11).
-                // Сравниваем канонические клубы: у склеенных клубов остаётся «надгробие»
-                // (MergedIntoId), и без канонизации один и тот же клуб выглядел бы как два.
-                if (!isAnonymousSwimmer && item.IsRelay != true && club != null && swimmer.Id != 0)
-                {
-                    var canonicalClubId = club.MergedIntoId ?? club.Id;
-                    var namesakeKey = (competition.Id, swimmerKey, canonicalClubId);
-
-                    if (namesakeByClub.TryGetValue(namesakeKey, out var namesake))
-                    {
-                        swimmer = namesake;
-                    }
-                    else if (seenClubInCompetition.TryGetValue((competition.Id, swimmer.Id), out var seenClub)
-                             && seenClub != canonicalClubId)
-                    {
-                        swimmer = new Swimmer
-                        {
-                            LastName = item.LastName ?? string.Empty,
-                            FirstName = item.FirstName ?? string.Empty,
-                            LastNameEn = item.LastNameEn ?? string.Empty,
-                            FirstNameEn = item.FirstNameEn ?? string.Empty,
-                            BirthYear = item.BirthYear ?? 0
-                        };
-                        _db.Swimmers.Add(swimmer);
-                        await _db.SaveChangesAsync();
-                        namesakeByClub[namesakeKey] = swimmer;
-                        diagnosticLog.Add(
-                            $"Тёзки: '{item.LastName} {item.FirstName}' ({item.BirthYear}) выступают за разные клубы "
-                            + $"в одном соревновании — заведена отдельная запись #{swimmer.Id} для '{club.Name}'");
-                    }
-
-                    seenClubInCompetition[(competition.Id, swimmer.Id)] = canonicalClubId;
-                }
-
-                // Дополнение данных спортсмена из результата (Gender, ClubId, CountryId)
-                EnrichSwimmerFromResult(swimmer, item.EventStyleGender, club, country);
-
-                // Дозаполнение пустых EN-имён у существующего пловца (двуязычный импорт)
-                if (swimmerKeyEn != null && string.IsNullOrWhiteSpace(swimmer.LastNameEn))
-                {
-                    swimmer.LastNameEn = item.LastNameEn ?? string.Empty;
-                    swimmer.FirstNameEn = item.FirstNameEn ?? string.Empty;
-                    swimmerCacheEn.TryAdd(swimmerKeyEn, swimmer);
-                }
-
-                // 6. Relay — created but NOT saved yet; will be inserted via ResultRecord.Relay navigation.
-                // Структурный состав ног (RelayMembers) резолвим по именам легов из парсера —
-                // тем же матчингом, что и обычных пловцов, — чтобы эстафета была видна каждому
-                // участнику, а не только «владельцу» строки (первой ноге).
-                Relay? relay = null;
-                if (item.IsRelay == true)
-                {
-                    relay = new Relay
-                    {
-                        TeamName = item.RelayTeamName,
-                        SwimmersName = item.RelaySwimmersName
-                    };
-                    relay.Members = await ResolveRelayMembersAsync(item.RelaySwimmers, swimmerCache);
-                    if (item.RelaySwimmers?.Any(l => !string.IsNullOrWhiteSpace(l.SplitTime)) == true)
-                        competitionsWithSplits.Add(competition.Id);
-                }
-                else if (!string.IsNullOrWhiteSpace(item.TimeSplit))
-                {
-                    competitionsWithSplits.Add(competition.Id);
-                }
-
-                // 7. Gallery — created but NOT saved yet; will be inserted via ResultRecord.Gallery navigation
-                Gallery? gallery = null;
-                if (item.Gallery != null && item.Gallery.Count > 0)
-                {
-                    gallery = new Gallery();
-                    foreach (var gi in item.Gallery)
-                    {
-                        gallery.Items.Add(new GalleryItem
-                        {
-                            Type = gi.Type ?? "image",
-                            SourceType = gi.SourceType,
-                            Url = gi.Url,
-                            Code = gi.Code
-                        });
-                    }
-                }
-
-                // 8. ResultRecord — added to batch; Relay and Gallery inserted via navigation on batch save
-                var record = new ResultRecord
-                {
-                    CompetitionId = competition.Id,
-                    SwimmerId = swimmer.Id,
-                    ClubId = club.Id,
-                    StyleId = style.Id,
-                    // Страна результата: явная из протокола, иначе — от псевдоклуба-сборной.
-                    CountryId = country?.Id ?? (club.IsPseudo ? club.CountryId : null),
-                    Relay = relay,      // EF Core inserts Relay and sets RelayId
-                    Gallery = gallery,  // EF Core inserts Gallery + GalleryItems and sets GalleryId
-                    CompetitionDate = ParseDate(item.Date),
-                    Distance = item.EventStyleLen ?? string.Empty,
-                    // Эстафета с неизвестным полом и смешанным составом — mixed (Э4); ключ
-                    // upsert это не ломает: ResultMatcher.KeyGender считает none и mixed одним.
-                    Gender = relay != null
-                        ? RelayGender.Resolve(item.EventStyleGender, relay.Members.Select(m =>
-                            swimmerCache.Values.FirstOrDefault(s => s.Id == m.SwimmerId)?.Gender))
-                        : ResolveResultGender(item.EventStyleGender, swimmer, false),
-                    AgeGroup = item.AgeGroup ?? string.Empty,
-                    EventStyleAge = item.EventStyleAge ?? string.Empty,
-                    EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
-                    HeatType = string.IsNullOrWhiteSpace(item.HeatType) ? null : item.HeatType,
-                    Round = string.IsNullOrWhiteSpace(item.Round) ? null : item.Round,
-                    OfficialClubPoints = item.OfficialClubPoints,
-                    // Место есть только у ДОПЛЫВШЕГО. У DQ / NS / DNS число в первой
-                    // колонке протокола местом не является — в одном заплыве оно
-                    // повторяется у разных снятых, — и, попав в базу, оно доезжает до
-                    // витрины как «#2 🥈» рядом со словом DSQ (инцидент И-18,
-                    // docs/data-integrity.md). Режем на ЗАПИСИ: иначе про это правило
-                    // обязан помнить каждый читающий репозиторий, а их полдюжины.
-                    Position = item.TimeFail ? null : item.Position,
-                    PositionAgeGroup = item.TimeFail ? null : item.PositionAgeGroup,
-                    Heat = item.Heat ?? 0,
-                    Lane = item.Lane ?? 0,
-                    TimeMillisecond = ParseTimeToMs(item.Time),
-                    TimeOriginal = item.Time ?? string.Empty,
-                    TimeSplit = item.TimeSplit ?? string.Empty,
-                    TimeFail = item.TimeFail,
-                    TimeFailNote = item.TimeFailNote,
-                    InternationalPoints = item.InternationalPoints ?? 0,
-                    Note = item.Note,
-                    // Пометка из превью — сразу РУЧНАЯ: её поставил человек, и переживать
-                    // она должна и скан, и переимпорт (см. ApplyPayloadUpdate).
-                    SuspectIsManual = !string.IsNullOrWhiteSpace(item.SuspectNote),
-                    SuspectReason = string.IsNullOrWhiteSpace(item.SuspectNote) ? null : SuspectReasons.Manual,
-                    SuspectNote = string.IsNullOrWhiteSpace(item.SuspectNote)
-                        ? null
-                        : Truncate(item.SuspectNote.Trim(), 300)
-                };
-
-                if (record.SuspectIsManual) suspectFlagged++;
-
-                resultBatch.Add(record);
-                created++;
+                await ResolveStyleAsync(item);
+                await ResolveCountryAsync(item);
+                if (await ResolveCompetitionAsync(item) is { } duplicate) return duplicate;
+                CountExpectedRow(item);
+                await ResolveClubAsync(item);
+                await ResolveSwimmerAsync(item);
+                await BuildRelayAsync(item);
+                BuildGallery(item);
+                AddRecord(item);
             }
             catch (Exception ex)
             {
@@ -810,408 +514,865 @@ public class JsonImportService : IImportService
                         errorMessages.Add($"  Inner: {ex.InnerException.Message}");
                 }
             }
+            return null;
+        }
+
+        // 1. Style
+        private async Task ResolveStyleAsync(ResultJsonItem item)
+        {
+            styleName = NormalizeStyleName(item.EventStyleName);
+            if (!styleCache.TryGetValue(styleName, out style))
+            {
+                // Новый ключ вне канона — почти всегда мусор из шапки протокола
+                // («מטר_חופשי» от «3000 МЕТРОВ вольным»). Такой стиль не покажет ни одна
+                // витрина, а импорт раньше молчал, и соревнование пропадало незаметно.
+                // Данные не подменяем — говорим вслух (docs/data-integrity.md §9).
+                if (!Strokes.IsCanonical(styleName))
+                    diagnosticLog.Add(
+                        $"⚠ Style: новый неканонический ключ '{styleName}' (из '{item.EventStyleName}') — " +
+                        "витрины показывают только канонические стили, проверь заголовок протокола");
+
+                style = new Style { Name = styleName };
+                _db.Styles.Add(style);
+                await _db.SaveChangesAsync(); // need ID immediately for ResultRecord.StyleId
+                styleCache[styleName] = style;
+            }
+        }
+
+        // 2. Country
+        // Код нормализуем ДО поиска (CountryCodes.Normalize): alpha-2 «IL» из старых
+        // JSON заводил вторую запись Израиля рядом с «ISR», и рекорды 791 пловцу не
+        // находились вовсе (docs/data-integrity.md §14). Правило — alpha-3 в данных.
+        private async Task ResolveCountryAsync(ResultJsonItem item)
+        {
+            country = null;
+            var countryCode = CountryCodes.Normalize(item.Country);
+            if (!string.IsNullOrEmpty(countryCode))
+            {
+                if (!countryCache.TryGetValue(countryCode, out country))
+                {
+                    country = await _db.Countries.FirstOrDefaultAsync(c => c.CountryCode == countryCode);
+                    if (country == null)
+                    {
+                        // Новую страну заводим, но не молча: незнакомый код — либо новый
+                        // синоним в CountryCodes.Aliases, либо опечатка в протоколе.
+                        // Данные не подменяем — говорим вслух (docs/data-integrity.md §9).
+                        if (!CountryCodes.LooksAlpha3(countryCode))
+                            diagnosticLog.Add(
+                                $"⚠ Country: код '{countryCode}' не alpha-3 (из '{item.Country}') — " +
+                                "заводится новая страна; если это второе имя уже известной, " +
+                                "добавь синоним в CountryCodes.Aliases и склей записи");
+
+                        country = new Country { CountryCode = countryCode, CountryName = countryCode };
+                        _db.Countries.Add(country);
+                        await _db.SaveChangesAsync();
+                    }
+                    countryCache[countryCode] = country;
+                }
+            }
+        }
+
+        // 3. Competition
+        // При привязке к событию дедуп и хранимое имя идут по ИМЕНИ СОБЫТИЯ (общее имя),
+        // чтобы дни одного события не плодили дубликаты и совпадали с unique-индексом
+        // (Name, Date, PoolType). Оригинальный заголовок файла уходит в SubName.
+        private async Task<ImportResult?> ResolveCompetitionAsync(ResultJsonItem item)
+        {
+            var displayName = targetEvent != null ? targetEvent.Name : (item.Competition ?? string.Empty);
+            // NormalizePoolType — как и в FindExistingCompetitionsAsync/ImportCompetitionMatcher:
+            // индекс построен по уже нормализованному Competition.PoolType из БД, а item.PoolType
+            // приходит из файла в сыром виде ("25"/"25m") — сравнивать нужно нормализованное с
+            // нормализованным, иначе тот же промах мимо кэша, что и с Name/SubName.
+            // Длина бассейна: решение из превью главнее распознанного парсером. Подменяем
+            // ДО ключа — бассейн входит в уникальный ключ соревнования, и правка «потом»
+            // означала бы второй Competition с тем же именем и датой.
+            var poolType = NormalizePoolType(eventOptions?.PoolType ?? item.PoolType);
+            var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, poolType);
+
+            // Д2: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
+            // разошлось. Кладём находку в кэш под именным ключом, чтобы весь дальнейший
+            // цикл (upsert-пометка, категории, touched) работал как обычно.
+            if (linkedDaysByDate.TryGetValue(item.Date ?? string.Empty, out var linkedDay))
+                competitionCache.TryAdd(compKey, linkedDay);
+
+            // Соревнование уже есть (перезатягивание, дописывание дня): флаги из превью —
+            // свежее решение человека, применяем и к нему. Не заданные (null) не трогаем.
+            //
+            // ⚠ Индекс соревнований построен AsNoTracking (он для поиска дублей), и правка
+            // его сущностей НЕ сохранится. Поэтому берём отслеживаемую копию — по одному
+            // запросу на соревнование, а не на каждую из тысяч строк файла.
+            if (eventOptions != null
+                && competitionCache.TryGetValue(compKey, out var existingComp)
+                && existingComp.Id != 0
+                && flagsAppliedTo.Add(existingComp.Id))
+            {
+                var tracked = await _db.Competitions.FirstOrDefaultAsync(c => c.Id == existingComp.Id);
+                if (tracked != null) ApplyCompetitionFlags(tracked, eventOptions);
+            }
+
+            if (!competitionCache.TryGetValue(compKey, out competition))
+            {
+                competition = new Competition
+                {
+                    Name = displayName,
+                    CountryId = country?.Id,
+                    // Дисциплина по названию: протоколов артистического мы не грузим,
+                    // но если такой файл однажды заедет — он не притворится плаванием.
+                    Discipline = Disciplines.GuessFromName(displayName),
+                    Date = item.Date ?? string.Empty,
+                    PoolType = poolType,
+                    IsMasters = eventOptions?.IsMasters ?? (isMasters || (item.IsMasters ?? false)),
+                    IsAward = eventOptions?.IsAward ?? (isAward || (item.IsAward ?? false)),
+                    IsChampionship = eventOptions?.IsChampionship ?? false,
+                    ClubPointsDisabled = eventOptions?.ClubPointsDisabled ?? false,
+                    ShowCombineAllResults = showCombine,
+                    EventId = targetEvent?.Id,
+                    SubName = targetEvent != null ? (item.Competition ?? string.Empty) : null,
+                    DayNumber = targetEvent != null ? nextDayNumber++ : null,
+                    // Э5: правила очков из формы импорта. null = «Авто» (подбор по дате
+                    // и типу). Ставится каждому дню — правило живёт у соревнования, не у события.
+                    PointRuleClubsId = eventOptions?.PointRuleClubsId,
+                    PointRuleSwimmersId = eventOptions?.PointRuleSwimmersId
+                };
+                _db.Competitions.Add(competition);
+                await _db.SaveChangesAsync();
+                competitionCache[compKey] = competition;
+                // Индексируем и по SubName (тем же правилом, что ImportCompetitionMatcher.BuildIndex),
+                // чтобы последующие строки этого же импорта и повторный импорт того же файла
+                // находили соревнование по обоим ключам.
+                if (!string.IsNullOrWhiteSpace(competition.SubName))
+                    competitionCache.TryAdd(
+                        ImportCompetitionMatcher.Key(competition.SubName, competition.Date, competition.PoolType),
+                        competition);
+                verifiedNewCompetitions.Add(competition.Id);
+                touchedCompetitionKeys.Add(compKey);
+
+                // Привязка нового соревнования к категориям (membership) из файла.
+                // Дубли ключей игнорируем; неизвестные ключи пропускаем с заметкой в лог.
+                foreach (var key in effectiveCategoryKeys.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    if (!categoryCache.TryGetValue(key, out var cat))
+                    {
+                        diagnosticLog.Add($"Category key not found, skipped: {key}");
+                        continue;
+                    }
+                    var order = categoryNextOrder.TryGetValue(cat.Id, out var o) ? o : 0;
+                    _db.CategoryCompetitions.Add(new CategoryCompetition
+                    {
+                        CategoryId = cat.Id,
+                        CompetitionId = competition.Id,
+                        DisplayOrder = order
+                    });
+                    categoryNextOrder[cat.Id] = order + 1;
+                }
+            }
+            else
+            {
+                if (!touchedCompetitionKeys.Contains(compKey))
+                    touchedCompetitionKeys.Add(compKey);
+
+                if (!verifiedNewCompetitions.Contains(competition.Id))
+                {
+                    var hasResults = await _db.Results.AnyAsync(r => r.CompetitionId == competition.Id);
+                    if (hasResults)
+                    {
+                        if (!overwriteExisting)
+                        {
+                            await tx.RollbackAsync();
+                            return new ImportResult
+                            {
+                                Message = $"Дубль: соревнование «{competition.Name}» ({competition.Date}) уже содержит результаты в БД. Удалите его через Admin → История импортов, затем импортируйте снова.",
+                                ErrorMessages = [$"Competition ID {competition.Id} already has results"],
+                                DiagnosticLog = diagnosticLog
+                            };
+                        }
+
+                        // Upsert-режим: не отбиваем, помечаем соревнование на пост-обработку
+                        // (матчинг старых/новых результатов) после основного цикла.
+                        upsertCompetitionIds.Add(competition.Id);
+                        diagnosticLog.Add($"Overwrite: competition ID {competition.Id} «{competition.Name}» already has results — will upsert");
+                    }
+                    verifiedNewCompetitions.Add(competition.Id);
+                }
+            }
+            return null;
+        }
+
+        // Сверка Д1: строка файла учтена как ожидаемая. Считаем ДО остальных шагов —
+        // если строка дальше упадёт с ошибкой, расхождение это и покажет.
+        private void CountExpectedRow(ResultJsonItem item)
+        {
+            (int CompetitionId, string EventKey) reconKey = (competition.Id, ImportReconciler.EventKey(
+                styleName, item.EventStyleLen, item.IsRelay == true, item.EventCategory));
+            expectedByEvent[reconKey] = expectedByEvent.GetValueOrDefault(reconKey) + 1;
+        }
+
+        // 4. Club
+        private async Task ResolveClubAsync(ResultJsonItem item)
+        {
+            var clubName = (item.Club ?? string.Empty).Trim();
+            var clubNameEn = (item.ClubEn ?? string.Empty).Trim();
+            // Пустая графа клуба в протоколе → единый псевдоклуб «No club»
+            // (клуб у Results NOT NULL; пловцам он, как и сборные, не проставляется).
+            if (clubName.Length == 0 && clubNameEn.Length == 0)
+            {
+                clubName = NoClubName;
+                clubNameEn = NoClubName;
+            }
+            var clubKey = $"{clubName}|{clubNameEn}";
+            if (!clubCache.TryGetValue(clubKey, out club))
+            {
+                // Склеенные исключены и ЗДЕСЬ, а не только в фоллбеке ниже: у надгробия
+                // NameEn обычно пустой, ивритский протокол его тоже не приносит — точная
+                // пара «Name|''» попадала прямо в склеенный клуб, и merge молча
+                // откатывался (инцидент И-13: 61 надгробие снова с результатами).
+                club = await _db.Clubs.FirstOrDefaultAsync(
+                    c => c.MergedIntoId == null && c.Name == clubName && c.NameEn == clubNameEn);
+
+                // Фоллбек по ОДНОМУ имени. Ивритский протокол не приносит NameEn, а у
+                // канонического клуба он заполнен (следствие двуязычного импорта), — по паре
+                // Name|NameEn матч промахивается и рождается клуб-дубль. 2026-08-03 так
+                // появилось 59 клубов на 5141 результат при переимпорте пяти протоколов.
+                // Совпадение имени = «уверенный» дубль и в дедупе клубов (эвристика same-name),
+                // так что матчить по имени безопаснее, чем плодить двойников.
+                // Склеенные исключены: иначе результаты уедут на клуб, которого уже нет.
+                club ??= await _db.Clubs
+                    .Where(c => c.MergedIntoId == null && c.Name == clubName)
+                    .OrderBy(c => c.Id)
+                    .FirstOrDefaultAsync();
+
+                // Нашли по имени и у нас есть английское название, которого в БД нет —
+                // дозаполняем (тот же приём, что «Синхр. языки»).
+                if (club != null && clubNameEn.Length > 0 && string.IsNullOrWhiteSpace(club.NameEn))
+                {
+                    var tracked = await _db.Clubs.FirstAsync(c => c.Id == club.Id);
+                    tracked.NameEn = clubNameEn;
+                    await _db.SaveChangesAsync();
+                    club = tracked;
+                }
+
+                if (club == null)
+                {
+                    club = new Club { Name = clubName, NameEn = clubNameEn, CountryId = country?.Id };
+
+                    // Псевдоклуб: в графе клуба страна/сборная (Maccabiah: "USA",
+                    // "Israel", "M25"). Метим флагом и привязываем страну по
+                    // справочнику Countries (имя или alpha-3 код).
+                    var pseudoCountry =
+                        countryByName.GetValueOrDefault(clubName.Trim())
+                        ?? countryByName.GetValueOrDefault(clubNameEn.Trim())
+                        ?? countryCache.GetValueOrDefault(clubName.Trim());
+                    if (pseudoCountry != null || PseudoTeamNames.Contains(clubName.Trim()) || clubName == NoClubName)
+                    {
+                        club.IsPseudo = true;
+                        club.CountryId ??= pseudoCountry?.Id;
+                        diagnosticLog.Add($"Pseudo club (country/team in club column): '{clubName}'");
+                    }
+
+                    _db.Clubs.Add(club);
+                    await _db.SaveChangesAsync();
+                }
+                clubCache[clubKey] = club;
+            }
+        }
+
+        // 5. Swimmer — ImportSwimmerResolver: поиск карточки, новая карточка, страж тёзок.
+        private async Task ResolveSwimmerAsync(ResultJsonItem item)
+        {
+            (swimmer, swimmerKeyEn) = await swimmers.ResolveAsync(item, club, competition.Id);
+
+            // Дополнение данных спортсмена из результата (Gender, ClubId, CountryId)
+            EnrichSwimmerFromResult(swimmer, item.EventStyleGender, club, country);
+
+            // Дозаполнение пустых EN-имён у существующего пловца (двуязычный импорт)
+            swimmers.FillEnglishName(swimmer, item, swimmerKeyEn);
+        }
+
+        // 6. Relay — created but NOT saved yet; will be inserted via ResultRecord.Relay navigation.
+        // Структурный состав ног (RelayMembers) резолвим по именам легов из парсера —
+        // тем же матчингом, что и обычных пловцов, — чтобы эстафета была видна каждому
+        // участнику, а не только «владельцу» строки (первой ноге).
+        private async Task BuildRelayAsync(ResultJsonItem item)
+        {
+            relay = null;
+            if (item.IsRelay == true)
+            {
+                relay = new Relay
+                {
+                    TeamName = item.RelayTeamName,
+                    SwimmersName = item.RelaySwimmersName
+                };
+                relay.Members = await swimmers.ResolveRelayMembersAsync(item.RelaySwimmers, club);
+                if (item.RelaySwimmers?.Any(l => !string.IsNullOrWhiteSpace(l.SplitTime)) == true)
+                    competitionsWithSplits.Add(competition.Id);
+            }
+            else if (!string.IsNullOrWhiteSpace(item.TimeSplit))
+            {
+                competitionsWithSplits.Add(competition.Id);
+            }
+        }
+
+        // 7. Gallery — created but NOT saved yet; will be inserted via ResultRecord.Gallery navigation
+        private void BuildGallery(ResultJsonItem item)
+        {
+            gallery = null;
+            if (item.Gallery != null && item.Gallery.Count > 0)
+            {
+                gallery = new Gallery();
+                foreach (var gi in item.Gallery)
+                {
+                    gallery.Items.Add(new GalleryItem
+                    {
+                        Type = gi.Type ?? "image",
+                        SourceType = gi.SourceType,
+                        Url = gi.Url,
+                        Code = gi.Code
+                    });
+                }
+            }
+        }
+
+        // 8. ResultRecord — added to batch; Relay and Gallery inserted via navigation on batch save
+        private void AddRecord(ResultJsonItem item)
+        {
+            var record = new ResultRecord
+            {
+                CompetitionId = competition.Id,
+                SwimmerId = swimmer.Id,
+                ClubId = club.Id,
+                StyleId = style.Id,
+                // Страна результата: явная из протокола, иначе — от псевдоклуба-сборной.
+                CountryId = country?.Id ?? (club.IsPseudo ? club.CountryId : null),
+                Relay = relay,      // EF Core inserts Relay and sets RelayId
+                Gallery = gallery,  // EF Core inserts Gallery + GalleryItems and sets GalleryId
+                CompetitionDate = ParseDate(item.Date),
+                Distance = item.EventStyleLen ?? string.Empty,
+                // Эстафета с неизвестным полом и смешанным составом — mixed (Э4); ключ
+                // upsert это не ломает: ResultMatcher.KeyGender считает none и mixed одним.
+                Gender = relay != null
+                    ? RelayGender.Resolve(item.EventStyleGender, relay.Members.Select(m =>
+                        swimmers.GenderOf(m.SwimmerId)))
+                    : ResolveResultGender(item.EventStyleGender, swimmer, false),
+                AgeGroup = item.AgeGroup ?? string.Empty,
+                EventStyleAge = item.EventStyleAge ?? string.Empty,
+                EventCategory = string.IsNullOrWhiteSpace(item.EventCategory) ? null : item.EventCategory,
+                HeatType = string.IsNullOrWhiteSpace(item.HeatType) ? null : item.HeatType,
+                Round = string.IsNullOrWhiteSpace(item.Round) ? null : item.Round,
+                OfficialClubPoints = item.OfficialClubPoints,
+                // Место есть только у ДОПЛЫВШЕГО. У DQ / NS / DNS число в первой
+                // колонке протокола местом не является — в одном заплыве оно
+                // повторяется у разных снятых, — и, попав в базу, оно доезжает до
+                // витрины как «#2 🥈» рядом со словом DSQ (инцидент И-18,
+                // docs/data-integrity.md). Режем на ЗАПИСИ: иначе про это правило
+                // обязан помнить каждый читающий репозиторий, а их полдюжины.
+                Position = item.TimeFail ? null : item.Position,
+                PositionAgeGroup = item.TimeFail ? null : item.PositionAgeGroup,
+                Heat = item.Heat ?? 0,
+                Lane = item.Lane ?? 0,
+                TimeMillisecond = ParseTimeToMs(item.Time),
+                TimeOriginal = item.Time ?? string.Empty,
+                TimeSplit = item.TimeSplit ?? string.Empty,
+                TimeFail = item.TimeFail,
+                TimeFailNote = item.TimeFailNote,
+                InternationalPoints = item.InternationalPoints ?? 0,
+                Note = item.Note,
+                // Пометка из превью — сразу РУЧНАЯ: её поставил человек, и переживать
+                // она должна и скан, и переимпорт (см. ApplyPayloadUpdate).
+                SuspectIsManual = !string.IsNullOrWhiteSpace(item.SuspectNote),
+                SuspectReason = string.IsNullOrWhiteSpace(item.SuspectNote) ? null : SuspectReasons.Manual,
+                SuspectNote = string.IsNullOrWhiteSpace(item.SuspectNote)
+                    ? null
+                    : Truncate(item.SuspectNote.Trim(), 300)
+            };
+
+            if (record.SuspectIsManual) suspectFlagged++;
+
+            resultBatch.Add(record);
+            created++;
         }
 
         // При наличии ошибок — откатываем всё соревнование целиком.
-        if (errors > 0)
+        private async Task<ImportResult?> RollBackOnRowErrorsAsync()
         {
-            await tx.RollbackAsync();
-            return new ImportResult
+            if (errors > 0)
             {
-                TotalRows = items.Count,
-                Created = 0,
-                Skipped = skipped,
-                Errors = errors,
-                ErrorMessages = errorMessages,
-                DiagnosticLog = diagnosticLog,
-                Message = $"Import rolled back: {errors} errors out of {items.Count} rows — no data was saved"
-            };
+                await tx.RollbackAsync();
+                return new ImportResult
+                {
+                    TotalRows = items.Count,
+                    Created = 0,
+                    Skipped = skipped,
+                    Errors = errors,
+                    ErrorMessages = errorMessages,
+                    DiagnosticLog = diagnosticLog,
+                    Message = $"Import rolled back: {errors} errors out of {items.Count} rows — no data was saved"
+                };
+            }
+            return null;
         }
 
         // === Upsert: матчинг старых/новых результатов по соревнованиям, помеченным выше ===
         // (import-upsert-plan.md, шаг 2). Для каждого upsert-соревнования: сматченные строки
         // обновляются на месте (Id сохранён — UserMedia/HubGroupMedia не рвутся), новые
         // добавляются как обычно, исчезнувшие удаляются, если на них не навешано медиа.
-        int updatedCount = 0, deletedCount = 0, skippedWithMediaCount = 0;
-        var orphanCandidateSwimmerIds = new HashSet<int>();
-
-        foreach (var competitionId in upsertCompetitionIds)
+        private async Task UpsertAsync()
         {
-            var newRowsForComp = resultBatch.Where(r => r.CompetitionId == competitionId).ToList();
+            updatedCount = 0; deletedCount = 0; skippedWithMediaCount = 0;
+            orphanCandidateSwimmerIds = new HashSet<int>();
 
-            var oldRows = await _db.Results
-                .Where(r => r.CompetitionId == competitionId)
-                .Include(r => r.Relay)
-                    .ThenInclude(rl => rl!.Members)
-                .Include(r => r.Gallery)
-                    .ThenInclude(g => g!.Items)
-                .ToListAsync();
-
-            var match = ResultMatcher.Match(
-                oldRows, newRowsForComp,
-                ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient,
-                ResultMatcher.DiscriminatorOfPersisted, ResultMatcher.DiscriminatorOfTransient);
-
-            foreach (var (old, incoming) in match.Matched)
+            foreach (var competitionId in upsertCompetitionIds)
             {
-                if (old.SwimmerId != incoming.SwimmerId)
-                    orphanCandidateSwimmerIds.Add(old.SwimmerId); // может осиротеть анонимная заглушка (Р5, Маккабиада-кейс)
+                var newRowsForComp = resultBatch.Where(r => r.CompetitionId == competitionId).ToList();
 
-                ApplyPayloadUpdate(old, incoming);
-                ApplyRelayUpdate(_db, old, incoming);
-                ApplyGalleryUpdate(_db, old, incoming);
+                var oldRows = await _db.Results
+                    .Where(r => r.CompetitionId == competitionId)
+                    .Include(r => r.Relay)
+                        .ThenInclude(rl => rl!.Members)
+                    .Include(r => r.Gallery)
+                        .ThenInclude(g => g!.Items)
+                    .ToListAsync();
 
-                // Не вставляем строку-«двойник» отдельным INSERT — она смёржена в old.
-                resultBatch.Remove(incoming);
-                updatedCount++;
-            }
+                var match = ResultMatcher.Match(
+                    oldRows, newRowsForComp,
+                    ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient,
+                    ResultMatcher.DiscriminatorOfPersisted, ResultMatcher.DiscriminatorOfTransient);
 
-            if (!deleteMissing)
-            {
-                // DeleteMissing=false (default, ImportModels.cs): исчезнувшие из файла результаты
-                // остаются нетронутыми — никакого удаления и, соответственно, никакой чистки
-                // Relay/Gallery/пловцов-заглушек по ним (инцидент 2026-07-20: partial-переимпорт
-                // с OverwriteExisting без явного согласия на удаление снёс 661 из 915 результатов).
-                if (match.Deleted.Count > 0)
-                    diagnosticLog.Add($"Upsert: {match.Deleted.Count} результат(ов) в comp {competitionId} отсутствуют в файле, но DeleteMissing=false — оставлены как есть");
-            }
-            else
-            {
-                foreach (var old in match.Deleted)
+                foreach (var (old, incoming) in match.Matched)
                 {
-                    // Источник без эстафет (пособытийные страницы loglig) не вправе объявлять
-                    // эстафеты исчезнувшими — они живут от PDF-импорта.
-                    if (preserveRelays && old.RelayId != null)
+                    if (old.SwimmerId != incoming.SwimmerId)
+                        orphanCandidateSwimmerIds.Add(old.SwimmerId); // может осиротеть анонимная заглушка (Р5, Маккабиада-кейс)
+
+                    ApplyPayloadUpdate(old, incoming);
+                    ApplyRelayUpdate(_db, old, incoming);
+                    ApplyGalleryUpdate(_db, old, incoming);
+
+                    // Не вставляем строку-«двойник» отдельным INSERT — она смёржена в old.
+                    resultBatch.Remove(incoming);
+                    updatedCount++;
+                }
+
+                if (!deleteMissing)
+                {
+                    // DeleteMissing=false (default, ImportModels.cs): исчезнувшие из файла результаты
+                    // остаются нетронутыми — никакого удаления и, соответственно, никакой чистки
+                    // Relay/Gallery/пловцов-заглушек по ним (инцидент 2026-07-20: partial-переимпорт
+                    // с OverwriteExisting без явного согласия на удаление снёс 661 из 915 результатов).
+                    if (match.Deleted.Count > 0)
+                        diagnosticLog.Add($"Upsert: {match.Deleted.Count} результат(ов) в comp {competitionId} отсутствуют в файле, но DeleteMissing=false — оставлены как есть");
+                }
+                else
+                {
+                    foreach (var old in match.Deleted)
                     {
-                        diagnosticLog.Add($"Upsert: эстафета {old.Id} (comp {competitionId}) сохранена — источник эстафет не несёт (PreserveRelays)");
-                        continue;
+                        // Источник без эстафет (пособытийные страницы loglig) не вправе объявлять
+                        // эстафеты исчезнувшими — они живут от PDF-импорта.
+                        if (preserveRelays && old.RelayId != null)
+                        {
+                            diagnosticLog.Add($"Upsert: эстафета {old.Id} (comp {competitionId}) сохранена — источник эстафет не несёт (PreserveRelays)");
+                            continue;
+                        }
+
+                        var hasMedia = await _db.UserMedia.AnyAsync(m => m.ResultId == old.Id)
+                            || await _db.HubGroupMedia.AnyAsync(m => m.ResultId == old.Id);
+                        if (hasMedia)
+                        {
+                            skippedWithMediaCount++;
+                            diagnosticLog.Add($"Upsert: result {old.Id} (comp {competitionId}) исчез из файла, но на нём есть UserMedia/HubGroupMedia — не удалён, разберитесь руками");
+                            continue;
+                        }
+
+                        orphanCandidateSwimmerIds.Add(old.SwimmerId);
+
+                        // Relay/Gallery — приватные 1:1-довески результата (Р4): при удалении результата
+                        // становятся сиротами, подчищаем вместе с ним.
+                        if (old.Relay != null)
+                            _db.Relays.Remove(old.Relay);
+                        if (old.Gallery != null)
+                        {
+                            if (old.Gallery.Items.Count > 0)
+                                _db.GalleryItems.RemoveRange(old.Gallery.Items);
+                            _db.Galleries.Remove(old.Gallery);
+                        }
+
+                        _db.Results.Remove(old);
+                        deletedCount++;
                     }
-
-                    var hasMedia = await _db.UserMedia.AnyAsync(m => m.ResultId == old.Id)
-                        || await _db.HubGroupMedia.AnyAsync(m => m.ResultId == old.Id);
-                    if (hasMedia)
-                    {
-                        skippedWithMediaCount++;
-                        diagnosticLog.Add($"Upsert: result {old.Id} (comp {competitionId}) исчез из файла, но на нём есть UserMedia/HubGroupMedia — не удалён, разберитесь руками");
-                        continue;
-                    }
-
-                    orphanCandidateSwimmerIds.Add(old.SwimmerId);
-
-                    // Relay/Gallery — приватные 1:1-довески результата (Р4): при удалении результата
-                    // становятся сиротами, подчищаем вместе с ним.
-                    if (old.Relay != null)
-                        _db.Relays.Remove(old.Relay);
-                    if (old.Gallery != null)
-                    {
-                        if (old.Gallery.Items.Count > 0)
-                            _db.GalleryItems.RemoveRange(old.Gallery.Items);
-                        _db.Galleries.Remove(old.Gallery);
-                    }
-
-                    _db.Results.Remove(old);
-                    deletedCount++;
                 }
             }
         }
 
         // Batch insert: saves modified Swimmers + Relays + Galleries + GalleryItems + Results in one round trip
-        if (resultBatch.Count > 0)
-            _db.Results.AddRange(resultBatch);
+        private async Task SaveBatchAsync()
+        {
+            if (resultBatch.Count > 0)
+                _db.Results.AddRange(resultBatch);
 
-        await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync();
+        }
 
         // Чистка сиротевших пловцов-заглушек после upsert (Р5) — тот же фильтр сиротства,
         // что и при удалении соревнования целиком (DeleteCompetitionCoreAsync). ExecuteDeleteAsync
         // здесь не годится (InMemory-провайдер тестов его не поддерживает, а сирот в один
         // upsert-запуск обычно единицы) — грузим и удаляем через tracked Remove.
-        if (orphanCandidateSwimmerIds.Count > 0)
+        private async Task RemoveOrphanSwimmersAsync()
         {
-            var orphanSwimmers = await _db.Swimmers
-                .Where(s => orphanCandidateSwimmerIds.Contains(s.Id))
-                .Where(s => !_db.Results.Any(r => r.SwimmerId == s.Id)
-                    && !_db.RelayMembers.Any(m => m.SwimmerId == s.Id)  // нога эстафеты (FK Restrict) — не сирота
-                    && !_db.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
-                    && !_db.HubGroupUserMembers.Any(m => m.SwimmerId == s.Id)
-                    && !_db.UserFavorites.Any(f => f.SwimmerId == s.Id)
-                    && !_db.UserMedia.Any(m => m.SwimmerId == s.Id)
-                    && !_db.HubGroupMedia.Any(m => m.SwimmerId == s.Id)
-                    && !_db.TrainingResults.Any(t => t.SwimmerId == s.Id)
-                    && !_db.AppUsers.Any(u => u.SwimmerId == s.Id))
-                .ToListAsync();
-            if (orphanSwimmers.Count > 0)
+            if (orphanCandidateSwimmerIds.Count > 0)
             {
-                _db.Swimmers.RemoveRange(orphanSwimmers);
-                await _db.SaveChangesAsync();
+                var orphanSwimmers = await _db.Swimmers
+                    .Where(s => orphanCandidateSwimmerIds.Contains(s.Id))
+                    .Where(s => !_db.Results.Any(r => r.SwimmerId == s.Id)
+                        && !_db.RelayMembers.Any(m => m.SwimmerId == s.Id)  // нога эстафеты (FK Restrict) — не сирота
+                        && !_db.HubGroupMembers.Any(m => m.SwimmerId == s.Id)
+                        && !_db.HubGroupUserMembers.Any(m => m.SwimmerId == s.Id)
+                        && !_db.UserFavorites.Any(f => f.SwimmerId == s.Id)
+                        && !_db.UserMedia.Any(m => m.SwimmerId == s.Id)
+                        && !_db.HubGroupMedia.Any(m => m.SwimmerId == s.Id)
+                        && !_db.TrainingResults.Any(t => t.SwimmerId == s.Id)
+                        && !_db.AppUsers.Any(u => u.SwimmerId == s.Id))
+                    .ToListAsync();
+                if (orphanSwimmers.Count > 0)
+                {
+                    _db.Swimmers.RemoveRange(orphanSwimmers);
+                    await _db.SaveChangesAsync();
+                }
             }
         }
 
         // Пересчёт диапазона дат события по всем его дням (min/max distinct дат).
-        if (targetEvent != null)
+        private async Task UpdateEventDatesAsync()
         {
-            var dayDates = await _db.Competitions
-                .Where(c => c.EventId == targetEvent.Id)
-                .Select(c => c.Date)
-                .ToListAsync();
-
-            var parsed = dayDates
-                .Select(ParseDate)
-                .Where(d => d != DateTime.MinValue)
-                .Select(DateOnly.FromDateTime)
-                .ToList();
-
-            if (parsed.Count > 0)
+            if (targetEvent != null)
             {
-                targetEvent.StartDate = parsed.Min();
-                targetEvent.EndDate = parsed.Max();
-                await _db.SaveChangesAsync();
+                var dayDates = await _db.Competitions
+                    .Where(c => c.EventId == targetEvent.Id)
+                    .Select(c => c.Date)
+                    .ToListAsync();
+
+                var parsed = dayDates
+                    .Select(ParseDate)
+                    .Where(d => d != DateTime.MinValue)
+                    .Select(DateOnly.FromDateTime)
+                    .ToList();
+
+                if (parsed.Count > 0)
+                {
+                    targetEvent.StartDate = parsed.Min();
+                    targetEvent.EndDate = parsed.Max();
+                    await _db.SaveChangesAsync();
+                }
             }
         }
 
         // Промежуточные: только ставим, не снимаем (см. Competition.HasSplits).
-        if (competitionsWithSplits.Count > 0)
+        private async Task MarkSplitsAsync()
         {
-            foreach (var c in await _db.Competitions
-                         .Where(c => competitionsWithSplits.Contains(c.Id) && !c.HasSplits).ToListAsync())
-                c.HasSplits = true;
-            await _db.SaveChangesAsync();
-            diagnosticLog.Add($"Промежуточные эстафет есть — HasSplits у соревнований: {string.Join(", ", competitionsWithSplits)}");
+            if (competitionsWithSplits.Count > 0)
+            {
+                foreach (var c in await _db.Competitions
+                             .Where(c => competitionsWithSplits.Contains(c.Id) && !c.HasSplits).ToListAsync())
+                    c.HasSplits = true;
+                await _db.SaveChangesAsync();
+                diagnosticLog.Add($"Промежуточные эстафет есть — HasSplits у соревнований: {string.Join(", ", competitionsWithSplits)}");
+            }
         }
 
         // Штамп OrgCompId (compID сайта) на «первичное» соревнование этого импорта — приходит
         // только из Discovery-импорта. OrgCompId уникален (partial UNIQUE), поэтому держит его
         // один ряд (для многодневных — первый затронутый; кросс-линк резолвит его к событию).
-        if (orgCompId is int oc && touchedCompetitionKeys.Count > 0)
+        private async Task StampOrgCompIdAsync()
         {
-            var primary = competitionCache[touchedCompetitionKeys[0]];
-            if (primary.OrgCompId != oc)
+            if (orgCompId is int oc && touchedCompetitionKeys.Count > 0)
             {
-                var takenByOther = await _db.Competitions.AnyAsync(c => c.OrgCompId == oc && c.Id != primary.Id);
-                if (takenByOther)
-                    diagnosticLog.Add($"OrgCompId {oc} уже занят другим соревнованием — штамп пропущен");
-                else
+                var primary = competitionCache[touchedCompetitionKeys[0]];
+                if (primary.OrgCompId != oc)
                 {
-                    primary.OrgCompId = oc;
-                    await _db.SaveChangesAsync();
+                    var takenByOther = await _db.Competitions.AnyAsync(c => c.OrgCompId == oc && c.Id != primary.Id);
+                    if (takenByOther)
+                        diagnosticLog.Add($"OrgCompId {oc} уже занят другим соревнованием — штамп пропущен");
+                    else
+                    {
+                        primary.OrgCompId = oc;
+                        await _db.SaveChangesAsync();
+                    }
                 }
-            }
 
-            // Д2: штамп ещё и на СОБЫТИИ — иначе у многодневки идентичность есть только у
-            // первого дня (AK на Competition.OrgCompId уникален, трём дням его не раздать),
-            // и переимпорт снова искал бы дни 2–3 по названию.
-            var stampEventId = primary.EventId ?? competitionCache[touchedCompetitionKeys[0]].EventId;
-            if (stampEventId is int evId)
-            {
-                var ev = await _db.CompetitionEvents.FirstOrDefaultAsync(e => e.Id == evId);
-                if (ev != null && ev.OrgCompId != oc)
+                // Д2: штамп ещё и на СОБЫТИИ — иначе у многодневки идентичность есть только у
+                // первого дня (AK на Competition.OrgCompId уникален, трём дням его не раздать),
+                // и переимпорт снова искал бы дни 2–3 по названию.
+                var stampEventId = primary.EventId ?? competitionCache[touchedCompetitionKeys[0]].EventId;
+                if (stampEventId is int evId)
                 {
-                    ev.OrgCompId = oc;
-                    await _db.SaveChangesAsync();
-                    diagnosticLog.Add($"Идентичность: событие {evId} помечено compID {oc}");
+                    var ev = await _db.CompetitionEvents.FirstOrDefaultAsync(e => e.Id == evId);
+                    if (ev != null && ev.OrgCompId != oc)
+                    {
+                        ev.OrgCompId = oc;
+                        await _db.SaveChangesAsync();
+                        diagnosticLog.Add($"Идентичность: событие {evId} помечено compID {oc}");
+                    }
                 }
-            }
 
-            // Источник стартового протокола (CompetitionSources). Отдельная от штампа связь:
-            // штамп на соревновании ОДИН (AK уникален), а источников у старта бывает несколько
-            // — окружные протоколы одного чемпионата лежат под разными compID. Заводим здесь,
-            // чтобы у нового соревнования таб Start list появлялся сам, без похода в админку.
-            var linked = await _db.CompetitionSources
-                .AnyAsync(cs => cs.CompetitionId == primary.Id && cs.OrgCompId == oc);
-            if (!linked)
-            {
-                var disc = await _db.DiscoveredCompetitions.AsNoTracking()
-                    .Where(d => d.OrgCompId == oc)
-                    .Select(d => new { d.Name, d.DateStart })
-                    .FirstOrDefaultAsync();
-                _db.CompetitionSources.Add(new CompetitionSource
+                // Источник стартового протокола (CompetitionSources). Отдельная от штампа связь:
+                // штамп на соревновании ОДИН (AK уникален), а источников у старта бывает несколько
+                // — окружные протоколы одного чемпионата лежат под разными compID. Заводим здесь,
+                // чтобы у нового соревнования таб Start list появлялся сам, без похода в админку.
+                var linked = await _db.CompetitionSources
+                    .AnyAsync(cs => cs.CompetitionId == primary.Id && cs.OrgCompId == oc);
+                if (!linked)
                 {
-                    CompetitionId = primary.Id,
-                    OrgCompId = oc,
-                    // Дата — календарная, поэтому из «Входящих» берём её как Unspecified:
-                    // колонка timestamp without time zone, а DateStart там timestamptz.
-                    SourceDate = disc != null
-                        ? DateTime.SpecifyKind(disc.DateStart, DateTimeKind.Unspecified)
-                        : NullableDate(primary.Date),
-                    SourceName = disc?.Name ?? primary.SubName ?? primary.Name,
-                    SortOrder = 0
-                });
-                await _db.SaveChangesAsync();
-                diagnosticLog.Add($"Стартовый протокол: соревнование {primary.Id} ← источник compID {oc}");
+                    var disc = await _db.DiscoveredCompetitions.AsNoTracking()
+                        .Where(d => d.OrgCompId == oc)
+                        .Select(d => new { d.Name, d.DateStart })
+                        .FirstOrDefaultAsync();
+                    _db.CompetitionSources.Add(new CompetitionSource
+                    {
+                        CompetitionId = primary.Id,
+                        OrgCompId = oc,
+                        // Дата — календарная, поэтому из «Входящих» берём её как Unspecified:
+                        // колонка timestamp without time zone, а DateStart там timestamptz.
+                        SourceDate = disc != null
+                            ? DateTime.SpecifyKind(disc.DateStart, DateTimeKind.Unspecified)
+                            : NullableDate(primary.Date),
+                        SourceName = disc?.Name ?? primary.SubName ?? primary.Name,
+                        SortOrder = 0
+                    });
+                    await _db.SaveChangesAsync();
+                    diagnosticLog.Add($"Стартовый протокол: соревнование {primary.Id} ← источник compID {oc}");
+                }
             }
         }
 
         // Запись в историю импортов — одна запись на весь импорт файла
-        if (created > 0 && touchedCompetitionKeys.Count > 0)
+        private async Task WriteImportHistoryAsync()
         {
-            var firstComp = competitionCache[touchedCompetitionKeys[0]];
-            _db.ImportHistory.Add(new ImportHistory
+            if (created > 0 && touchedCompetitionKeys.Count > 0)
             {
-                CompetitionId = firstComp.Id,
-                ImportFileName = fileName ?? "unknown.json",
-                ImportDate = DateTime.UtcNow,
-                Approved = false
-            });
-            await _db.SaveChangesAsync();
+                var firstComp = competitionCache[touchedCompetitionKeys[0]];
+                _db.ImportHistory.Add(new ImportHistory
+                {
+                    CompetitionId = firstComp.Id,
+                    ImportFileName = fileName ?? "unknown.json",
+                    ImportDate = DateTime.UtcNow,
+                    Approved = false
+                });
+                await _db.SaveChangesAsync();
+            }
         }
-
-        await tx.CommitAsync();
 
         // Объединённые места материализованы в строках результатов, а импорт их меняет:
         // без пересчёта тоггл «Combine All Results» показал бы пустоту у свежих соревнований
         // (docs/points-rules-per-competition-plan.md §3.4 — главный риск материализации).
         // Считается по СОБЫТИЮ целиком, поэтому одного дня многодневки достаточно.
-        var recalculatedRows = 0;
-        if (_recalc is not null && touchedCompetitionKeys.Count > 0)
+        private async Task RecalcCombinedAsync()
         {
-            var touchedIds = touchedCompetitionKeys
-                .Select(k => competitionCache[k].Id)
-                .Distinct()
-                .ToList();
-
-            // Импорт уже закоммичен — упасть на пересчёте нельзя, иначе загруженные результаты
-            // откатятся из-за производной величины. Ошибку показываем в логе импорта:
-            // починить можно прогоном `dotnet run -- --recalc-combined`.
-            try
+            var recalculatedRows = 0;
+            if (_recalc is not null && touchedCompetitionKeys.Count > 0)
             {
-                foreach (var compId in touchedIds)
-                    recalculatedRows += await _recalc.RecalculateCompetitionAsync(compId);
+                var touchedIds = touchedCompetitionKeys
+                    .Select(k => competitionCache[k].Id)
+                    .Distinct()
+                    .ToList();
 
-                if (recalculatedRows > 0)
-                    diagnosticLog.Add($"Combine All Results: пересчитано строк — {recalculatedRows}");
-            }
-            catch (Exception ex)
-            {
-                diagnosticLog.Add(
-                    $"Combine All Results: пересчёт не удался ({ex.GetType().Name}: {ex.Message}). " +
-                    "Импорт сохранён; выполните `dotnet run -- --recalc-combined`.");
+                // Импорт уже закоммичен — упасть на пересчёте нельзя, иначе загруженные результаты
+                // откатятся из-за производной величины. Ошибку показываем в логе импорта:
+                // починить можно прогоном `dotnet run -- --recalc-combined`.
+                try
+                {
+                    foreach (var compId in touchedIds)
+                        recalculatedRows += await _recalc.RecalculateCompetitionAsync(compId);
+
+                    if (recalculatedRows > 0)
+                        diagnosticLog.Add($"Combine All Results: пересчитано строк — {recalculatedRows}");
+                }
+                catch (Exception ex)
+                {
+                    diagnosticLog.Add(
+                        $"Combine All Results: пересчёт не удался ({ex.GetType().Name}: {ex.Message}). " +
+                        "Импорт сохранён; выполните `dotnet run -- --recalc-combined`.");
+                }
             }
         }
 
         // Скан качества по импортированным дням (Р70) — ПОСЛЕ коммита и в try/catch, как пересчёт:
         // прибор не имеет права уронить загруженное. Ручные пометки скан не трогает.
-        if (_suspects is not null && touchedCompetitionKeys.Count > 0)
+        private async Task ScanQualityAsync()
         {
-            // Область — как у кнопки «Качество»: событие целиком, если оно есть (правила сравнивают
-            // дни между собой, и скан одного дня снял бы пометки, которые держатся на соседних).
-            var scopes = touchedCompetitionKeys
-                .Select(k => competitionCache[k])
-                .Select(c => c.EventId is int eid ? (EventId: (int?)eid, CompetitionId: (int?)null) : (null, c.Id))
-                .Distinct()
-                .ToList();
+            if (_suspects is not null && touchedCompetitionKeys.Count > 0)
+            {
+                // Область — как у кнопки «Качество»: событие целиком, если оно есть (правила сравнивают
+                // дни между собой, и скан одного дня снял бы пометки, которые держатся на соседних).
+                var scopes = touchedCompetitionKeys
+                    .Select(k => competitionCache[k])
+                    .Select(c => c.EventId is int eid ? (EventId: (int?)eid, CompetitionId: (int?)null) : (null, c.Id))
+                    .Distinct()
+                    .ToList();
+                try
+                {
+                    int flagged = 0, cleared = 0, manualKept = 0;
+                    foreach (var (eventId, competitionId) in scopes)
+                    {
+                        var scan = await _suspects.ScanAsync(eventId, competitionId);
+                        flagged += scan.Flagged;
+                        cleared += scan.Cleared;
+                        manualKept += scan.ManualKept;
+                    }
+                    diagnosticLog.Add($"Качество: помечено {flagged}, снято {cleared}, ручных сохранено {manualKept}");
+                }
+                catch (Exception ex)
+                {
+                    diagnosticLog.Add(
+                        $"Качество: скан не удался ({ex.GetType().Name}: {ex.Message}). " +
+                        "Импорт сохранён; выполните `dotnet run -- --quality-scan <eventId>`.");
+                }
+            }
+        }
+
+        // Невозможные этапы эстафет (Р82) по импортированным дням — тем же правилом, что доклейка и
+        // чистка. Сборка мастерских эстафет кладёт этапы ног в обход доклейки, так что без этого шага
+        // каждый перезалив возвращал сбои касания. После коммита и в try/catch, как скан качества.
+        private async Task ClearImplausibleLegsAsync()
+        {
+            if (_legCleanup is null || touchedCompetitionKeys.Count == 0) return;
             try
             {
-                int flagged = 0, cleared = 0, manualKept = 0;
-                foreach (var (eventId, competitionId) in scopes)
-                {
-                    var scan = await _suspects.ScanAsync(eventId, competitionId);
-                    flagged += scan.Flagged;
-                    cleared += scan.Cleared;
-                    manualKept += scan.ManualKept;
-                }
-                diagnosticLog.Add($"Качество: помечено {flagged}, снято {cleared}, ручных сохранено {manualKept}");
+                var ids = touchedCompetitionKeys.Select(k => competitionCache[k].Id).Distinct().ToList();
+                var report = await _legCleanup.RunAsync(apply: true, ids);
+                if (report.Rows.Count > 0)
+                    diagnosticLog.Add($"Этапы эстафет: невозможный этап у {report.Rows.Count} команд — " +
+                                      $"обнулено {report.LegsCleared} ног (Р82, аудит relay.splits-clear)");
             }
             catch (Exception ex)
             {
-                diagnosticLog.Add(
-                    $"Качество: скан не удался ({ex.GetType().Name}: {ex.Message}). " +
-                    "Импорт сохранён; выполните `dotnet run -- --quality-scan <eventId>`.");
+                diagnosticLog.Add($"Этапы эстафет: проверка не удалась ({ex.GetType().Name}: {ex.Message}). " +
+                                  "Импорт сохранён; выполните `dotnet run -- --clear-implausible-legs --apply`.");
             }
         }
 
         // Сверка с файлом (Д1, docs/data-integrity.md). Как и пересчёт выше — ПОСЛЕ коммита
         // и в try/catch: прибор не имеет права уронить уже загруженные результаты.
-        var reconciliationSummary = "";
-        var reconciliationMismatches = 0;
-        try
+        private async Task ReconcileWithFileAsync()
         {
-            var competitionIds = expectedByEvent.Keys.Select(k => k.CompetitionId).Distinct().ToList();
-            if (competitionIds.Count > 0)
+            reconciliationSummary = "";
+            reconciliationMismatches = 0;
+            try
             {
-                // Сверка сравнивает файл с тем, что этот файл ВПРАВЕ был принести. Источник
-                // без эстафет (пособытийные страницы loglig, PreserveRelays) их не несёт и
-                // не удаляет — считать их «лишними строками в БД» значит объявлять
-                // расхождение там, где всё сделано намеренно (1581: файл 3466, БД 3561).
-                var actualRaw = await _db.Results.AsNoTracking()
-                    .Where(r => competitionIds.Contains(r.CompetitionId))
-                    .Where(r => !preserveRelays || r.RelayId == null)
-                    .Select(r => new
-                    {
-                        r.CompetitionId,
-                        StyleName = r.Style != null ? r.Style.Name : "",
-                        r.Distance,
-                        IsRelay = r.RelayId != null,
-                        r.EventCategory
-                    })
-                    .ToListAsync();
-
-                var actualByEvent = actualRaw
-                    .GroupBy(r => (r.CompetitionId, Key: ImportReconciler.EventKey(
-                        r.StyleName, r.Distance, r.IsRelay, r.EventCategory)))
-                    .ToDictionary(g => (g.Key.CompetitionId, g.Key.Key), g => g.Count());
-
-                var rows = ImportReconciler.Build(expectedByEvent, actualByEvent);
-                var stamp = DateTime.UtcNow;
-
-                _db.ImportReconciliations.AddRange(rows.Select(r => new ImportReconciliation
+                var competitionIds = expectedByEvent.Keys.Select(k => k.CompetitionId).Distinct().ToList();
+                if (competitionIds.Count > 0)
                 {
-                    CompetitionId = r.CompetitionId,
-                    ImportedAt = stamp,
-                    ImportFileName = fileName ?? "unknown.json",
-                    EventKey = r.EventKey,
-                    ExpectedRows = r.Expected,
-                    ActualRows = r.Actual,
-                    Status = r.Status
-                }));
-                await _db.SaveChangesAsync();
+                    // Сверка сравнивает файл с тем, что этот файл ВПРАВЕ был принести. Источник
+                    // без эстафет (пособытийные страницы loglig, PreserveRelays) их не несёт и
+                    // не удаляет — считать их «лишними строками в БД» значит объявлять
+                    // расхождение там, где всё сделано намеренно (1581: файл 3466, БД 3561).
+                    var actualRaw = await _db.Results.AsNoTracking()
+                        .Where(r => competitionIds.Contains(r.CompetitionId))
+                        .Where(r => !preserveRelays || r.RelayId == null)
+                        .Select(r => new
+                        {
+                            r.CompetitionId,
+                            StyleName = r.Style != null ? r.Style.Name : "",
+                            r.Distance,
+                            IsRelay = r.RelayId != null,
+                            r.EventCategory
+                        })
+                        .ToListAsync();
 
-                reconciliationMismatches = rows.Count(r => r.EventKey.Length > 0 && r.IsMismatch);
-                reconciliationSummary = ImportReconciler.Describe(rows);
-                diagnosticLog.Add(reconciliationSummary);
+                    var actualByEvent = actualRaw
+                        .GroupBy(r => (r.CompetitionId, Key: ImportReconciler.EventKey(
+                            r.StyleName, r.Distance, r.IsRelay, r.EventCategory)))
+                        .ToDictionary(g => (g.Key.CompetitionId, g.Key.Key), g => g.Count());
+
+                    var rows = ImportReconciler.Build(expectedByEvent, actualByEvent);
+                    var stamp = DateTime.UtcNow;
+
+                    _db.ImportReconciliations.AddRange(rows.Select(r => new ImportReconciliation
+                    {
+                        CompetitionId = r.CompetitionId,
+                        ImportedAt = stamp,
+                        ImportFileName = fileName ?? "unknown.json",
+                        EventKey = r.EventKey,
+                        ExpectedRows = r.Expected,
+                        ActualRows = r.Actual,
+                        Status = r.Status
+                    }));
+                    await _db.SaveChangesAsync();
+
+                    reconciliationMismatches = rows.Count(r => r.EventKey.Length > 0 && r.IsMismatch);
+                    reconciliationSummary = ImportReconciler.Describe(rows);
+                    diagnosticLog.Add(reconciliationSummary);
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            diagnosticLog.Add($"Сверка с файлом не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+            catch (Exception ex)
+            {
+                diagnosticLog.Add($"Сверка с файлом не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+            }
         }
 
         // Согласование пола карточек (решение 2026-08-23): пол человека живёт в ОДНОМ месте —
         // в карточке пловца, и её надо держать в согласии с протоколами. Идёт до прогона
         // проверок, чтобы results.gender-vs-card увидел уже поправленное.
-        try
+        private async Task AlignGendersAsync()
         {
-            _db.ChangeTracker.Clear();
-            var genderSummary = await AlignSwimmerGendersAsync();
-            if (genderSummary.Length > 0) diagnosticLog.Add(genderSummary);
+            try
+            {
+                _db.ChangeTracker.Clear();
+                var genderSummary = await _svc.AlignSwimmerGendersAsync();
+                if (genderSummary.Length > 0) diagnosticLog.Add(genderSummary);
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add($"Согласование пола пловцов не выполнено ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+            }
         }
-        catch (Exception ex)
+
+        // Общая категория открытой воды — места внутри пола (Р78). Строго ПОСЛЕ согласования
+        // пола: пола в блоке «כללי» протокол не печатает, его только что дописал шаг выше.
+        private async Task RerankOpenWaterAsync()
         {
-            diagnosticLog.Add($"Согласование пола пловцов не выполнено ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+            if (touchedCompetitionKeys.Count > 0)
+            {
+                try
+                {
+                    _db.ChangeTracker.Clear();
+                    var touchedIds = touchedCompetitionKeys
+                        .Select(k => competitionCache[k].Id).Distinct().ToList();
+                    var reranked = await _svc.RerankOpenWaterOpenSectionsAsync(touchedIds);
+                    if (reranked > 0)
+                        diagnosticLog.Add($"Открытая вода: места общей категории пересчитаны по полу — строк {reranked}");
+                }
+                catch (Exception ex)
+                {
+                    diagnosticLog.Add(
+                        $"Пересчёт мест общей категории открытой воды не выполнен ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+                }
+            }
         }
 
         // Сшивка стартового протокола с результатами (шаг С9, docs/plans/start-list-plan.md):
         // заявка получает свой результат либо становится неявкой. Идёт ДО прогона проверок,
         // чтобы entries.no-show-unmatched увидел уже проставленные статусы. Как и соседи —
         // после коммита и в try/catch: сшивка не имеет права уронить импорт.
-        if (_stitch is not null && touchedCompetitionKeys.Count > 0)
+        private async Task StitchStartListAsync()
         {
-            try
+            if (_stitch is not null && touchedCompetitionKeys.Count > 0)
             {
-                _db.ChangeTracker.Clear();
-                var touchedIds = touchedCompetitionKeys
-                    .Select(k => competitionCache[k].Id).Distinct().ToList();
-                var stitched = await _stitch.StitchCompetitionsAsync(touchedIds);
+                try
+                {
+                    _db.ChangeTracker.Clear();
+                    var touchedIds = touchedCompetitionKeys
+                        .Select(k => competitionCache[k].Id).Distinct().ToList();
+                    var stitched = await _stitch.StitchCompetitionsAsync(touchedIds);
 
-                foreach (var s in stitched.Where(s => s.Entries > 0))
+                    foreach (var s in stitched.Where(s => s.Entries > 0))
+                        diagnosticLog.Add(
+                            $"Стартовый протокол {s.OrgCompId}: заявок {s.Entries}, проплыли {s.Swum}, " +
+                            $"без результата {s.NoShow}" +
+                            (s.MatchedByDiscipline > 0 ? $" (по дисциплине, не по дорожке: {s.MatchedByDiscipline})" : "")
+                            + (s.Unlinked > 0 ? $", не привязано к дню {s.Unlinked}" : ""));
+                }
+                catch (Exception ex)
+                {
                     diagnosticLog.Add(
-                        $"Стартовый протокол {s.OrgCompId}: заявок {s.Entries}, проплыли {s.Swum}, " +
-                        $"без результата {s.NoShow}" +
-                        (s.MatchedByDiscipline > 0 ? $" (по дисциплине, не по дорожке: {s.MatchedByDiscipline})" : "")
-                        + (s.Unlinked > 0 ? $", не привязано к дню {s.Unlinked}" : ""));
-            }
-            catch (Exception ex)
-            {
-                diagnosticLog.Add(
-                    $"Сшивка стартового протокола не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+                        $"Сшивка стартового протокола не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+                }
             }
         }
 
@@ -1219,29 +1380,32 @@ public class JsonImportService : IImportService
         // hubgroup-club-subscription-plan.md П2): пловец, впервые выступивший за клуб, попадает в
         // состав, выпавший из окна активности — уходит. Только клубы этого импорта: чужие составы
         // от него не меняются. Как и соседи — после коммита и в try/catch.
-        if (_clubSync is not null && touchedCompetitionKeys.Count > 0)
+        private async Task SyncClubGroupsAsync()
         {
-            try
+            if (_clubSync is not null && touchedCompetitionKeys.Count > 0)
             {
-                _db.ChangeTracker.Clear();
-                var touchedIds = touchedCompetitionKeys
-                    .Select(k => competitionCache[k].Id).Distinct().ToList();
-                var clubIds = await _db.Results.AsNoTracking()
-                    .Where(r => touchedIds.Contains(r.CompetitionId))
-                    .Select(r => r.ClubId)
-                    .Distinct()
-                    .ToListAsync();
+                try
+                {
+                    _db.ChangeTracker.Clear();
+                    var touchedIds = touchedCompetitionKeys
+                        .Select(k => competitionCache[k].Id).Distinct().ToList();
+                    var clubIds = await _db.Results.AsNoTracking()
+                        .Where(r => touchedIds.Contains(r.CompetitionId))
+                        .Select(r => r.ClubId)
+                        .Distinct()
+                        .ToListAsync();
 
-                var sync = await _clubSync.SyncClubsAsync(clubIds);
-                if (sync.Groups > 0)
+                    var sync = await _clubSync.SyncClubsAsync(clubIds);
+                    if (sync.Groups > 0)
+                        diagnosticLog.Add(
+                            $"Группы с подпиской на клуб: пересобрано {sync.Groups}, пловцов добавлено {sync.Added}, убрано {sync.Removed}");
+                }
+                catch (Exception ex)
+                {
                     diagnosticLog.Add(
-                        $"Группы с подпиской на клуб: пересобрано {sync.Groups}, пловцов добавлено {sync.Added}, убрано {sync.Removed}");
-            }
-            catch (Exception ex)
-            {
-                diagnosticLog.Add(
-                    $"Пересборка групп по подписке на клуб не выполнена ({ex.GetType().Name}: {ex.Message}). " +
-                    "Импорт сохранён; догнать — `dotnet run -- --hubgroup-club-sync`.");
+                        $"Пересборка групп по подписке на клуб не выполнена ({ex.GetType().Name}: {ex.Message}). " +
+                        "Импорт сохранён; догнать — `dotnet run -- --hubgroup-club-sync`.");
+                }
             }
         }
 
@@ -1250,85 +1414,82 @@ public class JsonImportService : IImportService
         // с этим соревнованием: импорт трогает и справочники (клубы, пловцы), а на 30к строк
         // это секунды. Запускается последним — чтобы ReconciliationMismatchCheck увидел строки
         // сверки, записанные выше.
-        var dataChecksSummary = "";
-        var dataCheckErrors = 0;
-        var dataCheckWarnings = 0;
-        if (_checks is not null)
+        private async Task RunDataChecksAsync()
         {
-            try
+            dataChecksSummary = "";
+            dataCheckErrors = 0;
+            dataCheckWarnings = 0;
+            if (_checks is not null)
             {
-                // Импорт натащил в трекер десятки тысяч сущностей; всё уже сохранено и
-                // закоммичено, а DetectChanges на них стоил бы дороже самих проверок.
-                _db.ChangeTracker.Clear();
+                try
+                {
+                    // Импорт натащил в трекер десятки тысяч сущностей; всё уже сохранено и
+                    // закоммичено, а DetectChanges на них стоил бы дороже самих проверок.
+                    _db.ChangeTracker.Clear();
 
-                var run = await _checks.RunAllAsync("import");
-                dataCheckErrors = run.ErrorCount;
-                dataCheckWarnings = run.WarningCount;
-                dataChecksSummary = run.ErrorCount == 0 && run.WarningCount == 0
-                    ? "Проверки данных: чисто."
-                    : $"Проверки данных: ошибок — {run.ErrorCount}, предупреждений — {run.WarningCount}.";
-                diagnosticLog.Add(dataChecksSummary);
-            }
-            catch (Exception ex)
-            {
-                diagnosticLog.Add(
-                    $"Проверки данных не выполнены ({ex.GetType().Name}: {ex.Message}). " +
-                    "Импорт сохранён; прогнать вручную — /Admin/Health или `dotnet run -- --check-data`.");
+                    await _checks.RunAllAsync("import");
+
+                    // Счётчики прогона включают и ПРИНЯТЫЕ находки: «31 предупреждение» читалось
+                    // как «импорт что-то нашёл», хотя все 31 разобраны раньше. Открытые и принятые
+                    // берём из состояния реестра — те же числа, что у дашборда и /Admin/Health.
+                    var (_, states) = await _checks.GetStateAsync();
+                    dataCheckErrors = states.Where(s => s.Severity == DataCheckSeverity.Error).Sum(s => s.Open);
+                    dataCheckWarnings = states.Where(s => s.Severity == DataCheckSeverity.Warning).Sum(s => s.Open);
+                    var accepted = states.Sum(s => s.Accepted);
+                    var acceptedNote = accepted > 0 ? $"принятых раньше — {accepted}" : "";
+                    dataChecksSummary = (dataCheckErrors, dataCheckWarnings, accepted) switch
+                    {
+                        (0, 0, 0) => "Проверки данных: чисто.",
+                        (0, 0, _) => $"Проверки данных: открытых нет ({acceptedNote}).",
+                        _ => $"Проверки данных: открытых ошибок — {dataCheckErrors}, предупреждений — {dataCheckWarnings}" +
+                             (accepted > 0 ? $"; {acceptedNote}." : ".")
+                    };
+                    diagnosticLog.Add(dataChecksSummary);
+                }
+                catch (Exception ex)
+                {
+                    diagnosticLog.Add(
+                        $"Проверки данных не выполнены ({ex.GetType().Name}: {ex.Message}). " +
+                        "Импорт сохранён; прогнать вручную — /Admin/Health или `dotnet run -- --check-data`.");
+                }
             }
         }
 
-        await _cache.InvalidateAllAsync(fileName is null ? "импорт протокола" : $"импорт протокола {fileName}");
-
-        // insertedCount — реально вставленные строки resultBatch (после того как сматченные
-        // upsert-строки были из него удалены выше); created включает и их (полный успешный проход).
-        var insertedCount = resultBatch.Count;
-        var message = upsertCompetitionIds.Count > 0
-            ? $"Import complete (upsert): {updatedCount} updated, {insertedCount} inserted"
-                + (deleteMissing
-                    ? $", {deletedCount} deleted" + (skippedWithMediaCount > 0 ? $", {skippedWithMediaCount} skipped (медиа)" : "")
-                    : " (DeleteMissing off — исчезнувшие из файла результаты не удалялись)")
-            : $"Import complete: {created} created, {skipped} skipped, {errors} errors";
-
-        return new ImportResult
+        private async Task<ImportResult> FinishAsync()
         {
-            TotalRows = items.Count,
-            Created = created,
-            Skipped = skipped,
-            Errors = errors,
-            ErrorMessages = errorMessages,
-            DiagnosticLog = diagnosticLog,
-            Updated = updatedCount,
-            Inserted = insertedCount,
-            Deleted = deletedCount,
-            SkippedWithMedia = skippedWithMediaCount,
-            Reconciliation = reconciliationSummary,
-            ReconciliationMismatches = reconciliationMismatches,
-            DataChecks = dataChecksSummary,
-            DataCheckErrors = dataCheckErrors,
-            DataCheckWarnings = dataCheckWarnings,
-            SuspectFlagged = suspectFlagged,
-            Message = message
-        };
-        }
-        catch (Exception ex)
-        {
-            await tx.RollbackAsync();
-            // Разворачиваем цепочку inner-исключений: у EF/Npgsql реальная причина (нарушение
-            // constraint, null в NOT NULL и т.п.) лежит во вложенном исключении, а не в ex.Message.
-            var chain = new List<string>();
-            for (var e = ex; e != null; e = e.InnerException)
-                chain.Add($"{e.GetType().Name}: {e.Message}");
+            await _cache.InvalidateAllAsync(fileName is null ? "импорт протокола" : $"импорт протокола {fileName}");
+
+            // insertedCount — реально вставленные строки resultBatch (после того как сматченные
+            // upsert-строки были из него удалены выше); created включает и их (полный успешный проход).
+            var insertedCount = resultBatch.Count;
+            var message = upsertCompetitionIds.Count > 0
+                ? $"Import complete (upsert): {updatedCount} updated, {insertedCount} inserted"
+                    + (deleteMissing
+                        ? $", {deletedCount} deleted" + (skippedWithMediaCount > 0 ? $", {skippedWithMediaCount} skipped (медиа)" : "")
+                        : " (DeleteMissing off — исчезнувшие из файла результаты не удалялись)")
+                : $"Import complete: {created} created, {skipped} skipped, {errors} errors";
+
             return new ImportResult
             {
                 TotalRows = items.Count,
-                Created = 0,
-                Errors = 1,
-                ErrorMessages = ["Unexpected error, import rolled back: " + string.Join(" → ", chain)],
+                Created = created,
+                Skipped = skipped,
+                Errors = errors,
+                ErrorMessages = errorMessages,
                 DiagnosticLog = diagnosticLog,
-                Message = "Import failed and was rolled back"
+                Updated = updatedCount,
+                Inserted = insertedCount,
+                Deleted = deletedCount,
+                SkippedWithMedia = skippedWithMediaCount,
+                Reconciliation = reconciliationSummary,
+                ReconciliationMismatches = reconciliationMismatches,
+                DataChecks = dataChecksSummary,
+                DataCheckErrors = dataCheckErrors,
+                DataCheckWarnings = dataCheckWarnings,
+                SuspectFlagged = suspectFlagged,
+                Message = message
             };
         }
-        });
     }
 
     /// <summary>
@@ -1385,107 +1546,6 @@ public class JsonImportService : IImportService
             old.SuspectReason = incoming.SuspectReason;
             old.SuspectNote = incoming.SuspectNote;
         }
-    }
-
-    /// <summary>
-    /// Запасной ключ ноги эстафеты: английское имя + год. Нужен, когда протокол пишет пловца
-    /// латиницей не так, как лежит его карточка: у Shirli Ben Shoham в карточке «SHOHAM BEN»
-    /// (латиница в ивритском поле, обратный порядок), а loglig печатает «BEN SHOHAM» — совпадает
-    /// с её английским именем. Без запасного ключа каждый переимпорт заводил ей новую карточку
-    /// (19.09.2026, comp 64). Регистр не важен; берём только ОДНОЗНАЧНОЕ совпадение — двое
-    /// с тем же латинским именем и годом значит, что гадать нельзя, и заводится новая карточка.
-    /// </summary>
-    /// <summary>
-    /// Нога, записанная с ДРУГОЙ границей между именем и фамилией: ищем по всем словам
-    /// полного имени и году рождения (<see cref="SwimmerFullNameKey"/>). Неоднозначность
-    /// (двое под одним ключом) — не матчим: лучше тень, чем чужие результаты в профиле.
-    /// </summary>
-    private async Task<Swimmer?> FindLegByFullNameAsync(RelaySwimmerJson leg)
-    {
-        var year = leg.BirthYear ?? 0;
-        if (year == 0) return null;
-
-        var key = SwimmerFullNameKey(leg.LastName, leg.FirstName, year);
-        var sameYear = await _db.Swimmers.Where(s => s.BirthYear == year).ToListAsync();
-        var hits = sameYear
-            .Where(s => SwimmerFullNameKey(s.LastName, s.FirstName, s.BirthYear) == key)
-            .ToList();
-        return hits.Count == 1 ? hits[0] : null;
-    }
-
-    private async Task<Swimmer?> FindLegByEnglishNameAsync(RelaySwimmerJson leg)
-    {
-        var last = (leg.LastName ?? "").Trim().ToUpperInvariant();
-        var first = (leg.FirstName ?? "").Trim().ToUpperInvariant();
-        if (last.Length == 0 || leg.BirthYear is not int year || year == 0) return null;
-
-        var found = await _db.Swimmers
-            .Where(s => s.BirthYear == year
-                        && s.LastNameEn.ToUpper() == last
-                        && s.FirstNameEn.ToUpper() == first)
-            .Take(2)
-            .ToListAsync();
-        return found.Count == 1 ? found[0] : null;
-    }
-
-    /// <summary>
-    /// Резолвит ноги эстафеты (леги из парсера) в <see cref="RelayMember"/>: каждое имя —
-    /// в Swimmer тем же матчингом, что и обычный пловец (кэш → БД → заглушка). Анонимные
-    /// леги (без имени) пропускаем — членство им не атрибутировать. Дубли SwimmerId внутри
-    /// одной эстафеты схлопываем (уникальный индекс RelayId+SwimmerId).
-    /// </summary>
-    private async Task<List<RelayMember>> ResolveRelayMembersAsync(
-        List<RelaySwimmerJson>? legs, Dictionary<string, Swimmer> swimmerCache)
-    {
-        var members = new List<RelayMember>();
-        if (legs == null || legs.Count == 0) return members;
-
-        var seen = new HashSet<int>();
-        foreach (var leg in legs)
-        {
-            var normLast = SwimmerDedupService.Normalize(leg.LastName ?? "");
-            var normFirst = SwimmerDedupService.Normalize(leg.FirstName ?? "");
-            if (normLast == string.Empty && normFirst == string.Empty)
-                continue; // анонимная нога
-
-            var key = SwimmerMatchKey(leg.LastName, leg.FirstName, leg.BirthYear);
-            if (!swimmerCache.TryGetValue(key, out var swimmer))
-            {
-                swimmer = await _db.Swimmers.FirstOrDefaultAsync(s =>
-                    s.LastName == (leg.LastName ?? "") &&
-                    s.FirstName == (leg.FirstName ?? "") &&
-                    s.BirthYear == (leg.BirthYear ?? 0));
-
-                // Та же нога, разрезанная на имя и фамилию иначе (протокол гадает границу,
-                // loglig берёт её из колонок) — не новый пловец, см. SwimmerFullNameKey.
-                swimmer ??= await FindLegByFullNameAsync(leg);
-                swimmer ??= await FindLegByEnglishNameAsync(leg);
-
-                if (swimmer == null)
-                {
-                    swimmer = new Swimmer
-                    {
-                        LastName = leg.LastName ?? string.Empty,
-                        FirstName = leg.FirstName ?? string.Empty,
-                        LastNameEn = string.Empty,
-                        FirstNameEn = string.Empty,
-                        BirthYear = leg.BirthYear ?? 0
-                    };
-                    _db.Swimmers.Add(swimmer);
-                    await _db.SaveChangesAsync();
-                }
-                swimmerCache[key] = swimmer;
-            }
-
-            if (!seen.Add(swimmer.Id)) continue;
-            members.Add(new RelayMember
-            {
-                SwimmerId = swimmer.Id,
-                LegOrder = leg.Order ?? 0,
-                SplitTime = leg.SplitTime,
-            });
-        }
-        return members;
     }
 
     /// <summary>
@@ -1588,47 +1648,6 @@ public class JsonImportService : IImportService
     }
 
     /// <summary>
-    /// Ключ матчинга пловца для кэша/поиска — нормализует фамилию и имя по правилам
-    /// <see cref="SwimmerDedupService.Normalize"/> (гереш/апостроф, регистр, пробелы),
-    /// чтобы не плодить дублей из-за непоследовательной пунктуации в протоколах isr.org.il.
-    /// Хранимые Swimmer.LastName/FirstName нормализацию НЕ проходят.
-    /// </summary>
-    private static string SwimmerMatchKey(string? last, string? first, int? year) =>
-        $"{SwimmerDedupService.Normalize(last ?? "")}|{SwimmerDedupService.Normalize(first ?? "")}|{year ?? 0}";
-
-    /// <summary>
-    /// Ключ пловца, НЕ ЗАВИСЯЩИЙ от того, где прошла граница между именем и фамилией:
-    /// все слова полного имени по алфавиту + год рождения.
-    ///
-    /// Зачем: границу знает не каждый источник. Основной протокол даёт ногу эстафеты плоской
-    /// строкой «Фамилия… Имя Год» и вынужден гадать — <c>ParseRelaySwimmerLine</c> отдаёт имени
-    /// ровно одно слово, поэтому «בניסים שרה רוז 2015» превращается в фамилию «בניסים שרה» и
-    /// имя «רוז». У PDF промежуточных loglig имя и фамилия лежат в РАЗНЫХ КОЛОНКАХ, и тот же
-    /// человек разрезан правильно. Обычный ключ «фамилия|имя|год» на этих двух написаниях
-    /// разный, и импорт заводит пловца-тень рядом с настоящим: 20.09.2026 так появилось
-    /// 50 дублей за один прогон (docs/data-integrity.md, И-28).
-    ///
-    /// ⚠ ПОРЯДОК СЛОВ ЗНАЧИМ: склеиваем «фамилия + имя» как есть, без пробелов. «שני עידו» и
-    /// «עידו שני» остаются РАЗНЫМИ людьми — решение зафиксировано тестом
-    /// <c>Import_NameSurnameSwap_NotMerged</c>: в иврите обе половины бывают и именем, и
-    /// фамилией, и перестановка склеила бы двух разных детей. Сдвиг границы при этом ловится:
-    /// «בניסים שרה»+«רוז» и «בניסים»+«שרה רוז» дают одну и ту же склейку.
-    /// ⚠ Это ФОЛЛБЕК, а не основной ключ: сначала пробуем точное совпадение, и только если его
-    /// нет — этот. Сторож тёзок по клубам (И-11) работает после и не отключается.
-    /// </summary>
-    private static string SwimmerFullNameKey(string? last, string? first, int? year)
-    {
-        var glued = $"{SwimmerDedupService.Normalize(last ?? "")}{SwimmerDedupService.Normalize(first ?? "")}"
-            .Replace(" ", string.Empty);
-        return $"{glued}|{year ?? 0}";
-    }
-
-    /// <summary>
-    /// Дополняет данные спортсмена полями из результатов:
-    /// Gender (из event_style_gender), ClubId (FK на клуб) и CountryId (FK на страну).
-    /// Обновляет только пустые поля — не перезаписывает уже заполненные.
-    /// </summary>
-    /// <summary>
     /// Пол заплыва, у которого его нет в шапке протокола («none» — смешанные заплывы вроде
     /// «שומרי שבת»), берём с самого пловца: его пол известен по другим заплывам. Если и там
     /// пусто — оставляем пустым, такие строки видны в «дырах данных» (Admin/Results).
@@ -1652,6 +1671,11 @@ public class JsonImportService : IImportService
         || gender.Equals("mix", StringComparison.OrdinalIgnoreCase)
         || gender.Equals("mixed", StringComparison.OrdinalIgnoreCase); // смешанная эстафета — не пол пловца (Э4)
 
+    /// <summary>
+    /// Дополняет данные спортсмена полями из результатов:
+    /// Gender (из event_style_gender), ClubId (FK на клуб) и CountryId (FK на страну).
+    /// Обновляет только пустые поля — не перезаписывает уже заполненные.
+    /// </summary>
     private static void EnrichSwimmerFromResult(Swimmer swimmer, string? gender, Club? club, Country? country)
     {
         // «none»/«mix» — это отсутствие пола в шапке, а не пол пловца: записав его в Swimmer,
@@ -1770,6 +1794,33 @@ public class JsonImportService : IImportService
         await _db.SaveChangesAsync();
         return $"Пол согласован с протоколами: карточек заполнено {filled}, исправлено {corrected}, "
              + $"строк без пола дописано {rowsFilled}.";
+    }
+
+    /// <summary>
+    /// Места общей категории («כללי») открытой воды — внутри пола (Р78, правило — в
+    /// <see cref="OpenWaterOpenSectionRanker"/>). Блок общей категории узнаётся по программе
+    /// «mix-…»: парсер ставит её секции «כללי» без пола. Только соревнования этого импорта и
+    /// только с <c>StandingKindOverride = openwater</c> — смешанные блоки бассейна не трогаем.
+    /// </summary>
+    private async Task<int> RerankOpenWaterOpenSectionsAsync(IReadOnlyCollection<int> competitionIds)
+    {
+        var rows = await _db.Results
+            .Where(r => competitionIds.Contains(r.CompetitionId)
+                        && r.Competition.StandingKindOverride == StandingKinds.OpenWater
+                        && r.RelayId == null
+                        && r.EventCategory != null && r.EventCategory.StartsWith("mix"))
+            .ToListAsync();
+        if (rows.Count == 0) return 0;
+
+        var changes = OpenWaterOpenSectionRanker.Rerank(rows.Select(r => new OpenSectionRow(
+            r.Id, $"{r.CompetitionId}|{r.StyleId}|{r.Distance}|{r.EventCategory}", r.Gender, r.Position)));
+        if (changes.Count == 0) return 0;
+
+        foreach (var row in rows)
+            if (changes.TryGetValue(row.Id, out var place)) row.Position = place;
+
+        await _db.SaveChangesAsync();
+        return changes.Count;
     }
 
     /// <summary>Пол в БД живёт как male/female и как M/F — сводим к одному написанию.</summary>

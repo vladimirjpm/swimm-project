@@ -17,7 +17,7 @@ namespace Swimm.Infrastructure.Services;
 /// поэтому у многодневки его получает только один день; <c>CompetitionEvent.OrgCompId</c>
 /// покрывает событие целиком.
 /// </summary>
-internal static class CompetitionIdentity
+public static class CompetitionIdentity
 {
     /// <summary>
     /// Дни, относящиеся к этому compID: всё событие, если соревнование в него входит,

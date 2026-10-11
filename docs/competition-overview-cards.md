@@ -8,11 +8,12 @@
 
 | Слой | Файлы |
 |---|---|
-| Расчёт | `server/Swimm.Infrastructure/Repositories/ResultRepository.cs` → `GetCompetitionOverviewAsync` |
+| Расчёт | `server/Swimm.Infrastructure/Repositories/ResultRepository.Overview.cs` → `GetCompetitionOverviewAsync`; по методу на карточку: `BestSwimProjection`, `LoadMedalRowsAsync` + `BuildMedalists` (Most decorated), `LoadHighPointAwardsAsync` (legacy / по правилу), `LoadAppliedClubRulesAsync` / `LoadClubPointsVerifiedAsync` / `IsClubPointsUnofficialAsync` (Top clubs; сами очки — `GetClubSummaryAsync` в `ResultRepository.cs`), `DetectNewRecordsAsync` |
 | Контракт | `server/Swimm.Application/Dtos/CompetitionOverviewDto.cs`, эндпоинт `GET /api/competition-overview` |
 | Мозаика | `client/.../competition-header/overview2/competition-overview2.tsx` + `module-defs.ts` (порядок и ключи модулей) |
 | Карточки | `overview2/module-card-*.tsx` |
 | Типы клиента | `client/.../competition-header/types.ts` |
+| Тесты | `server/Swimm.Tests/`: `OverviewBestSwimCardTests`, `OverviewMostDecoratedTests`, `OverviewHighPointCardTests`, `OverviewTopClubsCardTests` (+ `OverviewClubPointsUnofficialTests`), `OverviewNewRecordsCardTests`, `OverviewOrgCompIdTests`; сводка, дни и базовые случаи карточек — `ResultRepositoryTests` (`Overview_*`). Общая посадка — `OverviewTestKit`. Меняешь правило карточки — тест рядом с её именем |
 
 **Общее для всех карточек**
 
@@ -117,6 +118,33 @@
 вручную. Показывается, только если статус одинаков у всех соревнований выборки. Остальные
 статусы проверки на сайте не видны — см. docs/admin-pages/pointsrules.md.
 
+**Серый чип «Unofficial»** (Р80, 08.10.2026) — у соревнования **нет официального клубного
+зачёта**, а шкалу очков выбрали мы — автоподбором (для 2025+ это шкала чемпионата Израиля,
+правило 1). Флаг `club_points_unofficial` в overview: `HasOfficialClubStanding = false`
+(loglig проверен, таблицы нет) либо `null` + пометка «клубный зачёт не ведётся»
+(`ClubPointsDisabled`); явное `true` главнее пометки. **Правило, привязанное вручную, снимает
+чип** (решение Влада 08.10.2026): ручная привязка значит, что шкала взята из регламента, — так
+у чемпионатов, чей зачёт loglig не публикует (лето-2026 Kids 8-11, Эйлат-2026 и др.). В выборке
+из нескольких соревнований (событие, сезон) — только если так у ВСЕХ: сумма, куда вошёл
+официальный зачёт, уже не «неофициальная». Правило одно — `Competition.IsClubPointsUnofficial`.
+С бейджем «★ Differs from official» не встречается: тот бывает только там, где официальный
+зачёт есть.
+
+Один и тот же компонент `UI_ClubPointsUnofficialChip` стоит **везде, где видны клубные очки
+соревнования**:
+
+| Где | Откуда флаг |
+|---|---|
+| Overview → Top clubs | `club_points_unofficial` overview |
+| Таб Clubs, у «Club standings» | тот же overview, пропом `unofficial` |
+| Таб Swims, фильтр Club (у легенды «⭐ rating…», `size="sm"`) | стор `clubPointsUnofficial` — его пишет `results-main-project` из overview: в full-режиме параметров источника в сторе нет, а панель фильтров overview сама не грузит |
+| Страница клуба → Season → карточка Standings | `standings.unofficial` в `/api/clubs/{id}/overview` |
+| Страница клуба → History, строка старта (`size="sm"`) | `timeline[].unofficial` там же |
+
+У зачётной единицы события (первый день) на странице клуба официальность решают ВСЕ дни
+события — как в overview. Сетка «сезон × группа» чипа не несёт: в ней только чемпионаты, а у
+них либо есть таблица на loglig, либо правило привязано по регламенту.
+
 **Чем именно официальные очки неверны** — в попапе «Points system»
 (`club_points_mismatch_note`, таблицы `CompetitionNotes` / `CompetitionNoteTexts`, заполняется
 в админке). Красная плашка стоит ПЕРЕД шкалой: читатель приходит в попап по бейджу и ищет
@@ -136,6 +164,10 @@
   [`points-rules-per-competition-plan.md`](points-rules-per-competition-plan.md) и
   [`admin-pages/pointsrules.md`](admin-pages/pointsrules.md).
 - **Эстафета даёт удвоенные очки** (`RelayMultiplier` правила, по умолчанию ×2).
+- **Зачёт «по заплыву целиком»** — у правила с общей категорией / порогом участников /
+  списком дистанций (схема Красного моря, Эйлат) очки строки зависят от всего заплыва:
+  победитель возраста получает шкалу, абсолют по времени — шкалу × вес сверху, категория меньше
+  порога не платит, остальные дистанции — ноль. Устройство — `docs/admin-pages/pointsrules.md`.
 - Три версии зачёта: общий, мужской, женский (`top_clubs`, `top_clubs_men`, `top_clubs_women`).
 - **Категория заплыва (`EventCategory`) НЕ учитывается** сознательно: зачёт идёт по
   протокольным местам, а они уже корректны внутри своей программы (para-золото — настоящее
@@ -210,7 +242,9 @@ Swims →» — заплывы клуба на этом соревновании
   очки по шкале класса даже в общем заплыве (бугрим: 1:22.76 на 100 в/с → 931), и они забирали
   «лучший заплыв». То же в High Point по FINA: такие строки дают 0.
 - **Помеченные ошибки протокола не участвуют** (`SuspectReason`, Р69) — как и в New records. В
-  High Point помеченная строка не даёт ни очков, ни места.
+  High Point помеченная строка не даёт ни очков, ни места. **Медали и клубные очки — не трогаем**
+  (Р72): у помеченной строки остаются протокольное место, медаль и очки клуба, даже если ошибка
+  источника переставила места (день 1512).
 - Эстафета может стать «лучшим заплывом» — тогда вместо имени показывается название команды
   (`relay_team_name`).
 - Если разбивки по полу нет, показывается общий `best_swim`.

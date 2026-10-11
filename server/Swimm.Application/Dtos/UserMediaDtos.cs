@@ -28,6 +28,13 @@ public class UserMediaDto
     [JsonPropertyName("competition_id")]
     public int? CompetitionId { get; set; }
 
+    /// <summary>
+    /// Событие многодневки дня CompetitionId (null — однодневное или без соревнования). По нему
+    /// карточка /my-media подбирает медиа дня без заплывов (кнопка шапки цепляет к первому дню).
+    /// </summary>
+    [JsonPropertyName("event_id")]
+    public int? EventId { get; set; }
+
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; }
 

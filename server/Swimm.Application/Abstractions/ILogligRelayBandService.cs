@@ -35,6 +35,10 @@ public interface ILogligRelayBandService
 /// <param name="PointsBefore">Наши очки эстафет ДО ремонта, по привязанному правилу.</param>
 /// <param name="PointsAfter">Наши очки эстафет ПОСЛЕ ремонта, по тому же правилу.</param>
 /// <param name="Applied">Сколько строк реально обновлено (0 у dry-run).</param>
+/// <param name="UnreadableEvents">
+/// События, которые loglig не отдал (HTTP-ошибка). Эстафета ли это, до чтения неизвестно;
+/// если да — наши строки останутся без пары, и план станет неприменимым сам.
+/// </param>
 public sealed record LogligRelayBandReport(
     string CompetitionName,
     int RelayEvents,
@@ -44,4 +48,5 @@ public sealed record LogligRelayBandReport(
     int PointsBefore,
     int PointsAfter,
     int Applied,
-    RelayBandPlan Plan);
+    RelayBandPlan Plan,
+    IReadOnlyList<int>? UnreadableEvents = null);

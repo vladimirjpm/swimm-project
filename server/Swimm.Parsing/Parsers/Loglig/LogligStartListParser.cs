@@ -262,11 +262,19 @@ public static partial class LogligStartListParser
         var isRelay = disciplineRaw.Contains(RelayMarker, StringComparison.Ordinal);
         var distanceMatch = DistanceRx().Match(disciplineRaw);
         var distance = distanceMatch.Success ? distanceMatch.Value.ToUpperInvariant() : string.Empty;
+        // Открытая вода — в километрах («5K חופשי»), наши строки — в метрах (как NormalizeHeaderLen
+        // у PDF). Иначе ключ дня «freestyle 5» не находил строк «5000», и деление Эйлата-2026
+        // отказывало на 94 строках, хотя каждая дистанция плылась в один день (М4, 07.10.2026).
+        if (distance.EndsWith('K') && int.TryParse(distance[..^1], out var km))
+            distance = (km * 1000).ToString(CultureInfo.InvariantCulture);
 
         var styleText = distanceMatch.Success
             ? disciplineRaw[(distanceMatch.Index + distanceMatch.Length)..]
             : disciplineRaw;
         styleText = styleText.Replace(RelayMarker, string.Empty, StringComparison.Ordinal).Trim();
+        // «מיקס» — состав, а не стиль: «4X1500 שליחים מיקס» (открытая вода, Эйлат-2026) иначе
+        // давал стиль «מיקס», и доклейка составов не находила дисциплину (07.10.2026).
+        if (isRelay) styleText = styleText.Replace(MixMarker, string.Empty, StringComparison.Ordinal).Trim();
 
         // «4X50 שליחים» без названия стиля — у источника это вольная эстафета.
         var style = styleText.Length == 0 && isRelay
@@ -416,6 +424,7 @@ public static partial class LogligStartListParser
         SpaceRx().Replace(WebUtility.HtmlDecode(TagRx().Replace(html, " ")), " ").Trim();
 
     private const string RelayMarker = "שליחים";
+    private const string MixMarker = "מיקס";
     private const string NoTimeMarker = "NT";
     private const string HeatColumnHeader = "מקצה";
     private const string BirthYearHeader = "שנת לידה";
@@ -450,7 +459,7 @@ public static partial class LogligStartListParser
     [GeneratedRegex("""\d{1,2}:\d{2}""")]
     private static partial Regex ClockRx();
 
-    [GeneratedRegex("""^\d+[xX]\d+|^\d+""")]
+    [GeneratedRegex("""^\d+[xX]\d+|^\d+[kK]\b|^\d+""")]
     private static partial Regex DistanceRx();
 
     [GeneratedRegex("""^\d{1,2}:\d{2}\.\d{2}$""")]

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Validation;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -50,6 +51,7 @@ public class UserMediaRepository : IUserMediaRepository
                 Url = m.Url,
                 ResultId = m.ResultId,
                 CompetitionId = m.CompetitionId,
+                EventId = m.Competition != null ? m.Competition.EventId : null,
                 CreatedAt = m.CreatedAt,
                 SwimmerName = (m.Swimmer.LastName + " " + m.Swimmer.FirstName).Trim(),
                 ResultLabel = m.ResultRecord != null
@@ -97,6 +99,23 @@ public class UserMediaRepository : IUserMediaRepository
 
     public async Task<int> CountForUserAsync(int userId)
         => await _db.UserMedia.CountAsync(m => m.UserId == userId);
+
+    public async Task<bool> HasSameLinkAsync(int userId, AddUserMediaRequest request)
+    {
+        // Цель выводим так же, как AddAsync: result_id главнее competition_id.
+        var query = _db.UserMedia.AsNoTracking().Where(m => m.UserId == userId);
+        if (request.ResultId != null)
+            query = query.Where(m => m.ResultId == request.ResultId.Value);
+        else if (request.CompetitionId != null)
+            query = query.Where(m => m.Level == "competition" && m.CompetitionId == request.CompetitionId.Value);
+        else
+            query = query.Where(m => m.Level == "swimmer" && m.SwimmerId == request.SwimmerId);
+
+        // Ключ (id файла Drive) в SQL не посчитать — ссылок у одной цели единицы, сравниваем в памяти.
+        var key = MediaUrlValidator.DedupKey(request.Url);
+        var urls = await query.Select(m => m.Url).ToListAsync();
+        return urls.Any(u => MediaUrlValidator.DedupKey(u) == key);
+    }
 
     public async Task<UserMediaDto?> AddAsync(int userId, AddUserMediaRequest request)
     {

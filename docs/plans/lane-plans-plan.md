@@ -1,6 +1,8 @@
 # Уровни пловцов и план дорожек
 
-Статус: **L1–L5 сделаны 26.09.2026 — фаза 8.14 закрыта, не закоммичена.** Дальше — только таблица «Позже» по мере надобности. Фаза 8.14 в [`../ROADMAP.md`](../ROADMAP.md).
+Статус: **фаза 8.14 закрыта, всё в master** — L1–L5 (PR #98, 26.09.2026) и Auto lanes (PR #99,
+27.09.2026). Открытых решений нет; дальше — таблица «Позже» по запросу Влада. Фаза 8.14 в
+[`../ROADMAP.md`](../ROADMAP.md). **Новый чат — начинать с раздела «Как вернуться к работе» в конце.**
 Пример из жизни — группа `dolphin-netanya-masters`: 20 пловцов, свободно 6 дорожек;
 дорожка 1 — уровень 1 (сильнейшие), 2–3 — уровень 2, 4–5 — уровень 3, 6 — уровень 4
 (начинающие). Тренер раскладывает людей и пишет задание на каждую дорожку; пловец заходит
@@ -40,9 +42,12 @@
 
 ```
 Sys_HubGroupLevels          Id, HubGroupId, Rank (1 = сильнейший), Name(50), Description(300)?, Color(9)?
-                            UNIQUE (HubGroupId, Rank)
+                            индекс (HubGroupId, Rank) НЕ уникальный (список сохраняется целиком с
+                            перенумерацией — уникальный падал бы на перестановке); AK (HubGroupId, Id)
+                            — цель составного FK уровня пловца
 Sys_HubGroupSwimmerLevels   HubGroupId, SwimmerId, LevelId            PK (HubGroupId, SwimmerId)
-                            LevelId → Sys_HubGroupLevels, ON DELETE CASCADE (строка уходит = «без уровня»)
+                            FK (HubGroupId, LevelId) → уровень ЭТОЙ ЖЕ группы, ON DELETE CASCADE
+                            (строка уходит = «без уровня»)
 Sys_LanePlans               Id, HubGroupId, Date (date), LaneCount (1..12), Note(500)?,
                             Status (draft|published), CreatedByUserId? (SET NULL), CreatedAt, UpdatedAt
                             UNIQUE (HubGroupId, Date)   ← снять, когда появится StartTime
@@ -150,11 +155,17 @@ DELETE /api/hub-groups/{id}/lane-plans/{date}              CanEdit → 204 / 404
   members only.»). Участнику — выбор даты + доска: карточка на дорожку (номер, уровень,
   задание, люди). Сверху карточка **«Your lane»**, если подсветка нашлась. Мобильный
   вид — карточки столбиком, своя первой.
-- **Управляющему в том же табе** — Edit: число дорожек, уровень на дорожку, «Distribute»,
-  перетаскивание (плюс выпадашка «Lane N» на телефоне — drag там неудобен), корзины
-  Unassigned / Not today, задание текстом с «Same for lanes 2–3», Publish.
+- **Управляющему в том же табе** — выбор даты (стрелки по планам + поле «любой день»), на
+  пустом дне «Create plan» и «Copy from <дата>»; в редакторе: число дорожек, заметка,
+  **«Auto lanes»** (дорожки между уровнями сами), уровень на дорожку, **«Distribute by level»**,
+  перетаскивание (плюс выпадашка «Lane N / Unassigned / Not today» на телефоне), ↑ «кто ведёт»,
+  корзины Unassigned / Not today, задание текстом с «Same workout as lane N−1» (соседу того же
+  уровня); на доске — Edit, Publish / Unpublish, Delete.
 - **Уровни** — карточка `Levels` в табе `Admin` группы: список уровней (имя, описание, цвет,
   порядок) и состав с выпадашкой уровня у каждого пловца, фильтр «No level».
+- **Уровень из таба `Swimmers`** (27.09.2026) — управляющему в карточке `Members` у каждого
+  пловца та же выпадашка уровня (точка цвета + «N · Name» / «No level»), в подзаголовке
+  «N without a level». Участнику и гостю уровни не грузятся вовсе.
 - Новых маршрутов нет (таб через `?tab=`) — три зеркала маршрутов не трогаем.
 
 ## Footguns — проверить при реализации
@@ -183,6 +194,7 @@ DELETE /api/hub-groups/{id}/lane-plans/{date}              CanEdit → 204 / 404
 | ✅ **L3** | Таб `Lanes`: редактор управляющего (дорожки, Distribute, перенос, корзины, задания) + доска только для чтения | сделано 26.09.2026 — см. «Сделано» ниже |
 | ✅ **L4** | Таб `Lanes`: доска участника + «Your lane» (`my_swimmers` на сервере); замок не участнику; `utest`-персонажи | сделано 26.09.2026 — см. «Сделано» ниже | `utest-member` видит опубликованный план и не видит черновик; гость — замок; pending — замок |
 | ✅ **L5** | «Copy from previous plan»; footguns: склейка пловцов, delete-impact | сделано 26.09.2026 — см. «Сделано» ниже |
+| ✅ **Auto lanes** | Дорожки между уровнями по числу пришедших (`LaneAllocation`), кнопка в редакторе | сделано 27.09.2026 (PR #99) — см. «Сделано» ниже |
 
 Тесты (`Swimm.Tests`): `LaneDistribution` (поровну ±1, уровень без дорожек → Unassigned,
 без уровня → Unassigned, детерминизм, пустой уровень), права (участник/pending/гость/
@@ -350,3 +362,84 @@ DELETE /api/hub-groups/{id}/lane-plans/{date}              CanEdit → 204 / 404
   Beginner; 2 → Advanced и Intermediate+Beginner (4 на второй); 5 → по две Advanced и Intermediate
   + Beginner; 1 → все вместе. В редакторе задание дорожки 2 осталось, повторный запуск
   спрашивает подтверждение. Тестовые уровни удалены.
+
+### Уровень из таба Swimmers (запрос Влада 27.09.2026)
+
+Тренер открывает таб `Swimmers` и правит уровни прямо в составе, не уходя в `Admin`.
+
+- **Клиент** — `GroupMembersCard` (`group-cards.tsx`) получил проп `editLevels` (в
+  `group-page.tsx` = `real && manages`, то же право, что у таба Admin). С ним у каждого пловца
+  справа выпадашка уровня, сохраняет сразу, оптимистично, откат с текстом сервера. Выпадашки
+  нет у пловца, которого нет в ответе уровней (сервер ставит уровень только видимому составу).
+- **Общий хук** `use-group-levels.ts` — загрузка уровней + `setSwimmerLevel` +
+  `applySwimmerLevel` (пересчёт счётчиков); на нём теперь и карточка `Levels`, и таб
+  `Swimmers`. `enabled = false` — ни одного запроса (участник, гость, «избранное»).
+  Ручка уровня пловца — `lanePlansApi.setSwimmerLevel`. Сервер не менялся.
+- ⚠ Первое открытие таба `Swimmers` тренером заводит группе стандартные 4 уровня (GET уровней
+  так устроен) — как и первое открытие таба Admin.
+- **Проверено вживую** (`utest-open`): тренер ставит уровень в Swimmers → сервер сохранил,
+  подзаголовок «5 without a level»; карточка Levels в Admin после рефакторинга считает и
+  сохраняет как раньше; `utest-member` — выпадашек нет, запросов к `/levels` нет; 375 px без
+  горизонтальной прокрутки. Тестовые уровни удалены.
+
+## Как вернуться к работе (27.09.2026)
+
+**Состояние.** Всё в master: PR #98 (L1–L5 + починка кэша после #97, merge `dd629385`) и PR #99
+(Auto lanes, merge `d6ec402c`). Миграции `AddHubGroupLevels`, `AddLanePlans` применены к локальной
+базе. Незакоммиченного по этой работе нет. Открытых решений Влада нет.
+
+**Где что лежит.**
+
+| Слой | Файлы |
+|---|---|
+| Домен | `Swimm.Domain/Entities/HubGroupLevel.cs`, `HubGroupSwimmerLevel.cs`, `LanePlan.cs` (+ `LanePlanLane`, `LanePlanSwimmer`, `LanePlanStatus`) |
+| Правила (чистые) | `Swimm.Application/Mapping/HubGroupLevelRules.cs`, `LanePlanRules.cs`, `LaneDistribution.cs` (Distribute), `LaneAllocation.cs` (Auto lanes) |
+| DTO / порты | `Dtos/HubGroupLevelDtos.cs` (camelCase), `Dtos/LanePlanDtos.cs` (snake_case); `Abstractions/IHubGroupLevelService.cs`, `ILanePlanService.cs` |
+| Сервисы | `Swimm.Infrastructure/Services/HubGroupLevelService.cs`, `LanePlanService.cs` (в т.ч. `my_swimmers`), `GroupAdvisoryLock.cs` (транзакция + блокировка группы) |
+| Контроллеры | `HubGroupLevelsController` (`/api/me/hub-groups/{id}/levels`), `HubGroupLanePlansController` (`/api/hub-groups/{id}/lane-plans`) |
+| Клиент | `client/src/projects/hub-groups-project/components/`: `group-levels.tsx` (карточка Levels), `use-group-levels.ts` (уровни — общий хук Levels и Swimmers), `group-cards.tsx` (`GroupMembersCard editLevels`), `group-lanes.tsx` (таб, даты, статус), `group-lane-editor.tsx`, `group-lane-board.tsx` (+ «Your lane»), `lane-plans-api.ts`, `level-color.ts`; таб — в `group-page.tsx` |
+| Задетое чужое | `SwimmerMergeService` (перенос уровней и мест), `HubGroupAdminService.GetDeleteImpactAsync` + `_DeleteConfirm.cshtml` + `delete-group-dialog.tsx` (перечень потерь), `seed-tables.txt` |
+| Тесты | `HubGroupLevelTests`, `LanePlanTests` (в т.ч. Auto lanes), `LanePlanPgTests` (живой PG), дополнения в `SwimmerMergeServiceTests`, `HubGroupDeleteTests` |
+
+**Кэш — важно знать.** Уровни и планы приватные и НЕ кэшируются. Но страница группы (кэшируемая)
+после #97 читает строки владельца и админов в `Sys_AppUsers` — для этого `AppUser` стал корнем
+сужения «только своей строки» (`CacheRowRoots.OwnRowOnly`, подробно —
+`cache-row-precision-plan.md` §10). Новая таблица с `SwimmerId` в ключе → дописать в
+`SwimmerMergeService`; новая ссылка страницы группы на пользователей → только через
+`CacheRows<AppUser>(ids)`.
+
+**Как проверять вживую.**
+
+- Стенд: конфиг `stack-5183-api5082-personas` в `.claude/launch.json` (API 5082 из Debug
+  `--no-build` + Vite 5183) — не мешает :5078 Влада и чужому :5079. Перед запуском
+  `dotnet build server/Swimm.sln`; если :5078 из Debug запущен — сборка упрётся в лок, тогда
+  тесты гонять `dotnet test server/Swimm.Tests --artifacts-path <scratchpad>/art` (тестовый
+  проект тянет API), а стенд — после остановки :5078.
+- Персонажи: `GET /api/dev/persona?as=utest-coach` (владелец тест-групп), `utest-member`
+  (участник обеих), `utest-newbie` (вошёл, не в группе — замок), `utest-pending` (заявка в
+  `utest-approval` — замок), `default` — вернуть. Тест-группы: `utest-open` (id 285),
+  `utest-approval` (id 286); у `utest-open` 6 пловцов.
+- «Your lane» участнику: метка членства «за пловца» —
+  `PUT /api/me/hub-groups/285/user-members/12/label {swimmerId}` под тренером (12 = `utest-member`);
+  после проверки вернуть `{swimmerId: null}`.
+- Уборка после проверки: `delete from "Sys_LanePlans" where "HubGroupId" in (285,286)` и то же для
+  `"Sys_HubGroupLevels"` (уровни пловцов уходят каскадом). ⚠ Уровни группы 17
+  (`dolphin-netanya-masters`) — настоящие, Влада: их не трогать.
+- Pane: скриншоты иногда не отдаются, если окно свёрнуто — проверять через DOM (`javascript_tool`),
+  клики — через `el.click()`; скрипт с `location.reload()` обрывается — перезагрузку делать
+  отдельным вызовом `navigate`.
+
+**Известные ограничения (сознательно, не баги).**
+
+- У дорожки один уровень: Auto lanes при нехватке дорожек кладёт соседние уровни на одну и
+  подписывает её сильнейшим. Distribute по такому плану слабый уровень отправит в Unassigned —
+  нужно жать Auto lanes. Лечится «несколько уровней на дорожке» (таблица уровней дорожки) — если
+  попросят.
+- Вход админа группы через Google (служебный `UpdatedAt`) сбрасывает кэш страниц его групп —
+  метка своей строки корня; редко и дёшево.
+- Клиентских юнит-тестов нет (в клиенте нет тестового раннера) — правила редактора (копия
+  прошлого плана, убранные дорожки → Unassigned) проверены только вживую.
+
+**Что можно делать дальше** — таблица «Позже» выше: задания сетами, связь плана с результатами
+тренировки, две тренировки в день, подсказка уровня по времени, шаблоны недели, уведомление о
+публикации. Лимит людей на дорожку Влад отклонил (27.09.2026).

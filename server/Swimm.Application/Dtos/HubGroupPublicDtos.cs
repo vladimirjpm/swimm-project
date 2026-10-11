@@ -526,6 +526,14 @@ public sealed class HubGroupDetailsDto
     /// </summary>
     [JsonPropertyName("next_training")]
     public NextTrainingDto? NextTraining { get; set; }
+
+    /// <summary>
+    /// Три ближайших занятия (первое — то же, что <see cref="NextTraining"/>) — вид «Next» таба
+    /// Trainings отвечает сразу на три (docs/plans/trainings-tab-redesign-plan.md, Т1б). Ответы —
+    /// личные, их здесь нет (как и у <see cref="NextTraining"/>). Пусто — расписания нет.
+    /// </summary>
+    [JsonPropertyName("next_trainings")]
+    public List<NextTrainingDto> NextTrainings { get; set; } = [];
 }
 
 /// <summary>Расписание как оно есть — для показа строкой и для формы редактирования.</summary>
@@ -558,6 +566,10 @@ public sealed class GroupTrainingScheduleDto
     /// <summary>Режим «сверху» (Ш4): не ответившему участнику «Are you coming?» над фото.</summary>
     [JsonPropertyName("rsvp_top")]
     public bool? RsvpTop { get; set; }
+
+    /// <summary>members | coach — кто добавляет видео к тренировкам (<c>GroupTrainingMedia</c>); null — members.</summary>
+    [JsonPropertyName("training_media")]
+    public string? TrainingMedia { get; set; }
 }
 
 /// <summary>Занятие недели: день ISO (1 = Mon … 7 = Sun) и часы по стенным часам бассейна.</summary>
@@ -599,4 +611,31 @@ public sealed class NextTrainingDto
 
     [JsonPropertyName("pool_type")]
     public string? PoolType { get; set; }
+
+    // Поля Р9 (разовые занятия и отмены) — только в приватной ручке
+    // <c>GET /api/hub-groups/{id}/next-trainings</c>. В кэшируемом ответе страницы группы они
+    // пустые / false: разовые и отмены приватные, гостю их не видно.
+
+    /// <summary>Название разовой тренировки; у занятия по расписанию — null.</summary>
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
+
+    /// <summary>Тип разовой тренировки (swim / technique / …); у занятия по расписанию — null.</summary>
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    /// <summary>Id тренировки (<c>Sys_TrainingSessions.Id</c>), если у занятия она есть.</summary>
+    [JsonPropertyName("training_id")]
+    public int? TrainingId { get; set; }
+
+    /// <summary>Занятие только разовое: такого слота в расписании нет.</summary>
+    [JsonPropertyName("one_off")]
+    public bool OneOff { get; set; }
+
+    /// <summary>Занятие отменено тренером — остаётся в списке с пометкой, ответить нельзя.</summary>
+    [JsonPropertyName("cancelled")]
+    public bool Cancelled { get; set; }
+
+    [JsonPropertyName("cancel_reason")]
+    public string? CancelReason { get; set; }
 }

@@ -21,7 +21,8 @@ import type {
   TrainingOption,
 } from './my-groups-types';
 import type { HubGroupMediaItem } from '../../utils/interfaces/results';
-import type { HubGroupMemberMediaItem } from './types';
+import type { HubGroupMemberMediaItem, TrainingSessionList } from './types';
+import { sessionLabel } from './use-training-sessions';
 
 // Тот же паттерн antiforgery-токена, что и в hooks/useFavorites.ts.
 let cachedToken: string | null = null;
@@ -381,8 +382,8 @@ export function useMyHubGroupEdit(id: number | null) {
 
 /**
  * Медиа группы (галерея + медиа тренировок) для панели самообслуживания. Читает публичную галерею
- * из /api/hub-groups/{slug} и список тренировок из /api/hub-groups/{slug}/trainings (для выбора
- * «привязать к тренировке» — отдельного CRUD тренировок в клиенте пока нет). Мутации — снейк-кейс
+ * из /api/hub-groups/{slug} и список тренировок из /api/hub-groups/{id}/sessions (для выбора
+ * «привязать к тренировке»; заводят их в табе Trainings → Sessions, Е3). Мутации — снейк-кейс
  * тело на /api/hub-groups/{id}/media, как ждёт HubGroupMediaInputDto на сервере.
  */
 export function useHubGroupMedia(hubGroupId: number, slug: string) {
@@ -403,7 +404,9 @@ export function useHubGroupMedia(hubGroupId: number, slug: string) {
     try {
       const [gRes, tRes, mRes] = await Promise.all([
         fetch(`/api/hub-groups/${encodeURIComponent(slug)}`, { credentials: 'include' }),
-        fetch(`/api/hub-groups/${encodeURIComponent(slug)}/trainings`, { credentials: 'include' }),
+        // Список тренировок — и без времён (Е3 group-events-media-plan): журнал `/trainings` идёт
+        // от результатов, и тренировка «Underwater filming» в нём не видна.
+        fetch(`/api/hub-groups/${hubGroupId}/sessions`, { credentials: 'include', cache: 'no-store' }),
         fetch(`/api/hub-groups/${encodeURIComponent(slug)}/media/members`, { credentials: 'include' }),
       ]);
 
@@ -421,23 +424,16 @@ export function useHubGroupMedia(hubGroupId: number, slug: string) {
 
       setMembersMedia(mRes.ok ? ((await mRes.json()) as HubGroupMemberMediaItem[]) : []);
 
-      const t = tRes.ok ? await tRes.json() : null;
-      const seen = new Map<number, TrainingOption>();
-      for (const row of t?.results ?? []) {
-        const sessionId = row?.training?.sessionId;
-        if (sessionId && !seen.has(sessionId)) {
-          seen.set(sessionId, {
-            sessionId,
-            label: `${row.training.trainingName || 'Training'} · ${row.date}`,
-            media: (row.training.media ?? []) as HubGroupMediaItem[],
-          });
-        }
-      }
-      setTrainings(Array.from(seen.values()));
+      const t = tRes.ok ? (await tRes.json()) as TrainingSessionList : null;
+      setTrainings((t?.sessions ?? []).map((s) => ({
+        sessionId: s.id,
+        label: `${sessionLabel(s)} · ${s.date}`,
+        media: s.media as unknown as HubGroupMediaItem[],
+      })));
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, hubGroupId]);
 
   useEffect(() => { reload(); }, [reload]);
 

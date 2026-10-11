@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Repositories;
@@ -71,6 +72,22 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
         };
     }
 
+    public async Task<List<TrainingFeed.Repeat>> GetRepeatsAsync(int hubGroupId, IReadOnlyCollection<int> sessionIds)
+    {
+        if (sessionIds.Count == 0) return [];
+
+        var ids = sessionIds.Distinct().ToList();
+        return await _db.TrainingResults.AsNoTracking()
+            .Where(r => ids.Contains(r.SessionId) && r.Session!.HubGroupId == hubGroupId)
+            .OrderBy(r => r.SessionId).ThenBy(r => r.SetNo).ThenBy(r => r.OrderNo).ThenBy(r => r.Id)
+            .Select(r => new TrainingFeed.Repeat(
+                r.SessionId, r.SetNo, r.OrderNo, r.SwimmerId,
+                (r.Swimmer!.LastName + " " + r.Swimmer.FirstName).Trim(),
+                (r.Swimmer.LastNameEn + " " + r.Swimmer.FirstNameEn).Trim(),
+                r.Distance, r.Style != null ? r.Style.Name : "", r.TimeOriginal, r.TimeMillisecond, r.Intensity))
+            .ToListAsync();
+    }
+
     private static TrainingRowDto Map(
         Swimm.Domain.Entities.TrainingResult r, Dictionary<int, List<HubGroupMediaDto>> mediaLookup)
     {
@@ -82,7 +99,8 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
 
         return new TrainingRowDto
         {
-            Competition = session.Name ?? session.ExternalTrainingId,
+            // Название тренера (Е1) — первым: у заведённых кнопкой ключ источника «ui-…» людям не нужен.
+            Competition = session.Title ?? session.Name ?? session.ExternalTrainingId,
             IsMasters = true,
             AgeGroup = sw.BirthYear > 0 ? sw.BirthYear.ToString() : string.Empty,
             Date = session.Date.ToString("dd/MM/yyyy"),
@@ -112,9 +130,12 @@ public class HubGroupTrainingRepository : IHubGroupTrainingRepository
 
             Training = new TrainingInfoDto
             {
-                TrainingId = long.TryParse(session.ExternalTrainingId, out var tid) ? tid : 0,
+                // Ключ источника — число (дата Дельфина «20251028»); у нечислового («ui-…» тренировки,
+                // заведённой кнопкой, и «utest-training-1») — id сессии: клиент считает строку
+                // тренировкой только при ненулевом trainingId, с нулём журнал был пуст.
+                TrainingId = long.TryParse(session.ExternalTrainingId, out var tid) ? tid : session.Id,
                 SessionId = session.Id,
-                TrainingName = session.Name ?? string.Empty,
+                TrainingName = session.Title ?? session.Name ?? string.Empty,
                 Note = session.Note,
                 Set = r.SetNo,
                 Order = r.OrderNo,

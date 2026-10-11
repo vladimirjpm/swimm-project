@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { GroupTrainingSchedule, GroupTrainingSlot, LaneViewMode, WhoIsComing } from '../types';
+import type { GroupTrainingSchedule, GroupTrainingSlot, LaneViewMode, TrainingMediaPolicy, WhoIsComing } from '../types';
 import { DAY_SHORT } from './group-training-slots';
 
 /**
@@ -14,6 +14,7 @@ import { DAY_SHORT } from './group-training-slots';
  *
  * Блок «Lanes» (Ш3.3): сколько дорожек обычно, режим вида по дорожкам и кто видит имена
  * «кто идёт» — всё в том же JSON расписания (`usual_lanes`, `lane_view`, `who_is_coming`).
+ * Там же «кто добавляет видео к тренировкам» (`training_media`, Е3 group-events-media-plan).
  */
 
 /** Токен antiforgery: свой кэш на модуль — как у остальных мутирующих клиентов проекта. */
@@ -66,6 +67,7 @@ function GroupScheduleEditor({
   const [laneView, setLaneView] = useState<LaneViewMode>(schedule?.lane_view ?? 'auto');
   const [whoIsComing, setWhoIsComing] = useState<WhoIsComing>(schedule?.who_is_coming ?? 'members');
   const [rsvpTop, setRsvpTop] = useState(!!schedule?.rsvp_top);
+  const [trainingMedia, setTrainingMedia] = useState<TrainingMediaPolicy>(schedule?.training_media ?? 'members');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -102,6 +104,7 @@ function GroupScheduleEditor({
       lane_view: laneView,
       who_is_coming: whoIsComing,
       rsvp_top: rsvpTop,
+      training_media: trainingMedia,
     });
     setSaving(false);
     if (result.ok) {
@@ -238,6 +241,24 @@ function GroupScheduleEditor({
             </span>
           </label>
         </div>
+      </div>
+
+      <div className="mt-4 border-t border-[var(--t-border-2)] pt-3">
+        <div className="text-[12px] font-black uppercase tracking-[0.06em] text-[var(--t-text-2)]">Training videos</div>
+        <label className="mt-2 flex flex-wrap items-center gap-2 text-[12.5px] text-[var(--t-text-2)]">
+          <span className="w-[120px]">Who adds</span>
+          <select
+            value={trainingMedia}
+            onChange={(e) => { setTrainingMedia(e.target.value as TrainingMediaPolicy); setSaved(false); }}
+            className={`${inputCls} cursor-pointer`}
+          >
+            <option value="members">Everyone in the group</option>
+            <option value="coach">Only coaches</option>
+          </select>
+        </label>
+        <p className="m-0 mt-1 text-[11px] text-[var(--t-text-3)]">
+          links to videos, photos and albums on trainings (Trainings → Sessions); saved with the schedule
+        </p>
       </div>
 
       {error && <p className="m-0 mt-2 text-[12px] font-bold text-[var(--t-danger)]">{error}</p>}

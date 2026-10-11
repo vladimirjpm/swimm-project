@@ -12,6 +12,12 @@ public interface IUserMediaRepository
     /// <summary>Всего медиа у пользователя — для потолка анти-спама в контроллере.</summary>
     Task<int> CountForUserAsync(int userId);
 
+    /// <summary>
+    /// true — у юзера уже есть эта ссылка (по MediaUrlValidator.DedupKey) к той же цели:
+    /// тот же заплыв, то же соревнование (уровень competition) или тот же пловец (уровень swimmer).
+    /// </summary>
+    Task<bool> HasSameLinkAsync(int userId, AddUserMediaRequest request);
+
     Task<bool> RemoveAsync(int userId, int mediaId);
 
     /* Пикер привязки к заплыву (Add link, дизайн-бриф §6.3) — публичные данные результатов. */

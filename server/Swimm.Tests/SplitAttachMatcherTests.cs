@@ -154,4 +154,54 @@ public class SplitAttachMatcherTests
         Assert.Equal(0, plan.Report.LegWrites);
         Assert.Equal(0, plan.Report.SwimWrites);
     }
+
+    // ── Невозможный этап (RelayLegFloor, решение Влада 10.10.2026) ─────────────────────────
+
+    /// <summary>Рекорд 14 лет 50 м вольным у мальчиков, бассейн 25 м: предел ≈ 23.9 с.</summary>
+    private static readonly RelayLegFloor Floor = new([new FreestyleRecordRow(14, "male", "25m", 50, 25_700)]);
+
+    private static RelayRow BoysRelay(params (int Order, int Year, string? Split)[] legs) =>
+        Relay(legs: legs) with
+        {
+            Year = 2024, Pool = "25m",
+            Legs = legs.Select(l => new RelayLegRow(l.Order * 10, l.Order, l.Year, l.Split, "male")).ToList(),
+        };
+
+    [Fact]
+    public void ImplausibleLeg_TeamGetsNoLegs()
+    {
+        // Сбой касания: 00:19.67 у мальчика 2010 г. р. и рядом раздутый этап.
+        (int, int, string?)[] broken =
+            [(1, 2010, "00:28.10"), (2, 2011, "00:28.40"), (3, 2010, "00:19.67"), (4, 2011, "00:36.13")];
+
+        var plan = SplitAttachMatcher.Build([BoysRelay(DbLegs)], [], [Team(legs: broken)], [], Floor);
+
+        Assert.Empty(plan.Legs);
+        Assert.Equal(0, plan.Report.TeamsAttached);
+        Assert.Equal(1, plan.Report.TeamsImplausible);
+        Assert.Contains("нога 3", Assert.Single(plan.ImplausibleTeams));
+    }
+
+    [Fact]
+    public void ImplausibleLeg_ClearsLegsWrittenBefore()
+    {
+        // Этапы, записанные доклейкой до сторожа, обязаны уйти: другого способа их убрать нет.
+        (int, int, string?)[] broken =
+            [(1, 2010, "00:28.10"), (2, 2011, "00:28.40"), (3, 2010, "00:19.67"), (4, 2011, "00:36.13")];
+
+        var plan = SplitAttachMatcher.Build([BoysRelay(broken)], [], [Team(legs: broken)], [], Floor);
+
+        Assert.Equal(4, plan.Legs.Count);
+        Assert.All(plan.Legs, w => Assert.Null(w.SplitTime));
+    }
+
+    [Fact]
+    public void PlausibleLegs_WithFloor_AttachedAsBefore()
+    {
+        var plan = SplitAttachMatcher.Build([BoysRelay(DbLegs)], [], [Team(legs: SourceLegs)], [], Floor);
+
+        Assert.Equal(1, plan.Report.TeamsAttached);
+        Assert.Equal(0, plan.Report.TeamsImplausible);
+        Assert.Equal(4, plan.Legs.Count);
+    }
 }

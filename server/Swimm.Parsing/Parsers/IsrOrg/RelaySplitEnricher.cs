@@ -67,14 +67,21 @@ public static class RelaySplitEnricher
         foreach (var team in ev.Teams)
         {
             teams++;
-            if (team.Legs.Count != 4 || team.Time is null) { noLegs++; continue; }
+            // Снятая команда времени не имеет, но ноги у неё напечатаны — и порванные фамилии
+            // тоже (DQ микс-эстафеты Эйлата-2026: «במירושניקו», «ברנדוייסלר» вместо
+            // «מירושניקוב», «וייסלר ברנד» — две тени при импорте). Вместо времени её ключ —
+            // статус: заплыв + дорожка + «DQ» с обеих сторон. Нет ни времени, ни статуса — пропуск.
+            if (team.Legs.Count != 4 || (team.Time is null && team.Status is null)) { noLegs++; continue; }
 
             var candidates = relayRows.Where(o =>
                     string.Equals(Str(o, "event_style_name"), ev.Style, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(Str(o, "event_style_len"), ev.Len, StringComparison.OrdinalIgnoreCase)
                     && Int(o, "heat") == team.Heat
                     && Int(o, "lane") == team.Lane
-                    && Str(o, "time") == team.Time)
+                    && (team.Time is not null
+                        ? Str(o, "time") == team.Time
+                        : string.IsNullOrEmpty(Str(o, "time"))
+                          && string.Equals(Str(o, "time_fail_note"), team.Status, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
             if (candidates.Count == 0) { unmatched++; continue; }

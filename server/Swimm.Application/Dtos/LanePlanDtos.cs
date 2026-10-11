@@ -137,6 +137,14 @@ public sealed class LanePlanMySwimmerDto
     /// <summary>me | family.</summary>
     [JsonPropertyName("kind")]
     public string Kind { get; set; } = "me";
+
+    /// <summary>
+    /// С какой дорожки тренер перенёс пловца в опубликованном плане после того, как зритель
+    /// последний раз открывал вид Lanes (<c>PUT …/lane-plans/seen</c>) — золотая метка (Т1б).
+    /// null — не переносили или перенос уже видел.
+    /// </summary>
+    [JsonPropertyName("moved_from_lane")]
+    public int? MovedFromLane { get; set; }
 }
 
 // ── Вход ────────────────────────────────────────────────────────────────────

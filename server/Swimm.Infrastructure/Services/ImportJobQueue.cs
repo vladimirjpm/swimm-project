@@ -14,10 +14,13 @@ public sealed class ImportJobQueue : IImportJobQueue
 {
     internal record ImportJobItem(Guid JobId, byte[] Data, string FileName, IReadOnlyList<string> CategoryKeys, ImportEventOptions? EventOptions, int? DiscoveredId = null, int? OrgCompId = null);
 
+    // Без верхней границы: Enqueue синхронный и пишет TryWrite — у ограниченного канала (было 20)
+    // лишние задачи молча НЕ попадали в очередь и навсегда оставались «Queued», а пакетный импорт
+    // отправляет до 30 строк за раз и после отправки удаляет их разборы (08.10.2026). Задача — это
+    // JSON разбора одного протокола; держать их в памяти дешевле, чем терять.
     private readonly Channel<ImportJobItem> _channel =
-        Channel.CreateBounded<ImportJobItem>(new BoundedChannelOptions(20)
+        Channel.CreateUnbounded<ImportJobItem>(new UnboundedChannelOptions
         {
-            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true
         });
 
@@ -33,9 +36,15 @@ public sealed class ImportJobQueue : IImportJobQueue
             QueuedAt = DateTimeOffset.UtcNow
         };
         _statuses[jobId] = status;
-        // TryWrite всегда успешен при BoundedChannelFullMode.Wait + sync caller,
-        // но если канал полон — возвращаем статус Queued, фоновый процесс заберёт позже.
-        _channel.Writer.TryWrite(new ImportJobItem(jobId, data, fileName, categoryKeys ?? [], eventOptions, discoveredId, orgCompId));
+        // У неограниченного канала TryWrite отказывает только после закрытия писателя (его никто
+        // не закрывает). Отказ всё же не молчит: задача, не попавшая в канал, — Failed, а не
+        // вечное Queued, которое панели пришлось бы ждать бесконечно.
+        if (!_channel.Writer.TryWrite(new ImportJobItem(jobId, data, fileName, categoryKeys ?? [], eventOptions, discoveredId, orgCompId)))
+        {
+            status.State = ImportJobState.Failed;
+            status.Error = "Очередь импорта закрыта — задача не принята";
+            status.CompletedAt = DateTimeOffset.UtcNow;
+        }
         return jobId;
     }
 

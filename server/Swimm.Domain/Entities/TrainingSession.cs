@@ -5,6 +5,31 @@ using Microsoft.EntityFrameworkCore;
 namespace Swimm.Domain.Entities;
 
 /// <summary>
+/// Тип тренировки — фиксированный список на весь сайт (решение Влада 01.10.2026; заменяет решение
+/// 30.09 «отдельного типа нет»). Нужен ленте (фильтр, значок), видеоразбору пловца
+/// (<see cref="Technique"/>) и разовым занятиям в Next. Название тренировки (<see cref="TrainingSession.Title"/>)
+/// остаётся свободным текстом. Список меняется только кодом — и клиентским зеркалом
+/// <c>training-types.ts</c>.
+/// </summary>
+public static class TrainingSessionType
+{
+    /// <summary>Обычная тренировка в воде — по умолчанию, у залитых скриптом тоже.</summary>
+    public const string Swim = "swim";
+    /// <summary>Техника / видеоразбор.</summary>
+    public const string Technique = "technique";
+    /// <summary>Суша, ОФП.</summary>
+    public const string Dryland = "dryland";
+    public const string OpenWater = "open-water";
+    /// <summary>Контрольный сет / прикидка.</summary>
+    public const string TestSet = "test-set";
+    public const string Other = "other";
+
+    public static readonly IReadOnlyList<string> All = [Swim, Technique, Dryland, OpenWater, TestSet, Other];
+
+    public static bool IsKnown(string? type) => type != null && All.Contains(type);
+}
+
+/// <summary>
 /// Тренировочная сессия группы (SwimHub). ПРИВАТНЫЕ данные — таблица <c>Sys_TrainingSessions</c>,
 /// БЕЗ grant <c>swimm_ro</c>: видят только владелец/админ группы и (в перспективе) привязанный пловец.
 /// Соревнования тут НЕ хранятся — только тренировки. См. hubgroups-architecture.md §7.
@@ -39,6 +64,46 @@ public class TrainingSession
 
     [MaxLength(500)]
     public string? Note { get; set; }
+
+    /// <summary>
+    /// Название тренировки для людей («Underwater filming»). Заводит тренер кнопкой — тренировка
+    /// может быть и без времён, а к ней видео (docs/plans/group-events-media-plan.md, Е1). У
+    /// залитых скриптом сессий пусто — там говорит <see cref="Name"/> (план из источника).
+    /// </summary>
+    [MaxLength(100)]
+    public string? Title { get; set; }
+
+    /// <summary>Тип — <see cref="TrainingSessionType"/>; по умолчанию <see cref="TrainingSessionType.Swim"/>.</summary>
+    [Required, MaxLength(20)]
+    public string Type { get; set; } = TrainingSessionType.Swim;
+
+    /// <summary>Начало «HH:mm» — связка с занятием расписания (ключ RSVP «дата + начало»); null — не задано.</summary>
+    [MaxLength(5)]
+    public string? StartTime { get; set; }
+
+    /// <summary>
+    /// «Ask who's coming» (Р9, docs/plans/trainings-tab-redesign-plan.md): разовое занятие — тренировка
+    /// появляется в Next среди ближайших, на неё отвечают «иду / не уверен / не приду». Занятием
+    /// (occurrence) считается при <c>AsksRsvp &amp;&amp; StartTime != null</c>; без галки — просто запись
+    /// ленты. Ключ занятия — <c>yyyy-MM-dd-HHmm</c> (<c>TrainingRsvpRules.SessionKey</c>).
+    /// </summary>
+    public bool AsksRsvp { get; set; }
+
+    /// <summary>Кто завёл кнопкой; null — залито скриптом (или аккаунт удалён — SetNull).</summary>
+    public int? CreatedByUserId { get; set; }
+
+    [ForeignKey(nameof(CreatedByUserId))]
+    public AppUser? CreatedBy { get; set; }
+
+    /// <summary>Когда заведена кнопкой; null — у залитых скриптом.</summary>
+    public DateTime? CreatedAt { get; set; }
+
+    /// <summary>
+    /// Ключевой сет — ★ тренера (docs/plans/trainings-tab-redesign-plan.md, Р4): по нему строка
+    /// «You» в ленте (быстрейший повтор «моих» пловцов в этом сете). null — не помечен, строки нет.
+    /// В источнике Дельфина такого поля нет — метка только на сайте.
+    /// </summary>
+    public int? KeySetNo { get; set; }
 
     public ICollection<TrainingResult> Results { get; set; } = new List<TrainingResult>();
 }

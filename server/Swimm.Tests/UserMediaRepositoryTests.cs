@@ -440,4 +440,121 @@ public class UserMediaRepositoryTests
 
         Assert.Empty(await repo.GetForUserAsync(user.Id));
     }
+    // ── HasSameLinkAsync: запрет дубля (docs/plans/media-duplicates-handoff.md) ──
+
+    private const string DrivePhoto = "https://drive.google.com/file/d/1RH1YV22pp1ubIjvDlbxwSNsJIWOQVYOL/view";
+
+    private static AddUserMediaRequest DriveRequest(int swimmerId, string url = DrivePhoto) => new()
+    {
+        SwimmerId = swimmerId,
+        MediaType = "image",
+        SourceType = "other",
+        Url = url
+    };
+
+    [Fact]
+    public async Task HasSameLink_SameLinkSameCompetition_True()
+    {
+        // Случай Влада: одна и та же ссылка Drive «ко всему соревнованию» уходила шесть раз.
+        await using var db = CreateDb(nameof(HasSameLink_SameLinkSameCompetition_True));
+        var (user, swimmer) = await SeedAsync(db);
+        var competition = await SeedCompetitionAsync(db);
+        var repo = new UserMediaRepository(db);
+
+        var first = DriveRequest(swimmer.Id);
+        first.CompetitionId = competition.Id;
+        await repo.AddAsync(user.Id, first);
+
+        var again = DriveRequest(swimmer.Id, DrivePhoto + "?usp=sharing");
+        again.CompetitionId = competition.Id;
+
+        Assert.True(await repo.HasSameLinkAsync(user.Id, again));
+    }
+
+    [Fact]
+    public async Task HasSameLink_DifferentLinkSameCompetition_False()
+    {
+        await using var db = CreateDb(nameof(HasSameLink_DifferentLinkSameCompetition_False));
+        var (user, swimmer) = await SeedAsync(db);
+        var competition = await SeedCompetitionAsync(db);
+        var repo = new UserMediaRepository(db);
+
+        var first = DriveRequest(swimmer.Id);
+        first.CompetitionId = competition.Id;
+        await repo.AddAsync(user.Id, first);
+
+        var second = DriveRequest(swimmer.Id, "https://drive.google.com/file/d/OTHERFILE123/view");
+        second.CompetitionId = competition.Id;
+
+        Assert.False(await repo.HasSameLinkAsync(user.Id, second));
+    }
+
+    [Fact]
+    public async Task HasSameLink_SameLinkOtherTarget_False()
+    {
+        // Та же ссылка к ДРУГОЙ цели — не дубль: другой день, заплыв, общий уровень пловца.
+        await using var db = CreateDb(nameof(HasSameLink_SameLinkOtherTarget_False));
+        var (user, swimmer) = await SeedAsync(db);
+        var day1 = await SeedCompetitionAsync(db);
+        var day2 = await SeedCompetitionAsync(db);
+        var result = await SeedResultAsync(db, swimmer.Id, day1.Id);
+        var repo = new UserMediaRepository(db);
+
+        var onDay1 = DriveRequest(swimmer.Id);
+        onDay1.CompetitionId = day1.Id;
+        await repo.AddAsync(user.Id, onDay1);
+
+        var onDay2 = DriveRequest(swimmer.Id);
+        onDay2.CompetitionId = day2.Id;
+        var onSwim = DriveRequest(swimmer.Id);
+        onSwim.ResultId = result.Id;
+
+        Assert.False(await repo.HasSameLinkAsync(user.Id, onDay2));
+        Assert.False(await repo.HasSameLinkAsync(user.Id, onSwim));
+        Assert.False(await repo.HasSameLinkAsync(user.Id, DriveRequest(swimmer.Id)));
+    }
+
+    [Fact]
+    public async Task HasSameLink_SameLinkSameSwim_True()
+    {
+        await using var db = CreateDb(nameof(HasSameLink_SameLinkSameSwim_True));
+        var (user, swimmer) = await SeedAsync(db);
+        var competition = await SeedCompetitionAsync(db);
+        var result = await SeedResultAsync(db, swimmer.Id, competition.Id);
+        var repo = new UserMediaRepository(db);
+
+        var request = YoutubeRequest(swimmer.Id);
+        request.ResultId = result.Id;
+        await repo.AddAsync(user.Id, request);
+
+        Assert.True(await repo.HasSameLinkAsync(user.Id, request));
+    }
+
+    [Fact]
+    public async Task HasSameLink_SameLinkSwimmerLevel_True()
+    {
+        await using var db = CreateDb(nameof(HasSameLink_SameLinkSwimmerLevel_True));
+        var (user, swimmer) = await SeedAsync(db);
+        var repo = new UserMediaRepository(db);
+
+        await repo.AddAsync(user.Id, YoutubeRequest(swimmer.Id));
+
+        Assert.True(await repo.HasSameLinkAsync(user.Id, YoutubeRequest(swimmer.Id)));
+    }
+
+    [Fact]
+    public async Task HasSameLink_OtherUsersLink_False()
+    {
+        // Чужая ссылка — не дубль: у каждого юзера свои записи.
+        await using var db = CreateDb(nameof(HasSameLink_OtherUsersLink_False));
+        var (user, swimmer) = await SeedAsync(db);
+        var other = new AppUser { Email = "other@example.com", DisplayName = "Other", SecurityStamp = Guid.NewGuid().ToString("N") };
+        db.AppUsers.Add(other);
+        await db.SaveChangesAsync();
+        var repo = new UserMediaRepository(db);
+
+        await repo.AddAsync(other.Id, YoutubeRequest(swimmer.Id));
+
+        Assert.False(await repo.HasSameLinkAsync(user.Id, YoutubeRequest(swimmer.Id)));
+    }
 }

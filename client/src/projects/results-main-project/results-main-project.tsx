@@ -240,6 +240,13 @@ function ResultsMain() {
   // org_comp_id уже известен из Overview — иначе таба всё равно нет (см. competition-tabs.tsx).
   // Источников бывает несколько (окружные протоколы одного чемпионата) — первый из них и
   // есть тот, что открывается по умолчанию; подтабы внутри таба переключают остальные.
+  // Флаг «очки неофициальные» (Р80) — в стор для фильтра Club таба Swims: панель фильтров
+  // живёт вне этого компонента и overview сама не грузит. Пока overview нет — false.
+  const clubPointsUnofficial = !!compOverview?.club_points_unofficial;
+  useEffect(() => {
+    dispatch(rootActions.updateState({ clubPointsUnofficial }));
+  }, [dispatch, clubPointsUnofficial]);
+
   const startListSources = compOverview?.start_list_sources ?? [];
   const startListOrgCompId = startListSources[0]?.org_comp_id ?? compOverview?.org_comp_id ?? null;
   const { data: startListProgramme } = useStartListProgramme(startListOrgCompId);
@@ -362,7 +369,9 @@ function ResultsMain() {
         filterSelected: {
           ...filters,
           style_name: swim.style_name,
-          style_len: Number(swim.distance) || 0,
+          // Строкой, как в filter_data («100», «4X100»): Number('4X100') — NaN, и эстафета
+          // открывалась без отбора по дистанции. Суффикс «m» — на случай формы справочника.
+          style_len: swim.distance.replace(/m$/i, '').toUpperCase() || 0,
           gender: 'all',
           age: 'all',
           club: 'all',
@@ -547,7 +556,11 @@ function ResultsMain() {
             onAddMedia={auth.isAuthenticated && addMedia.canAdd ? addMedia.openModal : undefined}
           />
         ) : compTab === 'clubs' ? (
-          <CompetitionClubs sourceParams={compSourceParams} onOpenSwimsForClub={handleOpenSwimsForClub} />
+          <CompetitionClubs
+            sourceParams={compSourceParams}
+            onOpenSwimsForClub={handleOpenSwimsForClub}
+            unofficial={clubPointsUnofficial}
+          />
         ) : compTab === 'media' ? (
           <CompetitionMedia
             items={compMediaItems}

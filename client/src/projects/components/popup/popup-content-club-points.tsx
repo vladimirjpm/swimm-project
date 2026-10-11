@@ -4,6 +4,8 @@ import type {
   ClubPointsRule, CompetitionMismatchNote,
 } from '../../results-main-project/components/competition-header/types';
 import { UI_LangTabs, useInfoLang, type InfoLang } from '../info-popup/info-popup';
+import UI_Markdown, { splitTitle } from '../markdown/markdown';
+import { useContent } from '../../../content/content';
 
 /**
  * Попап «как начисляются клубные очки»: шкала мест того правила (или правил), по которому
@@ -17,26 +19,24 @@ interface PopupData {
   mismatchNote?: CompetitionMismatchNote | null;
 }
 
-/** Подписи таблички расхождения — статика интерфейса, поэтому в коде, а не в БД. */
+/**
+ * Заголовок блока и пояснение под табличкой — текст, поэтому файлами
+ * `src/content/popups/club-points-mismatch/{en,ru,he}.md` (решение Влада 11.10.2026).
+ * Ниже в коде — только короткие подписи колонок и ссылки: это подписи интерфейса.
+ */
+const MISMATCH_CONTENT = 'popups/club-points-mismatch';
+
+/** Подписи колонок таблички расхождения — статика интерфейса, поэтому в коде, а не в БД. */
 const DIFF_LABELS: Record<InfoLang, {
-  title: string; place: string; heat: string; time: string;
+  place: string; heat: string; time: string;
   swimmer: string; club: string; expected: string; actual: string;
 }> = {
-  en: { title: 'The official standings were scored incorrectly',
-        place: 'Place', heat: 'Heat', time: 'Time', swimmer: 'Swimmer', club: 'Went to',
+  en: { place: 'Place', heat: 'Heat', time: 'Time', swimmer: 'Swimmer', club: 'Went to',
         expected: 'Per regulations', actual: 'Officially awarded' },
-  ru: { title: 'Официальный зачёт посчитан неверно',
-        place: 'Место', heat: 'Заплыв', time: 'Время', swimmer: 'Пловец', club: 'Кому',
+  ru: { place: 'Место', heat: 'Заплыв', time: 'Время', swimmer: 'Пловец', club: 'Кому',
         expected: 'По регламенту', actual: 'Начислено официально' },
-  he: { title: 'הדירוג הרשמי חושב באופן שגוי',
-        place: 'מקום', heat: 'מקצה', time: 'זמן', swimmer: 'שחיין', club: 'למי',
+  he: { place: 'מקום', heat: 'מקצה', time: 'זמן', swimmer: 'שחיין', club: 'למי',
         expected: 'לפי התקנון', actual: 'הוענק רשמית' },
-};
-
-const FOLLOW_UP: Record<InfoLang, string> = {
-  en: 'The scale below is the one from the meet regulations — the points on this page follow it.',
-  ru: 'Шкала ниже — из регламента соревнования, очки на этой странице считаются по ней.',
-  he: 'הסולם למטה הוא זה שבתקנון התחרות — הנקודות בעמוד זה מחושבות לפיו.',
 };
 
 /** Подпись ссылки на регламент — статика интерфейса, как и заголовки таблички. */
@@ -70,6 +70,8 @@ function safeHttpUrl(url?: string | null): string | null {
  */
 function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
   const [lang, pickLang] = useInfoLang();
+  const content = useContent(MISMATCH_CONTENT, lang);
+  const doc = content.markdown != null ? splitTitle(content.markdown) : null;
   const texts = note.texts ?? {};
   // Языка может не быть — тогда показываем любой заполненный, но вкладку не подсвечиваем ложно.
   const shown = texts[lang] ?? texts.en ?? Object.values(texts)[0] ?? '';
@@ -95,7 +97,7 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
       <UI_LangTabs lang={lang} onPick={pickLang} available={texts} />
 
       <div dir={isRtl ? 'rtl' : 'ltr'} style={{ textAlign: isRtl ? 'right' : 'left' }}>
-        <div className="mb-1 text-[13px] font-bold" style={{ color: '#dc2626' }}>{labels.title}</div>
+        <div className="mb-1 min-h-[1.25em] text-[13px] font-bold" style={{ color: '#dc2626' }}>{doc?.title}</div>
         <p className="whitespace-pre-line text-[13px]" style={{ color: 'var(--theme-mode-text-secondary)' }}>
           {shown}
         </p>
@@ -144,9 +146,10 @@ function MismatchBlock({ note }: { note: CompetitionMismatchNote }) {
           </div>
         )}
 
-        <p className="mt-2 text-[12px]" style={{ color: 'var(--theme-mode-text-muted)' }}>
-          {FOLLOW_UP[lang]}
-        </p>
+        {doc?.body && (
+          <UI_Markdown source={doc.body} variant="popup"
+            className="mt-2 text-[12px] text-[var(--theme-mode-text-muted)]" />
+        )}
 
         {/* Ссылка на регламент — то, чем объяснение доказывается: читатель может проверить сам. */}
         {sourceUrl && (
@@ -212,6 +215,16 @@ function RuleBlock({ rule }: { rule: ClubPointsRule }) {
 
       <ul className="mt-3 flex flex-col gap-1 text-[12.5px]" style={{ color: 'var(--theme-mode-text-secondary)' }}>
         <li>Relay results score ×{rule.relay_multiplier}.</li>
+        {rule.distances && <li>Only the {rule.distances.split(',').join(' / ')} m race scores.</li>}
+        {rule.overall_multiplier != null && (
+          <li>
+            Overall category (all ages, by time): the same places score ×{rule.overall_multiplier}, on top of the age category.
+          </li>
+        )}
+        {rule.age_bands && (
+          <li>Age categories by birth year: {rule.age_bands.split(',').join(', ')}; places within a category go by time.</li>
+        )}
+        {rule.min_entrants != null && <li>A category scores only with at least {rule.min_entrants} starters.</li>}
         {rule.max_scoring_place != null && <li>Only places up to {rule.max_scoring_place} score.</li>}
         {places.length > 0 && <li>Any other place scores {rule.default_points}.</li>}
         <li>Disqualified swims and unofficial times score nothing.</li>

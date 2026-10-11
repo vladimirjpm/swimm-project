@@ -67,6 +67,27 @@
   color: #fff; font-size: 9.5px; font-weight: 700;
   padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Метка «кто на видео» (лента тренировок группы): вместо подписи; мой пловец — плашка акцентом */
+.tbs-media-tag {
+  position: absolute; inset-inline: 0; bottom: 0;
+  background: linear-gradient(0deg, rgba(0,0,0,.75), transparent);
+  color: #fff; font-size: 9.5px; font-weight: 700;
+  padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tbs-media-tag--mine { background: var(--deep-accent); color: var(--deep-accent-ink); }
+/* ✕ на тайле: своё — автор, любое — тренер (Е3 group-events-media-plan) */
+.tbs-media-remove {
+  position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; padding: 0; border: 0; border-radius: 999px;
+  background: rgba(0,0,0,.65); color: #fff; font-size: 10px; line-height: 18px;
+  cursor: pointer;
+}
+.tbs-media-album { position: relative; }
+/* Карточка тренировок группы: лента без боковых отступов журнала */
+.tbs-media-strip.tbs-media-strip--flush { padding: 0; }
+/* Лента тренировок группы на десктопе: плитки крупнее (110×72) */
+.tbs-media-strip--lg .tbs-media-tile { width: 110px; height: 72px; }
+
 .tbs-media-album {
   display: flex; align-items: center; justify-content: center;
   text-align: center; font-size: 10px; font-weight: 800;

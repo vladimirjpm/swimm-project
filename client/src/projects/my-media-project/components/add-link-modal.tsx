@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AddMediaInput,
   fetchSwimmerCompetitionsBrief,
@@ -8,6 +9,8 @@ import {
 } from '../use-all-my-media';
 import { chipClass, segmentClass } from './status-styles';
 import { HelperMedia } from '../../../utils/helpers';
+import { useDeepThemeClass } from '../../components/deep/use-deep-theme-class';
+import '../../components/deep/deep-theme.css';
 
 export interface AddLinkSwimmerOption {
   id: number;
@@ -18,7 +21,8 @@ export interface AddLinkSwimmerOption {
 interface Props {
   swimmers: AddLinkSwimmerOption[];
   onClose: () => void;
-  onSave: (input: AddMediaInput) => Promise<boolean>;
+  /** true — сохранено (модал закрывается); строка — ошибка сервера, модал остаётся с ней. */
+  onSave: (input: AddMediaInput) => Promise<true | string>;
   /** «Link to a swim» на существующей карточке: URL уже известен, пловец один — стартуем сразу с шага 3. */
   initialUrl?: string;
   initialStep?: 1 | 2 | 3;
@@ -48,6 +52,10 @@ function AddLinkModal({
   fixedResultId, fixedCompetitionId, contextLabel,
 }: Props) {
   const singleStep = fixedResultId != null || fixedCompetitionId != null;
+  // Модал открывают и со страницы результатов, где темы deep на корне нет: без своего
+  // класса роли `--t-*` там пустые, и модал выходил прозрачным (30.09.2026). Поэтому —
+  // портал в body + класс темы, как у ConfirmDialog.
+  const deepThemeClass = useDeepThemeClass();
   const [step, setStep] = useState<1 | 2 | 3>(initialStep ?? 1);
   const [url, setUrl] = useState(initialUrl ?? '');
   const [otherKind, setOtherKind] = useState<'video' | 'photo'>('video');
@@ -57,6 +65,9 @@ function AddLinkModal({
   const [results, setResults] = useState<SwimmerResultBrief[]>([]);
   const [resultId, setResultId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  // Отказ сервера (дубль ссылки — 409, неверная ссылка, лимит): раньше модал молча
+  // оставался открытым, и повторный Save заводил ту же ссылку ещё раз.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const detected = detectType(url.trim());
   const isOther = detected === 'OTHER';
@@ -86,7 +97,8 @@ function AddLinkModal({
     if (swimmerId == null || saving) return;
     setSaving(true);
     const { media_type, source_type } = mediaTypeSourceType();
-    const ok = await onSave({
+    setSaveError(null);
+    const res = await onSave({
       swimmer_id: swimmerId,
       media_type,
       source_type,
@@ -97,8 +109,13 @@ function AddLinkModal({
         : attach === 'competition' ? competitionId : null,
     });
     setSaving(false);
-    if (ok) onClose();
+    if (res === true) onClose();
+    else setSaveError(res);
   };
+
+  const errorLine = saveError && (
+    <div role="alert" className="text-[12px] font-bold text-[var(--t-danger)]">{saveError}</div>
+  );
 
   const canNext = step === 1 ? url.trim().length > 0 : step === 2 ? swimmerId != null : true;
 
@@ -110,9 +127,9 @@ function AddLinkModal({
     />
   ));
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--t-scrim)] backdrop-blur-[4px] sm:items-center"
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-[var(--t-scrim)] backdrop-blur-[4px] sm:items-center ${deepThemeClass}`}
       onClick={onClose}
     >
       <div
@@ -137,7 +154,7 @@ function AddLinkModal({
             <label className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent)]">Paste a link</label>
             <input
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => { setUrl(e.target.value); setSaveError(null); }}
               placeholder="https://www.youtube.com/watch?v=…"
               className="hp-mono w-full rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-input-bg)] p-[12px_14px] text-[13px] text-[var(--t-text)] outline-none"
             />
@@ -165,6 +182,7 @@ function AddLinkModal({
                 </div>
               </>
             )}
+            {errorLine}
             <div className="mt-1 flex justify-end gap-2">
               <button type="button" onClick={onClose} className="hp-mono rounded-[10px] border border-[var(--t-border)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[var(--t-accent-dim)]">Cancel</button>
               <button
@@ -267,6 +285,7 @@ function AddLinkModal({
                 })}
               </div>
             )}
+            {errorLine}
             <div className="mt-1 flex justify-between gap-2">
               <button type="button" onClick={() => setStep(2)} className="hp-mono rounded-[10px] border border-[var(--t-border)] bg-transparent px-4 py-[9px] text-[12px] font-extrabold text-[var(--t-accent-dim)]">← Back</button>
               <div className="flex flex-wrap justify-end gap-2">
@@ -302,7 +321,8 @@ function AddLinkModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

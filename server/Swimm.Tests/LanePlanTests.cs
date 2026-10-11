@@ -498,6 +498,76 @@ public class LanePlanTests
         Assert.Equal("Slow", board.Lanes[1].Level!.Name);
     }
 
+    /// <summary>Участник, привязанный к пловцу A (на дорожке 1 в <see cref="Plan"/>).</summary>
+    private static async Task<int> ParentOfAAsync(SwimmDbContext db, Seed s)
+    {
+        var parent = new AppUser { Email = "parent-a@example.com", DisplayName = "P", SecurityStamp = "s", SwimmerId = s.A };
+        db.AppUsers.Add(parent);
+        await db.SaveChangesAsync();
+        return parent.Id;
+    }
+
+    private static LanePlanInputDto PlanWithA(Seed s, int? laneOfA)
+    {
+        var input = Plan(s);
+        input.Swimmers[0] = new() { SwimmerId = s.A, LaneNo = laneOfA };
+        return input;
+    }
+
+    [Fact]
+    public async Task MovedFromLane_PublishedMove_ShownUntilLanesSeen()
+    {
+        await using var db = CreateDb(nameof(MovedFromLane_PublishedMove_ShownUntilLanesSeen));
+        var s = await SeedAsync(db);
+        var service = new LanePlanService(db);
+        var parent = await ParentOfAAsync(db, s);
+        await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId);
+        await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published);
+
+        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 3), s.UserId);
+        var moved = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        // GET плана метку НЕ гасит — его грузит и бейдж таба.
+        var again = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        await service.MarkSeenAsync(s.GroupId, parent);
+        var seen = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+
+        Assert.Equal((s.A, (int?)1), (moved.SwimmerId, moved.MovedFromLane));
+        Assert.Equal(1, again.MovedFromLane);
+        Assert.Null(seen.MovedFromLane);
+    }
+
+    [Fact]
+    public async Task MovedFromLane_DraftEdits_PlacedFromUnassigned_MovedBack_AreNotMoves()
+    {
+        await using var db = CreateDb(nameof(MovedFromLane_DraftEdits_PlacedFromUnassigned_MovedBack_AreNotMoves));
+        var s = await SeedAsync(db);
+        var service = new LanePlanService(db);
+        var parent = await ParentOfAAsync(db, s);
+
+        // Черновик: переносы не считаются — участник его не видел.
+        await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId);
+        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 2), s.UserId);
+        await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published);
+        var draftMove = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+
+        // Вернули туда, откуда переносили, — для зрителя ничего не изменилось.
+        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 3), s.UserId);
+        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 2), s.UserId);
+        var movedBack = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+
+        // Из Unassigned на дорожку — «поставили», а не «перенесли»; с дорожки в Unassigned — перенос.
+        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, null), s.UserId);
+        var toUnassigned = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        await service.MarkSeenAsync(s.GroupId, parent);
+        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 1), s.UserId);
+        var placed = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+
+        Assert.Null(draftMove.MovedFromLane);
+        Assert.Null(movedBack.MovedFromLane);
+        Assert.Equal(2, toUnassigned.MovedFromLane);
+        Assert.Null(placed.MovedFromLane);
+    }
+
     [Fact]
     public async Task MySwimmers_AllSourcesInOrder_OnlyThoseInPlan()
     {

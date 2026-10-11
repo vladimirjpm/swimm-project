@@ -99,6 +99,19 @@ public class HubGroupMediaService : IHubGroupMediaService
         int? swimmerId = null;
         long? resultId = null;
 
+        // Медиа тренировки: метка «кто на видео» (Р8). Пловец — из видимого состава ЭТОЙ группы;
+        // проверка здесь, а не только в TrainingSessionService: сюда же ведёт ручка галереи
+        // `POST /api/hub-groups/{id}/media` с training_id — без неё отметить можно было бы любого
+        // пловца сайта (а несуществующий id ронял бы запись по FK). Право «только тренер» решают
+        // вызывающие. Visibility остаётся public и не используется.
+        if (input.TrainingId is not null && input.SwimmerId is int taggedId)
+        {
+            var inRoster = await _db.HubGroupMembers.AsNoTracking()
+                .AnyAsync(m => m.HubGroupId == hubGroupId && m.SwimmerId == taggedId && !m.IsExcluded);
+            if (!inRoster) return (false, "This swimmer isn't in the group.", 0);
+            swimmerId = taggedId;
+        }
+
         if (input.TrainingId is null)
         {
             visibility = string.IsNullOrWhiteSpace(input.Visibility)

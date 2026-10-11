@@ -1,6 +1,6 @@
 ﻿# /Admin/Clubs — дубли клубов
 
-Файлы: `Pages/Admin/Clubs/Index.cshtml`; API `ClubsAdminController`
+Файлы: `Pages/Admin/Clubs/Index.cshtml`, скрипт `wwwroot/js/admin/clubs.js`; API `ClubsAdminController`
 (`/api/admin/clubs`): dedup-candidates, merge, dedup-ignore(+remove/список),
 {id}/status. Сервисы: `ClubDedupService`, `ClubMergeService`.
 

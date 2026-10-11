@@ -21,15 +21,21 @@
 client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 ```
 
-`MyMedia` (my-media.tsx:23) — гейт авторизации: пока `auth.loading` — пустой экран;
+`MyMedia` (my-media.tsx) — гейт авторизации: пока `auth.loading` — пустой экран;
 неавторизованному — заглушка с кнопкой Sign in; иначе рендерит `MyMediaContent` —
-собственно страницу. Весь стейт живёт локально в `MyMediaContent` (useState/useMemo),
-никакого Redux — фича не завязана на `store/store.ts`. Тёмная палитра в стиле
+собственно страницу. Весь стейт живёт локально в `MyMediaContent` и его хуках рядом
+(useState/useMemo, см. список файлов ниже), никакого Redux — фича не завязана на `store/store.ts`. Тёмная палитра в стиле
 `groups.html`/`home.html` — осознанное решение (см. §9 Footguns).
 
 Ключевые файлы клиента:
-- `client/src/projects/my-media-project/my-media.tsx` — оркестратор экрана: фильтры,
-  модалы, реакции, share/withdraw, добавление/удаление.
+- `client/src/projects/my-media-project/my-media.tsx` — оркестратор экрана: оверлеи и
+  модалы, добавление/удаление, связка панели фильтров с полосой, разметка. Логика — в хуках
+  рядом (с 10.10.2026, рефакторинг 9б): `use-my-swims-season.ts` (сезон + агрегат заплывов),
+  `use-like-overrides.ts` (реакции ❤), `use-media-summary.ts` (публикации по медиа, сводка,
+  группы «Shared with» — всё, что не зависит от фильтров), `use-swim-filters.ts` (состояние
+  фильтров и что после них видно; там же `swimBelongsTo`), `use-share-dialog.ts`
+  (share/withdraw, `publishTo`; разметка модала — `components/share-dialog.tsx`),
+  `use-profile-swimmers.ts` (пловцы панели и пикера Add link).
 - `client/src/projects/my-media-project/components/add-link-modal.tsx` — попап добавления
   ссылки (3 шага/single-step, см. §5).
 - `client/src/projects/my-media-project/components/swim-list.tsx` — список заплывов,
@@ -93,7 +99,7 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 |---|---|---|---|
 | GET | `/api/me/media?swimmerId=` | список медиа юзера (опц. фильтр по пловцу) | `IUserMediaRepository.GetForUserAsync` |
 | GET | `/api/me/swims?season=` | агрегат My media v3 (заплывы сезона + медиа + реакции) | `IMySwimsRepository.GetMySwimsAsync`; сезон вне `[1990,2100]` сбрасывается на текущий |
-| POST | `/api/me/media` | добавить медиа | `[EnableRateLimiting("media")]`; 400 если `swimmer_id<=0`; 400 при достижении `MaxMediaPerUser=500`; валидация `MediaUrlValidator.TryValidate` (media_type/source_type/https/regex youtube-vimeo) |
+| POST | `/api/me/media` | добавить медиа | `[EnableRateLimiting("media")]`; 400 если `swimmer_id<=0`; 400 при достижении `MaxMediaPerUser=500`; валидация `MediaUrlValidator.TryValidate` (media_type/source_type/https/regex youtube-vimeo); **409** `This link is already added here` — та же ссылка у того же юзера к той же цели (`HasSameLinkAsync`, см. §9) |
 | DELETE | `/api/me/media/{id}` | удалить своё медиа | IDOR-проверка по `userId` в репозитории |
 | GET | `/api/me/media/publications` | статусы заявок на публикацию всех моих медиа | |
 | GET | `/api/me/moderation/media` | сводный inbox модерации: группы, где я владелец/админ + все клубные заявки, если я site admin | `IUserMediaPublicationService.GetModerationFeedAsync`; строка несёт `target_type`, от него зависит ручка решения |
@@ -185,7 +191,7 @@ mobile; `swimmers` = полный список (favorites + «has media»), бе
    (строка эстафеты принадлежит владельцу + всем ногам — см. `docs/relays.md`).
    `MemberSwimmerIds` донасыщается отдельным запросом — нужен клиенту для чип-фильтра
    («заплыв принадлежит пловцу, если он владелец строки ИЛИ нога эстафеты», `swimBelongsTo`
-   в `my-media.tsx`).
+   в `use-swim-filters.ts`).
 4. **Метки достижений — общий словарь продукта, локальных правил тут НЕТ.**
    • `PB` — личный рекорд: лучшее время пловца за всё время на (стиль, дистанция),
      индивидуальные незасчитанные-DSQ заплывы. Считает `MySwimsRepository` (`IsPb`).
@@ -240,10 +246,12 @@ mobile; `swimmers` = полный список (favorites + «has media»), бе
 6. Реакции: ❤ (`Sys_UserReactions`, `Kind="like"`, `MediaId`) по медиа юзера, 🎉
    (`Kind="congrats"`, `ResultId`) по заплывам сезона — групповые счётчики + флаг «мой».
 
-На клиенте `my-media.tsx` держит **оптимистичные оверрайды** поверх ответа `/api/me/swims`
-(`likeOverrides`/`cheerOverrides`, Map по id) — тоггл сразу меняет счётчик локально, сервер
-подтверждает/поправляет асинхронно (`toggleLike`/`toggleCheer` из `use-my-swims.ts`,
-идемпотентные, возвращают итоговый `{count, mine}`).
+На клиенте `use-like-overrides.ts` держит **оптимистичные оверрайды** ❤ поверх ответа
+`/api/me/swims` (`likeOverrides`, Map по id медиа) — тоггл сразу меняет счётчик локально, сервер
+подтверждает/поправляет асинхронно (`toggleLike` из `use-my-swims.ts`, идемпотентный,
+возвращает итоговый `{count, mine}`). 🎉 на странице только показывается (`CheerChip` в
+`swim-list.tsx`); `toggleCheer` в `use-my-swims.ts` есть, но страница его не зовёт, и
+оверрайдов для 🎉 нет (сверено 10.10.2026).
 
 ### Светлая тема: две роли только для неё
 
@@ -339,7 +347,7 @@ mobile; `swimmers` = полный список (favorites + «has media»), бе
 если у подающего есть привилегия в целевой группе (владелец/админ группы/site-admin),
 заявка сразу `approved` и сбрасывает общий кэш (публичная витрина группы читает
 Publications через кэшируемый payload). Смена уровня уже поданной pending/approved
-публикации не поддержана напрямую — клиент (`handlePublish` в `my-media.tsx`) сначала
+публикации не поддержана напрямую — клиент (`publishTo` в `use-share-dialog.ts`) сначала
 делает `withdraw`, затем подаёт заново с новым `level`. Полная модель ролей/статусов —
 в `docs/favorites-media-phase2-design.md` и `docs/hubgroups-architecture.md`, здесь не
 дублируется.
@@ -378,10 +386,10 @@ Publications через кэшируемый payload). Смена уровня �
 `publish-targets` (пловца убрали из ростера), а публикация осталась — опция дописывается
 вручную, иначе селект показал бы пустоту. Кнопка зовётся `Update` вместо `Share`, когда в
 выбранной группе публикация уже есть, и гаснет, если менять нечего. Сама смена уровня идёт
-через `publishTo` в `my-media.tsx` — единственное место, где живёт правило «сервер отвергает
+через `publishTo` в `use-share-dialog.ts` — единственное место, где живёт правило «сервер отвергает
 переподачу в ту же группу, поэтому withdraw + резаявка»; модал и инлайн-строка зовут его оба.
 
-**Фильтр «Shared with»** (`groupFilter` в `my-media.tsx`) — второй ряд чипов под чипами
+**Фильтр «Shared with»** (`groupFilter` в `use-swim-filters.ts`) — второй ряд чипов под чипами
 пловцов: `All` · по чипу на каждую группу, куда юзер что-то подавал · `Not shared` (медиа
 без единой заявки). Источник списка — `useMyMediaPublications` (публикации по ВСЕМУ моему
 медиа, все сезоны), поэтому чип может показывать `· 0`: страница сезонная, а публикация
@@ -403,7 +411,7 @@ rejected`; статус карточки выводит `derivedCardStatus` (`st
 и не откроешь шторку. Привязка снята: статус есть у ЛЮБОГО медиа, «private» (нет ни одной
 публикации) для фото значит ровно то же, что для видео. Вместе с привязкой убрана и внутренняя
 резка по `media_type === 'video'`, а сам фильтр, как и «Shared with», теперь действует на все
-три списка (`mediaVisible` в `my-media.tsx`) — иначе выбранный статус сужал бы только верх
+три списка (`mediaVisible` в `use-swim-filters.ts`) — иначе выбранный статус сужал бы только верх
 страницы, молча оставляя карточки соревнований и Unlinked нетронутыми.
 
 ## 8. Здоровье ссылок
@@ -416,11 +424,64 @@ rejected`; статус карточки выводит `derivedCardStatus` (`st
 Карточка «Broken media links» на `/Admin` (дашборд «здоровье данных») ссылается на эту
 страницу.
 
+## 8½. Метка пловца на видео тренировки (01.10.2026)
+
+Тренер может отметить на ссылке тренировки, **кто на видео** («Who's in it»: технический разбор,
+съёмка одного человека). Это **метка, а не авторство**: колонка `Sys_HubGroupMedia.SwimmerId`
+(для медиа тренировок раньше всегда `null`), автор остаётся `CreatedByUserId` — квота «N of 10
+yours», «Added by you» и право удалить считаются по нему, как и раньше.
+
+- **Кто ставит:** только управляющий. Участник с `swimmer_id` в `POST …/sessions/{id}/media` →
+  403 «Only the coach tags a swimmer.». Пловец-метка прав не получает никаких (снять метку или
+  удалить ссылку он не может — связь «я — этот пловец» на сайте не доверенная).
+- **Кого можно:** пловца из видимого состава группы (`HubGroupMembers` без `IsExcluded`, как
+  `LanePlanService.LoadRosterAsync`; пловцы группы без федерации тоже). Иначе 400 «This swimmer
+  isn't in the group.». Ушёл из состава ПОСЛЕ отметки — метка остаётся (снимок).
+- **Один пловец на ссылку** (одна колонка, таблицы отметок нет). Сменить / снять —
+  `PUT /api/hub-groups/{id}/sessions/{sessionId}/media/{mediaId}/swimmer`, тело
+  `{ "swimmer_id": 123 }` или `{ "swimmer_id": null }`, только управляющий; ответ — обновлённое
+  медиа. Форма «Add video» (поле «Who's in it») и лайтбокс (строка над кнопками) — у управляющего.
+- **Ответ медиа** несёт `swimmer { id, name, name_en }` (или `null`) и `for_me` — отмеченный
+  пловец «мой» для зрителя (`MySwimmersQuery`: сам и семья; только подсветка плитки акцентом).
+- **Видимость не меняется.** Метка не выводит ссылку ни на страницу пловца, ни в галерею группы:
+  `GetGalleryAsync` / `GetMembersMediaAsync` фильтруют `TrainingId == null` (покрыто тестом).
+  `Visibility` у медиа тренировки не используется — `members` туда не ставить, иначе ссылка
+  уедет в закрытую галерею.
+- **Проверка в базе:** `CK_HubGroupMedia_AnchorMembersOnly` раньше пускал `SwimmerId` только при
+  `Visibility = 'members'` — метка на видео тренировки падала 500. Миграция
+  `AllowSwimmerTagOnTrainingMedia` разрешила `SwimmerId` при `TrainingId IS NOT NULL`; якорь-заплыв
+  (`ResultId`) — по-прежнему только members. InMemory-тесты check-ограничений не видят — для них
+  `TrainingMediaTagPgTests` (живой Postgres).
+- **Два пути записи, проверка одна:** состав проверяет сам `HubGroupMediaService.AddAsync` — к нему
+  ведёт и ручка тренировки, и ручка галереи группы `POST /api/hub-groups/{id}/media` с `training_id`.
+
 ## 9. Footguns
 
 - **«Link to a swim» = delete+recreate**, не PATCH — теряются `Id`, `CreatedAt` и любые
   публикации медиа (см. §5). Если баг про «пропала публикация после привязки к заплыву» —
   смотреть сюда в первую очередь.
+- **Одна ссылка к одной цели — один раз** (30.09.2026, `docs/plans/media-duplicates-handoff.md`).
+  `POST /api/me/media` отвечает 409, если у юзера уже есть та же ссылка к той же цели: тот же
+  `ResultId`; либо уровень `competition` и тот же `CompetitionId` (пловец не в счёт — таб Media
+  клеит по `(ResultId, Url)` без пловца); либо уровень `swimmer` того же пловца. Сравнение —
+  `MediaUrlValidator.DedupKey`: пробелы по краям не в счёт, у Google Drive — id файла (`/view`,
+  `?usp=sharing`, `open?id=` одного файла = одна ссылка), остальные ссылки как есть. Та же ссылка
+  к ДРУГОЙ цели (другой день события, заплыв) — разрешена. Раньше дубль заводился молча:
+  полоса «MY MEDIA — N» считала строки (15), а таб Media клеил их (10). Модал Add link теперь
+  показывает текст отказа сервера строкой над кнопками (`onSave` → `true | string`,
+  `addUserMedia` → `{ item, error }`); до этого при любом отказе он молча оставался открытым.
+  Старые дубли в базе проверка не трогает.
+- **Медиа «ко всему соревнованию» у многодневки — на ДНЕ, карточка /my-media — тоже по дню**
+  (30.09.2026). Кнопка «＋ Add media» в шапке соревнования цепляет к первому дню события, а
+  карточка на /my-media собрана по дню заплывов (`SwimList`, группа по `competition_id`). Медиа
+  дня без заплывов раньше не было видно на /my-media нигде. Теперь `/api/me/swims` отдаёт
+  `event_id` у заплыва и у медиа, и `compMediaByComp` отдаёт такое медиа карточке другого дня
+  того же события. Если у события несколько карточек (заплывы в разные дни), медиа своего дня
+  остаётся на своей, а медиа дня без карточки — на первой по порядку.
+- **`AddLinkModal` — портал в `body` с классом темы deep** (30.09.2026). Его открывают и со
+  страницы результатов (шапка соревнования, «+ Add video» на строке), где на корне темы deep
+  нет: роли `--t-*` там пустые, и модал выходил прозрачным. Класс ставит сам модал
+  (`useDeepThemeClass`) и сам подключает `deep-theme.css`, как `ConfirmDialog`.
 - **`Level` выводит сервер**, клиенту не доверяем (`UserMediaRepository.AddAsync`) — если
   на клиенте что-то не так с уровнем/группировкой, проверяй именно серверную логику вывода,
   а не то, что «передал клиент».

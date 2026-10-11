@@ -1,4 +1,5 @@
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.Application.Abstractions;
 
@@ -20,4 +21,11 @@ public interface IHubGroupTrainingRepository
 
     /// <summary>Все тренировки группы в форме клиентского ResultWrap (готова для TrainingTable).</summary>
     Task<TrainingSourceDto> GetTrainingsAsync(int hubGroupId);
+
+    /// <summary>
+    /// Повторы этих сессий группы — для ленты тренировок (показатели, «You», «Sets & times»;
+    /// docs/plans/trainings-tab-redesign-plan.md, Т1а). Сессии чужой группы молча не попадают.
+    /// Аудиторию проверяет вызывающий до вызова.
+    /// </summary>
+    Task<List<TrainingFeed.Repeat>> GetRepeatsAsync(int hubGroupId, IReadOnlyCollection<int> sessionIds);
 }

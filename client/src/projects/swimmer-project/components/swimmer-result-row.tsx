@@ -65,9 +65,11 @@ interface Props {
   swimmerId: number;
   /** Нормативы у мужчин и женщин разные — без пола дуга уровня врёт. */
   gender: 'male' | 'female';
+  /** Ячейка второй линии (`SwimRow.extras`): Best time ставит туда помеченное время рядом. */
+  extras?: React.ReactNode;
 }
 
-function SwimmerResultRow({ row, swimmerId, gender }: Props) {
+function SwimmerResultRow({ row, swimmerId, gender, extras }: Props) {
   // Prelim-место — ранжир сессии, не медаль (Р34): кружок вместо медали.
   // Правило медали — ОДНО на продукт: раньше эта страница знала только про `prelim`,
   // а таблица результатов и My media считали по-своему (см. HelperResults.isMedalPlace).
@@ -104,6 +106,7 @@ function SwimmerResultRow({ row, swimmerId, gender }: Props) {
       meetPlacement="line2"
       date={row.date}
       points={row.points ?? null}
+      extras={extras}
       level={{ gender, ageInSeason: row.ageInSeason, isMasters: !!row.isMasters }}
     />
   );

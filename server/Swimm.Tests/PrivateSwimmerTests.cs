@@ -246,8 +246,8 @@ public class PrivateSwimmerTests
 
     /// <summary>
     /// «Неактивен» вместо удаления (Влад, 29.09.2026): строка скрыта — пловца нет в составе для
-    /// своих и на дорожках, но он и его времена целы; Restore возвращает. Обычного ручного
-    /// пловца так не прячут — его удаляют.
+    /// своих и на дорожках, но он и его времена целы; Restore возвращает. С 30.09.2026 (Р74) так же
+    /// «Inactive» делают и обычного ручного пловца.
     /// </summary>
     [Fact]
     public async Task Deactivate_HidesFromInsiders_KeepsSwimmer_RestoreBringsBack()
@@ -267,7 +267,8 @@ public class PrivateSwimmerTests
         Assert.True((await subs.SetExcludedAsync(w.Group.Id, privateRow.Id, false)).Success);
         Assert.Single(await repo.GetPrivateMembersAsync(w.Group.Id));
 
-        Assert.False((await subs.SetExcludedAsync(w.Group.Id, publicRow.Id, true)).Success);
+        Assert.True((await subs.SetExcludedAsync(w.Group.Id, publicRow.Id, true)).Success);
+        Assert.True((await db.HubGroupMembers.SingleAsync(m => m.Id == publicRow.Id)).IsExcluded);
     }
 
     [Fact]

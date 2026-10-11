@@ -1,0 +1,1234 @@
+[
+  {
+    "Heat": 2,
+    "Lane": 3,
+    "Time": "03:22.64",
+    "Club": "ירושלים רבתי",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "שלגל",
+        "first_name": "גל",
+        "birth_year": 2002,
+        "club": null,
+        "split_time": "00:49.81"
+      },
+      {
+        "order": 2,
+        "last_name": "לייטרובסקי",
+        "first_name": "מיכאל",
+        "birth_year": 1999,
+        "club": null,
+        "split_time": "00:51.59"
+      },
+      {
+        "order": 3,
+        "last_name": "מרדר",
+        "first_name": "מייק",
+        "birth_year": 2005,
+        "club": null,
+        "split_time": "00:51.30"
+      },
+      {
+        "order": 4,
+        "last_name": "בן שטרית",
+        "first_name": "איתן",
+        "birth_year": 2003,
+        "club": null,
+        "split_time": "00:49.94"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 1,
+    "Time": "03:24.36",
+    "Club": "הפועל ירושלים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "גליבינסקי",
+        "first_name": "אלכסיי",
+        "birth_year": 2004,
+        "club": null,
+        "split_time": "00:49.71"
+      },
+      {
+        "order": 2,
+        "last_name": "דנציגר",
+        "first_name": "ענבר",
+        "birth_year": 2004,
+        "club": null,
+        "split_time": "00:51.16"
+      },
+      {
+        "order": 3,
+        "last_name": "ניסן",
+        "first_name": "תמיר",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:53.26"
+      },
+      {
+        "order": 4,
+        "last_name": "פאחט",
+        "first_name": "בן",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:50.23"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 5,
+    "Time": "03:25.64",
+    "Club": "אלומה עירוני הוד השרון",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "ארז",
+        "first_name": "מורן",
+        "birth_year": 2007,
+        "club": null,
+        "split_time": "00:50.80"
+      },
+      {
+        "order": 2,
+        "last_name": "קריציבסקי",
+        "first_name": "דניאל",
+        "birth_year": 2004,
+        "club": null,
+        "split_time": "00:50.19"
+      },
+      {
+        "order": 3,
+        "last_name": "קינן",
+        "first_name": "רום",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:51.84"
+      },
+      {
+        "order": 4,
+        "last_name": "דה-בר",
+        "first_name": "אריאל עידו",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:52.81"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 6,
+    "Time": "03:25.98",
+    "Club": "מכבי ראשון לציון SEALS",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "כהן",
+        "first_name": "שגיא",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:51.33"
+      },
+      {
+        "order": 2,
+        "last_name": "שלם",
+        "first_name": "רום",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:51.65"
+      },
+      {
+        "order": 3,
+        "last_name": "שילר",
+        "first_name": "יהונתן",
+        "birth_year": 2007,
+        "club": null,
+        "split_time": "00:51.93"
+      },
+      {
+        "order": 4,
+        "last_name": "דותן",
+        "first_name": "אלון",
+        "birth_year": 2006,
+        "club": null,
+        "split_time": "00:51.07"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 5,
+    "Time": "03:25.98",
+    "Club": "מכבי חיפה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "וינר",
+        "first_name": "עומר",
+        "birth_year": 2003,
+        "club": null,
+        "split_time": "00:50.74"
+      },
+      {
+        "order": 2,
+        "last_name": "סלע",
+        "first_name": "תום",
+        "birth_year": 2006,
+        "club": null,
+        "split_time": "00:52.06"
+      },
+      {
+        "order": 3,
+        "last_name": "סטרימובסקי",
+        "first_name": "יונתן",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:52.11"
+      },
+      {
+        "order": 4,
+        "last_name": "חרותי",
+        "first_name": "מירון",
+        "birth_year": 1997,
+        "club": null,
+        "split_time": "00:51.07"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 6,
+    "Time": "03:26.39",
+    "Club": "מכבי א.ס. רמת השרון",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "יוסקוביץ - לב ארי",
+        "first_name": "ענבר רפאל",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:51.52"
+      },
+      {
+        "order": 2,
+        "last_name": "מסילתי",
+        "first_name": "ענבר",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:52.51"
+      },
+      {
+        "order": 3,
+        "last_name": "רוזנר",
+        "first_name": "תומר",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:52.55"
+      },
+      {
+        "order": 4,
+        "last_name": "קסטן מגורי",
+        "first_name": "עמית",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:49.81"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 7,
+    "Time": "03:27.18",
+    "Club": "הפועל בת ים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "פרסמן",
+        "first_name": "יוחאי",
+        "birth_year": 2007,
+        "club": null,
+        "split_time": "00:51.15"
+      },
+      {
+        "order": 2,
+        "last_name": "רבינוביץ",
+        "first_name": "דניאל",
+        "birth_year": 2006,
+        "club": null,
+        "split_time": "00:51.74"
+      },
+      {
+        "order": 3,
+        "last_name": "סגלוביץ",
+        "first_name": "מרק",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:51.78"
+      },
+      {
+        "order": 4,
+        "last_name": "נובוסד",
+        "first_name": "נתנאל",
+        "birth_year": 2007,
+        "club": null,
+        "split_time": "00:52.51"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 3,
+    "Time": "03:27.46",
+    "Club": "מכבי מרום רמת גן",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "כהן",
+        "first_name": "יהלי",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:50.45"
+      },
+      {
+        "order": 2,
+        "last_name": "נג'אר",
+        "first_name": "דניאל",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:52.41"
+      },
+      {
+        "order": 3,
+        "last_name": "חזן",
+        "first_name": "אביב",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:53.25"
+      },
+      {
+        "order": 4,
+        "last_name": "סקל",
+        "first_name": "אסף",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:51.35"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 2,
+    "Time": "03:29.92",
+    "Club": "הפועל כפר סבא ב. ב.",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "אבו עמשה",
+        "first_name": "סלאח",
+        "birth_year": 2006,
+        "club": null,
+        "split_time": "00:52.43"
+      },
+      {
+        "order": 2,
+        "last_name": "דרור",
+        "first_name": "ארז",
+        "birth_year": 2007,
+        "club": null,
+        "split_time": "00:51.05"
+      },
+      {
+        "order": 3,
+        "last_name": "לידאוי",
+        "first_name": "מוחמד",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:53.67"
+      },
+      {
+        "order": 4,
+        "last_name": "גאוגזייב",
+        "first_name": "איתן",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:52.77"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 8,
+    "Time": "03:30.84",
+    "Club": "מכבי קרית ביאליק",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "פרץ",
+        "first_name": "אופק",
+        "birth_year": 2005,
+        "club": null,
+        "split_time": "00:51.77"
+      },
+      {
+        "order": 2,
+        "last_name": "תורגמן",
+        "first_name": "ירין",
+        "birth_year": 2003,
+        "club": null,
+        "split_time": "00:53.93"
+      },
+      {
+        "order": 3,
+        "last_name": "וורונקוב",
+        "first_name": "שון",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:52.75"
+      },
+      {
+        "order": 4,
+        "last_name": "רוזנפלד",
+        "first_name": "איתי",
+        "birth_year": 2006,
+        "club": null,
+        "split_time": "00:52.39"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 0,
+    "Time": "03:32.69",
+    "Club": "מכבי וייסגל רחובות",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "גלצנקו",
+        "first_name": "איוון",
+        "birth_year": 2005,
+        "club": null,
+        "split_time": "00:53.66"
+      },
+      {
+        "order": 2,
+        "last_name": "הרלב",
+        "first_name": "אדם פרדקין",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "00:55.64"
+      },
+      {
+        "order": 3,
+        "last_name": "אלון",
+        "first_name": "אריאל",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:51.88"
+      },
+      {
+        "order": 4,
+        "last_name": "טרייבוך",
+        "first_name": "אלן",
+        "birth_year": 2007,
+        "club": null,
+        "split_time": "00:51.51"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 8,
+    "Time": "03:33.53",
+    "Club": "מתנ\"ס רמת הנגב",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "פובר",
+        "first_name": "מיכאל",
+        "birth_year": 2005,
+        "club": null,
+        "split_time": "00:52.26"
+      },
+      {
+        "order": 2,
+        "last_name": "פובר",
+        "first_name": "איליה",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:52.96"
+      },
+      {
+        "order": 3,
+        "last_name": "כהן",
+        "first_name": "ניב",
+        "birth_year": 2006,
+        "club": null,
+        "split_time": "00:51.15"
+      },
+      {
+        "order": 4,
+        "last_name": "גבריאל",
+        "first_name": "יהונתן",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:57.16"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 7,
+    "Time": "03:41.14",
+    "Club": "מכבי שוהם",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "רומנו",
+        "first_name": "יואב",
+        "birth_year": 2004,
+        "club": null,
+        "split_time": "00:51.00"
+      },
+      {
+        "order": 2,
+        "last_name": "בירנבאום",
+        "first_name": "מיכאל",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:54.33"
+      },
+      {
+        "order": 3,
+        "last_name": "מישב",
+        "first_name": "מיכאל",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:56.98"
+      },
+      {
+        "order": 4,
+        "last_name": "יהודאי",
+        "first_name": "ירין",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:58.83"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 1,
+    "Time": "03:42.01",
+    "Club": "מכבי פ.מ. רעות",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "סמויליץ",
+        "first_name": "תמיר",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:53.75"
+      },
+      {
+        "order": 2,
+        "last_name": "מסובי",
+        "first_name": "נועם",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:57.26"
+      },
+      {
+        "order": 3,
+        "last_name": "יעקובי",
+        "first_name": "איתמר",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:56.34"
+      },
+      {
+        "order": 4,
+        "last_name": "לשמנוב",
+        "first_name": "אלון",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:54.66"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 2,
+    "Time": "03:43.31",
+    "Club": "בני הרצליה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "בליק",
+        "first_name": "סאווה",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:54.80"
+      },
+      {
+        "order": 2,
+        "last_name": "וייסמן",
+        "first_name": "איתי",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "00:57.24"
+      },
+      {
+        "order": 3,
+        "last_name": "רבין",
+        "first_name": "יהונתן",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:55.34"
+      },
+      {
+        "order": 4,
+        "last_name": "דימונד",
+        "first_name": "איתן שלמה",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:55.93"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 1,
+    "Time": "03:44.42",
+    "Club": "הפועל פתח תקווה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "סידלקובסקי",
+        "first_name": "ליאור",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:58.89"
+      },
+      {
+        "order": 2,
+        "last_name": "צוזוי",
+        "first_name": "אור",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:56.44"
+      },
+      {
+        "order": 3,
+        "last_name": "מיכאלוביץ",
+        "first_name": "אגם",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "00:57.27"
+      },
+      {
+        "order": 4,
+        "last_name": "חי",
+        "first_name": "ניר",
+        "birth_year": 2005,
+        "club": null,
+        "split_time": "00:51.82"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 9,
+    "Time": "03:47.09",
+    "Club": "מכבי קרית אונו",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "סיון",
+        "first_name": "יותם",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:56.69"
+      },
+      {
+        "order": 2,
+        "last_name": "בר צבי",
+        "first_name": "תום",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:55.92"
+      },
+      {
+        "order": 3,
+        "last_name": "פרל",
+        "first_name": "נועם",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:57.98"
+      },
+      {
+        "order": 4,
+        "last_name": "גמליאל",
+        "first_name": "עידן",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:56.50"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 3,
+    "Time": "03:47.63",
+    "Club": "הפועל אולימפ נתניה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "גרונטווגה",
+        "first_name": "אריאל",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "00:57.37"
+      },
+      {
+        "order": 2,
+        "last_name": "סלבסקי",
+        "first_name": "עידן",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "00:58.90"
+      },
+      {
+        "order": 3,
+        "last_name": "פלייטמן",
+        "first_name": "דניאל",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:56.21"
+      },
+      {
+        "order": 4,
+        "last_name": "בילינסון",
+        "first_name": "איתמר",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:55.15"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 0,
+    "Time": "03:47.67",
+    "Club": "הפועל שחייני הנגב",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "ביטן",
+        "first_name": "נתיב",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:59.46"
+      },
+      {
+        "order": 2,
+        "last_name": "קורן",
+        "first_name": "אמיתי",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:57.42"
+      },
+      {
+        "order": 3,
+        "last_name": "ערוסי",
+        "first_name": "שגיא",
+        "birth_year": 2007,
+        "club": null,
+        "split_time": "00:57.37"
+      },
+      {
+        "order": 4,
+        "last_name": "לבובסקי",
+        "first_name": "נועם",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:53.42"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 4,
+    "Time": "03:49.42",
+    "Club": "מכבי תל אביב",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "ורסנו",
+        "first_name": "אריאל",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "00:58.38"
+      },
+      {
+        "order": 2,
+        "last_name": "קורוטקין",
+        "first_name": "יאיר",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:59.58"
+      },
+      {
+        "order": 3,
+        "last_name": "טורגובצקי",
+        "first_name": "אדם",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:56.04"
+      },
+      {
+        "order": 4,
+        "last_name": "זסלבסקי",
+        "first_name": "אלירן",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:55.42"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 6,
+    "Time": "03:50.65",
+    "Club": "הפועל בית שמש",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "דדוש",
+        "first_name": "דניאל",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:56.67"
+      },
+      {
+        "order": 2,
+        "last_name": "גפני",
+        "first_name": "ענב",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:57.69"
+      },
+      {
+        "order": 3,
+        "last_name": "יודין",
+        "first_name": "דניאל",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:56.09"
+      },
+      {
+        "order": 4,
+        "last_name": "קוזנצוב",
+        "first_name": "ליאון",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "01:00.20"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 7,
+    "Time": "03:53.48",
+    "Club": "הפועל עומר",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "חיון",
+        "first_name": "איתן חי",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:59.61"
+      },
+      {
+        "order": 2,
+        "last_name": "פרוקופייב",
+        "first_name": "ניקיטה",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "00:56.58"
+      },
+      {
+        "order": 3,
+        "last_name": "קיעאן",
+        "first_name": "עבד אל רחמאן",
+        "birth_year": 2012,
+        "club": null,
+        "split_time": "00:59.28"
+      },
+      {
+        "order": 4,
+        "last_name": "שפיץ",
+        "first_name": "אדם",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:58.01"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 8,
+    "Time": "03:58.16",
+    "Club": "הפועל עמק חפר",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "מזרחי",
+        "first_name": "אלון",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "01:04.78"
+      },
+      {
+        "order": 2,
+        "last_name": "אשלגי",
+        "first_name": "אדם",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:58.26"
+      },
+      {
+        "order": 3,
+        "last_name": "מירושניקוב",
+        "first_name": "ניק",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:55.39"
+      },
+      {
+        "order": 4,
+        "last_name": "אגרונוב",
+        "first_name": "מישל",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:59.73"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 2,
+    "Lane": 4,
+    "Time": "04:01.22",
+    "Club": "הפועל דולפין נתניה",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "דהן",
+        "first_name": "עידו",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "00:57.23"
+      },
+      {
+        "order": 2,
+        "last_name": "חדד",
+        "first_name": "ראם",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "01:04.42"
+      },
+      {
+        "order": 3,
+        "last_name": "חדד",
+        "first_name": "אליאור",
+        "birth_year": 2008,
+        "club": null,
+        "split_time": "00:59.12"
+      },
+      {
+        "order": 4,
+        "last_name": "יאגודייב",
+        "first_name": "נתנאל",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "01:00.45"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 2,
+    "Time": "04:02.79",
+    "Club": "מכבי ירושלים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "משעלי",
+        "first_name": "הראל",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:59.07"
+      },
+      {
+        "order": 2,
+        "last_name": "פרידמן",
+        "first_name": "אשר",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "01:01.23"
+      },
+      {
+        "order": 3,
+        "last_name": "גלבר",
+        "first_name": "עומר",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "01:03.46"
+      },
+      {
+        "order": 4,
+        "last_name": "שמש",
+        "first_name": "נריה",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:59.03"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 5,
+    "Time": "04:05.86",
+    "Club": "הפועל גליל עליון",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "בוסיאן",
+        "first_name": "מעין",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "01:01.02"
+      },
+      {
+        "order": 2,
+        "last_name": "גוטמן",
+        "first_name": "יניב",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "00:58.16"
+      },
+      {
+        "order": 3,
+        "last_name": "ווגל",
+        "first_name": "ארי",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "01:02.19"
+      },
+      {
+        "order": 4,
+        "last_name": "ויילר",
+        "first_name": "יונתן",
+        "birth_year": 2011,
+        "club": null,
+        "split_time": "01:04.49"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 1,
+    "Lane": 4,
+    "Time": "04:07.11",
+    "Club": "מועדון שחייה כפר תבור",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "פורת",
+        "first_name": "גיל",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": "00:55.35"
+      },
+      {
+        "order": 2,
+        "last_name": "גבאי",
+        "first_name": "אבינעם יצחק",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": "01:04.24"
+      },
+      {
+        "order": 3,
+        "last_name": "גבאי",
+        "first_name": "יהודה",
+        "birth_year": 2012,
+        "club": null,
+        "split_time": "01:04.82"
+      },
+      {
+        "order": 4,
+        "last_name": "אלקלעי",
+        "first_name": "עידן",
+        "birth_year": 2012,
+        "club": null,
+        "split_time": "01:02.70"
+      }
+    ],
+    "Band": null,
+    "Status": null,
+    "LegsBorrowed": false,
+    "LegNames": null
+  },
+  {
+    "Heat": 3,
+    "Lane": 9,
+    "Time": null,
+    "Club": "הפועל בת ים",
+    "Legs": [
+      {
+        "order": 1,
+        "last_name": "סחרוב",
+        "first_name": "גל",
+        "birth_year": 2005,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 2,
+        "last_name": "טוקרב",
+        "first_name": "דניס",
+        "birth_year": 2009,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 3,
+        "last_name": "מוצרנקו",
+        "first_name": "נורדן רוסלן",
+        "birth_year": 2010,
+        "club": null,
+        "split_time": null
+      },
+      {
+        "order": 4,
+        "last_name": "פושקה",
+        "first_name": "נתניאל",
+        "birth_year": 2007,
+        "club": null,
+        "split_time": null
+      }
+    ],
+    "Band": null,
+    "Status": "NS",
+    "LegsBorrowed": false,
+    "LegNames": null
+  }
+]

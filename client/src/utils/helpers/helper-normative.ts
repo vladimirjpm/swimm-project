@@ -216,16 +216,25 @@ export default class HelperNormative {
     };
 
     function defaultResult(): NormativeLevelInfo {
-      return {
-        currentLevel: '—',
-        currentLevelTime: '—',
-        nextLevel: null,
-        nextTime: null,
-        time: time ? `${time}` : null,
-        progressToNextLevel: null,
-        normativeAgeGroup: null,
-      };
+      return HelperNormative.noLevelInfo(time);
     }
+  }
+
+  /**
+   * «Уровня нет»: дуга рисуется пустой, фильтр по уровню строку не пропускает. Так выглядит и
+   * заплыв без норматива, и помеченная ошибка протокола (`suspect_reason`) — её время
+   * достижением не считается (правило `UI_SwimTime`, как в `SwimRow`).
+   */
+  static noLevelInfo(time: number | null = null): NormativeLevelInfo {
+    return {
+      currentLevel: '—',
+      currentLevelTime: '—',
+      nextLevel: null,
+      nextTime: null,
+      time: time ? `${time}` : null,
+      progressToNextLevel: null,
+      normativeAgeGroup: null,
+    };
   }
 
   /**

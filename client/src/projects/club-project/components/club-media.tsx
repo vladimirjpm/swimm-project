@@ -112,7 +112,7 @@ function ClubMedia({ clubId }: { clubId: number }) {
                 {m.media_type === 'video' && (
                   <span
                     className="absolute right-1.5 top-1.5 rounded-full px-1.5 py-1 text-[13px] leading-none"
-                    style={{ background: 'var(--deep-scrim, rgba(0,0,0,.55))' }}
+                    style={{ background: 'var(--t-scrim)' }}
                   >
                     ▶
                   </span>

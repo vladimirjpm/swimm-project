@@ -21,6 +21,9 @@ public interface ILanePlanService
     /// </summary>
     Task<LanePlanDto?> GetAsync(int hubGroupId, DateOnly date, bool isManager, int? viewerUserId = null);
 
+    /// <summary>Зритель открыл вид Lanes (Т1б): гаснет золотая метка «тебя перенесли».</summary>
+    Task MarkSeenAsync(int hubGroupId, int viewerUserId);
+
     /// <summary>
     /// Сохранить план целиком (создать черновиком, если его нет; статус существующего не
     /// меняется). Уровни дорожек — только этой группы; пловцы — видимого состава или уже

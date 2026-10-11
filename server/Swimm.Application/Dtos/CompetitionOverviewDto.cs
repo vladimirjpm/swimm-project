@@ -77,6 +77,18 @@ public sealed class CompetitionOverviewDto
     /// </summary>
     [JsonPropertyName("club_points_mismatch_note")]
     public CompetitionNoteDto? ClubPointsMismatchNote { get; init; }
+
+    /// <summary>
+    /// Официального клубного зачёта у соревнования нет: loglig проверен и таблицы нет
+    /// (<c>HasOfficialClubStanding = false</c>) либо не проверялся, но стоит пометка «клубный
+    /// зачёт не ведётся» (<c>ClubPointsDisabled</c>), и правило очков НЕ привязано вручную
+    /// (ручная привязка = шкала из регламента). Очки тогда считает автоподбор, и это НАШ вывод,
+    /// а не цифра протокола, поэтому
+    /// клиент ставит чип «Unofficial» на Top clubs и таб Clubs. true — только если так у ВСЕХ
+    /// соревнований выборки.
+    /// </summary>
+    [JsonPropertyName("club_points_unofficial")]
+    public bool ClubPointsUnofficial { get; init; }
     [JsonPropertyName("top_clubs_men")] public IReadOnlyList<ClubSummaryDto> TopClubsMen { get; init; } = [];
     [JsonPropertyName("top_clubs_women")] public IReadOnlyList<ClubSummaryDto> TopClubsWomen { get; init; } = [];
     /// <summary>
@@ -217,6 +229,18 @@ public sealed class OverviewPointsRuleDto
 
     /// <summary>Множитель очков за эстафету (обычно 2).</summary>
     [JsonPropertyName("relay_multiplier")] public int RelayMultiplier { get; init; }
+
+    /// <summary>Вес общей категории (абсолют по времени, все возрасты, внутри пола); null — нет.</summary>
+    [JsonPropertyName("overall_multiplier")] public int? OverallMultiplier { get; init; }
+
+    /// <summary>Минимум стартовавших, при котором категория приносит очки; null — без порога.</summary>
+    [JsonPropertyName("min_entrants")] public int? MinEntrants { get; init; }
+
+    /// <summary>Зачётные дистанции («1600»); null — все.</summary>
+    [JsonPropertyName("distances")] public string? Distances { get; init; }
+
+    /// <summary>Возрастные категории, которые правило строит по году рождения («12-13,14-15»); null — из протокола.</summary>
+    [JsonPropertyName("age_bands")] public string? AgeBands { get; init; }
 
     /// <summary>Шкала «место → очки», по возрастанию места.</summary>
     [JsonPropertyName("points_by_place")]

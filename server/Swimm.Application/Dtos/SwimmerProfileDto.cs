@@ -90,6 +90,14 @@ public class SwimmerProfileDto
     [JsonPropertyName("records")]
     public List<SwimmerHeldRecordDto> Records { get; set; } = [];
 
+    /// <summary>
+    /// Заплывов за карьеру, помеченных как ошибка протокола (<c>SuspectReason</c>). Больше
+    /// нуля — у таба Results появляется вид «Under review»; считается тем же правилом, что и
+    /// его список (<c>SwimmerPageBuilder.IsUnderReview</c>), иначе число и строки разойдутся.
+    /// </summary>
+    [JsonPropertyName("underReviewCount")]
+    public int UnderReviewCount { get; set; }
+
     /// <summary>Сезоны с заплывами, от свежих к старым; ровно один — isDisplayDefault.</summary>
     [JsonPropertyName("seasons")]
     public List<SwimmerSeasonOptionDto> Seasons { get; set; } = [];

@@ -63,7 +63,8 @@ public class ClubOverviewRepository : IClubOverviewRepository
         int Silver,
         int Bronze,
         int SwimmerCount,
-        int ScoringSwims);
+        int ScoringSwims,
+        bool Unofficial);
 
     public async Task<ClubOverviewDto?> GetOverviewAsync(
         int resolvedClubId, int requestedId, int? season, string? groupKey,
@@ -182,6 +183,10 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 s.CompetitionId,
                 s.Competition.Name,
                 s.Competition.Date,
+                s.Competition.EventId,
+                s.Competition.HasOfficialClubStanding,
+                s.Competition.ClubPointsDisabled,
+                s.Competition.PointRuleClubsId,
                 s.Competition.IsChampionship,
                 s.Competition.PoolType,
                 s.Competition.StandingKindOverride,
@@ -197,6 +202,19 @@ public class ClubOverviewRepository : IClubOverviewRepository
         if (raw.Count == 0) return [];
 
         var competitionIds = raw.Select(r => r.CompetitionId).ToList();
+
+        // Чип «Unofficial» (Р80): зачётная единица события — первый день, но официальность
+        // решают ВСЕ дни (как в overview соревнования): если хоть у одного дня зачёт есть,
+        // сумма уже не «неофициальная целиком».
+        var eventIds = raw.Where(r => r.EventId != null).Select(r => r.EventId!.Value).Distinct().ToList();
+        var eventDays = await _read.Competitions.AsNoTracking()
+            .Where(c => c.EventId != null && eventIds.Contains(c.EventId.Value))
+            .Select(c => new { EventId = c.EventId!.Value, c.HasOfficialClubStanding, c.ClubPointsDisabled, c.PointRuleClubsId })
+            .ToListAsync();
+        var eventUnofficial = eventDays
+            .GroupBy(d => d.EventId)
+            .ToDictionary(g => g.Key, g => g.All(d =>
+                Competition.IsClubPointsUnofficial(d.HasOfficialClubStanding, d.ClubPointsDisabled, d.PointRuleClubsId)));
 
         // Зачётную группу дают ТОЛЬКО категории возрастной лестницы: кастомные
         // (result-maccabiah и будущие) — это «соревнование само по себе», клубного зачёта
@@ -225,6 +243,9 @@ public class ClubOverviewRepository : IClubOverviewRepository
             var kind = StandingKinds.Resolve(r.IsChampionship, r.PoolType, r.StandingKindOverride);
             var sortDate = ParseDate(r.Date);
             var seasonYear = SeasonMath.StartYearOf(sortDate);
+            var unofficial = r.EventId is int evId && eventUnofficial.TryGetValue(evId, out var evUnofficial)
+                ? evUnofficial
+                : Competition.IsClubPointsUnofficial(r.HasOfficialClubStanding, r.ClubPointsDisabled, r.PointRuleClubsId);
 
             // Соревнование может висеть в ДВУХ группах лестницы (Kids + Young) — тогда это
             // два зачёта с одного старта, по строке на группу. Проверено на данных: Хадера-2026
@@ -235,7 +256,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 result.Add(new StandingRow(
                     r.CompetitionId, r.Name, r.Date, sortDate, seasonYear, kind,
                     null, null, null, int.MaxValue,
-                    r.Rank, r.Points, r.Gold, r.Silver, r.Bronze, r.SwimmerCount, r.ScoringSwims));
+                    r.Rank, r.Points, r.Gold, r.Silver, r.Bronze, r.SwimmerCount, r.ScoringSwims, unofficial));
                 continue;
             }
 
@@ -244,7 +265,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 result.Add(new StandingRow(
                     r.CompetitionId, r.Name, r.Date, sortDate, seasonYear, kind,
                     g.Key, g.Name, g.Badge, g.DisplayOrder,
-                    r.Rank, r.Points, r.Gold, r.Silver, r.Bronze, r.SwimmerCount, r.ScoringSwims));
+                    r.Rank, r.Points, r.Gold, r.Silver, r.Bronze, r.SwimmerCount, r.ScoringSwims, unofficial));
             }
         }
         return result;
@@ -395,6 +416,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
         Silver = r.Silver,
         Bronze = r.Bronze,
         SwimmerCount = r.SwimmerCount,
+        Unofficial = r.Unofficial,
     };
 
     /// <summary>
@@ -444,6 +466,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
             GroupKey = target.GroupKey,
             GroupName = target.GroupName,
             ClubCount = all.Count,
+            Unofficial = target.Unofficial,
             Rows = visible,
         };
     }
@@ -476,6 +499,8 @@ public class ClubOverviewRepository : IClubOverviewRepository
         var rows = await query
             .Select(r => new
             {
+                r.Id,
+                r.CompetitionId,
                 r.SwimmerId,
                 // Место prelim-заплыва — ранжир сессии, не награда; общий финал «כללי»
                 // (Round=final-open) тоже не зачётный: у организатора единица зачёта —
@@ -500,12 +525,21 @@ public class ClubOverviewRepository : IClubOverviewRepository
         var rules = await _read.PointRulesClubs.AsNoTracking().Include(r => r.Entries).ToListAsync();
         var seasonForAge = season ?? SeasonMath.CurrentStartYear();
 
+        // Правило «по заплыву целиком» (схема Красного моря) зависит от ВСЕХ участников заплыва,
+        // а здесь строки одного клуба — соревнование догружается целиком.
+        var contextPoints = await ContextClubPoints.LoadAsync(_read.Results, rules,
+            ContextClubPoints.CompetitionsNeedingContext(rules, rows
+                .Select(r => (r.CompetitionId, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate)))
+                .Distinct()));
+
         var acc = new Dictionary<int, ClubTopSwimmerDto>();
         foreach (var r in rows)
         {
             var rule = CompetitionRuleResolver.Resolve(
                 rules, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate));
-            var points = PointRulesClubsScoring.RelayPointsFor(rule, r.Position, r.TimeFail, r.IsRelay);
+            var points = PointRulesClubsScoring.NeedsContext(rule)
+                ? contextPoints.GetValueOrDefault(r.Id)
+                : PointRulesClubsScoring.RelayPointsFor(rule, r.Position, r.TimeFail, r.IsRelay);
 
             if (!acc.TryGetValue(r.SwimmerId, out var dto))
             {

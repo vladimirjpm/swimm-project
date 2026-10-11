@@ -15,7 +15,17 @@
             <button class="admin-btn admin-btn-danger">Удалить</button>
             <button class="admin-btn admin-btn-ghost">Отмена</button>
             <button class="admin-btn admin-btn-primary" disabled>Disabled</button>
+            <button class="admin-btn admin-btn-primary" aria-busy="true" disabled>Busy</button>
+            <button class="admin-btn admin-btn-ghost"
+                    onclick="adminBusy(this, true, 'Работаю…'); setTimeout(() => adminBusy(this, false), 2000)">adminBusy на 2 с</button>
+            <span class="flex items-center gap-1.5 text-xs text-admin-text-muted">
+                <span class="admin-spinner text-admin-accent"></span> admin-spinner
+            </span>
         </div>
+        <p class="mt-2 text-xs text-admin-text-muted">
+            Занятая кнопка — <code>adminBusy(btn, true, 'текст')</code> / <code>adminBusy(btn, false)</code> из _Layout:
+            колесико перед текстом и disabled. Отдельное колесико — класс <code>admin-spinner</code>, размер — утилитой (<code>size-5</code>).
+        </p>
     </section>
 
     <section class="admin-card">

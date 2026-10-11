@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
@@ -209,21 +210,50 @@ public class HubGroupClubSubscriptionService : IHubGroupClubSubscriptionService
         return await SyncManyAsync(groupIds);
     }
 
+    public async Task<HubGroupMemberSaveResult> SetExcludedBySwimmerAsync(int hubGroupId, int swimmerId, bool excluded)
+    {
+        var memberId = await _db.HubGroupMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId)
+            .Select(m => (int?)m.Id)
+            .FirstOrDefaultAsync();
+        return memberId == null
+            ? HubGroupMemberSaveResult.Fail("Member not found.")
+            : await SetExcludedAsync(hubGroupId, memberId.Value, excluded);
+    }
+
     public async Task<HubGroupMemberSaveResult> SetExcludedAsync(int hubGroupId, int memberId, bool excluded)
     {
         var member = await _db.HubGroupMembers.FindAsync(memberId);
         if (member == null || member.HubGroupId != hubGroupId)
             return HubGroupMemberSaveResult.Fail("Member not found.");
 
-        // Ручного не прячут — его удаляют: «ручной и скрытый» запрещён и в БД
-        // (CK_HubGroupMembers_ExcludedOnlyClub). Пловца группы (Р71) прячут — это «неактивен»:
-        // удаление стёрло бы его времена тренировок.
-        if (member.Source != HubGroupMemberSource.Club && member.Source != HubGroupMemberSource.Private)
-            return HubGroupMemberSaveResult.Fail("Only swimmers from the club subscription can be hidden — remove this swimmer instead.");
-
+        // Скрыть можно строку любого вида (Р74, 30.09.2026): клубного — чтобы пересборка его не
+        // вернула, пловца группы (Р71) и ручного — это «Inactive»: ушёл из группы, Restore вернёт
+        // одной кнопкой (удаление стёрло бы у пловца группы времена, а ручного пришлось бы искать).
         if (member.IsExcluded == excluded) return HubGroupMemberSaveResult.Ok();
 
         member.IsExcluded = excluded;
+
+        if (excluded)
+        {
+            // Неактивный пловец группы теряет ответы на ПРЕДСТОЯЩИЕ занятия (Р73) — как участник,
+            // ушедший из группы: после Restore он не должен оказаться «идущим». Прошлые — история.
+            if (member.Source == HubGroupMemberSource.Private)
+            {
+                var today = DateOnly.FromDateTime(IsraelTime.ToLocal(DateTime.UtcNow));
+                _db.HubGroupTrainingRsvps.RemoveRange(_db.HubGroupTrainingRsvps
+                    .Where(r => r.HubGroupId == hubGroupId && r.SwimmerId == member.SwimmerId && r.SessionDate >= today));
+            }
+
+            // Статус один (Р74): Inactive вытесняет «On break» / «Doesn't train» пловца —
+            // закрываем открытую строку, после Restore он Active.
+            var now = DateTime.UtcNow;
+            foreach (var b in await _db.HubGroupBreaks
+                         .Where(b => b.HubGroupId == hubGroupId && b.SwimmerId == member.SwimmerId && b.EndedAt == null)
+                         .ToListAsync())
+                b.EndedAt = now;
+        }
+
         await _db.SaveChangesAsync();
         await _core.TouchGroupAsync(hubGroupId); // UpdatedAt группы (кэш сбрасывают сами сохранения, К4)
         return HubGroupMemberSaveResult.Ok();

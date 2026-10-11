@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
@@ -15,6 +16,10 @@ namespace Swimm.Infrastructure.Services;
 /// </summary>
 public class DiscoveryPreviewService : IDiscoveryPreviewService
 {
+    /// <summary>Признак мастерс-строки в JSON разбора — и строкой («"true"»), и булевым.</summary>
+    internal static readonly Regex MastersFlagRx =
+        new(@"""is_masters""\s*:\s*""?true""?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     /// <summary>
     /// Сколько живёт отложенный разбор. Было 15 минут (одиночный поток: затянул — сразу
     /// импортировал), стало 60: в пакете два десятка строк тянутся минутами, и первый разбор
@@ -31,6 +36,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     private readonly IRegulationFetchService _regulations;
     private readonly ICategoryRepository _categories;
     private readonly IRelaySplitProvider _relaySplits;
+    private readonly ICollapsedDaysFixer _collapsedDays;
     private readonly SwimmDbContext _db;
     private readonly IMemoryCache _cache;
     private readonly ILogger<DiscoveryPreviewService> _logger;
@@ -45,6 +51,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         IRegulationFetchService regulations,
         ICategoryRepository categories,
         IRelaySplitProvider relaySplits,
+        ICollapsedDaysFixer collapsedDays,
         SwimmDbContext db,
         IMemoryCache cache,
         ILogger<DiscoveryPreviewService> logger)
@@ -58,6 +65,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         _regulations = regulations;
         _categories = categories;
         _relaySplits = relaySplits;
+        _collapsedDays = collapsedDays;
         _db = db;
         _cache = cache;
         _logger = logger;
@@ -88,33 +96,24 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         ParsedCompetition parsed;
         try
         {
-            using var ms = new MemoryStream(primary);
-            using var msEn = pdfHe != null && pdfEn != null ? new MemoryStream(pdfEn) : null;
-            parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
-                ms, primaryName, "IsrOrg",
-                IsAward: false, PoolType: null,
-                SecondaryStream: msEn, SecondaryFileName: msEn != null ? fileNameEn : null,
-                ExtraFiles: null,
-                Country: null, Language: language));
-        }
-        catch (InvalidOperationException ex) when (pdfHe != null && pdfEn != null)
-        {
-            // Пара не склеилась (разный порядок записей и т.п.) — деградируем до HE-only,
-            // EN-имена добираются потом кнопкой «Синхр. языки» после починки.
-            _logger.LogWarning(ex, "Discovery: двуязычная пара не склеилась (id={Id}), парсим HE-only", discoveredId);
-            languages.Remove("en");
-            using var ms = new MemoryStream(pdfHe);
-            try
+            if (pdfHe != null)
             {
-                parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
-                    ms, fileNameHe, "IsrOrg",
-                    IsAward: false, PoolType: null,
-                    SecondaryStream: null, SecondaryFileName: null, ExtraFiles: null,
-                    Country: null, Language: "he"));
+                // Пара HE + EN; не склеилась — HE-only (общее правило с консольным --repull).
+                var pair = await ProtocolPairParser.ParseAsync(_sourceProvider, pdfHe, fileNameHe, pdfEn, fileNameEn);
+                parsed = pair.Parsed;
+                if (pair.PairError != null)
+                {
+                    // EN-имена добираются потом кнопкой «Синхр. языки» после починки.
+                    _logger.LogWarning("Discovery: двуязычная пара не склеилась (id={Id}), парсим HE-only: {Error}",
+                        discoveredId, pair.PairError);
+                    languages.Remove("en");
+                }
             }
-            catch (InvalidOperationException ex2)
+            else
             {
-                return DiscoveryPreviewResult.Failed(ex2.Message);
+                using var ms = new MemoryStream(primary);
+                parsed = await _sourceProvider.ParseAsync(new ResultSourceRequest(
+                    ms, primaryName, "IsrOrg", Language: language));
             }
         }
         catch (InvalidOperationException ex)
@@ -140,6 +139,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         await _discovery.AddLanguagesAsync(discoveredId, languages, ct);
 
         parsed = await AddRelaySplitsAsync(discoveredId, parsed, ct);
+        parsed = await FixCollapsedDaysAsync(discoveredId, parsed, ct);
 
         // Официальный клубный зачёт: есть ли он и по какой шкале. Кладём В КЭШ вместе с превью —
         // из него потом заводится правило кнопкой, и второй поход в loglig (десяток запросов
@@ -191,6 +191,36 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     }
 
     /// <summary>
+    /// Даты дисциплин многодневки из сетки loglig, если протокол схлопнул их в одну
+    /// (docs/plans/multiday-split-plan.md, М3). Тот же круг стартов, что у эстафет, — чемпионаты:
+    /// многодневные старты — они, а остальным лишний запрос к loglig ни к чему.
+    ///
+    /// Если в базе этот старт уже лежит ОДНИМ днём без события, импорт с разными датами положит
+    /// второй день отдельным соревнованием, а строки первого дня в старом задвоит — говорим об
+    /// этом прямо в предупреждениях: сначала <c>--split-days</c>.
+    /// </summary>
+    private async Task<ParsedCompetition> FixCollapsedDaysAsync(int discoveredId, ParsedCompetition parsed, CancellationToken ct)
+    {
+        var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
+        if (row?.LogligId is not int logligId
+            || !await CompetitionAdminRepository.ShouldFetchSplitsAsync(_db, row.Name, row.OrgCompId, ct))
+            return parsed;
+
+        var fixedParsed = await _collapsedDays.FixAsync(logligId, parsed, ct);
+        if (fixedParsed.Competitions.Count < 2) return fixedParsed;
+
+        var days = await CompetitionIdentity.ResolveDaysAsync(_db, row.OrgCompId, ct);
+        if (days is [{ EventId: null } single])
+            return fixedParsed with
+            {
+                Warnings = fixedParsed.Warnings.Append(
+                    $"⚠ В базе этот старт лежит одним днём (#{single.Id}, {single.Date}) — сначала " +
+                    $"--split-days {single.Id}, иначе строки первого дня задвоятся").ToList(),
+            };
+        return fixedParsed;
+    }
+
+    /// <summary>
     /// Что предложить проставить соревнованию: медали и чемпионат — из регламента (его мы
     /// теперь качаем сами), чемпионат ещё и по названию, мастерс — из разобранного файла,
     /// «зачёт не ведётся» — из пробы loglig, бассейн — из регламента (И-30: протокол loglig длину
@@ -233,8 +263,11 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
                 : Quote(analysis!, "championship", "регламент чемпионата Израиля")
                   + " + в названии есть «אליפות»";
 
-        // Мастерс: признак стоит у строк файла — парсер уже разметил их при разборе.
-        var isMasters = parsed.ResultsJson.Contains("\"is_masters\":true", StringComparison.OrdinalIgnoreCase);
+        // Мастерс: признак стоит у строк файла — парсер уже разметил их при разборе (по имени
+        // файла или по названию соревнования в шапке PDF, IsrOrgParser.IsMastersFile).
+        // ⚠ Парсер пишет его СТРОКОЙ («"is_masters":"true"», Models.Result.IsMasters — string),
+        // а проверка ждала голое true — и не срабатывала никогда (comp 6595, 06.10.2026).
+        var isMasters = MastersFlagRx.IsMatch(parsed.ResultsJson);
         if (isMasters) reasons["isMasters"] = "в файле есть мастерс-заплывы";
 
         // «Зачёт не ведётся» предлагаем, только когда мы ТОЧНО знаем, что его нет: null —

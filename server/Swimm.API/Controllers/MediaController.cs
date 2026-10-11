@@ -88,8 +88,14 @@ public class MediaController : ControllerBase
         if (await _media.CountForUserAsync(userId.Value) >= MaxMediaPerUser)
             return BadRequest(new { error = "media limit reached" });
 
+        request.Url = request.Url?.Trim() ?? string.Empty;
         if (!MediaUrlValidator.TryValidate(request.MediaType, request.SourceType, request.Url, out var error))
             return BadRequest(new { error });
+
+        // Та же ссылка к той же цели — дубль: раньше заводился молча и «исчезал» при склейке
+        // в табе Media (docs/plans/media-duplicates-handoff.md).
+        if (await _media.HasSameLinkAsync(userId.Value, request))
+            return Conflict(new { error = "This link is already added here" });
 
         var media = await _media.AddAsync(userId.Value, request);
         if (media == null)

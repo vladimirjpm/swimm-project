@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Swimm.Parsing.Models;
@@ -25,7 +26,11 @@ public static class IsrOrgResultLineParser
     // порядке токенов, "7.1 SW / DQ" — после RTL-реверса ивритской строки.
     private static readonly Regex NoteFragmentRx = new(@"^(SW|/|\d+\.\d+)$", RegexOptions.Compiled);
 
-    public static IsrOrgResult ParseResultLine(string line)
+    /// <param name="knownClubs">Клубы, уже встреченные в этом протоколе, — нужны только
+    /// строке без года рождения (см. <see cref="InsertMissingYear"/>).</param>
+    /// <param name="log">Журнал разбора: туда пишется, как поделена строка без года.</param>
+    public static IsrOrgResult ParseResultLine(
+        string line, IReadOnlySet<string>? knownClubs = null, Action<string>? log = null)
     {
         var tok = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
@@ -34,6 +39,11 @@ public static class IsrOrgResultLineParser
         int lane = int.Parse(tok[2]);
 
         int idxYear = Array.FindIndex(tok, 3, t => Regex.IsMatch(t, @"^\d{4}$"));
+        if (idxYear < 0)
+        {
+            tok = InsertMissingYear(tok, knownClubs, log);
+            idxYear = Array.FindIndex(tok, 3, t => t == MissingYearToken);
+        }
         int birth = int.Parse(tok[idxYear]);
 
         int idxTime = -1;
@@ -199,6 +209,48 @@ public static class IsrOrgResultLineParser
             RelaySwimmersName: null,
             RelaySwimmers: null
         );
+    }
+
+    /// <summary>Год рождения «не указан»: <c>int.Parse</c> даёт 0 — так импорт и хранит неизвестный год.</summary>
+    private const string MissingYearToken = "0000";
+
+    /// <summary>
+    /// Строка без года рождения: протокол оставил колонку пустой. Живой случай — comp 6595
+    /// (мастерс, зима 2025), секция «כללי» 50 на спине: «1 1 7 בלכסן ויקטור מכבי חיפה 00:27.93 496».
+    /// Весь разбор строки держится за год — это граница «имя | клуб», и без него парсер падал
+    /// (`Index was outside the bounds of the array`), роняя импорт всего соревнования.
+    ///
+    /// Вставляем на место года пустой год (<see cref="MissingYearToken"/> → 0), а границу
+    /// ищем так: хвост перед временем, совпавший с клубом, уже встреченным в этом протоколе,
+    /// — это клуб (берётся самый длинный); не совпал ни один — имя считаем из двух слов
+    /// (фамилия + имя), остальное клуб. Год не додумываем: ошибку протокола не чиним.
+    /// </summary>
+    private static string[] InsertMissingYear(string[] tok, IReadOnlySet<string>? knownClubs, Action<string>? log)
+    {
+        // Конец «имя + клуб»: время или маркер срыва; нет ни того, ни другого — перед очками.
+        int end = Array.FindIndex(tok, 3, t => TimeRx.IsMatch(t) || FailMarkerRx.IsMatch(t));
+        if (end < 0) end = Math.Max(3, tok.Length - 1);
+        var segment = tok[3..end];
+
+        int nameLen = Math.Min(2, segment.Length);
+        string how = "two-word name (no known club matched)";
+        if (knownClubs is { Count: > 0 })
+        {
+            for (int k = 1; k < segment.Length; k++)
+            {
+                if (knownClubs.Contains(string.Join(' ', segment[k..])))
+                {
+                    nameLen = k;
+                    how = "known club";
+                    break;
+                }
+            }
+        }
+
+        log?.Invoke($"  -> No birth year in line: year=0, name/club split by {how}: " +
+                    $"name='{string.Join(' ', segment[..nameLen])}', club='{string.Join(' ', segment[nameLen..])}'");
+
+        return [.. tok[..(3 + nameLen)], MissingYearToken, .. tok[(3 + nameLen)..]];
     }
 
     /// <summary>Делит токены колонки клуба на само название и числовой мусор

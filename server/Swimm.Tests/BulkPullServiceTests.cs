@@ -79,14 +79,24 @@ public class BulkPullServiceTests
     {
         public List<(string FileName, IReadOnlyList<string>? Categories, ImportEventOptions? Options, string Payload)> Jobs { get; } = [];
 
+        /// <summary>Статусы задач по discoveredId — тест двигает их, как фоновый импорт.</summary>
+        public Dictionary<int, ImportJobStatus> ByRow { get; } = [];
+        private readonly Dictionary<Guid, ImportJobStatus> _statuses = [];
+
         public Guid Enqueue(byte[] data, string fileName, IReadOnlyList<string>? categoryKeys = null,
             ImportEventOptions? eventOptions = null, int? discoveredId = null, int? orgCompId = null)
         {
             Jobs.Add((fileName, categoryKeys, eventOptions, System.Text.Encoding.UTF8.GetString(data)));
-            return Guid.NewGuid();
+            var status = new ImportJobStatus { JobId = Guid.NewGuid(), State = ImportJobState.Queued };
+            _statuses[status.JobId] = status;
+            if (discoveredId is int id) ByRow[id] = status;
+            return status.JobId;
         }
 
-        public ImportJobStatus? GetStatus(Guid jobId) => null;
+        public ImportJobStatus? GetStatus(Guid jobId) => _statuses.GetValueOrDefault(jobId);
+
+        /// <summary>Очередь «забыла» задачи — как после перезапуска API.</summary>
+        public void Forget() => _statuses.Clear();
     }
 
     // ── сборка ────────────────────────────────────────────────────────────────
@@ -203,6 +213,97 @@ public class BulkPullServiceTests
         Assert.Equal([BulkPullService.DefaultCategoryKey], job.Categories);
         Assert.False(job.Options!.OverwriteExisting);
         Assert.False(job.Options.DeleteMissing);
+    }
+
+    [Fact]
+    public async Task Import_MarksTheRowQueued_InTheBatchStatus()
+    {
+        // Без признака панель после перезагрузки рисовала импортированные строки отмеченными,
+        // и отработанная пачка выглядела новым предложением (06.10.2026).
+        var (service, _, _) = Build(Row(1), Row(2));
+        var started = await service.StartAsync([1, 2], includeChampionships: false);
+        await WaitFinishedAsync(service, started.BatchId);
+
+        Assert.All(service.GetStatus(started.BatchId)!.Rows, r => Assert.False(r.Queued));
+
+        await service.ImportAsync(started.BatchId, [1]);
+
+        var rows = service.GetStatus(started.BatchId)!.Rows;
+        Assert.True(rows.Single(r => r.DiscoveredId == 1).Queued);
+        Assert.False(rows.Single(r => r.DiscoveredId == 2).Queued);
+    }
+
+    [Fact]
+    public async Task Import_StatusFollowsTheQueue_UntilEveryJobIsDone()
+    {
+        // «В очередь ушло» не значит «импортировано»: панель ждёт, пока доработает последняя
+        // задача, и только потом пишет «импорт завершён» (08.10.2026).
+        var (service, queue, _) = Build(Row(1), Row(2), Row(3));
+        var started = await service.StartAsync([1, 2, 3], includeChampionships: false);
+        await WaitFinishedAsync(service, started.BatchId);
+
+        var before = service.GetStatus(started.BatchId)!;
+        Assert.False(before.ImportsPending);
+        Assert.All(before.Rows, r => Assert.Null(r.ImportState));
+
+        await service.ImportAsync(started.BatchId, [1, 2]);
+        BulkPullRowDto RowOf(int id) => service.GetStatus(started.BatchId)!.Rows.Single(r => r.DiscoveredId == id);
+
+        Assert.True(service.GetStatus(started.BatchId)!.ImportsPending);
+        Assert.Equal(("queued", "queued", null), (RowOf(1).ImportState, RowOf(2).ImportState, RowOf(3).ImportState));
+
+        queue.ByRow[1].State = ImportJobState.Running;
+        Assert.Equal("running", RowOf(1).ImportState);
+
+        queue.ByRow[1].State = ImportJobState.Completed;
+        queue.ByRow[1].Result = new ImportResult { Created = 412 };
+        queue.ByRow[2].State = ImportJobState.Failed;
+        queue.ByRow[2].Error = "Соревнование с таким именем и датой уже есть";
+
+        var done = service.GetStatus(started.BatchId)!;
+        Assert.False(done.ImportsPending);
+        Assert.Equal(("completed", 412, (string?)null), (RowOf(1).ImportState, RowOf(1).ImportCreated, RowOf(1).ImportError));
+        Assert.Equal(("failed", "Соревнование с таким именем и датой уже есть"), (RowOf(2).ImportState, RowOf(2).ImportError));
+    }
+
+    [Fact]
+    public async Task Import_QueueForgotTheJob_RowStaysSent_NothingPending()
+    {
+        // Перезапуск API стирает статусы очереди; пачка такую строку не ждёт вечно.
+        var (service, queue, _) = Build(Row(1));
+        var started = await service.StartAsync([1], includeChampionships: false);
+        await WaitFinishedAsync(service, started.BatchId);
+        await service.ImportAsync(started.BatchId, [1]);
+
+        queue.Forget();
+
+        var batch = service.GetStatus(started.BatchId)!;
+        Assert.False(batch.ImportsPending);
+        var row = Assert.Single(batch.Rows);
+        Assert.True(row.Queued);
+        Assert.Null(row.ImportState);
+    }
+
+    [Fact]
+    public void WithImportStatus_CompletedWithRowErrors_NamesTheFirst()
+    {
+        var row = Assert.Single(BuildRows());
+        var status = new ImportJobStatus
+        {
+            State = ImportJobState.Completed,
+            Result = new ImportResult { Created = 10, Errors = 2, ErrorMessages = ["строка 7: нет года", "строка 9: нет года"] },
+        };
+
+        var withStatus = BulkPullService.WithImportStatus(row, status);
+
+        Assert.Equal(("completed", 10, "ошибок строк: 2 — строка 7: нет года"),
+            (withStatus.ImportState, withStatus.ImportCreated, withStatus.ImportError));
+
+        static IEnumerable<BulkPullRowDto> BuildRows() =>
+        [
+            new(1, 16701, "ליגה", "01/11/2025", BulkPullVerdict.Clean, [], Guid.NewGuid(), 10, 0, 1, null, null, [],
+                false, false, false, null, "25m", Queued: true),
+        ];
     }
 
     [Fact]

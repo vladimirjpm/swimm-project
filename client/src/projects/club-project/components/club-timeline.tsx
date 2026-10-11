@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ClubTimelineItem } from '../../../hooks/useClubOverview';
 import { routes } from '../../../utils/routes';
+import UI_ClubPointsUnofficialChip from '../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
 
 /**
  * Competition timeline — вертикальная линия зачётов клуба в выбранном скоупе
@@ -80,8 +81,10 @@ function ClubTimeline({ timeline }: Props) {
                       {item.name}
                     </a>
                   </div>
-                  <div className="mt-1 text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                     {item.date}
+                    {/* Очки справа — наша оценка, официального зачёта у старта нет (Р80). */}
+                    {item.unofficial && <UI_ClubPointsUnofficialChip size="sm" />}
                   </div>
                 </div>
 

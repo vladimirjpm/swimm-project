@@ -111,6 +111,8 @@ public class ClubStandingService : IClubStandingService
             .Where(r => !r.Club.IsPseudo)
             .Select(r => new
             {
+                r.Id,
+                r.CompetitionId,
                 r.ClubId,
                 ClubName = r.Club.Name,
                 ClubNameEn = r.Club.NameEn,
@@ -133,6 +135,13 @@ public class ClubStandingService : IClubStandingService
             .Include(r => r.Entries)
             .ToListAsync(ct);
 
+        // Правило «по заплыву целиком» (схема Красного моря) считается по всем участникам
+        // заплыва, включая псевдоклубы, — они тоже занимают места в абсолютном зачёте.
+        var contextPoints = await ContextClubPoints.LoadAsync(_db.Results, rules,
+            ContextClubPoints.CompetitionsNeedingContext(rules, rows
+                .Select(r => (r.CompetitionId, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate)))
+                .Distinct()), ct);
+
         var scoring = new List<ClubScoringRow>(rows.Count);
         foreach (var r in rows)
         {
@@ -151,7 +160,9 @@ public class ClubStandingService : IClubStandingService
             // Top clubs по умолчанию показывает первое. Если брать здесь второе, страница клуба
             // молча противоречила бы странице соревнования.
             var place = r.Position;
-            var points = PointRulesClubsScoring.RelayPointsFor(rule, place, r.TimeFail, r.IsRelay);
+            var points = PointRulesClubsScoring.NeedsContext(rule)
+                ? contextPoints.GetValueOrDefault(r.Id)
+                : PointRulesClubsScoring.RelayPointsFor(rule, place, r.TimeFail, r.IsRelay);
 
             scoring.Add(new ClubScoringRow(
                 ClubId: r.ClubId, ClubKey: clubKey, SwimmerId: r.SwimmerId,

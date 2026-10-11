@@ -24,11 +24,13 @@ public static class TrainingRsvpNote
 }
 
 /// <summary>
-/// Ответ участника-АККАУНТА на занятие группы (docs/plans/entity-hero-roles-plan.md, Ш2).
+/// Ответ на занятие группы (docs/plans/entity-hero-roles-plan.md, Ш2).
 /// ПРИВАТНЫЕ данные — <c>Sys_HubGroupTrainingRsvps</c>, БЕЗ grant <c>swimm_ro</c>.
 ///
-/// Отвечает ПОЛЬЗОВАТЕЛЬ, а не пловец (решение Влада 28.09.2026); тренер может поставить ответ
-/// за участника (<see cref="SetByUserId"/>). Занятие не строка в базе — расписание регулярное
+/// Субъект — ровно одно из двух. Обычно отвечает ПОЛЬЗОВАТЕЛЬ, а не пловец (решение Влада
+/// 28.09.2026); тренер может поставить ответ за участника (<see cref="SetByUserId"/>). У пловца
+/// группы (Р71) аккаунта нет — за него отвечает только тренер, строка на <see cref="SwimmerId"/>
+/// (Р73). Занятие не строка в базе — расписание регулярное
 /// (<see cref="Swimm.Domain.GroupTrainingSchedule"/>), поэтому оно адресуется парой
 /// «дата + начало слота» по стенным часам бассейна. Сменили расписание — ответы на
 /// исчезнувшие слоты просто перестают показываться.
@@ -51,11 +53,20 @@ public class HubGroupTrainingRsvp
     [Required, MaxLength(5)]
     public string SessionStart { get; set; } = "";
 
-    /// <summary>Чей ответ. Cascade: удалили аккаунт — ответ уходит с ним.</summary>
-    public int UserId { get; set; }
+    /// <summary>Чей ответ — аккаунт участника; null — ответ за пловца группы. Cascade: удалили аккаунт — ответ уходит с ним.</summary>
+    public int? UserId { get; set; }
 
     [ForeignKey(nameof(UserId))]
     public AppUser? User { get; set; }
+
+    /// <summary>
+    /// Пловец группы (<c>Swimmer.PrivateHubGroupId</c>), за которого ответил тренер; null — ответ
+    /// аккаунта. Cascade: пловца удалили насовсем — ответы уходят с ним.
+    /// </summary>
+    public int? SwimmerId { get; set; }
+
+    [ForeignKey(nameof(SwimmerId))]
+    public Swimmer? Swimmer { get; set; }
 
     /// <summary><see cref="TrainingRsvpAnswer"/>.</summary>
     [Required, MaxLength(8)]

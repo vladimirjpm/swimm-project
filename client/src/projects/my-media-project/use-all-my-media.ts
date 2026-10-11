@@ -14,6 +14,8 @@ export interface AllUserMediaDto {
   result_id?: number | null;
   result_label?: string | null;
   competition_id?: number | null;
+  /** Событие многодневки дня competition_id; null — однодневное / без соревнования. */
+  event_id?: number | null;
   competition_name?: string | null;
   /** dd/MM/yyyy, как отдаёт сервер */
   competition_date?: string | null;
@@ -67,13 +69,23 @@ function invalidateTokenCache() {
 }
 
 /**
+ * Итог POST /api/me/media: элемент или текст для строки ошибки в Add link. 409 — та же
+ * ссылка к той же цели («This link is already added here», media-duplicates-handoff.md).
+ */
+export type AddUserMediaResult =
+  | { item: AllUserMediaDto; error: null }
+  | { item: null; error: string };
+
+const ADD_FAILED = "Couldn't save the link. Try again.";
+
+/**
  * Standalone POST /api/me/media — вынесено из useAllMyMedia.add, чтобы можно было
  * дёргать addUserMedia() и без всего хука (напр. со страницы результатов, где грузить
  * всё медиа юзера не нужно). Хук использует эту же функцию и сам обновляет свой стейт.
  */
-export async function addUserMedia(input: AddMediaInput): Promise<AllUserMediaDto | null> {
+export async function addUserMedia(input: AddMediaInput): Promise<AddUserMediaResult> {
   const token = await fetchAntiforgeryToken();
-  if (!token) return null;
+  if (!token) return { item: null, error: ADD_FAILED };
 
   try {
     const r = await fetch('/api/me/media', {
@@ -83,11 +95,16 @@ export async function addUserMedia(input: AddMediaInput): Promise<AllUserMediaDt
       body: JSON.stringify(input),
     });
 
-    if (!r.ok) { invalidateTokenCache(); return null; }
-    return await r.json();
+    if (!r.ok) {
+      invalidateTokenCache();
+      // Сервер отвечает { error } — показываем его текст (дубль, неверная ссылка, лимит).
+      const body = await r.json().catch(() => null) as { error?: string } | null;
+      return { item: null, error: body?.error || ADD_FAILED };
+    }
+    return { item: await r.json(), error: null };
   } catch {
     invalidateTokenCache();
-    return null;
+    return { item: null, error: ADD_FAILED };
   }
 }
 
@@ -156,12 +173,13 @@ export function useAllMyMedia() {
   }, []);
 
   /** Add link, шаг 3: POST /api/me/media — новый элемент попадает в начало сетки. */
-  const add = useCallback(async (input: AddMediaInput): Promise<AllUserMediaDto | null> => {
-    const item = await addUserMedia(input);
+  const add = useCallback(async (input: AddMediaInput): Promise<AddUserMediaResult> => {
+    const res = await addUserMedia(input);
+    const item = res.item;
     if (item && mountedRef.current) {
       setMedia(prev => [item, ...prev]);
     }
-    return item;
+    return res;
   }, []);
 
   return { media, loading, remove, add, reload: load };

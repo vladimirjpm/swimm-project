@@ -78,6 +78,68 @@ public class LogligRelaySplitParserTests
         Assert.Equal(new[] { "00:26.18", "00:29.23", "00:35.91", "00:27.11" }, team.Legs.Select(l => l.SplitTime));
     }
 
+    // ── Этапы длиннее 50 м (10.10.2026, docs/relays.md) ──────────────────────
+    // Фикстуры — טריילז "ארנה" קיץ 2026, loglig 14561: 4×100 вольным ж (82498) и м (82495),
+    // 4×200 вольным ж (82500). Левое время строки ноги у них — последний 50-метровый отрезок,
+    // а этап — разность нарастающих.
+
+    [Fact]
+    public void Freestyle4x100_LegIsWholeHundred_NotLastFifty()
+    {
+        var women = Parse("loglig-split-relay-14561-82498-women-free-4x100.pdf");
+        var shoham = Assert.Single(women, t => t.Time == "04:21.81");
+        Assert.Equal("מכבי שוהם", shoham.Club);
+        // Отрезки по PDF: 30.38 + 32.77 | 31.06 + 35.0 | 32.21 + 34.48 | 31.30 + 34.61.
+        Assert.Equal(new[] { "01:03.15", "01:06.06", "01:06.69", "01:05.91" }, shoham.Legs.Select(l => l.SplitTime));
+
+        var men = Parse("loglig-split-relay-14561-82495-men-free-4x100.pdf");
+        var weisgal = Assert.Single(men, t => t.Time == "03:32.69");
+        Assert.Equal(new[] { "00:53.66", "00:55.64", "00:51.88", "00:51.51" }, weisgal.Legs.Select(l => l.SplitTime));
+    }
+
+    [Fact]
+    public void Freestyle4x200_WrappedCumulativeCell_DoesNotBreakLegTime()
+    {
+        // Узкая колонка «нарастающее 150» переносит цифру на строку ниже: «01:33.6» + «3».
+        var team = Assert.Single(Parse("loglig-split-relay-14561-82500-women-free-4x200.pdf"), t => t.Time == "08:21.11");
+        Assert.Equal(new[] { "02:07.97", "02:05.83", "02:04.67", "02:02.64" }, team.Legs.Select(l => l.SplitTime));
+    }
+
+    [Fact]
+    public void BrokenSourceRows_LegsWithoutTimes_NoGuessing()
+    {
+        // Зимний чемпионат 2025, loglig 13627, 4×100 вольным ж (72979): loglig напечатал
+        // отрицательные отрезки («-1.-29:00») и перепутал нарастающие. Ноги остаются (имена
+        // нужны), времён нет — угадывать порядок колонок не беремся.
+        // Испорчены строки у 21 команды из 22 (22-я снята) — разность нарастающих при этом
+        // всё равно складывается в итог, и прежний сторож «сумма = итог» пропускал этапы
+        // вроде 00:00.28.
+        var teams = Parse("loglig-split-relay-13627-72979-women-free-4x100-broken.pdf");
+        var bialik = Assert.Single(teams, t => t.Time == "03:45.08");
+        Assert.Equal(4, bialik.Legs.Count);
+        Assert.All(teams, t => Assert.All(t.Legs, l => Assert.Null(l.SplitTime)));
+
+        // В 4×200 испорчены 10 команд из 20 («-7.-36:00» у второго этапа 08:56.94) — пустые
+        // ровно они, остальные этапы получают.
+        var long200 = Parse("loglig-split-relay-14561-82500-women-free-4x200.pdf");
+        Assert.All(Assert.Single(long200, t => t.Time == "08:56.94").Legs, l => Assert.Null(l.SplitTime));
+        Assert.Equal(10, long200.Count(t => t.Legs.Count == 4 && t.Legs.All(l => l.SplitTime != null)));
+    }
+
+    [Theory]
+    [InlineData("loglig-split-relay-14561-82498-women-free-4x100.pdf")]
+    [InlineData("loglig-split-relay-14561-82495-men-free-4x100.pdf")]
+    [InlineData("loglig-split-relay-14561-82500-women-free-4x200.pdf")]
+    public void LongLegs_SumToTeamTime(string fixture)
+    {
+        // Этапы обязаны складываться в итог команды — у каждой команды с промежуточными.
+        var teams = Parse(fixture).Where(t => t.Time != null && t.Legs.All(l => l.SplitTime != null)).ToList();
+        Assert.NotEmpty(teams);
+        Assert.All(teams, t => Assert.Equal(
+            Swimm.Application.Mapping.SwimTime.ParseToMs(t.Time),
+            t.Legs.Sum(l => Swimm.Application.Mapping.SwimTime.ParseToMs(l.SplitTime))));
+    }
+
     [Fact]
     public void DisqualifiedOrSplitlessTeams_HaveLegsWithoutSplits()
     {
@@ -91,6 +153,26 @@ public class LogligRelaySplitParserTests
         var bare = Assert.Single(Mixed, t => t.Time == "02:05.73");
         Assert.Equal(4, bare.Legs.Count);
         Assert.All(bare.Legs, l => Assert.Null(l.SplitTime));
+    }
+
+    /// <summary>
+    /// У снятой команды на высоте переноса фамилии левее напечатаны причина «DQ / SW» и время
+    /// «10.11» — строка-обрывок отбрасывалась целиком, и фамилия из двух слов пропадала:
+    /// нога «איריס» без фамилии, импорт заводил карточку-тень (6595, 07.10.2026; тот же дефект
+    /// у двух ног 73056 — comp 64 получил тени #62906, #62907).
+    /// </summary>
+    [Fact]
+    public void DisqualifiedTeam_TwoWordSurnames_WrappedBesideReason_AreKept()
+    {
+        var beitEil = Assert.Single(Parse("loglig-split-relay-11586-58158-women-free.pdf"), t => t.Club == "הפועל בית איל");
+        Assert.Equal("DQ", beitEil.Status);
+        Assert.Equal(
+            [("מירב", "הרוש"), ("נאוה", "טל"), ("איריס", "סברנסקי נקש"), ("תמר", "ערמון אריאלי")],
+            beitEil.Legs.Select(l => (l.FirstName, l.LastName)));
+
+        var aquatics = Assert.Single(Women, t => t.Club == "אקוותיקים" && t.Status == "DQ");
+        Assert.Contains(aquatics.Legs, l => (l.FirstName, l.LastName) == ("רהאם אריב", "מנסור"));
+        Assert.Contains(aquatics.Legs, l => (l.FirstName, l.LastName) == ("ענבר", "קנטרביץ ארליך"));
     }
 
     [Fact]
@@ -151,6 +233,68 @@ public class LogligRelaySplitParserTests
             ((string?)rows[0]!["last_name"], (string?)rows[0]!["first_name"], (int?)rows[0]!["birth_year"]));
         Assert.Null((string?)rows[1]!["relay_swimmers"]![0]!["split_time"]);
         Assert.Equal("a", (string?)rows[2]!["relay_swimmers"]![0]!["last_name"]);
+    }
+
+    private static List<SplitRelayTeam> OpenWater => Parse("loglig-split-relay-14032-75021-openwater-mixed.pdf");
+
+    /// <summary>
+    /// Микс-эстафета открытой воды 4X1500 (Эйлат-2026, loglig 14032 / 75021): итоговое время
+    /// с ЧАСАМИ — «1:30:08.17». Без часов в шаблоне у всех 17 команд не было времени, и доклейка
+    /// состава не находила ни одной — оставались порванные фамилии основного протокола.
+    /// </summary>
+    [Fact]
+    public void OpenWaterRelay_HourTimes_AndCleanNames()
+    {
+        var teams = OpenWater;
+        Assert.Equal(17, teams.Count);
+        Assert.All(teams, t => Assert.Equal(4, t.Legs.Count));
+
+        var batYam = Assert.Single(teams, t => t.Time == "1:30:08.17");
+        Assert.Equal((1, 4, "הפועל בת ים"), (batYam.Heat, batYam.Lane, batYam.Club));
+        // Основной протокол рвёт «פילאר מריה» переносом и даёт «מריהפילאר».
+        Assert.Equal(("חשמה", "פילאר מריה"), (batYam.Legs[3].LastName, batYam.Legs[3].FirstName));
+
+        var dq = Assert.Single(teams, t => t.Status == "DQ");
+        Assert.Null(dq.Time);
+        Assert.Equal("וייסלר ברנד", dq.Legs[3].LastName);
+    }
+
+    /// <summary>
+    /// Снятая команда сверяется по статусу вместо времени: заплыв + дорожка + «DQ». Иначе её
+    /// порванные фамилии («ברנדוייסלר») уезжали в импорт и заводили пловцов-теней.
+    /// </summary>
+    [Fact]
+    public void Enricher_DisqualifiedTeam_MatchedByStatus()
+    {
+        static JsonObject Dq(string status) => new()
+        {
+            ["is_relay"] = true,
+            ["event_style_name"] = "freestyle",
+            ["event_style_len"] = "4X1500",
+            ["heat"] = 1,
+            ["lane"] = 17,
+            ["time"] = "",
+            ["time_fail_note"] = status,
+            ["relay_swimmers"] = new JsonArray(
+                new JsonObject { ["order"] = 1, ["last_name"] = "במירושניקו", ["first_name"] = "ניק", ["birth_year"] = 2010 },
+                new JsonObject { ["order"] = 2, ["last_name"] = "אשלגי", ["first_name"] = "אדם", ["birth_year"] = 2010 },
+                new JsonObject { ["order"] = 3, ["last_name"] = "פלסיאן", ["first_name"] = "שי", ["birth_year"] = 2012 },
+                new JsonObject { ["order"] = 4, ["last_name"] = "ברנדוייסלר", ["first_name"] = "תמר", ["birth_year"] = 2010 }),
+        };
+
+        var json = new JsonArray(Dq("DQ")).ToJsonString();
+        var (outJson, report) = RelaySplitEnricher.Apply(json,
+            new[] { new RelaySplitEvent("freestyle", "4X1500", OpenWater) }, writeSplitTimes: false);
+
+        Assert.Equal(1, report.Enriched);
+        var legs = JsonNode.Parse(outJson)!.AsArray()[0]!["relay_swimmers"]!.AsArray();
+        Assert.Equal("מירושניקוב", (string?)legs[0]!["last_name"]);
+        Assert.Equal("וייסלר ברנד", (string?)legs[3]!["last_name"]);
+
+        // Статус другой — это не та команда.
+        var (_, other) = RelaySplitEnricher.Apply(new JsonArray(Dq("NS")).ToJsonString(),
+            new[] { new RelaySplitEvent("freestyle", "4X1500", OpenWater) }, writeSplitTimes: false);
+        Assert.Equal(0, other.Enriched);
     }
 
     [Fact]

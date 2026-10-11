@@ -252,6 +252,63 @@ GroupAdmin** (создатель, его нельзя снять). Бейдж `c
 пловца RESTRICT). Бэкфилл миграции: локальный пловец ровно в одной группе стал её пловцом —
 18 человек Дельфин-мастерс (группа 17).
 
+**Ответ «иду / не приду» за пловца группы (Р73, решение Влада 29.09.2026).** Аккаунта у него
+нет, поэтому отвечает только тренер (CanEdit): строка `Sys_HubGroupTrainingRsvps` с `SwimmerId`
+вместо `UserId` (миграция `HubGroupTrainingRsvpSwimmer`, ровно одно из двух —
+`CK_HubGroupTrainingRsvps_Subject`, частичные UNIQUE, как у перерывов). Такой пловец — в
+знаменателе полосы, в списке тренера (пометка «no account»), в «Who's coming» и в виде по
+дорожкам; «Going» снимает его «On break»; Deactivate снимает ответы на будущие занятия, как
+уход участника из группы. Если активный участник стоит этим пловцом (метка тренера) — отвечает
+аккаунт, пловец в списке не дублируется, ответ за пловца — 400.
+
+**Статус человека в группе — один** (Р74, решение Влада 30.09.2026): Active / On break / Doesn't
+train with us / Inactive — выпадашка у тренера в Following (пловец состава) и в списке «кто идёт»
+(аккаунт и пловец группы; там без Inactive). «On break» и «Doesn't train» — одна строка
+`Sys_HubGroupBreaks` с `Kind` (`break` / `not_training`; открытая у человека одна; миграция
+`HubGroupPersonStatus`), читаются одним `HubGroupBreakQuery`: оба вне знаменателя и Unassigned,
+но «Going» снимает только перерыв. «Не тренируется» ставит только тренер, бессрочно; пометку
+видят все свои (`not_training` в `GET /breaks`). Inactive — `HubGroupMember.IsExcluded` у строки
+любого вида (для ручного — с Р74; `PUT /api/me/hub-groups/{id}/members/by-swimmer/{swimmerId}/excluded`
+для Following), закрывает открытую строку статуса; Restore и удаление насовсем — список Inactive
+в My groups.
+
+**Тренер заводит тренировку кнопкой — и без времён** (Е1 плана
+[plans/group-events-media-plan.md](plans/group-events-media-plan.md), решение Влада 30.09.2026).
+Это та же `Sys_TrainingSessions` (отдельной сущности «событие» нет): `Title` («Underwater filming»),
+`Type` — тип из фиксированного списка (`TrainingSessionType`: swim · technique · dryland · open-water ·
+test-set · other, по умолчанию swim; решение Влада 01.10.2026, миграция `AddTrainingSessionType`),
+`StartTime` (связка с занятием расписания), `CreatedByUserId`, ключ `ui-…`. API
+`api/hub-groups/{id}/sessions` — читают управляющие и активные участники, меняют управляющие;
+тренировку с временами не удалить и не перенести на другую дату. К ней цепляется медиа
+(`Sys_HubGroupMedia.TrainingId`): добавляют управляющие и — если группа не поставила «только
+тренер» (`training_media` в расписании) — активные участники (Е2,
+`POST/DELETE …/sessions/{sid}/media`); автор удаляет своё, управляющий — любое; потолки 50 на
+тренировку и 10 от участника.
+
+**Разовые занятия и отмена (Р9, решения Влада 01.10.2026; задание
+[tasks/one-off-and-cancelled-trainings-sonnet.md](tasks/one-off-and-cancelled-trainings-sonnet.md)).**
+Занятие в Next — по-прежнему ключ `yyyy-MM-dd-HHmm` (`TrainingRsvpRules.SessionKey`), им адресуются
+и ответы; но занятия теперь трёх видов, и сводит их чистая функция
+`Swimm.Application/Mapping/TrainingOccurrences.cs` (`Find` / `Upcoming`):
+- **слот недельного расписания** (JSON в `HubGroups.TrainingSchedule`, как раньше);
+- **разовое** — тренировка с галкой «Ask who's coming» (`TrainingSession.AsksRsvp`, колонка
+  `DEFAULT false`) и заданным `StartTime`. Галку можно поставить только при начале и дате не раньше
+  сегодняшней (по Израилю; иначе 400), снять — всегда. Разовое на ключ слота — ОДНО занятие (`End`
+  от слота, название и тип от тренировки);
+- **отмена** — строка `Sys_HubGroupTrainingCancellations` (`HubGroupId`, `Date`, `Start`, `Reason`,
+  UNIQUE по тройке; приватная, без `swimm_ro`, не едет в прод-наполнение). Отменить можно только
+  существующее занятие в окне ответов (`[сегодня − 7; сегодня + 28]`), повторная отмена — 200 и
+  обновлённая причина; ответы при отмене НЕ удаляются, вернул — на месте.
+
+Ответ на отменённое — 400 «This training is cancelled.» (и участнику, и тренеру). **Публичная
+страница группы (кэшируемая) их не несёт** — `next_trainings` там только из расписания; разовые и
+отмены приходят приватной ручкой `GET /api/hub-groups/{id}/next-trainings` (участник или
+управляющий; до трёх не отменённых + отменённые между ними), её страница группы подмешивает
+вместо публичных полей. Отмена и возврат — `PUT` / `DELETE /api/hub-groups/{id}/rsvp/{key}/cancel`
+(только управляющий; логика — `TrainingRsvpService.CancelAsync` / `RestoreAsync`). Миграция
+`AddOneOffAndCancelledTrainings`. Вне скоупа: уведомления, перерыв «Skips N trainings» (считает
+только расписание), повторяющиеся разовые.
+
 **Masters-соревнования → обычные `Results`.** Это официальные результаты (пусть источник не isr),
 семантика та же → рекорды/зачёт/очки работают штатно.
 

@@ -1,6 +1,6 @@
 ﻿# /Admin — Dashboard
 
-Файлы: `Pages/Admin/Index.cshtml(.cs)`; API: `AdminController` (`/api/admin/*`,
+Файлы: `Pages/Admin/Index.cshtml(.cs)`, скрипт `wwwroot/js/admin/dashboard.js`; API: `AdminController` (`/api/admin/*`,
 включая `GET /api/admin/dashboard/status`), `DashboardStatusService` (DTO —
 `Swimm.Application/Dtos/DashboardStatusDtos.cs`).
 

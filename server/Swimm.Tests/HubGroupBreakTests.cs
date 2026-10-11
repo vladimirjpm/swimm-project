@@ -163,6 +163,90 @@ public class HubGroupBreakTests
         Assert.NotNull((await db.HubGroupBreaks.SingleAsync()).EndedAt);
     }
 
+    // ── Статус «Doesn't train with us» (Р74, Влад 30.09.2026) ───────────────
+
+    private static HubGroupBreakInputDto Status(string status, int? userId = null, int? swimmerId = null, string? until = null) =>
+        new() { Status = status, UserId = userId, SwimmerId = swimmerId, Until = until };
+
+    [Fact]
+    public async Task NotTraining_OnlyCoach_OpenEnded_VisibleToMembers_NotInBreaksList()
+    {
+        await using var db = CreateDb(nameof(NotTraining_OnlyCoach_OpenEnded_VisibleToMembers_NotInBreaksList));
+        var s = await SeedAsync(db);
+        var service = new HubGroupBreakService(db);
+
+        // Участник себе «не тренируется» не ставит; неизвестный статус — 400.
+        Assert.Equal(403, (await service.SetAsync(s.GroupId, s.Vera, false, Status("not_training"), MondayNoonUtc)).Status);
+        Assert.Equal(400, (await service.SetAsync(s.GroupId, s.Coach, true, Status("gone", swimmerId: s.Gil), MondayNoonUtc)).Status);
+
+        // Дата тренеру не нужна — и если прислал, «не тренируется» всё равно бессрочно.
+        var set = await service.SetAsync(s.GroupId, s.Coach, true, Status("not_training", swimmerId: s.Gil, until: "2026-10-31"), MondayNoonUtc);
+
+        Assert.Empty(set.Breaks!.Breaks!);                                   // перерывов нет
+        var nt = Assert.Single(set.Breaks.NotTraining);
+        Assert.Equal((s.Gil, (string?)null, "not_training"), (nt.SwimmerId!.Value, nt.Until, nt.Kind));
+        // Пометку видит и участник — «тренер-пловчиха с нами не плавает» не личное.
+        var member = await service.GetAsync(s.GroupId, s.Vera, false, MondayNoonUtc);
+        Assert.Equal([s.Gil], member.NotTraining.Select(b => b.SwimmerId!.Value));
+        Assert.Null(member.Breaks);
+    }
+
+    [Fact]
+    public async Task Status_IsOne_SwitchReusesTheRow_ActiveEndsIt()
+    {
+        await using var db = CreateDb(nameof(Status_IsOne_SwitchReusesTheRow_ActiveEndsIt));
+        var s = await SeedAsync(db);
+        var service = new HubGroupBreakService(db);
+
+        await service.SetAsync(s.GroupId, s.Coach, true, Status("break", swimmerId: s.Gil), MondayNoonUtc);
+        var later = MondayNoonUtc.AddDays(3);
+        var switched = await service.SetAsync(s.GroupId, s.Coach, true, Status("not_training", swimmerId: s.Gil), later);
+
+        var row = await db.HubGroupBreaks.SingleAsync();                    // строка одна
+        Assert.Equal((HubGroupBreakKind.NotTraining, later), (row.Kind, row.Since));
+        Assert.Empty(switched.Breaks!.Breaks!);
+
+        await service.SetAsync(s.GroupId, s.Coach, true, Status("active", swimmerId: s.Gil), later);
+        Assert.NotNull((await db.HubGroupBreaks.SingleAsync()).EndedAt);
+    }
+
+    [Fact]
+    public async Task Rsvp_NotTraining_OutOfDenominator_GoingCountsThatDay_StatusStays()
+    {
+        await using var db = CreateDb(nameof(Rsvp_NotTraining_OutOfDenominator_GoingCountsThatDay_StatusStays));
+        var s = await SeedAsync(db);
+        var breaks = new HubGroupBreakService(db);
+        await breaks.SetAsync(s.GroupId, s.Coach, true, Status("not_training", userId: s.Vera), MondayNoonUtc);
+        await breaks.SetAsync(s.GroupId, s.Coach, true, Status("break", userId: s.Boris), MondayNoonUtc);
+        var rsvp = new TrainingRsvpService(db);
+
+        var before = (await rsvp.GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon))!;
+        Assert.Equal(1, before.Total);                                       // только Anna
+        var vera = before.People!.Single(p => p.UserId == s.Vera);
+        Assert.Equal((true, false), (vera.NotTraining, vera.OnBreak));
+        Assert.Equal(s.Vera, before.People!.Last().UserId);                  // после «on break»
+
+        // Пришла разок — посчитана в этот день, статус остался.
+        var going = (await rsvp.SetAsync(s.GroupId, TueKey, s.Vera, false, new TrainingRsvpInputDto { Answer = "yes" }, MondayNoon)).Rsvp!;
+        Assert.Equal((2, 1), (going.Total, going.Yes));
+        Assert.True(going.NotTraining);
+        Assert.Null((await db.HubGroupBreaks.SingleAsync(b => b.UserId == s.Vera)).EndedAt);
+    }
+
+    [Fact]
+    public async Task NotTraining_ThroughCoachLabel_AppliesToTheAccount()
+    {
+        // Статус пловчихи Anna — и на её аккаунте (метка тренера), как у перерыва.
+        await using var db = CreateDb(nameof(NotTraining_ThroughCoachLabel_AppliesToTheAccount));
+        var s = await SeedAsync(db);
+        await new HubGroupBreakService(db).SetAsync(s.GroupId, s.Coach, true, Status("not_training", swimmerId: s.AnnaSwimmer), MondayNoonUtc);
+
+        var dto = (await new TrainingRsvpService(db).GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon))!;
+
+        Assert.True(dto.People!.Single(p => p.UserId == s.Anna).NotTraining);
+        Assert.Equal(2, dto.Total);
+    }
+
     // ── RSVP ────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -369,6 +453,17 @@ public class HubGroupBreakTests
         who.RsvpTop = false;
         Assert.True((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
         Assert.DoesNotContain("rsvp_top", (await db.HubGroups.SingleAsync()).TrainingSchedule);
+
+        // Кто добавляет видео к тренировкам (Е2 group-events-media-plan): members — по умолчанию,
+        // хранится отсутствием; coach — хранится; мусор — отказ.
+        who.TrainingMedia = "everyone";
+        Assert.False((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
+        who.TrainingMedia = "Coach";
+        Assert.True((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
+        Assert.Equal("coach", GroupTrainingSchedule.Parse((await db.HubGroups.SingleAsync()).TrainingSchedule).EffectiveTrainingMedia);
+        who.TrainingMedia = "members";
+        Assert.True((await users.SetTrainingScheduleAsync(s.GroupId, who)).Success);
+        Assert.DoesNotContain("training_media", (await db.HubGroups.SingleAsync()).TrainingSchedule);
     }
 
     private sealed class StubSettings : ISettingsService

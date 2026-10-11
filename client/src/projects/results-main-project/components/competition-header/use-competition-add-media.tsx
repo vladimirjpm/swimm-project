@@ -75,12 +75,12 @@ export function useCompetitionAddMedia({ sourceParams, overview, title, refresh 
 
   const handleSave = useCallback(
     async (input: Parameters<typeof addUserMedia>[0]) => {
-      const item = await addUserMedia(input);
+      const { item, error } = await addUserMedia(input);
       if (item) {
         refresh();
         return true;
       }
-      return false;
+      return error;
     },
     [refresh],
   );
@@ -93,7 +93,7 @@ export function useCompetitionAddMedia({ sourceParams, overview, title, refresh 
       contextLabel={
         <span>
           <b>Competition media</b> 📎
-          <span dir="auto" className="ml-2 text-[rgba(203,224,240,0.55)]">{title}</span>
+          <span dir="auto" className="ml-2 text-[var(--t-text-2)]">{title}</span>
         </span>
       }
       onClose={closeModal}

@@ -1,0 +1,803 @@
+
+<div class="modal-dialog modal-lg modal-result-custom-width">
+<div class="modal-content" style="padding: 18px;">
+    <button type="button" class="close pull-left" data-dismiss="modal">
+        <span aria-hidden="true">&times;</span><span class="sr-only"></span>
+    </button>
+    <div class="swimming-export-actions" style="display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=11586" method="post">            <button id="excelBtnExp" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                PDF
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="58141" /></form>
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=11586&amp;IsSplitResults=True" method="post">            <button id="excelBtnExpSplit" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                זמני ביניים
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="58141" /></form>    </div>
+<div class="print_id" id="print_id" data-print-title="">
+
+<style>
+    td, th {
+        text-align: center;
+    }
+    .modal-result-custom-width {
+        width: 100%;
+    }
+    .format6cell {
+        border: 1px solid #dddddd !important;
+        height: 35px;
+        min-width: 30px;
+        max-width: 30px;
+    }
+    .format6th {
+        min-width: 90px;
+        max-width: 90px;
+    }
+    @media screen and ( min-width: 1500px) {
+    .modal-result-custom-width {
+        max-width: 1500px;
+        width: 100%;
+    }
+    @page {size: auto; margin: 5mm;}
+    }
+    }
+
+            </style>
+<div class="main-title disciplines-title">
+    <table class="borderless disciplines-title" style="width: 100%;">
+        <tr>
+            <td style="vertical-align: middle; text-align: left;" colspan="3" rowspan="3">
+    <img src="https://loglig.com/assets/union/logo_10032020094946824.jpg" class="img-circle keep-for-print" style="max-height:7rem;max-width:11rem;" alt=""/>
+            </td>
+            <td style="text-align: right;" colspan="4">
+                <h3 style="margin-top: 0px; margin-bottom: 0px;">
+                    איגוד השחייה בישראל
+                </h3>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">
+                        אליפות ישראל arena למאסטרס חורף 2025 - 03/01/2025
+                </h4>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">4X50 מעורב שליחים -  נשים 21-99 - תוצאות</h4>
+            </td>
+        </tr>
+    </table>
+</div>
+<div class="table-responsive">
+    <table class="table res-table">
+        <thead>
+        <tr class="disciplines-title">
+            <th>מיקום</th>
+            <th>שם מלא</th>
+                        <th>
+                אגודה
+            </th>
+                <th>מקצה</th>
+                    <th>מסלול</th>
+            <th style="text-align: center;">תוצאות</th>
+                            <th>ניקוד</th>
+
+                    <th>ניקוד קבוצתי</th>
+                                </tr>
+        </thead>
+        <tbody>
+
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 100-119</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <a href="/Players/Details/247859?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    הדר דיקשטיין, 
+                                                </a>
+                                                <a href="/Players/Details/271205?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    שירה פייגין, 
+                                                </a>
+                                                <a href="/Players/Details/283165?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    מיקה רוקח כהן, 
+                                                </a>
+                                                <a href="/Players/Details/130251?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    שקד פרלמוטר
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי כפר המכביה                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        7
+                                    </td>
+                                <td style="direction: ltr;">
+02:23.80                                </td>
+                                <td style="direction: ltr;">
+                                    360
+                                </td>
+                                        <td style="direction: ltr;">
+                                            24
+                                        </td>
+                                                            </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 120-159</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <a href="/Players/Details/132717?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    מיכל זילברברג, 
+                                                </a>
+                                                <a href="/Players/Details/114717?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    שלומית שורק, 
+                                                </a>
+                                                <a href="/Players/Details/113058?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    נעם שגב, 
+                                                </a>
+                                                <a href="/Players/Details/112977?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    שירלי  וייס 
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי פ.מ. רעות                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        5
+                                    </td>
+                                <td style="direction: ltr;">
+02:25.59                                </td>
+                                <td style="direction: ltr;">
+                                    347
+                                </td>
+                                        <td style="direction: ltr;">
+                                            24
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>2</td>
+
+                                <td>
+                                                <a href="/Players/Details/185023?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    הלן שרעבי, 
+                                                </a>
+                                                <a href="/Players/Details/111547?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    עמית רוט, 
+                                                </a>
+                                                <a href="/Players/Details/168718?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    ליז גרשנזון, 
+                                                </a>
+                                                <a href="/Players/Details/132999?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    דבורי שטיינמץ
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי חיפה                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        5
+                                    </td>
+                                <td style="direction: ltr;">
+02:27.72                                </td>
+                                <td style="direction: ltr;">
+                                    332
+                                </td>
+                                        <td style="direction: ltr;">
+                                            22
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>3</td>
+
+                                <td>
+                                                <a href="/Players/Details/282733?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    יעל מנצור, 
+                                                </a>
+                                                <a href="/Players/Details/110288?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    מילנה ליאפוסטין, 
+                                                </a>
+                                                <a href="/Players/Details/133636?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    טל מרמור סירוטה, 
+                                                </a>
+                                                <a href="/Players/Details/115455?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    פלר קמר
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי עולם המים                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        3
+                                    </td>
+                                <td style="direction: ltr;">
+02:37.86                                </td>
+                                <td style="direction: ltr;">
+                                    272
+                                </td>
+                                        <td style="direction: ltr;">
+                                            20
+                                        </td>
+                                                            </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 160-199</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <a href="/Players/Details/234836?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    נטליה אדייקינה, 
+                                                </a>
+                                                <a href="/Players/Details/186441?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    עפרה דיין, 
+                                                </a>
+                                                <a href="/Players/Details/189672?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    זיוית גוטמן מאירי, 
+                                                </a>
+                                                <a href="/Players/Details/83322?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    עדי סגל דורי
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי חיפה                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        4
+                                    </td>
+                                <td style="direction: ltr;">
+02:16.43                                </td>
+                                <td style="direction: ltr;">
+                                    422
+                                </td>
+                                        <td style="direction: ltr;">
+                                            24
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>2</td>
+
+                                <td>
+                                                <a href="/Players/Details/145976?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    אולגה רוזנטל, 
+                                                </a>
+                                                <a href="/Players/Details/115495?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    מאיה קובלבסקי, 
+                                                </a>
+                                                <a href="/Players/Details/156806?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    נועה לוין, 
+                                                </a>
+                                                <a href="/Players/Details/115502?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    מירי רוזנבוים
+                                                </a>
+                                </td>
+                                                                <td>    
+מאסטרס רחובות                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        2
+                                    </td>
+                                <td style="direction: ltr;">
+02:41.27                                </td>
+                                <td style="direction: ltr;">
+                                    255
+                                </td>
+                                        <td style="direction: ltr;">
+                                            22
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>3</td>
+
+                                <td>
+                                                <a href="/Players/Details/94535?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    רהאם אריב מנסור, 
+                                                </a>
+                                                <a href="/Players/Details/281846?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    אנדראה מאייר, 
+                                                </a>
+                                                <a href="/Players/Details/187225?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    מורן בורלא, 
+                                                </a>
+                                                <a href="/Players/Details/168914?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    דנה וינטר
+                                                </a>
+                                </td>
+                                                                <td>    
+אקוותיקים                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        3
+                                    </td>
+                                <td style="direction: ltr;">
+02:46.47                                </td>
+                                <td style="direction: ltr;">
+                                    232
+                                </td>
+                                        <td style="direction: ltr;">
+                                            20
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>4</td>
+
+                                <td>
+                                                <a href="/Players/Details/283782?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    ורה בר משיח, 
+                                                </a>
+                                                <a href="/Players/Details/112648?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    דפנה גורי דדוש, 
+                                                </a>
+                                                <a href="/Players/Details/238681?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    ויקטוריה מיצ&#39;קו -מגרין, 
+                                                </a>
+                                                <a href="/Players/Details/237423?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    אירנה נתן
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי כפר המכביה                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        8
+                                    </td>
+                                <td style="direction: ltr;">
+03:04.09                                </td>
+                                <td style="direction: ltr;">
+                                    171
+                                </td>
+                                        <td style="direction: ltr;">
+                                            18
+                                        </td>
+                                                            </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 200-239</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <a href="/Players/Details/115404?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    מיכל שנהר, 
+                                                </a>
+                                                <a href="/Players/Details/115341?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    לירון פוגל, 
+                                                </a>
+                                                <a href="/Players/Details/275512?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    ליהי צלניק-מנור, 
+                                                </a>
+                                                <a href="/Players/Details/156879?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    שירי מנור
+                                                </a>
+                                </td>
+                                                                <td>    
+אקוותיקים                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        6
+                                    </td>
+                                <td style="direction: ltr;">
+02:45.26                                </td>
+                                <td style="direction: ltr;">
+                                    237
+                                </td>
+                                        <td style="direction: ltr;">
+                                            24
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>2</td>
+
+                                <td>
+                                                <a href="/Players/Details/113406?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    שירלי בן שוהם, 
+                                                </a>
+                                                <a href="/Players/Details/113474?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    יעל קוסביצקי, 
+                                                </a>
+                                                <a href="/Players/Details/166213?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    אוקסנה בליסה, 
+                                                </a>
+                                                <a href="/Players/Details/113456?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    פרנסואז נתיב
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי שוהם                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        6
+                                    </td>
+                                <td style="direction: ltr;">
+02:45.47                                </td>
+                                <td style="direction: ltr;">
+                                    236
+                                </td>
+                                        <td style="direction: ltr;">
+                                            22
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>3</td>
+
+                                <td>
+                                                <a href="/Players/Details/61937?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    יעל כנעני, 
+                                                </a>
+                                                <a href="/Players/Details/115457?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    מיכל רוטשילד, 
+                                                </a>
+                                                <a href="/Players/Details/115425?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    שלומית דקל ברק, 
+                                                </a>
+                                                <a href="/Players/Details/283547?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    תמר קלצקי כהן
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי עולם המים                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        7
+                                    </td>
+                                <td style="direction: ltr;">
+02:56.41                                </td>
+                                <td style="direction: ltr;">
+                                    195
+                                </td>
+                                        <td style="direction: ltr;">
+                                            20
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>4</td>
+
+                                <td>
+                                                <a href="/Players/Details/113458?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    רותם סילוני, 
+                                                </a>
+                                                <a href="/Players/Details/113440?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    יפית יצחקי, 
+                                                </a>
+                                                <a href="/Players/Details/264400?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    טל שניידר, 
+                                                </a>
+                                                <a href="/Players/Details/113471?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    דבורה ציטיז
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי שוהם                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        1
+                                    </td>
+                                <td style="direction: ltr;">
+03:04.40                                </td>
+                                <td style="direction: ltr;">
+                                    170
+                                </td>
+                                        <td style="direction: ltr;">
+                                            18
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>5</td>
+
+                                <td>
+                                                <a href="/Players/Details/112672?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    לובוב זיורוב, 
+                                                </a>
+                                                <a href="/Players/Details/237424?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    חוה טנחיל, 
+                                                </a>
+                                                <a href="/Players/Details/112632?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    לודמילה בבאי, 
+                                                </a>
+                                                <a href="/Players/Details/112621?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    רעיה אובסישר
+                                                </a>
+                                </td>
+                                                                <td>    
+מכבי כפר המכביה                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        1
+                                    </td>
+                                <td style="direction: ltr;">
+DQ                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+                            <tr>
+
+
+
+
+                                <td>6</td>
+
+                                <td>
+                                                <a href="/Players/Details/271044?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    איריס סברנסקי נקש, 
+                                                </a>
+                                                <a href="/Players/Details/271049?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    מירב הרוש, 
+                                                </a>
+                                                <a href="/Players/Details/283117?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    נאוה טל, 
+                                                </a>
+                                                <a href="/Players/Details/276508?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    תמר ערמון אריאלי
+                                                </a>
+                                </td>
+                                                                <td>    
+הפועל בית איל                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        4
+                                    </td>
+                                <td style="direction: ltr;">
+NS                                </td>
+                                <td style="direction: ltr;">
+                                    0
+                                </td>
+                                        <td style="direction: ltr;">
+                                            
+                                        </td>
+                                                            </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 240-279</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <a href="/Players/Details/115380?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    אלן פישל-בודנר, 
+                                                </a>
+                                                <a href="/Players/Details/115333?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    ורד בן חרות, 
+                                                </a>
+                                                <a href="/Players/Details/115476?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    חגית כהן, 
+                                                </a>
+                                                <a href="/Players/Details/179329?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    גילי כהן
+                                                </a>
+                                </td>
+                                                                <td>    
+אקוותיקים                                </td>
+                                    <td>
+                                        1
+                                    </td>
+                                    <td>
+                                        2
+                                    </td>
+                                <td style="direction: ltr;">
+02:51.23                                </td>
+                                <td style="direction: ltr;">
+                                    213
+                                </td>
+                                        <td style="direction: ltr;">
+                                            24
+                                        </td>
+                                                            </tr>
+                        <tr>
+                            <td colspan="2" style="text-align:right;">גמר ישיר - מאסטרס שליחות 280-319</td>
+                        </tr>
+                            <tr>
+
+
+
+
+                                <td>1</td>
+
+                                <td>
+                                                <a href="/Players/Details/187636?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    פולה בריל אדלמן, 
+                                                </a>
+                                                <a href="/Players/Details/115347?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    סטלה הולדשטיין, 
+                                                </a>
+                                                <a href="/Players/Details/115401?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    יעל שטיינברג, 
+                                                </a>
+                                                <a href="/Players/Details/115373?seasonId=1605"
+                                                   style="color: #000080;" target="_blank">
+                                                    רונדה ניסמן
+                                                </a>
+                                </td>
+                                                                <td>    
+אקוותיקים                                </td>
+                                    <td>
+                                        2
+                                    </td>
+                                    <td>
+                                        8
+                                    </td>
+                                <td style="direction: ltr;">
+03:51.47                                </td>
+                                <td style="direction: ltr;">
+                                    86
+                                </td>
+                                        <td style="direction: ltr;">
+                                            24
+                                        </td>
+                                                            </tr>
+        </tbody>
+    </table>
+</div>
+
+
+</div>
+
+    <div class="modal-footer">
+        <button type="button" class="btn btn-default mobile-only" data-dismiss="modal">סגור</button>
+    </div>
+
+
+</div>
+</div>
+
+

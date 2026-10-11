@@ -11,20 +11,23 @@ public sealed record SplitSourceTeam(
 public sealed record SplitSourceSwim(
     string Style, string Distance, string Gender, string Time, int BirthYear, IReadOnlyList<string> Laps);
 
-/// <summary>Нога эстафеты, уже лежащая в базе (<c>RelayMembers</c>).</summary>
-public sealed record RelayLegRow(int MemberId, int LegOrder, int BirthYear, string? SplitTime);
+/// <summary>Нога эстафеты, уже лежащая в базе (<c>RelayMembers</c>). Пол — с карточки пловца,
+/// нужен пределу этапа (<see cref="RelayLegFloor"/>).</summary>
+public sealed record RelayLegRow(int MemberId, int LegOrder, int BirthYear, string? SplitTime, string? Gender = null);
 
-/// <summary>Строка эстафеты из базы — кандидат на доклейку.</summary>
+/// <summary>Строка эстафеты из базы — кандидат на доклейку. Год и бассейн соревнования — для
+/// предела этапа; не заданы — этапы не проверяются.</summary>
 public sealed record RelayRow(
     long ResultId, int RelayId, string Style, string Distance, int? Heat, int? Lane, string? Time,
-    IReadOnlyList<RelayLegRow> Legs);
+    IReadOnlyList<RelayLegRow> Legs, int? Year = null, string? Pool = null);
 
 /// <summary>Строка личного заплыва из базы — кандидат на доклейку.</summary>
 public sealed record SwimRow(
     long ResultId, string Style, string Distance, string Gender, string? Time, int BirthYear, string? TimeSplit);
 
-/// <summary>Что записать: нога <paramref name="MemberId"/> получает время этапа.</summary>
-public sealed record LegSplitWrite(int MemberId, string SplitTime);
+/// <summary>Что записать: нога <paramref name="MemberId"/> получает время этапа; null —
+/// обнулить (у команды невозможный этап, см. <see cref="RelayLegFloor"/>).</summary>
+public sealed record LegSplitWrite(int MemberId, string? SplitTime);
 
 /// <summary>Что записать: строка <paramref name="ResultId"/> получает отрезки («31.52;34.84»).</summary>
 public sealed record SwimSplitWrite(long ResultId, string TimeSplit);
@@ -43,8 +46,13 @@ public sealed record SplitAttachReport(
 
     public int SwimWrites { get; init; }
 
+    /// <summary>Команды с невозможным этапом (<see cref="RelayLegFloor"/>): этапов у них нет —
+    /// не пишем, а записанные раньше обнуляем.</summary>
+    public int TeamsImplausible { get; init; }
+
     public override string ToString() =>
         $"эстафеты: команд {Teams}, доклеено {TeamsAttached} (ног к записи {LegWrites})"
+        + (TeamsImplausible > 0 ? $", невозможный этап {TeamsImplausible}" : "")
         + (TeamsNoLegsInSource > 0 ? $", без ног в источнике {TeamsNoLegsInSource}" : "")
         + (TeamsNoLegsInDb > 0 ? $", без ног в базе {TeamsNoLegsInDb}" : "")
         + (TeamsUnmatched > 0 ? $", не нашлось в базе {TeamsUnmatched}" : "")
@@ -57,7 +65,11 @@ public sealed record SplitAttachReport(
 
 /// <summary>Что писать и что об этом рассказать.</summary>
 public sealed record SplitAttachPlan(
-    IReadOnlyList<LegSplitWrite> Legs, IReadOnlyList<SwimSplitWrite> Swims, SplitAttachReport Report);
+    IReadOnlyList<LegSplitWrite> Legs, IReadOnlyList<SwimSplitWrite> Swims, SplitAttachReport Report)
+{
+    /// <summary>По строке на команду с невозможным этапом: заплыв, дорожка, причина.</summary>
+    public IReadOnlyList<string> ImplausibleTeams { get; init; } = [];
+}
 
 /// <summary>
 /// Доклейка промежуточных К СТРОКАМ БАЗЫ, без переимпорта
@@ -84,11 +96,13 @@ public static class SplitAttachMatcher
         IReadOnlyList<RelayRow> relayRows,
         IReadOnlyList<SwimRow> swimRows,
         IReadOnlyList<SplitSourceTeam> teams,
-        IReadOnlyList<SplitSourceSwim> swims)
+        IReadOnlyList<SplitSourceSwim> swims,
+        RelayLegFloor? floor = null)
     {
         var legWrites = new List<LegSplitWrite>();
         var swimWrites = new List<SwimSplitWrite>();
-        int attached = 0, noLegsSource = 0, noLegsDb = 0, unmatched = 0, ambiguous = 0, yearMismatch = 0;
+        var implausibleTeams = new List<string>();
+        int attached = 0, noLegsSource = 0, noLegsDb = 0, unmatched = 0, ambiguous = 0, yearMismatch = 0, implausible = 0;
 
         foreach (var team in teams)
         {
@@ -115,6 +129,19 @@ public static class SplitAttachMatcher
             var inDb = row.Legs.Select(l => l.BirthYear).OrderBy(y => y);
             var inSource = team.Legs.Select(l => l.BirthYear ?? 0).OrderBy(y => y);
             if (!inDb.SequenceEqual(inSource)) { yearMismatch++; continue; }
+
+            // Невозможный этап — сбой касания хронометража (RelayLegFloor). Сбой сдвигает время
+            // между соседними этапами, поэтому неверен не один этап, а команда: этапов у неё нет
+            // совсем, без догадок, — а записанные раньше обнуляем, иначе их не убрать ничем.
+            if (ImplausibleLeg(floor, row, legs) is string reason)
+            {
+                implausible++;
+                implausibleTeams.Add($"заплыв {team.Heat}, дорожка {team.Lane}, {team.Distance} {team.Style}, итог {team.Time}: {reason}");
+                legWrites.AddRange(row.Legs
+                    .Where(l => l.SplitTime is not null)
+                    .Select(l => new LegSplitWrite(l.MemberId, null)));
+                continue;
+            }
 
             attached++;
             foreach (var leg in legs)
@@ -151,8 +178,23 @@ public static class SplitAttachMatcher
         {
             LegWrites = legWrites.Count,
             SwimWrites = swimWrites.Count,
+            TeamsImplausible = implausible,
         };
-        return new SplitAttachPlan(legWrites, swimWrites, report);
+        return new SplitAttachPlan(legWrites, swimWrites, report) { ImplausibleTeams = implausibleTeams };
+    }
+
+    /// <summary>Причина первого невозможного этапа команды или null. Пол — с карточки пловца
+    /// этой ноги в базе, год рождения — из источника (они уже сверены мультимножеством).</summary>
+    private static string? ImplausibleLeg(RelayLegFloor? floor, RelayRow row, IReadOnlyList<SplitSourceLeg> legs)
+    {
+        if (floor is null || row.Year is not int year) return null;
+        foreach (var leg in legs)
+        {
+            var gender = row.Legs.FirstOrDefault(l => l.LegOrder == leg.Order)?.Gender;
+            if (floor.Implausible(leg.SplitTime, row.Distance, gender, row.Pool, leg.BirthYear, year) is string reason)
+                return $"нога {leg.Order}: {reason}";
+        }
+        return null;
     }
 
     private static bool Same(string? a, string? b) =>

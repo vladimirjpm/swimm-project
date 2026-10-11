@@ -39,6 +39,10 @@ export interface StateInterface extends IIndexable {
   bestLevelInfo?: BestLevelInfo | null;
   showCombineAllResults: boolean;
   resultsPaging?: ResultsPaging;
+  /** Клубные очки текущего соревнования — наша оценка, официального зачёта нет (Р80).
+   *  Пишет results-main-project из overview (`club_points_unofficial`), читает фильтр Club
+   *  в табе Swims: в full-режиме sourceParams в стор не попадают, и сам он overview не знает. */
+  clubPointsUnofficial: boolean;
 }
 
 // Начальное состояние (может быть заполнено динамически)
@@ -53,6 +57,7 @@ const initialState: StateInterface = {
   popUpObj: null,
   bestLevelInfo: null,
   showCombineAllResults: false,
+  clubPointsUnofficial: false,
   filterSelected:{
     selected_name: "all", // спортсмен
     date: (new Date()).toString(), // Текущая дата

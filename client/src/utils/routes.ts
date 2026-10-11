@@ -18,6 +18,7 @@
 //   /season-best            → season-best.html (списки лучших в сезоне; всё в query)
 //   /records                → records.html (рейтинг рекордов стран; дисциплина в query)
 //   /records/compare        → records-compare.html (две страны по рекордам; пара в query)
+//   /help/{key}             → help.html (справка из src/content/help/{key}/{en,ru,he}.md)
 //
 // ПРАВИЛО: в путь идёт только идентичность ресурса. Состояние вида
 // (tab, filter, club, swim, eventId, cat, loadMode, themes) остаётся в query —
@@ -52,6 +53,15 @@ export const routes = {
   club: (id: string | number) => `/clubs/${enc(String(id))}`,
   myMedia: () => '/my-media',
   myFavorites: () => '/my-favorites',
+
+  /**
+   * Страница справки: текст из `src/content/help/{key}/{en,ru,he}.md` (`content.ts`).
+   * Отдельный раздел `/help/…`, а не `/groups/guide`: там путь занят слагами групп, и группа
+   * со слагом «guide» перекрыла бы справку.
+   */
+  help: (key: string) => `/help/${enc(key)}`,
+  /** Памятка «Нужна ли вам группа?» — ссылка со страницы групп. */
+  helpGroups: () => '/help/groups',
 
   /**
    * Страница списков «лучшие в сезоне»: кто быстрее всех в связке возраст × пол ×
@@ -428,6 +438,8 @@ export interface RouteIdentity {
   swimmerId: number | null;
   /** id клуба из /clubs/{id}. */
   clubId: number | null;
+  /** Ключ справки из /help/{key} (без раздела: `groups`, а не `help/groups`). */
+  helpKey: string | null;
 }
 
 /**
@@ -447,6 +459,7 @@ export function parseRoute(pathname: string = window.location.pathname): RouteId
     upcomingOrgCompId: null,
     swimmerId: null,
     clubId: null,
+    helpKey: null,
   };
 
   if (seg[0] === 'groups' && seg[1]) {
@@ -463,6 +476,8 @@ export function parseRoute(pathname: string = window.location.pathname): RouteId
   } else if (seg[0] === 'clubs' && seg[1]) {
     const n = Number(decodeURIComponent(seg[1]));
     id.clubId = Number.isFinite(n) && n > 0 ? n : null;
+  } else if (seg[0] === 'help' && seg[1]) {
+    id.helpKey = decodeURIComponent(seg[1]);
   }
 
   return id;

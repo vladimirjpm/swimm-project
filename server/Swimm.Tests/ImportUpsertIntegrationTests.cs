@@ -412,6 +412,56 @@ public class ImportUpsertIntegrationTests
         Assert.Equal(1, await db.Swimmers.CountAsync(s => s.FirstName == "Shirli"));
     }
 
+    /// <summary>
+    /// Ивритский протокол напечатал ЛИЧНУЮ строку латиницей, EN-полей у неё нет (6595, 07.10.2026:
+    /// «Yael Fridland»). Карточка פרידלנד יעל знает латиницу в *En — это она, а не новый пловец;
+    /// ивритское имя карточки не перетирается латиницей.
+    /// </summary>
+    [Fact]
+    public async Task PersonalRow_InLatin_MatchesHebrewCardByEnglishName()
+    {
+        await using var db = CreateDb(nameof(PersonalRow_InLatin_MatchesHebrewCardByEnglishName));
+        var yael = new Swimmer
+        {
+            LastName = "פרידלנד", FirstName = "יעל", LastNameEn = "FRIDLAND", FirstNameEn = "Yael", BirthYear = 1985,
+        };
+        db.Swimmers.Add(yael);
+        await db.SaveChangesAsync();
+
+        var svc = new JsonImportService(db, new NullCacheService());
+        var result = await svc.ImportAsync(ToStream(new[]
+        {
+            Item("Fridland", "Yael", 1985, lane: 1),
+            // Тот же человек ногой эстафеты в том же файле — попадает на ту же карточку.
+            RelayWithLegs(("כהן", "רונית", 1969), ("שחר", "תמר", 1983), ("Fridland", "Yael", 1985), ("קמר", "פלר", 1974)),
+        }));
+
+        Assert.Empty(result.ErrorMessages);
+        Assert.Equal(1, await db.Swimmers.CountAsync(s => s.BirthYear == 1985));
+        Assert.Equal(yael.Id, (await db.Results.SingleAsync(r => r.RelayId == null)).SwimmerId);
+        Assert.Contains(yael.Id, await db.RelayMembers.Select(m => m.SwimmerId).ToListAsync());
+        Assert.Equal(("פרידלנד", "יעל"), ((await db.Swimmers.SingleAsync(s => s.Id == yael.Id)).LastName, yael.FirstName));
+    }
+
+    /// <summary>Двое с тем же английским именем и годом — гадать нельзя, личная строка заводит свою карточку.</summary>
+    [Fact]
+    public async Task PersonalRow_InLatin_AmbiguousEnglishName_CreatesNewCard()
+    {
+        await using var db = CreateDb(nameof(PersonalRow_InLatin_AmbiguousEnglishName_CreatesNewCard));
+        foreach (var hebrew in new[] { "כהן", "כוהן" })
+            db.Swimmers.Add(new Swimmer
+            {
+                LastName = hebrew, FirstName = "דנה", LastNameEn = "COHEN", FirstNameEn = "Dana", BirthYear = 1990,
+            });
+        await db.SaveChangesAsync();
+
+        var svc = new JsonImportService(db, new NullCacheService());
+        await svc.ImportAsync(ToStream(new[] { Item("Cohen", "Dana", 1990) }));
+
+        var owner = await db.Results.Select(r => r.Swimmer.LastName).SingleAsync();
+        Assert.Equal("Cohen", owner);
+    }
+
     [Fact]
     public async Task RelayLeg_AmbiguousEnglishName_CreatesNewCard()
     {

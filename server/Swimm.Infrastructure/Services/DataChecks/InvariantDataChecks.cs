@@ -227,12 +227,20 @@ public sealed class SwimmerTwoClubsInCompetitionCheck(SwimmDbContext db) : IData
         + "перемешаны. Разделять руками, сверяясь с loglig.";
     public DataCheckSeverity Severity => DataCheckSeverity.Error;
 
+    /// <summary>
+    /// Псевдоклуб, который импорт ставит строке без клуба в протоколе (то же имя, что
+    /// <c>JsonImportService.NoClubName</c>). Это отсутствие клуба, а не второй клуб: пловец с
+    /// «No club» на 100 и «הפועל ירושלים» на 200 одного старта — один человек (מירוצ׳ניק,
+    /// זורבלוב после склейки 06.10.2026 подняли две ложные ошибки).
+    /// </summary>
+    internal const string NoClubName = "No club";
+
     public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
     {
         // Канонизируем клуб: у склеенного остаётся «надгробие» (MergedIntoId), и без этого
         // один и тот же клуб выглядел бы как два.
         var rows = await db.Results.AsNoTracking()
-            .Where(r => r.RelayId == null)
+            .Where(r => r.RelayId == null && r.Club.Name != NoClubName)
             .Select(r => new
             {
                 r.SwimmerId,

@@ -2,6 +2,7 @@
 import type { ClubStandingsTable } from '../../../hooks/useClubOverview';
 import { routes } from '../../../utils/routes';
 import { seasonLabel } from '../../../utils/helpers/season-helper';
+import UI_ClubPointsUnofficialChip from '../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
 
 /**
  * Standings — детализация выбранного зачёта (клик по линии в гриде «сезон × группа», или
@@ -35,7 +36,10 @@ function ClubStandings({ standings }: Props) {
 
   return (
     <section className="deep-card h-full">
-      <div className="deep-card-title">Standings</div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="deep-card-title">Standings</div>
+        {standings.unofficial && <UI_ClubPointsUnofficialChip />}
+      </div>
       {/* Название соревнования обязательно: карточка показывает зачёт ОДНОГО старта
           (в гриде слева он подсвечен), а без имени и даты видно только «Kids · 2025/26»,
           и какой именно чемпионат раскрыт — непонятно. Имя ведёт на само соревнование. */}

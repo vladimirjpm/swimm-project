@@ -98,4 +98,52 @@ public class IsrOrgDiscoveryProviderTests
     [InlineData("10.10")]
     public void TryParseDateRange_Garbage_False(string raw)
         => Assert.False(IsrOrgDiscoveryProvider.TryParseDateRange(raw, out _, out _));
+
+    // ── Программа loglig: все дни ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Без <c>dateFilter=הכל</c> loglig отдаёт только сегодняшний день, если он есть в
+    /// программе (10.10.2026, 16849: 1 заплыв из 4). Оба читателя программы — забор заявок
+    /// и id событий для импорта — обязаны просить все дни.
+    /// </summary>
+    [Fact]
+    public async Task Programme_RequestsAllDates_ForGridAndEventIds()
+    {
+        var html = File.ReadAllText(Path.Combine(
+            AppContext.BaseDirectory, "Fixtures", "Parsing", "loglig", "disciplines-15687-alldates.html"));
+        var handler = new RecordingHandler(html);
+        var provider = new IsrOrgDiscoveryProvider(
+            new HandlerClientFactory(handler), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+
+        var grid = await provider.FetchDisciplineGridAsync(15687);
+        Assert.Equal(4, grid.Count);
+        // У предстоящего старта ссылок на результаты нет — сам сбой тут ожидаем, важен адрес.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => provider.FetchEventIdsAsync(15687));
+
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.All(handler.Requests, u =>
+        {
+            Assert.Equal("/LeagueTable/AthleticsDisciplines/15687", u.AbsolutePath);
+            Assert.Equal("dateFilter=הכל", Uri.UnescapeDataString(u.Query.TrimStart('?')));
+        });
+    }
+
+    private sealed class RecordingHandler(string body) : HttpMessageHandler
+    {
+        public List<Uri> Requests { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Requests.Add(request.RequestUri!);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(body),
+            });
+        }
+    }
+
+    private sealed class HandlerClientFactory(HttpMessageHandler handler) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+    }
 }

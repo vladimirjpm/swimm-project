@@ -59,6 +59,10 @@ public class EditModel : PageModel
         public bool ManualOnly { get; set; }
 
         public int RelayMultiplier { get; set; } = 2;
+        public int? OverallMultiplier { get; set; }
+        public int? MinEntrants { get; set; }
+        public string? Distances { get; set; }
+        public string? AgeBands { get; set; }
 
         public string PointsSource { get; set; } = "placement";
         public int? CountBestSwims { get; set; }
@@ -126,6 +130,10 @@ public class EditModel : PageModel
             MaxScoringPlace = Input.MaxScoringPlace,
             ManualOnly = Input.ManualOnly,
             RelayMultiplier = Input.RelayMultiplier,
+            OverallMultiplier = Input.OverallMultiplier,
+            MinEntrants = Input.MinEntrants,
+            Distances = Input.Distances,
+            AgeBands = Input.AgeBands,
             PointsSource = Input.PointsSource,
             CountBestSwims = Input.CountBestSwims,
             GroupBy = Input.GroupBy,
@@ -191,6 +199,10 @@ public class EditModel : PageModel
         MaxScoringPlace = dto.MaxScoringPlace,
         ManualOnly = dto.ManualOnly,
         RelayMultiplier = dto.RelayMultiplier,
+        OverallMultiplier = dto.OverallMultiplier,
+        MinEntrants = dto.MinEntrants,
+        Distances = dto.Distances,
+        AgeBands = dto.AgeBands,
         PointsSource = dto.PointsSource,
         CountBestSwims = dto.CountBestSwims,
         GroupBy = dto.GroupBy,

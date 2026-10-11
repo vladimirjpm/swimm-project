@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useAppSelector } from '../../../../store/store';
 import { useClubSummary } from '../../../../hooks/useClubSummary';
 import { routes } from '../../../../utils/routes';
+import UI_ClubPointsUnofficialChip from '../../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
 import type { Result } from '../../../../utils/interfaces/results';
 
 // Таб Clubs: клубный зачёт источника (/api/club-summary, фаза 3.4) + drill-down по клубу:
@@ -32,6 +33,9 @@ interface Props {
   sourceParams?: Record<string, string>;
   /** Переход в Swims с фильтром по клубу. */
   onOpenSwimsForClub?(club: string): void;
+  /** Официального клубного зачёта нет — подписать зачёт чипом «Unofficial»
+   *  (club_points_unofficial из overview, тот же флаг, что у карточки Top clubs). */
+  unofficial?: boolean;
 }
 
 function writeClubUrl(club: string | null) {
@@ -58,7 +62,7 @@ function eventOf(r: Result): string {
   return `${r.event_style_len ?? ''} ${r.event_style_name ?? ''}`.trim() || r.event || '—';
 }
 
-export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub }: Props) {
+export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub, unofficial = false }: Props) {
   const clubs = useClubSummary(sourceParams, !!sourceParams);
   const selectedSource = useAppSelector((s) => s.dataSourceSelected);
   // Тоггл «Combine All Results»: он же управляет зачётом слева, поэтому разбор справа
@@ -149,7 +153,10 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub }: P
     <div className={`mt-4 grid gap-3 ${selectedClub ? 'lg:grid-cols-2 lg:items-start' : ''}`}>
       {/* Полный зачёт */}
       <div className="min-w-0 overflow-x-auto rounded-[12px] p-4" style={cardStyle}>
-        <div className="mb-2 text-[14px] font-extrabold">Club standings</div>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span className="text-[14px] font-extrabold">Club standings</span>
+          {unofficial && <UI_ClubPointsUnofficialChip />}
+        </div>
         {clubs.length === 0 ? (
           <div className="py-6 text-center text-[12.5px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}>
             No club data for this competition.

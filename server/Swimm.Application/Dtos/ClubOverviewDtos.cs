@@ -289,6 +289,13 @@ public sealed class ClubStandingsTableDto
     [JsonPropertyName("club_count")]
     public int ClubCount { get; set; }
 
+    /// <summary>
+    /// Официального клубного зачёта у соревнования нет — очки наша оценка, клиент ставит чип
+    /// «Unofficial» (Р80, <c>Competition.IsClubPointsUnofficial</c>; у события — по всем дням).
+    /// </summary>
+    [JsonPropertyName("unofficial")]
+    public bool Unofficial { get; set; }
+
     /// <summary>Строки таблицы: лидеры + окно вокруг нашего клуба.</summary>
     [JsonPropertyName("rows")]
     public List<ClubStandingRowDto> Rows { get; set; } = [];
@@ -374,6 +381,11 @@ public sealed class ClubTimelineItemDto
 
     [JsonPropertyName("swimmer_count")]
     public int SwimmerCount { get; set; }
+
+    /// <summary>Очки этого старта — наша оценка, официального зачёта нет (Р80). См.
+    /// <see cref="ClubStandingsTableDto.Unofficial"/>.</summary>
+    [JsonPropertyName("unofficial")]
+    public bool Unofficial { get; set; }
 }
 
 /// <summary>Пловец в топе клуба.</summary>

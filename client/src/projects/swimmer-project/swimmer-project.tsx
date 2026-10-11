@@ -17,17 +17,22 @@ import { seasonLabel } from '../../utils/helpers/season-helper';
 import { useSwimmerProfile } from './use-swimmer-profile';
 import {
   useSwimmerBestTimes, useSwimmerCompare, useSwimmerPersonalBests, useSwimmerProgress,
-  useSwimmerSearch, useSwimmerSeasonRanks, useSwimmerSummary,
+  useSwimmerSearch, useSwimmerSeasonRanks, useSwimmerSummary, useSwimmerUnderReview,
 } from './use-swimmer-page';
 import SwimmerHero from './components/swimmer-hero';
 import SwimmerMediaPanel from './components/swimmer-media-panel';
 import Popup from '../components/popup/popup';
 import { useAppSelector } from '../../store/store';
 import SwimmerUpcomingStarts from './components/swimmer-upcoming-starts';
+import { holdsSeasonBest, PanelEmpty } from './components/swimmer-panels';
+import { SeasonPanel } from './components/panels/season-panel';
 import {
-  H2HPanel, holdsSeasonBest, PanelEmpty, PersonalBestsPanel, ProgressPanel, ResultsFilters,
-  ResultsPanel, SeasonBestPanel, SeasonPanel, type ResultsView,
-} from './components/swimmer-panels';
+  ResultsFilters, ResultsPanel, UnderReviewPanel, type ResultsView,
+} from './components/panels/results-panel';
+import { SeasonBestPanel } from './components/panels/season-best-panel';
+import { PersonalBestsPanel } from './components/panels/personal-bests-panel';
+import { ProgressPanel } from './components/panels/progress-panel';
+import { H2HPanel } from './components/panels/h2h-panel';
 
 /**
  * Страница спортсмена `/swimmers/{id}` — вариант 2a «Card DNA»
@@ -55,7 +60,7 @@ const TABS: SwimmerTab[] = ['overview', 'season', 'results', 'media', 'h2h'];
 const isTab = (v: string | null | undefined): v is SwimmerTab =>
   v != null && (TABS as string[]).includes(v);
 
-const VIEWS: ResultsView[] = ['best', 'season-best', 'records', 'progress'];
+const VIEWS: ResultsView[] = ['best', 'season-best', 'records', 'progress', 'under-review'];
 const isView = (v: string | null | undefined): v is ResultsView =>
   v != null && (VIEWS as string[]).includes(v);
 
@@ -151,10 +156,14 @@ function SwimmerProject() {
 
   // Умолчание — ВИТРИННЫЙ сезон: до зимних чемпионатов это прошлый сезон, а не свежий
   // (docs/season-boundary-rule.md). Сервер помечает его isDisplayDefault.
+  // Сезонов нет вовсе (пловец без заплывов в базе — держатель рекордов, #62873) — ждать
+  // витринного нечего: режим «за карьеру» (null). Иначе сезон навсегда оставался «не выбран»,
+  // все табы гейтятся seasonReady и висели на «Loading…».
   useEffect(() => {
-    if (season !== undefined || !profile?.seasons?.length) return;
-    const preferred = profile.seasons.find((s) => s.isDisplayDefault) ?? profile.seasons[0];
-    setSeason(preferred.season);
+    if (season !== undefined || !profile) return;
+    const seasons = profile.seasons ?? [];
+    const preferred = seasons.find((s) => s.isDisplayDefault) ?? seasons[0];
+    setSeason(preferred?.season ?? null);
   }, [profile, season]);
 
   const writeQuery = (
@@ -213,6 +222,7 @@ function SwimmerProject() {
 
   const [poolType, setPoolType] = useState('25m');
   const personalBests = useSwimmerPersonalBests(swimmerId, poolType, onResults && view === 'records');
+  const underReview = useSwimmerUnderReview(swimmerId, onResults && view === 'under-review');
 
   /**
    * Сезон, за который считаются МЕСТА. Обычно это выбранный сезон, но в режиме ∞ (All)
@@ -387,14 +397,15 @@ function SwimmerProject() {
           id: 'best-times-digest',
           span: 'half' as const,
           render: () => {
-            const rows = [...(bestTimes.data ?? [])]
+            // «Strongest results» — только засчитанные: помеченный заплыв достижением не считается.
+            const rows = (bestTimes.data ?? []).filter((r) => !r.quality)
               .sort((a, b) => (b.points ?? 0) - (a.points ?? 0))
               .slice(0, 3);
             return (
               <DeepDigestCard
                 title="Best times"
                 subtitle="strongest results by FINA points"
-                count={bestTimes.data?.length ?? null}
+                count={bestTimes.data ? bestTimes.data.filter((r) => !r.quality).length : null}
                 countLabel="DISTANCES"
                 moreLabel="All best times →"
                 onMore={() => nav.go('results')}
@@ -443,12 +454,20 @@ function SwimmerProject() {
       id: 'results',
       icon: '⏱',
       label: 'Results',
-      sub: bestTimes.data ? `${bestTimes.data.length} best times` : 'best per distance',
+      // Строки из одного помеченного заплыва лучшими не считаются — и в счёт не идут.
+      sub: bestTimes.data
+        ? `${bestTimes.data.filter((r) => !r.quality).length} best times`
+        : 'best per distance',
       cards: () => [{
         id: 'results-panel',
         render: () => (!seasonReady ? <PanelEmpty>Loading…</PanelEmpty> : (
           <>
-            <ResultsFilters view={view} onView={handleView} recordsHeld={profile.recordsHeld} />
+            <ResultsFilters
+              view={view}
+              onView={handleView}
+              recordsHeld={profile.recordsHeld}
+              underReviewCount={profile.underReviewCount}
+            />
 
             {view === 'best' && (
               <ResultsPanel
@@ -456,6 +475,7 @@ function SwimmerProject() {
                 swimmerId={profile.id}
                 gender={gender}
                 sbKeys={sbKeys}
+                career={activeSeason == null}
                 state={bestTimes}
               />
             )}
@@ -484,6 +504,14 @@ function SwimmerProject() {
                 gender={gender}
                 age={profile.ageInSeason}
                 state={personalBests}
+              />
+            )}
+            {view === 'under-review' && (
+              <UnderReviewPanel
+                rows={underReview.data}
+                swimmerId={profile.id}
+                gender={gender}
+                state={underReview}
               />
             )}
             {view === 'progress' && (
