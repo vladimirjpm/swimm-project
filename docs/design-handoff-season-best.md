@@ -261,7 +261,8 @@ competition_id, competition, pool_type, date (DD/MM/YYYY)
 с золотым `#1` и бейджем `SB`). Новая страница должна выглядеть **так же, плюс имя пловца,
 соревнование и дата**. Это готовая вёрстка, её и берём.
 
-Где лежит: `SeasonBestPanel` в `swimmer-project/components/swimmer-panels.tsx`,
+Где лежит: `SeasonBestPanel` в `swimmer-project/components/panels/season-best-panel.tsx`
+(до 09.10.2026 — в `swimmer-panels.tsx`),
 стили — `.deep-pb-row` / `.deep-rank-row` в `swimmer-page.css`.
 
 ```css

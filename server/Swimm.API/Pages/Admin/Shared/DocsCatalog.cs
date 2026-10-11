@@ -39,6 +39,7 @@ public static class DocsCatalog
             new("docs/ARCHITECTURE.md", "Архитектура", "принципиальные решения, швы, кэш"),
             new("docs/data-integrity.md", "Целостность данных", "инварианты, журнал решений и инцидентов"),
             new("docs/competition-overview-cards.md", "Места, медали, очки", "два набора мест, что считается медалью"),
+            new("docs/masters-records-rules.md", "Мастерс-рекорды: как признают", "MSW 5.3: какой старт годится, хронометраж, заявка за 60 дней"),
             new("docs/relays.md", "Эстафеты", "модель RelayMembers, журнал фиксов"),
             new("docs/media-page.md", "Медиа", "My media, публикации, видимость"),
             new("docs/plans/cache-tags-plan.md", "Кэш", "сброс по меткам, готовность к Redis"),
