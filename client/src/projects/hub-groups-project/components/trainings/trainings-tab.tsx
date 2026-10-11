@@ -4,6 +4,7 @@ import type { HubGroupDetails } from '../../types';
 import { TrainingsTabProvider, useTrainingsTab } from './trainings-context';
 import { LANES_SECTIONS, NEXT_SECTIONS, SectionList, TRAININGS_SECTIONS, VIEW_SECTIONS } from './trainings-sections';
 import TrainingsSegments from './trainings-segments';
+import type { TrainingMarks } from './use-training-marks';
 import { TrainingsSheetHost } from './trainings-sheets';
 
 /**
@@ -23,7 +24,7 @@ import { TrainingsSheetHost } from './trainings-sheets';
  *   во всю ширину с «← Back to Next» (6b: редактору дорожек нужна ширина под колонки).
  */
 function GroupTrainingsTab({
-  group, manages, rsvp, onOpenSchedule, onNextTrainingsChanged,
+  group, manages, rsvp, onOpenSchedule, onNextTrainingsChanged, onMarksChange,
 }: {
   group: HubGroupDetails;
   manages: boolean;
@@ -35,6 +36,8 @@ function GroupTrainingsTab({
    * перечитывает `GET …/next-trainings` и подменяет `next_trainings` в `group`.
    */
   onNextTrainingsChanged?: () => void;
+  /** Метки видов таба — странице группы для метки на самом табе (см. `use-group-trainings-mark.ts`). */
+  onMarksChange?: (marks: TrainingMarks) => void;
 }) {
   return (
     <TrainingsTabProvider
@@ -43,6 +46,7 @@ function GroupTrainingsTab({
       rsvp={rsvp}
       openSchedule={onOpenSchedule}
       onNextTrainingsChanged={onNextTrainingsChanged}
+      onMarksChange={onMarksChange}
     >
       <TrainingsLayout />
       <SheetHost />

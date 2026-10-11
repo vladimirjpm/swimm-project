@@ -11,7 +11,8 @@ import GroupTrainingsTab from './components/trainings/trainings-tab';
 import TrainingsEmpty from './components/trainings/trainings-empty';
 import GroupMembershipChip, { type GroupMembershipState } from './components/group-membership';
 import { MarkDot } from './components/trainings/trainings-section';
-import { redMark } from './components/trainings/use-training-marks';
+import { MARK_COLOR } from './components/trainings/use-training-marks';
+import { useGroupTrainingsMark } from './use-group-trainings-mark';
 import { formatNextDate, scheduleDaysLabel } from './components/group-training-slots';
 import { readViewParam, rewriteLegacyTab, writeViewParam } from '../components/deep/view-chips';
 import { useTrainingRsvp } from './use-training-rsvp';
@@ -160,8 +161,17 @@ function GroupPage({ slug }: { slug: string }) {
     group?.next_training?.id,
     real && (manages || isMember) && !membersOnly,
   );
-  // Не ответившие на ближайшее занятие — красный бейдж таба Trainings у тренера (Т8).
-  const trainingsRed = manages ? redMark(rsvp.rsvp) : null;
+  // Метка таба Trainings — одна, самая срочная (Т8 + хвост «вне таба»): тренеру красная — пилюлей с
+  // числом не ответивших, остальное (и всё у участника) — точкой. Золотая и акцентная — ленивой
+  // подгрузкой плана и ленты, пока таб не открыт; открыт — их подаёт сам таб.
+  const trainingsMark = useGroupTrainingsMark({
+    groupId: real ? group!.id : null,
+    nextDate: group?.next_training?.date ?? null,
+    manages,
+    rsvp: rsvp.rsvp,
+    enabled: real && (manages || isMember) && !membersOnly,
+  });
+  const trainingsCount = trainingsMark.mark?.count;
 
   // Пловцы группы (Р71) — тем же гейтом, что ответы на занятие: сервер ответил бы остальным 403.
   const insiderSlug = real && (manages || isMember) && !membersOnly ? group!.slug : null;
@@ -316,10 +326,13 @@ function GroupPage({ slug }: { slug: string }) {
       // не пропажа таба (правило каркаса: locked ≠ «не класть»). Внутри — Sessions | Lanes:
       // план дорожек был отдельным табом (docs/plans/lane-plans-plan.md).
       pinned: manages,
-      // Красная пилюля с числом не ответивших на ближайшее занятие (Т8) — только тренеру; участнику
-      // таб не закреплён, бейджа у него нет. Остальные метки таба вне его не показываем.
-      badge: trainingsRed?.count ? String(trainingsRed.count) : undefined,
+      // Красная пилюля с числом не ответивших (тренеру); иначе метка точкой — участнику красная
+      // «не ответил», обоим золотая (план дорожек) и акцентная (новые видео).
+      badge: trainingsCount ? String(trainingsCount) : undefined,
       badgeTone: 'danger' as const,
+      dot: trainingsMark.mark && !trainingsCount
+        ? { color: MARK_COLOR[trainingsMark.mark.tone], label: trainingsMark.mark.label }
+        : undefined,
       locked: !(manages || isMember),
       // Замок гостя / не участника (хендофф 4a, Т9): карточка пустого состояния, под ней — расписание
       // (то, что и так видно в шапке) и тот же чип вступления, что в шапке (одно состояние членства).
@@ -333,6 +346,7 @@ function GroupPage({ slug }: { slug: string }) {
             rsvp={rsvp}
             onOpenSchedule={() => openScheduleCard(nav)}
             onNextTrainingsChanged={reloadNextTrainings}
+            onMarksChange={trainingsMark.reportTabMarks}
           />
         ),
       }],

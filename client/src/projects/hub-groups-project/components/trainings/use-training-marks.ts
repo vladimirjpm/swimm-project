@@ -99,6 +99,14 @@ export function useTrainingMarks({
   }), [rsvp, manages, nextPlan, sessions, trainingsSeen, lanesSeen]);
 }
 
+/**
+ * Одна метка на таб группы «Trainings» (снаружи таба): самая срочная из видов — красная › золотая ›
+ * акцентная (`marks-spec.md`, «Precedence per tab»). Нет ни одной — меток нет, зелёных не бывает.
+ */
+export function tabMark(marks: TrainingMarks): TrainingMark | null {
+  return marks.next ?? marks.lanes ?? marks.trainings;
+}
+
 /** Цвет точки метки — роль темы, не хекс. */
 export const MARK_COLOR: Record<TrainingMarkTone, string> = {
   red: 'var(--deep-danger)',
