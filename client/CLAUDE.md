@@ -261,4 +261,6 @@ style»; чип «⚠ Under review» вместо голого значка вк
   базе оно было.
 - Поле в store опечатано как `debigConfig` — не «чини» вслепую, на него могут быть ссылки.
 - `data-helper2.js` и часть legacy — JS среди TS; типов нет, проверяй сигнатуры по месту.
-- `build:azure` дополнительно вырезает видео — для прод-сборки под Azure используй именно его.
+- `build:azure` — мёртвый скрипт (видео в репозитории давно нет). Прод-сборку клиента делает
+  `dotnet publish` (таргет `PublishClientApp` в `Swimm.API.csproj` зовёт обычный `npm run build`),
+  см. `docs/plans/azure-deploy-plan.md` §4 A1.

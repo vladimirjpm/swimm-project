@@ -23,6 +23,8 @@ public class TrainingResultsPrivacyTests
     {
         ["Swimm.Infrastructure/Data/SwimmDbContext.cs"] =
             "объявление DbSet и маппинг таблиц",
+        ["Swimm.Infrastructure/Data/Configurations/TrainingConfigurations.cs"] =
+            "маппинг таблиц (EF-конфигурация вынесена из SwimmDbContext в 1a2514da): имена таблиц, не чтение",
         ["Swimm.Infrastructure/Repositories/HubGroupTrainingRepository.cs"] =
             "ЕДИНСТВЕННОЕ чтение времён для показа: таб тренировок группы; аудиторию (управляющие + активные " +
             "участники) проверяет вызывающий до вызова",

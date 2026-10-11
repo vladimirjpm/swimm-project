@@ -3,6 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Закрыто от индексации: имена держателей рекордов, в т.ч. мировые юниоры (несовершеннолетние).
+         Решение В15, docs/plans/azure-deploy-plan.md. Без Disallow в robots.txt — иначе краулер не прочтёт мета-тег. -->
+    <meta name="robots" content="noindex, nofollow" />
     <title>Records</title>
     <!-- Линки на CSS вручную НЕ нужны, Vite добавит их сам благодаря import в TSX -->
   </head>

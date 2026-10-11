@@ -86,14 +86,13 @@ public static class DependencyInjection
         services.AddSingleton<IRecordCountryRunQueue>(sp => sp.GetRequiredService<RecordCountryRunQueue>());
         // Архив источников: боевой прогон сам кладёт выгрузку разобранных строк в
         // !records-sources/ (правило 11 pre-push). Путь из конфига, относительный считается от
-        // ContentRoot; пустой — архив выключен.
+        // ContentRoot; пустой — архив выключен. Вне Development относительный путь тоже
+        // выключает архив — см. FileRecordRunArchive.ResolveDirectory.
         services.AddSingleton<IRecordRunArchive>(sp =>
         {
-            var configured = configuration["RecordsImport:SourceArchiveDir"];
-            var dir = string.IsNullOrWhiteSpace(configured)
-                ? null
-                : Path.GetFullPath(Path.Combine(
-                    sp.GetRequiredService<IHostEnvironment>().ContentRootPath, configured));
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            var dir = FileRecordRunArchive.ResolveDirectory(
+                configuration["RecordsImport:SourceArchiveDir"], env.ContentRootPath, env.IsDevelopment());
 
             return new FileRecordRunArchive(
                 dir, sp.GetRequiredService<ILogger<FileRecordRunArchive>>());
