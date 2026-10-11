@@ -8,6 +8,16 @@ import { cardCls, btnCls, btnDangerCls } from './my-groups/my-groups-shared';
 import { GroupInputForm } from './my-groups/group-input-form';
 import { EditGroupCard } from './my-groups/edit-group-card';
 
+/** Ссылка на памятку «Do you need a group?» (`/help/groups`) — рядом с каждым входом в создание. */
+function GuideLink() {
+  return (
+    <a href={routes.helpGroups()}
+      className="text-[12.5px] font-semibold text-[var(--t-accent)] underline underline-offset-2">
+      Do you need a group?
+    </a>
+  );
+}
+
 const EMPTY_INPUT: HubGroupInput = {
   name: '', nameEn: '', slug: '', description: '', iconUrl: '', coverImageUrl: '', location: '',
   country: '', clubId: null, isPublic: true, joinPolicy: 'open', links: [],
@@ -35,6 +45,7 @@ function GuestCreateHint({ policy }: { policy: GroupCreationPolicy | null }) {
               ? 'Creating groups is open to coaches right now. Sign in with your coach account to start one.'
               : 'Coach a squad or train with friends from different clubs? Sign in to create a group and follow everyone’s swims, records and season standings in one place.'}
           </p>
+          <p className="m-0 mt-1.5"><GuideLink /></p>
         </div>
         <button
           type="button"
@@ -82,7 +93,8 @@ export default function MyGroupsPanel() {
       <div className={cardCls}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">My groups</h2>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <GuideLink />
             {eligibility?.limit != null && (
               <span className="hp-mono text-[11.5px] font-bold text-[var(--t-text-2)]"
                 title="Groups you own out of your limit (official groups count too)">

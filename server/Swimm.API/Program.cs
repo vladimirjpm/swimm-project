@@ -397,6 +397,7 @@ app.Use(async (context, next) =>
                 "competitions" => "/results_main.html",              // /competitions/{id}
                 "swimmers" => "/swimmer.html",                       // /swimmers/{id}
                 "clubs" => "/club.html",                             // /clubs/{id}
+                "help" => "/help.html",                              // /help/{key} — справка из src/content/help
                 "groups" when seg.Length >= 3 && seg[2] == "results"
                     => "/results_main.html",                         // /groups/{slug}/results
                 "groups" => "/groups.html",                          // /groups/{slug}
