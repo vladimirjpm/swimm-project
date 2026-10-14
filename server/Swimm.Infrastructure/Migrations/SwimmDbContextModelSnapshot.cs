@@ -147,6 +147,9 @@ namespace Swimm.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("AgeConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");

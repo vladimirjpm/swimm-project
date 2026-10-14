@@ -28,7 +28,7 @@ const cleanUrlRewrite = () => ({
       const seg = pathname.split('/').filter(Boolean);
       if (seg.length === 1) {
         return { results: '/results_main.html', competitions: '/competitions.html',
-          groups: '/groups.html', clubs: '/results_main.html', 'my-media': '/media.html', 'my-favorites': '/my-favorites.html', about: '/about.html',
+          groups: '/groups.html', clubs: '/results_main.html', 'my-media': '/media.html', 'my-favorites': '/my-favorites.html', about: '/about.html', privacy: '/help.html',
           'season-best': '/season-best.html', h2h: '/h2h.html',
           records: '/records.html' }[seg[0]] ?? null;
       }

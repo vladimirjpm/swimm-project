@@ -88,7 +88,7 @@ public class LocalAuthServiceTests
         var (hasher, email) = Mocks();
 
         var result = await BuildSvc(db, hasher, email)
-            .RegisterAsync("not-an-email", ValidPassword, null, "https://app.com");
+            .RegisterAsync("not-an-email", ValidPassword, null, ageConfirmed: true, "https://app.com");
 
         Assert.Equal(RegisterStatus.InvalidEmail, result.Status);
     }
@@ -100,7 +100,7 @@ public class LocalAuthServiceTests
         var (hasher, email) = Mocks();
 
         var result = await BuildSvc(db, hasher, email)
-            .RegisterAsync(ValidEmail, "short", null, "https://app.com");
+            .RegisterAsync(ValidEmail, "short", null, ageConfirmed: true, "https://app.com");
 
         Assert.Equal(RegisterStatus.WeakPassword, result.Status);
     }
@@ -112,7 +112,7 @@ public class LocalAuthServiceTests
         var (hasher, emailMock) = Mocks();
 
         var result = await BuildSvc(db, hasher, emailMock)
-            .RegisterAsync(ValidEmail, ValidPassword, "Alice", "https://app.com");
+            .RegisterAsync(ValidEmail, ValidPassword, "Alice", ageConfirmed: true, "https://app.com");
 
         Assert.Equal(RegisterStatus.Ok, result.Status);
         emailMock.Verify(e => e.SendAsync(
@@ -128,14 +128,76 @@ public class LocalAuthServiceTests
         var (hasher, emailMock) = Mocks();
         var svc = BuildSvc(db, hasher, emailMock);
 
-        await svc.RegisterAsync(ValidEmail, ValidPassword, null, "https://app.com");
-        var result = await svc.RegisterAsync(ValidEmail, ValidPassword, null, "https://app.com");
+        await svc.RegisterAsync(ValidEmail, ValidPassword, null, ageConfirmed: true, "https://app.com");
+        var result = await svc.RegisterAsync(ValidEmail, ValidPassword, null, ageConfirmed: true, "https://app.com");
 
         Assert.Equal(RegisterStatus.Ok, result.Status);
         emailMock.Verify(e => e.SendAsync(
             ValidEmail,
             It.Is<string>(s => s.Contains("already exists")),
             It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── Register: галочка 13+ (В4) ───────────────────────────────────────────
+
+    [Fact]
+    public async Task Register_AgeNotConfirmed_RefusesWithoutCreatingAccountOrEmail()
+    {
+        await using var db = CreateDb(nameof(Register_AgeNotConfirmed_RefusesWithoutCreatingAccountOrEmail));
+        var (hasher, emailMock) = Mocks();
+
+        var result = await BuildSvc(db, hasher, emailMock)
+            .RegisterAsync(ValidEmail, ValidPassword, null, ageConfirmed: false, "https://app.com");
+
+        Assert.Equal(RegisterStatus.AgeNotConfirmed, result.Status);
+        Assert.Empty(db.AppUsers);
+        emailMock.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Register_AgeNotConfirmed_ForExistingEmail_SameAnswerAsForNew()
+    {
+        // Anti-enumeration: отказ по галочке не должен выдавать, что email уже занят.
+        await using var db = CreateDb(nameof(Register_AgeNotConfirmed_ForExistingEmail_SameAnswerAsForNew));
+        var (hasher, emailMock) = Mocks();
+        await SeedConfirmedUserAsync(db);
+
+        var result = await BuildSvc(db, hasher, emailMock)
+            .RegisterAsync(ValidEmail, ValidPassword, null, ageConfirmed: false, "https://app.com");
+
+        Assert.Equal(RegisterStatus.AgeNotConfirmed, result.Status);
+        emailMock.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Register_NewUser_RecordsAgeConfirmation()
+    {
+        await using var db = CreateDb(nameof(Register_NewUser_RecordsAgeConfirmation));
+        var (hasher, emailMock) = Mocks();
+
+        await BuildSvc(db, hasher, emailMock)
+            .RegisterAsync(ValidEmail, ValidPassword, null, ageConfirmed: true, "https://app.com");
+
+        var user = await db.AppUsers.SingleAsync();
+        Assert.NotNull(user.AgeConfirmedAt);
+    }
+
+    [Fact]
+    public async Task Register_GoogleOnlyUserAddsPassword_RecordsAgeConfirmation()
+    {
+        await using var db = CreateDb(nameof(Register_GoogleOnlyUserAddsPassword_RecordsAgeConfirmation));
+        var (hasher, emailMock) = Mocks();
+        // Аккаунт заведён до галочки, вход только через Google — пароля нет.
+        db.AppUsers.Add(new AppUser { Email = ValidEmail, DisplayName = "Old", IsActive = true });
+        await db.SaveChangesAsync();
+
+        await BuildSvc(db, hasher, emailMock)
+            .RegisterAsync(ValidEmail, ValidPassword, null, ageConfirmed: true, "https://app.com");
+
+        var user = await db.AppUsers.SingleAsync();
+        Assert.NotNull(user.AgeConfirmedAt);
     }
 
     // ── Login ────────────────────────────────────────────────────────────────

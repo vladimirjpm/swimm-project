@@ -59,6 +59,13 @@ public class AppUser
     /// </summary>
     public int? HubGroupLimit { get; set; }
 
+    /// <summary>
+    /// Когда человек отметил «мне 13+, если младше 18 — родитель знает» (В4, самодекларация).
+    /// Без галочки аккаунт не создаётся — ни регистрацией, ни первым входом через Google.
+    /// null — аккаунт заведён до введения галочки (или тестовый персонаж).
+    /// </summary>
+    public DateTime? AgeConfirmedAt { get; set; }
+
     // --- Навигация ---
     public ICollection<AppUserRole> UserRoles { get; set; } = new List<AppUserRole>();
     public ICollection<UserExternalLogin> ExternalLogins { get; set; } = new List<UserExternalLogin>();

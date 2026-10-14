@@ -241,14 +241,15 @@ var authBuilder = builder.Services
         options.Events.OnValidatePrincipal = CookieSecurityStampValidator.ValidateAsync;
     })
     // Транзитная схема для OAuth-рукопожатия. Google пишет промежуточные claims сюда,
-    // а не в основную куку → OnValidatePrincipal их не трогает. Короткоживущая.
+    // а не в основную куку → OnValidatePrincipal их не трогает. Короткоживущая; 15 минут —
+    // запас на шаг «мне 13+» нового пользователя (В4), если он пошёл читать /privacy.
     .AddCookie(AuthSchemes.External, options =>
     {
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = secureCookiePolicy;
         options.Cookie.Name = "Swimm.External";
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
     });
 
 if (googleEnabled)
@@ -438,6 +439,7 @@ app.Use(async (context, next) =>
                 "my-media" => "/media.html",
                 "my-favorites" => "/my-favorites.html", // своё избранное и пометка «семья»
                 "about" => "/about.html",
+                "privacy" => "/help.html",              // политика приватности — справка с ключом privacy
                 "season-best" => "/season-best.html",   // весь фильтр в query
                 "h2h" => "/h2h.html",                   // сравнение двух пловцов, пара в query
                 "records" => "/records.html",           // рейтинг рекордов стран, дисциплина в query
