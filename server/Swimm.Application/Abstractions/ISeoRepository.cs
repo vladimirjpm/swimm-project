@@ -18,7 +18,7 @@ public interface ISeoRepository
     Task<SeoCompetitionFacts?> GetCompetitionAsync(int id, CancellationToken ct = default);
 
     /// <summary>
-    /// Пути для sitemap.xml (от корня): соревнования, клубы (без псевдо и склеенных), пловцы
+    /// Пути для sitemap.xml (от корня): соревнования, клубы (без псевдо и склеенных), взрослые пловцы
     /// с результатами — без скрытых из поиска и без пловцов закрытых групп.
     /// </summary>
     Task<IReadOnlyList<string>> GetSitemapPathsAsync(CancellationToken ct = default);

@@ -313,7 +313,7 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
                   className="mt-[2px] h-4 w-4 shrink-0 cursor-pointer accent-[var(--t-accent)]"
                 />
                 <span>
-                  I am 13 or older. If I am under 18, my parent or guardian knows I use SwimHub.
+                  I am 13 or older. If I am under 18, I have permission from my parent or legal guardian to use SwimHub.
                 </span>
               </label>
               <p className="text-[11.5px] font-bold leading-snug text-[var(--t-text-3)]">

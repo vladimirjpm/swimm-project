@@ -21,13 +21,13 @@ public class SeoPagesTests
     // ── SeoText ──────────────────────────────────────────────────────────────
 
     private static SeoSwimmerFacts Swimmer(string he = "נועה", string heLast = "כהן",
-        string? club = "מכבי חיפה", bool hidden = false, int swims = 12, int comps = 4) =>
-        new(7, he, heLast, "Noa", "Cohen", club, "Maccabi Haifa", hidden, swims, comps);
+        string? club = "מכבי חיפה", bool hidden = false, int swims = 12, int comps = 4, int birthYear = 1990) =>
+        new(7, he, heLast, "Noa", "Cohen", club, "Maccabi Haifa", hidden, birthYear, swims, comps);
 
     [Fact]
     public void Swimmer_HebrewNameByDefault_NoBirthYear()
     {
-        var head = SeoText.Swimmer(Swimmer());
+        var head = SeoText.Swimmer(Swimmer(), Year);
 
         Assert.Equal("נועה כהן — swimming results · SwimHub", head.Title);
         Assert.Contains("נועה כהן (מכבי חיפה)", head.Description);
@@ -39,20 +39,43 @@ public class SeoPagesTests
     [Fact]
     public void Swimmer_NoHebrewName_FallsBackToEnglish()
     {
-        var head = SeoText.Swimmer(Swimmer(he: "", heLast: " "));
+        var head = SeoText.Swimmer(Swimmer(he: "", heLast: " "), Year);
         Assert.StartsWith("Noa Cohen —", head.Title);
     }
 
     [Fact]
     public void Swimmer_HiddenFromSearch_IsNoIndex()
     {
-        Assert.True(SeoText.Swimmer(Swimmer(hidden: true)).NoIndex);
+        Assert.True(SeoText.Swimmer(Swimmer(hidden: true), Year).NoIndex);
+    }
+
+    // ── Дети не индексируются (решение Влада 14.10.2026) ─────────────────────
+
+    private const int Year = 2026;
+
+    [Theory]
+    [InlineData(2007, true)]   // 2026 − 2007 = 19 → 18 исполнилось наверняка
+    [InlineData(2008, false)]  // в 2026 может быть ещё 17 — до дня рождения
+    [InlineData(2014, false)]
+    [InlineData(0, false)]     // год неизвестен — считаем ребёнком
+    public void IsCertainlyAdult_ByBirthYearOnly(int birthYear, bool adult)
+    {
+        Assert.Equal(adult, SeoText.IsCertainlyAdult(birthYear, Year));
+        Assert.Equal(!adult, SeoText.Swimmer(Swimmer(birthYear: birthYear), Year).NoIndex);
+    }
+
+    [Fact]
+    public void Swimmer_MinorPage_KeepsTitleButNoIndex()
+    {
+        var head = SeoText.Swimmer(Swimmer(birthYear: 2014), Year);
+        Assert.True(head.NoIndex);
+        Assert.DoesNotContain("2014", head.Title + head.Description);
     }
 
     [Fact]
     public void Swimmer_Singular_AndNoClub()
     {
-        var head = SeoText.Swimmer(Swimmer(club: null, swims: 1, comps: 1) with { ClubNameEn = null });
+        var head = SeoText.Swimmer(Swimmer(club: null, swims: 1, comps: 1) with { ClubNameEn = null }, Year);
         Assert.Contains("נועה כהן: 1 swim at 1 competition.", head.Description);
     }
 
@@ -213,16 +236,16 @@ public class SeoPagesTests
         AgeGroup = "Open", EventStyleAge = "100 freestyle Open"
     };
 
-    private static Swimmer NewSwimmer(string last, bool hidden = false, int? privateGroup = null) => new()
+    private static Swimmer NewSwimmer(string last, bool hidden = false, int? privateGroup = null, int birthYear = 1990) => new()
     {
         FirstName = "שם", LastName = last, FirstNameEn = "Name", LastNameEn = last,
-        BirthYear = 2012, HideFromSearch = hidden, PrivateHubGroupId = privateGroup
+        BirthYear = birthYear, HideFromSearch = hidden, PrivateHubGroupId = privateGroup
     };
 
     [Fact]
-    public async Task Sitemap_ExcludesHiddenPrivateNoResultsPseudoAndMerged()
+    public async Task Sitemap_ExcludesHiddenPrivateNoResultsMinorsPseudoAndMerged()
     {
-        await using var db = CreateDb(nameof(Sitemap_ExcludesHiddenPrivateNoResultsPseudoAndMerged));
+        await using var db = CreateDb(nameof(Sitemap_ExcludesHiddenPrivateNoResultsMinorsPseudoAndMerged));
         var style = new Style { Name = "freestyle" };
         var live = new Club { Name = "מכבי", NameEn = "Maccabi" };
         var pseudo = new Club { Name = "MIX", NameEn = "MIX", IsPseudo = true };
@@ -231,12 +254,15 @@ public class SeoPagesTests
         var hidden = NewSwimmer("hidden", hidden: true);
         var groupOnly = NewSwimmer("group", privateGroup: 1);
         var noResults = NewSwimmer("none");
-        db.AddRange(style, live, pseudo, comp, open, hidden, groupOnly, noResults);
+        var minor = NewSwimmer("minor", birthYear: DateTime.UtcNow.Year - 12);
+        var unknownYear = NewSwimmer("unknown", birthYear: 0);
+        db.AddRange(style, live, pseudo, comp, open, hidden, groupOnly, noResults, minor, unknownYear);
         await db.SaveChangesAsync();
         var merged = new Club { Name = "ישן", NameEn = "Old", MergedIntoId = live.Id };
         db.Add(merged);
         db.Results.AddRange(Result(comp.Id, open.Id, style.Id), Result(comp.Id, hidden.Id, style.Id),
-            Result(comp.Id, groupOnly.Id, style.Id));
+            Result(comp.Id, groupOnly.Id, style.Id), Result(comp.Id, minor.Id, style.Id),
+            Result(comp.Id, unknownYear.Id, style.Id));
         await db.SaveChangesAsync();
 
         var paths = await new SeoRepository(db, new NullCacheService()).GetSitemapPathsAsync();
@@ -249,6 +275,8 @@ public class SeoPagesTests
         Assert.DoesNotContain($"/swimmers/{hidden.Id}", paths);
         Assert.DoesNotContain($"/swimmers/{groupOnly.Id}", paths);
         Assert.DoesNotContain($"/swimmers/{noResults.Id}", paths);
+        Assert.DoesNotContain($"/swimmers/{minor.Id}", paths);
+        Assert.DoesNotContain($"/swimmers/{unknownYear.Id}", paths);
     }
 
     [Fact]

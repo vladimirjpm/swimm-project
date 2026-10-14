@@ -13,6 +13,9 @@ namespace Swimm.Application.Mapping;
 /// <item>имена пловцов и названия клубов — ивритские, английские только фоллбеком (правило имён);</item>
 /// <item>год рождения в заголовок и описание НЕ выносим — это профиль ребёнка;</item>
 /// <item>пловец «скрыт из поиска» — <c>noindex</c>, но страница та же (данные протокола не прячем, Р76);</item>
+/// <item>пловец, о котором нельзя сказать наверняка, что ему 18 (<see cref="IsCertainlyAdult"/>), —
+///   <c>noindex</c> и вне sitemap (решение Влада 14.10.2026 после ревью /privacy: страницы детей не
+///   индексируются; соревнования и клубы, где их имена есть как в протоколе, — индексируются);</item>
 /// <item>псевдоклуб и склеенный клуб — <c>noindex</c>: их нет в sitemap и
 ///   не должно быть в выдаче.</item>
 /// </list>
@@ -31,7 +34,19 @@ public static class SeoText
     public static string ClubName(string? name, string? nameEn) =>
         !string.IsNullOrWhiteSpace(name) ? name.Trim() : (nameEn ?? "").Trim();
 
-    public static SeoHead Swimmer(SeoSwimmerFacts s)
+    /// <summary>
+    /// Совершеннолетний НАВЕРНЯКА: известен только год рождения, поэтому 18 исполнилось точно лишь
+    /// с 1 января года, когда «по году» стало 19. Год неизвестен (0) — считаем ребёнком: ошибка в
+    /// эту сторону стоит странице в выдаче, в обратную — профиля ребёнка в поиске. Это не
+    /// <c>SeasonMath.AgeInSeason</c>: там спортивный возраст, здесь — возраст человека.
+    /// </summary>
+    public static bool IsCertainlyAdult(int birthYear, int currentYear) =>
+        birthYear > 0 && currentYear - birthYear >= 19;
+
+    /// <summary>Самый поздний год рождения, при котором пловец в <paramref name="currentYear"/> наверняка взрослый.</summary>
+    public static int LatestAdultBirthYear(int currentYear) => currentYear - 19;
+
+    public static SeoHead Swimmer(SeoSwimmerFacts s, int currentYear)
     {
         var name = SwimmerName(s);
         var club = ClubName(s.ClubName, s.ClubNameEn);
@@ -44,7 +59,7 @@ public static class SeoText
             Title: $"{name} — swimming results · {SiteName}",
             Description: Clip(description),
             CanonicalPath: $"/swimmers/{s.Id}",
-            NoIndex: s.HideFromSearch);
+            NoIndex: s.HideFromSearch || !IsCertainlyAdult(s.BirthYear, currentYear));
     }
 
     public static SeoHead Club(SeoClubFacts c)

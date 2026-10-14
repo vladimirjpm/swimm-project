@@ -457,7 +457,7 @@ public class AuthController : Controller
 
     /// <summary>Текст галочки — один на форму регистрации клиента и страницу Google-шага.</summary>
     internal const string AgeConfirmationText =
-        "I am 13 or older. If I am under 18, my parent or guardian knows I use SwimHub.";
+        "I am 13 or older. If I am under 18, I have permission from my parent or legal guardian to use SwimHub.";
 
     private const string AgeRequiredError =
         "You need to be 13 or older to create an account — please confirm the checkbox.";
