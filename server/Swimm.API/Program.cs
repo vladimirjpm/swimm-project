@@ -414,7 +414,13 @@ app.Use(async (context, next) =>
     {
         var rewrite = ResolveCleanUrl(path);
         if (rewrite is not null)
+        {
+            // Страница пловца/клуба/соревнования — с серверными title/description/canonical
+            // (A10). Не наша страница или клиента нет в wwwroot — отдаём файл как раньше.
+            if (await SeoPages.TryServeAsync(context, path, rewrite))
+                return;
             context.Request.Path = rewrite;
+        }
     }
 
     await next();
@@ -496,6 +502,16 @@ app.MapGet("/api/antiforgery/token", (IAntiforgery af, HttpContext ctx) =>
     var tokens = af.GetAndStoreTokens(ctx);
     return Results.Ok(new { token = tokens.RequestToken });
 }).RequireAuthorization();
+
+// sitemap.xml (A10 шаг 3): соревнования, клубы, пловцы — без скрытых из поиска и пловцов групп.
+// Ссылка на него — в robots.txt. Кэш списка — в репозитории, ответ браузеру — на час.
+app.MapGet("/sitemap.xml", async (ISeoRepository seo, IConfiguration config, HttpContext ctx) =>
+{
+    var paths = SeoPages.StaticSitemapPaths.Concat(await seo.GetSitemapPathsAsync(ctx.RequestAborted));
+    ctx.Response.Headers.CacheControl = "public, max-age=3600";
+    return Results.Text(SeoPages.BuildSitemap(paths, config[SeoPages.BaseUrlKey] ?? SeoPages.DefaultBaseUrl),
+        "application/xml; charset=utf-8");
+}).AllowAnonymous();
 
 app.MapGet("/api/db-status",
     (DbStatusService s) => Results.Ok(new { available = s.IsAvailable }))

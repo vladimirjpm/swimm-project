@@ -1,16 +1,16 @@
 # https://www.robotstxt.org/robotstxt.html
 #
-# Страницы с поимённой информацией о спортсменах (в т.ч. несовершеннолетних) закрыты от
-# индексации — решение Р6, docs/plans/azure-deploy-plan.md Б14. Снимать только вместе с
-# политикой приватности и решением по В4 (кто оператор данных).
+# Сайт открыт для поиска — решение В16 (14.10.2026), этап A10 в docs/plans/azure-deploy-plan.md.
+# Закрыто только пользовательское и групповое: группы, своё избранное и медиа, админка, вход.
+# Пловца, скрытого из поиска по просьбе (/privacy), закрывает noindex его страницы и отсутствие
+# в sitemap.xml — сюда его не пишем (Disallow не дал бы краулеру прочесть noindex).
+# /api не закрываем: Google дорисовывает страницы скриптом, и скрипту нужны ответы API.
 User-agent: *
-Disallow: /results
-Disallow: /competitions
-Disallow: /swimmers/
-Disallow: /clubs/
-Disallow: /groups/
+Disallow: /groups
 Disallow: /my-media
 Disallow: /my-favorites
-Disallow: /season-best
 Disallow: /Admin/
 Disallow: /admin/
+Disallow: /auth/
+
+Sitemap: https://swimhub.co.il/sitemap.xml

@@ -240,6 +240,10 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, CountryDuplicateCheck>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 
+        // Открытие для поиска (A10): заголовки страниц, sitemap.xml, «скрыть пловца из поиска».
+        services.AddScoped<ISeoRepository, SeoRepository>();
+        services.AddScoped<ISearchVisibilityService, SearchVisibilityService>();
+
         // Локальный вход (email + пароль)
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
 
