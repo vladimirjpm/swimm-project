@@ -176,7 +176,7 @@ public static class SeoPages
     /// <summary>Публичные страницы без сущности — в sitemap.xml целиком. Группы, my-*, h2h — нет.</summary>
     public static readonly IReadOnlyList<string> StaticSitemapPaths =
     [
-        "/", "/competitions", "/season-best", "/records", "/about", "/privacy", "/help/groups",
+        "/", "/competitions", "/season-best", "/records", "/about", "/privacy", "/terms", "/help/groups",
     ];
 
     /// <summary>sitemap.xml по списку путей. Адреса — на canonical-хост, как в голове страниц.</summary>

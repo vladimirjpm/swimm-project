@@ -457,6 +457,7 @@ app.Use(async (context, next) =>
                 "my-favorites" => "/my-favorites.html", // своё избранное и пометка «семья»
                 "about" => "/about.html",
                 "privacy" => "/help.html",              // политика приватности — справка с ключом privacy
+                "terms" => "/help.html",                // условия пользования — справка с ключом terms
                 "season-best" => "/season-best.html",   // весь фильтр в query
                 "h2h" => "/h2h.html",                   // сравнение двух пловцов, пара в query
                 "records" => "/records.html",           // рейтинг рекордов стран, дисциплина в query
