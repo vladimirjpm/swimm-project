@@ -304,6 +304,17 @@ if (!app.Environment.IsLocalMachine())
     // только на 2xx, а 307 сочтёт отказом и начнёт перезапускать живой процесс.
     app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/healthz"),
         branch => branch.UseHttpsRedirection());
+
+    // www.swimhub.co.il → swimhub.co.il (A10): у сайта один адрес — в выдаче, в canonical и в
+    // redirect URI Google. Остальные хосты (*.azurewebsites.net) не трогаем.
+    var seoBaseUrl = app.Configuration[SeoPages.BaseUrlKey] ?? SeoPages.DefaultBaseUrl;
+    app.Use(async (context, next) =>
+    {
+        var target = SeoPages.WwwRedirect(context.Request.Host.Host,
+            $"{context.Request.PathBase}{context.Request.Path}{context.Request.QueryString}", seoBaseUrl);
+        if (target is null) { await next(); return; }
+        context.Response.Redirect(target, permanent: true);
+    });
 }
 
 // Админка выключена (прод, В17): её пути — 404, как будто их нет. Раньше аутентификации, чтобы
@@ -643,7 +654,13 @@ if (!app.Environment.IsDevelopment())
             ? "SMTP НЕ НАСТРОЕН (пуст Email__Smtp__Host): письма, которые шлёт локальная админка (решения по заявкам групп на клуб), уходят только в лог. Пароль Resend — Email:Smtp:Password в appsettings.ProdAdmin.Local.json."
             : "SMTP НЕ НАСТРОЕН (пуст Email__Smtp__Host): письма подтверждения почты и сброса пароля никуда не уходят. Регистрация и восстановление доступа в проде не работают.");
 
-    foreach (var name in new[] { "DefaultConnection", "MigrationConnection", "AdminConnection", "ReadConnection" })
+    // MigrationConnection (owner-роль) сайту не нужна: миграции идут из ProdAdmin с машины Влада
+    // (В8, В17). На App Service её не задаём — пароль владельца базы на веб-сервере не лежит, —
+    // поэтому и не проверяем: там она — localhost-заглушка из appsettings.json, и это нормально.
+    var connectionNames = prodAdmin
+        ? new[] { "DefaultConnection", "MigrationConnection", "AdminConnection", "ReadConnection" }
+        : new[] { "DefaultConnection", "AdminConnection", "ReadConnection" };
+    foreach (var name in connectionNames)
     {
         var cs = cfg.GetConnectionString(name);
         if (string.IsNullOrWhiteSpace(cs))

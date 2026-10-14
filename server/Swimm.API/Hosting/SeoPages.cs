@@ -159,6 +159,20 @@ public static class SeoPages
         return true;
     }
 
+    /// <summary>
+    /// Куда увести запрос на <c>www.</c>-хост canonical-адреса: <c>www.swimhub.co.il/x?y</c> →
+    /// <c>https://swimhub.co.il/x?y</c> (301). null — уводить не надо (другой хост: сам
+    /// swimhub.co.il, *.azurewebsites.net для health check и дымовой проверки деплоя, localhost).
+    /// Один адрес сайта — одна страница в выдаче и один redirect URI у Google.
+    /// </summary>
+    public static string? WwwRedirect(string host, string pathAndQuery, string baseUrl)
+    {
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var canonical)) return null;
+        return string.Equals(host, "www." + canonical.Host, StringComparison.OrdinalIgnoreCase)
+            ? $"{canonical.Scheme}://{canonical.Host}{pathAndQuery}"
+            : null;
+    }
+
     /// <summary>Публичные страницы без сущности — в sitemap.xml целиком. Группы, my-*, h2h — нет.</summary>
     public static readonly IReadOnlyList<string> StaticSitemapPaths =
     [

@@ -15,5 +15,8 @@
     "Smtp": {
       "Password": "re_... (ключ swimhub-prod из менеджера паролей Google)"
     }
+  },
+  "CandidateSearch": {
+    "ApiKey": "... (ключ serper.dev для прода: поиск кандидатов loglig — только в админке, на App Service не нужен)"
   }
 }

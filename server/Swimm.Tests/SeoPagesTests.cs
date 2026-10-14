@@ -168,6 +168,17 @@ public class SeoPagesTests
         Assert.DoesNotContain("canonical", html);
     }
 
+    [Theory]
+    [InlineData("www.swimhub.co.il", "/swimmers/5?tab=h2h", "https://swimhub.co.il/swimmers/5?tab=h2h")]
+    [InlineData("WWW.SwimHub.co.il", "/", "https://swimhub.co.il/")]
+    [InlineData("swimhub.co.il", "/", null)]
+    [InlineData("swimhub.azurewebsites.net", "/healthz", null)]
+    [InlineData("localhost", "/", null)]
+    public void WwwRedirect_OnlyWwwOfCanonicalHost(string host, string path, string? expected)
+    {
+        Assert.Equal(expected, SeoPages.WwwRedirect(host, path, "https://swimhub.co.il"));
+    }
+
     [Fact]
     public void BuildSitemap_AbsoluteUrlsOnCanonicalHost()
     {
