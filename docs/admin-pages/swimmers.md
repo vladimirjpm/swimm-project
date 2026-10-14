@@ -55,3 +55,14 @@ FK `RelayMember→Swimmer` (Restrict) удаление отбивал, так ч
 сворачиваемая секция «Качество данных» под сиротами, грузится лениво через
 `GET /api/admin/swimmers/quality?filter=…` (`IDataQualityService`, топ-200 + total),
 предикаты те же, что в `DashboardStatusService` (карточки дашборда). Read-only.
+
+## Скрыты из поиска (A10, 14.10.2026)
+
+Сворачиваемый блок под сиротами. Человек попросил (письмо на `privacy@swimhub.co.il`, страница
+`/privacy`) убрать страницу пловца из поисковиков → ввести Id → «Скрыть из поиска». Флаг
+`Swimmers.HideFromSearch`: страница пловца получает `noindex` (мета + `X-Robots-Tag`) и уходит из
+`sitemap.xml`. **Это не удаление:** страница открывается по ссылке, результаты остаются в
+соревнованиях и рейтингах (Р76). «вернуть в поиск» снимает флаг. API — `GET /api/admin/swimmers/search-hidden`,
+`POST /api/admin/swimmers/{id}/search-hidden` `{hidden}`; аудит `swimmer.search-hide` / `search-unhide`.
+Пловца закрытой группы скрыть нельзя (404) — его и так нет ни на витрине, ни в поиске.
+Сброс кэша страницы и sitemap — сам, по метке таблицы. Устройство — `docs/plans/azure-deploy-plan.md` §0-пять.

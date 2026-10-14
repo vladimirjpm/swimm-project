@@ -1,10 +1,11 @@
-# ПЕРЕДАЧА — деплой на Azure (состояние на 14.10.2026)
+# ПЕРЕДАЧА — деплой на Azure (состояние на 14.10.2026, вечер)
 
 **Читать первым в новом чате по деплою.** Единственный источник решений и порядка —
 [azure-deploy-plan.md](azure-deploy-plan.md) (ревизия 3 + решения 14.10). Здесь — где мы, что
 делать дальше и грабли; детали — ссылками на разделы плана, не копией.
 
-Ветка работы — `entity-hero-roles` (всё влито в master: PR #101–#104). **Прода всё ещё нет**:
+Ветка работы — `entity-hero-roles` (в master влиты PR #101–#104; коды деплоя 14.10 — `a84c2833`, `aaa6d77c`,
+`05a757b4`, `b3e9bdd4`, `df1eb881`, `b70be2ad` — **только в ветке, не запушены**). **Прода всё ещё нет**:
 в Azure не создано ни одного ресурса swimhub.
 
 ---
@@ -83,8 +84,21 @@
 Не проверено: красная полоса глазами (нужен вход настоящим Google-аккаунтом в ProdAdmin) и
 синхронизация против настоящего Azure — только против второй базы в локальном Postgres.
 
-После — **В4** (галочка 13+ при регистрации и первом входе через Google) и **A10** (открытие
-для поиска: `/privacy` → серверные title/description → `sitemap.xml` → снять `noindex`).
+### 3.1-бис В4 и A10 `[агент]` — ✅ код сделан 14.10 (план §0-пять)
+
+- **В4** (`b3e9bdd4`): галочка 13+ в форме регистрации; новый пользователь Google проходит шаг
+  `/auth/google/confirm-age`; отметка — `Sys_AppUsers.AgeConfirmedAt`.
+- **A10 шаги 1–4** (`b3e9bdd4`, `df1eb881`): `/privacy` (EN/RU/HE, справкой), флаг «скрыть из
+  поиска» на `/Admin/Swimmers`, серверные title/description/canonical пловца, клуба, соревнования,
+  `/sitemap.xml`, `noindex` снят с 7 страниц (закрыты группы, my-*, h2h, админка).
+- **`www` → корень 301** (`b70be2ad`) — redirect URI Google для `www` не нужен.
+
+⚠ **Развилка для Влада:** с этим кодом сайт открыт для поиска с первой минуты на проде, а
+`/privacy` — черновик, юрист его ещё не видел (В4: «юрист до A10»). Если юрист не успеет до
+деплоя — временно вернуть `noindex` (откат `df1eb881` только в части html/robots) или деплоить
+как есть и показать юристу сразу после. Решать Владу.
+
+Не проверено: Google-шаг 13+ вживую (нужен настоящий вход).
 
 Тесты — на каждый пункт (правило «предлагать юнит-тесты»); новые пути записи — `*PgTests`.
 
@@ -102,11 +116,18 @@
   куда уходят письма процесса и кнопка тестового письма себе; в ProdAdmin должен быть зелёным
   (SMTP — `appsettings.ProdAdmin.json`, ключ — `*.Local.json`). Приёмка почты — план A8.
 - **Прод-клиент Google OAuth** (redirect: `https://swimhub.co.il/signin-google`,
-  `https://<app>.azurewebsites.net/signin-google`).
-- Ключ **serper.dev** для прода.
-- **Юрист** — `/privacy` и условия до A10.
+  `https://swimhub.azurewebsites.net/signin-google`; для `www` не нужен — редирект в коде).
+- Ключ **serper.dev** для прода — в `appsettings.ProdAdmin.Local.json` (на App Service не нужен).
+- **Юрист** — `/privacy` (`client/src/content/help/privacy/`) до открытия индексации. Там же
+  решить, писать ли имя оператора (сейчас — «частное лицо в Израиле»).
+- **Слить ветку в master** до A7: деплой и `--migrate` берут код из master.
 
-### 3.3 Ресурсы Azure (A7) — агент готовит команды, запускает Влад
+### 3.3 Ресурсы Azure (A7) — команды готовы, запускает Влад
+**Runbook — [azure-a7-commands.md](azure-a7-commands.md)** (PowerShell 5.1, §0–§9; имена `swimhub`
+и `swimhub-pg` на 14.10 свободны; провайдер `Microsoft.DBforPostgreSQL` надо зарегистрировать —
+§1). Отличия от плана, внесённые и в план 14.10: `ASPNETCORE_FORWARDEDHEADERS_ENABLED`,
+`MigrationConnection` и `CandidateSearch__ApiKey` на App Service **не задаются**; для publish
+profile включается basic auth SCM (FTP выключен). Кратко, что в нём:
 Группа `swimm-rg` заново в `israelcentral`: App Service Plan B1 Linux + Web App
 (`DOTNETCORE|10.0`, Always On, HTTPS Only, 1 инстанс), Flexible Server B1ms PG 16
 (админ-логин **`swimm`**, public + firewall, retention 14, 32 ГБ + autogrow), БД `swimm`.
