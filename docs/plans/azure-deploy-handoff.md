@@ -97,8 +97,15 @@
 Тесты — на каждый пункт (правило «предлагать юнит-тесты»); новые пути записи — `*PgTests`.
 
 ### 3.2 За Владом `[Влад]`
-- Аккаунт **Resend**, домен `swimhub.co.il` в нём, его DNS-записи — в Cloudflare
-  (DKIM `resend._domainkey`, SPF/MX на поддомене `send.`), плюс `_dmarc` `p=none`.
+- ✅ (14.10) Аккаунт **Resend**, домен `swimhub.co.il` Verified, регион eu-west-1, Return-Path
+  `send`, трекинг выключен. Записи в Cloudflare внесены автонастройкой Resend (все DNS only):
+  CNAME `send` → `send.forge.rmta.net`, CNAME `rsend` → `rsend-euw1.forge.rmta.net`,
+  TXT `resend._domainkey` (DKIM); руками — TXT `_dmarc` `v=DMARC1; p=none;`. Корневые
+  MX/SPF Cloudflare Email Routing не тронуты. API-ключ `swimhub-prod`
+  (Sending access, только этот домен) создан, лежит в менеджере паролей Google; на проде →
+  `Email__Smtp__Password` (логин `resend`). Потерялся — удалить в Resend, выпустить новый.
+  Живая проверка 14.10: локальный API с `Email__Smtp__*` → письмо регистрации на Gmail пришло
+  во «Входящие» за 1 с, SPF/DKIM (`swimhub.co.il`)/DMARC — все PASS.
 - **Прод-клиент Google OAuth** (redirect: `https://swimhub.co.il/signin-google`,
   `https://<app>.azurewebsites.net/signin-google`).
 - Ключ **serper.dev** для прода.
@@ -142,7 +149,8 @@ Whois реестра `.il` — TCP 43 `whois.isoc.org.il` (в PowerShell чер�
 
 - **SPF у домена — одна TXT-запись.** Провайдер почты сайта дописывает свой `include:` в неё;
   вторая `v=spf1` ломает SPF, письма уходят в спам. (У Resend SPF на поддомене `send.` —
-  корневую не трогает.)
+  CNAME на их `forge.rmta.net`, корневую не трогает; старой схемы «MX + TXT на `send`
+  с amazonses» у них больше нет.)
 - **Записи Cloudflare под Azure — только DNS only (серое облако).** Прокси ломает продление
   App Service Managed Certificate и подменяет IP клиента в `X-Forwarded-For` → лимиты входа и
   история логинов по узлу Cloudflare. Совет Cloudflare «пускать только IP Cloudflare» — НЕ
