@@ -4,7 +4,7 @@ namespace Swimm.Application.Dtos;
 // Текст из них собирает Seo.SeoText — репозиторий отдаёт только данные.
 
 /// <summary>
-/// Пловец для заголовка страницы /swimmers/{id}. Год рождения сюда сознательно не входит.
+/// Пловец для заголовка страницы /swimmers/{id}. Год рождения в заголовок и описание не выносится.
 /// Пловца закрытой группы (Р71) здесь не бывает: для витрины его нет, и имя не должно попасть в HTML.
 /// </summary>
 public sealed record SeoSwimmerFacts(
@@ -16,6 +16,8 @@ public sealed record SeoSwimmerFacts(
     string? ClubName,
     string? ClubNameEn,
     bool HideFromSearch,
+    // Год рождения — только для решения «noindex для несовершеннолетних», в текст не идёт. 0 — неизвестен.
+    int BirthYear,
     int Swims,
     int Competitions);
 

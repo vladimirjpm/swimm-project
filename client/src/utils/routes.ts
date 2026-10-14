@@ -20,6 +20,7 @@
 //   /records/compare        → records-compare.html (две страны по рекордам; пара в query)
 //   /help/{key}             → help.html (справка из src/content/help/{key}/{en,ru,he}.md)
 //   /privacy                → help.html (политика приватности = справка с ключом privacy)
+//   /terms                  → help.html (условия пользования = справка с ключом terms)
 //
 // ПРАВИЛО: в путь идёт только идентичность ресурса. Состояние вида
 // (tab, filter, club, swim, eventId, cat, loadMode, themes) остаётся в query —
@@ -33,6 +34,8 @@ export const routes = {
   about: () => '/about',
   /** Политика приватности (A10, В4): та же страница справки, текст — `src/content/help/privacy`. */
   privacy: () => '/privacy',
+  /** Условия пользования (В4, A10): страница справки, текст — `src/content/help/terms`. */
+  terms: () => '/terms',
 
   results: () => '/results',
   competition: (id: string | number) => `/competitions/${enc(String(id))}`,
@@ -479,6 +482,8 @@ export function parseRoute(pathname: string = window.location.pathname): RouteId
   } else if (seg[0] === 'clubs' && seg[1]) {
     const n = Number(decodeURIComponent(seg[1]));
     id.clubId = Number.isFinite(n) && n > 0 ? n : null;
+  } else if (seg[0] === 'terms') {
+    id.helpKey = 'terms';
   } else if (seg[0] === 'privacy') {
     id.helpKey = 'privacy';
   } else if (seg[0] === 'help' && seg[1]) {

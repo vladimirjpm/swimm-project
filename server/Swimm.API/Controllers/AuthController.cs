@@ -457,7 +457,7 @@ public class AuthController : Controller
 
     /// <summary>Текст галочки — один на форму регистрации клиента и страницу Google-шага.</summary>
     internal const string AgeConfirmationText =
-        "I am 13 or older. If I am under 18, my parent or guardian knows I use SwimHub.";
+        "I am 13 or older. If I am under 18, I have permission from my parent or legal guardian to use SwimHub.";
 
     private const string AgeRequiredError =
         "You need to be 13 or older to create an account — please confirm the checkbox.";
@@ -474,7 +474,8 @@ public class AuthController : Controller
                 <span>{enc(AgeConfirmationText)}</span>
               </label>
               <p style=""font-size:.9rem"">Children under 13 don't get their own account — a parent can follow them
-                from their own account. See our <a href=""/privacy"" target=""_blank"">privacy policy</a>.</p>
+                from their own account. By creating an account you agree to the
+                <a href=""/terms"" target=""_blank"">Terms of use</a> and the <a href=""/privacy"" target=""_blank"">Privacy policy</a>.</p>
               <button type=""submit"" style=""padding:.5rem 1rem"">Create account</button>
             </form>";
         return HtmlPage("Almost there", body, rawHtml: true);

@@ -66,3 +66,5 @@ FK `RelayMember→Swimmer` (Restrict) удаление отбивал, так ч
 `POST /api/admin/swimmers/{id}/search-hidden` `{hidden}`; аудит `swimmer.search-hide` / `search-unhide`.
 Пловца закрытой группы скрыть нельзя (404) — его и так нет ни на витрине, ни в поиске.
 Сброс кэша страницы и sitemap — сам, по метке таблицы. Устройство — `docs/plans/azure-deploy-plan.md` §0-пять.
+Страницы пловцов младше 18 (и с неизвестным годом рождения) закрыты от поиска и без флага — сами
+(`SeoText.IsCertainlyAdult`); флаг нужен для взрослых.

@@ -1,55 +1,93 @@
 # Privacy policy
 
-Last updated: October 2026.
+Last updated: 14 October 2026.
 
-SwimHub (swimhub.co.il) shows Israeli swimming competition results and records. It is run by a private individual in Israel. Questions, corrections and removal requests: **privacy@swimhub.co.il**.
+SwimHub (swimhub.co.il) shows results of swimming competitions in Israel and swimming records. This policy explains what information we hold, why, who can see or receive it and what you can ask of us. Using the site is also governed by the [Terms of use](route:terms).
 
-## What we show about swimmers
+## Who we are
 
-Everything on swimmer, club and competition pages comes from **published sources**: official results of the Israel Swimming Association and the competition protocols it publishes (loglig.com), and record lists of World Aquatics and national federations. For a swimmer that means:
+SwimHub is run by a private individual in Israel, Vladimir Barentsev, who is the controller of the site’s database. Contact for anything about your information: **privacy@swimhub.co.il**. General questions: info@swimhub.co.il.
 
-- name (in Hebrew and, where available, in English), birth year, club;
-- races: times, places, medals, points, split times — as printed in the protocol.
+## Information about swimmers
 
-From these results we calculate our own figures: personal and season bests, levels, places among swimmers of the same age, head-to-head comparisons.
+**Where it comes from.** Competition, swimmer and club pages are built from published sources: the official results of the Israel Swimming Association and the competition protocols it publishes on loglig.com, and the record lists of World Aquatics and national federations. We do not ask swimmers for this information.
 
-We show what the protocol says. If a protocol has an obvious error, we keep the official figures and mark the line “Under review” — we don’t silently change official data.
+**What it is.** A swimmer’s name (in Hebrew and, where available, in English), birth year, club and races — times, places, medals, points and split times, as printed in the protocol. From these results we calculate our own figures: personal and season bests, levels, places among swimmers of the same age, head-to-head comparisons.
 
-## Accounts
+**Why.** We use published competition results to provide searchable competition records and statistical summaries of sporting performance.
 
-You don’t need an account to look at results. An account lets you keep favorites, join groups and add videos. For an account we store:
+**Accuracy.** We show what the protocol says; where a protocol has an obvious error, the official figure stays and the line is marked “Under review”. We cannot amend the federation’s official protocol. We can correct errors in SwimHub’s copying, identification and calculations — for example a result attached to the wrong person or two people merged into one — and we will assess requests concerning inaccurate personal information displayed on our site.
 
-- your email, display name and, if you sign in with Google, your Google profile picture;
-- a password hash (never the password itself), if you use email and password;
-- sign-in history — date, time and IP address — to protect your account. It is deleted after about 90 days;
-- what you add yourself: favorites, groups, links to photos and videos, reactions.
+## Information about account holders
 
-Sign-in uses one cookie that keeps you signed in. Display settings (light or dark mode, the language of explanations) are kept in your browser. We don’t use advertising or tracking cookies, and we don’t sell or share your data for marketing.
+You don’t need an account to look at results. **Giving us information for an account is voluntary — there is no legal obligation to do so.** Without an account you can’t keep favorites, join groups or add videos; everything else works.
+
+What we keep and why:
+
+- **email, display name** and, if you sign in with Google, your **Google profile picture** — to run your account and send account emails (confirming your address, resetting your password);
+- a **password hash**, never the password itself, if you use email and password — to let you sign in;
+- your **confirmation that you are 13 or older** (and, if under 18, that you have a parent’s or guardian’s permission) and when you gave it — see “Children”;
+- **sign-in history** — date, time and IP address — to protect your account from misuse;
+- **what you add yourself**: favorites, groups and their members, trainings, links to photos and videos, reactions — to show them to you and to the audience you choose.
+
+We don’t use your information for advertising, we don’t sell it and we don’t pass it to anyone for marketing. We don’t make automated decisions about you.
+
+## Who can see or receive information
+
+- **Everyone.** Published competition information — results and the swimmer, club and competition pages built from them — is available to all visitors. Pages of competitions, clubs and adult swimmers may be indexed by search engines; see “Search engines”.
+- **Group members.** Information shared within a group — its members, trainings, lanes, media — is available to that group’s members. Swimmers added to a group by a coach are visible only inside that group.
+- **The audience you choose.** Media you add is visible at the level you choose: only you, a group’s members, or everyone. Media made public appears on public pages and can be found by search engines. Visibility settings on SwimHub do not change the privacy settings of linked content on external services — a YouTube video stays as public or private as it is on YouTube.
+- **Authorities** — only when the law requires it.
+
+We also use service providers that operate the site for us, each for its own task:
+
+- **Microsoft Azure**, Israel Central region — hosting of the site and its database;
+- **Resend** — sending account emails;
+- **Google** — “Sign in with Google”; we receive only your name, email and profile picture;
+- **Cloudflare** — the site’s domain name and email routing for swimhub.co.il.
+
+Some of these providers process personal information outside Israel, including in the United States. This may include email addresses, email content and sign-in information.
 
 ## Children
 
-- **You need to be 13 or older to create an account.** When you sign up you confirm it; if you are under 18, you also confirm that a parent or guardian knows you use SwimHub. We don’t ask for documents.
-- Children under 13 don’t get their own account. A parent can follow their child from the parent’s account — mark the child with the gold heart in Favorites.
-- A coach who adds swimmers to a group — including swimmers who aren’t in the federation results, their training times and videos — confirms that the swimmers’ parents agreed to it. Swimmers added this way are visible only inside the group.
+- **You must be at least 13 to create an account. If you are under 18, you must have permission from a parent or legal guardian.** You confirm this when you sign up; we don’t ask for documents.
+- Children under 13 don’t have their own account. A parent can follow their children’s results from the parent’s own account.
+- **Profile pages of swimmers under 18 are not indexed by search engines** and are not in our sitemap. Their names still appear in competition and club results, as in the official protocol.
+- Before adding a swimmer’s personal information or media to a group, a group member must obtain the swimmer’s permission and, for a minor, permission from their parent or legal guardian for the intended sharing.
 
 ## Search engines
 
-Competition, club and swimmer pages can appear in search engines such as Google. Groups, your favorites and your media never do.
+Pages of competitions, clubs and adult swimmers can appear in search engines such as Google, and so can media its owner made public. Groups and your favorites never do; profile pages of swimmers under 18 are not indexed.
 
-**If you want a swimmer’s page out of search engines**, write to privacy@swimhub.co.il. We will tell search engines not to index that page and take it out of our sitemap. The page itself stays reachable by its link, and the results stay part of the competition, because they are official public results.
+**To take a swimmer’s profile page out of search engines**, write to privacy@swimhub.co.il. We will tell search engines not to index the page and remove it from our sitemap. This request concerns the swimmer’s profile page. Their name may still appear on competition and club pages. Search engines control when their indexes are updated. We will also assess requests to restrict or remove personal information, taking account of applicable law and the circumstances.
+
+## How long we keep information
+
+- swimmers’ results — while the site exists, as part of the competition record;
+- account information and what you added — until you remove it or your account is deleted;
+- sign-in history — about 90 days;
+- technical server logs (requests and errors, which may include IP addresses) — for the limited period needed to run and protect the site;
+- emails you send us — as long as needed to handle your request;
+- database backups — 14 days; information deleted from the site disappears from backups within that time.
+
+## Deleting your account
+
+Write to privacy@swimhub.co.il from the account’s email address. We delete the account details and what is linked only to you — favorites, your media links and reactions. For groups you manage we will agree with you whether to hand them over or delete them. Deleting an account does not remove published competition results.
 
 ## Your rights
 
-Under the Israeli Privacy Protection Law you may ask to see the information we hold about you and to correct it. You can also ask us to delete your account and everything you added. Write to **privacy@swimhub.co.il** — we answer within 30 days.
+Under the Israeli Protection of Privacy Law you may ask to see the information we hold about you and ask us to correct or delete information that is not correct, complete, clear or up to date. A parent or legal guardian may make requests for a minor. Before giving out or changing information we will take reasonable steps to confirm who is asking and, for a parent, their authority.
 
-If the data about a swimmer is wrong, tell us. If the mistake is in the official protocol, we will mark it and report it to the source; the protocol itself can only be corrected by the federation.
+Write to **privacy@swimhub.co.il**. We give access to information within 30 days, as the law provides, and handle other requests as soon as we reasonably can. If you think we got it wrong, you may complain to the Privacy Protection Authority (gov.il).
 
-## Where the data is kept
+## Cookies and your browser
 
-- the site and its database — Microsoft Azure, Israel Central region;
-- emails (account confirmation, password reset) are sent through Resend;
-- “Sign in with Google” is handled by Google — we receive only your name, email and profile picture.
+We use only cookies the site needs: one that keeps you signed in, a temporary one during “Sign in with Google”, and a security cookie that protects forms. Display settings — light or dark mode, the language of explanations — are kept in your browser. We don’t use advertising or tracking cookies or third-party analytics, and account emails are sent without open or click tracking. Embedded videos use YouTube’s privacy-enhanced mode; profile pictures from Google are loaded from Google’s servers.
+
+## Security
+
+Connections to the site are encrypted, passwords are stored only as hashes, and access to the database is limited to the operator. No system is perfectly safe; if a breach puts your information at risk, we will act as the law requires, including notifying the authority and, where required, you.
 
 ## Changes
 
-If we change this policy, the new version appears on this page with a new date. A significant change that affects account holders — we will also announce it on the site.
+If we change this policy, the new version appears on this page with a new date and applies from then on. A significant change that affects account holders we will also announce on the site. We will not use information already collected for a substantially new purpose without the notice or consent the law requires.

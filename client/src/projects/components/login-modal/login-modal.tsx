@@ -313,12 +313,15 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
                   className="mt-[2px] h-4 w-4 shrink-0 cursor-pointer accent-[var(--t-accent)]"
                 />
                 <span>
-                  I am 13 or older. If I am under 18, my parent or guardian knows I use SwimHub.{' '}
-                  <a href={routes.privacy()} target="_blank" rel="noreferrer" className="text-[var(--t-accent)] hover:underline">
-                    Privacy policy
-                  </a>
+                  I am 13 or older. If I am under 18, I have permission from my parent or legal guardian to use SwimHub.
                 </span>
               </label>
+              <p className="text-[11.5px] font-bold leading-snug text-[var(--t-text-3)]">
+                By creating an account you agree to the{' '}
+                <a href={routes.terms()} target="_blank" rel="noreferrer" className="text-[var(--t-accent)] hover:underline">Terms of use</a>
+                {' '}and the{' '}
+                <a href={routes.privacy()} target="_blank" rel="noreferrer" className="text-[var(--t-accent)] hover:underline">Privacy policy</a>.
+              </p>
               {error && (
                 <p className="rounded-[11px] border border-[var(--t-danger-border)] bg-[var(--t-danger-soft)] px-4 py-[9px] text-[12px] font-bold text-[var(--t-danger)]">
                   {error}

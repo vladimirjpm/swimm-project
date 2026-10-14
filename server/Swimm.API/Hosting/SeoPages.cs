@@ -3,6 +3,7 @@ using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 
@@ -59,7 +60,8 @@ public static class SeoPages
     public static async Task<SeoHead?> BuildHeadAsync(Target target, ISeoRepository repo, CancellationToken ct) =>
         target.Kind switch
         {
-            Kind.Swimmer => await repo.GetSwimmerAsync(target.Id, ct) is { } s ? SeoText.Swimmer(s) : null,
+            Kind.Swimmer => await repo.GetSwimmerAsync(target.Id, ct) is { } s
+                ? SeoText.Swimmer(s, IsraelTime.ToLocal(DateTime.UtcNow).Year) : null,
             Kind.Club => await repo.GetClubAsync(target.Id, ct) is { } c ? SeoText.Club(c) : null,
             Kind.Competition => await repo.GetCompetitionAsync(target.Id, ct) is { } c ? SeoText.Competition(c) : null,
             _ => null,
@@ -176,7 +178,7 @@ public static class SeoPages
     /// <summary>Публичные страницы без сущности — в sitemap.xml целиком. Группы, my-*, h2h — нет.</summary>
     public static readonly IReadOnlyList<string> StaticSitemapPaths =
     [
-        "/", "/competitions", "/season-best", "/records", "/about", "/privacy", "/help/groups",
+        "/", "/competitions", "/season-best", "/records", "/about", "/privacy", "/terms", "/help/groups",
     ];
 
     /// <summary>sitemap.xml по списку путей. Адреса — на canonical-хост, как в голове страниц.</summary>

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Repositories;
@@ -34,7 +36,7 @@ public class SeoRepository : ISeoRepository
                     x.Id, x.FirstName, x.LastName, x.FirstNameEn, x.LastNameEn,
                     ClubName = x.Club != null ? x.Club.Name : null,
                     ClubNameEn = x.Club != null ? x.Club.NameEn : null,
-                    x.HideFromSearch,
+                    x.HideFromSearch, x.BirthYear,
                 })
                 .FirstOrDefaultAsync(ct);
             if (s is null) return null;
@@ -44,7 +46,7 @@ public class SeoRepository : ISeoRepository
             var competitions = swims == 0 ? 0 : await results.Select(r => r.CompetitionId).Distinct().CountAsync(ct);
 
             return new SeoSwimmerFacts(s.Id, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn,
-                s.ClubName, s.ClubNameEn, s.HideFromSearch, swims, competitions);
+                s.ClubName, s.ClubNameEn, s.HideFromSearch, s.BirthYear, swims, competitions);
         }, CacheTtl);
 
     public Task<SeoClubFacts?> GetClubAsync(int id, CancellationToken ct = default) =>
@@ -90,9 +92,12 @@ public class SeoRepository : ISeoRepository
                 .Where(x => !x.IsPseudo && x.MergedIntoId == null)
                 .OrderBy(x => x.Id).Select(x => x.Id).ToListAsync(ct);
 
-            // Пловцы — с результатами, не скрытые из поиска, не пловцы закрытых групп.
+            // Пловцы — с результатами, наверняка взрослые (страницы детей не индексируются —
+            // SeoText.IsCertainlyAdult), не скрытые из поиска, не пловцы закрытых групп.
+            var latestAdultBirthYear = SeoText.LatestAdultBirthYear(IsraelTime.ToLocal(DateTime.UtcNow).Year);
             var swimmers = await _db.Swimmers.AsNoTracking()
                 .Where(x => !x.HideFromSearch && x.PrivateHubGroupId == null
+                            && x.BirthYear > 0 && x.BirthYear <= latestAdultBirthYear
                             && _db.Results.Any(r => r.SwimmerId == x.Id))
                 .OrderBy(x => x.Id).Select(x => x.Id).ToListAsync(ct);
 
