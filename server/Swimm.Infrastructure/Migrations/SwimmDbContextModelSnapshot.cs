@@ -78,6 +78,29 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_AdminAudit", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.AdminSettingValue", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("Sys_AdminSettings", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.AppRole", b =>
                 {
                     b.Property<int>("Id")

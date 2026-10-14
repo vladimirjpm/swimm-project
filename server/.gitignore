@@ -8,3 +8,5 @@
 Swimm.API/appsettings.Development.json
 # Локальное переключение БД (например, временное подключение к проду) — не коммитить
 Swimm.API/appsettings.Local.json
+# Профиль ProdAdmin (локальная админка против прод-БД, В17): прод-пароли — не коммитить
+Swimm.API/appsettings.ProdAdmin.Local.json

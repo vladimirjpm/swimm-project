@@ -173,6 +173,19 @@
       ],
       "port": 5084,
       "autoPort": false
+    },
+    {
+      "name": "swimm-api-prodadmin",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "server/Swimm.API",
+        "--launch-profile",
+        "ProdAdmin"
+      ],
+      "port": 5078,
+      "autoPort": false
     }
   ]
 }

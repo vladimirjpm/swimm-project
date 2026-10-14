@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
@@ -7,22 +8,50 @@ using Swimm.Application.Mapping;
 namespace Swimm.Infrastructure.Services;
 
 /// <summary>
-/// In-memory хранилище настроек (thread-safe).
-/// Значения сбрасываются при перезапуске сервера.
+/// Настройки /Admin/Settings (thread-safe). Реестр ключей, тип, описание и дефолты — в коде
+/// (<see cref="SeedDefaults"/>); ИЗМЕНЁННЫЕ значения — в БД, таблица <see cref="TableName"/>
+/// (решение В7, docs/plans/azure-deploy-plan.md §10). Читается всё из памяти: база — только
+/// источник при загрузке и место записи при правке.
+///
+/// Зачем БД. С В17 админка работает в другом процессе (локально, ProdAdmin): режим обслуживания,
+/// включённый ею, прод видит только через общую базу. Перечитать велит мост кэша
+/// (<see cref="CacheBridgeListener"/>: правка пишет строку → сброс метки таблицы уходит в канал);
+/// на случай потерянного сообщения слушатель перечитывает и сам, раз в 5 минут.
+///
+/// Без хранилища (тесты, <c>new AdminSettingsService(cache)</c>) — чисто в памяти, как раньше.
 /// </summary>
-public class AdminSettingsService : ISettingsService
+public class AdminSettingsService : ISettingsService, IReloadableSettings
 {
+    /// <summary>Таблица изменённых значений — её метку кэша слушает мост, чтобы перечитать.</summary>
+    public const string TableName = "Sys_AdminSettings";
+
+    /// <summary>База лежит — не долбим её на каждом GetValue: следующая попытка не раньше чем через…</summary>
+    private static readonly TimeSpan LoadRetry = TimeSpan.FromSeconds(30);
+
     private readonly ConcurrentDictionary<string, AdminSetting> _settings = new();
+    private readonly Dictionary<string, AdminSetting> _defaults = new(StringComparer.Ordinal);
     private readonly IMemoryCache _cache;
+    private readonly IAdminSettingsStore? _store;
+    private readonly ILogger? _logger;
+
+    private readonly object _loadGate = new();
+    private volatile bool _loaded;
+    private bool _loading;
+    private DateTime _retryAfterUtc;
 
     /// <param name="development">
     /// Среда Development: от неё зависят дефолты отладочного толка (доля сверки кэша на
     /// попадании — там ощутимая, на проде 0).
     /// </param>
-    public AdminSettingsService(IMemoryCache cache, bool development = false)
+    /// <param name="store">Где лежат изменённые значения; null — только память (тесты).</param>
+    public AdminSettingsService(IMemoryCache cache, bool development = false,
+        IAdminSettingsStore? store = null, ILogger<AdminSettingsService>? logger = null)
     {
         _cache = cache;
+        _store = store;
+        _logger = logger;
         SeedDefaults(development);
+        foreach (var (key, setting) in _settings) _defaults[key] = setting;
     }
 
     private void SeedDefaults(bool development)
@@ -105,6 +134,14 @@ public class AdminSettingsService : ISettingsService
                 "(на странице заплыва loglig имя — ссылка на карточку). Уже привязанных не " +
                 "трогает, тёзок пропускает. Стоит запрос на заплыв — выключается, если сайт " +
                 "лежит или импортов много подряд"),
+            // Ночная сверка предложенных loglig-id (docs/loglig-id-plan.md, шаг 6). Джоб читал эти
+            // ключи и раньше, но в реестре их не было — из админки было не выключить (§8.2 плана деплоя).
+            new("LogligVerifyEnabled", "true", "bool", "admin",
+                "Ночная сверка предложенных пользователями loglig-id: true — фоновый джоб раз в " +
+                "LogligVerifyIntervalHours сверяет карточки loglig и переводит предложения в Verified / " +
+                "Rejected. Джоб работает только там, где включены фоновые джобы (локальная админка, не прод)"),
+            new("LogligVerifyIntervalHours", "24", "int", "admin",
+                "Интервал ночной сверки loglig-id в часах (минимум 1)"),
             new("DebugDetails", "false", "bool", "both",
                 "Общий тумблер отладочных подробностей на витринах. Пока выключен, ни одна " +
                 "опция из Sys_DebugOptions не действует — одним движением гасится всё. " +
@@ -137,13 +174,20 @@ public class AdminSettingsService : ISettingsService
     }
 
     public IReadOnlyList<AdminSetting> GetAll()
-        => _settings.Values.OrderBy(s => s.Scope).ThenBy(s => s.Key).ToList();
+    {
+        EnsureLoaded();
+        return _settings.Values.OrderBy(s => s.Scope).ThenBy(s => s.Key).ToList();
+    }
 
     public AdminSetting? Get(string key)
-        => _settings.GetValueOrDefault(key);
+    {
+        EnsureLoaded();
+        return _settings.GetValueOrDefault(key);
+    }
 
     public T GetValue<T>(string key, T fallback)
     {
+        EnsureLoaded();
         if (!_settings.TryGetValue(key, out var setting))
             return fallback;
 
@@ -159,9 +203,88 @@ public class AdminSettingsService : ISettingsService
 
     public bool Update(string key, string newValue)
     {
+        EnsureLoaded();
         if (!_settings.TryGetValue(key, out var existing))
             return false;
 
+        if (!IsValid(existing, newValue))
+            return false;
+
+        // Сначала база, потом память: не записалось — значит, не изменилось нигде, и другой
+        // процесс (прод при правке из ProdAdmin) не разойдётся с этим.
+        if (_store is not null)
+        {
+            try { _store.Save(key, newValue); }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Настройка {Key} не записана в БД — значение не изменено.", key);
+                return false;
+            }
+        }
+
+        Apply(key, newValue);
+        return true;
+    }
+
+    /// <summary>
+    /// Перечитать изменённые значения из БД (мост кэша, страховка раз в 5 минут). Ключа в базе
+    /// нет — возвращается дефолт: удалённая строка значит «вернуть как было».
+    /// </summary>
+    public void Reload()
+    {
+        if (_store is null) return;
+        var stored = _store.LoadAll();
+        foreach (var (key, def) in _defaults)
+        {
+            var value = def.Value;
+            if (stored.TryGetValue(key, out var v))
+            {
+                if (IsValid(def, v)) value = v;
+                else _logger?.LogWarning("Настройка {Key}: в БД недопустимое значение «{Value}» — действует дефолт.", key, v);
+            }
+            Apply(key, value);
+        }
+        _loaded = true;
+    }
+
+    /// <summary>
+    /// Ленивая первая загрузка: на первом обращении, а не в конструкторе, — синглтон собирается и
+    /// там, где базы нет (или она ещё лежит). Не загрузилось — работаем на дефолтах и пробуем снова
+    /// через <see cref="LoadRetry"/>.
+    /// </summary>
+    private void EnsureLoaded()
+    {
+        if (_loaded || _store is null || DateTime.UtcNow < _retryAfterUtc) return;
+        lock (_loadGate)
+        {
+            // Повторный вход тем же потоком: загрузка ходит в БД через EF, а EF может спросить
+            // настройку (точность сброса кэша) — отвечаем дефолтом, а не рекурсией.
+            if (_loaded || _loading) return;
+            _loading = true;
+            try { Reload(); }
+            catch (Exception ex)
+            {
+                _retryAfterUtc = DateTime.UtcNow + LoadRetry;
+                _logger?.LogWarning(ex, "Настройки не загрузились из БД — пока действуют дефолты, повтор через {Seconds} с.",
+                    (int)LoadRetry.TotalSeconds);
+            }
+            finally { _loading = false; }
+        }
+    }
+
+    private void Apply(string key, string value)
+    {
+        if (!_settings.TryGetValue(key, out var existing) || existing.Value == value) return;
+        _settings[key] = existing with { Value = value };
+
+        if (key is "SchemaCacheTTL" or "ForceRefresh" or "ShowSystemTables" or "DefaultSchema")
+            _cache.Remove("DbSchema");
+    }
+
+    /// <summary>Тип и допустимые значения — одни правила для правки из админки и для загрузки из БД.</summary>
+    private static bool IsValid(AdminSetting existing, string newValue)
+    {
+        var key = existing.Key;
         if (!ValidateType(existing.DataType, newValue))
             return false;
 
@@ -188,11 +311,6 @@ public class AdminSettingsService : ISettingsService
         if (key == MediaReportRules.HideThresholdKey
             && int.Parse(newValue) is < MediaReportRules.MinHideThreshold or > MediaReportRules.MaxHideThreshold)
             return false;
-
-        _settings[key] = existing with { Value = newValue };
-
-        if (key is "SchemaCacheTTL" or "ForceRefresh" or "ShowSystemTables" or "DefaultSchema")
-            _cache.Remove("DbSchema");
 
         return true;
     }

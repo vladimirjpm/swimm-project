@@ -9,8 +9,12 @@
 #   ./dump-seed.sh                          # из локального docker-контейнера
 #   ./dump-seed.sh -o /tmp/seed.sql         # в конкретный файл
 #   PGHOST=... PGUSER=... PGDATABASE=... ./dump-seed.sh --direct
+#   PGHOST=... PGUSER=... PGDATABASE=... PGSSLMODE=require ./dump-seed.sh --remote
 #
 # --direct — брать pg_dump с хоста вместо docker exec (для не-локальной БД).
+# --remote — pg_dump из локального контейнера, но к УДАЛЁННОЙ базе по PG*-переменным
+#            (PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE/PGSSLMODE пробрасываются в
+#            контейнер). Свой pg_dump на хосте не нужен — так ходит sync-from-prod.sh.
 # Пароль — через ~/.pgpass или PGPASSWORD, в аргументах его не передаём.
 # ============================================================================
 set -euo pipefail
@@ -28,7 +32,8 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -o|--out) OUT="$2"; shift 2 ;;
     --direct) DIRECT=1; shift ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    --remote) DIRECT=2; shift ;;
+    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     *) echo "Неизвестный аргумент: $1" >&2; exit 2 ;;
   esac
 done
@@ -52,6 +57,12 @@ for t in "${TABLES[@]}"; do ARGS+=(--table="public.\"$t\""); done
 if [ "$DIRECT" = "1" ]; then
   command -v pg_dump >/dev/null || { echo "pg_dump не найден в PATH" >&2; exit 1; }
   pg_dump -U "$PGUSER" -d "$PGDATABASE" "${ARGS[@]}" > "$OUT"
+elif [ "$DIRECT" = "2" ]; then
+  [ -n "${PGHOST:-}" ] || { echo "--remote: не задан PGHOST" >&2; exit 1; }
+  # -e VAR без значения берёт его из окружения хоста; пароль в аргументы не попадает.
+  export PGUSER PGDATABASE
+  docker exec -i -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE \
+    "$CONTAINER" pg_dump "${ARGS[@]}" > "$OUT"
 else
   docker exec -i "$CONTAINER" pg_dump -U "$PGUSER" -d "$PGDATABASE" "${ARGS[@]}" > "$OUT"
 fi

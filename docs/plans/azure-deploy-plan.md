@@ -65,6 +65,9 @@ origin**, App Service раздаёт прод-сборку клиента из `
 локально у Влада и пишет прямо в прод-БД; все обращения к loglig и долгие операции — тоже
 локально. Открытыми остались мелочи В14 (В11 с В17 снят).
 
+**✅ Пункты 1–5 сделаны 14.10.2026** (тесты 3097/3097, смоук Production/ProdAdmin/Development) —
+как устроено, в §0-четыре ниже; исходная постановка оставлена как была.
+
 **Работа по коду, которую решения создали** `[код]` — пункты 1–3 до первого деплоя:
 1. **В17 — прод без админки:** флаг `Admin:Enabled` (на проде `false`) → `/Admin/*`,
    `/api/admin/*` и `admin-home.html` отдают 404; флаг `BackgroundJobs:Enabled` (на проде
@@ -88,7 +91,7 @@ origin**, App Service раздаёт прод-сборку клиента из `
    входе через Google), текст условий; без неё аккаунт не создаётся.
 7. **A10 — открытие для поиска** (в т.ч. `/privacy` с `privacy@swimhub.co.il`).
 
-**За Владом** `[Влад]`: аккаунт Resend + записи DNS в Cloudflare; прод-клиент Google OAuth;
+**За Владом** `[Влад]`: ~~аккаунт Resend + записи DNS в Cloudflare~~ ✅ 14.10 (В12); прод-клиент Google OAuth;
 ключ serper.dev для прода; ресурсы Azure по командам, которые готовлю (A7); юрист до A10.
 
 ---
@@ -136,6 +139,100 @@ origin**, App Service раздаёт прод-сборку клиента из `
 
 ---
 
+## 0-четыре. Как сделано (14.10.2026) — пункты 1–5 §0-тер
+
+Отступления от постановки выше помечены **⚑** — с причиной.
+
+**1. Прод без админки.** `Swimm.API/Hosting/HostingMode.cs`: флаги `Admin:Enabled`,
+`BackgroundJobs:Enabled` (по умолчанию `true` — разработка не меняется). Выключает их
+**закоммиченный `appsettings.Production.json`** ⚑ (а не переменная App Service): выключатель
+приезжает с кодом, забыть нельзя. Без админки `/admin*`, `/api/admin*`, `/admin-home.html`,
+`/js/admin/*` → 404 (страница `/error`) раньше аутентификации; `MapRazorPages` не вызывается;
+`admin-home.html` нет в `DefaultFileNames`. Без джобов из фоновых — только `DbPingBackgroundService`
+и слушатель моста кэша. В логе старта — строка «Окружение X: админка …, фоновые джобы …».
+Смоук Production: админ-пути 404, публичные API 200.
+
+**2. Профиль `ProdAdmin`.** Окружение `ProdAdmin`: профиль в `launchSettings.json`
+(`dotnet run --project server/Swimm.API --launch-profile ProdAdmin`, порт 5078 — у dev-клиента
+Google есть redirect) и `swimm-api-prodadmin` в `.claude/launch.json`. Конфиг —
+`appsettings.ProdAdmin.json` (закоммичен: флаги, `PublicSite:BaseUrl`, SMTP Resend без пароля) +
+gitignored `appsettings.ProdAdmin.Local.json` (строки подключения, Google-секрет,
+`Email:Smtp:Password`; образец — `*.example`). Оба файла в publish не едут. Кука — SameAsRequest,
+без HSTS/https-редиректа (localhost), обработчик ошибок — как в проде. **Сторож**
+(`ProdAdminGuard`): база `localhost` → отказ стартовать; миграции кода ≠ `__EFMigrationsHistory`
+прода → отказ с указанием, что делать; ветка не master → Warning ⚑ (не отказ: хотфикс без миграций
+схеме не вредит; «из master» проверяется по факту — по схеме). Красная полоса «PRODUCTION DATABASE»
+с хостом и веткой — `Pages/Admin/Shared/_ModeBanner.cshtml`. `--migrate` в ProdAdmin работает
+(CLI раньше сторожа). Архив источников рекордов пишется и в ProdAdmin
+(`HostingEnvironments.IsLocalMachine`): боевой прогон по странам теперь идёт оттуда.
+
+**3. Мост кэша** — `Swimm.Infrastructure/Services/CacheBridge.cs`. ⚑ Не в
+`CacheInvalidationInterceptor`, а обёрткой `BridgingCacheService` над всем `ICacheService`: в канал
+уходит **любой** сброс — перехватчик EF, явные метки массовой записи, кнопки `/Admin/Cache`.
+Канал `swimm_cache`, сообщение `{o, a, t, k, r}` (метка процесса, всё/метки/ключ, подпись);
+> 7900 байт → общий сброс. Слушатель `CacheBridgeListener` — отдельное соединение (роль `swimm_ro`,
+KeepAlive, пинг раз в минуту), от `BackgroundJobs:Enabled` не зависит; после переподключения —
+общий сброс (NOTIFY не хранится). Ошибка отправки запись не отменяет — Warning и счётчик. Состояние
+— блок «Между процессами: мост» на `/Admin/Cache`. Выключатель `CacheBridge:Enabled` (по умолчанию
+вкл. везде, и в разработке: CLI рядом с живым API тоже сбрасывает его кэш). Смоук: сброс из
+соседнего процесса (запись `Sys_AdminAudit`) пришёл в журнал с подписью «⇄ из другого процесса».
+
+**4. Настройки в БД.** `Sys_AdminSettings` (`AdminSettingValue`: Key, Value, UpdatedAt,
+UpdatedBy), миграция `AdminSettingsInDb`. Реестр, тип, описание, дефолты — по-прежнему в
+`AdminSettingsService`; в БД — только изменённые. Загрузка ленивая, на первом обращении; база
+лежит — дефолты и повтор через 30 с. Правка: сначала БД, потом память (не записалось — не
+изменилось нигде). Другие процессы перечитывают по сообщению моста с меткой `table:Sys_AdminSettings`
+или общим сбросом и страховочно раз в 5 минут. В реестр добавлены `LogligVerifyEnabled`,
+`LogligVerifyIntervalHours` (§8.2). ⚠ Побочное: настройки теперь **переживают рестарт** —
+`DebugDetails` и аварийные рычаги кэша сами в дефолт больше не возвращаются. Таблица в прод-наполнение
+и синхронизацию не едет (у каждой базы свои), `02-grants.sql` её не знает. Смоук: настройка,
+записанная «другим процессом» + NOTIFY, видна в `/api/client-config` процесса Production за ~1 с.
+
+**5. Синхронизация «прод → локально».** Миграция `DataVersionForSync` (чистый SQL, в модели EF
+нет):
+- ⚑ версия — **последовательность** `Sys_DataVersionSeq`, а не счётчик в одной строке. Счётчик
+  держал бы блокировку строки до коммита: длинный импорт ставил бы в очередь всех писателей, а
+  два писателя, трогающие одни строки в разном порядке, ловили бы deadlock. `nextval` блокировок
+  не берёт; откаченная транзакция тоже двигает версию — лишняя синхронизация безопасна;
+- `Sys_DataVersion` — строка на таблицу (Version, ChangedAt) для подписи «последнее изменение —
+  Results, 14.10 21:03»; занятую строку триггер пропускает (`SKIP LOCKED`);
+- триггер `Sys_DataVersion_Bump` (statement-level, функция SECURITY DEFINER) на 34 таблицах
+  `seed-tables.txt`; соответствие сторожит `DataVersionPgTests` (новая таблица в списке ⇒ новая
+  миграция с триггером);
+- `Sys_SyncState` — отметка синхронизации, пишется только в локальной базе.
+
+⚑ **Роль одна — `swimm_sync`**, а не «только версия» + отдельная для дампа: `SELECT` на таблицы с
+триггером (= `seed-tables.txt`, персональных данных в них нет — тот же набор и так публичен на
+сайте), `Sys_DataVersion`, `__EFMigrationsHistory`, последовательности. Заводится в `01-roles.sql`,
+только если передан `-v sync_password=…`; гранты — `02-grants.sql` (по триггеру, без второго
+списка таблиц). Проверено: `Sys_AppUsers` ей — `permission denied`.
+
+⚑ **`sync-from-prod.sh` сливает, а не заливает заново.** Путь `restore-seed.sh` («DELETE всё +
+COPY») для локальной базы непригоден: `Sys_UserFavorites`, `Sys_UserMedia`, `HubGroupMembers` и ещё
+десяток ссылаются на бизнес-таблицы с `ON DELETE CASCADE` — DELETE всех пловцов снёс бы всё
+локальное, даже если те же пловцы тут же вернутся. Скрипт: сверка миграций прода и локальной →
+версия прода (до дампа) → `dump-seed.sh --remote` (pg_dump из локального контейнера к удалённой
+базе; вырезка пловцов групп и сторож ПДн — те же) → строки в схему `_sync` → `sync-merge.sql`
+одной транзакцией: ушедшие на проде строки, локальное, держащееся за них через RESTRICT,
+перевешивание остающихся на нового родителя (склейки), удаление ушедших от детей к родителям,
+upsert без перезаписи неизменённого; FK отложены, сбой — откат целиком → `fix-sequences.sql`
+(общий теперь с `restore-seed.sh`) → `Sys_SyncState` → `--seed-personas --reset` → общий сброс
+кэша локального API через канал моста. Локальные пловцы групп остаются; занявшие Id, который на
+проде у другого человека, уходят вместе со своими членствами. Проверено на двух копиях локальной
+базы («прод» с удалённым соревнованием, склейкой пловцов, переименованиями и новым клубом):
+изменения доехали, локальные избранное/медиа/группы/аккаунты целы, кроме висевших на удалённом;
+повторный прогон ничего не меняет.
+
+Напоминание: `DataSyncCheckBackgroundService` (только Development, при заданной
+`ConnectionStrings:ProdVersionConnection` — роль `swimm_sync`) сверяет через 5 с после старта и раз в
+15 минут → Warning в лог и жёлтая полоса в админке. Скилл `/db-sync-from-prod`, строка в CLAUDE.md.
+
+**Не сделано в шаге 1:** визуально красная полоса ProdAdmin не проверена (вход в админку ProdAdmin
+— только настоящим Google-аккаунтом); проверены её разметка и логи старта. Синхронизация не
+прогонялась против настоящего Azure (его ещё нет) — только против второй базы в локальном Postgres.
+
+---
+
 ## 0. Что изменилось с прошлой редакции
 
 | Пункт ревизии 1 | Сегодня |
@@ -158,7 +255,7 @@ origin**, App Service раздаёт прод-сборку клиента из `
 
 | # | Решение |
 |---|---|
-| Р1 | Домен на старте — `*.azurewebsites.net`. Свой домен покупается позже, отдельным шагом. ✅ **14.10.2026: куплен `swimhub.co.il`** — MyNames (Drubit Raid, аккредитован ISOC-IL), до 14.10.2031, блокировка переноса и автопродление вкл. DNS — в Cloudflare (Free) по NS, записи под Azure — **DNS only** (серое облако): прокси ломает продление App Service Managed Certificate и подменяет IP клиента в `X-Forwarded-For` (лимиты и история логинов — по узлу Cloudflare). При подключении: `AllowedHosts`, redirect URI в Google (лучше отдельный прод-клиент OAuth), SPF/DKIM для SMTP (В12). **Почта (14.10):** Cloudflare Email Routing — `info@` и `privacy@swimhub.co.il` пересылаются в Gmail Влада (только приём, отправки нет); записи MX ×3, SPF `v=spf1 include:_spf.mx.cloudflare.net ~all`, DKIM `cf2024-1`. ⚠ SPF у домена — ОДНА запись: SMTP-провайдер сайта дописывает свой `include:` в неё, второй TXT `v=spf1` не заводить (две записи = SPF сломан, письма в спам). DMARC (`_dmarc`) пока нет — завести вместе с SMTP |
+| Р1 | Домен на старте — `*.azurewebsites.net`. Свой домен покупается позже, отдельным шагом. ✅ **14.10.2026: куплен `swimhub.co.il`** — MyNames (Drubit Raid, аккредитован ISOC-IL), до 14.10.2031, блокировка переноса и автопродление вкл. DNS — в Cloudflare (Free) по NS, записи под Azure — **DNS only** (серое облако): прокси ломает продление App Service Managed Certificate и подменяет IP клиента в `X-Forwarded-For` (лимиты и история логинов — по узлу Cloudflare). При подключении: `AllowedHosts`, redirect URI в Google (лучше отдельный прод-клиент OAuth), SPF/DKIM для SMTP (В12). **Почта (14.10):** Cloudflare Email Routing — `info@` и `privacy@swimhub.co.il` пересылаются в Gmail Влада (только приём, отправки нет); записи MX ×3, SPF `v=spf1 include:_spf.mx.cloudflare.net ~all`, DKIM `cf2024-1`. ⚠ SPF у домена — ОДНА запись: SMTP-провайдер сайта дописывает свой `include:` в неё, второй TXT `v=spf1` не заводить (две записи = SPF сломан, письма в спам). **Отправка (14.10):** Resend — записи на поддоменах, корневые не тронуты; `_dmarc` `p=none` заведён; живое письмо — SPF/DKIM/DMARC PASS (В12) |
 | Р2 | Объём — **минимум рабочего**: App Service B1 Linux + Flexible Server B1ms, один инстанс, без staging-слота |
 | Р3 | Данные — **дамп бизнес-таблиц** (решение пересмотрено 27.08: сценарий «с нуля» нереализуем, см. Б11). `pg_dump --data-only` по include-списку `server/db/seed-tables.txt` (34 таблицы на 11.10), `Sys_*` и `tmp_*` не едут |
 | Р5 | Главная страница прода — **клиентская** (EN, React). ⚠ **Уточнено 28.08:** серверная страница НЕ удаляется, а переезжает в `wwwroot/admin-home.html` — коллизии больше нет, а вход в админку (ссылки на `/Admin`, `/Admin/Health`, Google-логин, баннер «БД недоступна») сохраняется. Корень прода по-прежнему клиентский |
@@ -198,10 +295,13 @@ DevOps (Organization settings → Billing). Новые ресурсы swimhub �
 | `test-rg1`, `test-app-service-plan`, `sportmp-cdn`, `rss`, `db-migrate` | Наследие 8–9 лет | Проверить счёт и снести |
 
 Список неполный (вкладка «Недавние»). Полный инвентарь — `az resource list -o table`;
-кто ест деньги — `az consumption usage list`. **Секрет `AZURE_STATIC_WEB_APPS_API_TOKEN_
-BLUE_TREE_0E916EB10` всё ещё лежит в GitHub Secrets** — удалить вместе с ресурсом.
+кто ест деньги — `az consumption usage list`. ~~Секрет `AZURE_STATIC_WEB_APPS_API_TOKEN_
+BLUE_TREE_0E916EB10` всё ещё лежит в GitHub Secrets~~ — ✅ удалён 14.10 вместе с ресурсом (выше).
 
 ### 2.2 Репозиторий
+
+*Снимок 27.08 — до A1/A6: клиент в `wwwroot`, CI и деплой с тех пор есть (§4); сверка кода —
+§0-бис.*
 
 - **Рантайм:** `net10.0` во всех шести проектах. `RuntimeIdentifier`, `SelfContained`,
   `PublishTrimmed`, `PublishAot`, `global.json`, `Directory.Build.props`, `NuGet.config`,
@@ -617,7 +717,7 @@ workflow, который заведомо падает, хуже, чем не в
 **Что нужно от Влада, чтобы деплой поехал:**
 - secret `AZURE_WEBAPP_PUBLISH_PROFILE` — кнопка «Get publish profile» на странице App Service;
 - variable `AZURE_WEBAPP_NAME` — имя App Service (можно вместо этого вводить руками при запуске);
-- удалить протухший secret `AZURE_STATIC_WEB_APPS_API_TOKEN_BLUE_TREE_0E916EB10`.
+- ~~удалить протухший secret `AZURE_STATIC_WEB_APPS_API_TOKEN_BLUE_TREE_0E916EB10`~~ ✅ 14.10 (§2.1).
 
 
 ### A0. Pre-flight ✅ (14.10.2026: `DOTNETCORE|10.0` есть на Linux App Service — framework-dependent, ничего не меняем; publish-папка проверена 11.10, §0-бис)
@@ -724,6 +824,19 @@ Network**, эмблемы клубов и иконки стилей на мес�
 `/Admin/*` под админом и 403 под обычным; один импорт XLSX (единственный путь, где вообще
 исполняется ClosedXML); `/Admin/Health` — реестр проверок целостности зелёный.
 
+⚠ С В17 (14.10): на проде `/Admin/*`, `/api/admin/*`, `/admin-home.html` → **404** под кем
+угодно — это и проверить. Админ-сценарии (импорт XLSX, `/Admin/Health`, 403 под обычным) — из
+**ProdAdmin** против прод-БД; там же проверить мост кэша: правка в ProdAdmin видна на сайте сразу,
+а не через TTL (блок «Между процессами» на `/Admin/Cache` — «слушает»), и режим обслуживания,
+включённый в ProdAdmin, закрывает сайт.
+
+**Почта (14.10):** в ProdAdmin блок «Почта» (`/Admin/Settings#email`, он же первый пункт
+системной строки дашборда) — зелёный `SMTP · smtp.resend.com`; кнопка «Отправить тестовое письмо
+мне» → письмо во «Входящих». На проде админки нет — там SMTP проверяется сценарием
+register→verify (письмо приходит, ссылка на `https://swimhub.co.il`, не `http://` и не
+`*.azurewebsites.net` при заданном `AllowedHosts`) и отсутствием Critical «SMTP НЕ НАСТРОЕН» в
+логе старта.
+
 ### A9. Документация ☐ `[код]`
 
 `docs/deploy.md` — единственный источник порядка первого запуска, полного списка переменных,
@@ -802,6 +915,9 @@ Network**, эмблемы клубов и иконки стилей на мес�
 **Resend (В12):** `Email__Smtp__Host=smtp.resend.com`, `Email__Smtp__Port=587`,
 `Email__Smtp__EnableSsl=true`, `Email__Smtp__User=resend`, `Email__Smtp__Password=<API key
 Resend>` (секрет), `Email__Smtp__From=noreply@swimhub.co.il`, `Email__Smtp__FromName=SwimHub`.
+Ключ — `swimhub-prod` (Sending access, только домен `swimhub.co.il`), лежит в менеджере паролей
+Google Влада; этот же ключ — в `appsettings.ProdAdmin.Local.json`. Набор проверен 14.10 живым
+письмом с локального API (handoff §3.2).
 
 `Authentication__Google__ClientId` · `Email__Smtp__Host` (**сам переключатель SMTP/лог**) ·
 `Email__Smtp__Port` (587) · `Email__Smtp__EnableSsl` (true) · `Email__Smtp__From` ·
@@ -843,6 +959,20 @@ autoscale выключен.
 (с 11.10 не нужен: в проде пусто = относительные ссылки, клиент на том же origin —
 `Pages/Admin/Shared/PublicSite.cs`).
 
+### Форма процесса (В17, 14.10) — в App Service задавать НЕ нужно
+
+`Admin__Enabled=false` и `BackgroundJobs__Enabled=false` приезжают с кодом —
+`appsettings.Production.json` (закоммичен, едет в publish). В логе старта проверить строку
+«Окружение Production: админка выкл, фоновые джобы выкл». `CacheBridge__Enabled` — по умолчанию
+вкл.; `CacheBridge__Channel` — по умолчанию `swimm_cache`, одинаковый у сайта и ProdAdmin.
+
+**ProdAdmin (машина Влада, не App Service)** — всё в `appsettings.ProdAdmin.Local.json`
+(образец `*.example`): четыре `ConnectionStrings` к Azure, `Authentication:Google:ClientSecret`
+(dev-клиент), `Email:Smtp:Password` (ключ Resend; остальной SMTP — в закоммиченном
+`appsettings.ProdAdmin.json`: письма о заявках групп на клуб шлёт локальная админка).
+Разработка, для напоминания об отставании: `ConnectionStrings:ProdVersionConnection`
+(роль `swimm_sync`) в `appsettings.Development.json` или `appsettings.Local.json`.
+
 ### Исходящий трафик, который нужен приложению
 
 `api.worldaquatics.com` · `www.worldaquatics.com` (страница мастерс-рекордов) ·
@@ -862,15 +992,19 @@ autoscale выключен.
    `ENCODING 'UTF8' LC_COLLATE 'en_US.utf8' LC_CTYPE 'en_US.utf8'` — паритет с локальной,
    иначе поедет сортировка имён) и БД. Админ-логин назвать **`swimm`** — тогда
    `MigrationConnection` и `ALTER DEFAULT PRIVILEGES FOR ROLE swimm` работают без правок.
-2. **Роли:** `01-roles.sql` с реальными паролями (без табличных грантов).
+2. **Роли:** `01-roles.sql` с реальными паролями (без табличных грантов); плюс
+   `-v sync_password=…` — роль `swimm_sync` для синхронизации «прод → локально» (§0-четыре п. 5).
 3. **Миграции:** `--migrate`.
 4. **Гранты:** `02-grants.sql`.
 5. **Данные:** восстановление дампа бизнес-таблиц (или сидеры — по решению В1).
 6. **App Service:** задать все переменные §5, Always On, Scale out = 1.
 7. **Деплой** пакета из GitHub Actions.
 8. **Google Console:** redirect URI `https://<app>.azurewebsites.net/signin-google`.
-9. **Войти** через Google на проде (создастся `Sys_AppUsers`), затем `--grant-admin <email>`.
+9. **Войти** через Google на проде (создастся `Sys_AppUsers`), затем `--grant-admin <email>`
+   (из ProdAdmin: `dotnet run --project server/Swimm.API --launch-profile ProdAdmin -- --grant-admin <email>`).
 10. **Приёмка** A8.
+11. **Локальная копия:** `server/db/sync-from-prod.sh` (скилл `/db-sync-from-prod`) — с этого
+    момента главная база прод, локальная — её копия.
 
 ---
 
@@ -881,7 +1015,7 @@ autoscale выключен.
 
 **Только Влад:** `az login` и создание ресурсов; **все секреты** (строки подключения, пароли
 ролей, SMTP-пароль, Google client secret, publish-profile/OIDC); прогон SQL на прод-БД;
-redirect URI в Google Console; удаление Static Web App и старого хлама; ротация ключей;
+redirect URI в Google Console; ~~удаление Static Web App и старого хлама~~ (✅ 14.10, §2.1); ротация ключей;
 решения §10.
 
 ---
@@ -894,12 +1028,16 @@ redirect URI в Google Console; удаление Static Web App и старог�
 **`MaintenanceMode` сбрасывается в `false` при каждом деплое** — заглушка снимается с
 публичного сайта сама; при scale-out фоновые сервисы задублируют записи в БД. ➜ Жёсткое
 правило «ровно один инстанс» + перенос хотя бы `MaintenanceMode` в БД (§10-В7).
+✅ *14.10: настройки в БД (В7), кэш между процессами — мостом, фоновых джобов на проде нет (В17) —
+§0-четыре. Правило «один инстанс» остаётся до проверки второго инстанса.*
 
 **8.2. Ночная сверка loglig включена жёстко и стартует немедленно.**
 `LogligVerifyEnabled` читается со значением по умолчанию `true`, но самого ключа **нет в
 реестре настроек** — из админки его не выключить. При каждом рестарте инстанса джоб сразу
 идёт на чужой сайт `loglig.com:2053` и пишет в БД. ➜ Досеять ключи, добавить стартовую
 задержку и джиттер.
+✅ *14.10: на проде джоба нет (В17); ключи `LogligVerifyEnabled` / `LogligVerifyIntervalHours`
+досеяны в реестр. Задержка и джиттер не делались — джоб теперь крутится только в ProdAdmin.*
 
 **8.3. 230-секундный таймаут App Service.** ✅ *Снят решением В17 (14.10): админка на проде не
 работает, долгие операции идут локально.* Исходный текст: Долгие синхронные админ-операции (stamp-loglig,
@@ -925,6 +1063,9 @@ redirect URI в Google Console; удаление Static Web App и старог�
 
 **8.5. Письма без SPF/DKIM/DMARC уедут в спам** — это ломает и регистрацию, и сброс пароля.
 Настраивается на домене отправителя, то есть упирается в §10-В12.
+✅ *14.10: снят — домен в Resend, письмо в Gmail легло во «Входящие», SPF/DKIM/DMARC — PASS.
+Остаток: DMARC `p=none` (только наблюдение); ужесточать до `quarantine` — после нескольких
+недель без чужих отправителей в отчётах.*
 
 **8.6. Мониторинга нет** — о падении узнаете, открыв сайт.
 
@@ -954,7 +1095,7 @@ Roslyn/MSBuild (включая `BuildHost-net472` — хост для .NET Frame
 |---|---|
 | App Service B1 Linux | ≈ 14.5 ($0.0198/ч; West Europe — $0.018/ч ≈ 13.1) |
 | Flexible Server B1ms (1 vCore / 2 GiB) | ≈ 16.1 compute ($0.022/ч; West Europe — $0.0199/ч ≈ 14.5) + ≈ 4–5 storage (32 ГБ) |
-| Storage Account под ключи Data Protection | < 1 |
+| ~~Storage Account под ключи Data Protection~~ | 0 — с В6 ключи в `/home` App Service |
 | **Итого по Р2** | **≈ 35** (West Europe было бы ≈ 32) |
 | *Опционально:* Application Insights | 5 ГБ/мес бесплатно, дальше ≈ 2,3/ГБ |
 | *Опционально:* availability-тест | 1–3 |
@@ -1041,7 +1182,15 @@ West Europe (§9); выигрыш — ~5–10 мс вместо ~60–70 мс н
 регламентов. Заодно — нужно ли уведомить isr.org.il/loglig о регулярном доступе с
 облачного IP.
 
-**В12. SMTP.** ✅ **РЕШЕНО 14.10.2026 (Влад): Resend** — бесплатно 3 000 писем/мес, 100/день; `smtp.resend.com:587` STARTTLS (наш `SmtpEmailSender` на `System.Net.Mail` — только STARTTLS, неявный TLS 465 не умеет); отправитель `noreply@swimhub.co.il`, ответы — `info@`. DNS в Cloudflare: DKIM `resend._domainkey`, SPF и MX возврата — на поддомене `send.` (корневую SPF не трогает), плюс `_dmarc` (`p=none` на старте). SendGrid бесплатный тариф убрал. Исходный вопрос: **SMTP-провайдер и адрес отправителя?** Resend / Postmark / SendGrid / Azure
+**В12. SMTP.** ✅ **РЕШЕНО 14.10.2026 (Влад): Resend** — бесплатно 3 000 писем/мес, 100/день; `smtp.resend.com:587` STARTTLS (наш `SmtpEmailSender` на `System.Net.Mail` — только STARTTLS, неявный TLS 465 не умеет); отправитель `noreply@swimhub.co.il`, ответы — `info@`. SendGrid бесплатный тариф убрал.
+✅ **Настроено и проверено 14.10:** домен Verified, регион eu-west-1 (Ireland), Return-Path `send`,
+трекинг кликов/открытий выключен (иначе ссылки сброса пароля шли бы через чужой редирект).
+Записи внесла автонастройка Resend через Cloudflare (все DNS only): CNAME `send` →
+`send.forge.rmta.net`, CNAME `rsend` → `rsend-euw1.forge.rmta.net`, TXT `resend._domainkey`
+(DKIM); руками — TXT `_dmarc` `v=DMARC1; p=none;`. ⚠ Старой схемы «MX + TXT SPF на `send` с
+amazonses» у Resend больше нет — SPF возврата у них за CNAME. Живое письмо через наш
+`SmtpEmailSender` — «Входящие» Gmail за 1 с, SPF/DKIM (`swimhub.co.il`)/DMARC PASS. Темы писем —
+«SwimHub — …». Статус и тестовое письмо — блок «Почта» в админке (`docs/admin-pages/settings.md`). Исходный вопрос: **SMTP-провайдер и адрес отправителя?** Resend / Postmark / SendGrid / Azure
 Communication Services — все дают SMTP-endpoint, под который написан `SmtpEmailSender`.
 Упирается в домен (SPF/DKIM), а домен по Р1 ещё не куплен — то есть на старте локальный вход
 (регистрация + сброс пароля) может остаться нерабочим, а вход через Google — работать.
@@ -1088,7 +1237,8 @@ Communication Services — все дают SMTP-endpoint, под который 
 
 ## 11. Не в этом плане
 
-- Кастомный домен + TLS + www-редирект (Р1), SPF/DKIM/DMARC.
+- Кастомный домен + TLS + www-редирект (Р1). *(14.10: домен куплен, SPF/DKIM/DMARC почты
+  сделаны — В12; привязка домена к App Service и сертификат — шаг после A7, см. handoff §3.3.)*
 - Staging-слот и обкатка миграций на копии (компромисс: поднять временный B1ms того же
   региона на сутки, прогнать §6 целиком, удалить — стоит центы).
 - Redis вместо `MemoryCacheService`, лидер-выбор для фоновых сервисов, autoscale — одной фазой

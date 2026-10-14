@@ -16,11 +16,16 @@
 --   swimm_ro                — SELECT только на публичные бизнес-таблицы. ReadConnection.
 --                             Намеренно НЕ видит Sys_* — SQL-инъекция в публичном
 --                             read-пути не прочитает ПДн и SecurityStamp и ничего не запишет.
+--   swimm_sync (по желанию) — чтение для синхронизации «прод → локально» (В17): таблицы из
+--                             seed-tables.txt (в них нет ПДн), версия данных Sys_DataVersion и
+--                             __EFMigrationsHistory. Ею ходят sync-from-prod.sh и проверка
+--                             отставания локального API (ProdVersionConnection). Заводится,
+--                             только если передан sync_password; гранты — 02-grants.sql.
 --
 -- Пароли в файле НЕ зашиты — передаются переменными psql:
 --
 --   psql -h <host> -U <owner> -d <db> \
---        -v rw_password='...' -v ro_password='...' [-v owner=swimm] \
+--        -v rw_password='...' -v ro_password='...' [-v sync_password='...'] [-v owner=swimm] \
 --        -f server/db/01-roles.sql
 --
 -- Локально (дев-пароли те же, что в appsettings.json):
@@ -71,6 +76,21 @@ SELECT format('ALTER ROLE swimm_rw PASSWORD %L', :'rw_password')
 
 SELECT format('ALTER ROLE swimm_ro PASSWORD %L', :'ro_password')
 \gexec
+
+-- swimm_sync — только если задан пароль: локально она не нужна (синхронизируют С прода).
+\if :{?sync_password}
+SELECT format('CREATE ROLE swimm_sync LOGIN PASSWORD %L', :'sync_password')
+ WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'swimm_sync')
+\gexec
+
+SELECT format('ALTER ROLE swimm_sync PASSWORD %L', :'sync_password')
+\gexec
+
+REVOKE CREATE ON SCHEMA public FROM swimm_sync;
+SELECT format('GRANT CONNECT ON DATABASE %I TO swimm_sync', current_database())
+\gexec
+GRANT USAGE ON SCHEMA public TO swimm_sync;
+\endif
 
 -- ── Ни одна рантайм-роль не создаёт объекты ─────────────────────────────────
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;

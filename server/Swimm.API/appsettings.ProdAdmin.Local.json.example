@@ -1,0 +1,19 @@
+{
+  "_comment": "Скопируй в appsettings.ProdAdmin.Local.json и заполни. В git не попадёт. Подключается ТОЛЬКО в окружении ProdAdmin и перебивает всё остальное. Пароли ролей — те, что задавались в 01-roles.sql на проде; MigrationConnection — админ-логин Flexible Server (swimm). Google — dev-клиент: у него уже есть redirect http://localhost:5078/signin-google. Email.Smtp.Password — ключ Resend: письма о заявках клубов шлёт локальная админка, без него они уйдут только в лог.",
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=PROD_HOST.postgres.database.azure.com;Port=5432;Database=swimm;Username=swimm_rw;Password=...;SslMode=Require",
+    "MigrationConnection": "Host=PROD_HOST.postgres.database.azure.com;Port=5432;Database=swimm;Username=swimm;Password=...;SslMode=Require",
+    "AdminConnection": "Host=PROD_HOST.postgres.database.azure.com;Port=5432;Database=swimm;Username=swimm_rw;Password=...;SslMode=Require;Maximum Pool Size=10",
+    "ReadConnection": "Host=PROD_HOST.postgres.database.azure.com;Port=5432;Database=swimm;Username=swimm_ro;Password=...;SslMode=Require;Maximum Pool Size=10"
+  },
+  "Authentication": {
+    "Google": {
+      "ClientSecret": "..."
+    }
+  },
+  "Email": {
+    "Smtp": {
+      "Password": "re_... (ключ swimhub-prod из менеджера паролей Google)"
+    }
+  }
+}

@@ -21,7 +21,9 @@
 - **DNS — свой аккаунт Cloudflare (Free)**, серверы имён `maleah` / `nicolas.ns.cloudflare.com`,
   зона Active. Записей под сайт ещё нет — заводятся после создания App Service.
 - **Почта — Cloudflare Email Routing:** `info@` и `privacy@swimhub.co.il` → Gmail Влада
-  (только приём; проверено живыми письмами). MX ×3, SPF, DKIM `cf2024-1`. DMARC — нет.
+  (только приём; проверено живыми письмами). MX ×3, SPF, DKIM `cf2024-1`.
+- **Отправка — Resend** (В12): домен Verified, DKIM/SPF/DMARC `p=none`, ключ на месте, живое
+  письмо — все PASS. Подробности — §3.2.
 - **Azure вычищен:** удалены 5 старых групп и секрет SWA в GitHub; оставлена группа
   `VS-clt-…` (организация Azure DevOps с привязанной оплатой, $0, удалить можно только из
   DevOps). План §2.1.
@@ -61,35 +63,25 @@
 
 ## 3. Что делать дальше — по порядку
 
-### 3.1 Код до первого деплоя `[агент]` (план §0-тер, пп. 1–5)
+### 3.1 Код до первого деплоя `[агент]` — ✅ сделано 14.10 (план §0-тер, пп. 1–5)
 
-1. **Флаги `Admin:Enabled` и `BackgroundJobs:Enabled`** (на проде `false`).
-   - Admin: `/Admin/*`, `/api/admin/*`, `admin-home.html` → 404. Точки: middleware в
-     [Program.cs](../../server/Swimm.API/Program.cs) (блок «Блокируем /admin/», ~стр. 325),
-     `MapRazorPages` (~429), `DefaultFileNames` (admin-home в списке — §3 Б3 плана).
-   - Jobs: `AddHostedService` (~стр. 100, 103, 244–247) — оставить только
-     `DbPingBackgroundService`.
-   - Стартовая диагностика (~стр. 543–577): проверку Google оставить (вход нужен
-     пользователям), но текст «/admin недостижима» при `Admin:Enabled=false` поправить.
-2. **Профиль `ProdAdmin`**: окружение `ProdAdmin` (НЕ `Development` — без `DevAdminBypass`,
-   персонажей, `--seed-personas`); строки подключения к Azure — gitignored-файл;
-   `launchSettings.json` + конфиг в `.claude/launch.json`. Вход — настоящим аккаунтом Влада
-   (ему `--grant-admin`). **Красная полоса «PRODUCTION DATABASE»** на всех страницах админки.
-3. **Мост сброса кэша через `pg_notify`**: [CacheInvalidationInterceptor](../../server/Swimm.Infrastructure/Data/CacheInvalidationInterceptor.cs)
-   после сохранения шлёт метки в канал; фоновый `LISTEN`-сервис в каждом процессе сайта
-   сбрасывает их у себя (`ICacheService.InvalidateTagsAsync`). ⚠ Этот сервис должен работать
-   и при `BackgroundJobs:Enabled=false`. Пейлоад `NOTIFY` ≤ 8000 байт — длинный список меток
-   резать или слать «сбросить всё». Правило 1 `docs/pre-push-rules.md` (кэш → `/Admin/Cache`).
-4. **В7 — настройки в БД**: [AdminSettingsService](../../server/Swimm.Infrastructure/Services/AdminSettingsService.cs)
-   сейчас в памяти; образец таблицы — `DebugOption` / миграция `20260822141149_DebugOptions`.
-   Плюс `LogligVerifyEnabled` в реестр настроек (§8.2). Новая таблица `Sys_*` →
-   `seed-tables.txt` (исключить), `02-grants.sql` не трогать.
-5. **Синхронизация «прод → локально»** (§0-тер-бис): `Sys_DataVersion` + statement-level
-   триггер на таблицах из `seed-tables.txt`; `Sys_SyncState` локально; скрипт
-   `server/db/sync-from-prod.sh` (⚠ `restore-seed.sh` рассчитан на пустую БД — сначала
-   вычистить локальные `Sys_*`-ссылки на исчезнувшее, потом заливка, потом
-   `--seed-personas --reset`); предупреждение при старте локального API + жёлтая полоса;
-   скилл `/db-sync-from-prod` + строка в CLAUDE.md.
+Как устроено и где отступили от постановки — **план §0-четыре** (здесь не копирую). Коротко:
+
+1. **Прод без админки** — `Hosting/HostingMode.cs`; флаги выключает закоммиченный
+   `appsettings.Production.json`. Админ-пути → 404, джобов нет, кроме пинга БД и моста кэша.
+2. **ProdAdmin** — `dotnet run --project server/Swimm.API --launch-profile ProdAdmin`;
+   секреты — `appsettings.ProdAdmin.Local.json` (образец `*.example`, там же пароль SMTP Resend).
+   Сторож `ProdAdminGuard`: база localhost или расхождение миграций → отказ стартовать.
+   Красная полоса — `Pages/Admin/Shared/_ModeBanner.cshtml`.
+3. **Мост кэша** — `Services/CacheBridge.cs`: обёртка над всем `ICacheService`, а не только
+   перехватчик; блок «Между процессами» на `/Admin/Cache`.
+4. **Настройки в БД** — `Sys_AdminSettings`; ⚠ теперь переживают рестарт (и `DebugDetails` тоже).
+5. **Синхронизация** — версия на последовательности (без блокировок), роль `swimm_sync`
+   (`01-roles.sql -v sync_password=…`), `server/db/sync-from-prod.sh` **сливает**, а не заливает
+   заново (каскады снесли бы локальное), скилл `/db-sync-from-prod`.
+
+Не проверено: красная полоса глазами (нужен вход настоящим Google-аккаунтом в ProdAdmin) и
+синхронизация против настоящего Azure — только против второй базы в локальном Postgres.
 
 После — **В4** (галочка 13+ при регистрации и первом входе через Google) и **A10** (открытие
 для поиска: `/privacy` → серверные title/description → `sitemap.xml` → снять `noindex`).
@@ -105,7 +97,10 @@
   (Sending access, только этот домен) создан, лежит в менеджере паролей Google; на проде →
   `Email__Smtp__Password` (логин `resend`). Потерялся — удалить в Resend, выпустить новый.
   Живая проверка 14.10: локальный API с `Email__Smtp__*` → письмо регистрации на Gmail пришло
-  во «Входящие» за 1 с, SPF/DKIM (`swimhub.co.il`)/DMARC — все PASS.
+  во «Входящие» за 1 с, SPF/DKIM (`swimhub.co.il`)/DMARC — все PASS. Темы писем — «SwimHub —»
+  (`aaa6d77c`). В админке — блок «Почта» (`/Admin/Settings#email` + пункт дашборда, `05a757b4`):
+  куда уходят письма процесса и кнопка тестового письма себе; в ProdAdmin должен быть зелёным
+  (SMTP — `appsettings.ProdAdmin.json`, ключ — `*.Local.json`). Приёмка почты — план A8.
 - **Прод-клиент Google OAuth** (redirect: `https://swimhub.co.il/signin-google`,
   `https://<app>.azurewebsites.net/signin-google`).
 - Ключ **serper.dev** для прода.

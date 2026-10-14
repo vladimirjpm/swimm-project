@@ -62,14 +62,59 @@ public static class DependencyInjection
             untagged: sp.GetService<IHostEnvironment>()?.IsDevelopment() == true
                 ? UntaggedEntryPolicy.Throw
                 : UntaggedEntryPolicy.Warn));
-        services.AddSingleton<ICacheService>(sp => sp.GetRequiredService<MemoryCacheService>());
         services.AddSingleton<ICacheDiagnostics>(sp => sp.GetRequiredService<MemoryCacheService>());
 
-        // Settings (singleton — in-memory store). Среда нужна дефолтам отладочного толка (доля
-        // сверки кэша); вне хоста (тесты) IHostEnvironment нет — тогда дефолты как на проде.
+        // Мост сброса кэша между процессами (В17): сброс у себя → pg_notify → чужие процессы
+        // сбрасывают у себя (Services/CacheBridge.cs). Включён по умолчанию — и в разработке:
+        // CLI-команда, запущенная рядом с живым API, тоже должна сбрасывать его кэш.
+        // Выключатель — CacheBridge:Enabled=false; тогда ICacheService — голый MemoryCacheService.
+        var bridge = new CacheBridgeOptions(
+            configuration.GetValue("CacheBridge:Enabled", true),
+            configuration["CacheBridge:Channel"] is { Length: > 0 } ch ? ch : CacheBridgeOptions.DefaultChannel);
+        if (!CacheBridgeOptions.IsValidChannel(bridge.Channel))
+            throw new InvalidOperationException($"CacheBridge:Channel «{bridge.Channel}» — допустимы только [a-z0-9_].");
+        services.AddSingleton(bridge);
+        services.AddSingleton<CacheBridgeMonitor>();
+        services.AddSingleton<ICacheBridgeStatus>(sp => sp.GetRequiredService<CacheBridgeMonitor>());
+        if (bridge.Enabled)
+        {
+            // Отправка — от роли записи (её соединение и так есть у писателя), коротким таймаутом:
+            // запись уже закоммичена, ждать недоступный канал долго незачем.
+            services.AddSingleton<ICacheBridgeTransport>(_ =>
+                new PgNotifyTransport(BridgeDataSource(adminCs, timeoutSeconds: 3), bridge.Channel));
+            services.AddSingleton<ICacheService>(sp => new BridgingCacheService(
+                sp.GetRequiredService<MemoryCacheService>(),
+                sp.GetRequiredService<ICacheBridgeTransport>(),
+                sp.GetRequiredService<CacheBridgeMonitor>(),
+                sp.GetService<ILogger<BridgingCacheService>>()));
+            // Слушатель — всегда, когда мост включён, и от BackgroundJobs:Enabled не зависит: на
+            // проде это единственный способ узнать о записи локальной админки. В CLI хост не
+            // стартует, и слушатель не запускается — CLI только отправляет.
+            // Слушать может любая роль (LISTEN прав не требует) — берём наименее привилегированную.
+            services.AddHostedService(sp => new CacheBridgeListener(
+                BridgeDataSource(readCs, timeoutSeconds: 10),
+                sp.GetRequiredService<MemoryCacheService>(),
+                sp.GetRequiredService<CacheBridgeMonitor>(),
+                sp.GetRequiredService<ISettingsService>(),
+                sp.GetRequiredService<ILogger<CacheBridgeListener>>()));
+        }
+        else
+            services.AddSingleton<ICacheService>(sp => sp.GetRequiredService<MemoryCacheService>());
+
+        // Отстаёт ли локальная копия от прода (В17, §0-тер-бис). Включается строкой
+        // ProdVersionConnection (роль swimm_sync) в gitignored-конфиге разработки; без неё — молчит.
+        services.AddSingleton<IDataSyncStatus>(_ => new DataSyncStatusService(
+            configuration.GetConnectionString("ProdVersionConnection"), adminCs));
+
+        // Настройки /Admin/Settings: реестр и дефолты — в коде, изменённые значения — в БД (В7,
+        // Sys_AdminSettings). Среда нужна дефолтам отладочного толка (доля сверки кэша); вне хоста
+        // (тесты) IHostEnvironment нет — тогда дефолты как на проде.
+        services.AddSingleton<IAdminSettingsStore, DbAdminSettingsStore>();
         services.AddSingleton<ISettingsService>(sp => new AdminSettingsService(
             sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
-            development: sp.GetService<IHostEnvironment>()?.IsDevelopment() ?? false));
+            development: sp.GetService<IHostEnvironment>()?.IsDevelopment() ?? false,
+            store: sp.GetRequiredService<IAdminSettingsStore>(),
+            logger: sp.GetService<ILogger<AdminSettingsService>>()));
         services.AddScoped<IDebugOptionsService, DebugOptionsService>();
 
         // Scoped services
@@ -88,11 +133,12 @@ public static class DependencyInjection
         // !records-sources/ (правило 11 pre-push). Путь из конфига, относительный считается от
         // ContentRoot; пустой — архив выключен. Вне Development относительный путь тоже
         // выключает архив — см. FileRecordRunArchive.ResolveDirectory.
+        // ProdAdmin (В17) — тоже машина Влада с репозиторием: боевой прогон по странам идёт оттуда.
         services.AddSingleton<IRecordRunArchive>(sp =>
         {
             var env = sp.GetRequiredService<IHostEnvironment>();
             var dir = FileRecordRunArchive.ResolveDirectory(
-                configuration["RecordsImport:SourceArchiveDir"], env.ContentRootPath, env.IsDevelopment());
+                configuration["RecordsImport:SourceArchiveDir"], env.ContentRootPath, HostingEnvironments.IsLocalMachine(env));
 
             return new FileRecordRunArchive(
                 dir, sp.GetRequiredService<ILogger<FileRecordRunArchive>>());
@@ -340,5 +386,22 @@ public static class DependencyInjection
         services.AddScoped<ISuspectResultService, SuspectResultService>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Источник соединений моста кэша — свой, мимо пула EF: слушающее соединение живёт часами, и
+    /// держать его в общем пуле значило бы отнять слот у запросов. KeepAlive — чтобы обрыв
+    /// (перезапуск сервера, балансировщик Azure) замечался, а не висел молча.
+    /// </summary>
+    private static Npgsql.NpgsqlDataSource BridgeDataSource(string? connectionString, int timeoutSeconds)
+    {
+        var b = new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Timeout = timeoutSeconds,
+            CommandTimeout = timeoutSeconds,
+            KeepAlive = 30,
+            ApplicationName = "swimm-cache-bridge",
+        };
+        return Npgsql.NpgsqlDataSource.Create(b.ConnectionString);
     }
 }
