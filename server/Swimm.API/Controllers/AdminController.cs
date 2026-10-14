@@ -153,7 +153,8 @@ public class AdminController : ControllerBase
     {
         if (!_settings.Update(key, request.Value))
             return BadRequest(new { error = "Invalid key or value type mismatch" });
-        // Настройки живут в памяти, не в базе, — сброс по меткам таблиц их не видит. А кэшированные
+        // Записанная строка Sys_AdminSettings сбросит только метку своей таблицы — ответы, которые
+        // от настройки зависят, этой метки не носят. А кэшированные
         // ответы от них зависят: ось возраста рекордов (RecordAgeAxis) в ключ кэша не входит, и без
         // сброса обзор соревнования и страница пловца до 5 минут считали бы по старой оси.
         await _cacheService.InvalidateAllAsync($"настройка «{key}» изменена");

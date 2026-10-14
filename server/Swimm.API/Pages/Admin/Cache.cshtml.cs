@@ -21,8 +21,16 @@ namespace Swimm.API.Pages.Admin;
 public class CacheModel : PageModel
 {
     private readonly ICacheDiagnostics _diagnostics;
+    private readonly ICacheBridgeStatus _bridge;
 
-    public CacheModel(ICacheDiagnostics diagnostics) => _diagnostics = diagnostics;
+    public CacheModel(ICacheDiagnostics diagnostics, ICacheBridgeStatus bridge)
+    {
+        _diagnostics = diagnostics;
+        _bridge = bridge;
+    }
+
+    /// <summary>Мост сброса между процессами (В17): жив ли канал и что через него прошло.</summary>
+    public CacheBridgeState Bridge { get; private set; } = null!;
 
     public IReadOnlyList<CachePolicyRow> Policies { get; private set; } = [];
 
@@ -50,6 +58,7 @@ public class CacheModel : PageModel
     public void OnGet()
     {
         Policies = CachePolicyCatalog.Build(typeof(CacheModel).Assembly);
+        Bridge = _bridge.State();
         Entries = _diagnostics.Snapshot();
         Journal = _diagnostics.Journal();
         Overview = CacheOverview.From(Entries, Journal, Environment.WorkingSet, GC.GetGCMemoryInfo().HeapSizeBytes);

@@ -45,7 +45,8 @@ plus repo-specific footguns.
   boundary rules for the Application layer.
 
 **Skills for recurring multi-step ops:** `/db-migrate` (EF migrations with the two-context flag),
-`/smoke-test-api` (build → run → poll → curl → stop, handles the build-lock).
+`/smoke-test-api` (build → run → poll → curl → stop, handles the build-lock),
+`/db-sync-from-prod` (локальная копия бизнес-данных с прода, слиянием).
 
 ---
 
@@ -163,6 +164,13 @@ if unset. ⚠ **Порядок на чистой БД жёсткий и не п�
 Наполнение прод-БД — `dump-seed.sh` / `restore-seed.sh` (что переносится и что нет — в
 `server/db/seed-tables.txt`). Read-only public path uses `SwimmReadDbContext`; everything that writes or touches
 `Sys_*` uses `SwimmDbContext`.
+
+**Прод vs локальная (В17, `docs/plans/azure-deploy-plan.md` §0-тер-бис).** После запуска прода
+главная база — прод; локальная — копия. **Перед работой с данными** (импорт, склейки, проверки)
+убедись, что локальная не отстаёт: Warning «Локальная база отстаёт от прода» в логе API / жёлтая
+полоса в админке → `/db-sync-from-prod`. Что должно оказаться на сайте, делается не в локальной
+базе, а в профиле **ProdAdmin** (`--launch-profile ProdAdmin`, красная полоса «PRODUCTION
+DATABASE») — его запускает Влад; агент без явной просьбы в ProdAdmin не пишет.
 
 ## Migrations
 

@@ -200,7 +200,7 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
 
         await SubscribeOfficialGroupAsync(group.Id, request.ClubId, request.DecidedByUserId);
 
-        await _email.SendAsync(request.User.Email, "Swimm — club request approved",
+        await _email.SendAsync(request.User.Email, "SwimHub — club request approved",
             $"Your group \"{group.Name}\" is now the official group of {request.Club!.Name}. " +
             "You've been granted the Coach role for managing groups.");
 
@@ -233,7 +233,7 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
         request.DecidedByUserId = await ResolveAdminUserIdAsync(adminUserId);
         await _db.SaveChangesAsync();
 
-        await _email.SendAsync(request.User!.Email, "Swimm — club request rejected",
+        await _email.SendAsync(request.User!.Email, "SwimHub — club request rejected",
             $"Your official-status request for group \"{request.HubGroup!.Name}\" was not approved.");
 
         return HubGroupMemberSaveResult.Ok();

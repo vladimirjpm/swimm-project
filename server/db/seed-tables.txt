@@ -81,6 +81,13 @@ Sys_StartListPulls           # журнал заборов стартового 
 # Заполняются кодом при старте — перенос дал бы конфликт первичных ключей:
 #   Sys_AppRoles, Sys_DebugOptions
 #
+# У каждой базы свои (решение В17, docs/plans/azure-deploy-plan.md §0-четыре):
+#   Sys_AdminSettings — изменённые настройки /Admin/Settings: у прода — прода, у локальной — свои;
+#   Sys_DataVersion, Sys_SyncState — версия данных и отметка синхронизации «прод → локально».
+#
+# ⚠ Этот список — ещё и набор таблиц с триггером версии Sys_DataVersion_Bump: новая строка здесь
+#   требует миграции с триггером (pre-push-rules.md, правило 13), иначе упадёт DataVersionPgTests.
+#
 # Журнал проверок целостности — должен отражать прогоны В ПРОДЕ, а не локальные.
 # Восстанавливается первым запуском реестра на /Admin/Health:
 #   Sys_DataCheckRuns, Sys_DataCheckFindings, Sys_DataCheckStates

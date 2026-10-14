@@ -69,6 +69,32 @@ GRANT SELECT ON "Sys_RecordIssues" TO swimm_ro;
 -- данные конкретного залогиненного пользователя; они ходят ТОЛЬКО через SwimmDbContext
 -- (роль swimm_rw, authenticated path). RO-путь — публичный анонимный read.
 
+-- ── swimm_sync: чтение для синхронизации «прод → локально» (В17) ───────────
+-- Только если роль заведена (01-roles.sql с sync_password). Список таблиц здесь не дублируем:
+-- переносятся ровно таблицы с триггером версии Sys_DataVersion_Bump, а его ставят миграции по
+-- seed-tables.txt (сверяет DataVersionPgTests). Персональных данных в этих таблицах нет.
+-- Последовательности — целиком: pg_dump читает состояние последовательностей своих таблиц,
+-- а данных в них нет. __EFMigrationsHistory — чтобы скрипт сверил схему до заливки.
+DO $$
+DECLARE r record;
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'swimm_sync') THEN
+        RAISE NOTICE 'swimm_sync нет — гранты синхронизации пропущены';
+        RETURN;
+    END IF;
+    FOR r IN
+        SELECT DISTINCT c.relname
+          FROM pg_trigger t
+          JOIN pg_class c     ON c.oid = t.tgrelid
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE t.tgname = 'Sys_DataVersion_Bump' AND n.nspname = 'public'
+    LOOP
+        EXECUTE format('GRANT SELECT ON public.%I TO swimm_sync', r.relname);
+    END LOOP;
+    GRANT SELECT ON "Sys_DataVersion", "__EFMigrationsHistory" TO swimm_sync;
+    GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO swimm_sync;
+END $$;
+
 -- ── Проверка ────────────────────────────────────────────────────────────────
 \echo ''
 \echo 'Гранты применены. Таблиц, доступных swimm_ro на чтение (ожидается 31):'

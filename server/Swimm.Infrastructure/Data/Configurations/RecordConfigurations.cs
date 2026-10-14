@@ -96,6 +96,20 @@ internal sealed class DebugOptionConfiguration : IEntityTypeConfiguration<DebugO
     }
 }
 
+// Настройки /Admin/Settings в БД (В7). Sys_: служебное, публичной роли не нужно; в прод-наполнение
+// и синхронизацию «прод → локально» не едет — у каждой базы свои (seed-tables.txt).
+internal sealed class AdminSettingValueConfiguration : IEntityTypeConfiguration<AdminSettingValue>
+{
+    public void Configure(EntityTypeBuilder<AdminSettingValue> entity)
+    {
+        entity.ToTable("Sys_AdminSettings");
+        entity.HasKey(e => e.Key);
+        entity.Property(e => e.Key).HasMaxLength(100);
+        entity.Property(e => e.Value).HasMaxLength(2000);
+        entity.Property(e => e.UpdatedBy).HasMaxLength(200);
+    }
+}
+
 internal sealed class NormativeStandardConfiguration : IEntityTypeConfiguration<NormativeStandard>
 {
     public void Configure(EntityTypeBuilder<NormativeStandard> entity)

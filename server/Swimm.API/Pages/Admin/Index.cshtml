@@ -20,7 +20,10 @@
             <span class="text-[11px]">SQL-счётчик или очередь — добавляется конфигом.</span>
         </div>
 
-        <div id="dash-system" class="mt-auto pt-3 border-t border-admin-border flex gap-6 flex-wrap text-[11px] text-admin-text-muted"></div>
+        <div id="dash-system"
+             data-email-label="@Swimm.API.Pages.Admin.Shared.EmailStatusView.ShortLabel(Model.EmailTransport)"
+             data-email-warn="@(Model.EmailTransport.IsHealthy ? "0" : "1")"
+             class="mt-auto pt-3 border-t border-admin-border flex gap-6 flex-wrap text-[11px] text-admin-text-muted"></div>
     </div>
 
     <!-- Правая панель деталей выбранного блока -->

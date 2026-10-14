@@ -38,6 +38,14 @@
          docs/plans/azure-deploy-plan.md Б7. -->
     <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
     <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" />
+    <!-- Профиль ProdAdmin (локальная админка против прод-БД, решение В17) — только для машины
+         Влада: на проде админки нет, а в .Local.json лежат прод-пароли. -->
+    <Content Update="appsettings.ProdAdmin.json" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.ProdAdmin.Local.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Swimm.Tests" />
   </ItemGroup>
 
   <ItemGroup>

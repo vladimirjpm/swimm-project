@@ -82,7 +82,9 @@ jobs:
             fail=1
           fi
 
-          for f in publish/wwwroot/css/admin.min.css publish/wwwroot/swimmer.js publish/wwwroot/data/filter-data.js; do
+          # appsettings.Production.json выключает на проде админку и фоновые джобы (В17) — без него
+          # прод поднимется с открытой /Admin.
+          for f in publish/wwwroot/css/admin.min.css publish/wwwroot/swimmer.js publish/wwwroot/data/filter-data.js publish/appsettings.Production.json; do
             if [ ! -f "$f" ]; then
               echo "::error::Нет обязательного файла: $f"
               fail=1
@@ -90,7 +92,8 @@ jobs:
           done
 
           # Локальные конфиги содержат живые ключи и DevAdminBypass — в артефакте их быть не должно.
-          for f in publish/appsettings.Development.json publish/appsettings.Local.json; do
+          # ProdAdmin.* — профиль локальной админки против прод-БД, в .Local.json прод-пароли.
+          for f in publish/appsettings.Development.json publish/appsettings.Local.json publish/appsettings.ProdAdmin.json publish/appsettings.ProdAdmin.Local.json; do
             if [ -f "$f" ]; then
               echo "::error::В артефакт попал локальный конфиг: $f"
               fail=1

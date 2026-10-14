@@ -73,6 +73,8 @@ public class SwimmDbContext : DbContext
 
     /// <summary>Отладочные подробности витрин (двухуровневый выключатель, см. DebugOption).</summary>
     public DbSet<DebugOption> DebugOptions => Set<DebugOption>();
+    /// <summary>Изменённые настройки /Admin/Settings (В7): реестр и дефолты — в AdminSettingsService.</summary>
+    public DbSet<AdminSettingValue> AdminSettingValues => Set<AdminSettingValue>();
 
     /* === Импорт === */
     public DbSet<ImportHistory> ImportHistory => Set<ImportHistory>();

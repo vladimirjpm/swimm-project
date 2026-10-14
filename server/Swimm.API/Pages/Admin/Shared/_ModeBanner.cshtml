@@ -1,0 +1,26 @@
+@using Swimm.API.Hosting
+@inject IHostEnvironment Env
+@inject ProdAdminGuard.Info ProdAdmin
+@inject Swimm.Application.Abstractions.IDataSyncStatus DataSync
+@* Метки режима (В17, docs/plans/azure-deploy-plan.md §0-тер-бис).
+   Красная — ProdAdmin: админка пишет в ПРОД-БД, чтобы не перепутать, где удаляешь.
+   Жёлтая — разработка, локальная копия отстаёт от прода (сверка DataSyncCheckBackgroundService). *@
+@if (Env.IsProdAdmin())
+{
+    <div class="sticky top-0 z-40 flex flex-wrap items-center gap-x-3 gap-y-1 bg-admin-danger px-6 py-2 text-[13px] font-semibold text-white">
+        <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"alert-triangle"' />
+        <span class="tracking-wide">PRODUCTION DATABASE</span>
+        <span class="font-normal opacity-90">@ProdAdmin.DatabaseHost / @ProdAdmin.DatabaseName</span>
+        @if (ProdAdmin.GitBranch is { } branch)
+        {
+            <span class="font-normal opacity-90">· ветка @branch@(branch == "master" ? "" : " — НЕ master")</span>
+        }
+    </div>
+}
+else if (Env.IsDevelopment() && DataSync.Current?.Warning() is { } lag)
+{
+    <div class="flex items-center gap-2.5 border-b border-admin-warning/30 bg-admin-warning/10 px-6 py-2.5 text-[13px] text-admin-warning">
+        <partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"alert-triangle"' />
+        <span>@lag</span>
+    </div>
+}

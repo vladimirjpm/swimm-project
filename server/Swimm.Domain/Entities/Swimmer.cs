@@ -55,6 +55,14 @@ public class Swimmer
     [ForeignKey(nameof(PrivateHubGroupId))]
     public HubGroup? PrivateHubGroup { get; set; }
 
+    /// <summary>
+    /// Скрыть страницу пловца из поисковиков — по просьбе (A10 шаг 1, /privacy). Страница
+    /// остаётся открытой по ссылке и данные протокола не прячутся (Р76): только
+    /// <c>noindex</c> на странице и исключение из <c>sitemap.xml</c>. Ставит админ на
+    /// /Admin/Swimmers.
+    /// </summary>
+    public bool HideFromSearch { get; set; }
+
     /// <summary>ID спортсмена в федерации</summary>
     [MaxLength(50)]
     public string? SwimmerOrgId { get; set; }

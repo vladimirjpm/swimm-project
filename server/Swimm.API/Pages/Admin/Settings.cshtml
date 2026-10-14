@@ -1,17 +1,44 @@
 ﻿@page
 @model Swimm.API.Pages.Admin.SettingsModel
+@using Swimm.API.Pages.Admin.Shared
 @{
     ViewData["Title"] = "Settings";
     ViewData["PageSubtitle"] = "Параметры приложения (admin / livesite / both)";
 }
 
 <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
-    Параметры хранятся <strong class="text-admin-text">в памяти</strong> и сбрасываются при перезапуске сервера.<br>
+    Изменённые значения хранятся <strong class="text-admin-text">в БД</strong> (<code>Sys_AdminSettings</code>) и переживают рестарт; дефолты — в коде.
+    Правка из локальной админки (ProdAdmin) доходит до прода через мост кэша, страховка — перечитывание раз в 5 минут.<br>
     <strong class="text-admin-text">Scope</strong> показывает к чему относится параметр:
     <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-admin-accent/15 text-admin-accent">admin</span> — только админ-панель,
     <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-admin-success/15 text-admin-success">livesite</span> — только публичная часть,
     <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-[rgba(206,147,216,0.15)] text-[#ce93d8]">both</span> — и то и другое.<br>
     Изменение параметров со scope <span class="text-[0.7rem] py-0.5 px-1.5 rounded-sm font-semibold uppercase whitespace-nowrap bg-admin-accent/15 text-admin-accent">admin</span> автоматически сбрасывает кеш схемы БД.
+</div>
+
+@{
+    var mail = Model.EmailTransport;
+    var mailOk = mail.IsHealthy;
+}
+<div id="email" class="admin-card mb-6 flex flex-wrap items-center gap-3 @(mailOk ? "" : "border-l-[3px] border-l-admin-warning")">
+    <div class="flex-1 min-w-[240px]">
+        <div class="text-sm font-semibold text-admin-text">
+            Почта:
+            <span class="@(mailOk ? "text-admin-success" : "text-admin-warning")">@EmailStatusView.ShortLabel(mail)</span>
+        </div>
+        <div class="text-xs text-admin-text-muted leading-relaxed">@EmailStatusView.Detail(mail)</div>
+        @if (Model.EmailTestResult != null)
+        {
+            <div class="text-xs mt-1 @(Model.EmailTestFailed ? "text-admin-danger" : "text-admin-success")">@Model.EmailTestResult</div>
+        }
+    </div>
+    <form method="post" asp-page-handler="TestEmail">
+        <button type="submit" class="admin-btn admin-btn-primary @(EmailStatusView.CanSendTest(mail) && Model.AdminEmail != null ? "cursor-pointer" : "opacity-50 cursor-not-allowed")"
+                disabled="@(!EmailStatusView.CanSendTest(mail) || Model.AdminEmail == null)"
+                title="@(Model.AdminEmail != null ? $"Письмо уйдёт на {Model.AdminEmail}" : "У аккаунта нет email")">
+            Отправить тестовое письмо мне
+        </button>
+    </form>
 </div>
 
 <div class="admin-card mb-6 flex flex-wrap items-center gap-3">

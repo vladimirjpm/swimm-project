@@ -142,27 +142,7 @@ EPILOGUE
 # последовательность — это конфликт первичного ключа на первой же вставке в
 # проде. Поэтому пересчитываем от фактического максимума и проверяем.
 echo "Сверяю последовательности..."
-run_psql -q -c "
-DO \$\$
-DECLARE r record; mx bigint; cur bigint;
-BEGIN
-    FOR r IN
-        SELECT c.relname AS tbl, a.attname AS col, pg_get_serial_sequence(quote_ident(c.relname), a.attname) AS seq
-          FROM pg_class c
-          JOIN pg_namespace n ON n.oid = c.relnamespace
-          JOIN pg_attribute a ON a.attrelid = c.oid
-         WHERE n.nspname = 'public' AND c.relkind = 'r' AND a.attidentity <> ''
-    LOOP
-        IF r.seq IS NULL THEN CONTINUE; END IF;
-        EXECUTE format('SELECT coalesce(max(%I), 0) FROM %I', r.col, r.tbl) INTO mx;
-        SELECT last_value INTO cur FROM pg_sequences
-         WHERE schemaname = 'public' AND sequencename = split_part(r.seq, '.', 2);
-        IF mx > coalesce(cur, 0) THEN
-            PERFORM setval(r.seq, mx);
-            RAISE NOTICE 'seq % -> %', r.seq, mx;
-        END IF;
-    END LOOP;
-END \$\$;"
+run_psql -q -f - < "$SCRIPT_DIR/fix-sequences.sql"  # общий шаг с sync-from-prod.sh
 
 echo ""
 echo "Готово. Что получилось:"

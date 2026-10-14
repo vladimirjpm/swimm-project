@@ -22,6 +22,7 @@ public class SwimmersAdminController : ControllerBase
     private readonly IAdminAuditService _audit;
     private readonly IDataQualityService _quality;
     private readonly IDataCheckRunner _checks;
+    private readonly ISearchVisibilityService _visibility;
     private readonly ILogger<SwimmersAdminController> _logger;
 
     public SwimmersAdminController(
@@ -31,6 +32,7 @@ public class SwimmersAdminController : ControllerBase
         IAdminAuditService audit,
         IDataQualityService quality,
         IDataCheckRunner checks,
+        ISearchVisibilityService visibility,
         ILogger<SwimmersAdminController> logger)
     {
         _dedup = dedup;
@@ -39,6 +41,7 @@ public class SwimmersAdminController : ControllerBase
         _audit = audit;
         _quality = quality;
         _checks = checks;
+        _visibility = visibility;
         _logger = logger;
     }
 
@@ -132,6 +135,29 @@ public class SwimmersAdminController : ControllerBase
             $"Пол '{request.Gender}' проставлен пловцу; строк результата поправлено — {rows}",
             new { swimmerId = id, request.Gender, rows }, ct);
         return Ok(new { rows });
+    }
+
+    /// <summary>Пловцы, скрытые из поиска по просьбе (A10 шаг 1, /privacy).</summary>
+    [HttpGet("search-hidden")]
+    public async Task<IActionResult> ListSearchHidden(CancellationToken ct)
+        => Ok(await _visibility.ListHiddenAsync(ct));
+
+    public sealed record SearchHiddenRequest(bool Hidden);
+
+    /// <summary>
+    /// Скрыть / вернуть пловца в поиск: <c>noindex</c> на его странице и исключение из
+    /// sitemap.xml. Страница и результаты остаются (Р76) — это не удаление.
+    /// </summary>
+    [HttpPost("{id:int}/search-hidden")]
+    public async Task<IActionResult> SetSearchHidden(int id, [FromBody] SearchHiddenRequest request, CancellationToken ct)
+    {
+        if (!await _visibility.SetHiddenAsync(id, request.Hidden, ct))
+            return NotFound(new { error = "Пловец не найден (или это пловец закрытой группы — его и так нет в поиске)" });
+
+        await _audit.LogAsync(request.Hidden ? "swimmer.search-hide" : "swimmer.search-unhide", "Swimmer", id.ToString(),
+            request.Hidden ? "Пловец скрыт из поиска (noindex, вне sitemap)" : "Пловец возвращён в поиск",
+            new { swimmerId = id, request.Hidden }, ct);
+        return Ok();
     }
 
     public sealed record DeleteOrphansRequest(List<int>? Ids);

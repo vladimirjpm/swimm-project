@@ -92,7 +92,8 @@ public class CacheValueRulesTests
         var offenders = CacheCalls()
             .Where(c => c.Called.Name == "SetAsync")
             .Select(c => IlCalls.OuterType(c.Caller.DeclaringType!))
-            .Where(t => t != typeof(MemoryCacheService) && t != typeof(ICacheService))
+            // Мост кэша (В17) — тоже часть самого кэша: обёртка, которая делегирует каждый член.
+            .Where(t => t != typeof(MemoryCacheService) && t != typeof(ICacheService) && t != typeof(BridgingCacheService))
             .Select(t => t.Name)
             .Distinct()
             .ToList();

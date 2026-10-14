@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Swimm.API.BackgroundServices;
+using Swimm.API.Hosting;
 using Swimm.API.Security;
 using Swimm.API.Services;
 using Swimm.Application;
@@ -27,6 +28,16 @@ var builder = WebApplication.CreateBuilder(args);
 // docs/plans/azure-deploy-plan.md Б7.
 if (builder.Environment.IsDevelopment())
     builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+
+// ProdAdmin (решение В17): локальная админка против прод-БД. Прод-пароли и Google-секрет —
+// в gitignored-файле, по той же схеме, что Local.json в разработке: процесс крутится на машине
+// Влада, переменных App Service тут нет, перебивать нечего. Образец — *.example рядом.
+if (builder.Environment.IsProdAdmin())
+    builder.Configuration.AddJsonFile("appsettings.ProdAdmin.Local.json", optional: true, reloadOnChange: false);
+
+// Форма процесса (В17): на проде админка и фоновые джобы выключены — appsettings.Production.json.
+var adminEnabled = HostingMode.AdminEnabled(builder.Configuration);
+var backgroundJobsEnabled = HostingMode.BackgroundJobsEnabled(builder.Configuration);
 
 // Сжатие ответов. Замер 2026-08-25: справочники, которые тянет КАЖДАЯ страница
 // (records + normative-standards), весят 1.9 МБ несжатыми и 118 КБ в gzip — 94%.
@@ -93,14 +104,28 @@ builder.Services.AddCors(options =>
 builder.Services.AddProblemDetails();
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
+// Красная полоса админки в ProdAdmin: куда подключены и с какой ветки (читается раз на старте).
+builder.Services.AddSingleton(_ => ProdAdminGuard.Describe(builder.Configuration, builder.Environment));
 
 // Аудит админки (фаза 7.4): actor берётся из HTTP-контекста через ICurrentActor.
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentActor, Swimm.API.Services.HttpCurrentActor>();
-builder.Services.AddHostedService<ImportBackgroundService>();
 
-// Прогон рекордов по странам (11.1.2) — 470 файлов, час-два; в HTTP-запрос не пролезет.
-builder.Services.AddHostedService<Swimm.API.BackgroundServices.RecordCountryRunBackgroundService>();
+// Фоновые джобы — только где есть админка, которая их ставит и смотрит (В17). На проде из
+// фоновых остаются пинг БД (ниже) и мост сброса кэша (AddInfrastructure): от флага они не зависят.
+if (backgroundJobsEnabled)
+{
+    builder.Services.AddHostedService<ImportBackgroundService>();
+
+    // Прогон рекордов по странам (11.1.2) — 470 файлов, час-два; в HTTP-запрос не пролезет.
+    builder.Services.AddHostedService<Swimm.API.BackgroundServices.RecordCountryRunBackgroundService>();
+
+    builder.Services.AddHostedService<Swimm.API.BackgroundServices.CompetitionDiscoveryBackgroundService>();
+    // Публичная кнопка «предложить loglig-id» на проде остаётся: предложения копятся в БД
+    // (Suggested) и проверяются этим джобом, когда запущена локальная админка (ProdAdmin).
+    builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligSuggestionVerificationBackgroundService>();
+    builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligBatchBackgroundService>();
+}
 
 // Rate limiting для чувствительных к перебору auth-эндпоинтов (login/register/forgot/reset).
 // Фиксированное окно по IP: 10 запросов в минуту, лишнее — 429.
@@ -175,9 +200,9 @@ builder.Services.AddRateLimiter(options =>
 });
 // Antiforgery: header-based (double-submit) для защиты admin-мутаций.
 // Клиент читает токен из JS-переменной, генерируемой в _Layout.cshtml, и посылает в этом заголовке.
-// В проде кука уходит только по HTTPS; в деве сайт живёт на http://localhost, поэтому
-// SameAsRequest — иначе локальный вход перестал бы работать.
-var secureCookiePolicy = builder.Environment.IsDevelopment()
+// В проде кука уходит только по HTTPS; в деве (и в ProdAdmin — та же машина Влада) сайт живёт
+// на http://localhost, поэтому SameAsRequest — иначе локальный вход перестал бы работать.
+var secureCookiePolicy = builder.Environment.IsLocalMachine()
     ? CookieSecurePolicy.SameAsRequest
     : CookieSecurePolicy.Always;
 
@@ -216,14 +241,15 @@ var authBuilder = builder.Services
         options.Events.OnValidatePrincipal = CookieSecurityStampValidator.ValidateAsync;
     })
     // Транзитная схема для OAuth-рукопожатия. Google пишет промежуточные claims сюда,
-    // а не в основную куку → OnValidatePrincipal их не трогает. Короткоживущая.
+    // а не в основную куку → OnValidatePrincipal их не трогает. Короткоживущая; 15 минут —
+    // запас на шаг «мне 13+» нового пользователя (В4), если он пошёл читать /privacy.
     .AddCookie(AuthSchemes.External, options =>
     {
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = secureCookiePolicy;
         options.Cookie.Name = "Swimm.External";
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
     });
 
 if (googleEnabled)
@@ -242,14 +268,20 @@ if (googleEnabled)
 
 builder.Services.AddSingleton<DbStatusService>();
 builder.Services.AddHostedService<DbPingBackgroundService>();
-builder.Services.AddHostedService<Swimm.API.BackgroundServices.CompetitionDiscoveryBackgroundService>();
-builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligSuggestionVerificationBackgroundService>();
-builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligBatchBackgroundService>();
+
+// Разработка: не отстаёт ли локальная копия от прода (В17). Молчит без ProdVersionConnection.
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddHostedService<DataSyncCheckBackgroundService>();
 
 var app = builder.Build();
 
 // Консольные команды (--migrate, --repull, --check-data, …) — Cli/CliCommands.cs: выполнить одну и выйти.
 if (await Swimm.API.Cli.CliCommands.TryRunAsync(app, args)) return;
+
+// ProdAdmin пишет в прод-БД — стартовать можно только с кодом, совпадающим со схемой прода,
+// и только против настоящей прод-базы. CLI (--migrate) выше этой проверки намеренно.
+if (app.Environment.IsProdAdmin())
+    await ProdAdminGuard.EnsureSafeToStartAsync(app);
 
 // ПЕРВЫМ в конвейере: остальные middleware (и OAuth, и rate-limiter) должны видеть уже
 // исправленные Scheme и RemoteIpAddress. docs/plans/azure-deploy-plan.md Б5.
@@ -262,11 +294,43 @@ if (!app.Environment.IsDevelopment())
     // для остальных — минимальная страница с кодом.
     app.UseExceptionHandler("/error");
     app.UseStatusCodePagesWithReExecute("/error", "?code={0}");
+}
+
+// ProdAdmin — localhost по http, как разработка: HSTS и редирект на https ему не нужны.
+if (!app.Environment.IsLocalMachine())
+{
     app.UseHsts();
     // /healthz — мимо HTTPS-редиректа: health-check App Service считает инстанс здоровым
     // только на 2xx, а 307 сочтёт отказом и начнёт перезапускать живой процесс.
     app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/healthz"),
         branch => branch.UseHttpsRedirection());
+
+    // www.swimhub.co.il → swimhub.co.il (A10): у сайта один адрес — в выдаче, в canonical и в
+    // redirect URI Google. Остальные хосты (*.azurewebsites.net) не трогаем.
+    var seoBaseUrl = app.Configuration[SeoPages.BaseUrlKey] ?? SeoPages.DefaultBaseUrl;
+    app.Use(async (context, next) =>
+    {
+        var target = SeoPages.WwwRedirect(context.Request.Host.Host,
+            $"{context.Request.PathBase}{context.Request.Path}{context.Request.QueryString}", seoBaseUrl);
+        if (target is null) { await next(); return; }
+        context.Response.Redirect(target, permanent: true);
+    });
+}
+
+// Админка выключена (прод, В17): её пути — 404, как будто их нет. Раньше аутентификации, чтобы
+// аноним не получал редирект на вход в несуществующую админку, а вошедший — 403 вместо 404.
+// Страницу 404 рисует UseStatusCodePagesWithReExecute выше.
+if (!adminEnabled)
+{
+    app.Use(async (context, next) =>
+    {
+        if (HostingMode.IsAdminPath(context.Request.Path))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+        await next();
+    });
 }
 
 // До статики и эндпоинтов: иначе middleware не увидит ответ, который надо сжать.
@@ -361,7 +425,13 @@ app.Use(async (context, next) =>
     {
         var rewrite = ResolveCleanUrl(path);
         if (rewrite is not null)
+        {
+            // Страница пловца/клуба/соревнования — с серверными title/description/canonical
+            // (A10). Не наша страница или клиента нет в wwwroot — отдаём файл как раньше.
+            if (await SeoPages.TryServeAsync(context, path, rewrite))
+                return;
             context.Request.Path = rewrite;
+        }
     }
 
     await next();
@@ -386,6 +456,7 @@ app.Use(async (context, next) =>
                 "my-media" => "/media.html",
                 "my-favorites" => "/my-favorites.html", // своё избранное и пометка «семья»
                 "about" => "/about.html",
+                "privacy" => "/help.html",              // политика приватности — справка с ключом privacy
                 "season-best" => "/season-best.html",   // весь фильтр в query
                 "h2h" => "/h2h.html",                   // сравнение двух пловцов, пара в query
                 "records" => "/records.html",           // рейтинг рекордов стран, дисциплина в query
@@ -413,8 +484,11 @@ app.UseDefaultFiles(new DefaultFilesOptions
     // Порядок значим. В ПРОДЕ publish кладёт сюда клиента, и `/` отдаёт его витрину.
     // ЛОКАЛЬНО клиента в wwwroot нет (он живёт на Vite :5173), и `/` откатывается на
     // admin-home.html — серверную страницу входа в админку. Один и тот же адрес показывает
-    // ту сторону, которая в этом окружении вообще есть.
-    DefaultFileNames = new List<string> { "home.html", "admin-home.html", "index.html" }
+    // ту сторону, которая в этом окружении вообще есть. Без админки (прод, В17) её страницы
+    // входа в списке нет: потеряйся home.html в сборке — `/` даст 404, а не вход в админку.
+    DefaultFileNames = adminEnabled
+        ? new List<string> { "home.html", "admin-home.html", "index.html" }
+        : new List<string> { "home.html", "index.html" }
 });
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -426,7 +500,10 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
-app.MapRazorPages();
+// Razor Pages в проекте — только админка (Pages/Admin). Без неё не маппим вовсе: 404 даёт и
+// middleware выше, это вторая линия.
+if (adminEnabled)
+    app.MapRazorPages();
 app.MapControllers();
 
 // SPA не получает antiforgery-токен из Razor-разметки (_Layout.cshtml), поэтому
@@ -436,6 +513,16 @@ app.MapGet("/api/antiforgery/token", (IAntiforgery af, HttpContext ctx) =>
     var tokens = af.GetAndStoreTokens(ctx);
     return Results.Ok(new { token = tokens.RequestToken });
 }).RequireAuthorization();
+
+// sitemap.xml (A10 шаг 3): соревнования, клубы, пловцы — без скрытых из поиска и пловцов групп.
+// Ссылка на него — в robots.txt. Кэш списка — в репозитории, ответ браузеру — на час.
+app.MapGet("/sitemap.xml", async (ISeoRepository seo, IConfiguration config, HttpContext ctx) =>
+{
+    var paths = SeoPages.StaticSitemapPaths.Concat(await seo.GetSitemapPathsAsync(ctx.RequestAborted));
+    ctx.Response.Headers.CacheControl = "public, max-age=3600";
+    return Results.Text(SeoPages.BuildSitemap(paths, config[SeoPages.BaseUrlKey] ?? SeoPages.DefaultBaseUrl),
+        "application/xml; charset=utf-8");
+}).AllowAnonymous();
 
 app.MapGet("/api/db-status",
     (DbStatusService s) => Results.Ok(new { available = s.IsAvailable }))
@@ -540,20 +627,40 @@ app.MapGet("/api/client-config",
 // и админка), без SMTP письма с одноразовыми токенами уходят в лог, забытая AdminConnection
 // молча роняет рантайм на owner-роль. Пусть отказ будет видно в логе App Service.
 // docs/plans/azure-deploy-plan.md A2.
+{
+    // Форма процесса — одной строкой в лог при каждом старте, в любом окружении: по логу App
+    // Service сразу видно, не приехала ли на прод включённая админка.
+    var modeLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Swimm.Startup");
+    modeLog.LogInformation("Окружение {Environment}: админка {Admin}, фоновые джобы {Jobs}.",
+        app.Environment.EnvironmentName, adminEnabled ? "ВКЛ" : "выкл", backgroundJobsEnabled ? "ВКЛ" : "выкл");
+    if (adminEnabled && !backgroundJobsEnabled)
+        modeLog.LogWarning(
+            "Админка включена, а фоновые джобы — нет: импорт из очереди, прогон по странам и пакетный забор loglig встанут в очередь и не выполнятся.");
+}
+
 if (!app.Environment.IsDevelopment())
 {
     var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Swimm.Startup");
     var cfg = app.Configuration;
+    var prodAdmin = app.Environment.IsProdAdmin();
 
     if (!googleEnabled)
-        startupLog.LogCritical(
-            "Google OAuth ВЫКЛЮЧЕН: не задан Authentication__Google__ClientSecret. Вход через Google не работает, а /admin для анонима ведёт именно туда — админка недостижима.");
+        startupLog.LogCritical(adminEnabled
+            ? "Google OAuth ВЫКЛЮЧЕН: не задан Authentication__Google__ClientSecret. Вход через Google не работает, а /admin для анонима ведёт именно туда — админка недостижима."
+            : "Google OAuth ВЫКЛЮЧЕН: не задан Authentication__Google__ClientSecret. Пользователи сайта не могут войти через Google.");
 
     if (string.IsNullOrWhiteSpace(cfg["Email:Smtp:Host"]))
-        startupLog.LogCritical(
-            "SMTP НЕ НАСТРОЕН (пуст Email__Smtp__Host): письма подтверждения почты и сброса пароля никуда не уходят. Регистрация и восстановление доступа в проде не работают.");
+        startupLog.LogCritical(prodAdmin
+            ? "SMTP НЕ НАСТРОЕН (пуст Email__Smtp__Host): письма, которые шлёт локальная админка (решения по заявкам групп на клуб), уходят только в лог. Пароль Resend — Email:Smtp:Password в appsettings.ProdAdmin.Local.json."
+            : "SMTP НЕ НАСТРОЕН (пуст Email__Smtp__Host): письма подтверждения почты и сброса пароля никуда не уходят. Регистрация и восстановление доступа в проде не работают.");
 
-    foreach (var name in new[] { "DefaultConnection", "MigrationConnection", "AdminConnection", "ReadConnection" })
+    // MigrationConnection (owner-роль) сайту не нужна: миграции идут из ProdAdmin с машины Влада
+    // (В8, В17). На App Service её не задаём — пароль владельца базы на веб-сервере не лежит, —
+    // поэтому и не проверяем: там она — localhost-заглушка из appsettings.json, и это нормально.
+    var connectionNames = prodAdmin
+        ? new[] { "DefaultConnection", "MigrationConnection", "AdminConnection", "ReadConnection" }
+        : new[] { "DefaultConnection", "AdminConnection", "ReadConnection" };
+    foreach (var name in connectionNames)
     {
         var cs = cfg.GetConnectionString(name);
         if (string.IsNullOrWhiteSpace(cs))
@@ -567,11 +674,13 @@ if (!app.Environment.IsDevelopment())
                 "В строке подключения {Name} не задан SslMode. Azure Database for PostgreSQL требует TLS — добавь SslMode=Require.", name);
     }
 
-    if (cfg["AllowedHosts"] is null or "*")
+    // ProdAdmin слушает только localhost и наружу не смотрит: ни AllowedHosts, ни общее кольцо
+    // ключей Data Protection ему не нужны (кука локальной админки живёт на этой машине).
+    if (!prodAdmin && cfg["AllowedHosts"] is null or "*")
         startupLog.LogWarning(
             "AllowedHosts = \"*\": ссылки в письмах строятся из заголовка Host, то есть их можно подделать. Сузь до реального хоста прода.");
 
-    if (string.IsNullOrWhiteSpace(cfg["DataProtection:KeysDir"]))
+    if (!prodAdmin && string.IsNullOrWhiteSpace(cfg["DataProtection:KeysDir"]))
         startupLog.LogWarning(
             "DataProtection:KeysDir не задан — кольцо ключей лежит в эфемерной файловой системе. После деплоя или рестарта у всех слетят сессии и сломается antiforgery в админке.");
 }

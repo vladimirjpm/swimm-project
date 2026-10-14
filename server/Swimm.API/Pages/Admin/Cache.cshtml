@@ -177,19 +177,72 @@
     </p>
     <p>
         <strong class="text-admin-text">Весь кэш сбрасывают</strong> только импорт протоколов, смена
-        настроек (они живут в памяти, не в базе) и кнопка ниже. Параллельные запросы одного ответа
+        настроек (ответы от них зависят, а метки таблиц этого не видят) и кнопка ниже. Параллельные запросы одного ответа
         после сброса строят его <strong class="text-admin-text">один раз</strong>
         (<code>GetOrCreateAsync</code>), а ответ, собранный во время сброса, в кэш не ложится.
     </p>
     <p>
         <strong class="text-admin-text">Ручной сброс нужен</strong>, только когда данные поменяли
-        мимо этого процесса API: руками в базе, командой <code>dotnet run -- --флаг</code>, другим
-        экземпляром сервера. Кнопки — вверху страницы и в блоке «Кэш» дашборда; весь кэш — с
+        мимо кода: руками в базе (psql, DBeaver). Запись другим процессом — командой
+        <code>dotnet run -- --флаг</code>, локальной админкой в режиме ProdAdmin, другим экземпляром
+        сервера — доходит сама, через мост (блок ниже); выключен мост или лежит канал — тогда тоже
+        вручную. Кнопки — вверху страницы и в блоке «Кэш» дашборда; весь кэш — с
         подтверждением. Точечно: <strong class="text-admin-text">страницы всех клубов</strong>
         (метка <code>page:clubs</code>), одного клуба — «Refresh this club» в табе Admin страницы
         клуба (<code>page:club:{id}</code>). Свежие ответы соберутся при следующих запросах;
         браузеры посетителей это не трогает.
     </p>
+</div>
+
+@{ var br = Model.Bridge; }
+<h2 class="text-lg text-admin-accent m-0 mb-2">Между процессами: мост
+    @if (!br.Enabled)
+    {
+        <span class="admin-badge text-admin-text-muted">выключен</span>
+    }
+    else if (br.Listening)
+    {
+        <span class="admin-badge text-admin-success">слушает</span>
+    }
+    else
+    {
+        <span class="admin-badge text-admin-danger">канал недоступен</span>
+    }
+</h2>
+<div class="admin-card mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    <p class="mt-0">
+        Кэш у каждого процесса свой, в памяти. В базу пишет не только этот процесс: локальная админка
+        в режиме <strong class="text-admin-text">ProdAdmin</strong> и её CLI пишут прямо в прод-БД
+        (решение В17, <code>docs/plans/azure-deploy-plan.md</code> §0-тер). Поэтому каждый сброс —
+        после коммита, у себя — уходит ещё и в канал Postgres <code>@br.Channel</code>
+        (<code>pg_notify</code>), а каждый процесс слушает канал (<code>LISTEN</code>) и сбрасывает те
+        же метки у себя. Свои сообщения процесс пропускает — у себя уже сброшено. Пришедшие из канала
+        видны в журнале ниже с подписью «⇄ из другого процесса».
+    </p>
+    <p>
+        <strong class="text-admin-text">Чего мост не гарантирует:</strong> NOTIFY не хранится — пока
+        соединение лежит, сообщения теряются. Поэтому после каждого переподключения процесс сбрасывает
+        весь кэш. Отправка не удалась — запись в базе всё равно прошла, другие процессы увидят её через
+        TTL. Список меток длиннее 8000 байт уходит общим сбросом. По сообщению о настройках
+        (<code>Sys_AdminSettings</code>) процесс перечитывает их из базы, и ещё сам раз в 5 минут.
+        Выключатель — <code>CacheBridge:Enabled=false</code> в конфиге.
+    </p>
+    @if (br.Enabled)
+    {
+        <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 m-0">
+            <dt>Слушает с</dt>
+            <dd class="m-0 text-admin-text">@(br.ListeningSince?.ToLocalTime().ToString("dd.MM HH:mm:ss") ?? "—") · переподключений: @br.Reconnects</dd>
+            <dt>Отправлено</dt>
+            <dd class="m-0 text-admin-text">@br.Published · не удалось: @br.PublishFailures · общим сбросом из-за размера: @br.Oversized</dd>
+            <dt>Принято</dt>
+            <dd class="m-0 text-admin-text">@br.Received@(br.LastReceivedAt is { } at ? $" · последнее {at.ToLocalTime():dd.MM HH:mm:ss}: {br.LastReceivedReason ?? "без подписи"}" : "")</dd>
+            @if (br.LastError is not null)
+            {
+                <dt>Последняя ошибка</dt>
+                <dd class="m-0 text-admin-danger">@br.LastErrorAt?.ToLocalTime().ToString("dd.MM HH:mm:ss") — @br.LastError</dd>
+            }
+        </dl>
+    }
 </div>
 
 <h2 class="text-lg text-admin-accent m-0 mb-2">Сейчас в кэше: @Model.Entries.Count · @CacheOverview.Human(o.Bytes)</h2>

@@ -31,8 +31,10 @@ public class AdminSettingsServiceTests
         // + CacheRowPrecision/CacheHitVerifyPercent (точность сброса кэша, К4б.3, 2026-09-14)
         // + CacheColumnPrecision (служебные колонки, К4б.6, 2026-09-14)
         // + 4 потолка групп и рубильник самозаписи (HubGroupQuotaRules, Ш3.0, 2026-09-28)
-        // + MediaReportHideThreshold (порог жалоб «Report», Р62, 2026-09-29).
-        Assert.Equal(28, all.Count);
+        // + MediaReportHideThreshold (порог жалоб «Report», Р62, 2026-09-29)
+        // + LogligVerifyEnabled/LogligVerifyIntervalHours (ночная сверка loglig-id — джоб читал
+        //   их и раньше, но в реестре их не было; план деплоя §8.2, 2026-10-14).
+        Assert.Equal(30, all.Count);
     }
 
     [Fact]

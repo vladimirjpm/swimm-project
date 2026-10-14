@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import '../deep/deep-theme.css';
 import { useDeepThemeClass } from '../deep/use-deep-theme-class';
+import { routes } from '../../../utils/routes';
 
 // Модал логина (фаза 4.2-4.3). Общий компонент — используется из шапки на home/competitions/groups.
 // Режимы: login (Google + email/пароль) / register / forgot — переключаются внутри одного модала.
@@ -39,6 +40,7 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -51,6 +53,7 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
     setEmail('');
     setPassword('');
     setDisplayName('');
+    setAgeConfirmed(false);
     setError(null);
     setStatus(null);
     setSubmitting(false);
@@ -112,6 +115,7 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
           email: email.trim(),
           password,
           displayName: displayName.trim() || undefined,
+          ageConfirmed,
         }),
       });
       if (r.ok) {
@@ -298,6 +302,23 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              {/* Самодекларация 13+ (В4): без неё сервер аккаунт не создаёт. Текст — тот же,
+                  что на шаге первого входа через Google (AuthController.AgeConfirmationText). */}
+              <label className="flex cursor-pointer items-start gap-2.5 text-[12px] font-bold leading-snug text-[var(--t-text-2)]">
+                <input
+                  type="checkbox"
+                  required
+                  checked={ageConfirmed}
+                  onChange={(e) => setAgeConfirmed(e.target.checked)}
+                  className="mt-[2px] h-4 w-4 shrink-0 cursor-pointer accent-[var(--t-accent)]"
+                />
+                <span>
+                  I am 13 or older. If I am under 18, my parent or guardian knows I use SwimHub.{' '}
+                  <a href={routes.privacy()} target="_blank" rel="noreferrer" className="text-[var(--t-accent)] hover:underline">
+                    Privacy policy
+                  </a>
+                </span>
+              </label>
               {error && (
                 <p className="rounded-[11px] border border-[var(--t-danger-border)] bg-[var(--t-danger-soft)] px-4 py-[9px] text-[12px] font-bold text-[var(--t-danger)]">
                   {error}
@@ -305,7 +326,7 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
               )}
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || !ageConfirmed}
                 className="mt-1 rounded-[13px] bg-[image:var(--t-accent-grad)] px-4 py-[12px] text-[14px] font-black text-[var(--t-accent-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {submitting ? 'Creating…' : 'Create account'}

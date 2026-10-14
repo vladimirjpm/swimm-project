@@ -242,5 +242,54 @@
         }
     })();
 
+    // ── Скрыты из поиска (A10 шаг 1): noindex + вне sitemap.xml по просьбе. Не удаление. ──
+    (function () {
+        const body = document.getElementById('search-hidden-body');
+        const input = document.getElementById('search-hide-id');
+
+        async function setHidden(id, hidden) {
+            await apiJson(`${API}/${id}/search-hidden`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hidden })
+            });
+        }
+
+        async function loadHidden() {
+            try {
+                const list = await apiJson(`${API}/search-hidden`);
+                document.getElementById('search-hidden-summary').textContent = `Скрыты из поиска (${list.length})`;
+                body.innerHTML = list.length === 0
+                    ? '<div class="italic py-1">Никого.</div>'
+                    : list.map(s => `
+                        <div class="mb-1">
+                            <a href="/swimmers/${s.id}" target="_blank" rel="noopener" dir="rtl" class="text-admin-text hover:underline">${esc(s.name)}</a>
+                            <span class="text-[#546e7a]">#${s.id} (${s.birthYear || '—'}, ${esc(s.clubName ?? '—')})</span>
+                            <button class="search-unhide cursor-pointer ml-2 text-admin-accent hover:underline" data-id="${s.id}">вернуть в поиск</button>
+                        </div>`).join('');
+                [...body.querySelectorAll('.search-unhide')].forEach(btn =>
+                    btn.addEventListener('click', async () => {
+                        try {
+                            await setHidden(+btn.dataset.id, false);
+                            toast('Пловец возвращён в поиск', 3000);
+                            await loadHidden();
+                        } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+                    }));
+            } catch (e) { body.textContent = 'Ошибка: ' + e.message; }
+        }
+
+        document.getElementById('btn-search-hide').addEventListener('click', async () => {
+            const id = parseInt(input.value, 10);
+            if (!(id > 0)) { toast('Укажи Id пловца', 3000); return; }
+            try {
+                await setHidden(id, true);
+                input.value = '';
+                toast(`Пловец #${id} скрыт из поиска`, 3000);
+                await loadHidden();
+            } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+        });
+
+        loadHidden();
+    })();
+
     load();
 })();

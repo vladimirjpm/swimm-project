@@ -9,8 +9,9 @@ namespace Swimm.Application.Abstractions;
 public interface ILocalAuthService
 {
     /// <summary>Регистрация. Создаёт/привязывает локальные креды, отправляет письмо подтверждения.
-    /// Anti-enumeration: при существующем email возвращает Ok и шлёт соответствующее письмо.</summary>
-    Task<RegisterResult> RegisterAsync(string email, string password, string? displayName, string baseUrl, CancellationToken ct = default);
+    /// Anti-enumeration: при существующем email возвращает Ok и шлёт соответствующее письмо.
+    /// Без <paramref name="ageConfirmed"/> (галочка 13+, В4) — отказ до любых обращений к БД.</summary>
+    Task<RegisterResult> RegisterAsync(string email, string password, string? displayName, bool ageConfirmed, string baseUrl, CancellationToken ct = default);
 
     /// <summary>Вход. На Ok возвращает UserId (контроллер выпускает cookie). Управляет lockout-счётчиком.</summary>
     Task<LoginResult> LoginAsync(string email, string password, CancellationToken ct = default);

@@ -64,6 +64,21 @@
 </div>
 <div id="orphans" class="text-[12.5px] text-admin-text-muted leading-relaxed"></div>
 
+<details id="search-hidden-wrap" class="mt-10 max-w-[900px]">
+    <summary id="search-hidden-summary" class="cursor-pointer select-none text-sm font-semibold text-admin-text">Скрыты из поиска</summary>
+    <div class="mt-2 mb-3 text-[12.5px] text-admin-text-muted leading-relaxed">
+        По просьбе (письмо на privacy@@swimhub.co.il, страница <code>/privacy</code>): страница пловца получает
+        <code>noindex</code> и уходит из <code>sitemap.xml</code>. Это не удаление — страница
+        открывается по ссылке, результаты остаются в соревнованиях (Р76).
+    </div>
+    <div class="mb-3 flex flex-wrap items-center gap-2 text-[13px]">
+        <input id="search-hide-id" type="number" min="1" placeholder="Id пловца"
+               class="w-32 rounded-md border border-admin-border bg-transparent px-2 py-1.5 text-admin-text" />
+        <button id="btn-search-hide" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[13px] font-semibold">Скрыть из поиска</button>
+    </div>
+    <div id="search-hidden-body" class="text-[13px] text-admin-text-muted">Загружаю…</div>
+</details>
+
 <details id="quality-wrap" class="mt-10 max-w-[900px]">
     <summary id="quality-summary" class="cursor-pointer select-none text-sm font-semibold text-admin-text">Качество данных</summary>
     <div class="mt-2 mb-2 flex flex-wrap gap-2 text-[12.5px]">

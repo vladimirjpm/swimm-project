@@ -78,6 +78,29 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_AdminAudit", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.AdminSettingValue", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("Sys_AdminSettings", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.AppRole", b =>
                 {
                     b.Property<int>("Id")
@@ -123,6 +146,9 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AgeConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(1000)
@@ -3238,6 +3264,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<string>("Gender")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
+
+                    b.Property<bool>("HideFromSearch")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("LastName")
                         .IsRequired()

@@ -15,7 +15,7 @@
   (`DirectMemoryCacheTests`), обёртка `ClubJson`. Попутно починен `/api/categories/{key}` — жил без
   меток. Что и почему — строка К5 в §6 [cache-tags-plan.md](cache-tags-plan.md).
 - Тесты 1973/1973.
-- Настройки кэша (`/Admin/Settings`, живут в памяти, рестарт возвращает дефолт):
+- Настройки кэша (`/Admin/Settings`; тогда жили в памяти и рестарт возвращал дефолт — с 14.10.2026 в БД, В7):
   `CacheRowPrecision` = `true`, `CacheColumnPrecision` = `true`, `CacheHitVerifyPercent` = 20 в
   Development, 0 на проде.
 - Миграций в цепочке не было — на проде применять нечего.

@@ -39,8 +39,12 @@ public class LocalAuthService : ILocalAuthService
         _email = email;
     }
 
-    public async Task<RegisterResult> RegisterAsync(string email, string password, string? displayName, string baseUrl, CancellationToken ct = default)
+    public async Task<RegisterResult> RegisterAsync(string email, string password, string? displayName, bool ageConfirmed, string baseUrl, CancellationToken ct = default)
     {
+        // Галочка 13+ (В4) — первой: отказ не зависит от того, есть ли такой email (anti-enumeration).
+        if (!ageConfirmed)
+            return RegisterResult.Fail(RegisterStatus.AgeNotConfirmed);
+
         email = Normalize(email);
         if (!IsValidEmail(email))
             return RegisterResult.Fail(RegisterStatus.InvalidEmail);
@@ -56,7 +60,7 @@ public class LocalAuthService : ILocalAuthService
         {
             // Локальный аккаунт уже есть. Не раскрываем это (anti-enumeration): шлём письмо-напоминание,
             // отвечаем как при успехе. Сам аккаунт не трогаем.
-            await _email.SendAsync(email, "Swimm — account already exists",
+            await _email.SendAsync(email, "SwimHub — account already exists",
                 "You already have an account with this email. Try logging in or resetting your password.", ct);
             return RegisterResult.Success();
         }
@@ -68,11 +72,17 @@ public class LocalAuthService : ILocalAuthService
                 Email = email,
                 DisplayName = string.IsNullOrWhiteSpace(displayName) ? email : displayName!,
                 IsActive = true,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                AgeConfirmedAt = DateTime.UtcNow
             };
             _db.AppUsers.Add(user);
             await _db.SaveChangesAsync(ct);
             _db.AppUserRoles.Add(new AppUserRole { UserId = user.Id, RoleId = DefaultUserRoleId });
+        }
+        else
+        {
+            // Аккаунт без пароля (вход только через Google) добавляет пароль — галочка отмечена сейчас.
+            user.AgeConfirmedAt ??= DateTime.UtcNow;
         }
 
         // Если email уже подтверждён через верифицированный внешний вход — не требуем повторного подтверждения.
@@ -96,7 +106,7 @@ public class LocalAuthService : ILocalAuthService
         {
             var token = await IssueTokenAsync(user.Id, SecurityTokenPurpose.EmailVerification, EmailTokenTtl, ct);
             var link = $"{baseUrl}/auth/verify-email?token={token}";
-            await _email.SendAsync(email, "Swimm — confirm your email",
+            await _email.SendAsync(email, "SwimHub — confirm your email",
                 $"Welcome! Confirm your email to activate local login:<br><a href=\"{link}\">{link}</a><br>Link expires in 24 hours.", ct);
         }
 
@@ -203,7 +213,7 @@ public class LocalAuthService : ILocalAuthService
 
         var token = await IssueTokenAsync(user.Id, SecurityTokenPurpose.PasswordReset, ResetTokenTtl, ct);
         var link = $"{baseUrl}/auth/reset-password?token={token}";
-        await _email.SendAsync(email, "Swimm — reset your password",
+        await _email.SendAsync(email, "SwimHub — reset your password",
             $"Reset your password:<br><a href=\"{link}\">{link}</a><br>Link expires in 1 hour. If you didn't request this, ignore this email.", ct);
     }
 
