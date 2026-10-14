@@ -551,7 +551,10 @@
     }
 
     function buildSystemItems(sys) {
+        // «Почта» — из конфига процесса, Razor кладёт её в data-атрибуты #dash-system.
+        const mail = document.getElementById('dash-system').dataset;
         return [
+            { label: 'Почта', val: mail.emailLabel || '—', href: '/Admin/Settings#email', warn: mail.emailWarn === '1' },
             { label: 'Последний импорт', val: `${fmtDT(sys.lastImportAt)}${sys.lastImportAt ? (sys.lastImportApproved ? ' · OK' : ' · ?') : ''}`, href: '/Admin/ImportHistory', warn: false },
             { label: 'Проверка медиа-ссылок', val: fmtDT(sys.lastMediaCheckAt), href: '/Admin/Media?filter=unchecked', warn: false },
             { label: 'Discovery-скан', val: fmtDT(sys.lastDiscoverySeenAt), href: '/Admin/Competitions?filter=discovery-new', warn: false },

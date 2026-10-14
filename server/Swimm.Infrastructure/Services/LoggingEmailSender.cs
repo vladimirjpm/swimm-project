@@ -26,6 +26,10 @@ public class LoggingEmailSender : IEmailSender
         _logBody = logBody;
     }
 
+    /// <summary>Дев (тело в консоль) — штатно; без тела — письма не уходят, отказ конфигурации.</summary>
+    public EmailTransportInfo Transport =>
+        new(_logBody ? EmailTransportKind.DevLog : EmailTransportKind.Disabled);
+
     public Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken ct = default)
     {
         if (_logBody)

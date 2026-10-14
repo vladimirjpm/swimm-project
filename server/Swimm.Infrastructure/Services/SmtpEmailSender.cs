@@ -44,9 +44,14 @@ public class SmtpEmailSender : IEmailSender
         _logger = logger;
     }
 
+    public EmailTransportInfo Transport =>
+        new(EmailTransportKind.Smtp, _options.Host, _options.Port, FromAddress, _options.FromName);
+
+    private string FromAddress => string.IsNullOrWhiteSpace(_options.From) ? _options.User : _options.From;
+
     public async Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken ct = default)
     {
-        var from = string.IsNullOrWhiteSpace(_options.From) ? _options.User : _options.From;
+        var from = FromAddress;
 
         using var message = new MailMessage
         {
