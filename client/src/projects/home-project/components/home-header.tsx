@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import LoginModal from '../../components/login-modal/login-modal';
+import UI_BrandMark from '../../components/mix/brand-mark/brand-mark';
 import { routes } from '../../../utils/routes';
 
 type ActivePage = 'home' | 'competitions' | 'groups';
@@ -8,9 +9,7 @@ type ActivePage = 'home' | 'competitions' | 'groups';
 export function SwimHubLogo() {
   return (
     <a href={routes.home()} className="flex items-center gap-3 no-underline">
-      <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-[image:var(--t-accent-grad)] text-[14px] font-black text-[var(--t-accent-ink)] lg:h-9 lg:w-9 lg:rounded-[11px] lg:text-[17px]">
-        S
-      </span>
+      <UI_BrandMark className="h-[30px] w-[30px] lg:h-9 lg:w-9" />
       <span className="text-[12px] font-black tracking-[0.22em] text-[var(--t-text)] lg:text-[14px]">
         SWIM<span className="text-[var(--t-accent)]">HUB</span>
       </span>
