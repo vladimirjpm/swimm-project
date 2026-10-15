@@ -7,6 +7,7 @@ import RecordTicker from './components/record-ticker';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { HOME_REGION_LABEL } from '../../utils/constants/home-region';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
+import { routes } from '../../utils/routes';
 
 function Home() {
   const deep = useDeepThemeClass();
@@ -37,6 +38,14 @@ function Home() {
       </section>
 
       <DestinationCards />
+
+      {/* Ссылки на политику и условия прямо на главной — требование проверки бренда Google
+          (OAuth Branding): ссылка на политику конфиденциальности должна быть видна на главной без входа. */}
+      <nav aria-label="Legal" className="relative mt-10 flex flex-wrap gap-x-5 gap-y-2 px-5 text-[12.5px] font-semibold text-[var(--t-text-3)] lg:px-16">
+        <a href={routes.privacy()} className="text-[var(--t-text-3)] no-underline hover:text-[var(--t-accent)]">Privacy policy</a>
+        <a href={routes.terms()} className="text-[var(--t-text-3)] no-underline hover:text-[var(--t-accent)]">Terms of use</a>
+        <a href={routes.about()} className="text-[var(--t-text-3)] no-underline hover:text-[var(--t-accent)]">About</a>
+      </nav>
 
       <RecordTicker />
       {/* Переключатель тем. На витрине он единственный способ сменить режим: топбар его
