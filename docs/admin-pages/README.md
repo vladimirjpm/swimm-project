@@ -35,6 +35,7 @@
 | /Admin/Api | [api.md](api.md) | Каталог эндпоинтов + браузер данных |
 | /Admin/Cache | [cache.md](cache.md) | Как устроен кэш: кто сколько держит в браузере и на сервере (таблица из кода), как сбрасывается, правила под Redis, кнопка сброса |
 | /Admin/Settings | [settings.md](settings.md) | Параметры приложения (in-memory settings) |
+| /Admin/Services | [services.md](services.md) | **Сайты и кабинеты проекта**: Azure, GitHub, Cloudflare, Resend, Google, источники данных — зачем каждый и ссылки |
 | /Admin/Docs/{section} | [docs.md](docs.md) | **Документация** репозитория в админке: Important / Rules / Decisions, MD читается с диска |
 | /Admin/UiPreview | [uipreview.md](uipreview.md) | Витрина компонентов админки |
 

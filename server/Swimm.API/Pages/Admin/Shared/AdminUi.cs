@@ -42,6 +42,7 @@ public static class AdminNav
         // Как устроен кэш и кто сколько кэширует; держится в синхроне по docs/pre-push-rules.md.
         new("Cache", "database", "/Admin/Cache", "System"),
         new("Settings", "settings", "/Admin/Settings", "System"),
+        new("Services", "globe", "/Admin/Services", "System"),
 
         // Документация репозитория (MD, читается с диска): что в каком разделе — DocsCatalog.cs.
         new("Important", "award", "/Admin/Docs/important", "Docs"),
