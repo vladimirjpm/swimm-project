@@ -21,17 +21,23 @@
 
 ### 0.1 Предусловия
 
-- **В master на GitHub должен лежать код деплоя.** Деплой и `--migrate` берут код из master. На
-  14.10 `origin/master` = `50a02b7f`, а всё под деплой есть только в ветке `entity-hero-roles`:
-  `a84c2833` (В17: `appsettings.Production.json` с выключенной админкой, мост кэша, миграции
-  `AdminSettingsInDb` и `DataVersionForSync`), `b3e9bdd4` (В4: галочка 13+, `/privacy`, миграция
-  `AppUserAgeConfirmedAt`), `df1eb881` (A10: заголовки страниц, `sitemap.xml`, миграция
-  `SwimmerHideFromSearch`), `b70be2ad` (редирект `www`). Без них workflow деплоя упадёт на
-  проверке артефакта, а `--migrate` создаст не ту схему.
-- `--migrate` (§4.3) и дамп (§4.5) — **из рабочей копии на том же коммите, что поедет на прод**:
-  `git rev-parse HEAD` = `git rev-parse origin/master`, `git status --short server/` пуст.
+- ✅ **Код деплоя в master** (с 14.10): PR #105 (`409e2e25` — В17: прод без админки, мост кэша,
+  настройки в БД, синхронизация; почта; В4; A10; `www` → корень) и PR #106 (`16f5276b` — `/privacy`
+  и `/terms` после ревью, страницы пловцов младше 18 не индексируются). CI на master зелёный.
+  Миграции, которых ещё нет ни в одной базе Azure: `AdminSettingsInDb`, `DataVersionForSync`,
+  `AppUserAgeConfirmedAt`, `SwimmerHideFromSearch` — `--migrate` в §4.3 накатит их вместе со всеми.
+- **`--migrate` (§4.3), дамп (§4.5) и потом ProdAdmin — из ветки `master`, а не из рабочей**: в master
+  лежат merge-коммиты, поэтому SHA рабочей ветки с ним не совпадает, даже когда код тот же; на чужой
+  ветке сторож ProdAdmin ещё и предупреждает. Перед §4:
+  ```powershell
+  git fetch origin
+  git switch master
+  git pull --ff-only
+  git rev-parse HEAD origin/master      # ✔ две одинаковые строки
+  git status --short server/            # ✔ пусто (свои неотслеживаемые файлы вне server/ не мешают)
+  ```
   Иначе в прод уедет миграция, которой нет в выкаченном коде, и `ProdAdmin` потом откажется
-  стартовать (сторож сверки миграций).
+  стартовать (сторож сверки миграций). Вернуться к работе — `git switch entity-hero-roles`.
 - Docker Desktop запущен, контейнер `swimm-postgres` работает (через него идут `psql`/`pg_dump`:
   на Windows их нет). API локально **не запущен** (build-lock).
 - Готов прод-клиент Google OAuth (ClientId + ClientSecret), ключ Resend `swimhub-prod` — в
