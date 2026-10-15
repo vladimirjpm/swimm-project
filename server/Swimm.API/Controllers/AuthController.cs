@@ -100,7 +100,7 @@ public class AuthController : Controller
         var providerKey = claims.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
         var email = claims.FindFirstValue(ClaimTypes.Email) ?? "";
         var name = claims.FindFirstValue(ClaimTypes.Name) ?? email;
-        var avatar = claims.FindFirstValue("urn:google:picture")
+        var avatar = claims.FindFirstValue(GoogleClaims.Picture)
                      ?? claims.FindFirstValue("picture");
         // Признак «Google подтвердил email» — его переносит GoogleClaims (стандартный набор не переносит)
         var emailVerified = string.Equals(claims.FindFirstValue(GoogleClaims.EmailVerified), "true", StringComparison.OrdinalIgnoreCase);

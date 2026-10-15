@@ -16,14 +16,21 @@ namespace Swimm.API.Security;
 /// Имя поля зависит от эндпоинта userinfo: v2 (им ходит обработчик) отдаёт <c>verified_email</c>,
 /// v3 и id_token — <c>email_verified</c>. Сопоставляем оба в один claim <see cref="EmailVerified"/>;
 /// ключа нет в ответе — действие ничего не добавляет.
+///
+/// <b>picture.</b> Фото профиля — тоже не в стандартном наборе; переносим в <see cref="Picture"/>.
 /// </summary>
 public static class GoogleClaims
 {
     public const string EmailVerified = "email_verified";
 
+    /// <summary>URL фото профиля Google — аватар пользователя (политика конфиденциальности его упоминает).</summary>
+    public const string Picture = "urn:google:picture";
+
     public static void Configure(GoogleOptions options)
     {
         options.ClaimActions.MapJsonKey(EmailVerified, "verified_email");
         options.ClaimActions.MapJsonKey(EmailVerified, "email_verified");
+        // Фото профиля стандартный набор тоже не переносит — без этого avatarUrl всегда пуст.
+        options.ClaimActions.MapJsonKey(Picture, "picture");
     }
 }

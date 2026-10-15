@@ -55,6 +55,14 @@ public class GoogleClaimsTests
     }
 
     [Fact]
+    public void Picture_IsMapped_StandardSetLosesIt()
+    {
+        const string json = """{"id":"1","email":"a@b.c","picture":"https://lh3.googleusercontent.com/a/x"}""";
+        Assert.Equal("https://lh3.googleusercontent.com/a/x", Run(json).FindFirst(GoogleClaims.Picture)?.Value);
+        Assert.Null(Run(json, withOurMapping: false).FindFirst(GoogleClaims.Picture));
+    }
+
+    [Fact]
     public void WithoutOurMapping_FlagIsLost_TheBugThisGuards()
     {
         // Стандартный набор GoogleOptions признак не переносит — ради этого и нужен GoogleClaims.
