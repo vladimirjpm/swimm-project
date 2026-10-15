@@ -116,12 +116,26 @@
   (`aaa6d77c`). В админке — блок «Почта» (`/Admin/Settings#email` + пункт дашборда, `05a757b4`):
   куда уходят письма процесса и кнопка тестового письма себе; в ProdAdmin должен быть зелёным
   (SMTP — `appsettings.ProdAdmin.json`, ключ — `*.Local.json`). Приёмка почты — план A8.
-- **Прод-клиент Google OAuth** (redirect: `https://swimhub.co.il/signin-google`,
-  `https://swimhub.azurewebsites.net/signin-google`; для `www` не нужен — редирект в коде).
+- ✅ (15.10) **Прод-клиент Google OAuth** `SwimHub prod` — redirect только
+  `https://swimhub.co.il/signin-google` (azurewebsites убран 16.10: сайт сам уводит туда на домен).
 - Ключ **serper.dev** для прода — в `appsettings.ProdAdmin.Local.json` (на App Service не нужен).
 - **Юрист** — по желанию: `/privacy` и `/terms` (`client/src/content/help/{privacy,terms}/`) составлены
   агентом 14.10, оператор назван по имени (§11 закона требует указать владельца базы).
-- **Слить ветку в master** до A7: деплой и `--migrate` берут код из master.
+- ✅ (15.10) Ветка влита в master.
+
+**Хвосты после запуска (16.10.2026)** — все сайты со ссылками собраны на `/Admin/Services`:
+- ☐ **UptimeRobot** (Влад, 17.10) — монитор HTTP(s) на `https://swimhub.co.il/readyz`, интервал 5 мин,
+  письмо при падении. Карточка уже на `/Admin/Services`; после регистрации снять «(завести)» в
+  `ServicesCatalog.cs`.
+- ⏳ **Проверка бренда Google** — заявка отправлена 16.10 (логотип `images/brand/swimhub-logo.png`,
+  ссылки на главной — PR #114, authorized domain только `swimhub.co.il`). Ждать письма на
+  efreet007@gmail.com, вопросы Google — разобрать с агентом.
+- ⏳ **Search Console** — sitemap отправлен 15.10 («Не получено» в первые часы — норма); через сутки
+  проверить «Успешно» и ~1 345 страниц.
+- ☐ **Бюджет Azure** — Cost Management → Budgets, $50/мес, письмо на 80 %.
+- ☐ **MyNames** — сверить адрес сайта регистратора на `/Admin/Services` (стоит mynames.co.il наугад).
+- ☐ По желанию: логотип в письмах сайта (сейчас голый текст), `ProdVersionConnection` в
+  `appsettings.Development.json` (напоминание «локальная база отстаёт»).
 
 ### 3.3 Ресурсы Azure (A7) — ✅ 15.10.2026, сайт на https://swimhub.co.il (итог — план A7)
 **Runbook — [azure-a7-commands.md](azure-a7-commands.md)** (PowerShell 5.1, §0–§9; имена `swimhub`

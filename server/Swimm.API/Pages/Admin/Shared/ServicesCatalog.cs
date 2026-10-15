@@ -40,6 +40,13 @@ public static class ServicesCatalog
                     new("/version", "https://swimhub.co.il/version"),
                     new("sitemap.xml", "https://swimhub.co.il/sitemap.xml"),
                 ]),
+            new("UptimeRobot — мониторинг (завести)",
+                "Каждые 5 минут открывает https://swimhub.co.il/readyz и пишет письмо, если сайт или база не " +
+                "отвечают (и когда поднялись). Ловит то, о чём Azure не скажет: упавшую базу, истёкший " +
+                "сертификат, слетевший DNS. Бесплатно. ☐ Завести: монитор HTTP(s) на /readyz, интервал 5 минут, " +
+                "уведомление на почту.",
+                [new("Dashboard", "https://dashboard.uptimerobot.com")],
+                Access: "аккаунт UptimeRobot (вход через Google)"),
         ]),
 
         new("Хостинг — Microsoft Azure",
