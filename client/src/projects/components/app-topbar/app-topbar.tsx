@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import LoginModal from '../login-modal/login-modal';
+import UI_BrandMark from '../mix/brand-mark/brand-mark';
 import { routes } from '../../../utils/routes';
 import { PAGE_CONTAINER } from '../../../utils/layout';
 
@@ -43,9 +44,7 @@ const NAV_LINKS: { label: string; href?: string; key?: TopbarActivePage }[] = [
 function TopbarLogo() {
   return (
     <a href={routes.home()} className="flex shrink-0 items-center gap-2 no-underline">
-      <span className="flex h-[26px] w-[26px] items-center justify-center rounded-[8px] bg-[var(--theme-topbar-accent)] text-[13px] font-black text-[var(--theme-topbar-accent-text)]">
-        S
-      </span>
+      <UI_BrandMark className="h-[26px] w-[26px]" />
       <span className="text-[11px] font-black tracking-[0.22em] text-[var(--theme-topbar-text)]">
         SWIM<span className="text-[var(--theme-topbar-accent)]">HUB</span>
       </span>
