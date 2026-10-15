@@ -123,7 +123,7 @@
   агентом 14.10, оператор назван по имени (§11 закона требует указать владельца базы).
 - **Слить ветку в master** до A7: деплой и `--migrate` берут код из master.
 
-### 3.3 Ресурсы Azure (A7) — команды готовы, запускает Влад
+### 3.3 Ресурсы Azure (A7) — ✅ 15.10.2026, сайт на https://swimhub.co.il (итог — план A7)
 **Runbook — [azure-a7-commands.md](azure-a7-commands.md)** (PowerShell 5.1, §0–§9; имена `swimhub`
 и `swimhub-pg` на 14.10 свободны; провайдер `Microsoft.DBforPostgreSQL` надо зарегистрировать —
 §1). Отличия от плана, внесённые и в план 14.10: `ASPNETCORE_FORWARDEDHEADERS_ENABLED`,

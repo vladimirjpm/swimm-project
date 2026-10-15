@@ -162,15 +162,27 @@ public static class SeoPages
     }
 
     /// <summary>
-    /// Куда увести запрос на <c>www.</c>-хост canonical-адреса: <c>www.swimhub.co.il/x?y</c> →
-    /// <c>https://swimhub.co.il/x?y</c> (301). null — уводить не надо (другой хост: сам
-    /// swimhub.co.il, *.azurewebsites.net для health check и дымовой проверки деплоя, localhost).
-    /// Один адрес сайта — одна страница в выдаче и один redirect URI у Google.
+    /// Служебные пути, которые отвечают на ЛЮБОМ хосте: health check App Service и дымовая проверка
+    /// деплоя (<c>azure-deploy.yml</c>) ходят на <c>*.azurewebsites.net</c> и ждут 200, а не 301.
     /// </summary>
-    public static string? WwwRedirect(string host, string pathAndQuery, string baseUrl)
+    private static readonly string[] ServicePaths = ["/healthz", "/readyz", "/version"];
+
+    /// <summary>
+    /// Куда увести запрос на «не тот» хост: <c>www.swimhub.co.il/x?y</c> и
+    /// <c>swimhub.azurewebsites.net/x?y</c> → <c>https://swimhub.co.il/x?y</c> (301). У сайта один
+    /// адрес — одна страница в выдаче, одна кука входа, один redirect URI у Google (15.10.2026: вход
+    /// на azurewebsites.net не давал входа на swimhub.co.il — куки у адресов свои).
+    /// null — уводить не надо: сам canonical-хост, служебные пути на любом хосте, прочие хосты
+    /// (localhost, ProdAdmin — их этот код и не видит).
+    /// </summary>
+    public static string? CanonicalRedirect(string host, string path, string pathAndQuery, string baseUrl)
     {
         if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var canonical)) return null;
-        return string.Equals(host, "www." + canonical.Host, StringComparison.OrdinalIgnoreCase)
+        if (ServicePaths.Any(p => string.Equals(path, p, StringComparison.OrdinalIgnoreCase))) return null;
+
+        var isWww = string.Equals(host, "www." + canonical.Host, StringComparison.OrdinalIgnoreCase);
+        var isAzureDefault = host.EndsWith(".azurewebsites.net", StringComparison.OrdinalIgnoreCase);
+        return isWww || isAzureDefault
             ? $"{canonical.Scheme}://{canonical.Host}{pathAndQuery}"
             : null;
     }

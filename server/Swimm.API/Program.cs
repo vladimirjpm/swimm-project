@@ -307,12 +307,13 @@ if (!app.Environment.IsLocalMachine())
     app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/healthz"),
         branch => branch.UseHttpsRedirection());
 
-    // www.swimhub.co.il → swimhub.co.il (A10): у сайта один адрес — в выдаче, в canonical и в
-    // redirect URI Google. Остальные хосты (*.azurewebsites.net) не трогаем.
+    // www.swimhub.co.il и swimhub.azurewebsites.net → swimhub.co.il (301): у сайта один адрес — в
+    // выдаче, в canonical, в куке входа и в redirect URI Google. /healthz, /readyz, /version отвечают
+    // на любом хосте — их ждут health check App Service и проверка деплоя (SeoPages.CanonicalRedirect).
     var seoBaseUrl = app.Configuration[SeoPages.BaseUrlKey] ?? SeoPages.DefaultBaseUrl;
     app.Use(async (context, next) =>
     {
-        var target = SeoPages.WwwRedirect(context.Request.Host.Host,
+        var target = SeoPages.CanonicalRedirect(context.Request.Host.Host, context.Request.Path.Value ?? "",
             $"{context.Request.PathBase}{context.Request.Path}{context.Request.QueryString}", seoBaseUrl);
         if (target is null) { await next(); return; }
         context.Response.Redirect(target, permanent: true);

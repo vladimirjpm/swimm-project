@@ -192,14 +192,21 @@ public class SeoPagesTests
     }
 
     [Theory]
-    [InlineData("www.swimhub.co.il", "/swimmers/5?tab=h2h", "https://swimhub.co.il/swimmers/5?tab=h2h")]
-    [InlineData("WWW.SwimHub.co.il", "/", "https://swimhub.co.il/")]
-    [InlineData("swimhub.co.il", "/", null)]
-    [InlineData("swimhub.azurewebsites.net", "/healthz", null)]
-    [InlineData("localhost", "/", null)]
-    public void WwwRedirect_OnlyWwwOfCanonicalHost(string host, string path, string? expected)
+    [InlineData("www.swimhub.co.il", "/swimmers/5", "/swimmers/5?tab=h2h", "https://swimhub.co.il/swimmers/5?tab=h2h")]
+    [InlineData("WWW.SwimHub.co.il", "/", "/", "https://swimhub.co.il/")]
+    [InlineData("swimhub.azurewebsites.net", "/clubs/7", "/clubs/7?x=1", "https://swimhub.co.il/clubs/7?x=1")]
+    [InlineData("swimhub.azurewebsites.net", "/auth/login/google", "/auth/login/google", "https://swimhub.co.il/auth/login/google")]
+    [InlineData("swimhub.co.il", "/", "/", null)]
+    [InlineData("localhost", "/", "/", null)]
+    // Служебные пути — на любом хосте без перенаправления: их ждут health check и проверка деплоя.
+    [InlineData("swimhub.azurewebsites.net", "/healthz", "/healthz", null)]
+    [InlineData("swimhub.azurewebsites.net", "/readyz", "/readyz", null)]
+    [InlineData("swimhub.azurewebsites.net", "/version", "/version", null)]
+    [InlineData("www.swimhub.co.il", "/healthz", "/healthz", null)]
+    public void CanonicalRedirect_WwwAndAzureDefaultHost_ExceptServicePaths(
+        string host, string path, string pathAndQuery, string? expected)
     {
-        Assert.Equal(expected, SeoPages.WwwRedirect(host, path, "https://swimhub.co.il"));
+        Assert.Equal(expected, SeoPages.CanonicalRedirect(host, path, pathAndQuery, "https://swimhub.co.il"));
     }
 
     [Fact]

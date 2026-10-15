@@ -132,6 +132,25 @@ $resendKey          = Read-Secret 'Ключ Resend swimhub-prod (re_...)'
 - `curl` — алиас `Invoke-WebRequest`; ниже везде `curl.exe`.
 - `;` в значениях (строки подключения, `AllowedHosts`) — только внутри кавычек.
 
+**Грабли первого прогона (15.10.2026) — проверены на деле:**
+- **Ctrl+V в `Read-Secret` (`Read-Host -AsSecureString`) в PS 5.1 не вставляет текст**, а пишет
+  один служебный символ — одна звёздочка, длина 1. Вставлять **правой кнопкой мыши** или
+  **Shift+Insert**; после каждого ввода сверять `$var.Length`.
+- **Блок с несколькими `Read-Host` вставлять по одной строке**: иначе следующая строка уйдёт ответом
+  на предыдущий вопрос.
+- **Не гонять `az` из Git Bash** (только PowerShell): Git Bash молча переписывает аргументы вида
+  `/home/...` в `C:/Program Files/Git/home/...`. Так `DataProtection__KeysDir` стал Windows-путём, и
+  ключи Data Protection не сохранялись (`Read-only file system: '/home/site/wwwroot/C:'` в логе
+  старта). Если всё-таки bash — `MSYS_NO_PATHCONV=1`.
+- **`az webapp config ssl create` в первый раз может вернуть пустой ответ** — Azure ещё проверяет
+  домен; повторить через минуту. `ssl bind` может упасть с `JSONDecodeError`, но привязка при этом
+  проходит — смотреть `az webapp config hostname list` (`SslState: SniEnabled`).
+- **Правил firewall для сайта — около 31** (`possibleOutboundIpAddresses` у B1 в israelcentral),
+  создаются ~10 минут.
+- **Лог старта:** `az webapp log tail` может молчать — надёжнее `az webapp log download` и файл
+  `LogFiles/*_default_docker.log`.
+- **Новая версия поднимается 1–3 минуты после зелёного деплоя** — `/version` ещё отдаёт старый SHA.
+
 ### 0.5 psql до прод-базы — через локальный контейнер
 
 ```powershell
