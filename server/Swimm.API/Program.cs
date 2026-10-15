@@ -263,6 +263,8 @@ if (googleEnabled)
         options.SignInScheme = AuthSchemes.External;
         options.Scope.Add("profile");
         options.Scope.Add("email");
+        // Признак «email подтверждён» — без него новый пользователь Google не войдёт (GoogleClaims).
+        GoogleClaims.Configure(options);
     });
 }
 

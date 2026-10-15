@@ -102,8 +102,8 @@ public class AuthController : Controller
         var name = claims.FindFirstValue(ClaimTypes.Name) ?? email;
         var avatar = claims.FindFirstValue("urn:google:picture")
                      ?? claims.FindFirstValue("picture");
-        // Google возвращает email_verified — пригодится для безопасной линковки аккаунтов
-        var emailVerified = string.Equals(claims.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
+        // Признак «Google подтвердил email» — его переносит GoogleClaims (стандартный набор не переносит)
+        var emailVerified = string.Equals(claims.FindFirstValue(GoogleClaims.EmailVerified), "true", StringComparison.OrdinalIgnoreCase);
 
         if (string.IsNullOrEmpty(providerKey))
             return BadRequest("Google did not return a stable user id.");
