@@ -176,13 +176,13 @@
     },
     {
       "name": "swimm-api-prodadmin",
-      "runtimeExecutable": "dotnet",
+      "runtimeExecutable": "powershell",
       "runtimeArgs": [
-        "run",
-        "--project",
-        "server/Swimm.API",
-        "--launch-profile",
-        "ProdAdmin"
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "server/run-prodadmin.ps1"
       ],
       "port": 5078,
       "autoPort": false
