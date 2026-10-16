@@ -56,6 +56,7 @@ public static class ServicesCatalog
                 "база swimhub-pg. Перезапуск сайта, логи, переменные окружения, firewall базы. " +
                 "Группу VS-clt-… не трогать — это Azure DevOps с привязанной оплатой.",
                 [
+                    new("Portal", "https://portal.azure.com/#home"),
                     new("Группы ресурсов", "https://portal.azure.com/#browse/resourcegroups"),
                     new("App Services", "https://portal.azure.com/#browse/Microsoft.Web%2Fsites"),
                     new("PostgreSQL", "https://portal.azure.com/#browse/Microsoft.DBforPostgreSQL%2FflexibleServers"),
@@ -105,6 +106,7 @@ public static class ServicesCatalog
                 "Письма сайта от noreply@swimhub.co.il: подтверждение почты, сброс пароля, решения по заявкам групп. " +
                 "Emails/Logs — дошло ли письмо, отказы, жалобы. Бесплатно 3 000 писем/мес, 100/день.",
                 [
+                    new("Resend", "https://resend.com/"),
                     new("Emails", "https://resend.com/emails"),
                     new("Домены", "https://resend.com/domains"),
                     new("API-ключи", "https://resend.com/api-keys"),
@@ -123,6 +125,7 @@ public static class ServicesCatalog
                 "(dev и ProdAdmin, localhost:5078). Branding — что видит человек в окне входа; Audience — " +
                 "должно быть In production.",
                 [
+                    new("Console", $"https://console.cloud.google.com/home/dashboard?project={GoogleProject}"),
                     new("Clients", $"https://console.cloud.google.com/auth/clients?project={GoogleProject}"),
                     new("Branding", $"https://console.cloud.google.com/auth/branding?project={GoogleProject}"),
                     new("Audience", $"https://console.cloud.google.com/auth/audience?project={GoogleProject}"),
