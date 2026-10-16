@@ -90,6 +90,16 @@ rate limit — константа, не настройка. Ответ отка�
 возвращает. Правило — `MediaReportRules`, решения Р62/Р64 в `docs/data-integrity.md`. Rate limit
 подачи — политика `reports`, **10 жалоб в минуту на пользователя** (константа, не настройка).
 
+## Бегущая лента внизу витрин (2026-10-16)
+
+`RecordTickerEnabled` (bool, дефолт **false**, scope livesite) — лента «NEW RECORD · LIVE · …»
+внизу `/`, `/competitions`, `/groups` (`client/src/projects/home-project/components/record-ticker.tsx`).
+Пока в ней **выдуманные** имена и времена — заглушка до реальных данных, поэтому выключена.
+Клиент читает флаг через `GET /api/client-config` → `recordTickerEnabled`; до ответа ленты нет.
+⚠ Даже при `true` лента видна только на dev-сервере (`import.meta.env.DEV`): на публичном сайте
+выдуманный «NEW RECORD» читался бы как настоящий результат. Когда лента получит реальные данные,
+эту проверку убрать — тогда решает только настройка.
+
 ## Избранное: сколько пловцов и клубов (2026-09-10)
 
 `FavoritesMaxSwimmers` (дефолт **30**) и `FavoritesMaxClubs` (дефолт **3**), оба 1..200 — ноль

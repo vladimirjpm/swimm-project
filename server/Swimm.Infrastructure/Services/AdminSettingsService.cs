@@ -119,6 +119,11 @@ public class AdminSettingsService : ISettingsService, IReloadableSettings
                 "Видимость групп: perGroup — решает галочка «Public group» у группы (снята — группу " +
                 "видят только участники, остальным страница «только для участников», в каталоге её нет); " +
                 "public — все группы открыты всем, галочка не действует; private — все группы только для участников"),
+            // Бегущая лента внизу /, /competitions, /groups (16.10.2026): пока имена и времена в
+            // ней выдуманные, поэтому дефолт — выключена. Читает клиент через /api/client-config.
+            new("RecordTickerEnabled", "false", "bool", "livesite",
+                "Бегущая лента внизу главной, /competitions и /groups: true — показывать. Пока в ней " +
+                "ВЫДУМАННЫЕ имена и времена (заглушка до реальных данных), поэтому на проде её нет и при true"),
             new("DiscoveryEnabled", "false", "bool", "admin",
                 "Автозабор isr.org.il: true — фоновая проверка списка соревнований по расписанию"),
             new("DiscoveryIntervalHours", "12", "int", "admin",

@@ -25,6 +25,8 @@ export interface ClientConfig {
   favoritesLimits?: Partial<Record<FavoriteTarget, FavoritesLimit>>;
   /** Сколько избранных можно пометить «семьёй» (FavoritesRules.MaxFamily на сервере). */
   familyLimit?: FavoritesLimit;
+  /** Бегущая лента внизу витрин (настройка RecordTickerEnabled, дефолт false). */
+  recordTickerEnabled?: boolean;
   debug?: { ageRecordsDetails?: boolean };
 }
 

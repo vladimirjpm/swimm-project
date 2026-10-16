@@ -601,6 +601,9 @@ app.Map("/error", (HttpContext ctx) =>
 //
 // familyLimit: сколько избранных можно пометить «семьёй» (FavoritesRules.MaxFamily) и текст
 // отказа — страница My favorites гасит кнопку Family на пределе до клика.
+//
+// recordTickerEnabled: показывать ли бегущую ленту внизу /, /competitions, /groups (настройка
+// RecordTickerEnabled, дефолт false — пока в ленте выдуманные данные).
 app.MapGet("/api/client-config",
     async (ISettingsService settings, IDebugOptionsService debug) => Results.Ok(new
     {
@@ -616,6 +619,8 @@ app.MapGet("/api/client-config",
                 return new { max, fullHint = FavoritesRules.FullHint(t, max) };
             }),
         familyLimit = new { max = FavoritesRules.MaxFamily, fullHint = FavoritesRules.FamilyFullHint },
+        // Бегущая лента внизу витрин (RecordTicker): дефолт false — данные в ней пока выдуманные.
+        recordTickerEnabled = settings.GetValue("RecordTickerEnabled", false),
         // Отладочные подробности витрин: только ДЕЙСТВУЮЩИЕ (общий тумблер × галочка опции),
         // клиенту знать про два уровня незачем. См. DebugOption.
         debug = new

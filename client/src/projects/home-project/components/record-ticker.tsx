@@ -1,4 +1,5 @@
 import React from 'react';
+import { loadClientConfig } from '../../../utils/helpers/client-config';
 
 // Статичный плейсхолдер: подключение реальных данных — отдельная задача.
 // ⚠ Имена и времена ВЫДУМАНЫ, поэтому в прод-сборку лента не попадает (см. RecordTicker):
@@ -28,9 +29,23 @@ function TickerRow({ ariaHidden }: { ariaHidden?: boolean }) {
 }
 
 function RecordTicker() {
-  // Только dev-сервер: дизайн ленты виден при вёрстке, в проде её нет, пока нет реальных данных.
-  // Кнопка режима сама опускается на место, когда ленты нет (`home.css`, `:has(.hp-ticker)`).
-  if (!import.meta.env.DEV) return null;
+  // Включается настройкой RecordTickerEnabled в /Admin/Settings (дефолт false, 16.10.2026).
+  // До ответа конфига ленты нет — чтобы выключенная не мелькнула при загрузке.
+  const [enabled, setEnabled] = React.useState(false);
+  React.useEffect(() => {
+    let alive = true;
+    loadClientConfig().then((cfg) => {
+      if (alive) setEnabled(cfg?.recordTickerEnabled === true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // И при включённой настройке — только dev-сервер: имена в ленте выдуманы, в проде её нет, пока
+  // нет реальных данных. Кнопка режима сама опускается на место, когда ленты нет
+  // (`home.css`, `:has(.hp-ticker)`).
+  if (!enabled || !import.meta.env.DEV) return null;
 
   return (
     <div className="hp-ticker fixed bottom-0 left-0 right-0 z-20 overflow-hidden border-t border-[var(--t-border)] bg-[var(--t-surface-strong)] backdrop-blur-[10px]">
