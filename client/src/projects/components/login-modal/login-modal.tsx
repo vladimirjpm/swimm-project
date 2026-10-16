@@ -40,7 +40,6 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -53,7 +52,6 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
     setEmail('');
     setPassword('');
     setDisplayName('');
-    setAgeConfirmed(false);
     setError(null);
     setStatus(null);
     setSubmitting(false);
@@ -115,7 +113,6 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
           email: email.trim(),
           password,
           displayName: displayName.trim() || undefined,
-          ageConfirmed,
         }),
       });
       if (r.ok) {
@@ -302,20 +299,7 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              {/* Самодекларация 13+ (В4): без неё сервер аккаунт не создаёт. Текст — тот же,
-                  что на шаге первого входа через Google (AuthController.AgeConfirmationText). */}
-              <label className="flex cursor-pointer items-start gap-2.5 text-[12px] font-bold leading-snug text-[var(--t-text-2)]">
-                <input
-                  type="checkbox"
-                  required
-                  checked={ageConfirmed}
-                  onChange={(e) => setAgeConfirmed(e.target.checked)}
-                  className="mt-[2px] h-4 w-4 shrink-0 cursor-pointer accent-[var(--t-accent)]"
-                />
-                <span>
-                  I am 13 or older. If I am under 18, I have permission from my parent or legal guardian to use SwimHub.
-                </span>
-              </label>
+              {/* Возраст не спрашиваем (решение Влада 16.10.2026: галочка 13+ отменена). */}
               <p className="text-[11.5px] font-bold leading-snug text-[var(--t-text-3)]">
                 By creating an account you agree to the{' '}
                 <a href={routes.terms()} target="_blank" rel="noreferrer" className="text-[var(--t-accent)] hover:underline">Terms of use</a>
@@ -329,7 +313,7 @@ function LoginModal({ open, onClose, onLoggedIn }: LoginModalProps) {
               )}
               <button
                 type="submit"
-                disabled={submitting || !ageConfirmed}
+                disabled={submitting}
                 className="mt-1 rounded-[13px] bg-[image:var(--t-accent-grad)] px-4 py-[12px] text-[14px] font-black text-[var(--t-accent-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {submitting ? 'Creating…' : 'Create account'}

@@ -241,15 +241,14 @@ var authBuilder = builder.Services
         options.Events.OnValidatePrincipal = CookieSecurityStampValidator.ValidateAsync;
     })
     // Транзитная схема для OAuth-рукопожатия. Google пишет промежуточные claims сюда,
-    // а не в основную куку → OnValidatePrincipal их не трогает. Короткоживущая; 15 минут —
-    // запас на шаг «мне 13+» нового пользователя (В4), если он пошёл читать /privacy.
+    // а не в основную куку → OnValidatePrincipal их не трогает. Короткоживущая.
     .AddCookie(AuthSchemes.External, options =>
     {
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = secureCookiePolicy;
         options.Cookie.Name = "Swimm.External";
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
     });
 
 if (googleEnabled)

@@ -57,45 +57,16 @@ public class AuthController : Controller
         if (result?.Principal == null)
             return Redirect("/auth/login");
 
-        return await CompleteGoogleSignInAsync(result.Principal, returnUrl, ageConfirmed: false);
+        return await CompleteGoogleSignInAsync(result.Principal, returnUrl);
     }
 
     /// <summary>
-    /// Шаг «мне 13+» для первого входа через Google (В4). Сюда callback уводит совсем нового
-    /// пользователя; claims Google ждут в транзитной куке, аккаунта ещё нет.
+    /// Находит/создаёт пользователя по claims Google и выпускает куку. Возраст не спрашиваем
+    /// (решение Влада 16.10.2026): шаг «мне 13+» отменён — он заставлял ребёнка, которому родитель
+    /// разрешил вход через Google Family Link, отмечать неправду. Возраст и согласие родителя сайт
+    /// не проверяет и вход через Google таким доказательством не считает.
     /// </summary>
-    [HttpGet("google/confirm-age")]
-    public async Task<IActionResult> GoogleConfirmAgeForm([FromQuery] string? returnUrl = "/")
-    {
-        var result = await HttpContext.AuthenticateAsync(AuthSchemes.External);
-        if (result?.Principal == null)
-            return GoogleSignInExpiredPage();
-
-        return GoogleConfirmAgePage(result.Principal.FindFirstValue(ClaimTypes.Email) ?? "", returnUrl, error: false);
-    }
-
-    /// <summary>Отправка шага «мне 13+»: с галочкой — создаём аккаунт и входим, без — форма снова.</summary>
-    [EnableRateLimiting("auth")]
-    [HttpPost("google/confirm-age")]
-    public async Task<IActionResult> GoogleConfirmAge([FromForm] bool ageConfirmed, [FromForm] string? returnUrl = "/")
-    {
-        // Транзитная кука — SameSite=Lax: межсайтовый POST её не донесёт, чужая страница
-        // отправить эту форму за человека не может.
-        var result = await HttpContext.AuthenticateAsync(AuthSchemes.External);
-        if (result?.Principal == null)
-            return GoogleSignInExpiredPage();
-
-        if (!ageConfirmed)
-            return GoogleConfirmAgePage(result.Principal.FindFirstValue(ClaimTypes.Email) ?? "", returnUrl, error: true);
-
-        return await CompleteGoogleSignInAsync(result.Principal, returnUrl, ageConfirmed: true);
-    }
-
-    /// <summary>
-    /// Находит/создаёт пользователя по claims Google и выпускает куку. Новый аккаунт создаётся
-    /// только при <paramref name="ageConfirmed"/>; без него — уводим на шаг «мне 13+».
-    /// </summary>
-    private async Task<IActionResult> CompleteGoogleSignInAsync(ClaimsPrincipal claims, string? returnUrl, bool ageConfirmed)
+    private async Task<IActionResult> CompleteGoogleSignInAsync(ClaimsPrincipal claims, string? returnUrl)
     {
         var providerKey = claims.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
         var email = claims.FindFirstValue(ClaimTypes.Email) ?? "";
@@ -159,19 +130,14 @@ public class AuthController : Controller
             }
             else
             {
-                // Совершенно новый пользователь. Без галочки 13+ аккаунт не создаём (В4):
-                // транзитная кука с claims Google остаётся — форма её дочитает.
-                if (!ageConfirmed)
-                    return Redirect("/auth/google/confirm-age?returnUrl=" + Uri.EscapeDataString(returnUrl ?? "/"));
-
+                // Совершенно новый пользователь.
                 user = new AppUser
                 {
                     Email = email,
                     DisplayName = name,
                     AvatarUrl = avatar,
                     IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    AgeConfirmedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow
                 };
                 _db.AppUsers.Add(user);
                 await _db.SaveChangesAsync();
@@ -339,13 +305,12 @@ public class AuthController : Controller
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest req)
     {
-        var result = await _localAuth.RegisterAsync(req.Email, req.Password, req.DisplayName, req.AgeConfirmed, BaseUrl());
+        var result = await _localAuth.RegisterAsync(req.Email, req.Password, req.DisplayName, BaseUrl());
         return result.Status switch
         {
             RegisterStatus.Ok => Ok(new { message = "If the address is valid, a confirmation email has been sent." }),
             RegisterStatus.WeakPassword => BadRequest(new { error = "Password must be at least 8 characters." }),
             RegisterStatus.InvalidEmail => BadRequest(new { error = "Invalid email address." }),
-            RegisterStatus.AgeNotConfirmed => BadRequest(new { error = AgeRequiredError }),
             _ => BadRequest()
         };
     }
@@ -453,38 +418,7 @@ public class AuthController : Controller
         return new ContentResult { Content = html, ContentType = "text/html; charset=utf-8", StatusCode = 200 };
     }
 
-    // ── шаг «мне 13+» (В4) ───────────────────────────────────────────────────
-
-    /// <summary>Текст галочки — один на форму регистрации клиента и страницу Google-шага.</summary>
-    internal const string AgeConfirmationText =
-        "I am 13 or older. If I am under 18, I have permission from my parent or legal guardian to use SwimHub.";
-
-    private const string AgeRequiredError =
-        "You need to be 13 or older to create an account — please confirm the checkbox.";
-
-    private ContentResult GoogleConfirmAgePage(string email, string? returnUrl, bool error)
-    {
-        static string enc(string s) => System.Net.WebUtility.HtmlEncode(s);
-        var body = $@"<p>You're creating a SwimHub account as <b>{enc(email)}</b>.</p>
-            {(error ? $@"<p style=""color:#b3261e"">{enc(AgeRequiredError)}</p>" : "")}
-            <form method=""post"" action=""/auth/google/confirm-age"" style=""max-width:400px"">
-              <input type=""hidden"" name=""returnUrl"" value=""{enc(returnUrl ?? "/")}"" />
-              <label style=""display:flex;gap:.6rem;align-items:flex-start;margin:1rem 0"">
-                <input type=""checkbox"" name=""ageConfirmed"" value=""true"" required style=""margin-top:.2rem"" />
-                <span>{enc(AgeConfirmationText)}</span>
-              </label>
-              <p style=""font-size:.9rem"">Children under 13 don't get their own account — a parent can follow them
-                from their own account. By creating an account you agree to the
-                <a href=""/terms"" target=""_blank"">Terms of use</a> and the <a href=""/privacy"" target=""_blank"">Privacy policy</a>.</p>
-              <button type=""submit"" style=""padding:.5rem 1rem"">Create account</button>
-            </form>";
-        return HtmlPage("Almost there", body, rawHtml: true);
-    }
-
-    private ContentResult GoogleSignInExpiredPage() =>
-        HtmlPage("Sign-in timed out", "The Google sign-in step expired. Please sign in with Google again.");
-
-    public record RegisterRequest(string Email, string Password, string? DisplayName, bool AgeConfirmed = false);
+    public record RegisterRequest(string Email, string Password, string? DisplayName);
     public record LoginRequest(string Email, string Password);
     public record ForgotPasswordRequest(string Email);
 }
