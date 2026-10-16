@@ -151,8 +151,7 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("AvatarUrl")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3790,7 +3789,7 @@ namespace Swimm.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_UserMediaPublications_Target", "\"TargetType\" IN ('group', 'club')");
 
-                            t.HasCheckConstraint("CK_UserMediaPublications_TargetShape", "(\"TargetType\" = 'group' AND \"HubGroupId\" IS NOT NULL AND \"ClubId\" IS NULL)\n                  OR (\"TargetType\" = 'club' AND \"ClubId\" IS NOT NULL AND \"HubGroupId\" IS NULL)");
+                            t.HasCheckConstraint("CK_UserMediaPublications_TargetShape", "(\"TargetType\" = 'group' AND \"HubGroupId\" IS NOT NULL AND \"ClubId\" IS NULL)\r\n                  OR (\"TargetType\" = 'club' AND \"ClubId\" IS NOT NULL AND \"HubGroupId\" IS NULL)");
                         });
                 });
 
