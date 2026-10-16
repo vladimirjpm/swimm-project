@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 14 October 2026.
+Last updated: 16 October 2026.
 
 SwimHub (swimhub.co.il) shows results of swimming competitions in Israel and swimming records. This policy explains what information we hold, why, who can see or receive it and what you can ask of us. Using the site is also governed by the [Terms of use](route:terms).
 
@@ -26,7 +26,6 @@ What we keep and why:
 
 - **email, display name** and, if you sign in with Google, your **Google profile picture** — to run your account and send account emails (confirming your address, resetting your password);
 - a **password hash**, never the password itself, if you use email and password — to let you sign in;
-- your **confirmation that you are 13 or older** (and, if under 18, that you have a parent’s or guardian’s permission) and when you gave it — see “Children”;
 - **sign-in history** — date, time and IP address — to protect your account from misuse;
 - **what you add yourself**: favorites, groups and their members, trainings, links to photos and videos, reactions — to show them to you and to the audience you choose.
 
@@ -50,8 +49,8 @@ Some of these providers process personal information outside Israel, including i
 
 ## Children
 
-- **You must be at least 13 to create an account. If you are under 18, you must have permission from a parent or legal guardian.** You confirm this when you sign up; we don’t ask for documents.
-- Children under 13 don’t have their own account. A parent can follow their children’s results from the parent’s own account.
+- **There is no minimum age for an account.** We don’t ask for your age or date of birth and we don’t check documents. If you are under 18, use SwimHub with the permission of a parent or legal guardian.
+- We don’t treat signing in with Google — including a Google account supervised by a parent — as proof of age or of a parent’s consent. A parent or legal guardian can ask us to delete a minor’s account: write to privacy@swimhub.co.il. A parent can also follow their children’s results from the parent’s own account.
 - **Profile pages of swimmers under 18 are not indexed by search engines** and are not in our sitemap. Their names still appear in competition and club results, as in the official protocol.
 - Before adding a swimmer’s personal information or media to a group, a group member must obtain the swimmer’s permission and, for a minor, permission from their parent or legal guardian for the intended sharing.
 

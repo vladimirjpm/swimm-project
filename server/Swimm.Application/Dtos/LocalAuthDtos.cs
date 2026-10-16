@@ -1,6 +1,6 @@
 namespace Swimm.Application.Dtos;
 
-public enum RegisterStatus { Ok, WeakPassword, InvalidEmail, AgeNotConfirmed }
+public enum RegisterStatus { Ok, WeakPassword, InvalidEmail }
 
 public enum LoginStatus { Ok, InvalidCredentials, LockedOut, EmailNotConfirmed }
 
