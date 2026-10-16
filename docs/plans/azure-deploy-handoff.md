@@ -134,6 +134,7 @@
   проверить «Успешно» и ~1 345 страниц.
 - ☐ **Бюджет Azure** — Cost Management → Budgets, $50/мес, письмо на 80 %.
 - ☐ **MyNames** — сверить адрес сайта регистратора на `/Admin/Services` (стоит mynames.co.il наугад).
+- ☐ Планы на потом: [content-permissions-plan.md](content-permissions-plan.md) (права на медиа), [sign-in-rules-plan.md](sign-in-rules-plan.md) (правила входа).
 - ☐ По желанию: логотип в письмах сайта (сейчас голый текст), `ProdVersionConnection` в
   `appsettings.Development.json` (напоминание «локальная база отстаёт»).
 

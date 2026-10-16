@@ -172,6 +172,14 @@ if unset. ⚠ **Порядок на чистой БД жёсткий и не п�
 базе, а в профиле **ProdAdmin** (`--launch-profile ProdAdmin`, красная полоса «PRODUCTION
 DATABASE») — его запускает Влад; агент без явной просьбы в ProdAdmin не пишет.
 
+**SQL на проде — `node server/db/prod-sql.mjs`** (разрешено агенту правилом в
+`.claude/settings.local.json`, решение Влада 16.10.2026). `read -c "SELECT …"` — смотреть свободно
+(транзакция read-only). Запись — **только по просьбе Влада в чате, на конкретную задачу**: файл с
+`BEGIN … COMMIT` в `server/db/private/` (в .gitignore — там могут быть email) → `local <file>`
+(репетиция) → `apply <file>`; без репетиции того же файла `apply` откажет. Роль — рабочая
+(`swimm_rw`, без DDL); журнал запусков — `server/db/private/prod-sql-journal.jsonl`. Схему меняют
+только миграции, не этот инструмент. Пароли из конфига не читать и не печатать — их берёт скрипт.
+
 ## Migrations
 
 There are **two `DbContext`s**, so every EF command needs `--context SwimmDbContext`:
