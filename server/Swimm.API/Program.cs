@@ -457,6 +457,7 @@ app.Use(async (context, next) =>
                 "clubs" => "/results_main.html",     // /clubs без id — пусть падает штатно
                 "my-media" => "/media.html",
                 "my-favorites" => "/my-favorites.html", // своё избранное и пометка «семья»
+                "setup-profile" => "/setup-profile.html", // «Set up profile»: три шага + опрос
                 "about" => "/about.html",
                 "privacy" => "/help.html",              // политика приватности — справка с ключом privacy
                 "terms" => "/help.html",                // условия пользования — справка с ключом terms

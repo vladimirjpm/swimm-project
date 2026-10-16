@@ -108,6 +108,15 @@
                         }
                     </td>
                     <td class="text-right whitespace-nowrap">
+                        @* Тестовый персонаж — вернуть в исходное состояние (только Development). *@
+                        @if (Model.CanResetPersonas && Swimm.API.Pages.Admin.Users.IndexModel.IsPersona(u.Email))
+                        {
+                            <form method="post" asp-page-handler="ResetPersona" class="inline"
+                                  onsubmit="return confirm('Вернуть @u.DisplayName в исходное состояние? Всё, что на нём поменяли руками (избранное, группы, медиа, опрос), будет стёрто.');">
+                                <input type="hidden" name="userId" value="@u.Id" />
+                                <button type="submit" class="admin-btn admin-btn-ghost py-1 px-2.5" title="Тестовый персонаж: стереть изменения и засидить заново (id не меняется)">Сбросить</button>
+                            </form>
+                        }
                         <form method="post" asp-page-handler="ForceSignOut" class="inline"
                               onsubmit="return confirm('Отозвать все сессии пользователя @u.Email?');">
                             <input type="hidden" name="userId" value="@u.Id" />
@@ -157,6 +166,34 @@
             @if (d.LocalLockoutEnd is { } lockout && lockout > DateTime.UtcNow)
             {
                 <span class="text-admin-danger">· Lockout до @lockout.ToString("dd.MM HH:mm") UTC</span>
+            }
+        </div>
+        @* ── Опрос «Who are you?» со страницы /setup-profile: только ответ о себе, прав не даёт
+              (I'm a coach ≠ роль Coach). docs/plans/profile-setup-plan.md ── *@
+        @{ var survey = Swimm.API.Pages.Admin.Users.IndexModel.SurveyAnswer(d); }
+        <div class="mb-3 flex flex-wrap gap-2 text-xs text-admin-text-muted">
+            <span title="Ответ пользователя о себе на странице Set up profile. Ни на что не влияет и прав не даёт">
+                Кто он (опрос):
+                @if (survey == null)
+                {
+                    <span>не отвечал</span>
+                }
+                else if (survey.Length == 0)
+                {
+                    <span>снял все ответы</span>
+                }
+                else
+                {
+                    <span class="font-semibold text-admin-text">@survey</span>
+                }
+            </span>
+            @if (d.ProfileRolesAnsweredAt is { } answeredAt)
+            {
+                <span>· ответ от @answeredAt.ToString("dd.MM.yyyy")</span>
+            }
+            @if (d.ProfileSetupDismissedAt is { } dismissedAt)
+            {
+                <span>· Set up profile закрыт (Dismiss) @dismissedAt.ToString("dd.MM.yyyy")</span>
             }
         </div>
         @* ── Лимит групп: владение и персональное исключение (правило — HubGroupCreationRules) ── *@

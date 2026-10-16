@@ -144,6 +144,85 @@ public class PersonaSeederTests
         Assert.Equal(2, await db.HubGroups.CountAsync());
     }
 
+    // ── Сброс одного персонажа (кнопка «Сбросить» в /Admin/Users, 17.10.2026) ──────────
+
+    [Fact]
+    public async Task ResetPersona_ClearsManualChanges_KeepsId()
+    {
+        await using var db = CreateDb(nameof(ResetPersona_ClearsManualChanges_KeepsId));
+        await SeedBaseAsync(db);
+        var seeder = new PersonaSeeder(db);
+        await seeder.SeedAsync();
+
+        var newbie = await db.AppUsers.SingleAsync(u => u.DisplayName == TestPersonas.Newbie);
+        var id = newbie.Id;
+        var swimmerId = await db.Swimmers.Select(s => s.Id).FirstAsync();
+        var adminRoleId = await db.AppRoles.Where(r => r.Name == "Admin").Select(r => r.Id).SingleAsync();
+        // Руками «пощупали»: «это я», клуб-опрос-отказ, своя группа, лишняя роль, новое имя.
+        db.UserFavorites.Add(new UserFavorite { UserId = id, TargetType = "swimmer", SwimmerId = swimmerId, IsPrimary = true });
+        db.HubGroups.Add(new HubGroup { Name = "Mine", Slug = "utest-newbie-own", OwnerUserId = id });
+        db.AppUserRoles.Add(new AppUserRole { UserId = id, RoleId = adminRoleId });
+        newbie.DisplayName = "Renamed";
+        newbie.ProfileRoleWatcher = true;
+        newbie.ProfileRolesAnsweredAt = DateTime.UtcNow;
+        newbie.ProfileSkipClub = true;
+        await db.SaveChangesAsync();
+        var parentFavsBefore = await db.UserFavorites.CountAsync(f => f.User.DisplayName == TestPersonas.Parent);
+
+        var log = await seeder.ResetPersonaAsync(id);
+
+        Assert.NotNull(log);
+        db.ChangeTracker.Clear();
+        var after = await db.AppUsers.SingleAsync(u => u.Id == id);
+        Assert.Equal(TestPersonas.Newbie, after.DisplayName);
+        Assert.False(after.ProfileRoleWatcher);
+        Assert.Null(after.ProfileRolesAnsweredAt);
+        Assert.False(after.ProfileSkipClub);
+        Assert.Equal(0, await db.UserFavorites.CountAsync(f => f.UserId == id));
+        Assert.False(await db.HubGroups.AnyAsync(g => g.Slug == "utest-newbie-own"));
+        var roles = await db.AppUserRoles.Where(r => r.UserId == id).Select(r => r.Role.Name).ToListAsync();
+        Assert.Equal(["User"], roles);
+        // Соседей сброс не трогает: тест-группы и «дети» родителя на месте.
+        Assert.Equal(2, await db.HubGroups.CountAsync());
+        Assert.Equal(parentFavsBefore, await db.UserFavorites.CountAsync(f => f.User.DisplayName == TestPersonas.Parent));
+    }
+
+    [Fact]
+    public async Task ResetPersona_RestoresWhatWasRemoved()
+    {
+        await using var db = CreateDb(nameof(ResetPersona_RestoresWhatWasRemoved));
+        await SeedBaseAsync(db);
+        var seeder = new PersonaSeeder(db);
+        await seeder.SeedAsync();
+
+        // Родитель снял «детей», участник вышел из групп — сброс возвращает как было.
+        var parent = await db.AppUsers.SingleAsync(u => u.DisplayName == TestPersonas.Parent);
+        var member = await db.AppUsers.SingleAsync(u => u.DisplayName == TestPersonas.Member);
+        db.UserFavorites.RemoveRange(db.UserFavorites.Where(f => f.UserId == parent.Id));
+        db.HubGroupUserMembers.RemoveRange(db.HubGroupUserMembers.Where(m => m.UserId == member.Id));
+        await db.SaveChangesAsync();
+
+        await seeder.ResetPersonaAsync(parent.Id);
+        await seeder.ResetPersonaAsync(member.Id);
+
+        Assert.Equal(2, await db.UserFavorites.CountAsync(f => f.UserId == parent.Id && f.IsFamily));
+        Assert.Equal(2, await db.HubGroupUserMembers.CountAsync(m => m.UserId == member.Id));
+    }
+
+    [Fact]
+    public async Task ResetPersona_NotAPersona_Null()
+    {
+        await using var db = CreateDb(nameof(ResetPersona_NotAPersona_Null));
+        await SeedBaseAsync(db);
+        var seeder = new PersonaSeeder(db);
+        await seeder.SeedAsync();
+
+        var real = await db.AppUsers.SingleAsync(u => u.Email == "real.person@example.com");
+        Assert.Null(await seeder.ResetPersonaAsync(real.Id));
+        Assert.Null(await seeder.ResetPersonaAsync(int.MaxValue));
+        Assert.Equal("Real", (await db.AppUsers.SingleAsync(u => u.Id == real.Id)).DisplayName);
+    }
+
     private static async Task<(int, int, int, int, int, int, int, int, int)> CountsAsync(SwimmDbContext db) => (
         await db.AppUsers.CountAsync(),
         await db.AppUserRoles.CountAsync(),

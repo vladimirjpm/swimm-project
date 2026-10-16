@@ -14,6 +14,7 @@
 //   /clubs/{id}             → club.html
 //   /my-media               → media.html
 //   /my-favorites           → my-favorites.html (своё избранное, пометка «семья»)
+//   /setup-profile          → setup-profile.html (три шага «Set up profile» + опрос)
 //   /about                  → about.html
 //   /season-best            → season-best.html (списки лучших в сезоне; всё в query)
 //   /records                → records.html (рейтинг рекордов стран; дисциплина в query)
@@ -59,6 +60,8 @@ export const routes = {
   club: (id: string | number) => `/clubs/${enc(String(id))}`,
   myMedia: () => '/my-media',
   myFavorites: () => '/my-favorites',
+  /** «Set up profile»: три шага и опрос (docs/plans/profile-setup-plan.md). */
+  setupProfile: () => '/setup-profile',
 
   /**
    * Страница справки: текст из `src/content/help/{key}/{en,ru,he}.md` (`content.ts`).

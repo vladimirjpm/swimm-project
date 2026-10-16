@@ -1,0 +1,195 @@
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useAuth } from './useAuth';
+import { fetchAntiforgeryToken, invalidateTokenCache } from '../utils/antiforgery';
+
+// «Set up profile» (docs/plans/profile-setup-plan.md): пункт меню с прогрессом и страница
+// /setup-profile. Шаги и счётчик считает сервер (ProfileSetupRules) — здесь только чтение.
+
+export type ProfileSetupStepKey = 'me' | 'club' | 'group';
+
+export interface ProfileSetupStep {
+  key: ProfileSetupStepKey;
+  done: boolean;
+  /** Засчитан отказом («Not a swimmer», «No club», «No group»); сделанное делом — false. */
+  skipped: boolean;
+  /** Id пловца / клуба / группы, которым шаг закрыт. */
+  targetId: number | null;
+  /** Имя пловца или клуба (иврит по умолчанию), название группы. */
+  targetName: string | null;
+  /** Только у группы. */
+  targetSlug: string | null;
+  /** Только у группы: active | pending (заявка тоже засчитывает шаг). */
+  status: 'active' | 'pending' | null;
+}
+
+/** Ответ опроса «Who are you?» — ни на что не влияет (решение Влада 16.10.2026). */
+export interface ProfileSurvey {
+  swimmer: boolean;
+  parent: boolean;
+  coach: boolean;
+  watcher: boolean;
+  answeredAt: string | null;
+}
+
+export interface ProfileSetup {
+  survey: ProfileSurvey;
+  steps: ProfileSetupStep[];
+  done: number;
+  total: number;
+  /** Показывать пункт меню: не закрыт Dismiss и не все шаги сделаны. */
+  visible: boolean;
+  dismissed: boolean;
+}
+
+// ── Модульный кэш на страницу (как useAuth) ──────────────────────────────────
+// Один GET на загрузку страницы, сколько бы компонентов ни звало хук (меню + страница
+// /setup-profile). refresh() перечитывает и обновляет всех подписчиков. Кэш помнит, ЧЕЙ он:
+// сменился пользователь (вход, выход, dev-переключатель персонажа) — читаем заново.
+
+let cached: ProfileSetup | null = null;
+let cachedFor: number | null = null;
+let inflight: Promise<ProfileSetup | null> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((l) => l());
+}
+
+async function fetchSetup(): Promise<ProfileSetup | null> {
+  try {
+    const r = await fetch('/api/me/profile-setup', { credentials: 'include' });
+    // Ошибка — не повод ломать шапку: пункта просто нет.
+    if (!r.ok) return null;
+    return (await r.json()) as ProfileSetup;
+  } catch {
+    return null;
+  }
+}
+
+function load(userId: number, force = false): Promise<ProfileSetup | null> {
+  if (!force && cachedFor === userId && (cached || inflight)) return inflight ?? Promise.resolve(cached);
+  cachedFor = userId;
+  const p = fetchSetup().then((s) => {
+    // Пока шёл запрос, пользователь мог смениться — тогда ответ чужой, выбрасываем.
+    if (cachedFor === userId) {
+      cached = s;
+      inflight = null;
+      notify();
+    }
+    return s;
+  });
+  inflight = p;
+  return p;
+}
+
+/** Подменить снимок без запроса — оптимистичная запись опроса и её откат. */
+function setCached(next: ProfileSetup | null) {
+  cached = next;
+  notify();
+}
+
+export type SurveyRole = 'swimmer' | 'parent' | 'coach' | 'watcher';
+export const SURVEY_ROLES: SurveyRole[] = ['swimmer', 'parent', 'coach', 'watcher'];
+
+/**
+ * Ответ после клика по чипу. «Just watching» исключающий (решение Влада 16.10.2026): включил
+ * его — остальные гаснут; включил другую роль — гаснет он. Сервер такую пару всё равно
+ * отклонит (400 `watcher_exclusive`), здесь правило лишь не даёт её отправить.
+ */
+export function toggleSurveyRole(s: ProfileSurvey, role: SurveyRole): Record<SurveyRole, boolean> {
+  const next = { swimmer: s.swimmer, parent: s.parent, coach: s.coach, watcher: s.watcher };
+  const on = !next[role];
+  if (role === 'watcher') {
+    if (on) { next.swimmer = false; next.parent = false; next.coach = false; }
+  } else if (on) {
+    next.watcher = false;
+  }
+  next[role] = on;
+  return next;
+}
+
+async function send(method: 'PUT' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<boolean> {
+  const token = await fetchAntiforgeryToken();
+  const init: RequestInit = {
+    method,
+    credentials: 'include',
+    headers: {
+      ...(token ? { 'X-XSRF-TOKEN': token } : {}),
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  };
+  let r = await fetch(path, init);
+  // Протухший токен (сессия сменилась) — один повтор со свежим.
+  if (r.status === 400 || r.status === 403) {
+    invalidateTokenCache();
+    const fresh = await fetchAntiforgeryToken();
+    if (fresh && fresh !== token) {
+      r = await fetch(path, { ...init, headers: { ...init.headers, 'X-XSRF-TOKEN': fresh } });
+    }
+  }
+  return r.ok;
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot(): ProfileSetup | null {
+  return cached;
+}
+
+/**
+ * Состояние «Set up profile» текущего пользователя. У гостя — null (запроса нет).
+ * `refresh()` — после любого действия, меняющего шаги (Me, клуб, группа, Dismiss).
+ */
+export function useProfileSetup() {
+  const auth = useAuth();
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+  const userId = auth.isAuthenticated ? auth.userId : null;
+
+  useEffect(() => {
+    if (userId != null) load(userId);
+  }, [userId]);
+
+  const refresh = useCallback(() => (userId != null ? load(userId, true) : Promise.resolve(null)), [userId]);
+
+  /**
+   * Клик по чипу опроса: снимок меняется сразу, ответ уходит на сервер; отказ — откат.
+   * Шаги и счётчик от опроса не зависят (Р1), поэтому перечитывать после записи нечего.
+   */
+  const toggleRole = useCallback(async (role: SurveyRole): Promise<boolean> => {
+    const before = cached;
+    if (userId == null || !before || cachedFor !== userId) return false;
+    const answer = toggleSurveyRole(before.survey, role);
+    setCached({ ...before, survey: { ...answer, answeredAt: new Date().toISOString() } });
+    const ok = await send('PUT', '/api/me/profile-setup/roles', answer);
+    if (!ok && cachedFor === userId) setCached(before);
+    return ok;
+  }, [userId]);
+
+  /**
+   * Отказ от шага или его отмена (решение Влада 17.10.2026): отказ засчитывает шаг — тренер
+   * отмечает только клуб, родитель обходится без «это я». После записи статус перечитывается,
+   * чтобы счётчик в меню совпал со страницей.
+   */
+  const setStepSkipped = useCallback(async (key: ProfileSetupStepKey, skipped: boolean): Promise<boolean> => {
+    if (userId == null) return false;
+    const ok = await send(skipped ? 'PUT' : 'DELETE', `/api/me/profile-setup/steps/${key}/skip`);
+    if (ok) await load(userId, true);
+    return ok;
+  }, [userId]);
+
+  /** Dismiss: пункт «Set up profile» больше не показывается в меню. */
+  const dismiss = useCallback(async (): Promise<boolean> => {
+    if (userId == null) return false;
+    const ok = await send('POST', '/api/me/profile-setup/dismiss');
+    if (ok) await load(userId, true);
+    return ok;
+  }, [userId]);
+
+  // Снимок другого пользователя (или гостя) не показываем.
+  const setup = userId != null && cachedFor === userId ? snapshot : null;
+  return { setup, refresh, toggleRole, setStepSkipped, dismiss };
+}

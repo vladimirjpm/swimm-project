@@ -237,6 +237,12 @@
   сердечко и на клике получает модал логина (`openLoginModal()` из `LoginModalProvider`,
   см. `results-table.tsx`), а страница My media вместо пустоты — экран «Sign in to manage
   your media».
+- ◐ 4.6. (2026-10-16, S0–S5, не закоммичено) «Set up profile» после входа — хендофф 1a: пункт с
+  прогрессом первым в меню пользователя (и в шапке главной), точка на аватаре, страница
+  `/setup-profile` с тремя шагами (это я → клуб → группа) и опросом «Who are you?», который только
+  хранится (колонки `AppUser.ProfileRole*`, ни на что не влияет; «Just watching» исключающий).
+  Ручки `api/me/profile-setup`, правило `ProfileSetupRules`. `/privacy` дополнен. Осталось: выкатка
+  миграций `AddUserProfileSetup` и `AddUserProfileSetupSkips`; у шагов есть отказ («Not a swimmer», «No club», «No group»). План — [plans/profile-setup-plan.md](plans/profile-setup-plan.md).
 
 План/детали шагов: `docs/tasks/client-login-plan.md`.
 

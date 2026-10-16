@@ -40,11 +40,14 @@ interface Props {
    * нашлось» — неправда: нашёлся, но он уже на доске.
    */
   emptyText?: string;
+  /** Подсказка в поле поиска; по умолчанию — про соперника (H2H). */
+  placeholder?: string;
 }
 
 const UI_H2HRivalPicker: React.FC<Props> = ({
   favorites, query, onQuery, hits, loading, error, onPick, inputRef,
   emptyText = 'Nobody found.',
+  placeholder = 'Search a swimmer to compare with...',
 }) => (
   <div className="h2h-picker">
     {favorites.length > 0 && (
@@ -65,8 +68,8 @@ const UI_H2HRivalPicker: React.FC<Props> = ({
       type="search"
       value={query}
       onChange={(e) => onQuery(e.target.value)}
-      placeholder="Search a swimmer to compare with..."
-      aria-label="Search a swimmer to compare with"
+      placeholder={placeholder}
+      aria-label={placeholder.replace(/\.+$/, '')}
     />
 
     {query.trim().length >= 2 && (

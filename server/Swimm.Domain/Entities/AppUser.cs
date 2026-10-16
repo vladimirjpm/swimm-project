@@ -70,6 +70,49 @@ public class AppUser
     /// </summary>
     public DateTime? AgeConfirmedAt { get; set; }
 
+    // --- Опрос «Who are you?» на странице /setup-profile (docs/plans/profile-setup-plan.md) ---
+    // Решение Влада 16.10.2026: ТОЛЬКО опрос, ни на что не влияет — ни на шаги и счётчик
+    // «Set up profile», ни на права. Хранится, потому что может пригодиться в будущем.
+    // ⚠ ProfileRoleCoach — ответ человека о себе, НЕ site-роль Coach (AppRole) и НЕ бейдж
+    // HubGroupMember.Role = "coach". Права на нём не строить.
+
+    /// <summary>Ответ опроса «I swim».</summary>
+    public bool ProfileRoleSwimmer { get; set; }
+
+    /// <summary>Ответ опроса «I'm a parent».</summary>
+    public bool ProfileRoleParent { get; set; }
+
+    /// <summary>Ответ опроса «I'm a coach» — не право, см. комментарий выше.</summary>
+    public bool ProfileRoleCoach { get; set; }
+
+    /// <summary>Ответ опроса «Just watching».</summary>
+    public bool ProfileRoleWatcher { get; set; }
+
+    /// <summary>
+    /// Когда ответ опроса последний раз менялся. null — ни разу не отвечал (отличает «не отвечал»
+    /// от «снял все галочки»).
+    /// </summary>
+    public DateTime? ProfileRolesAnsweredAt { get; set; }
+
+    /// <summary>
+    /// Когда нажал Dismiss на /setup-profile: пункт «Set up profile» в меню больше не показывается.
+    /// null — пункт виден, пока не сделаны все шаги (<c>ProfileSetupRules</c>).
+    /// </summary>
+    public DateTime? ProfileSetupDismissedAt { get; set; }
+
+    // --- Отказ от шага «Set up profile» (решение Влада 17.10.2026) ---
+    // «Не про меня»: тренер отмечает только клуб, родитель — без «это я». Отказ засчитывает шаг
+    // так же, как сделанный (ProfileSetupRules); снимается в любой момент. Прав не даёт.
+
+    /// <summary>Отказ от шага «It's me» («Not a swimmer»).</summary>
+    public bool ProfileSkipMe { get; set; }
+
+    /// <summary>Отказ от шага «My club» («No club»).</summary>
+    public bool ProfileSkipClub { get; set; }
+
+    /// <summary>Отказ от шага «My group» («No group»).</summary>
+    public bool ProfileSkipGroup { get; set; }
+
     // --- Навигация ---
     public ICollection<AppUserRole> UserRoles { get; set; } = new List<AppUserRole>();
     public ICollection<UserExternalLogin> ExternalLogins { get; set; } = new List<UserExternalLogin>();

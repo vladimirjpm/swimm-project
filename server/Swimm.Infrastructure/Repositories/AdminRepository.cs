@@ -249,6 +249,12 @@ public class AdminRepository : IAdminRepository
             LocalLockoutEnd = user.LocalCredential?.LockoutEnd,
             HubGroupsOwned = await _db.HubGroups.CountAsync(g => g.OwnerUserId == userId),
             HubGroupLimit = user.HubGroupLimit,
+            ProfileRoleSwimmer = user.ProfileRoleSwimmer,
+            ProfileRoleParent = user.ProfileRoleParent,
+            ProfileRoleCoach = user.ProfileRoleCoach,
+            ProfileRoleWatcher = user.ProfileRoleWatcher,
+            ProfileRolesAnsweredAt = user.ProfileRolesAnsweredAt,
+            ProfileSetupDismissedAt = user.ProfileSetupDismissedAt,
             ExternalLogins = user.ExternalLogins
                 .OrderBy(e => e.Provider)
                 .Select(e => new ExternalLoginDto

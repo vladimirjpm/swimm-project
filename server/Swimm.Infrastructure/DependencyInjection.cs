@@ -193,6 +193,8 @@ public static class DependencyInjection
         services.AddScoped<IHubGroupPermissionService, HubGroupPermissionService>();
         services.AddScoped<IEntityDisplayRepository, EntityDisplayRepository>();
         services.AddScoped<IHubGroupUserService, HubGroupUserService>();
+        // «Set up profile» (docs/plans/profile-setup-plan.md) — личное, без кэша.
+        services.AddScoped<IProfileSetupService, ProfileSetupService>();
         services.AddScoped<IHubGroupClubRequestAdminService, HubGroupClubRequestAdminService>();
         // Подписка группы на клуб: зовут контроллер «My groups», импорт (после коммита) и
         // склейка клубов — оба последних через необязательный параметр конструктора.

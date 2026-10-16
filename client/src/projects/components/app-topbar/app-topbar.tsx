@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
+import { useProfileSetup } from '../../../hooks/useProfileSetup';
 import LoginModal from '../login-modal/login-modal';
 import UI_BrandMark from '../mix/brand-mark/brand-mark';
 import { routes } from '../../../utils/routes';
@@ -75,6 +76,64 @@ function TopbarAvatar({ name, avatarUrl, size }: { name: string; avatarUrl: stri
   );
 }
 
+/**
+ * Точка «профиль не настроен» на аватаре (хендофф set-up-profile 1a): 9px цвета текста полосы
+ * с кольцом цвета полосы — отделяет её от аватара на любой теме. Видна, пока виден пункт
+ * «Set up profile».
+ */
+function SetupDot() {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute right-[-1px] top-[-1px] h-[9px] w-[9px] rounded-full bg-[var(--theme-topbar-text)] shadow-[0_0_0_2px_var(--theme-topbar-bg)]"
+    />
+  );
+}
+
+/**
+ * Пункт «Set up profile» с прогрессом — первым в меню пользователя, пока шаги не сделаны и не
+ * нажат Dismiss (docs/plans/profile-setup-plan.md §4). Фон — как hover соседних пунктов, чтобы
+ * пункт читался «уже подсвеченным». `mobile` — отступы и скругление пунктов бургера.
+ *
+ * Отступление от хендоффа (S5, замер по 9 темам × 2 режима): счётчик «0/3» хендофф красил
+ * `--theme-topbar-accent`, а на этой подложке акцент даёт 2.4–2.5 в competition-blue и training*
+ * — цифры текстом цвета полосы, акцент остался у заливки полоски. Подсказка: `-text-muted`
+ * в тёмных режимах давала 3.8–4.3 на 11px — взят текст полосы на 78%.
+ */
+function SetupProfileItem({ done, total, mobile }: { done: number; total: number; mobile?: boolean }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  return (
+    <a
+      href={routes.setupProfile()}
+      className={`mb-[2px] flex flex-col gap-[6px] bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)] no-underline ${
+        mobile ? 'rounded-[10px] px-4 py-[10px]' : 'rounded-[8px] px-3 py-[9px]'
+      }`}
+    >
+      <span className="flex items-center gap-[6px]">
+        <span className={`flex-1 font-bold text-[var(--theme-topbar-text)] ${mobile ? 'text-[14px]' : 'text-[13px]'}`}>
+          Set up profile
+        </span>
+        <span className="text-[12px] font-bold text-[var(--theme-topbar-text)]">
+          {done}/{total}
+        </span>
+      </span>
+      <span
+        className="block h-[3px] rounded-[2px] bg-[color-mix(in_srgb,var(--theme-topbar-text)_14%,transparent)]"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+        aria-label="Profile setup progress"
+      >
+        <span className="block h-full rounded-[2px] bg-[var(--theme-topbar-accent)]" style={{ width: `${pct}%` }} />
+      </span>
+      <span className="text-[11px] leading-[1.35] text-[color-mix(in_srgb,var(--theme-topbar-text)_78%,transparent)]">
+        Add yourself, your club and group
+      </span>
+    </a>
+  );
+}
+
 function TopbarNavItem({
   link,
   active,
@@ -143,6 +202,10 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
   const userName = overridden ? user?.name || 'User' : auth.displayName || auth.email || 'User';
   const avatarUrl = overridden ? user?.avatarUrl || null : auth.avatarUrl;
 
+  // «Set up profile»: только для своего входа (при override шапка не знает, чей профиль).
+  const { setup } = useProfileSetup();
+  const showSetup = !overridden && isAuthenticated && !!setup?.visible;
+
   // Клик мимо дропдауна закрывает его (эталон — home-header.tsx).
   useEffect(() => {
     if (!userMenuOpen) return;
@@ -190,7 +253,10 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
         aria-expanded={userMenuOpen}
         onClick={() => setUserMenuOpen((open) => !open)}
       >
-        <TopbarAvatar name={userName} avatarUrl={avatarUrl} size={30} />
+        <span className="relative flex">
+          <TopbarAvatar name={userName} avatarUrl={avatarUrl} size={30} />
+          {showSetup && <SetupDot />}
+        </span>
         <span className="hidden max-w-[140px] truncate text-[12px] font-bold text-[var(--theme-topbar-text)] sm:block">
           {userName}
         </span>
@@ -198,6 +264,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
       </button>
       {userMenuOpen && (
         <div className="absolute right-0 top-[40px] w-[210px] rounded-[12px] border border-[color-mix(in_srgb,var(--theme-topbar-text)_18%,transparent)] bg-[var(--theme-topbar-bg)] p-1.5 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
+          {showSetup && setup && <SetupProfileItem done={setup.done} total={setup.total} />}
           <a href={routes.myMedia()} className={dropdownItemClass}>
             My media
           </a>
@@ -289,6 +356,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
                 <TopbarAvatar name={userName} avatarUrl={avatarUrl} size={28} />
                 <span className="truncate text-[13px] font-extrabold text-[var(--theme-topbar-text)]">{userName}</span>
               </div>
+              {showSetup && setup && <SetupProfileItem done={setup.done} total={setup.total} mobile />}
               <a
                 href={routes.myMedia()}
                 className="block rounded-[10px] px-4 py-[10px] text-[14px] font-extrabold text-[var(--theme-topbar-text)] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)]"

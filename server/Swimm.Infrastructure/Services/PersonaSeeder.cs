@@ -62,6 +62,63 @@ public class PersonaSeeder : IPersonaSeeder
         return log;
     }
 
+    public async Task<IReadOnlyList<string>?> ResetPersonaAsync(int userId)
+    {
+        var user = await _db.AppUsers.FirstOrDefaultAsync(u => u.Id == userId);
+        var persona = user == null
+            ? null
+            : TestPersonas.All.FirstOrDefault(p => string.Equals(p.Email, user.Email, StringComparison.OrdinalIgnoreCase));
+        if (user == null || persona == null) return null;
+
+        var log = new List<string>();
+
+        // Группы, которые персонаж создал сам. Сидерные (их владелец — utest-coach) не трогаем:
+        // на них держится состояние остальных персонажей. Удаление группы каскадом уносит её
+        // состав, участников, админов, тренировки и публикации.
+        string[] seeded = [TestPersonas.OpenGroupSlug, TestPersonas.ApprovalGroupSlug];
+        var ownGroups = await _db.HubGroups
+            .Where(g => g.OwnerUserId == userId && !seeded.Contains(g.Slug))
+            .ToListAsync();
+        _db.HubGroups.RemoveRange(ownGroups);
+        await _db.SaveChangesAsync();
+
+        // Всё, что висит на самом аккаунте. Через трекер (а не ExecuteDelete) — так перехватчик
+        // кэша сбросит страницы, где это показывалось. Медиа уносит свои публикации, жалобы и
+        // реакции каскадом. Журнал входов, внешние логины и пароль — не состояние персонажа.
+        _db.UserFavorites.RemoveRange(await _db.UserFavorites.Where(x => x.UserId == userId).ToListAsync());
+        _db.UserMedia.RemoveRange(await _db.UserMedia.Where(x => x.UserId == userId).ToListAsync());
+        _db.UserReactions.RemoveRange(await _db.UserReactions.Where(x => x.UserId == userId).ToListAsync());
+        _db.MediaReports.RemoveRange(await _db.MediaReports.Where(x => x.ReporterUserId == userId).ToListAsync());
+        _db.UserStartListPlans.RemoveRange(await _db.UserStartListPlans.Where(x => x.UserId == userId).ToListAsync());
+        _db.HubGroupUserMembers.RemoveRange(await _db.HubGroupUserMembers.Where(x => x.UserId == userId).ToListAsync());
+        _db.HubGroupAdmins.RemoveRange(await _db.HubGroupAdmins.Where(x => x.UserId == userId).ToListAsync());
+        _db.HubGroupClubRequests.RemoveRange(await _db.HubGroupClubRequests.Where(x => x.UserId == userId).ToListAsync());
+        _db.HubGroupTrainingRsvps.RemoveRange(await _db.HubGroupTrainingRsvps.Where(x => x.UserId == userId).ToListAsync());
+        _db.HubGroupBreaks.RemoveRange(await _db.HubGroupBreaks.Where(x => x.UserId == userId).ToListAsync());
+        _db.HubGroupAccountLevels.RemoveRange(await _db.HubGroupAccountLevels.Where(x => x.UserId == userId).ToListAsync());
+        _db.HubGroupUserSeen.RemoveRange(await _db.HubGroupUserSeen.Where(x => x.UserId == userId).ToListAsync());
+        _db.UserSecurityTokens.RemoveRange(await _db.UserSecurityTokens.Where(x => x.UserId == userId).ToListAsync());
+        // Роли — тоже: админ мог выдать лишнюю в /Admin/Users; сидер вернёт положенные.
+        _db.AppUserRoles.RemoveRange(await _db.AppUserRoles.Where(x => x.UserId == userId).ToListAsync());
+
+        // Поля аккаунта — как у только что засиженного. IsActive и HubGroupLimit выставит сидер.
+        user.DisplayName = persona.Nick;
+        user.AvatarUrl = null;
+        user.SwimmerId = null;
+        user.ProfileRoleSwimmer = user.ProfileRoleParent = user.ProfileRoleCoach = user.ProfileRoleWatcher = false;
+        user.ProfileRolesAnsweredAt = null;
+        user.ProfileSetupDismissedAt = null;
+        user.ProfileSkipMe = user.ProfileSkipClub = user.ProfileSkipGroup = false;
+        // Роли менялись — сессии персонажа (если входил по-настоящему) перечитают claims.
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        await _db.SaveChangesAsync();
+        log.Add($"сброс {persona.Nick} (#{userId}): удалено своих групп {ownGroups.Count}, связи аккаунта очищены");
+
+        // Сидер идемпотентен: вернёт персонажу его роли, участие, избранное и медиа, остальных не тронет.
+        log.AddRange(await SeedAsync());
+        return log;
+    }
+
     /// <summary>Удалить всех utest-пользователей и тестовые группы, которыми они владеют.</summary>
     private async Task ResetAsync(List<string> log)
     {
