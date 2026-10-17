@@ -25,7 +25,8 @@ description: Refresh the LOCAL database with business data from production (serv
 
 ### 1. Проверить, нужно ли
 Отставание видно в логе локального API при старте (только если в gitignored-конфиге
-разработки задана `ConnectionStrings:ProdVersionConnection`). Нет строки — спроси Влада.
+разработки задана `ConnectionStrings:ProdVersionConnection`). Нет строки — предложи Владу один раз
+запустить `server/db/set-prod-version-connection.ps1` (пароль `swimm_sync` вводит он сам).
 
 ### 2. Подготовить
 - Docker с `swimm-postgres` запущен (`docker compose -f server/docker-compose.yml up -d`).

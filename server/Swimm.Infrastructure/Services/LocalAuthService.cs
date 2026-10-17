@@ -6,6 +6,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Services.Email;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -58,7 +59,7 @@ public class LocalAuthService : ILocalAuthService
             // Локальный аккаунт уже есть. Не раскрываем это (anti-enumeration): шлём письмо-напоминание,
             // отвечаем как при успехе. Сам аккаунт не трогаем.
             await _email.SendAsync(email, "SwimHub — account already exists",
-                "You already have an account with this email. Try logging in or resetting your password.", ct);
+                "<p style=\"margin:0\">You already have a SwimHub account with this email. Log in, or use \"Forgot password\" if you don't remember it.</p>", ct);
             return RegisterResult.Success();
         }
 
@@ -98,7 +99,9 @@ public class LocalAuthService : ILocalAuthService
             var token = await IssueTokenAsync(user.Id, SecurityTokenPurpose.EmailVerification, EmailTokenTtl, ct);
             var link = $"{baseUrl}/auth/verify-email?token={token}";
             await _email.SendAsync(email, "SwimHub — confirm your email",
-                $"Welcome! Confirm your email to activate local login:<br><a href=\"{link}\">{link}</a><br>Link expires in 24 hours.", ct);
+                "<p style=\"margin:0 0 4px\">Welcome to SwimHub! Confirm your email to activate login with your password.</p>" +
+                EmailLayout.Button(link, "Confirm email") +
+                $"<p style=\"margin:0\">The link expires in 24 hours. If the button doesn't work, open this link:<br><a href=\"{link}\">{link}</a></p>", ct);
         }
 
         return RegisterResult.Success();
@@ -205,7 +208,10 @@ public class LocalAuthService : ILocalAuthService
         var token = await IssueTokenAsync(user.Id, SecurityTokenPurpose.PasswordReset, ResetTokenTtl, ct);
         var link = $"{baseUrl}/auth/reset-password?token={token}";
         await _email.SendAsync(email, "SwimHub — reset your password",
-            $"Reset your password:<br><a href=\"{link}\">{link}</a><br>Link expires in 1 hour. If you didn't request this, ignore this email.", ct);
+            "<p style=\"margin:0 0 4px\">Someone asked to reset the password of your SwimHub account.</p>" +
+            EmailLayout.Button(link, "Reset password") +
+            $"<p style=\"margin:0\">The link expires in 1 hour. If the button doesn't work, open this link:<br><a href=\"{link}\">{link}</a></p>" +
+            "<p style=\"margin:12px 0 0\">If you didn't request this, just ignore this email — your password stays the same.</p>", ct);
     }
 
     public async Task<ResetResult> ResetPasswordAsync(string token, string newPassword, CancellationToken ct = default)

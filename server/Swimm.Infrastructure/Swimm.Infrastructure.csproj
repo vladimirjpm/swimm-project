@@ -22,6 +22,11 @@
     <InternalsVisibleTo Include="Swimm.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Логотип в шапке писем (EmailLayout) — вложением с Content-ID, поэтому вшит в сборку. -->
+    <EmbeddedResource Include="Services\Email\swimhub-logo-96.png" LogicalName="Swimm.Infrastructure.Email.swimhub-logo-96.png" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
