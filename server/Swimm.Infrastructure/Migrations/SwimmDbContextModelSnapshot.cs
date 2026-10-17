@@ -175,6 +175,37 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<DateTime?>("LastSeenAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("ProfileRoleCoach")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ProfileRoleParent")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ProfileRoleSwimmer")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ProfileRoleWatcher")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ProfileRolesAnsweredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProfileSetupDismissedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("ProfileSkipClub")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ProfileSkipGroup")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ProfileSkipMe")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ProfileStepsSeen")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
                         .HasMaxLength(64)

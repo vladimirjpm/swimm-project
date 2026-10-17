@@ -9,6 +9,7 @@ User-agent: *
 Disallow: /groups
 Disallow: /my-media
 Disallow: /my-favorites
+Disallow: /setup-profile
 Disallow: /Admin/
 Disallow: /admin/
 Disallow: /auth/

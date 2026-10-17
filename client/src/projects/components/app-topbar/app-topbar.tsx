@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
+import { useProfileSetup, profileSubtitle, STEP_TITLES, type ProfileSetup } from '../../../hooks/useProfileSetup';
 import LoginModal from '../login-modal/login-modal';
 import UI_BrandMark from '../mix/brand-mark/brand-mark';
 import { routes } from '../../../utils/routes';
@@ -75,6 +76,127 @@ function TopbarAvatar({ name, avatarUrl, size }: { name: string; avatarUrl: stri
   );
 }
 
+/**
+ * Точка «профиль не настроен» на аватаре (хендофф set-up-profile 1a): 9px цвета текста полосы
+ * с кольцом цвета полосы — отделяет её от аватара на любой теме. Видна, пока виден пункт
+ * «Set up profile».
+ */
+function SetupDot({ warn }: { warn?: boolean }) {
+  // `warn` — появился новый шаг (хендофф ex2, 3b): точка жёлтая.
+  return (
+    <span
+      aria-hidden="true"
+      className={`absolute right-[-1px] top-[-1px] h-[9px] w-[9px] rounded-full shadow-[0_0_0_2px_var(--theme-topbar-bg)] ${
+        warn ? 'bg-[var(--theme-topbar-warn)]' : 'bg-[var(--theme-topbar-text)]'
+      }`}
+    />
+  );
+}
+
+/** Залитый круг с галочкой («профиль готов») или с «!» («новое поле») — 16px, хендофф ex2. */
+function StatusCircle({ kind }: { kind: 'ok' | 'warn' }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0">
+      <circle cx="8" cy="8" r="8" fill={kind === 'ok' ? 'var(--theme-topbar-ok)' : 'var(--theme-topbar-warn)'} />
+      {kind === 'ok' ? (
+        <path d="M4.6 8.3l2.2 2.2 4.6-4.8" fill="none" stroke="var(--theme-topbar-bg)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      ) : (
+        <>
+          <path d="M8 4.2v4.6" stroke="var(--theme-topbar-bg)" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="8" cy="11.4" r="1.05" fill="var(--theme-topbar-bg)" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/**
+ * Тихий пункт «My profile» (хендофф set-up-profile-ex2, 3b) — первым в меню, когда «Set up profile»
+ * не нужен: всё заполнено или закрыто Dismiss. Без фона, по hover — как соседние пункты. Под
+ * заголовком — роли из опроса через « · ». Ведёт на /setup-profile: там итог «You're all set».
+ * Галочка — только у заполненного; после Dismiss с незаполненным — без значка.
+ */
+function MyProfileItem({ subtitle, complete, mobile }: { subtitle: string; complete: boolean; mobile?: boolean }) {
+  return (
+    <a
+      href={routes.setupProfile()}
+      className={`mb-[2px] flex items-center gap-2 no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)] ${
+        mobile ? 'rounded-[10px] px-4 py-[10px]' : 'rounded-[8px] px-3 py-[9px]'
+      }`}
+    >
+      {complete && <StatusCircle kind="ok" />}
+      <span className="min-w-0 flex-1">
+        <span className={`block font-bold text-[var(--theme-topbar-text)] ${mobile ? 'text-[14px]' : 'text-[13px]'}`}>My profile</span>
+        <span className="block truncate text-[11px] text-[color-mix(in_srgb,var(--theme-topbar-text)_78%,transparent)]">{subtitle}</span>
+      </span>
+    </a>
+  );
+}
+
+/** Разделитель перед Sign out (хендофф ex2, 3b). */
+function MenuDivider() {
+  return <div aria-hidden="true" className="mx-2 my-1 h-px bg-[color-mix(in_srgb,var(--theme-topbar-text)_12%,transparent)]" />;
+}
+
+/**
+ * Пункт «Set up profile» с прогрессом — первым в меню пользователя, пока шаги не сделаны и не
+ * нажат Dismiss (docs/plans/profile-setup-plan.md §4). Фон — как hover соседних пунктов, чтобы
+ * пункт читался «уже подсвеченным». `mobile` — отступы и скругление пунктов бургера.
+ *
+ * Отступление от хендоффа (S5, замер по 9 темам × 2 режима): счётчик «0/3» хендофф красил
+ * `--theme-topbar-accent`, а на этой подложке акцент даёт 2.4–2.5 в competition-blue и training*
+ * — цифры текстом цвета полосы, акцент остался у заливки полоски. Подсказка: `-text-muted`
+ * в тёмных режимах давала 3.8–4.3 на 11px — взят текст полосы на 78%.
+ */
+function SetupProfileItem({ done, total, newTitle, mobile }: { done: number; total: number; newTitle?: string; mobile?: boolean }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  return (
+    <a
+      href={routes.setupProfile()}
+      className={`mb-[2px] flex flex-col gap-[6px] bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)] no-underline ${
+        mobile ? 'rounded-[10px] px-4 py-[10px]' : 'rounded-[8px] px-3 py-[9px]'
+      }`}
+    >
+      <span className="flex items-center gap-[6px]">
+        {/* Новый шаг после завершения (хендофф ex2, 3b) — жёлтый «!». */}
+        {newTitle && <StatusCircle kind="warn" />}
+        <span className={`flex-1 font-bold text-[var(--theme-topbar-text)] ${mobile ? 'text-[14px]' : 'text-[13px]'}`}>
+          Set up profile
+        </span>
+        <span className="text-[12px] font-bold text-[var(--theme-topbar-text)]">
+          {done}/{total}
+        </span>
+      </span>
+      <span
+        className="block h-[3px] rounded-[2px] bg-[color-mix(in_srgb,var(--theme-topbar-text)_14%,transparent)]"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+        aria-label="Profile setup progress"
+      >
+        <span className="block h-full rounded-[2px] bg-[var(--theme-topbar-accent)]" style={{ width: `${pct}%` }} />
+      </span>
+      <span className="text-[11px] leading-[1.35] text-[color-mix(in_srgb,var(--theme-topbar-text)_78%,transparent)]">
+        {newTitle ? `New: ${newTitle}` : 'Add yourself, your club and group'}
+      </span>
+    </a>
+  );
+}
+
+/**
+ * Первый пункт меню про профиль: «Set up profile» (нужно заполнить; «New: …», если появился
+ * новый шаг) или тихий «My profile». null — статуса ещё нет (гость, загрузка, override).
+ */
+function ProfileMenuItem({ setup, mobile }: { setup: ProfileSetup | null; mobile?: boolean }) {
+  if (!setup) return null;
+  if (setup.visible) {
+    const newKey = setup.newSteps[0];
+    return <SetupProfileItem done={setup.done} total={setup.total} newTitle={newKey ? STEP_TITLES[newKey] : undefined} mobile={mobile} />;
+  }
+  return <MyProfileItem subtitle={profileSubtitle(setup)} complete={setup.complete} mobile={mobile} />;
+}
+
 function TopbarNavItem({
   link,
   active,
@@ -143,6 +265,12 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
   const userName = overridden ? user?.name || 'User' : auth.displayName || auth.email || 'User';
   const avatarUrl = overridden ? user?.avatarUrl || null : auth.avatarUrl;
 
+  // «Set up profile»: только для своего входа (при override шапка не знает, чей профиль).
+  const { setup } = useProfileSetup();
+  const showSetup = !overridden && isAuthenticated && !!setup?.visible;
+  // Статус профиля для первого пункта меню («Set up profile» / «My profile») — только свой вход.
+  const profileSetup = !overridden && isAuthenticated ? setup : null;
+
   // Клик мимо дропдауна закрывает его (эталон — home-header.tsx).
   useEffect(() => {
     if (!userMenuOpen) return;
@@ -190,7 +318,10 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
         aria-expanded={userMenuOpen}
         onClick={() => setUserMenuOpen((open) => !open)}
       >
-        <TopbarAvatar name={userName} avatarUrl={avatarUrl} size={30} />
+        <span className="relative flex">
+          <TopbarAvatar name={userName} avatarUrl={avatarUrl} size={30} />
+          {showSetup && <SetupDot warn={(setup?.newSteps.length ?? 0) > 0} />}
+        </span>
         <span className="hidden max-w-[140px] truncate text-[12px] font-bold text-[var(--theme-topbar-text)] sm:block">
           {userName}
         </span>
@@ -198,6 +329,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
       </button>
       {userMenuOpen && (
         <div className="absolute right-0 top-[40px] w-[210px] rounded-[12px] border border-[color-mix(in_srgb,var(--theme-topbar-text)_18%,transparent)] bg-[var(--theme-topbar-bg)] p-1.5 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
+          <ProfileMenuItem setup={profileSetup} />
           <a href={routes.myMedia()} className={dropdownItemClass}>
             My media
           </a>
@@ -210,6 +342,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
           <a href={routes.myFavorites()} className={dropdownItemClass}>
             My favorites
           </a>
+          <MenuDivider />
           {onLogout ? (
             <button type="button" className={dropdownItemClass} onClick={() => { setUserMenuOpen(false); onLogout(); }}>
               Sign out
@@ -289,6 +422,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
                 <TopbarAvatar name={userName} avatarUrl={avatarUrl} size={28} />
                 <span className="truncate text-[13px] font-extrabold text-[var(--theme-topbar-text)]">{userName}</span>
               </div>
+              <ProfileMenuItem setup={profileSetup} mobile />
               <a
                 href={routes.myMedia()}
                 className="block rounded-[10px] px-4 py-[10px] text-[14px] font-extrabold text-[var(--theme-topbar-text)] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)]"
@@ -301,6 +435,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
               >
                 My favorites
               </a>
+              <MenuDivider />
               {onLogout ? (
                 <button
                   type="button"

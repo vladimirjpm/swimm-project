@@ -457,6 +457,7 @@ app.Use(async (context, next) =>
                 "clubs" => "/results_main.html",     // /clubs без id — пусть падает штатно
                 "my-media" => "/media.html",
                 "my-favorites" => "/my-favorites.html", // своё избранное и пометка «семья»
+                "setup-profile" => "/setup-profile.html", // «Set up profile»: три шага + опрос
                 "about" => "/about.html",
                 "privacy" => "/help.html",              // политика приватности — справка с ключом privacy
                 "terms" => "/help.html",                // условия пользования — справка с ключом terms
@@ -601,6 +602,9 @@ app.Map("/error", (HttpContext ctx) =>
 //
 // familyLimit: сколько избранных можно пометить «семьёй» (FavoritesRules.MaxFamily) и текст
 // отказа — страница My favorites гасит кнопку Family на пределе до клика.
+//
+// recordTickerEnabled: показывать ли бегущую ленту внизу /, /competitions, /groups (настройка
+// RecordTickerEnabled, дефолт false — пока в ленте выдуманные данные).
 app.MapGet("/api/client-config",
     async (ISettingsService settings, IDebugOptionsService debug) => Results.Ok(new
     {
@@ -616,6 +620,8 @@ app.MapGet("/api/client-config",
                 return new { max, fullHint = FavoritesRules.FullHint(t, max) };
             }),
         familyLimit = new { max = FavoritesRules.MaxFamily, fullHint = FavoritesRules.FamilyFullHint },
+        // Бегущая лента внизу витрин (RecordTicker): дефолт false — данные в ней пока выдуманные.
+        recordTickerEnabled = settings.GetValue("RecordTickerEnabled", false),
         // Отладочные подробности витрин: только ДЕЙСТВУЮЩИЕ (общий тумблер × галочка опции),
         // клиенту знать про два уровня незачем. См. DebugOption.
         debug = new

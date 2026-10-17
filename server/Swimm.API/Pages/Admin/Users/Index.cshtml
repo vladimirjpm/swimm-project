@@ -34,6 +34,20 @@
     </div>
 </div>
 
+@* ── Фильтр списка (?show=): чип — ссылка, число — сколько подходит без фильтра ── *@
+<div class="mb-3 flex flex-wrap gap-2">
+    @foreach (var (key, label) in Swimm.API.Pages.Admin.Users.IndexModel.Filters)
+    {
+        if (key == "changed" && !Model.CanResetPersonas) { continue; }
+        var active = (Model.Show ?? "all") == key || (key == "all" && !Swimm.API.Pages.Admin.Users.IndexModel.Filters.Any(f => f.Key == Model.Show));
+        var count = Model.AllUsers.Count(u => Model.Matches(u, key));
+        <a href="@Url.Page("Index", new { show = key == "all" ? null : key })"
+           class="admin-btn @(active ? "admin-btn-primary" : "admin-btn-ghost") py-1 px-2.5">
+            @label <span class="tabular-nums">@count</span>
+        </a>
+    }
+</div>
+
 <div class="overflow-x-auto">
     <table class="admin-table">
         <thead>
@@ -55,7 +69,7 @@
                 var groupLimit = Model.EffectiveHubGroupLimit(u.Roles, u.HubGroupLimit);
                 <tr class="@(u.Id == Model.UserId ? "bg-admin-surface-hover" : null)">
                     <td>
-                        <a href="@Url.Page("Index", new { userId = u.Id })" class="text-admin-accent hover:underline font-medium">@u.DisplayName</a>
+                        <a href="@Url.Page("Index", new { userId = u.Id, show = Model.Show })" class="text-admin-accent hover:underline font-medium">@u.DisplayName</a>
                         <div class="text-xs text-admin-text-muted">@u.Email</div>
                     </td>
                     <td>
@@ -108,14 +122,28 @@
                         }
                     </td>
                     <td class="text-right whitespace-nowrap">
-                        <form method="post" asp-page-handler="ForceSignOut" class="inline"
+                        @* Тестовый персонаж — вернуть в исходное состояние (только Development). *@
+                        @if (Model.CanResetPersonas && Swimm.API.Pages.Admin.Users.IndexModel.IsPersona(u.Email))
+                        {
+                            @* Изменён руками — кнопка горит, в подсказке что именно; не менялся — блёклая. *@
+                            var changed = Model.IsPersonaChanged(u.Id);
+                            var resetTitle = changed
+                                ? "Изменено: " + string.Join(", ", Model.PersonaChanges[u.Id]) + ". Сбросить — вернуть в исходное состояние (id не меняется)"
+                                : "Не менялся — совпадает с исходным состоянием";
+                            <form method="post" asp-page-handler="ResetPersona" asp-route-show="@Model.Show" class="inline"
+                                  onsubmit="return confirm('Вернуть @u.DisplayName в исходное состояние? Всё, что на нём поменяли руками (избранное, группы, медиа, опрос), будет стёрто.');">
+                                <input type="hidden" name="userId" value="@u.Id" />
+                                <button type="submit" class="admin-btn @(changed ? "admin-btn-primary" : "admin-btn-ghost opacity-50") py-1 px-2.5" title="@resetTitle">Сбросить</button>
+                            </form>
+                        }
+                        <form method="post" asp-page-handler="ForceSignOut" asp-route-show="@Model.Show" class="inline"
                               onsubmit="return confirm('Отозвать все сессии пользователя @u.Email?');">
                             <input type="hidden" name="userId" value="@u.Id" />
                             <button type="submit" class="admin-btn admin-btn-ghost py-1 px-2.5" title="Разлогинить со всех устройств (аккаунт остаётся активным)">Выход везде</button>
                         </form>
                         @if (u.IsActive)
                         {
-                            <form method="post" asp-page-handler="SetActive" class="inline"
+                            <form method="post" asp-page-handler="SetActive" asp-route-show="@Model.Show" class="inline"
                                   onsubmit="return confirm('Отключить пользователя @u.Email? Все сессии будут отозваны немедленно.');">
                                 <input type="hidden" name="userId" value="@u.Id" />
                                 <input type="hidden" name="isActive" value="false" />
@@ -124,7 +152,7 @@
                         }
                         else
                         {
-                            <form method="post" asp-page-handler="SetActive" class="inline">
+                            <form method="post" asp-page-handler="SetActive" asp-route-show="@Model.Show" class="inline">
                                 <input type="hidden" name="userId" value="@u.Id" />
                                 <input type="hidden" name="isActive" value="true" />
                                 <button type="submit" class="admin-btn admin-btn-primary py-1 px-2.5">Включить</button>
@@ -145,7 +173,7 @@
             <h3 class="font-semibold text-admin-text">
                 История логинов — @d.DisplayName <span class="text-admin-text-muted font-normal">(@d.Email)</span>
             </h3>
-            <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost py-1 px-2.5">Закрыть</a>
+            <a href="@Url.Page("Index", new { show = Model.Show })" class="admin-btn admin-btn-ghost py-1 px-2.5">Закрыть</a>
         </div>
         <div class="mb-3 flex flex-wrap gap-2 text-xs text-admin-text-muted">
             <span>Создан: @d.CreatedAt.ToString("dd.MM.yyyy")</span>
@@ -159,6 +187,34 @@
                 <span class="text-admin-danger">· Lockout до @lockout.ToString("dd.MM HH:mm") UTC</span>
             }
         </div>
+        @* ── Опрос «Who are you?» со страницы /setup-profile: только ответ о себе, прав не даёт
+              (I'm a coach ≠ роль Coach). docs/plans/profile-setup-plan.md ── *@
+        @{ var survey = Swimm.API.Pages.Admin.Users.IndexModel.SurveyAnswer(d); }
+        <div class="mb-3 flex flex-wrap gap-2 text-xs text-admin-text-muted">
+            <span title="Ответ пользователя о себе на странице Set up profile. Ни на что не влияет и прав не даёт">
+                Кто он (опрос):
+                @if (survey == null)
+                {
+                    <span>не отвечал</span>
+                }
+                else if (survey.Length == 0)
+                {
+                    <span>снял все ответы</span>
+                }
+                else
+                {
+                    <span class="font-semibold text-admin-text">@survey</span>
+                }
+            </span>
+            @if (d.ProfileRolesAnsweredAt is { } answeredAt)
+            {
+                <span>· ответ от @answeredAt.ToString("dd.MM.yyyy")</span>
+            }
+            @if (d.ProfileSetupDismissedAt is { } dismissedAt)
+            {
+                <span>· Set up profile закрыт (Dismiss) @dismissedAt.ToString("dd.MM.yyyy")</span>
+            }
+        </div>
         @* ── Лимит групп: владение и персональное исключение (правило — HubGroupCreationRules) ── *@
         @{ var detailLimit = Model.EffectiveHubGroupLimit(d.Roles, d.HubGroupLimit); }
         <div class="mb-4 rounded-md border border-admin-border p-3">
@@ -168,7 +224,7 @@
                 <span class="text-xs text-admin-text-muted">· @Swimm.API.Pages.Admin.Users.IndexModel.HubGroupLimitSource(d.Roles, d.HubGroupLimit)</span>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <form method="post" asp-page-handler="SetHubGroupLimit" class="flex flex-wrap items-center gap-2">
+                <form method="post" asp-page-handler="SetHubGroupLimit" asp-route-show="@Model.Show" class="flex flex-wrap items-center gap-2">
                     <input type="hidden" name="userId" value="@d.Id" />
                     <label for="hubGroupLimit" class="text-xs text-admin-text-muted">Персональный лимит</label>
                     <input id="hubGroupLimit" name="hubGroupLimit" type="number" step="1" min="0"
@@ -178,7 +234,7 @@
                 </form>
                 @if (d.HubGroupLimit != null)
                 {
-                    <form method="post" asp-page-handler="SetHubGroupLimit" class="inline">
+                    <form method="post" asp-page-handler="SetHubGroupLimit" asp-route-show="@Model.Show" class="inline">
                         <input type="hidden" name="userId" value="@d.Id" />
                         <button type="submit" class="admin-btn admin-btn-ghost py-1 px-2.5" title="Снять исключение — будет действовать лимит по роли">Снять</button>
                     </form>

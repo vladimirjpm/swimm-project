@@ -34,7 +34,8 @@ public class AdminSettingsServiceTests
         // + MediaReportHideThreshold (порог жалоб «Report», Р62, 2026-09-29)
         // + LogligVerifyEnabled/LogligVerifyIntervalHours (ночная сверка loglig-id — джоб читал
         //   их и раньше, но в реестре их не было; план деплоя §8.2, 2026-10-14).
-        Assert.Equal(30, all.Count);
+        // + RecordTickerEnabled (бегущая лента внизу витрин, дефолт false, 2026-10-16)
+        Assert.Equal(31, all.Count);
     }
 
     [Fact]

@@ -114,6 +114,18 @@ public class UserDetailDto
     public int HubGroupsOwned { get; set; }
     /// <summary>Персональный лимит групп; null — действует лимит по роли.</summary>
     public int? HubGroupLimit { get; set; }
+
+    // Опрос «Who are you?» со страницы /setup-profile (docs/plans/profile-setup-plan.md):
+    // только ответ человека о себе, ни на что не влияет; ProfileRoleCoach — НЕ роль Coach.
+    public bool ProfileRoleSwimmer { get; set; }
+    public bool ProfileRoleParent { get; set; }
+    public bool ProfileRoleCoach { get; set; }
+    public bool ProfileRoleWatcher { get; set; }
+    /// <summary>Когда последний раз менял ответ; null — не отвечал.</summary>
+    public DateTime? ProfileRolesAnsweredAt { get; set; }
+    /// <summary>Когда закрыл «Set up profile» (Dismiss); null — не закрывал.</summary>
+    public DateTime? ProfileSetupDismissedAt { get; set; }
+
     public List<ExternalLoginDto> ExternalLogins { get; set; } = [];
     public List<LoginHistoryItemDto> LoginHistory { get; set; } = [];
 }

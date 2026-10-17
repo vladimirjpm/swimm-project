@@ -14,4 +14,20 @@ public interface IPersonaSeeder
     /// тестовые группы, которыми они владеют, и засидить заново. Возвращает лог.
     /// </summary>
     Task<IReadOnlyList<string>> SeedAsync(bool reset = false);
+
+    /// <summary>
+    /// Вернуть ОДНОГО персонажа в исходное состояние (кнопка «Сбросить» в /Admin/Users, просьба
+    /// Влада 17.10.2026): стереть всё, что на нём накопилось руками, и засидить его заново — id
+    /// аккаунта не меняется. null — это не персонаж из <c>TestPersonas.All</c> (сбрасывать нечего).
+    /// Только Development.
+    /// </summary>
+    Task<IReadOnlyList<string>?> ResetPersonaAsync(int userId);
+
+    /// <summary>
+    /// Чем каждый персонаж отличается от исходного состояния (то, что выставил бы сидер):
+    /// id аккаунта → список отличий человеческими словами; пустой список — не менялся. Для
+    /// подсветки кнопки «Сбросить» в /Admin/Users (17.10.2026). Отметки «видел группу» и журнал
+    /// входов изменением не считаются — они появляются от простого просмотра.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetPersonaChangesAsync();
 }
