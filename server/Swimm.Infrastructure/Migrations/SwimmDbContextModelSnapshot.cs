@@ -196,6 +196,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<bool>("ProfileSkipClub")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ProfileSkipFamily")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ProfileSkipGroup")
                         .HasColumnType("boolean");
 
