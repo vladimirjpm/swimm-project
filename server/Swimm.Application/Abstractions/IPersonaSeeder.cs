@@ -22,4 +22,12 @@ public interface IPersonaSeeder
     /// Только Development.
     /// </summary>
     Task<IReadOnlyList<string>?> ResetPersonaAsync(int userId);
+
+    /// <summary>
+    /// Чем каждый персонаж отличается от исходного состояния (то, что выставил бы сидер):
+    /// id аккаунта → список отличий человеческими словами; пустой список — не менялся. Для
+    /// подсветки кнопки «Сбросить» в /Admin/Users (17.10.2026). Отметки «видел группу» и журнал
+    /// входов изменением не считаются — они появляются от простого просмотра.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, IReadOnlyList<string>>> GetPersonaChangesAsync();
 }

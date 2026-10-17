@@ -210,6 +210,58 @@ public class PersonaSeederTests
     }
 
     [Fact]
+    public async Task PersonaChanges_CleanAfterSeed_DirtyAfterEdit_CleanAfterReset()
+    {
+        await using var db = CreateDb(nameof(PersonaChanges_CleanAfterSeed_DirtyAfterEdit_CleanAfterReset));
+        await SeedBaseAsync(db);
+        var seeder = new PersonaSeeder(db);
+        await seeder.SeedAsync();
+
+        // Сторож зеркала: ожидаемое в GetPersonaChangesAsync обязано совпадать с тем, что выдаёт сидер.
+        var clean = await seeder.GetPersonaChangesAsync();
+        Assert.Equal(TestPersonas.All.Count, clean.Count);
+        Assert.All(clean, kv => Assert.Empty(kv.Value));
+
+        var parent = await db.AppUsers.SingleAsync(u => u.DisplayName == TestPersonas.Parent);
+        var newbie = await db.AppUsers.SingleAsync(u => u.DisplayName == TestPersonas.Newbie);
+        db.UserFavorites.RemoveRange(db.UserFavorites.Where(f => f.UserId == parent.Id).Take(1));
+        newbie.ProfileSkipMe = true;
+        db.HubGroupUserSeen.Add(new HubGroupUserSeen { UserId = newbie.Id, HubGroupId = (await db.HubGroups.FirstAsync()).Id });
+        await db.SaveChangesAsync();
+
+        var dirty = await seeder.GetPersonaChangesAsync();
+        Assert.Equal(["избранное"], dirty[parent.Id]);
+        Assert.Equal(["Set up profile (отказы / Dismiss)"], dirty[newbie.Id]); // «видел группу» — не изменение
+        Assert.All(dirty.Where(kv => kv.Key != parent.Id && kv.Key != newbie.Id), kv => Assert.Empty(kv.Value));
+
+        await seeder.ResetPersonaAsync(parent.Id);
+        await seeder.ResetPersonaAsync(newbie.Id);
+        Assert.All(await seeder.GetPersonaChangesAsync(), kv => Assert.Empty(kv.Value));
+    }
+
+    [Fact]
+    public void Description_IsConsistent()
+    {
+        // Описание персонажей — данные: опечатка в slug или нике всплыла бы только при сиде.
+        var slugs = TestPersonas.Groups.Select(g => g.Slug).ToHashSet();
+        var nicks = TestPersonas.All.Select(p => p.Nick).ToHashSet();
+
+        Assert.Equal(TestPersonas.All.Count, nicks.Count);                       // ники уникальны
+        Assert.All(TestPersonas.All, p => Assert.True(TestAccountRules.IsTestEmail(p.Email)));
+        Assert.All(TestPersonas.Groups, g => Assert.Contains(g.OwnerNick, nicks));
+        Assert.All(TestPersonas.Groups, g => Assert.StartsWith(TestAccountRules.Prefix, g.Slug));
+        Assert.All(TestPersonas.All, p =>
+        {
+            Assert.Contains(TestPersonas.RoleUser, p.Roles);
+            Assert.All(p.Memberships, m => Assert.Contains(m.GroupSlug, slugs));
+            Assert.All(p.AdminOf, s => Assert.Contains(s, slugs));
+            Assert.All(p.Favorites, f => Assert.InRange(f.RosterIndex, 0, 5));      // состав — 6 пловцов
+            Assert.All(p.Media, m => Assert.InRange(m.RosterIndex, 0, 5));
+            Assert.True(p.Favorites.Count(f => f.Level == PersonaFavoriteLevel.Me) <= 1); // «это я» — один
+        });
+    }
+
+    [Fact]
     public async Task ResetPersona_NotAPersona_Null()
     {
         await using var db = CreateDb(nameof(ResetPersona_NotAPersona_Null));

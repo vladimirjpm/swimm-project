@@ -124,6 +124,20 @@ ASPNETCORE_ENVIRONMENT=Development dotnet run --project server/Swimm.API -- --se
 **только Development** (в ProdAdmin её нет: та админка пишет в прод-БД, а персонажей там нет).
 Тесты — `PersonaSeederTests.ResetPersona_*`.
 
+**Персонажи описаны ДАННЫМИ** (решение Влада 17.10.2026) — `TestPersonas.cs`: у каждого
+`TestPersona` — `IsActive`, `HubGroupLimit`, `Roles`, `Memberships` (slug + статус), `AdminOf`,
+`Favorites` (место в составе + уровень Favorite/Family/Me), `Media` (ключ, видимость, место в
+составе, публикация в open-группу); тест-группы — `TestPersonas.Groups` (slug, имя, политика,
+владелец). Из одного описания работают все трое: сидер его выставляет, `GetPersonaChangesAsync`
+с ним сравнивает (кнопка «Сбросить» горит), `ResetPersonaAsync` к нему возвращает. **Персонажа
+меняют только там** — код сидера трогать не нужно. Пловцы — по МЕСТУ в составе, не по id (состав
+выбирается из живых пловцов один раз). Чего в описании нет — пусто: реакции, жалобы, RSVP, уровни,
+перерывы, заявки на клуб, планы стартового протокола; «видел группу» и журнал входов не считаются.
+Сторожа — `PersonaSeederTests.Description_IsConsistent` (slug, ники, места в составе) и
+`PersonaChanges_CleanAfterSeed_DirtyAfterEdit_CleanAfterReset`. Проверено 17.10 на живой базе:
+`--seed-personas` новым кодом ничего не создал, изменённых 0; снятая «семья» у `utest-parent` →
+кнопка горит («избранное») → «Сбросить» → вернулось.
+
 ## Переключатель (этап 3)
 
 - **Сервер** — `Swimm.API/Security/DevAdminBypass.cs`. Dev-кука `swimm_dev_persona` (ник
