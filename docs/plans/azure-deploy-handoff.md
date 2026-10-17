@@ -124,16 +124,18 @@
 - ✅ (15.10) Ветка влита в master.
 
 **Хвосты после запуска (16.10.2026)** — все сайты со ссылками собраны на `/Admin/Services`:
-- ☐ **UptimeRobot** (Влад, 17.10) — монитор HTTP(s) на `https://swimhub.co.il/readyz`, интервал 5 мин,
-  письмо при падении. Карточка уже на `/Admin/Services`; после регистрации снять «(завести)» в
-  `ServicesCatalog.cs`.
+- ✅ **UptimeRobot** (17.10) — монитор HTTP(s) «swimhub.co.il» на `https://swimhub.co.il/readyz`, раз в
+  5 мин, письмо на efreet007@gmail.com; бесплатный тариф.
 - ⏳ **Проверка бренда Google** — заявка отправлена 16.10 (логотип `images/brand/swimhub-logo.png`,
   ссылки на главной — PR #114, authorized domain только `swimhub.co.il`). Ждать письма на
   efreet007@gmail.com, вопросы Google — разобрать с агентом.
-- ⏳ **Search Console** — sitemap отправлен 15.10 («Не получено» в первые часы — норма); через сутки
-  проверить «Успешно» и ~1 345 страниц.
-- ☐ **Бюджет Azure** — Cost Management → Budgets, $50/мес, письмо на 80 %.
-- ☐ **MyNames** — сверить адрес сайта регистратора на `/Admin/Services` (стоит mynames.co.il наугад).
+- ✅ **Search Console** — sitemap «Успешно», 1 345 страниц (сверено 17.10). Отчёт «Страницы» ещё
+  обрабатывается; через 1–2 недели глянуть «Почему эти страницы не индексируются» (ждём там только
+  то, что закрыто намеренно: noindex детей, группы).
+- ✅ **Бюджет Azure** (17.10) — `swimhub-monthly` на подписке Pay-As-You-Go: $60/мес до 30.09.2030,
+  письма на 80 % и 100 % факта и 100 % прогноза.
+- ✅ **MyNames** — сверено по whois ISOC 17.10: регистратор Drubit Raid LTD, https://mynames.co.il;
+  до 14.10.2031, Transfer Locked, NS Cloudflare.
 - ☐ Планы на потом: [content-permissions-plan.md](content-permissions-plan.md) (права на медиа), [sign-in-rules-plan.md](sign-in-rules-plan.md) (правила входа).
 - ☐ По желанию: логотип в письмах сайта (сейчас голый текст), `ProdVersionConnection` в
   `appsettings.Development.json` (напоминание «локальная база отстаёт»).
