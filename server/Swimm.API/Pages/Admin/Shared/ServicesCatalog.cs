@@ -40,11 +40,10 @@ public static class ServicesCatalog
                     new("/version", "https://swimhub.co.il/version"),
                     new("sitemap.xml", "https://swimhub.co.il/sitemap.xml"),
                 ]),
-            new("UptimeRobot — мониторинг (завести)",
-                "Каждые 5 минут открывает https://swimhub.co.il/readyz и пишет письмо, если сайт или база не " +
-                "отвечают (и когда поднялись). Ловит то, о чём Azure не скажет: упавшую базу, истёкший " +
-                "сертификат, слетевший DNS. Бесплатно. ☐ Завести: монитор HTTP(s) на /readyz, интервал 5 минут, " +
-                "уведомление на почту.",
+            new("UptimeRobot — мониторинг",
+                "Каждые 5 минут открывает https://swimhub.co.il/readyz и пишет письмо на почту владельца, если " +
+                "сайт или база не отвечают (и когда поднялись). Ловит то, о чём Azure не скажет: упавшую базу, " +
+                "истёкший сертификат, слетевший DNS. Бесплатный тариф; монитор «swimhub.co.il» заведён 17.10.2026.",
                 [new("Dashboard", "https://dashboard.uptimerobot.com")],
                 Access: "аккаунт UptimeRobot (вход через Google)"),
         ]),
@@ -70,7 +69,8 @@ public static class ServicesCatalog
                 [new("PostgreSQL → swimhub-pg", "https://portal.azure.com/#browse/Microsoft.DBforPostgreSQL%2FflexibleServers")],
                 Access: "пароли ролей — менеджер паролей Google, сайт swimhub-pg.postgres.database.azure.com"),
             new("Cost Management",
-                "Сколько стоит сайт за месяц. Стоит завести бюджет с письмом (например $50/мес, письмо на 80 %).",
+                "Сколько стоит сайт за месяц. Бюджет «swimhub-monthly» на подписке Pay-As-You-Go: $60/мес, " +
+                "письма на 80 % и 100 % факта и 100 % прогноза (заведён 17.10.2026).",
                 [new("Расходы", "https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview")]),
         ]),
 
@@ -98,9 +98,10 @@ public static class ServicesCatalog
                 [new("Dashboard", "https://dash.cloudflare.com")],
                 Access: "аккаунт Cloudflare Влада (Free)"),
             new("MyNames — регистратор домена",
-                "Где куплен swimhub.co.il: оплачен до 14.10.2031, автопродление и блокировка переноса включены. " +
+                "Где куплен swimhub.co.il (юрлицо регистратора — Drubit Raid LTD): оплачен до 14.10.2031, " +
+                "автопродление и блокировка переноса включены (сверено по whois ISOC 17.10.2026). " +
                 "Нужен, только если меняются серверы имён (сейчас — Cloudflare) или владелец домена.",
-                [new("mynames.co.il", "https://www.mynames.co.il")],
+                [new("mynames.co.il", "https://mynames.co.il")],
                 Access: "аккаунт MyNames Влада"),
             new("Resend — отправка писем",
                 "Письма сайта от noreply@swimhub.co.il: подтверждение почты, сброс пароля, решения по заявкам групп. " +
