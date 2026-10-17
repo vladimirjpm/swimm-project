@@ -128,6 +128,21 @@ const STEP_META: Record<ProfileSetupStepKey, { title: string; hint: string; cta:
   },
 };
 
+/** Итог (2a): подпись строки и ссылка на выбранное. */
+const RECAP: Record<ProfileSetupStepKey, { label: string; open: string }> = {
+  me: { label: 'Me', open: 'My swims →' },
+  club: { label: 'Club', open: 'Open club →' },
+  group: { label: 'Group', open: 'Open group →' },
+};
+
+/** Плашки ответа опроса в итоге (2a). */
+const ROLE_PILL: Record<SurveyRole, string> = {
+  swimmer: 'Swimmer',
+  parent: 'Parent',
+  coach: 'Coach',
+  watcher: 'Just watching',
+};
+
 const CHECK = (
   <Svg size={16}>
     <path d="M5 12.5l4.5 4.5L19 7.5" />
@@ -384,6 +399,125 @@ function SetupProfile() {
     );
   };
 
+  // Окна выбора — общие для чек-листа и итога (у пропущенного шага в итоге та же кнопка).
+  const pickers = (
+    <>
+      <UI_H2HPickerModal open={picker === 'me'} title="Find your swimmer record" onClose={() => { setPicker(null); setSearch(''); }}>
+        <UI_H2HRivalPicker
+          favorites={favoriteSwimmers}
+          query={search}
+          onQuery={setSearch}
+          hits={found.data ?? null}
+          loading={found.loading}
+          error={!!found.error}
+          onPick={pickMe}
+          placeholder="Search your name..."
+          emptyText="Nobody found — no results under this name yet."
+        />
+      </UI_H2HPickerModal>
+
+      <UI_H2HPickerModal open={picker === 'club'} title="Choose your club" onClose={() => setPicker(null)}>
+        <ClubPicker onPick={pickClub} />
+      </UI_H2HPickerModal>
+    </>
+  );
+
+  /**
+   * Строка итога (2a): иконка, подпись, что выбрано и ссылка на это. Пропущенный шаг — «Not added»
+   * и та же кнопка, что в чек-листе: сделанное делом потом сильнее отказа (ProfileSetupRules).
+   */
+  const recapRow = (step: ProfileSetupStep) => {
+    const meta = STEP_META[step.key];
+    const recap = RECAP[step.key];
+    const href = targetHref(step);
+    return (
+      <li key={step.key} className="flex items-center gap-3 border-t border-[var(--t-border)] py-2.5">
+        <span className={`flex w-5 shrink-0 justify-center ${step.skipped ? 'text-[var(--t-text-3)]' : 'text-[var(--t-accent)]'}`}>
+          {meta.icon}
+        </span>
+        <span className="w-12 shrink-0 text-[13px] text-[var(--t-text-2)] sm:w-[90px]">{recap.label}</span>
+        {step.skipped || !step.targetName ? (
+          <span className="min-w-0 flex-1 text-[14px] text-[var(--t-text-3)]">Not added</span>
+        ) : (
+          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            <span dir="auto" className="truncate text-[14px] font-bold">{step.targetName}</span>
+            {step.status === 'pending' && (
+              <span className="hp-mono shrink-0 rounded-[6px] border border-[var(--t-border)] px-1.5 py-px text-[10px] font-extrabold text-[var(--t-text-2)]">
+                PENDING
+              </span>
+            )}
+          </span>
+        )}
+        {step.skipped ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => stepAction(step)}
+            className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-[var(--t-accent)] hover:underline disabled:opacity-50"
+          >
+            {meta.cta}
+          </button>
+        ) : href ? (
+          <a href={href} className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-[var(--t-accent)] no-underline hover:underline">
+            {recap.open}
+          </a>
+        ) : null}
+      </li>
+    );
+  };
+
+  // ── Готово (хендофф set-up-profile-ex1, вариант 2a): все три шага сделаны или пропущены ──
+  if (s.done === s.total) {
+    const me = s.steps.find((x) => x.key === 'me');
+    const myHref = me && !me.skipped && me.targetId != null ? routes.swimmer(me.targetId) : null;
+    const pickedRoles = SURVEY_ROLES.filter((r) => s.survey[r]);
+    return shell(
+      <main className="mx-auto w-full max-w-[640px] px-4 pt-24">
+        <section className="rounded-[12px] border border-[var(--t-border)] bg-[var(--t-card)] p-6 shadow-[var(--t-shadow)]">
+          <div className="mb-[18px] flex flex-wrap items-center gap-[14px]">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--t-good)_14%,transparent)] text-[var(--t-good)]">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+            </span>
+            <div className="min-w-0 flex-1">
+              <h1 className="m-0 text-[20px] font-extrabold">You&apos;re all set</h1>
+              <p className="m-0 mt-0.5 text-[13px] text-[var(--t-text-2)]">SwimHub now shows your results, club and group first.</p>
+            </div>
+            {/* Ответ опроса — только плашками, ни на что не влияет (Р1). */}
+            {pickedRoles.length > 0 && (
+              <span className="flex basis-full flex-wrap gap-1.5 sm:basis-auto">
+                {pickedRoles.map((r) => (
+                  <span key={r} className="whitespace-nowrap rounded-[12px] bg-[var(--t-accent-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--t-accent)]">
+                    {ROLE_PILL[r]}
+                  </span>
+                ))}
+              </span>
+            )}
+          </div>
+
+          <ul className="m-0 list-none p-0">{s.steps.map(recapRow)}</ul>
+
+          {error && <p className="m-0 mt-3 text-[13px] text-[var(--t-danger)]">{error}</p>}
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--t-border)] pt-4">
+            <span className="text-[12px] text-[var(--t-text-3)]">
+              Change any of this later in <a href={routes.myFavorites()} className="text-[var(--t-accent)]">My favorites</a>.
+            </span>
+            {/* «Это я» есть — к своим заплывам; пропущен — к результатам: своих заплывов не найти. */}
+            <a
+              href={myHref ?? routes.results()}
+              className="flex h-9 items-center whitespace-nowrap rounded-[8px] bg-[var(--t-accent)] px-[18px] text-[13px] font-bold text-[var(--t-accent-ink)] no-underline hover:opacity-90"
+            >
+              {myHref ? 'Go to my swims' : 'Browse results'}
+            </a>
+          </div>
+        </section>
+        {pickers}
+      </main>,
+    );
+  }
+
   return shell(
     <main className="mx-auto w-full max-w-[640px] px-4 pt-24">
       <section className="rounded-[12px] border border-[var(--t-border)] bg-[var(--t-card)] p-6 shadow-[var(--t-shadow)]">
@@ -441,23 +575,7 @@ function SetupProfile() {
         )}
       </div>
 
-      <UI_H2HPickerModal open={picker === 'me'} title="Find your swimmer record" onClose={() => { setPicker(null); setSearch(''); }}>
-        <UI_H2HRivalPicker
-          favorites={favoriteSwimmers}
-          query={search}
-          onQuery={setSearch}
-          hits={found.data ?? null}
-          loading={found.loading}
-          error={!!found.error}
-          onPick={pickMe}
-          placeholder="Search your name..."
-          emptyText="Nobody found — no results under this name yet."
-        />
-      </UI_H2HPickerModal>
-
-      <UI_H2HPickerModal open={picker === 'club'} title="Choose your club" onClose={() => setPicker(null)}>
-        <ClubPicker onPick={pickClub} />
-      </UI_H2HPickerModal>
+      {pickers}
     </main>,
   );
 }
