@@ -28,7 +28,7 @@ What we keep and why:
 - a **password hash**, never the password itself, if you use email and password — to let you sign in;
 - **sign-in history** — date, time and IP address — to protect your account from misuse;
 - **what you add yourself**: favorites, groups and their members, trainings, links to photos and videos, reactions — to show them to you and to the audience you choose;
-- **your answer to “Who are you?”** on the Set up profile page (I swim, I’m a parent, I’m a coach, just watching) — optional. It changes nothing on the site, is visible only to you and the site’s administrator, and you can change or clear it at any time.
+- **your answer to “Who are you?”** on the Set up profile page (I swim, I’m a parent, I’m a coach, just watching) — optional. It gives no rights; the only thing it changes is the setup steps (“I’m a parent” adds a step to mark your children). It is visible only to you and the site’s administrator, and you can change or clear it at any time.
 
 We don’t use your information for advertising, we don’t sell it and we don’t pass it to anyone for marketing. We don’t make automated decisions about you.
 

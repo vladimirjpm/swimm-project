@@ -34,6 +34,9 @@ import { routes } from '../../utils/routes';
  * - Dismiss — ссылкой внизу, пункт меню после него не показывается;
  * - (17.10.2026) от шага можно отказаться: «Not a swimmer», «No club», «No group» — отказ
  *   засчитывает шаг и снимается кнопкой Undo. Тренер отмечает только клуб, родитель — без «это я».
+ * - (17.10.2026, хендофф `set-up-profile-ex3`) «I'm a parent» добавляет шаг «My family»: найти
+ *   детей поиском и отметить семьёй (золотое сердечко, до `familyLimit.max`). Других шагов по
+ *   ролям нет. Сняли роль — шаг пропал, семья осталась.
  *
  * Тема — deep, как у соседних личных страниц (/my-favorites, /my-media): токены хендоффа
  * `--theme-mode-*` переложены на роли `--t-*` (client/CLAUDE.md «Роли --t-*»).
@@ -43,6 +46,7 @@ import { routes } from '../../utils/routes';
 // ── Иконки (Phosphor в проекте не подключён — свои SVG, контур 1.8) ─────────────
 
 const STAR = 'M12 2.5l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 21.3l-5.8 3.05 1.1-6.45-4.7-4.6 6.5-.95z';
+const HEART = 'M12 20.5s-7.5-4.6-9.3-9.1C1.4 8 3.6 4.5 7 4.5c2.1 0 3.5 1.1 5 2.9 1.5-1.8 2.9-2.9 5-2.9 3.4 0 5.6 3.5 4.3 6.9-1.8 4.5-9.3 9.1-9.3 9.1z';
 
 function Svg({ size, children, fill }: { size: number; children: React.ReactNode; fill?: string }) {
   return (
@@ -105,6 +109,15 @@ const STEP_META: Record<ProfileSetupStepKey, { title: string; hint: string; cta:
     // Золотая звезда «это я» — та же, что на /my-favorites (решение 24.09.2026).
     icon: <span style={{ color: 'var(--t-level-me)' }}><Svg size={18} fill="currentColor"><path d={STAR} /></Svg></span>,
   },
+  family: {
+    title: STEP_TITLES.family,
+    // Число — из лимита сервера (`familyHint` ниже); здесь запасной текст, пока лимит не приехал.
+    hint: 'Mark your children · Family favorite',
+    cta: 'Add children',
+    skip: 'Skip',
+    // Золотое сердечко «семья» — то же, что на /my-favorites.
+    icon: <span style={{ color: 'var(--t-level-family)' }}><Svg size={18} fill="currentColor"><path d={HEART} /></Svg></span>,
+  },
   club: {
     title: STEP_TITLES.club,
     hint: 'Club you or your child swim for',
@@ -133,9 +146,13 @@ const STEP_META: Record<ProfileSetupStepKey, { title: string; hint: string; cta:
 /** Итог (2a): подпись строки и ссылка на выбранное. */
 const RECAP: Record<ProfileSetupStepKey, { label: string; open: string }> = {
   me: { label: 'Me', open: 'My swims →' },
+  family: { label: 'Family', open: 'Edit family →' },
   club: { label: 'Club', open: 'Open club →' },
   group: { label: 'Group', open: 'Open group →' },
 };
+
+/** Порядок строк итога: семья — после клуба, перед группой (хендофф ex3), в чек-листе — второй. */
+const RECAP_ORDER: ProfileSetupStepKey[] = ['me', 'club', 'family', 'group'];
 
 const CHECK = (
   <Svg size={16}>
@@ -199,7 +216,9 @@ function ClubPicker({ onPick }: { onPick: (id: number) => void }) {
 
 // ── Страница ─────────────────────────────────────────────────────────────────
 
-type Picker = 'me' | 'club' | null;
+type Picker = 'me' | 'family' | 'club' | null;
+
+const SAVE_FAILED = 'Could not save — please try again.';
 
 function SetupProfile() {
   const auth = useAuth();
@@ -212,7 +231,7 @@ function SetupProfile() {
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const found = useSwimmerSearch(picker === 'me' ? search : '');
+  const found = useSwimmerSearch(picker === 'me' || picker === 'family' ? search : '');
 
   const favoriteSwimmers = useMemo(
     () => fav.favorites
@@ -220,6 +239,17 @@ function SetupProfile() {
       .map((f) => ({ id: f.swimmer_id as number, name: f.swimmer_name || `#${f.swimmer_id}` })),
     [fav.favorites],
   );
+
+  // Семья (шаг «My family»): уже отмеченные — плашками сверху окна; в полосе и выдаче — все,
+  // кроме них и «это я» (семья сняла бы звезду «Me»: уровни исключают друг друга).
+  const familyMembers = useMemo(
+    () => fav.favorites.filter((f) => f.target_type === 'swimmer' && f.is_family && f.swimmer_id != null),
+    [fav.favorites],
+  );
+  const familyCandidates = favoriteSwimmers.filter(
+    (f) => f.id !== fav.primarySwimmerId && !fav.familySwimmerIds.has(f.id));
+  const familyHits = found.data?.filter(
+    (h) => h.id !== fav.primarySwimmerId && !fav.familySwimmerIds.has(h.id)) ?? null;
 
   const shell = (children: React.ReactNode) => (
     <div className={`${deep} relative min-h-screen overflow-x-clip pb-24 text-[var(--t-text)]`} style={{ background: 'var(--deep-hero-grad)' }}>
@@ -290,15 +320,57 @@ function SetupProfile() {
     });
   };
 
+  /**
+   * Отметить ребёнка семьёй: не в избранном — сначала добавить (семья — пометка на избранном),
+   * потом поставить сердечко. Лимит семьи и общий лимит избранного — текстом из ответа.
+   */
+  const markFamily = (swimmerId: number) => {
+    setSearch('');
+    void run(async () => {
+      let target = fav.favorites.find((f) => f.target_type === 'swimmer' && f.swimmer_id === swimmerId);
+      if (target?.is_family) return null;
+      if (fav.familyFull) return fav.familyLimit?.fullHint || SAVE_FAILED;
+      if (!target) {
+        if (fav.isFull('swimmer')) return fav.fullHint('swimmer');
+        const added = await fav.addFavoriteSwimmer(swimmerId);
+        if (!added) return SAVE_FAILED;
+        target = added;
+      }
+      return (await fav.setFamily(target.id, true)) ? null : fav.familyLimit?.fullHint || SAVE_FAILED;
+    });
+  };
+
+  /** Снять сердечко семьи: пловец остаётся в обычном избранном. */
+  const unmarkFamily = (favoriteId: number) => {
+    void run(async () => ((await fav.setFamily(favoriteId, false)) ? null : SAVE_FAILED));
+  };
+
+  const closeFamily = () => {
+    setPicker(null);
+    setSearch('');
+    setError(null);
+  };
+
+  /** Подсказка шага: у семьи — число из лимита сервера; клуб тренера — «Club you coach at» (ex3). */
+  const hintFor = (step: ProfileSetupStep): string => {
+    if (step.key === 'family' && fav.familyLimit) {
+      return `Mark your children · Family favorite, up to ${fav.familyLimit.max}`;
+    }
+    if (step.key === 'club' && s.survey.coach && !s.survey.swimmer && !s.survey.parent) return 'Club you coach at';
+    return STEP_META[step.key].hint;
+  };
+
   const stepAction = (step: ProfileSetupStep) => {
     if (step.key === 'me') setPicker('me');
+    else if (step.key === 'family') setPicker('family');
     else if (step.key === 'club') setPicker('club');
     // Публичный список групп не несёт id, а вступают на странице группы — туда и ведём.
     else window.location.href = routes.groupsList();
   };
 
   const targetHref = (step: ProfileSetupStep): string | null => {
-    if (step.targetId == null) return null;
+    // Семья — несколько пловцов: ссылки нет, её строка открывает окно семьи.
+    if (step.targetId == null || step.key === 'family') return null;
     if (step.key === 'me') return routes.swimmer(step.targetId);
     if (step.key === 'club') return routes.club(step.targetId);
     return step.targetSlug ? routes.group(step.targetSlug) : null;
@@ -341,6 +413,16 @@ function SetupProfile() {
                 <a href={href} dir="auto" className="truncate text-[var(--t-text-2)] no-underline hover:text-[var(--t-accent)]">
                   {step.targetName}
                 </a>
+              ) : step.key === 'family' ? (
+                <button
+                  type="button"
+                  dir="auto"
+                  onClick={() => setPicker('family')}
+                  title="Edit family"
+                  className="truncate text-left text-[var(--t-text-2)] hover:text-[var(--t-accent)]"
+                >
+                  {step.targetName}
+                </button>
               ) : (
                 <span dir="auto" className="truncate">{step.targetName}</span>
               )}
@@ -366,7 +448,7 @@ function SetupProfile() {
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-x-1.5 text-[12px] text-[var(--t-text-2)]">
-              <span>{meta.hint}</span>
+              <span>{hintFor(step)}</span>
               <span aria-hidden="true">·</span>
               <button
                 type="button"
@@ -421,6 +503,60 @@ function SetupProfile() {
       <UI_H2HPickerModal open={picker === 'club'} title="Choose your club" onClose={() => setPicker(null)}>
         <ClubPicker onPick={pickClub} />
       </UI_H2HPickerModal>
+
+      {/* Семья: отмечать можно нескольких подряд, окно закрывает «Done». */}
+      <UI_H2HPickerModal open={picker === 'family'} title="Mark your children" onClose={closeFamily}>
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[12px] font-bold text-[var(--t-text-2)]">
+            Family{fav.familyLimit ? ` ${familyMembers.length}/${fav.familyLimit.max}` : ''}
+          </span>
+          {familyMembers.length === 0 && (
+            <span className="text-[12px] text-[var(--t-text-3)]">Nobody yet — search below.</span>
+          )}
+          {familyMembers.map((f) => {
+            const name = f.swimmer_name || `#${f.swimmer_id}`;
+            return (
+              <span
+                key={f.id}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--t-border)] py-0.5 pl-2.5 pr-1 text-[12px] font-bold"
+              >
+                <span aria-hidden="true" style={{ color: 'var(--t-level-family)' }}>♥</span>
+                <span dir="auto">{name}</span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => unmarkFamily(f.id)}
+                  aria-label={`Remove ${name} from family`}
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--t-text-2)] hover:bg-[var(--t-accent-soft)] hover:text-[var(--t-text)] disabled:opacity-50"
+                >
+                  ×
+                </button>
+              </span>
+            );
+          })}
+        </div>
+        <UI_H2HRivalPicker
+          favorites={familyCandidates}
+          query={search}
+          onQuery={setSearch}
+          hits={familyHits}
+          loading={found.loading}
+          error={!!found.error}
+          onPick={markFamily}
+          placeholder="Search your child's name..."
+          emptyText="Nobody else found under this name."
+        />
+        {error && <p className="m-0 mt-3 text-[13px] text-[var(--t-danger)]">{error}</p>}
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={closeFamily}
+            className="h-9 rounded-[8px] bg-[var(--t-accent)] px-[18px] text-[13px] font-bold text-[var(--t-accent-ink)] hover:opacity-90"
+          >
+            Done
+          </button>
+        </div>
+      </UI_H2HPickerModal>
     </>
   );
 
@@ -463,6 +599,14 @@ function SetupProfile() {
           <a href={href} className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-[var(--t-accent)] no-underline hover:underline">
             {recap.open}
           </a>
+        ) : step.key === 'family' ? (
+          <button
+            type="button"
+            onClick={() => setPicker('family')}
+            className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-[var(--t-accent)] hover:underline"
+          >
+            {recap.open}
+          </button>
         ) : null}
       </li>
     );
@@ -498,7 +642,9 @@ function SetupProfile() {
             )}
           </div>
 
-          <ul className="m-0 list-none p-0">{s.steps.map(recapRow)}</ul>
+          <ul className="m-0 list-none p-0">
+            {RECAP_ORDER.flatMap((k) => s.steps.filter((x) => x.key === k)).map(recapRow)}
+          </ul>
 
           {error && <p className="m-0 mt-3 text-[13px] text-[var(--t-danger)]">{error}</p>}
 
@@ -531,7 +677,7 @@ function SetupProfile() {
         </div>
         <p className="m-0 mb-5 text-[13px] text-[var(--t-text-2)]">Add yourself, your club and group</p>
 
-        {/* Опрос: ни на что не влияет (Р1), только сохраняется. */}
+        {/* Опрос: прав не даёт (Р1); «I'm a parent» добавляет шаг «My family» (ex3). */}
         <div className="mb-2.5 flex items-baseline gap-2">
           <span className="shrink-0 whitespace-nowrap text-[14px] font-bold">Who are you?</span>
           <span className="text-[12px] text-[var(--t-text-3)]">Pick all that apply</span>

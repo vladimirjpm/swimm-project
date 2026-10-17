@@ -41,7 +41,10 @@ public class ProfileSetupController : ControllerBase
         return dto == null ? Unauthorized() : Ok(dto);
     }
 
-    /// <summary>Ответ опроса «Who are you?» — все четыре разом. Ни на что не влияет (Р1 плана).</summary>
+    /// <summary>
+    /// Ответ опроса «Who are you?» — все четыре разом. Прав не даёт (Р1 плана); на шаги влияет
+    /// только «I'm a parent» — добавляет шаг «My family» (хендофф ex3).
+    /// </summary>
     [HttpPut("roles")]
     public async Task<IActionResult> SaveRoles([FromBody] ProfileSurveyRequest request)
     {
@@ -60,7 +63,7 @@ public class ProfileSetupController : ControllerBase
 
     /// <summary>
     /// Отказ от шага («Not a swimmer», «No club», «No group») — засчитывает шаг (решение Влада
-    /// 17.10.2026). <c>key</c> — me | club | group.
+    /// 17.10.2026). <c>key</c> — me | family | club | group.
     /// </summary>
     [HttpPut("steps/{key}/skip")]
     public Task<IActionResult> SkipStep(string key) => SetSkipped(key, true);

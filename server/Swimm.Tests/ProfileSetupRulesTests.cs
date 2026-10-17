@@ -94,21 +94,79 @@ public class ProfileSetupRulesTests
     [InlineData("me", true)]
     [InlineData("club", true)]
     [InlineData("group", true)]
+    [InlineData("family", true)]
     [InlineData("child", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
-    public void StepKey_OnlyThree(string? key, bool valid) =>
+    public void StepKey_Known(string? key, bool valid) =>
         Assert.Equal(valid, ProfileSetupRules.IsStepKey(key));
 
+    // ── Шаг семьи у родителя (хендофф set-up-profile-ex3, решение Влада 17.10.2026) ───────
+
+    [Fact]
+    public void Parent_GetsFamilyStep_AfterMe()
+    {
+        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(false, false, false), ProfileSetupSkips.None,
+            dismissed: false, parent: true);
+
+        Assert.Equal(
+            new[] { ProfileSetupRules.StepMe, ProfileSetupRules.StepFamily, ProfileSetupRules.StepClub, ProfileSetupRules.StepGroup },
+            s.Steps.Select(x => x.Key));
+        Assert.Equal(4, s.Total);
+    }
+
+    [Fact]
+    public void NotParent_NoFamilyStep_EvenWithFamilySaved()
+    {
+        // Роль сняли — шаг пропал, сохранённая семья ни на что не влияет.
+        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(true, true, true, HasFamily: true), dismissed: false);
+
+        Assert.DoesNotContain(s.Steps, x => x.Key == ProfileSetupRules.StepFamily);
+        Assert.Equal(3, s.Total);
+        Assert.True(s.Complete);
+    }
+
+    [Theory]
+    [InlineData(true, false, true, false)]   // отметил детей
+    [InlineData(false, true, true, true)]    // отказался
+    [InlineData(false, false, false, false)] // ни то, ни другое — 3/4
+    public void Parent_FamilyStep_DoneBySavedFamilyOrSkip(bool hasFamily, bool skip, bool done, bool skipped)
+    {
+        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(true, true, true, HasFamily: hasFamily),
+            new ProfileSetupSkips(false, false, false, Family: skip), dismissed: false, parent: true);
+
+        var f = s.Steps.Single(x => x.Key == ProfileSetupRules.StepFamily);
+        Assert.Equal(done, f.Done);
+        Assert.Equal(skipped, f.Skipped);
+        Assert.Equal(done, s.Complete);
+        Assert.Equal(!done, s.Visible);
+    }
+
+    [Fact]
+    public void Parent_WithOldSnapshot_FamilyIsNew_EvenAfterDismiss()
+    {
+        // Прошёл настройку до шага семьи (снимок «me,club,group»), родитель — пункт возвращается.
+        var oldSnapshot = new HashSet<string> { "me", "club", "group" };
+        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(true, true, true), ProfileSetupSkips.None,
+            dismissed: true, seen: oldSnapshot, parent: true);
+
+        Assert.Equal([ProfileSetupRules.StepFamily], s.NewSteps);
+        Assert.True(s.Visible);
+        Assert.Equal(3, s.Done);
+        Assert.Equal(4, s.Total);
+    }
+
     // ── Новый шаг (хендофф set-up-profile-ex2, 3b) ───────────────────────────────────────
-    // Настоящего четвёртого шага нет — «новый» моделируем снимком, где одного из трёх не было.
+    // Здесь «новый» моделируем снимком, где одного из трёх базовых шагов не было.
 
     private static readonly IReadOnlySet<string> SeenMeClub = new HashSet<string> { "me", "club" };
 
     [Fact]
-    public void Evaluate_StepsMatchStepKeys()
+    public void Evaluate_ParentStepsMatchStepKeys()
     {
-        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(false, false, false), dismissed: false);
+        // У родителя видны все шаги — список совпадает с обязательными полями целиком.
+        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(false, false, false), ProfileSetupSkips.None,
+            dismissed: false, parent: true);
         Assert.Equal(ProfileSetupRules.StepKeys, s.Steps.Select(x => x.Key));
     }
 

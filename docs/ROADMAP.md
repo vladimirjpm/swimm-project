@@ -237,12 +237,13 @@
   сердечко и на клике получает модал логина (`openLoginModal()` из `LoginModalProvider`,
   см. `results-table.tsx`), а страница My media вместо пустоты — экран «Sign in to manage
   your media».
-- ◐ 4.6. (2026-10-16, S0–S5, не закоммичено) «Set up profile» после входа — хендофф 1a: пункт с
+- ◐ 4.6. (2026-10-16, на проде с 17.10) «Set up profile» после входа — хендофф 1a: пункт с
   прогрессом первым в меню пользователя (и в шапке главной), точка на аватаре, страница
-  `/setup-profile` с тремя шагами (это я → клуб → группа) и опросом «Who are you?», который только
-  хранится (колонки `AppUser.ProfileRole*`, ни на что не влияет; «Just watching» исключающий).
-  Ручки `api/me/profile-setup`, правило `ProfileSetupRules`. `/privacy` дополнен. Осталось: выкатка
-  миграций `AddUserProfileSetup`, `AddUserProfileSetupSkips` и `AddUserProfileStepsSeen`; после завершения в меню тихий «My profile», новый шаг возвращает «Set up profile» с «New: …» (3b); у шагов есть отказ («Not a swimmer», «No club», «No group»). План — [plans/profile-setup-plan.md](plans/profile-setup-plan.md).
+  `/setup-profile` с тремя шагами (это я → клуб → группа) и опросом «Who are you?» (колонки
+  `AppUser.ProfileRole*`, прав не даёт; «Just watching» исключающий).
+  Ручки `api/me/profile-setup`, правило `ProfileSetupRules`. `/privacy` дополнен. После завершения в меню тихий «My profile», новый шаг возвращает «Set up profile» с «New: …» (3b); у шагов есть отказ («Not a swimmer», «No club», «No group»).
+  17.10 (хендофф ex3, не закоммичено): «I'm a parent» добавляет шаг «My family» — отметить детей
+  семьёй, до 4; осталась выкатка миграции `AddUserProfileSkipFamily`. План — [plans/profile-setup-plan.md](plans/profile-setup-plan.md).
 
 План/детали шагов: `docs/tasks/client-login-plan.md`.
 

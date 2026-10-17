@@ -71,8 +71,9 @@ public class AppUser
     public DateTime? AgeConfirmedAt { get; set; }
 
     // --- Опрос «Who are you?» на странице /setup-profile (docs/plans/profile-setup-plan.md) ---
-    // Решение Влада 16.10.2026: ТОЛЬКО опрос, ни на что не влияет — ни на шаги и счётчик
-    // «Set up profile», ни на права. Хранится, потому что может пригодиться в будущем.
+    // Решение Влада 16.10.2026: ТОЛЬКО опрос, на права не влияет. Хранится, потому что может
+    // пригодиться в будущем. На шаги «Set up profile» влияет ровно одно (решение 17.10.2026,
+    // хендофф ex3): «I'm a parent» добавляет шаг «My family».
     // ⚠ ProfileRoleCoach — ответ человека о себе, НЕ site-роль Coach (AppRole) и НЕ бейдж
     // HubGroupMember.Role = "coach". Права на нём не строить.
 
@@ -112,6 +113,9 @@ public class AppUser
 
     /// <summary>Отказ от шага «My group» («No group»).</summary>
     public bool ProfileSkipGroup { get; set; }
+
+    /// <summary>Отказ от шага «My family» (только у родителя, хендофф ex3).</summary>
+    public bool ProfileSkipFamily { get; set; }
 
     /// <summary>
     /// Какие шаги «Set up profile» пользователь уже видел — ключи через запятую, снимок на момент,

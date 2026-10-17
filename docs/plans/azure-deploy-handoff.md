@@ -137,8 +137,8 @@
 - ✅ **MyNames** — сверено по whois ISOC 17.10: регистратор Drubit Raid LTD, https://mynames.co.il;
   до 14.10.2031, Transfer Locked, NS Cloudflare.
 - ☐ Планы на потом: [content-permissions-plan.md](content-permissions-plan.md) (права на медиа), [sign-in-rules-plan.md](sign-in-rules-plan.md) (правила входа).
-- ☐ По желанию: логотип в письмах сайта (сейчас голый текст), `ProdVersionConnection` в
-  `appsettings.Development.json` (напоминание «локальная база отстаёт»).
+- ✅ Логотип в письмах сайта (17.10, `Services/Email/EmailLayout.cs`). ☐ `ProdVersionConnection`
+  (напоминание «локальная база отстаёт») — Влад запускает `server/db/set-prod-version-connection.ps1`.
 
 ### 3.3 Ресурсы Azure (A7) — ✅ 15.10.2026, сайт на https://swimhub.co.il (итог — план A7)
 **Runbook — [azure-a7-commands.md](azure-a7-commands.md)** (PowerShell 5.1, §0–§9; имена `swimhub`

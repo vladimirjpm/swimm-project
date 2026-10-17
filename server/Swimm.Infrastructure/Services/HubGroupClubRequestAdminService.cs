@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
@@ -201,8 +202,8 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
         await SubscribeOfficialGroupAsync(group.Id, request.ClubId, request.DecidedByUserId);
 
         await _email.SendAsync(request.User.Email, "SwimHub — club request approved",
-            $"Your group \"{group.Name}\" is now the official group of {request.Club!.Name}. " +
-            "You've been granted the Coach role for managing groups.");
+            $"<p style=\"margin:0\">Your group <b>{WebUtility.HtmlEncode(group.Name)}</b> is now the official group of " +
+            $"<b>{WebUtility.HtmlEncode(request.Club!.Name)}</b>. You've been granted the Coach role for managing groups.</p>");
 
         // Одобрение меняет чужие группы (каталог, имена) — пусть в /Admin/Audit останется, кто
         // и что. Писем их владельцам не шлём (решение §1-4): они видят плашку в «My groups».
@@ -234,7 +235,7 @@ public class HubGroupClubRequestAdminService : IHubGroupClubRequestAdminService
         await _db.SaveChangesAsync();
 
         await _email.SendAsync(request.User!.Email, "SwimHub — club request rejected",
-            $"Your official-status request for group \"{request.HubGroup!.Name}\" was not approved.");
+            $"<p style=\"margin:0\">Your official-status request for group <b>{WebUtility.HtmlEncode(request.HubGroup!.Name)}</b> was not approved.</p>");
 
         return HubGroupMemberSaveResult.Ok();
     }

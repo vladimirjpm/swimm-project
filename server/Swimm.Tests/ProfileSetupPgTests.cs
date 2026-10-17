@@ -75,7 +75,7 @@ public class ProfileSetupPgTests
             Assert.True(after!.Survey.Swimmer);
             Assert.True(after.Survey.Coach);
             Assert.NotNull(after.Survey.AnsweredAt);
-            // Р1: опрос ни на что не влияет — те же три шага, тот же счётчик.
+            // Р1: без «I'm a parent» опрос на шаги не влияет — те же три шага, тот же счётчик.
             Assert.Equal(before.Steps.Select(s => s.Key), after.Steps.Select(s => s.Key));
             Assert.Equal(0, after.Done);
             Assert.True(after.Visible);
@@ -218,6 +218,64 @@ public class ProfileSetupPgTests
         }
         finally
         {
+            await db.AppUsers.Where(u => u.Id == user.Id).ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Parent_FamilyStep_FromFavorites_SkipColumn_AndRoleOff()
+    {
+        await using var db = TryCreate();
+        if (db == null) return;
+
+        var kids = await db.Swimmers.AsNoTracking()
+            .Where(s => s.Origin == "isr" && s.PrivateHubGroupId == null)
+            .OrderBy(s => s.Id).Select(s => s.Id).Take(2).ToListAsync();
+        if (kids.Count < 2) return; // пустая база — пропуск
+
+        var user = NewUser("family");
+        db.AppUsers.Add(user);
+        await db.SaveChangesAsync();
+        try
+        {
+            var svc = Service(db);
+            await svc.SaveSurveyAsync(user.Id, new ProfileSurveyRequest { Parent = true });
+
+            // Родитель — шаг семьи появился вторым, 0/4.
+            var s = await svc.GetAsync(user.Id);
+            Assert.Equal(
+                new[] { ProfileSetupRules.StepMe, ProfileSetupRules.StepFamily, ProfileSetupRules.StepClub, ProfileSetupRules.StepGroup },
+                s!.Steps.Select(x => x.Key));
+            Assert.Equal(4, s.Total);
+            Assert.False(s.Steps.Single(x => x.Key == ProfileSetupRules.StepFamily).Done);
+
+            // Отказ пишет свою колонку и засчитывает шаг.
+            Assert.True(await svc.SetStepSkippedAsync(user.Id, ProfileSetupRules.StepFamily, true));
+            Assert.True(await db.AppUsers.Where(u => u.Id == user.Id).Select(u => u.ProfileSkipFamily).SingleAsync());
+            Assert.True((await svc.GetAsync(user.Id))!.Steps.Single(x => x.Key == ProfileSetupRules.StepFamily).Skipped);
+            await svc.SetStepSkippedAsync(user.Id, ProfileSetupRules.StepFamily, false);
+
+            // Двое детей семьёй — шаг сделан делом, имена через запятую.
+            db.UserFavorites.AddRange(kids.Select(id => new UserFavorite
+            {
+                UserId = user.Id, TargetType = FavoritesRules.TargetSwimmer, SwimmerId = id, IsFamily = true,
+            }));
+            await db.SaveChangesAsync();
+            var fam = (await svc.GetAsync(user.Id))!.Steps.Single(x => x.Key == ProfileSetupRules.StepFamily);
+            Assert.True(fam.Done);
+            Assert.False(fam.Skipped);
+            Assert.Contains(", ", fam.TargetName);
+
+            // Роль сняли — шага нет, семья осталась.
+            await svc.SaveSurveyAsync(user.Id, new ProfileSurveyRequest());
+            var off = await svc.GetAsync(user.Id);
+            Assert.DoesNotContain(off!.Steps, x => x.Key == ProfileSetupRules.StepFamily);
+            Assert.Equal(3, off.Total);
+            Assert.Equal(2, await db.UserFavorites.CountAsync(f => f.UserId == user.Id && f.IsFamily));
+        }
+        finally
+        {
+            await db.UserFavorites.Where(f => f.UserId == user.Id).ExecuteDeleteAsync();
             await db.AppUsers.Where(u => u.Id == user.Id).ExecuteDeleteAsync();
         }
     }

@@ -5,16 +5,17 @@ import { fetchAntiforgeryToken, invalidateTokenCache } from '../utils/antiforger
 // «Set up profile» (docs/plans/profile-setup-plan.md): пункт меню с прогрессом и страница
 // /setup-profile. Шаги и счётчик считает сервер (ProfileSetupRules) — здесь только чтение.
 
-export type ProfileSetupStepKey = 'me' | 'club' | 'group';
+// `family` — только у родителя (хендофф set-up-profile-ex3, решение Влада 17.10.2026).
+export type ProfileSetupStepKey = 'me' | 'family' | 'club' | 'group';
 
 export interface ProfileSetupStep {
   key: ProfileSetupStepKey;
   done: boolean;
-  /** Засчитан отказом («Not a swimmer», «No club», «No group»); сделанное делом — false. */
+  /** Засчитан отказом («Not a swimmer», «No club», «No group», «Skip»); сделанное делом — false. */
   skipped: boolean;
-  /** Id пловца / клуба / группы, которым шаг закрыт. */
+  /** Id пловца / клуба / группы, которым шаг закрыт; у семьи — null. */
   targetId: number | null;
-  /** Имя пловца или клуба (иврит по умолчанию), название группы. */
+  /** Имя пловца или клуба (иврит по умолчанию), название группы; у семьи — имена через запятую. */
   targetName: string | null;
   /** Только у группы. */
   targetSlug: string | null;
@@ -22,7 +23,10 @@ export interface ProfileSetupStep {
   status: 'active' | 'pending' | null;
 }
 
-/** Ответ опроса «Who are you?» — ни на что не влияет (решение Влада 16.10.2026). */
+/**
+ * Ответ опроса «Who are you?» — прав не даёт (решение Влада 16.10.2026); на шаги влияет только
+ * `parent` — добавляет шаг «My family» (хендофф ex3, 17.10.2026).
+ */
 export interface ProfileSurvey {
   swimmer: boolean;
   parent: boolean;
@@ -98,6 +102,7 @@ export const SURVEY_ROLES: SurveyRole[] = ['swimmer', 'parent', 'coach', 'watche
 /** Названия шагов — общие для страницы и строки «New: …» в меню. */
 export const STEP_TITLES: Record<ProfileSetupStepKey, string> = {
   me: "It's me",
+  family: 'My family',
   club: 'My club',
   group: 'My group',
 };
@@ -183,7 +188,8 @@ export function useProfileSetup() {
 
   /**
    * Клик по чипу опроса: снимок меняется сразу, ответ уходит на сервер; отказ — откат.
-   * Шаги и счётчик от опроса не зависят (Р1), поэтому перечитывать после записи нечего.
+   * «I'm a parent» добавляет или убирает шаг «My family» (хендофф ex3) — тогда статус
+   * перечитывается: шаги и счётчик считает сервер.
    */
   const toggleRole = useCallback(async (role: SurveyRole): Promise<boolean> => {
     const before = cached;
@@ -192,6 +198,7 @@ export function useProfileSetup() {
     setCached({ ...before, survey: { ...answer, answeredAt: new Date().toISOString() } });
     const ok = await send('PUT', '/api/me/profile-setup/roles', answer);
     if (!ok && cachedFor === userId) setCached(before);
+    else if (ok && answer.parent !== before.survey.parent) await load(userId, true);
     return ok;
   }, [userId]);
 

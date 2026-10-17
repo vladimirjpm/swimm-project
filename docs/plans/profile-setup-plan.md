@@ -1,9 +1,10 @@
 # План — «Set up profile»: три первых шага и опрос «кто ты» (хендофф 1a)
 
-**Статус:** ◐ S0–S6 сделаны 16.10.2026 (миграция `AddUserProfileSetup` применена локально, на прод —
-нет; ручки `api/me/profile-setup` + тесты; хук `client/src/hooks/useProfileSetup.ts`; пункт и точка в
-`app-topbar.tsx` и `home-header.tsx`; страница `client/src/projects/setup-profile-project/`). Осталось:
-выкатка миграций `AddUserProfileSetup` + `AddUserProfileSetupSkips` + `AddUserProfileStepsSeen` на прод. 17.10 — отказ от шага (раздел ниже). Поставлено 16.10.2026, решения Влада — в тот же день. **Оценка:** ~2 дня.
+**Статус:** ◐ S0–S6 сделаны 16.10.2026 (ручки `api/me/profile-setup` + тесты; хук
+`client/src/hooks/useProfileSetup.ts`; пункт и точка в `app-topbar.tsx` и `home-header.tsx`; страница
+`client/src/projects/setup-profile-project/`), PR #119, на проде с 17.10 (три миграции). 17.10 — отказ
+от шага и шаг семьи у родителя (хендофф ex3, разделы ниже); осталась выкатка миграции
+`AddUserProfileSkipFamily` на прод. Поставлено 16.10.2026, решения Влада — в тот же день. **Оценка:** ~2 дня.
 **Дизайн:** `!design_handoff/set-up-profile/` (`README.md` + `New User Setup.dc.html`, рамка `id="1a"`;
 1b и 1c НЕ делаем). Хендофф лежит вне git, поэтому размеры и токены перенесены сюда — разделы
 «Пункт меню» и «Страница».
@@ -30,9 +31,9 @@
 | Р5 | Проверять ли «It's me» | Нет: пометка недоверенная, прав не даёт |
 | Р6 | Пловец с несколькими клубами | Избранных клубов сколько угодно; шаг засчитан с первого |
 
-Следствие Р1: шагов по ролям из хендоффа (My child, Groups I coach, Follow) **нет** — набор шагов
-фиксированный, ровно три из заголовка «Add yourself, your club and group». Если позже роли начнут
-влиять, шаги по ролям из хендоффа — готовая заготовка (README хендоффа, таблица «Steps by role»).
+Следствие Р1: шагов по ролям из хендоффа (Groups I coach, Follow) **нет**. ⚠ Исключение с 17.10.2026 —
+шаг «My family» у родителя (раздел «Шаг семьи», хендофф ex3). Остальные шаги по ролям — заготовка
+(README хендоффа, таблица «Шаги по ролям»).
 
 Принято по умолчанию (поправимо без переделки):
 - **Опрос в счётчик не входит:** `total = 3`. Иначе неответивший видел бы «недоделанный» профиль
@@ -254,6 +255,35 @@ ProfileSetupStatus Evaluate(ProfileSetupFacts facts, bool dismissed)
 - Тесты: правило (отказ засчитан, дело сильнее отказа, три ключа) и PG (отказ, 3/3, отмена).
 - Проверено в pane под `utest-newbie`: 0/3 → Not a swimmer + No group = 2/3 → No club = 3/3, точка
   пропала → Undo = 2/3, точка вернулась.
+
+## Шаг семьи у родителя (хендофф `!design_handoff/set-up-profile-ex3`, решение Влада 17.10.2026)
+
+Впервые опрос влияет на шаги, и ровно в одном месте: **«I'm a parent» добавляет шаг «My family»**.
+Другие шаги по ролям (Groups I coach, Follow, «Club you coach at» как отдельный шаг) не делаем.
+
+- Порядок: It's me → **My family** → My club → My group; счётчик у родителя — из четырёх.
+  `ProfileSetupRules.StepKeys` = `me, family, club, group`, шаг `family` попадает в набор только при
+  `parent` (`Evaluate(…, parent: true)`).
+- Чем засчитан: хотя бы один пловец с `UserFavorite.IsFamily` (та же семья, что на `/my-favorites`,
+  лимит `FavoritesRules.MaxFamily` = 4). Отказ — кнопка **Skip**, колонка `AppUser.ProfileSkipFamily`
+  (миграция `AddUserProfileSkipFamily`), ручка та же: `PUT/DELETE …/steps/family/skip`.
+- Сняли роль — шаг пропал, сохранённая семья осталась. «Это я» и «My family» живут вместе.
+- **Старые родители** (снимок `ProfileStepsSeen` = `me,club,group`) получают «Set up profile · New: My
+  family», даже после Dismiss — решено «да» 17.10. Снимок теперь пишется со всеми четырьмя ключами,
+  поэтому не-родитель, который позже отметит «I'm a parent», шаг «новым» не увидит (он на странице сам).
+- Окно «Mark your children»: сверху отмеченные плашками с × (снять сердечко — пловец остаётся в
+  избранном) и счётчик «Family n/4»; ниже — тот же `UI_H2HRivalPicker` (полоса избранных + поиск).
+  Из полосы и выдачи убраны уже отмеченные и сам «это я» (семья сняла бы звезду «Me»). Не в избранном —
+  сначала добавляется в избранное, потом сердечко; лимиты — текстом из ответа. Закрывает «Done».
+- Итог 2a: строка Family (золотое сердечко, имена через запятую, «Edit family →» открывает то же окно)
+  стоит **после Club, перед Group** — в чек-листе семья вторая, в итоге третья (`RECAP_ORDER`).
+- Подсказка клуба у тренера без других ролей — «Club you coach at» (текст из ex3, шагов не меняет).
+- `/privacy` (en/ru/he): ответ прав не даёт, меняет только шаги настройки.
+- Тесты: `ProfileSetupRulesTests` (шаг у родителя, нет без роли, сделан семьёй или отказом, старый
+  снимок → New), `ProfileSetupPgTests.Parent_FamilyStep_FromFavorites_SkipColumn_AndRoleOff`.
+- Проверено в pane под `utest-newbie` (Swimmer + Parent, был 3/3): меню «Set up profile 3/4 · New: My
+  family», NEW у шага, окно — отметил двоих → итог 4/4 с Family между Club и Group, ширина телефона.
+  Персонажа вернул как было (избранное и снимок).
 
 ## Шаги
 

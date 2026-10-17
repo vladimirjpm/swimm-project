@@ -6,10 +6,13 @@ namespace Swimm.Application.Dtos;
 /// </summary>
 public sealed class ProfileSetupDto
 {
-    /// <summary>Ответ опроса «Who are you?». Ни на что не влияет (решение Влада 16.10.2026).</summary>
+    /// <summary>
+    /// Ответ опроса «Who are you?». Прав не даёт (решение Влада 16.10.2026); «I'm a parent»
+    /// добавляет шаг family (хендофф ex3, 17.10.2026).
+    /// </summary>
     public ProfileSurveyDto Survey { get; set; } = new();
 
-    /// <summary>Три шага в фиксированном порядке: me, club, group.</summary>
+    /// <summary>Шаги по порядку: me, family (только у родителя), club, group.</summary>
     public IReadOnlyList<ProfileSetupStepDto> Steps { get; set; } = [];
 
     public int Done { get; set; }
@@ -46,17 +49,20 @@ public sealed class ProfileSurveyDto
 /// </summary>
 public sealed class ProfileSetupStepDto
 {
-    /// <summary>me | club | group (<c>ProfileSetupRules.Step*</c>).</summary>
+    /// <summary>me | family | club | group (<c>ProfileSetupRules.Step*</c>).</summary>
     public string Key { get; set; } = "";
     public bool Done { get; set; }
 
     /// <summary>Засчитан ОТКАЗОМ («Not a swimmer», «No club», «No group»); сделанное делом — false.</summary>
     public bool Skipped { get; set; }
 
-    /// <summary>Id пловца / клуба / группы.</summary>
+    /// <summary>Id пловца / клуба / группы. У семьи — null (пловцов несколько).</summary>
     public int? TargetId { get; set; }
 
-    /// <summary>Имя пловца или клуба (иврит по умолчанию, EN фоллбеком), название группы.</summary>
+    /// <summary>
+    /// Имя пловца или клуба (иврит по умолчанию, EN фоллбеком), название группы; у семьи — имена
+    /// отмеченных пловцов через запятую.
+    /// </summary>
     public string? TargetName { get; set; }
 
     /// <summary>Только у группы — для ссылки.</summary>

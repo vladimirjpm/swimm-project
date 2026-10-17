@@ -1,8 +1,11 @@
 using System.Net;
 using System.Net.Mail;
+using System.Net.Mime;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Swimm.Application.Abstractions;
+using Swimm.Infrastructure.Services.Email;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -25,6 +28,8 @@ public class SmtpEmailOptions
     /// <summary>Адрес отправителя; если пуст — берётся User.</summary>
     public string From { get; set; } = "";
     public string FromName { get; set; } = "SwimHub";
+    /// <summary>Сайт в шапке и подвале письма. Один и тот же у сайта и у локальной админки ProdAdmin.</summary>
+    public string SiteUrl { get; set; } = "https://swimhub.co.il";
 }
 
 /// <summary>
@@ -51,16 +56,7 @@ public class SmtpEmailSender : IEmailSender
 
     public async Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken ct = default)
     {
-        var from = FromAddress;
-
-        using var message = new MailMessage
-        {
-            From = new MailAddress(from, _options.FromName),
-            Subject = subject,
-            Body = htmlBody,
-            IsBodyHtml = true,
-        };
-        message.To.Add(toEmail);
+        using var message = BuildMessage(toEmail, subject, htmlBody);
 
         using var client = new SmtpClient(_options.Host, _options.Port)
         {
@@ -81,5 +77,29 @@ public class SmtpEmailSender : IEmailSender
             _logger.LogError(ex, "Failed to send email to {To}: {Subject}", toEmail, subject);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Письмо целиком в общем виде (<see cref="EmailLayout"/>): текстовая версия + HTML с логотипом
+    /// вложением (cid:). Порядок альтернатив важен — клиент показывает ПОСЛЕДНЮЮ, которую умеет.
+    /// </summary>
+    internal MailMessage BuildMessage(string toEmail, string subject, string htmlBody)
+    {
+        var message = new MailMessage
+        {
+            From = new MailAddress(FromAddress, _options.FromName),
+            Subject = subject,
+        };
+        message.To.Add(toEmail);
+        message.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(
+            EmailLayout.PlainText(htmlBody, _options.SiteUrl), Encoding.UTF8, MediaTypeNames.Text.Plain));
+        var html = AlternateView.CreateAlternateViewFromString(
+            EmailLayout.Html(subject, htmlBody, _options.SiteUrl), Encoding.UTF8, MediaTypeNames.Text.Html);
+        html.LinkedResources.Add(new LinkedResource(new MemoryStream(EmailLayout.LogoPng()), "image/png")
+        {
+            ContentId = EmailLayout.LogoContentId,
+        });
+        message.AlternateViews.Add(html);
+        return message;
     }
 }

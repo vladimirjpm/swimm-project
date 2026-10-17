@@ -29,7 +29,7 @@ public sealed class ProfileSetupService(
             {
                 u.ProfileRoleSwimmer, u.ProfileRoleParent, u.ProfileRoleCoach, u.ProfileRoleWatcher,
                 u.ProfileRolesAnsweredAt, u.ProfileSetupDismissedAt,
-                u.ProfileSkipMe, u.ProfileSkipClub, u.ProfileSkipGroup, u.ProfileStepsSeen,
+                u.ProfileSkipMe, u.ProfileSkipClub, u.ProfileSkipGroup, u.ProfileSkipFamily, u.ProfileStepsSeen,
             })
             .FirstOrDefaultAsync();
         if (user == null) return null;
@@ -37,6 +37,8 @@ public sealed class ProfileSetupService(
         var favs = await favorites.GetForUserAsync(userId);
         var me = favs.FirstOrDefault(f => f.IsPrimary && f.SwimmerId != null);
         var club = favs.FirstOrDefault(f => f.TargetType == FavoritesRules.TargetClub && f.ClubId != null);
+        // Семья — до FavoritesRules.MaxFamily пловцов; в шаге и итоге — имена через запятую.
+        var family = favs.Where(f => f.IsFamily && f.SwimmerId != null).ToList();
 
         // Заявка (pending) засчитывает шаг (Р3), но показать лучше группу, где уже приняли.
         var joined = await groups.GetJoinedAsync(userId);
@@ -45,10 +47,12 @@ public sealed class ProfileSetupService(
 
         var dismissed = user.ProfileSetupDismissedAt != null;
         var status = ProfileSetupRules.Evaluate(
-            new ProfileSetupFacts(HasMe: me != null, HasClub: club != null, InGroup: group != null),
-            new ProfileSetupSkips(user.ProfileSkipMe, user.ProfileSkipClub, user.ProfileSkipGroup),
+            new ProfileSetupFacts(HasMe: me != null, HasClub: club != null, InGroup: group != null,
+                HasFamily: family.Count > 0),
+            new ProfileSetupSkips(user.ProfileSkipMe, user.ProfileSkipClub, user.ProfileSkipGroup, user.ProfileSkipFamily),
             dismissed,
-            ProfileSetupRules.ParseSeen(user.ProfileStepsSeen));
+            ProfileSetupRules.ParseSeen(user.ProfileStepsSeen),
+            parent: user.ProfileRoleParent);
 
         // Всё заполнено — запомнить, какие шаги человек видел: появится новый шаг — он придёт как
         // «New: …» (хендофф ex2, 3b). Пишем, только когда снимок устарел, — обычно ни разу.
@@ -76,6 +80,12 @@ public sealed class ProfileSetupService(
                 ProfileSetupRules.StepClub => new ProfileSetupStepDto
                 {
                     Key = s.Key, Done = s.Done, Skipped = s.Skipped, TargetId = club?.ClubId, TargetName = club?.ClubName,
+                },
+                ProfileSetupRules.StepFamily => new ProfileSetupStepDto
+                {
+                    Key = s.Key, Done = s.Done, Skipped = s.Skipped,
+                    TargetName = family.Count == 0 ? null
+                        : string.Join(", ", family.Select(f => f.SwimmerName ?? $"#{f.SwimmerId}")),
                 },
                 _ => new ProfileSetupStepDto
                 {
@@ -118,6 +128,7 @@ public sealed class ProfileSetupService(
             ProfileSetupRules.StepMe => await q.ExecuteUpdateAsync(s => s.SetProperty(u => u.ProfileSkipMe, skipped)),
             ProfileSetupRules.StepClub => await q.ExecuteUpdateAsync(s => s.SetProperty(u => u.ProfileSkipClub, skipped)),
             ProfileSetupRules.StepGroup => await q.ExecuteUpdateAsync(s => s.SetProperty(u => u.ProfileSkipGroup, skipped)),
+            ProfileSetupRules.StepFamily => await q.ExecuteUpdateAsync(s => s.SetProperty(u => u.ProfileSkipFamily, skipped)),
             _ => throw new ArgumentOutOfRangeException(nameof(stepKey), stepKey, "Unknown profile setup step"),
         };
         return rows > 0;
