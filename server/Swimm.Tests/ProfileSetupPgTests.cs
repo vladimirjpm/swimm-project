@@ -223,6 +223,41 @@ public class ProfileSetupPgTests
     }
 
     [Fact]
+    public async Task StepsSeen_WrittenOnComplete_AndOnDismiss()
+    {
+        await using var db = TryCreate();
+        if (db == null) return;
+
+        var done = NewUser("seen-done");
+        var dismissed = NewUser("seen-dismiss");
+        db.AppUsers.AddRange(done, dismissed);
+        await db.SaveChangesAsync();
+        try
+        {
+            var svc = Service(db);
+            var snapshot = ProfileSetupRules.SeenSnapshot();
+
+            // Пока не всё — снимка нет; отказался от всех трёх — «готово», снимок записан при чтении.
+            await svc.GetAsync(done.Id);
+            Assert.Null(await db.AppUsers.Where(u => u.Id == done.Id).Select(u => u.ProfileStepsSeen).SingleAsync());
+            foreach (var key in ProfileSetupRules.StepKeys) await svc.SetStepSkippedAsync(done.Id, key, true);
+            var status = await svc.GetAsync(done.Id);
+            Assert.True(status!.Complete);
+            Assert.Empty(status.NewSteps);
+            Assert.Equal(snapshot, await db.AppUsers.Where(u => u.Id == done.Id).Select(u => u.ProfileStepsSeen).SingleAsync());
+
+            // Dismiss — тоже снимок.
+            await svc.SetDismissedAsync(dismissed.Id, true);
+            Assert.Equal(snapshot, await db.AppUsers.Where(u => u.Id == dismissed.Id).Select(u => u.ProfileStepsSeen).SingleAsync());
+            Assert.False((await svc.GetAsync(dismissed.Id))!.Visible);
+        }
+        finally
+        {
+            await db.AppUsers.Where(u => u.Id == done.Id || u.Id == dismissed.Id).ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
     public async Task UnknownUser_NullAndFalse()
     {
         await using var db = TryCreate();

@@ -100,6 +100,58 @@ public class ProfileSetupRulesTests
     public void StepKey_OnlyThree(string? key, bool valid) =>
         Assert.Equal(valid, ProfileSetupRules.IsStepKey(key));
 
+    // ── Новый шаг (хендофф set-up-profile-ex2, 3b) ───────────────────────────────────────
+    // Настоящего четвёртого шага нет — «новый» моделируем снимком, где одного из трёх не было.
+
+    private static readonly IReadOnlySet<string> SeenMeClub = new HashSet<string> { "me", "club" };
+
+    [Fact]
+    public void Evaluate_StepsMatchStepKeys()
+    {
+        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(false, false, false), dismissed: false);
+        Assert.Equal(ProfileSetupRules.StepKeys, s.Steps.Select(x => x.Key));
+    }
+
+    [Fact]
+    public void NewStep_NotSeenNotDone_ReturnsItem_EvenAfterDismiss()
+    {
+        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(true, true, false), ProfileSetupSkips.None,
+            dismissed: true, seen: SeenMeClub);
+
+        Assert.Equal([ProfileSetupRules.StepGroup], s.NewSteps);
+        Assert.True(s.Visible);
+        Assert.False(s.Complete);
+    }
+
+    [Fact]
+    public void NewStep_Skipped_IsClosed()
+    {
+        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(true, true, false),
+            new ProfileSetupSkips(false, false, Group: true), dismissed: true, seen: SeenMeClub);
+
+        Assert.Empty(s.NewSteps!);
+        Assert.False(s.Visible);
+        Assert.True(s.Complete);
+    }
+
+    [Fact]
+    public void NoSnapshot_NothingIsNew()
+    {
+        var s = ProfileSetupRules.Evaluate(new ProfileSetupFacts(false, false, false), ProfileSetupSkips.None,
+            dismissed: true, seen: null);
+
+        Assert.Empty(s.NewSteps!);
+        Assert.False(s.Visible); // Dismiss прячет — новых шагов нет
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData("me,club", "club,me")]
+    [InlineData(" me , group ,", "group,me")]
+    public void ParseSeen(string? stored, string? expected) =>
+        Assert.Equal(expected, ProfileSetupRules.ParseSeen(stored) is { } set ? string.Join(",", set.Order()) : null);
+
     [Fact]
     public void Dismissed_HiddenEvenWhenUnfinished()
     {

@@ -29,7 +29,7 @@ public sealed class ProfileSetupService(
             {
                 u.ProfileRoleSwimmer, u.ProfileRoleParent, u.ProfileRoleCoach, u.ProfileRoleWatcher,
                 u.ProfileRolesAnsweredAt, u.ProfileSetupDismissedAt,
-                u.ProfileSkipMe, u.ProfileSkipClub, u.ProfileSkipGroup,
+                u.ProfileSkipMe, u.ProfileSkipClub, u.ProfileSkipGroup, u.ProfileStepsSeen,
             })
             .FirstOrDefaultAsync();
         if (user == null) return null;
@@ -47,7 +47,15 @@ public sealed class ProfileSetupService(
         var status = ProfileSetupRules.Evaluate(
             new ProfileSetupFacts(HasMe: me != null, HasClub: club != null, InGroup: group != null),
             new ProfileSetupSkips(user.ProfileSkipMe, user.ProfileSkipClub, user.ProfileSkipGroup),
-            dismissed);
+            dismissed,
+            ProfileSetupRules.ParseSeen(user.ProfileStepsSeen));
+
+        // Всё заполнено — запомнить, какие шаги человек видел: появится новый шаг — он придёт как
+        // «New: …» (хендофф ex2, 3b). Пишем, только когда снимок устарел, — обычно ни разу.
+        var snapshot = ProfileSetupRules.SeenSnapshot();
+        if (status.Complete && user.ProfileStepsSeen != snapshot)
+            await db.AppUsers.Where(u => u.Id == userId)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.ProfileStepsSeen, snapshot));
 
         return new ProfileSetupDto
         {
@@ -78,6 +86,8 @@ public sealed class ProfileSetupService(
             Done = status.Done,
             Total = status.Total,
             Visible = status.Visible,
+            Complete = status.Complete,
+            NewSteps = status.NewSteps ?? [],
             Dismissed = dismissed,
         };
     }
@@ -116,9 +126,13 @@ public sealed class ProfileSetupService(
     public async Task<bool> SetDismissedAsync(int userId, bool dismissed)
     {
         DateTime? value = dismissed ? DateTime.UtcNow : null;
-        var rows = await db.AppUsers
-            .Where(u => u.Id == userId)
-            .ExecuteUpdateAsync(s => s.SetProperty(u => u.ProfileSetupDismissedAt, value));
+        var q = db.AppUsers.Where(u => u.Id == userId);
+        // Dismiss — тоже «видел эти шаги»: следующий новый шаг вернёт пункт, а нынешние — нет.
+        var rows = dismissed
+            ? await q.ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.ProfileSetupDismissedAt, value)
+                .SetProperty(u => u.ProfileStepsSeen, ProfileSetupRules.SeenSnapshot()))
+            : await q.ExecuteUpdateAsync(s => s.SetProperty(u => u.ProfileSetupDismissedAt, value));
         return rows > 0;
     }
 }

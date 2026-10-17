@@ -3,7 +3,7 @@
 **Статус:** ◐ S0–S6 сделаны 16.10.2026 (миграция `AddUserProfileSetup` применена локально, на прод —
 нет; ручки `api/me/profile-setup` + тесты; хук `client/src/hooks/useProfileSetup.ts`; пункт и точка в
 `app-topbar.tsx` и `home-header.tsx`; страница `client/src/projects/setup-profile-project/`). Осталось:
-выкатка миграций `AddUserProfileSetup` + `AddUserProfileSetupSkips` на прод. 17.10 — отказ от шага (раздел ниже). Поставлено 16.10.2026, решения Влада — в тот же день. **Оценка:** ~2 дня.
+выкатка миграций `AddUserProfileSetup` + `AddUserProfileSetupSkips` + `AddUserProfileStepsSeen` на прод. 17.10 — отказ от шага (раздел ниже). Поставлено 16.10.2026, решения Влада — в тот же день. **Оценка:** ~2 дня.
 **Дизайн:** `!design_handoff/set-up-profile/` (`README.md` + `New User Setup.dc.html`, рамка `id="1a"`;
 1b и 1c НЕ делаем). Хендофф лежит вне git, поэтому размеры и токены перенесены сюда — разделы
 «Пункт меню» и «Страница».
@@ -197,6 +197,28 @@ ProfileSetupStatus Evaluate(ProfileSetupFacts facts, bool dismissed)
 После каждого действия — `refresh()` статуса (страница и пункт меню берут его из одного хука).
 Золотая звезда Me — та же, что на `/my-favorites` (решение 24.09.2026), не новая.
 
+## «My profile» в меню и новые шаги (хендофф `!design_handoff/set-up-profile-ex2`, вариант 3b, 17.10.2026)
+
+- **Тихий пункт «My profile».** Когда «Set up profile» не нужен, первым пунктом меню (AppTopbar —
+  выпадающее и бургер; шапка главной) стоит строка без фона: зелёная галочка (только если всё
+  заполнено), «My profile» 13/700 и под ней роли из опроса через « · » (нет ответа — «All set» /
+  «2/3 done»). Ведёт на `/setup-profile` — там итог 2a. Перед «Sign out» — разделитель 1px.
+  Точки на аватаре нет. **После Dismiss** с незаполненным — тот же тихий пункт, без галочки: это и
+  есть «как вернуться после Dismiss» (бывший открытый вопрос).
+- **Новый шаг.** Обязательные поля — `ProfileSetupRules.StepKeys`. Снимок «какие шаги видел» —
+  `AppUser.ProfileStepsSeen` (миграция `AddUserProfileStepsSeen`), пишется сервером при завершении
+  (на чтении статуса, только если снимок устарел) и при Dismiss. Несделанный шаг вне снимка —
+  `newSteps`: пункт возвращается в «Set up profile» с жёлтым «!», «New: {название шага}» и жёлтой
+  точкой на аватаре — **даже после Dismiss**. Пропущенный шаг закрыт и не возвращает. На странице у
+  такого шага чип NEW. Новичку (снимка нет) ничего не «новое».
+- Цвета: на полосе — роли `--theme-topbar-ok` (#4ade80) и `--theme-topbar-warn` (#f7c948) в
+  `index.css` (полоса тёмная в обоих режимах); в шапке главной — `--t-good` / `--t-warn`.
+- Проверено 17.10 в pane: `utest-newbie` (всё заполнено) — «My profile · Swimmer · Parent» с
+  галочкой; `utest-swimmer-me` со снимком «me,club» — «Set up profile 2/3 · New: My group», жёлтая
+  точка, NEW у шага. Тесты — `ProfileSetupRulesTests` (новый шаг, отказ закрывает, без снимка
+  ничего не новое), `ProfileSetupPgTests.StepsSeen_WrittenOnComplete_AndOnDismiss`.
+- На прод теперь **три** миграции: `AddUserProfileSetup`, `AddUserProfileSetupSkips`, `AddUserProfileStepsSeen`.
+
 ## Итог «You're all set» (хендофф `!design_handoff/set-up-profile-ex1`, вариант 2a, 17.10.2026)
 
 Когда все три шага сделаны или пропущены (`done == total`), карточка вместо чек-листа показывает итог:
@@ -264,8 +286,9 @@ ProfileSetupStatus Evaluate(ProfileSetupFacts facts, bool dismissed)
 3. ~~**Шапка главной.**~~ **Решено 16.10.2026 — да.** `/` рисует свой `HomeHeader` (тема deep), туда
    поставлен тот же пункт на ролях `--t-*` (меню аватара и бургер) и точка на аватаре; на телефоне
    аватара в шапке нет — точка на кнопке бургера. Данные — тот же `useProfileSetup`.
-4. **Возвращение после Dismiss:** нужна ли где-то ссылка «Set up profile» (например, вверху
-   `/my-favorites`), чтобы вернуть пункт? Ручка `DELETE /dismiss` заложена, UI — по решению.
+4. ~~**Возвращение после Dismiss.**~~ **Закрыто 17.10.2026 хендоффом ex2 (3b):** после Dismiss в меню
+   тихий «My profile» → `/setup-profile`; новый шаг сам возвращает «Set up profile». Ручка
+   `DELETE /dismiss` осталась без UI.
 
 ## Можно ли отдать Sonnet
 

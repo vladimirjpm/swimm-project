@@ -7,6 +7,8 @@ import { useFavorites } from '../../hooks/useFavorites';
 import {
   useProfileSetup,
   SURVEY_ROLES,
+  STEP_TITLES,
+  ROLE_LABELS,
   type ProfileSetupStep,
   type ProfileSetupStepKey,
   type SurveyRole,
@@ -96,7 +98,7 @@ const ROLE_META: Record<SurveyRole, { label: string; icon: React.ReactNode }> = 
 // `skip` — подпись кнопки отказа от шага (решение Влада 17.10.2026): отказ засчитывает шаг.
 const STEP_META: Record<ProfileSetupStepKey, { title: string; hint: string; cta: string; skip: string; icon: React.ReactNode }> = {
   me: {
-    title: "It's me",
+    title: STEP_TITLES.me,
     hint: 'Find your swimmer record',
     cta: 'Find me',
     skip: 'Not a swimmer',
@@ -104,7 +106,7 @@ const STEP_META: Record<ProfileSetupStepKey, { title: string; hint: string; cta:
     icon: <span style={{ color: 'var(--t-level-me)' }}><Svg size={18} fill="currentColor"><path d={STAR} /></Svg></span>,
   },
   club: {
-    title: 'My club',
+    title: STEP_TITLES.club,
     hint: 'Club you or your child swim for',
     cta: 'Choose club',
     skip: 'No club',
@@ -115,7 +117,7 @@ const STEP_META: Record<ProfileSetupStepKey, { title: string; hint: string; cta:
     ),
   },
   group: {
-    title: 'My group',
+    title: STEP_TITLES.group,
     hint: 'Training group · coach approves',
     cta: 'Join group',
     skip: 'No group',
@@ -133,14 +135,6 @@ const RECAP: Record<ProfileSetupStepKey, { label: string; open: string }> = {
   me: { label: 'Me', open: 'My swims →' },
   club: { label: 'Club', open: 'Open club →' },
   group: { label: 'Group', open: 'Open group →' },
-};
-
-/** Плашки ответа опроса в итоге (2a). */
-const ROLE_PILL: Record<SurveyRole, string> = {
-  swimmer: 'Swimmer',
-  parent: 'Parent',
-  coach: 'Coach',
-  watcher: 'Just watching',
 };
 
 const CHECK = (
@@ -332,7 +326,15 @@ function SetupProfile() {
           {meta.icon}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[14px] font-bold">{meta.title}</div>
+          <div className="flex items-center gap-1.5 text-[14px] font-bold">
+            {meta.title}
+            {/* Шаг, которого человек ещё не видел (хендофф ex2, 3b): его и привёл пункт «New: …». */}
+            {s.newSteps.includes(step.key) && (
+              <span className="hp-mono rounded-[6px] bg-[color-mix(in_srgb,var(--t-warn)_18%,transparent)] px-1.5 py-px text-[10px] font-extrabold text-[var(--t-text)]">
+                NEW
+              </span>
+            )}
+          </div>
           {step.done && step.targetName ? (
             <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--t-text-2)]">
               {href ? (
@@ -489,7 +491,7 @@ function SetupProfile() {
               <span className="flex basis-full flex-wrap gap-1.5 sm:basis-auto">
                 {pickedRoles.map((r) => (
                   <span key={r} className="whitespace-nowrap rounded-[12px] bg-[var(--t-accent-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--t-accent)]">
-                    {ROLE_PILL[r]}
+                    {ROLE_LABELS[r]}
                   </span>
                 ))}
               </span>

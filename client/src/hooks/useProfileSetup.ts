@@ -36,8 +36,12 @@ export interface ProfileSetup {
   steps: ProfileSetupStep[];
   done: number;
   total: number;
-  /** Показывать пункт меню: не закрыт Dismiss и не все шаги сделаны. */
+  /** Показывать «Set up profile»: не все шаги сделаны и не закрыт Dismiss (или есть новый шаг). */
   visible: boolean;
+  /** Все шаги сделаны или пропущены — итог «You're all set», в меню тихий «My profile». */
+  complete: boolean;
+  /** Несделанные шаги, которых пользователь ещё не видел — «New: …» и жёлтая точка (хендофф ex2, 3b). */
+  newSteps: ProfileSetupStepKey[];
   dismissed: boolean;
 }
 
@@ -90,6 +94,28 @@ function setCached(next: ProfileSetup | null) {
 
 export type SurveyRole = 'swimmer' | 'parent' | 'coach' | 'watcher';
 export const SURVEY_ROLES: SurveyRole[] = ['swimmer', 'parent', 'coach', 'watcher'];
+
+/** Названия шагов — общие для страницы и строки «New: …» в меню. */
+export const STEP_TITLES: Record<ProfileSetupStepKey, string> = {
+  me: "It's me",
+  club: 'My club',
+  group: 'My group',
+};
+
+/** Подписи ответа опроса — плашки итога и подстрока «My profile» в меню. */
+export const ROLE_LABELS: Record<SurveyRole, string> = {
+  swimmer: 'Swimmer',
+  parent: 'Parent',
+  coach: 'Coach',
+  watcher: 'Just watching',
+};
+
+/** Подстрока тихого пункта «My profile»: роли через « · »; без ответа — сколько сделано. */
+export function profileSubtitle(s: ProfileSetup): string {
+  const roles = SURVEY_ROLES.filter((r) => s.survey[r]).map((r) => ROLE_LABELS[r]);
+  if (roles.length > 0) return roles.join(' · ');
+  return s.complete ? 'All set' : `${s.done}/${s.total} done`;
+}
 
 /**
  * Ответ после клика по чипу. «Just watching» исключающий (решение Влада 16.10.2026): включил

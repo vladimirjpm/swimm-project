@@ -113,6 +113,15 @@ public class AppUser
     /// <summary>Отказ от шага «My group» («No group»).</summary>
     public bool ProfileSkipGroup { get; set; }
 
+    /// <summary>
+    /// Какие шаги «Set up profile» пользователь уже видел — ключи через запятую, снимок на момент,
+    /// когда он всё заполнил или нажал Dismiss (хендофф set-up-profile-ex2, 3b). Появится новый
+    /// шаг, которого здесь нет, — пункт меню вернётся с «New: …», даже после Dismiss.
+    /// null — снимка ещё не было (новых шагов для него не бывает).
+    /// </summary>
+    [MaxLength(200)]
+    public string? ProfileStepsSeen { get; set; }
+
     // --- Навигация ---
     public ICollection<AppUserRole> UserRoles { get; set; } = new List<AppUserRole>();
     public ICollection<UserExternalLogin> ExternalLogins { get; set; } = new List<UserExternalLogin>();

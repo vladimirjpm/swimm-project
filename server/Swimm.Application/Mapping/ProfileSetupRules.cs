@@ -24,8 +24,14 @@ public sealed record ProfileSetupSkips(bool Me, bool Club, bool Group)
 /// </summary>
 public sealed record ProfileSetupStep(string Key, bool Done, bool Skipped = false);
 
-/// <summary>Итог для пункта меню и страницы /setup-profile.</summary>
-public sealed record ProfileSetupStatus(IReadOnlyList<ProfileSetupStep> Steps, int Done, int Total, bool Visible);
+/// <summary>
+/// Итог для пункта меню и страницы /setup-profile. <c>Visible</c> — показывать «Set up profile»
+/// (иначе в меню тихий «My profile»); <c>Complete</c> — все шаги сделаны или пропущены;
+/// <c>NewSteps</c> — несделанные шаги, которых пользователь ещё не видел (хендофф ex2, 3b).
+/// </summary>
+public sealed record ProfileSetupStatus(
+    IReadOnlyList<ProfileSetupStep> Steps, int Done, int Total, bool Visible,
+    bool Complete = false, IReadOnlyList<string>? NewSteps = null);
 
 /// <summary>
 /// Шаги и счётчик пункта «Set up profile» (docs/plans/profile-setup-plan.md, хендофф 1a).
@@ -41,6 +47,12 @@ public sealed record ProfileSetupStatus(IReadOnlyList<ProfileSetupStep> Steps, i
 ///
 /// Решение Влада 17.10.2026: от шага можно отказаться — тренер отмечает только клуб, родитель
 /// обходится без «это я». Отказ засчитывает шаг так же, как сделанный, и снимается в любой момент.
+///
+/// Хендофф set-up-profile-ex2 (3b): <see cref="StepKeys"/> — это и есть список обязательных полей
+/// профиля. Пользователь запоминает, какие шаги видел (снимок при завершении или Dismiss,
+/// <c>AppUser.ProfileStepsSeen</c>). Добавили шаг — у всех, кто его не видел и не сделал, пункт
+/// «Set up profile» возвращается с «New: …», в том числе после Dismiss. Пропущенный шаг не
+/// возвращает: отказ — тоже «закрыт».
 /// </summary>
 public static class ProfileSetupRules
 {
@@ -48,13 +60,29 @@ public static class ProfileSetupRules
     public const string StepClub = "club";
     public const string StepGroup = "group";
 
-    /// <summary>Ключ шага из адреса (<c>…/steps/{key}/skip</c>) — один из трёх.</summary>
-    public static bool IsStepKey(string? key) => key is StepMe or StepClub or StepGroup;
+    /// <summary>
+    /// Обязательные шаги профиля по порядку. Новый шаг — новый ключ здесь (и факт в
+    /// <see cref="ProfileSetupFacts"/>): тем, кто уже всё заполнил, он придёт как «New: …».
+    /// </summary>
+    public static readonly IReadOnlyList<string> StepKeys = [StepMe, StepClub, StepGroup];
+
+    /// <summary>Ключ шага из адреса (<c>…/steps/{key}/skip</c>) — один из списка.</summary>
+    public static bool IsStepKey(string? key) => key != null && StepKeys.Contains(key);
+
+    /// <summary>Снимок «какие шаги видел» → множество ключей; null/пусто — снимка не было.</summary>
+    public static IReadOnlySet<string>? ParseSeen(string? stored) =>
+        string.IsNullOrWhiteSpace(stored)
+            ? null
+            : stored.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet();
+
+    /// <summary>Снимок для записи: все нынешние шаги.</summary>
+    public static string SeenSnapshot() => string.Join(",", StepKeys);
 
     public static ProfileSetupStatus Evaluate(ProfileSetupFacts facts, bool dismissed) =>
         Evaluate(facts, ProfileSetupSkips.None, dismissed);
 
-    public static ProfileSetupStatus Evaluate(ProfileSetupFacts facts, ProfileSetupSkips skips, bool dismissed)
+    public static ProfileSetupStatus Evaluate(
+        ProfileSetupFacts facts, ProfileSetupSkips skips, bool dismissed, IReadOnlySet<string>? seen = null)
     {
         var steps = new[]
         {
@@ -64,7 +92,16 @@ public static class ProfileSetupRules
         };
 
         var done = steps.Count(s => s.Done);
-        return new ProfileSetupStatus(steps, done, steps.Length, Visible: !dismissed && done < steps.Length);
+        var complete = done == steps.Length;
+        // «Новый» — только у того, кто уже видел набор шагов (снимок есть): новичку все шаги
+        // новые, и подсвечивать там нечего.
+        var newSteps = seen == null
+            ? []
+            : steps.Where(s => !s.Done && !seen.Contains(s.Key)).Select(s => s.Key).ToList();
+
+        // Dismiss прячет пункт — но не от шага, которого человек ещё не видел.
+        var visible = !complete && (!dismissed || newSteps.Count > 0);
+        return new ProfileSetupStatus(steps, done, steps.Length, visible, complete, newSteps);
     }
 
     private static ProfileSetupStep Step(string key, bool fact, bool skip) =>

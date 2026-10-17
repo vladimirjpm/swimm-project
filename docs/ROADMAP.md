@@ -242,7 +242,7 @@
   `/setup-profile` с тремя шагами (это я → клуб → группа) и опросом «Who are you?», который только
   хранится (колонки `AppUser.ProfileRole*`, ни на что не влияет; «Just watching» исключающий).
   Ручки `api/me/profile-setup`, правило `ProfileSetupRules`. `/privacy` дополнен. Осталось: выкатка
-  миграций `AddUserProfileSetup` и `AddUserProfileSetupSkips`; у шагов есть отказ («Not a swimmer», «No club», «No group»). План — [plans/profile-setup-plan.md](plans/profile-setup-plan.md).
+  миграций `AddUserProfileSetup`, `AddUserProfileSetupSkips` и `AddUserProfileStepsSeen`; после завершения в меню тихий «My profile», новый шаг возвращает «Set up profile» с «New: …» (3b); у шагов есть отказ («Not a swimmer», «No club», «No group»). План — [plans/profile-setup-plan.md](plans/profile-setup-plan.md).
 
 План/детали шагов: `docs/tasks/client-login-plan.md`.
 

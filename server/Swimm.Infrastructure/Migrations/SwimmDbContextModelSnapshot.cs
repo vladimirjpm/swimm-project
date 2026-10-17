@@ -202,6 +202,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<bool>("ProfileSkipMe")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ProfileStepsSeen")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
                         .HasMaxLength(64)

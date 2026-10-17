@@ -15,8 +15,17 @@ public sealed class ProfileSetupDto
     public int Done { get; set; }
     public int Total { get; set; }
 
-    /// <summary>Показывать ли пункт меню: не закрыт Dismiss и не все шаги сделаны.</summary>
+    /// <summary>
+    /// Показывать «Set up profile»: не все шаги сделаны и не закрыт Dismiss (или есть новый шаг).
+    /// Иначе в меню тихий пункт «My profile».
+    /// </summary>
     public bool Visible { get; set; }
+
+    /// <summary>Все шаги сделаны или пропущены — итог «You're all set».</summary>
+    public bool Complete { get; set; }
+
+    /// <summary>Несделанные шаги, которых пользователь ещё не видел — «New: …» в меню (хендофф ex2, 3b).</summary>
+    public IReadOnlyList<string> NewSteps { get; set; } = [];
 
     public bool Dismissed { get; set; }
 }

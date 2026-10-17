@@ -125,6 +125,7 @@ public class PersonaSeeder : IPersonaSeeder
         user.ProfileRolesAnsweredAt = null;
         user.ProfileSetupDismissedAt = null;
         user.ProfileSkipMe = user.ProfileSkipClub = user.ProfileSkipGroup = false;
+        user.ProfileStepsSeen = null;
         // Роли менялись — сессии персонажа (если входил по-настоящему) перечитают claims.
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         await _db.SaveChangesAsync();
@@ -205,7 +206,8 @@ public class PersonaSeeder : IPersonaSeeder
             if (user.HubGroupLimit != p.HubGroupLimit) diff.Add("лимит групп");
             if (user.ProfileRoleSwimmer || user.ProfileRoleParent || user.ProfileRoleCoach || user.ProfileRoleWatcher
                 || user.ProfileRolesAnsweredAt != null) diff.Add("опрос «Who are you?»");
-            if (user.ProfileSkipMe || user.ProfileSkipClub || user.ProfileSkipGroup || user.ProfileSetupDismissedAt != null)
+            if (user.ProfileSkipMe || user.ProfileSkipClub || user.ProfileSkipGroup || user.ProfileSetupDismissedAt != null
+                || user.ProfileStepsSeen != null)
                 diff.Add("Set up profile (отказы / Dismiss)");
 
             Check("роли", p.Roles, roles.Where(r => r.UserId == user.Id).Select(r => r.Name));

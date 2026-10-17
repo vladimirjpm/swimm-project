@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useProfileSetup } from '../../../hooks/useProfileSetup';
+import { useProfileSetup, profileSubtitle, STEP_TITLES, type ProfileSetup } from '../../../hooks/useProfileSetup';
 import LoginModal from '../../components/login-modal/login-modal';
 import UI_BrandMark from '../../components/mix/brand-mark/brand-mark';
 import { routes } from '../../../utils/routes';
@@ -83,13 +83,61 @@ function UserAvatar({ name, avatarUrl, size }: { name: string; avatarUrl: string
  * Точка «профиль не настроен» (хендофф set-up-profile 1a) — та же, что у аватара в AppTopbar,
  * на ролях темы deep. Кольцо — цвет панели, чтобы точка отделялась от градиента аватара.
  */
-function SetupDot() {
+function SetupDot({ warn }: { warn?: boolean }) {
+  // `warn` — появился новый шаг (хендофф ex2, 3b): точка жёлтая.
   return (
     <span
       aria-hidden="true"
-      className="absolute right-[-1px] top-[-1px] h-[9px] w-[9px] rounded-full bg-[var(--t-text)] shadow-[0_0_0_2px_var(--t-surface-strong)]"
+      className={`absolute right-[-1px] top-[-1px] h-[9px] w-[9px] rounded-full shadow-[0_0_0_2px_var(--t-surface-strong)] ${
+        warn ? 'bg-[var(--t-warn)]' : 'bg-[var(--t-text)]'
+      }`}
     />
   );
+}
+
+/** Залитый круг с галочкой («профиль готов») или «!» («новое поле») — двойник AppTopbar на `--t-*`. */
+function StatusCircle({ kind }: { kind: 'ok' | 'warn' }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0">
+      <circle cx="8" cy="8" r="8" fill={kind === 'ok' ? 'var(--t-good)' : 'var(--t-warn)'} />
+      {kind === 'ok' ? (
+        <path d="M4.6 8.3l2.2 2.2 4.6-4.8" fill="none" stroke="var(--t-surface-strong)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      ) : (
+        <>
+          <path d="M8 4.2v4.6" stroke="var(--t-surface-strong)" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="8" cy="11.4" r="1.05" fill="var(--t-surface-strong)" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/** Тихий пункт «My profile» (хендофф ex2, 3b) — двойник AppTopbar на ролях `--t-*`. */
+function MyProfileItem({ subtitle, complete, mobile }: { subtitle: string; complete: boolean; mobile?: boolean }) {
+  return (
+    <a
+      href={routes.setupProfile()}
+      className={`mb-[2px] flex items-center gap-2 no-underline transition-colors hover:bg-[var(--t-accent-soft)] ${
+        mobile ? 'rounded-[13px] px-4 py-[12px]' : 'rounded-[10px] px-4 py-[10px]'
+      }`}
+    >
+      {complete && <StatusCircle kind="ok" />}
+      <span className="min-w-0 flex-1">
+        <span className={`block font-bold text-[var(--t-text)] ${mobile ? 'text-[15px] font-extrabold' : 'text-[13px]'}`}>My profile</span>
+        <span className="block truncate text-[11px] text-[color-mix(in_srgb,var(--t-text)_78%,transparent)]">{subtitle}</span>
+      </span>
+    </a>
+  );
+}
+
+/** «Set up profile» / «My profile» — первый пункт меню про профиль; null — статуса ещё нет. */
+function ProfileMenuItem({ setup, mobile }: { setup: ProfileSetup | null; mobile?: boolean }) {
+  if (!setup) return null;
+  if (setup.visible) {
+    const newKey = setup.newSteps[0];
+    return <SetupProfileItem done={setup.done} total={setup.total} newTitle={newKey ? STEP_TITLES[newKey] : undefined} mobile={mobile} />;
+  }
+  return <MyProfileItem subtitle={profileSubtitle(setup)} complete={setup.complete} mobile={mobile} />;
 }
 
 /**
@@ -97,7 +145,7 @@ function SetupDot() {
  * AppTopbar на ролях `--t-*`: главная рисует свою шапку, а новичок после входа чаще всего здесь.
  * Фон — как hover соседних пунктов. `mobile` — отступы пунктов бургера.
  */
-function SetupProfileItem({ done, total, mobile }: { done: number; total: number; mobile?: boolean }) {
+function SetupProfileItem({ done, total, newTitle, mobile }: { done: number; total: number; newTitle?: string; mobile?: boolean }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
     <a
@@ -107,6 +155,7 @@ function SetupProfileItem({ done, total, mobile }: { done: number; total: number
       }`}
     >
       <span className="flex items-center gap-[6px]">
+        {newTitle && <StatusCircle kind="warn" />}
         <span className={`flex-1 font-bold text-[var(--t-text)] ${mobile ? 'text-[15px] font-extrabold' : 'text-[13px]'}`}>
           Set up profile
         </span>
@@ -124,7 +173,7 @@ function SetupProfileItem({ done, total, mobile }: { done: number; total: number
       >
         <span className="block h-full rounded-[2px] bg-[var(--t-accent)]" style={{ width: `${pct}%` }} />
       </span>
-      <span className="text-[11px] leading-[1.35] text-[color-mix(in_srgb,var(--t-text)_78%,transparent)]">Add yourself, your club and group</span>
+      <span className="text-[11px] leading-[1.35] text-[color-mix(in_srgb,var(--t-text)_78%,transparent)]">{newTitle ? `New: ${newTitle}` : 'Add yourself, your club and group'}</span>
     </a>
   );
 }
@@ -141,6 +190,8 @@ function HomeHeader({ active }: { active: ActivePage }) {
 
   const { setup } = useProfileSetup();
   const showSetup = auth.isAuthenticated && !!setup?.visible;
+  const warnSetup = showSetup && (setup?.newSteps.length ?? 0) > 0;
+  const profileSetup = auth.isAuthenticated ? setup : null;
 
   // Клик мимо дропдауна закрывает его.
   useEffect(() => {
@@ -212,14 +263,14 @@ function HomeHeader({ active }: { active: ActivePage }) {
             >
               <span className="relative flex">
                 <UserAvatar name={userName} avatarUrl={auth.avatarUrl} size={30} />
-                {showSetup && <SetupDot />}
+                {showSetup && <SetupDot warn={warnSetup} />}
               </span>
               <span className="max-w-[140px] truncate text-[13px] font-bold text-[var(--t-text)]">{userName}</span>
               <span className="text-[10px] text-[var(--t-accent)]">▾</span>
             </button>
             {userMenuOpen && (
               <div className="absolute right-0 top-[42px] z-40 w-[220px] rounded-[16px] border border-[var(--t-accent-border)] bg-[var(--t-surface-strong)] p-2 shadow-[var(--t-shadow)] backdrop-blur-[18px]">
-                {showSetup && setup && <SetupProfileItem done={setup.done} total={setup.total} />}
+                <ProfileMenuItem setup={profileSetup} />
                 <a href={routes.myMedia()} className={dropdownItemClass}>
                   My media
                 </a>
@@ -252,7 +303,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
             {showSetup && (
               <span
                 aria-hidden="true"
-                className="absolute right-[0px] top-[9px] h-[9px] w-[9px] rounded-full bg-[var(--t-text)] shadow-[0_0_0_2px_var(--t-surface-strong)]"
+                className={`absolute right-[0px] top-[9px] h-[9px] w-[9px] rounded-full shadow-[0_0_0_2px_var(--t-surface-strong)] ${warnSetup ? 'bg-[var(--t-warn)]' : 'bg-[var(--t-text)]'}`}
               />
             )}
           </>
@@ -306,7 +357,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
                     <UserAvatar name={userName} avatarUrl={auth.avatarUrl} size={28} />
                     <span className="truncate text-[14px] font-extrabold text-[var(--t-text)]">{userName}</span>
                   </div>
-                  {showSetup && setup && <SetupProfileItem done={setup.done} total={setup.total} mobile />}
+                  <ProfileMenuItem setup={profileSetup} mobile />
                   <a
                     href={routes.myMedia()}
                     className="block rounded-[13px] px-4 py-[12px] text-[15px] font-extrabold text-[var(--t-text)] no-underline transition-colors hover:bg-[var(--t-accent-soft)]"
