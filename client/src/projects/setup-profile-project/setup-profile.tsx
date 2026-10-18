@@ -1,7 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '../home-project/home.css';
 import '../components/deep/deep-theme.css';
-import '../components/mix/h2h/h2h.css';
 import { useAuth } from '../../hooks/useAuth';
 import { useFavorites } from '../../hooks/useFavorites';
 import {
@@ -11,15 +10,15 @@ import {
   ROLE_LABELS,
   type ProfileSetupStep,
   type ProfileSetupStepKey,
+  type ProfileSetupTarget,
   type SurveyRole,
 } from '../../hooks/useProfileSetup';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
-import UI_H2HPickerModal from '../components/mix/h2h/h2h-picker-modal';
-import UI_H2HRivalPicker from '../components/mix/h2h/h2h-rival-picker';
-import { useSwimmerSearch } from '../swimmer-project/use-swimmer-page';
+import ProfileEditPopup, { type EditKind, type EditRequest } from './components/profile-edit-popup';
+import * as api from './profile-api';
 import { routes } from '../../utils/routes';
 
 /**
@@ -27,9 +26,8 @@ import { routes } from '../../utils/routes';
  * план `docs/plans/profile-setup-plan.md` §5.
  *
  * Решения Влада 16.10.2026:
- * - шагов ровно три и всегда одни и те же: «это я», клуб, группа;
- * - опрос «Who are you?» ТОЛЬКО сохраняется — на шаги, счётчик и права не влияет;
- *   «Just watching» исключающий (правило — `toggleSurveyRole`);
+ * - три базовых шага у всех: «это я», клуб, группа;
+ * - опрос «Who are you?» прав не даёт; «Just watching» исключающий (правило — `toggleSurveyRole`);
  * - заявка в группу (pending) засчитывает шаг;
  * - Dismiss — ссылкой внизу, пункт меню после него не показывается;
  * - (17.10.2026) от шага можно отказаться: «Not a swimmer», «No club», «No group» — отказ
@@ -37,6 +35,8 @@ import { routes } from '../../utils/routes';
  * - (17.10.2026, хендофф `set-up-profile-ex3`) «I'm a parent» добавляет шаг «My family»: найти
  *   детей поиском и отметить семьёй (золотое сердечко, до `familyLimit.max`). Других шагов по
  *   ролям нет. Сняли роль — шаг пропал, семья осталась.
+ * - (18.10.2026, хендофф `set-up-profile-ex4`) все правки — одним попапом (5d), невыбранные роли
+ *   подсказками «Also» внизу итога (4b); решения Р7–Р10 — в плане, «Правка итога».
  *
  * Тема — deep, как у соседних личных страниц (/my-favorites, /my-media): токены хендоффа
  * `--theme-mode-*` переложены на роли `--t-*` (client/CLAUDE.md «Роли --t-*»).
@@ -59,16 +59,29 @@ function Svg({ size, children, fill }: { size: number; children: React.ReactNode
   );
 }
 
+const SWIM_ICON = (
+  <Svg size={16}>
+    <circle cx="16" cy="5.5" r="2" />
+    <path d="M4 11l5-2.5 3.5 3L15 10M2 17c1.7 0 1.7-1.2 3.3-1.2S7 17 8.7 17s1.7-1.2 3.3-1.2S13.7 17 15.3 17s1.7-1.2 3.4-1.2S20.3 17 22 17" />
+  </Svg>
+);
+// Учитель у доски — `ph-chalkboard-teacher` из хендоффа ex4 (раньше был планшет с листом).
+const COACH_ICON = (
+  <Svg size={16}>
+    <rect x="9" y="3.5" width="12" height="9" rx="1" />
+    <circle cx="6" cy="9.5" r="2.2" />
+    <path d="M2.5 20.5v-1.8a3.5 3.5 0 0 1 7 0v1.8M8.5 14l4.5-2.5" />
+  </Svg>
+);
+const EYE_ICON = (
+  <Svg size={16}>
+    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </Svg>
+);
+
 const ROLE_META: Record<SurveyRole, { label: string; icon: React.ReactNode }> = {
-  swimmer: {
-    label: 'I swim',
-    icon: (
-      <Svg size={16}>
-        <circle cx="16" cy="5.5" r="2" />
-        <path d="M4 11l5-2.5 3.5 3L15 10M2 17c1.7 0 1.7-1.2 3.3-1.2S7 17 8.7 17s1.7-1.2 3.3-1.2S13.7 17 15.3 17s1.7-1.2 3.4-1.2S20.3 17 22 17" />
-      </Svg>
-    ),
-  },
+  swimmer: { label: 'I swim', icon: SWIM_ICON },
   parent: {
     label: "I'm a parent",
     icon: (
@@ -79,24 +92,8 @@ const ROLE_META: Record<SurveyRole, { label: string; icon: React.ReactNode }> = 
       </Svg>
     ),
   },
-  coach: {
-    label: "I'm a coach",
-    icon: (
-      <Svg size={16}>
-        <rect x="5" y="4" width="14" height="17" rx="2" />
-        <path d="M9 4V3h6v1M8.5 10h7M8.5 14h7M8.5 18h4" />
-      </Svg>
-    ),
-  },
-  watcher: {
-    label: 'Just watching',
-    icon: (
-      <Svg size={16}>
-        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-        <circle cx="12" cy="12" r="3" />
-      </Svg>
-    ),
-  },
+  coach: { label: "I'm a coach", icon: COACH_ICON },
+  watcher: { label: 'Just watching', icon: EYE_ICON },
 };
 
 // `skip` — подпись кнопки отказа от шага (решение Влада 17.10.2026): отказ засчитывает шаг.
@@ -111,7 +108,7 @@ const STEP_META: Record<ProfileSetupStepKey, { title: string; hint: string; cta:
   },
   family: {
     title: STEP_TITLES.family,
-    // Число — из лимита сервера (`familyHint` ниже); здесь запасной текст, пока лимит не приехал.
+    // Число — из лимита сервера (`hintFor` ниже); здесь запасной текст, пока лимит не приехал.
     hint: 'Mark your children · Family favorite',
     cta: 'Add children',
     skip: 'Skip',
@@ -146,7 +143,7 @@ const STEP_META: Record<ProfileSetupStepKey, { title: string; hint: string; cta:
 /** Итог (2a): подпись строки и ссылка на выбранное. */
 const RECAP: Record<ProfileSetupStepKey, { label: string; open: string }> = {
   me: { label: 'Me', open: 'My swims →' },
-  family: { label: 'Family', open: 'Edit family →' },
+  family: { label: 'Family', open: '' },
   club: { label: 'Club', open: 'Open club →' },
   group: { label: 'Group', open: 'Open group →' },
 };
@@ -154,105 +151,119 @@ const RECAP: Record<ProfileSetupStepKey, { label: string; open: string }> = {
 /** Порядок строк итога: семья — после клуба, перед группой (хендофф ex3), в чек-листе — второй. */
 const RECAP_ORDER: ProfileSetupStepKey[] = ['me', 'club', 'family', 'group'];
 
+/**
+ * Подсказки «Also» (хендофф ex4, 4b): что даёт роль и куда ведёт кнопка. Порядок — как в
+ * хендоффе. Р7: показываем все четыре; у coach/watcher своих шагов нет — кнопка ставит роль и
+ * ведёт в каталог групп / к результатам.
+ */
+const ALSO: { role: SurveyRole; icon: React.ReactNode; question: string; gives: string; cta: string }[] = [
+  {
+    role: 'parent',
+    icon: <Svg size={16} fill="currentColor"><path d={HEART} /></Svg>,
+    question: 'Are you a parent?',
+    gives: 'Mark your children · Family favorite',
+    cta: 'Add children',
+  },
+  { role: 'coach', icon: COACH_ICON, question: 'Are you a coach?', gives: 'Get access to the groups you coach', cta: 'Request access' },
+  { role: 'swimmer', icon: SWIM_ICON, question: 'Do you swim?', gives: 'Find your swimmer record', cta: 'Find me' },
+  { role: 'watcher', icon: EYE_ICON, question: 'Just watching?', gives: 'Follow swimmers and clubs', cta: 'Browse' },
+];
+const ALSO_VISIBLE = 2;
+
 const CHECK = (
   <Svg size={16}>
     <path d="M5 12.5l4.5 4.5L19 7.5" />
   </Svg>
 );
 
-// ── Окно выбора клуба ────────────────────────────────────────────────────────
+const PENCIL = (
+  <Svg size={14}>
+    <path d="M14.5 5.5l4 4M4 20l1-4.5L15.8 4.7a1.4 1.4 0 0 1 2 0l1.5 1.5a1.4 1.4 0 0 1 0 2L8.5 19 4 20z" />
+  </Svg>
+);
 
-interface ClubOption { id: number; name: string }
+/** Сколько живёт тост и сколько ждёт отложенный уход из группы (Р9). */
+const TOAST_MS = 5000;
 
 /**
- * Клубы приезжают ВСЕ одним списком (`/api/me/hub-groups/clubs`, около полутора сотен) и
- * фильтруются на месте — как страны в `RcCountryPicker`; классы те же, что у пикера пловцов.
+ * Тост после Save/Remove. `undo` — обратная операция; `commit` — отложенное действие (уход из
+ * группы): уходит на сервер, когда тост погас, и не уходит вовсе, если нажали Undo.
  */
-function ClubPicker({ onPick }: { onPick: (id: number) => void }) {
-  const [clubs, setClubs] = useState<ClubOption[] | null>(null);
-  const [error, setError] = useState(false);
-  const [query, setQuery] = useState('');
-
-  React.useEffect(() => {
-    let alive = true;
-    fetch('/api/me/hub-groups/clubs', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((list: ClubOption[]) => { if (alive) setClubs(list.filter((c) => c.name)); })
-      .catch(() => { if (alive) setError(true); });
-    return () => { alive = false; };
-  }, []);
-
-  const q = query.trim().toLowerCase();
-  const hits = clubs?.filter((c) => !q || c.name.toLowerCase().includes(q)) ?? null;
-
-  return (
-    <div className="h2h-picker">
-      <input
-        className="h2h-search"
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search a club..."
-        aria-label="Search a club"
-      />
-      <div className="h2h-hits">
-        {error ? (
-          <div className="h2h-hint">Could not load clubs right now.</div>
-        ) : !hits ? (
-          <div className="h2h-hint">Loading…</div>
-        ) : hits.length === 0 ? (
-          <div className="h2h-hint">No club found.</div>
-        ) : (
-          hits.map((c) => (
-            <button key={c.id} type="button" className="h2h-hit" onClick={() => onPick(c.id)}>
-              <span className="h2h-hit__name" dir="auto">{c.name}</span>
-            </button>
-          ))
-        )}
-      </div>
-    </div>
-  );
+interface Toast {
+  text: string;
+  undo: () => Promise<void>;
+  commit?: () => Promise<void>;
 }
 
 // ── Страница ─────────────────────────────────────────────────────────────────
-
-type Picker = 'me' | 'family' | 'club' | null;
-
-const SAVE_FAILED = 'Could not save — please try again.';
 
 function SetupProfile() {
   const auth = useAuth();
   const { openLoginModal } = useLoginModal();
   const deep = useDeepThemeClass();
   const { setup, refresh, toggleRole, setStepSkipped, dismiss } = useProfileSetup();
-  const fav = useFavorites();
+  // Только лимит семьи: правки идут через profile-api, показ — статусом с сервера.
+  const { familyLimit } = useFavorites();
 
-  const [picker, setPicker] = useState<Picker>(null);
-  const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
-  // Опрос на экране итога спрятан за «Edit roles»: иначе, заполнив всё, роль не поменять
-  // (родителю не добавить шаг «My family»).
-  const [editRoles, setEditRoles] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const found = useSwimmerSearch(picker === 'me' || picker === 'family' ? search : '');
+  const [edit, setEdit] = useState<EditRequest | null>(null);
+  const [showAllAlso, setShowAllAlso] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+  // Группы, уход из которых ждёт конца тоста (Р9) — их строк в итоге уже не видно.
+  const [leaving, setLeaving] = useState<Set<number>>(new Set());
 
-  const favoriteSwimmers = useMemo(
-    () => fav.favorites
-      .filter((f) => f.target_type === 'swimmer' && f.swimmer_id != null)
-      .map((f) => ({ id: f.swimmer_id as number, name: f.swimmer_name || `#${f.swimmer_id}` })),
-    [fav.favorites],
-  );
+  const toastRef = useRef<Toast | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Семья (шаг «My family»): уже отмеченные — плашками сверху окна; в полосе и выдаче — все,
-  // кроме них и «это я» (семья сняла бы звезду «Me»: уровни исключают друг друга).
-  const familyMembers = useMemo(
-    () => fav.favorites.filter((f) => f.target_type === 'swimmer' && f.is_family && f.swimmer_id != null),
-    [fav.favorites],
-  );
-  const familyCandidates = favoriteSwimmers.filter(
-    (f) => f.id !== fav.primarySwimmerId && !fav.familySwimmerIds.has(f.id));
-  const familyHits = found.data?.filter(
-    (h) => h.id !== fav.primarySwimmerId && !fav.familySwimmerIds.has(h.id)) ?? null;
+  /** Тост погас (или его вытеснил следующий): отложенное — на сервер. */
+  const settle = useCallback(async (t: Toast | null) => {
+    if (!t?.commit) return;
+    await t.commit();
+    await refresh();
+  }, [refresh]);
+
+  const showToast = useCallback((t: Toast) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const prev = toastRef.current;
+    toastRef.current = t;
+    setToast(t);
+    void settle(prev);
+    timerRef.current = setTimeout(() => {
+      if (toastRef.current !== t) return;
+      toastRef.current = null;
+      setToast(null);
+      void settle(t);
+    }, TOAST_MS);
+  }, [settle]);
+
+  const undoToast = async () => {
+    const t = toastRef.current;
+    if (!t) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    toastRef.current = null;
+    setToast(null);
+    setBusy(true);
+    try {
+      await t.undo();
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Закрыли вкладку, пока тост висел: отложенный уход всё равно отправляем (keepalive).
+  useEffect(() => {
+    const flush = () => { void toastRef.current?.commit?.(); toastRef.current = null; };
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, []);
+
+  // Шаг семьи, клубы и группы — из статуса; группы под отложенным уходом скрыты.
+  const stepOf = useCallback(
+    (key: ProfileSetupStepKey) => setup?.steps.find((x) => x.key === key) ?? null, [setup]);
+  const takenClubIds = useMemo(() => new Set((stepOf('club')?.targets ?? []).map((t) => t.id)), [stepOf]);
+  const takenGroupIds = useMemo(() => new Set((stepOf('group')?.targets ?? []).map((t) => t.id)), [stepOf]);
 
   const shell = (children: React.ReactNode) => (
     <div className={`${deep} relative min-h-screen overflow-x-clip pb-24 text-[var(--t-text)]`} style={{ background: 'var(--deep-hero-grad)' }}>
@@ -285,98 +296,147 @@ function SetupProfile() {
   }
 
   const s = setup!;
+  const familyTargets = stepOf('family')?.targets ?? [];
+  const meTarget = stepOf('me')?.targets[0] ?? null;
 
-  /** Действие шага: ошибка — строкой под шагами, успех — перечитать статус (меню тоже). */
-  const run = async (action: () => Promise<string | null>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      const err = await action();
-      if (err) setError(err);
-      await refresh();
-    } finally {
-      setBusy(false);
+  // ── Правки из попапа (5d) ──────────────────────────────────────────────────
+  // Каждая возвращает текст ошибки или null; успех — тост с Undo и перечитанный статус.
+
+  const done = async (text: string, undo: () => Promise<void>, commit?: () => Promise<void>) => {
+    await refresh();
+    showToast({ text, undo, commit });
+    return null;
+  };
+
+  const saveEdit = async (req: EditRequest, ids: number[]): Promise<string | null> => {
+    const prev = req.current ?? null;
+    const id = ids[0];
+
+    if (req.kind === 'me') {
+      const fav = await api.ensureFavorite('swimmer', id);
+      if ('error' in fav) return fav.error;
+      const err = await api.setPrimary(fav.id, true);
+      if (err) return err;
+      return done(prev ? 'Me changed' : 'Me added', async () => {
+        if (prev?.favoriteId) await api.setPrimary(prev.favoriteId, true);
+        else await api.setPrimary(fav.id, false);
+        if (fav.created) await api.removeFavorite(fav.id);
+      });
     }
-  };
 
-  const pickMe = (swimmerId: number) => {
-    setPicker(null);
-    setSearch('');
-    void run(async () => {
-      const existing = fav.favorites.find((f) => f.target_type === 'swimmer' && f.swimmer_id === swimmerId);
-      // setMeBySwimmer — переключатель: по уже отмеченному «это я» он бы СНЯЛ звезду.
-      if (existing?.is_primary) return null;
-      if (!existing && fav.isFull('swimmer')) return fav.fullHint('swimmer');
-      await fav.setMeBySwimmer(swimmerId);
-      return null;
-    });
-  };
-
-  const pickClub = (clubId: number) => {
-    setPicker(null);
-    void run(async () => {
-      // toggleFavoriteClub — переключатель: уже избранный клуб он бы убрал.
-      if (fav.favoriteClubIds.has(clubId)) return null;
-      if (fav.isFull('club')) return fav.fullHint('club');
-      await fav.toggleFavoriteClub(clubId);
-      return null;
-    });
-  };
-
-  /**
-   * Отметить ребёнка семьёй: не в избранном — сначала добавить (семья — пометка на избранном),
-   * потом поставить сердечко. Лимит семьи и общий лимит избранного — текстом из ответа.
-   */
-  const markFamily = (swimmerId: number) => {
-    setSearch('');
-    void run(async () => {
-      let target = fav.favorites.find((f) => f.target_type === 'swimmer' && f.swimmer_id === swimmerId);
-      if (target?.is_family) return null;
-      if (fav.familyFull) return fav.familyLimit?.fullHint || SAVE_FAILED;
-      if (!target) {
-        if (fav.isFull('swimmer')) return fav.fullHint('swimmer');
-        const added = await fav.addFavoriteSwimmer(swimmerId);
-        if (!added) return SAVE_FAILED;
-        target = added;
+    if (req.kind === 'family') {
+      const before = familyTargets;
+      const removed = before.filter((t) => !ids.includes(t.id));
+      const addedIds = ids.filter((x) => !before.some((t) => t.id === x));
+      // Сначала снимаем — освобождаем места под лимит семьи.
+      for (const t of removed) {
+        const err = t.favoriteId ? await api.setFamily(t.favoriteId, false) : null;
+        if (err) { await refresh(); return err; }
       }
-      return (await fav.setFamily(target.id, true)) ? null : fav.familyLimit?.fullHint || SAVE_FAILED;
-    });
+      const added: { favId: number; created: boolean }[] = [];
+      for (const swimmerId of addedIds) {
+        const fav = await api.ensureFavorite('swimmer', swimmerId);
+        if ('error' in fav) { await refresh(); return fav.error; }
+        const err = await api.setFamily(fav.id, true);
+        if (err) { await refresh(); return err; }
+        added.push({ favId: fav.id, created: fav.created });
+      }
+      return done('Family updated', async () => {
+        for (const a of added) {
+          await api.setFamily(a.favId, false);
+          if (a.created) await api.removeFavorite(a.favId);
+        }
+        for (const t of removed) if (t.favoriteId) await api.setFamily(t.favoriteId, true);
+      });
+    }
+
+    if (req.kind === 'club') {
+      // Р8: смена клуба группу не трогает. Снимаем прежний первым — общий лимит клубов.
+      if (prev?.favoriteId) {
+        const err = await api.removeFavorite(prev.favoriteId);
+        if (err) return err;
+      }
+      const fav = await api.ensureFavorite('club', id);
+      if ('error' in fav) {
+        if (prev) await api.ensureFavorite('club', prev.id);
+        await refresh();
+        return fav.error;
+      }
+      return done(prev ? 'Club changed' : 'Club added', async () => {
+        if (fav.created) await api.removeFavorite(fav.id);
+        if (prev) await api.ensureFavorite('club', prev.id);
+      });
+    }
+
+    // Группа: вступаем сразу, уход из прежней — отложен под Undo (Р9).
+    const err = await api.joinGroup(id);
+    if (err) return err;
+    if (prev) setLeaving((l) => new Set(l).add(prev.id));
+    return done(prev ? 'Group changed' : 'Group added', async () => {
+      if (prev) setLeaving((l) => { const n = new Set(l); n.delete(prev.id); return n; });
+      await api.leaveGroup(id);
+    }, prev ? async () => {
+      await api.leaveGroup(prev.id, true);
+      setLeaving((l) => { const n = new Set(l); n.delete(prev.id); return n; });
+    } : undefined);
   };
 
-  /** Снять сердечко семьи: пловец остаётся в обычном избранном. */
-  const unmarkFamily = (favoriteId: number) => {
-    void run(async () => ((await fav.setFamily(favoriteId, false)) ? null : SAVE_FAILED));
+  const removeEdit = async (req: EditRequest): Promise<string | null> => {
+    const prev = req.current ?? null;
+
+    if (req.kind === 'me' && prev?.favoriteId) {
+      // Снимается только звезда «это я»; пловец остаётся в избранном, результаты не трогаются.
+      const err = await api.setPrimary(prev.favoriteId, false);
+      if (err) return err;
+      return done('Me removed', async () => { await api.setPrimary(prev.favoriteId!, true); });
+    }
+
+    if (req.kind === 'family') {
+      const before = familyTargets;
+      for (const t of before) {
+        const err = t.favoriteId ? await api.setFamily(t.favoriteId, false) : null;
+        if (err) { await refresh(); return err; }
+      }
+      return done('Family removed', async () => {
+        for (const t of before) if (t.favoriteId) await api.setFamily(t.favoriteId, true);
+      });
+    }
+
+    if (req.kind === 'club' && prev?.favoriteId) {
+      const err = await api.removeFavorite(prev.favoriteId);
+      if (err) return err;
+      return done('Club removed', async () => { await api.ensureFavorite('club', prev.id); });
+    }
+
+    if (req.kind === 'group' && prev) {
+      setLeaving((l) => new Set(l).add(prev.id));
+      return done('Left the group', async () => {
+        setLeaving((l) => { const n = new Set(l); n.delete(prev.id); return n; });
+      }, async () => {
+        await api.leaveGroup(prev.id, true);
+        setLeaving((l) => { const n = new Set(l); n.delete(prev.id); return n; });
+      });
+    }
+    return null;
   };
 
-  const closeFamily = () => {
-    setPicker(null);
-    setSearch('');
-    setError(null);
-  };
+  const openEdit = (kind: EditKind, current?: ProfileSetupTarget | null) =>
+    setEdit({ kind, mode: kind === 'family' ? (familyTargets.length > 0 ? 'change' : 'add') : current ? 'change' : 'add', current });
 
   /** Подсказка шага: у семьи — число из лимита сервера; клуб тренера — «Club you coach at» (ex3). */
   const hintFor = (step: ProfileSetupStep): string => {
-    if (step.key === 'family' && fav.familyLimit) {
-      return `Mark your children · Family favorite, up to ${fav.familyLimit.max}`;
+    if (step.key === 'family' && familyLimit) {
+      return `Mark your children · Family favorite, up to ${familyLimit.max}`;
     }
     if (step.key === 'club' && s.survey.coach && !s.survey.swimmer && !s.survey.parent) return 'Club you coach at';
     return STEP_META[step.key].hint;
   };
 
-  const stepAction = (step: ProfileSetupStep) => {
-    if (step.key === 'me') setPicker('me');
-    else if (step.key === 'family') setPicker('family');
-    else if (step.key === 'club') setPicker('club');
-    // Публичный список групп не несёт id, а вступают на странице группы — туда и ведём.
-    else window.location.href = routes.groupsList();
-  };
-
-  const targetHref = (step: ProfileSetupStep): string | null => {
-    // Семья — несколько пловцов: ссылки нет, её строка открывает окно семьи.
-    if (step.targetId == null || step.key === 'family') return null;
-    if (step.key === 'me') return routes.swimmer(step.targetId);
-    if (step.key === 'club') return routes.club(step.targetId);
-    return step.targetSlug ? routes.group(step.targetSlug) : null;
+  const targetHref = (key: ProfileSetupStepKey, t: ProfileSetupTarget): string | null => {
+    if (key === 'me') return routes.swimmer(t.id);
+    if (key === 'club') return routes.club(t.id);
+    if (key === 'group') return t.slug ? routes.group(t.slug) : null;
+    return null; // семья — несколько пловцов: строка открывает окно семьи
   };
 
   /** Отказ от шага или его отмена; статус (и счётчик в меню) перечитывает хук. */
@@ -388,9 +448,16 @@ function SetupProfile() {
       .finally(() => setBusy(false));
   };
 
+  const pendingChip = (
+    <span className="hp-mono shrink-0 rounded-[6px] border border-[var(--t-border)] px-1.5 py-px text-[10px] font-extrabold text-[var(--t-text-2)]">
+      PENDING
+    </span>
+  );
+
   const stepRow = (step: ProfileSetupStep) => {
     const meta = STEP_META[step.key];
-    const href = targetHref(step);
+    const first = step.targets.find((t) => !(step.key === 'group' && leaving.has(t.id))) ?? null;
+    const href = first ? targetHref(step.key, first) : null;
     return (
       <li key={step.key} className="flex items-center gap-[14px] border-t border-[var(--t-border)] py-3">
         <span
@@ -416,24 +483,17 @@ function SetupProfile() {
                 <a href={href} dir="auto" className="truncate text-[var(--t-text-2)] no-underline hover:text-[var(--t-accent)]">
                   {step.targetName}
                 </a>
-              ) : step.key === 'family' ? (
+              ) : (
                 <button
                   type="button"
                   dir="auto"
-                  onClick={() => setPicker('family')}
-                  title="Edit family"
+                  onClick={() => openEdit(step.key, first)}
                   className="truncate text-left text-[var(--t-text-2)] hover:text-[var(--t-accent)]"
                 >
                   {step.targetName}
                 </button>
-              ) : (
-                <span dir="auto" className="truncate">{step.targetName}</span>
               )}
-              {step.status === 'pending' && (
-                <span className="hp-mono shrink-0 rounded-[6px] border border-[var(--t-border)] px-1.5 py-px text-[10px] font-extrabold text-[var(--t-text-2)]">
-                  PENDING
-                </span>
-              )}
+              {step.status === 'pending' && pendingChip}
             </div>
           ) : step.skipped ? (
             // Отказ: шаг засчитан, вернуть можно в один клик.
@@ -476,7 +536,7 @@ function SetupProfile() {
           <button
             type="button"
             disabled={busy}
-            onClick={() => stepAction(step)}
+            onClick={() => openEdit(step.key)}
             className="h-[34px] shrink-0 whitespace-nowrap rounded-[8px] bg-[var(--t-accent)] px-[14px] text-[13px] font-bold text-[var(--t-accent-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {meta.cta}
@@ -486,138 +546,96 @@ function SetupProfile() {
     );
   };
 
-  // Окна выбора — общие для чек-листа и итога (у пропущенного шага в итоге та же кнопка).
-  const pickers = (
+  // Попап и тост — общие для чек-листа и итога.
+  const overlays = (
     <>
-      <UI_H2HPickerModal open={picker === 'me'} title="Find your swimmer record" onClose={() => { setPicker(null); setSearch(''); }}>
-        <UI_H2HRivalPicker
-          favorites={favoriteSwimmers}
-          query={search}
-          onQuery={setSearch}
-          hits={found.data ?? null}
-          loading={found.loading}
-          error={!!found.error}
-          onPick={pickMe}
-          placeholder="Search your name..."
-          emptyText="Nobody found — no results under this name yet."
-        />
-      </UI_H2HPickerModal>
-
-      <UI_H2HPickerModal open={picker === 'club'} title="Choose your club" onClose={() => setPicker(null)}>
-        <ClubPicker onPick={pickClub} />
-      </UI_H2HPickerModal>
-
-      {/* Семья: отмечать можно нескольких подряд, окно закрывает «Done». */}
-      <UI_H2HPickerModal open={picker === 'family'} title="Mark your children" onClose={closeFamily}>
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-[12px] font-bold text-[var(--t-text-2)]">
-            Family{fav.familyLimit ? ` ${familyMembers.length}/${fav.familyLimit.max}` : ''}
-          </span>
-          {familyMembers.length === 0 && (
-            <span className="text-[12px] text-[var(--t-text-3)]">Nobody yet — search below.</span>
-          )}
-          {familyMembers.map((f) => {
-            const name = f.swimmer_name || `#${f.swimmer_id}`;
-            return (
-              <span
-                key={f.id}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--t-border)] py-0.5 pl-2.5 pr-1 text-[12px] font-bold"
-              >
-                <span aria-hidden="true" style={{ color: 'var(--t-level-family)' }}>♥</span>
-                <span dir="auto">{name}</span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => unmarkFamily(f.id)}
-                  aria-label={`Remove ${name} from family`}
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--t-text-2)] hover:bg-[var(--t-accent-soft)] hover:text-[var(--t-text)] disabled:opacity-50"
-                >
-                  ×
-                </button>
-              </span>
-            );
-          })}
-        </div>
-        <UI_H2HRivalPicker
-          favorites={familyCandidates}
-          query={search}
-          onQuery={setSearch}
-          hits={familyHits}
-          loading={found.loading}
-          error={!!found.error}
-          onPick={markFamily}
-          placeholder="Search your child's name..."
-          emptyText="Nobody else found under this name."
-        />
-        {error && <p className="m-0 mt-3 text-[13px] text-[var(--t-danger)]">{error}</p>}
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={closeFamily}
-            className="h-9 rounded-[8px] bg-[var(--t-accent)] px-[18px] text-[13px] font-bold text-[var(--t-accent-ink)] hover:opacity-90"
-          >
-            Done
+      <ProfileEditPopup
+        request={edit}
+        takenClubIds={takenClubIds}
+        takenGroupIds={takenGroupIds}
+        family={familyTargets}
+        meSwimmerId={meTarget?.id ?? null}
+        familyMax={familyLimit?.max ?? null}
+        icon={edit ? STEP_META[edit.kind].icon : null}
+        onClose={() => setEdit(null)}
+        onSave={(ids) => saveEdit(edit!, ids)}
+        onRemove={() => removeEdit(edit!)}
+      />
+      {toast && (
+        <div
+          role="status"
+          className={`${deep} fixed bottom-6 left-1/2 z-[110] flex -translate-x-1/2 items-center gap-3 rounded-[10px] border border-[var(--t-border)] bg-[var(--t-card)] px-4 py-2.5 text-[13px] text-[var(--t-text)] shadow-[var(--t-shadow)]`}
+        >
+          <span>{toast.text}</span>
+          <button type="button" disabled={busy} onClick={() => { void undoToast(); }} className="font-bold text-[var(--t-accent)] hover:underline disabled:opacity-50">
+            Undo
           </button>
         </div>
-      </UI_H2HPickerModal>
+      )}
     </>
   );
 
   /**
-   * Строка итога (2a): иконка, подпись, что выбрано и ссылка на это. Пропущенный шаг — «Not added»
-   * и та же кнопка, что в чек-листе: сделанное делом потом сильнее отказа (ProfileSetupRules).
+   * Строка итога (2a, 5d): вся строка открывает попап (карандаш справа), ссылка-переход —
+   * отдельная цель. Пустая или пропущенная строка — «Not added» и попап в режиме Add.
    */
-  const recapRow = (step: ProfileSetupStep) => {
-    const meta = STEP_META[step.key];
-    const recap = RECAP[step.key];
-    const href = targetHref(step);
+  const recapRow = (key: ProfileSetupStepKey, step: ProfileSetupStep, t: ProfileSetupTarget | null, rowKey: string) => {
+    const meta = STEP_META[key];
+    const empty = t == null || step.skipped;
+    const href = !empty && t ? targetHref(key, t) : null;
+    const value = key === 'family'
+      ? familyTargets.map((f) => f.name).join(', ')
+      : t?.name ?? '';
+    const open = () => openEdit(key, empty ? null : t);
     return (
-      <li key={step.key} className="flex items-center gap-3 border-t border-[var(--t-border)] py-2.5">
-        <span className={`flex w-5 shrink-0 justify-center ${step.skipped ? 'text-[var(--t-text-3)]' : 'text-[var(--t-accent)]'}`}>
-          {meta.icon}
-        </span>
-        <span className="w-12 shrink-0 text-[13px] text-[var(--t-text-2)] sm:w-[90px]">{recap.label}</span>
-        {step.skipped || !step.targetName ? (
-          <span className="min-w-0 flex-1 text-[14px] text-[var(--t-text-3)]">Not added</span>
-        ) : (
-          <span className="flex min-w-0 flex-1 items-center gap-1.5">
-            <span dir="auto" className="truncate text-[14px] font-bold">{step.targetName}</span>
-            {step.status === 'pending' && (
-              <span className="hp-mono shrink-0 rounded-[6px] border border-[var(--t-border)] px-1.5 py-px text-[10px] font-extrabold text-[var(--t-text-2)]">
-                PENDING
-              </span>
-            )}
+      <li key={rowKey} className="border-t border-[var(--t-border)]">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={open}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
+          className="group -mx-2 flex cursor-pointer items-center gap-3 rounded-[8px] px-2 py-2.5 transition-colors hover:bg-[var(--t-accent-soft)]"
+        >
+          <span className={`flex w-5 shrink-0 justify-center ${empty ? 'text-[var(--t-text-3)]' : 'text-[var(--t-accent)]'}`}>
+            {meta.icon}
           </span>
-        )}
-        {step.skipped ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => stepAction(step)}
-            className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-[var(--t-accent)] hover:underline disabled:opacity-50"
-          >
-            {meta.cta}
-          </button>
-        ) : href ? (
-          <a href={href} className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-[var(--t-accent)] no-underline hover:underline">
-            {recap.open}
-          </a>
-        ) : step.key === 'family' ? (
-          <button
-            type="button"
-            onClick={() => setPicker('family')}
-            className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-[var(--t-accent)] hover:underline"
-          >
-            {recap.open}
-          </button>
-        ) : null}
+          <span className="w-12 shrink-0 text-[13px] text-[var(--t-text-2)] sm:w-[90px]">{RECAP[key].label}</span>
+          {empty ? (
+            <span className="min-w-0 flex-1 text-[14px] text-[var(--t-text-3)]">Not added</span>
+          ) : (
+            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+              <span dir="auto" className="truncate text-[14px] font-bold">{value}</span>
+              {t?.status === 'pending' && pendingChip}
+            </span>
+          )}
+          {empty ? (
+            <span className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-[var(--t-accent)]">{meta.cta}</span>
+          ) : href ? (
+            <a
+              href={href}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-[var(--t-accent)] no-underline hover:underline"
+            >
+              {RECAP[key].open}
+            </a>
+          ) : null}
+          <span className="shrink-0 text-[var(--t-text-3)]">{PENCIL}</span>
+        </div>
       </li>
     );
   };
 
-  // Опрос «Who are you?» — общий для чек-листа и итога. Прав не даёт (Р1); «I'm a parent»
-  // добавляет шаг «My family» (ex3): на итоге это возвращает страницу в чек-лист сама —
-  // шагов стало больше, чем сделано.
+  const recapRows = RECAP_ORDER.flatMap((key) => {
+    const step = stepOf(key);
+    if (!step) return [];
+    if (key === 'family') return [recapRow(key, step, familyTargets[0] ?? null, key)];
+    const targets = key === 'group' ? step.targets.filter((t) => !leaving.has(t.id)) : step.targets;
+    // Р10: строка на каждый клуб и группу; пусто — одна строка «Not added».
+    if (targets.length === 0 || step.skipped) return [recapRow(key, step, null, key)];
+    return targets.map((t) => recapRow(key, step, t, `${key}-${t.id}`));
+  });
+
+  // Опрос «Who are you?» — в чек-листе. Прав не даёт (Р1); «I'm a parent» добавляет шаг «My family».
   const surveyBlock = (
     <>
       <div className="mb-2.5 flex items-baseline gap-2">
@@ -648,11 +666,33 @@ function SetupProfile() {
     </>
   );
 
-  // ── Готово (хендофф set-up-profile-ex1, вариант 2a): все три шага сделаны или пропущены ──
+  // ── Готово (хендофф ex1, 2a + ex4, 4b/5d): все шаги сделаны или пропущены ──
   if (s.done === s.total) {
-    const me = s.steps.find((x) => x.key === 'me');
-    const myHref = me && !me.skipped && me.targetId != null ? routes.swimmer(me.targetId) : null;
+    const me = stepOf('me');
+    const myHref = me && !me.skipped && meTarget ? routes.swimmer(meTarget.id) : null;
     const pickedRoles = SURVEY_ROLES.filter((r) => s.survey[r]);
+    const anyRole = pickedRoles.length > 0;
+
+    // 4b: невыбранные роли. «Just watching» исключает остальные (Р1а) — предлагаем его, только
+    // пока не выбрано ничего: иначе кнопка молча сняла бы уже выбранные роли и их шаги.
+    const also = ALSO.filter((a) => !s.survey[a.role] && (a.role !== 'watcher' || !anyRole));
+    const alsoShown = showAllAlso ? also : also.slice(0, ALSO_VISIBLE);
+    const alsoHidden = also.length - alsoShown.length;
+
+    /** Кнопка подсказки: ставит роль и сразу ведёт к делу (не к выбору роли). */
+    const alsoAction = async (role: SurveyRole) => {
+      setBusy(true);
+      try {
+        if (!(await toggleRole(role))) { setError('Could not save — please try again.'); return; }
+        if (role === 'parent') openEdit('family');
+        else if (role === 'swimmer') openEdit('me', meTarget);
+        else if (role === 'coach') window.location.href = routes.groupsList();
+        else window.location.href = routes.results();
+      } finally {
+        setBusy(false);
+      }
+    };
+
     return shell(
       <main className="mx-auto w-full max-w-[640px] px-4 pt-24">
         <section className="rounded-[12px] border border-[var(--t-border)] bg-[var(--t-card)] p-6 shadow-[var(--t-shadow)]">
@@ -664,32 +704,57 @@ function SetupProfile() {
             </span>
             <div className="min-w-0 flex-1">
               <h1 className="m-0 text-[20px] font-extrabold">You&apos;re all set</h1>
-              <p className="m-0 mt-0.5 text-[13px] text-[var(--t-text-2)]">SwimHub now shows your results, club and group first.</p>
+              <p className="m-0 mt-0.5 text-[13px] text-[var(--t-text-2)]">Click any row to change it.</p>
             </div>
-            {/* Ответ опроса плашками + «Edit roles»: роль меняется и после завершения
-                (родитель добавляет шаг «My family»). */}
-            <span className="flex basis-full flex-wrap items-center gap-1.5 sm:basis-auto">
-              {!editRoles && pickedRoles.map((r) => (
-                <span key={r} className="whitespace-nowrap rounded-[12px] bg-[var(--t-accent-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--t-accent)]">
-                  {ROLE_LABELS[r]}
-                </span>
-              ))}
-              <button
-                type="button"
-                aria-expanded={editRoles}
-                onClick={() => setEditRoles((v) => !v)}
-                className="whitespace-nowrap text-[12px] font-bold text-[var(--t-accent)] hover:underline"
-              >
-                {editRoles ? 'Done' : pickedRoles.length > 0 ? 'Edit roles' : 'Add your role'}
-              </button>
-            </span>
+            {anyRole && (
+              <span className="flex basis-full flex-wrap gap-1.5 sm:basis-auto">
+                {pickedRoles.map((r) => (
+                  <span key={r} className="whitespace-nowrap rounded-[12px] bg-[var(--t-accent-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--t-accent)]">
+                    {ROLE_LABELS[r]}
+                  </span>
+                ))}
+              </span>
+            )}
           </div>
 
-          {editRoles && surveyBlock}
+          <ul className="m-0 list-none p-0">{recapRows}</ul>
 
-          <ul className="m-0 list-none p-0">
-            {RECAP_ORDER.flatMap((k) => s.steps.filter((x) => x.key === k)).map(recapRow)}
-          </ul>
+          {/* 5d: ещё клуб или группа — тот же попап в режиме Add. */}
+          <div className="mt-2 text-[13px] text-[var(--t-text-2)]">
+            + Add another{' '}
+            <button type="button" onClick={() => openEdit('club')} className="font-semibold text-[var(--t-accent)] hover:underline">club</button>
+            {' or '}
+            <button type="button" onClick={() => openEdit('group')} className="font-semibold text-[var(--t-accent)] hover:underline">group</button>
+          </div>
+
+          {/* 4b «Also»: невыбранные роли — вопрос, что даёт, кнопка сразу к делу. */}
+          {also.length > 0 && (
+            <div className="mt-4 flex flex-col gap-2 border-t border-[var(--t-border)] pt-3.5">
+              <div className="text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--t-text-3)]">Also</div>
+              {alsoShown.map((a) => (
+                <div key={a.role} className="flex items-center gap-3 rounded-[8px] border border-dashed border-[var(--t-border)] px-3 py-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--t-accent-soft)] text-[var(--t-accent)]">{a.icon}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-bold">{a.question}</span>
+                    <span className="block text-[12px] text-[var(--t-text-2)]">{a.gives}</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => { void alsoAction(a.role); }}
+                    className="h-8 shrink-0 whitespace-nowrap rounded-[8px] border border-[var(--t-accent)] px-3 text-[13px] font-semibold text-[var(--t-accent)] hover:bg-[var(--t-accent-soft)] disabled:opacity-50"
+                  >
+                    {a.cta}
+                  </button>
+                </div>
+              ))}
+              {alsoHidden > 0 && (
+                <button type="button" onClick={() => setShowAllAlso(true)} className="self-start text-[12px] font-semibold text-[var(--t-accent)] hover:underline">
+                  {alsoHidden} more role{alsoHidden > 1 ? 's' : ''}
+                </button>
+              )}
+            </div>
+          )}
 
           {error && <p className="m-0 mt-3 text-[13px] text-[var(--t-danger)]">{error}</p>}
 
@@ -706,7 +771,7 @@ function SetupProfile() {
             </a>
           </div>
         </section>
-        {pickers}
+        {overlays}
       </main>,
     );
   }
@@ -743,7 +808,7 @@ function SetupProfile() {
         )}
       </div>
 
-      {pickers}
+      {overlays}
     </main>,
   );
 }

@@ -168,6 +168,17 @@ public class ProfileSetupPgTests
             Assert.Equal(group.Id, g.TargetId);
             Assert.Equal(group.Slug, g.TargetSlug);
             Assert.Equal(HubGroupUserMemberStatus.Pending, g.Status);
+
+            // ex4 (Р10): у каждого шага полный список целей — итог рисует строку на каждую.
+            var meTarget = Assert.Single(me.Targets);
+            Assert.Equal(swimmerId, meTarget.Id);
+            Assert.NotNull(meTarget.FavoriteId);
+            var clubTarget = Assert.Single(s.Steps.Single(x => x.Key == ProfileSetupRules.StepClub).Targets);
+            Assert.Equal(clubId, clubTarget.Id);
+            Assert.NotNull(clubTarget.FavoriteId);
+            var groupTarget = Assert.Single(g.Targets);
+            Assert.Equal(group.Id, groupTarget.Id);
+            Assert.Equal(HubGroupUserMemberStatus.Pending, groupTarget.Status);
         }
         finally
         {

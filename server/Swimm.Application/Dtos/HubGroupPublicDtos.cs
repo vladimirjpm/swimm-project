@@ -13,6 +13,14 @@ public sealed record HubGroupAccessDto(int Id, bool IsPrivate, bool CanView, boo
 /// <summary>Карточка группы в публичном списке /api/hub-groups.</summary>
 public sealed class HubGroupListItemDto
 {
+    /// <summary>Id — для вступления из окна выбора группы на /setup-profile (POST …/{id}/join, ex4).</summary>
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+
+    /// <summary>open | approval — окно выбора предупреждает, что заявку подтвердит тренер.</summary>
+    [JsonPropertyName("join_policy")]
+    public string JoinPolicy { get; set; } = "open";
+
     [JsonPropertyName("slug")]
     public string Slug { get; set; } = "";
 

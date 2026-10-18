@@ -140,7 +140,14 @@ public class HubGroupAdminService : IHubGroupAdminService
         return await _db.Clubs.AsNoTracking()
             .Where(c => c.MergedIntoId == null)   // склеенные в выпадашку не предлагаем
             .OrderBy(c => c.Name)
-            .Select(c => new ClubOptionDto { Id = c.Id, Name = c.Name })
+            .Select(c => new ClubOptionDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                // Пловцы групп (Р71) — только своим, в публичном числе их нет.
+                SwimmerCount = _db.Swimmers.Count(s => s.ClubId == c.Id && s.PrivateHubGroupId == null),
+                IsPseudo = c.IsPseudo,
+            })
             .ToListAsync();
     }
 
