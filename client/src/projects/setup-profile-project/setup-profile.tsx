@@ -230,6 +230,9 @@ function SetupProfile() {
   const [picker, setPicker] = useState<Picker>(null);
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
+  // Опрос на экране итога спрятан за «Edit roles»: иначе, заполнив всё, роль не поменять
+  // (родителю не добавить шаг «My family»).
+  const [editRoles, setEditRoles] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const found = useSwimmerSearch(picker === 'me' || picker === 'family' ? search : '');
 
@@ -612,6 +615,39 @@ function SetupProfile() {
     );
   };
 
+  // Опрос «Who are you?» — общий для чек-листа и итога. Прав не даёт (Р1); «I'm a parent»
+  // добавляет шаг «My family» (ex3): на итоге это возвращает страницу в чек-лист сама —
+  // шагов стало больше, чем сделано.
+  const surveyBlock = (
+    <>
+      <div className="mb-2.5 flex items-baseline gap-2">
+        <span className="shrink-0 whitespace-nowrap text-[14px] font-bold">Who are you?</span>
+        <span className="text-[12px] text-[var(--t-text-3)]">Pick all that apply</span>
+      </div>
+      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Who are you?">
+        {SURVEY_ROLES.map((role) => {
+          const on = s.survey[role];
+          return (
+            <button
+              key={role}
+              type="button"
+              aria-pressed={on}
+              onClick={() => { void toggleRole(role); }}
+              className={`flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[18px] border px-[14px] text-[13px] font-semibold transition-colors ${
+                on
+                  ? 'border-[var(--t-accent)] bg-[var(--t-accent-soft)] text-[var(--t-accent)]'
+                  : 'border-[var(--t-border)] bg-transparent text-[var(--t-text)] hover:border-[var(--t-accent-border)]'
+              }`}
+            >
+              {ROLE_META[role].icon}
+              {ROLE_META[role].label}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+
   // ── Готово (хендофф set-up-profile-ex1, вариант 2a): все три шага сделаны или пропущены ──
   if (s.done === s.total) {
     const me = s.steps.find((x) => x.key === 'me');
@@ -630,17 +666,26 @@ function SetupProfile() {
               <h1 className="m-0 text-[20px] font-extrabold">You&apos;re all set</h1>
               <p className="m-0 mt-0.5 text-[13px] text-[var(--t-text-2)]">SwimHub now shows your results, club and group first.</p>
             </div>
-            {/* Ответ опроса — только плашками, ни на что не влияет (Р1). */}
-            {pickedRoles.length > 0 && (
-              <span className="flex basis-full flex-wrap gap-1.5 sm:basis-auto">
-                {pickedRoles.map((r) => (
-                  <span key={r} className="whitespace-nowrap rounded-[12px] bg-[var(--t-accent-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--t-accent)]">
-                    {ROLE_LABELS[r]}
-                  </span>
-                ))}
-              </span>
-            )}
+            {/* Ответ опроса плашками + «Edit roles»: роль меняется и после завершения
+                (родитель добавляет шаг «My family»). */}
+            <span className="flex basis-full flex-wrap items-center gap-1.5 sm:basis-auto">
+              {!editRoles && pickedRoles.map((r) => (
+                <span key={r} className="whitespace-nowrap rounded-[12px] bg-[var(--t-accent-soft)] px-2.5 py-1 text-[12px] font-semibold text-[var(--t-accent)]">
+                  {ROLE_LABELS[r]}
+                </span>
+              ))}
+              <button
+                type="button"
+                aria-expanded={editRoles}
+                onClick={() => setEditRoles((v) => !v)}
+                className="whitespace-nowrap text-[12px] font-bold text-[var(--t-accent)] hover:underline"
+              >
+                {editRoles ? 'Done' : pickedRoles.length > 0 ? 'Edit roles' : 'Add your role'}
+              </button>
+            </span>
           </div>
+
+          {editRoles && surveyBlock}
 
           <ul className="m-0 list-none p-0">
             {RECAP_ORDER.flatMap((k) => s.steps.filter((x) => x.key === k)).map(recapRow)}
@@ -677,32 +722,7 @@ function SetupProfile() {
         </div>
         <p className="m-0 mb-5 text-[13px] text-[var(--t-text-2)]">Add yourself, your club and group</p>
 
-        {/* Опрос: прав не даёт (Р1); «I'm a parent» добавляет шаг «My family» (ex3). */}
-        <div className="mb-2.5 flex items-baseline gap-2">
-          <span className="shrink-0 whitespace-nowrap text-[14px] font-bold">Who are you?</span>
-          <span className="text-[12px] text-[var(--t-text-3)]">Pick all that apply</span>
-        </div>
-        <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Who are you?">
-          {SURVEY_ROLES.map((role) => {
-            const on = s.survey[role];
-            return (
-              <button
-                key={role}
-                type="button"
-                aria-pressed={on}
-                onClick={() => { void toggleRole(role); }}
-                className={`flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[18px] border px-[14px] text-[13px] font-semibold transition-colors ${
-                  on
-                    ? 'border-[var(--t-accent)] bg-[var(--t-accent-soft)] text-[var(--t-accent)]'
-                    : 'border-[var(--t-border)] bg-transparent text-[var(--t-text)] hover:border-[var(--t-accent-border)]'
-                }`}
-              >
-                {ROLE_META[role].icon}
-                {ROLE_META[role].label}
-              </button>
-            );
-          })}
-        </div>
+        {surveyBlock}
 
         <ul className="m-0 list-none p-0">{s.steps.map(stepRow)}</ul>
 
