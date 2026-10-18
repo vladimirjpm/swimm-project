@@ -278,6 +278,10 @@ ProfileSetupStatus Evaluate(ProfileSetupFacts facts, bool dismissed)
 - Итог 2a: строка Family (золотое сердечко, имена через запятую, «Edit family →» открывает то же окно)
   стоит **после Club, перед Group** — в чек-листе семья вторая, в итоге третья (`RECAP_ORDER`).
 - Подсказка клуба у тренера без других ролей — «Club you coach at» (текст из ex3, шагов не меняет).
+- **Роль меняется и на итоге** (18.10.2026, нашёл Влад: заполнил профиль раньше и не мог отметить
+  себя родителем — чипы опроса жили только в чек-листе). Справа от плашек ролей — «Edit roles»
+  («Add your role», если ответа нет), раскрывает те же чипы (`surveyBlock`). Выбрал «I'm a parent» —
+  шагов стало 4, сделано 3, и страница сама уходит в чек-лист с «My family».
 - `/privacy` (en/ru/he): ответ прав не даёт, меняет только шаги настройки.
 - Тесты: `ProfileSetupRulesTests` (шаг у родителя, нет без роли, сделан семьёй или отказом, старый
   снимок → New), `ProfileSetupPgTests.Parent_FamilyStep_FromFavorites_SkipColumn_AndRoleOff`.
