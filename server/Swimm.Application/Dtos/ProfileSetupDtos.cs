@@ -70,6 +70,31 @@ public sealed class ProfileSetupStepDto
 
     /// <summary>Только у группы: active | pending.</summary>
     public string? Status { get; set; }
+
+    /// <summary>
+    /// ВСЕ цели шага: каждый избранный клуб, каждая группа (active и pending), каждый пловец семьи,
+    /// пловец «это я». Итог рисует строку на каждую (хендофф ex4, решение Р10); поля выше — первая
+    /// цель, их читает меню и чек-лист.
+    /// </summary>
+    public IReadOnlyList<ProfileSetupTargetDto> Targets { get; set; } = [];
+}
+
+/// <summary>Одна цель шага: пловец, клуб или группа.</summary>
+public sealed class ProfileSetupTargetDto
+{
+    /// <summary>Id пловца / клуба / группы.</summary>
+    public int Id { get; set; }
+
+    /// <summary>Id записи избранного (у пловца и клуба) — для правок из окна на /setup-profile.</summary>
+    public int? FavoriteId { get; set; }
+
+    public string Name { get; set; } = "";
+
+    /// <summary>Только у группы.</summary>
+    public string? Slug { get; set; }
+
+    /// <summary>Только у группы: active | pending.</summary>
+    public string? Status { get; set; }
 }
 
 /// <summary>Тело <c>PUT /api/me/profile-setup/roles</c> — все четыре ответа разом (замена целиком).</summary>

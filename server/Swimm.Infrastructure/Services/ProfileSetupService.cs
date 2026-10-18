@@ -39,11 +39,17 @@ public sealed class ProfileSetupService(
         var club = favs.FirstOrDefault(f => f.TargetType == FavoritesRules.TargetClub && f.ClubId != null);
         // Семья — до FavoritesRules.MaxFamily пловцов; в шаге и итоге — имена через запятую.
         var family = favs.Where(f => f.IsFamily && f.SwimmerId != null).ToList();
+        var clubs = favs.Where(f => f.TargetType == FavoritesRules.TargetClub && f.ClubId != null).ToList();
 
         // Заявка (pending) засчитывает шаг (Р3), но показать лучше группу, где уже приняли.
-        var joined = await groups.GetJoinedAsync(userId);
-        var group = joined.FirstOrDefault(g => g.Status == HubGroupUserMemberStatus.Active)
-                    ?? joined.FirstOrDefault();
+        var joined = (await groups.GetJoinedAsync(userId))
+            .OrderBy(g => g.Status == HubGroupUserMemberStatus.Active ? 0 : 1)
+            .ToList();
+        var group = joined.FirstOrDefault();
+
+        // Итог рисует строку на КАЖДЫЙ клуб и группу (ex4, Р10) — отдаём все цели шага.
+        static ProfileSetupTargetDto Swimmer(FavoriteDto f) =>
+            new() { Id = f.SwimmerId!.Value, FavoriteId = f.Id, Name = f.SwimmerName ?? $"#{f.SwimmerId}" };
 
         var dismissed = user.ProfileSetupDismissedAt != null;
         var status = ProfileSetupRules.Evaluate(
@@ -76,21 +82,31 @@ public sealed class ProfileSetupService(
                 ProfileSetupRules.StepMe => new ProfileSetupStepDto
                 {
                     Key = s.Key, Done = s.Done, Skipped = s.Skipped, TargetId = me?.SwimmerId, TargetName = me?.SwimmerName,
+                    Targets = me == null ? [] : [Swimmer(me)],
                 },
                 ProfileSetupRules.StepClub => new ProfileSetupStepDto
                 {
                     Key = s.Key, Done = s.Done, Skipped = s.Skipped, TargetId = club?.ClubId, TargetName = club?.ClubName,
+                    Targets = clubs.Select(c => new ProfileSetupTargetDto
+                    {
+                        Id = c.ClubId!.Value, FavoriteId = c.Id, Name = c.ClubName ?? $"#{c.ClubId}",
+                    }).ToList(),
                 },
                 ProfileSetupRules.StepFamily => new ProfileSetupStepDto
                 {
                     Key = s.Key, Done = s.Done, Skipped = s.Skipped,
                     TargetName = family.Count == 0 ? null
                         : string.Join(", ", family.Select(f => f.SwimmerName ?? $"#{f.SwimmerId}")),
+                    Targets = family.Select(Swimmer).ToList(),
                 },
                 _ => new ProfileSetupStepDto
                 {
                     Key = s.Key, Done = s.Done, Skipped = s.Skipped, TargetId = group?.Id, TargetName = group?.Name,
                     TargetSlug = group?.Slug, Status = group?.Status,
+                    Targets = joined.Select(g => new ProfileSetupTargetDto
+                    {
+                        Id = g.Id, Name = g.Name, Slug = g.Slug, Status = g.Status,
+                    }).ToList(),
                 },
             }).ToList(),
             Done = status.Done,

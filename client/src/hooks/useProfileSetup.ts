@@ -21,6 +21,21 @@ export interface ProfileSetupStep {
   targetSlug: string | null;
   /** Только у группы: active | pending (заявка тоже засчитывает шаг). */
   status: 'active' | 'pending' | null;
+  /**
+   * ВСЕ цели шага (хендофф ex4, Р10): каждый клуб, группа, ребёнок семьи, «это я». Итог рисует
+   * строку на каждую; поля выше — первая цель.
+   */
+  targets: ProfileSetupTarget[];
+}
+
+/** Одна цель шага: пловец, клуб или группа. */
+export interface ProfileSetupTarget {
+  id: number;
+  /** Id записи избранного — у пловца и клуба; у группы null. */
+  favoriteId: number | null;
+  name: string;
+  slug: string | null;
+  status: 'active' | 'pending' | null;
 }
 
 /**

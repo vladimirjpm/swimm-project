@@ -213,6 +213,12 @@ public sealed class ClubOptionDto
 {
     public int Id { get; set; }
     public string Name { get; set; } = "";
+
+    /// <summary>Пловцов клуба в справочнике — подпись в окне выбора клуба на /setup-profile (ex4, 5d).</summary>
+    public int SwimmerCount { get; set; }
+
+    /// <summary>Псевдоклуб («No club», страны делегаций) — окно выбора клуба его не предлагает.</summary>
+    public bool IsPseudo { get; set; }
 }
 
 /// <summary>Результат поиска пловца (типаэд добавления участника).</summary>

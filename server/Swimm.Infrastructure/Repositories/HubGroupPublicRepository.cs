@@ -60,6 +60,8 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             .OrderBy(g => g.Name)
             .Select(g => new HubGroupListItemDto
             {
+                Id = g.Id,
+                JoinPolicy = g.JoinPolicy,
                 Slug = g.Slug,
                 Name = g.Name,
                 NameEn = g.NameEn,
