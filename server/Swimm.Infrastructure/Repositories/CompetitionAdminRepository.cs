@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -239,9 +240,36 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         unified = unified.OrderByDescending(u => u.SortDate).ToList();
         var total = unified.Count;
         var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+        await AttachStartListBadgesAsync(pageItems);
         return new UnifiedCompetitionList(
             new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts,
             hiddenByDiscipline, monthImported, seasonCounts, monthNothingToPull);
+    }
+
+    /// <summary>
+    /// Бейдж «стартовый протокол затянут» (решение Влада 18.10.2026) — только строкам текущей
+    /// страницы и одним запросом на всю страницу: журнал по OrgCompId, правило — в
+    /// <see cref="StartListBadgeRules"/>. Колонку «заявок N» раньше пропустили именно из-за
+    /// цены построчного запроса (docs/admin-pages/competitions.md) — здесь его нет.
+    /// </summary>
+    private async Task AttachStartListBadgesAsync(IReadOnlyList<UnifiedCompetitionRowDto> rows)
+    {
+        var orgIds = rows.Where(r => r.Site != null).Select(r => r.Site!.OrgCompId).Distinct().ToList();
+        if (orgIds.Count == 0) return;
+
+        var pulls = await _db.StartListPulls.AsNoTracking()
+            .Where(p => orgIds.Contains(p.OrgCompId))
+            .Select(p => new
+            {
+                p.OrgCompId,
+                Fact = new StartListPullFact(p.PulledAt, p.Status, p.Events, p.Entries, p.Added, p.Removed, p.Moved),
+            })
+            .ToListAsync();
+        var byOrg = pulls.ToLookup(p => p.OrgCompId, p => p.Fact);
+
+        var now = DateTime.UtcNow;
+        foreach (var site in rows.Select(r => r.Site).OfType<UnifiedSiteInfo>())
+            site.StartList = StartListBadgeRules.Evaluate(byOrg[site.OrgCompId], site.DateStart, now);
     }
 
     /// <summary>

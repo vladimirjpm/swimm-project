@@ -65,6 +65,40 @@
         $"<span class=\"min-[1920px]:hidden\">{b.Short}</span>" +
         $"<span class=\"hidden min-[1920px]:inline\">{b.Text}</span></span>";
 
+    // Бейдж «стартовый протокол затянут» (решение Влада 18.10.2026): исход последнего забора
+    // из журнала Sys_StartListPulls, правило — StartListBadgeRules. Ни разу не тянули — пусто.
+    // В подсказке — последние заборы: видно, что протокол менялся (+добавились / −снялись / пересев).
+    string StartListBadgeHtml(Swimm.Application.Dtos.UnifiedSiteInfo? site)
+    {
+        if (site?.StartList is not { } b) return "";
+
+        static string When(DateTime utc) => utc.ToLocalTime().ToString("dd.MM HH:mm");
+        var (label, cls) = b.Kind switch
+        {
+            Swimm.Application.Mapping.StartListBadgeKind.Ok => ($"SL {b.Last.Entries}", "bg-admin-success/15 text-admin-success"),
+            Swimm.Application.Mapping.StartListBadgeKind.Partial => ("SL частично", "bg-admin-warning/15 text-admin-warning"),
+            Swimm.Application.Mapping.StartListBadgeKind.Empty => ("SL пусто", "bg-white/[.08] text-admin-text-muted"),
+            _ => ("SL ошибка", "bg-admin-danger/15 text-admin-danger"),
+        };
+        // «Пора обновить» перекрашивает в жёлтый всё, кроме ошибки — та и так красная.
+        if (b.Stale && b.Kind != Swimm.Application.Mapping.StartListBadgeKind.Error)
+            cls = "bg-admin-warning/15 text-admin-warning";
+
+        var lines = new List<string>
+        {
+            $"Стартовый протокол: последний забор {When(b.Last.PulledAt)}, заявок {b.Last.Entries}, заплывов {b.Last.Events}",
+        };
+        if (b.Stale)
+            lines.Add($"До старта ≤ {Swimm.Application.Mapping.StartListBadgeRules.StaleWindowDays} дн., а забору больше суток — нажми «Стартовый протокол» ещё раз");
+        lines.Add("Последние заборы:");
+        lines.AddRange(b.History.Select(p =>
+            $"{When(p.PulledAt)} · {p.Status} · заявок {p.Entries} (+{p.Added} −{p.Removed} пересев {p.Moved})"));
+        var title = System.Net.WebUtility.HtmlEncode(string.Join("\n", lines));
+
+        var text = $"{label} · {When(b.Last.PulledAt)}" + (b.Stale ? " · обновить" : "");
+        return $"<span class=\"ml-1 inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold {cls}\" title=\"{title}\">{System.Net.WebUtility.HtmlEncode(text)}</span>";
+    }
+
     // Диапазон дат: до 1920 — в две строки, дальше одной. Колонка дат иначе тянет таблицу
     // шире экрана, и горизонтальный скролл прячет колонку действий.
     string DateRangeHtml(string? range)
@@ -471,7 +505,7 @@ else
                         <!-- Многодневное событие: заголовок (дни и действия — в панели) -->
                         @* data-disc-id — якорь для бейджа «затянуто» после успешного импорта. *@
                         <tr id="evhead-@ev.EventId" data-disc-id="@(u.Site?.DiscoveredId)">
-                            <td>@Html.Raw(StageBadgeHtml(badge))</td>
+                            <td>@Html.Raw(StageBadgeHtml(badge))@Html.Raw(StartListBadgeHtml(u.Site))</td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
                                 <span class="font-medium text-admin-text">@ev.EventName</span>
@@ -522,7 +556,7 @@ else
                     {
                         <!-- Одиночное соревнование (импортировано или только в БД) -->
                         <tr data-disc-id="@(u.Site?.DiscoveredId)">
-                            <td>@Html.Raw(StageBadgeHtml(badge))</td>
+                            <td>@Html.Raw(StageBadgeHtml(badge))@Html.Raw(StartListBadgeHtml(u.Site))</td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
                                 <a href="@EditUrl(c.Id)" class="text-admin-accent hover:underline font-medium">@c.Name</a>
@@ -582,6 +616,7 @@ else
                                     <span class="ml-1 inline-block py-0.5 px-1.5 rounded text-[10px] font-bold bg-white/[.08] text-admin-text-muted"
                                           title="Протокола нет: PDF пустой (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола</span>
                                 }
+                                @Html.Raw(StartListBadgeHtml(s))
                             </td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td dir="rtl" style="text-align:left">

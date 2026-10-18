@@ -69,6 +69,12 @@ public sealed class UnifiedSiteInfo
     public DateTime? EmptySourceAt { get; set; }
 
     public int? LogligId { get; set; }
+
+    /// <summary>
+    /// Стартовый протокол уже затягивали — бейдж из журнала <c>Sys_StartListPulls</c>
+    /// (<c>StartListBadgeRules</c>). null — ни разу. Заполняется только у строк текущей страницы.
+    /// </summary>
+    public Mapping.StartListBadge? StartList { get; set; }
 }
 
 /// <summary>
