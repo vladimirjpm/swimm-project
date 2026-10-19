@@ -154,7 +154,7 @@ function ViewSegment({
             onClick={() => {
               if (!disabled) onView(opt.value);
             }}
-            className={`cc-focus cc-focus-inset font-bold ${mobile ? 'text-[14px]' : 'px-4 text-[15px]'} ${
+            className={`cc-focus cc-focus-inset font-bold ${mobile ? 'text-[14px]' : 'px-3.5 text-[14px]'} ${
               i > 0 ? 'border-l border-solid border-l-[var(--t-divider)]' : ''
             } ${
               selected
@@ -200,15 +200,17 @@ function CalendarControls({
 
   return (
     <>
-    <div className="hidden flex-wrap items-center justify-between gap-x-6 gap-y-3 lg:flex">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+    {/* Одна строка: месяц · вид · типы справа (ml-auto); не хватает ширины — типы переносятся целиком,
+        последний чип не обрезается. На 1180 влезает в строку (Б12). */}
+    <div className="hidden flex-wrap items-center gap-x-4 gap-y-3 lg:flex">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="flex items-center gap-1">
           <NavButton label="Previous" disabled={prevDisabled} onClick={onPrev}>
             <IconCaretLeft size={20} />
           </NavButton>
           <h2
             aria-live="polite"
-            className="m-0 min-w-[190px] text-center text-[22px] font-extrabold leading-tight text-[var(--t-text)]"
+            className="m-0 min-w-[172px] text-center text-[20px] font-extrabold leading-tight text-[var(--t-text)]"
           >
             {title}
           </h2>
@@ -220,7 +222,7 @@ function CalendarControls({
         <ViewSegment variant="desktop" view={view} onView={onView} disabledViews={disabledViews} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Meet type">
+      <div className="ml-auto flex flex-wrap items-center gap-1.5" role="group" aria-label="Meet type">
         {TYPE_OPTIONS.map(({ value, label, Icon }) => {
           const selected = value === 'all' ? typeFilter.length === 0 : typeFilter.includes(value);
           return (
@@ -229,14 +231,14 @@ function CalendarControls({
               type="button"
               aria-pressed={selected}
               onClick={() => toggleType(value)}
-              className={`cc-focus flex h-[34px] cursor-pointer items-center gap-2 rounded-[10px] border px-3 text-[var(--t-text)] hover:border-[var(--t-accent)] ${
+              className={`cc-focus flex h-[34px] cursor-pointer items-center gap-1.5 rounded-[10px] border px-2.5 text-[var(--t-text)] hover:border-[var(--t-accent)] ${
                 selected
                   ? 'border-[var(--t-accent)] bg-[var(--t-accent-soft)]'
                   : 'border-[var(--t-border)] bg-[var(--t-surface)]'
               }`}
             >
               <Icon size={16} />
-              <span className="text-[14px] font-semibold">{label}</span>
+              <span className="text-[13px] font-semibold">{label}</span>
               <span className="text-[12px] text-[var(--t-text-2)]">{counts[value]}</span>
             </button>
           );

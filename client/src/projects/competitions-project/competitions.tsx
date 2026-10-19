@@ -59,19 +59,17 @@ function Competitions() {
 
       {/* Весь контент — колонка 1180 по центру (хендофф competitions_home-2, «Layout на широких
           экранах»): на всю ширину ячейки календаря на 1980 растягивались до 280px, и текст 11px в
-          них терялся. Отступ ≥24px — от обёртки, как у топбара (`PAGE_CONTAINER`). */}
+          них терялся. Отступ ≥24px — от обёртки, как у топбара (`PAGE_CONTAINER`). Hero компактный (≤140px,
+          без подзаголовка): календарь должен влезать в экран по высоте (Б12). */}
       <div className="relative px-4 lg:px-6">
         <div className="content-box-xl">
-          <section className="relative pt-[26px] lg:pt-[46px]">
-            <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent-text)] lg:text-[15px] lg:tracking-[0.3em]">
+          <section className="relative pt-5 lg:pt-7">
+            <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent-text)] lg:text-[13px] lg:tracking-[0.3em]">
               {`Season ${seasonLabel(seasonStartYear())} · ${HOME_REGION_LABEL}`}
             </p>
-            <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[var(--t-text)] lg:text-[88px] lg:leading-[0.9]">
+            <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[var(--t-text)] lg:text-[56px] lg:leading-[0.95]">
               Competitions
             </h1>
-            <p className="mt-5 max-w-[560px] text-[14.5px] leading-[1.55] text-[var(--t-text-2)] lg:text-[18px] lg:leading-[1.6]">
-              Pick a meet — results are live from the pool.
-            </p>
           </section>
 
           <CompetitionCalendar />

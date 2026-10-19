@@ -21,6 +21,53 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const CELL_PAD = 7;
 const GAP_HALF = 2;
 
+// Высота ячейки — по экрану, чтобы месяц влезал целиком (Б12, ТЗ «Layout /competitions»):
+// clamp(76, (высота окна − верх сетки) / 6 − 6, 112). Верх сетки меряем, а не берём константой
+// ~300px: hero, строка управления и шапка дней меняются от ширины. Делим на 6 даже у месяца из
+// 5 недель — остаток уходит под легенду. Плашек — сколько физически влезает (`fitChips`), а не
+// формулой ТЗ floor((h − 24) / 24): та при h=100 даёт 3, а три в 100px не помещаются, и плашка
+// с бейджем группы выше обычной.
+const CELL_H_MIN = 76;
+const CELL_H_MAX = 112;
+
+// Раскладка ячейки: паддинг 2×5 + число 16; плашка 22 (с бейджем группы — 29 + 2×2) + зазор 3;
+// строка «+N more» 14 + зазор 3.
+const CELL_FIXED = 26;
+const CHIP_COST = 25;
+const BADGE_CHIP_COST = 36;
+const MORE_COST = 17;
+
+/** Сколько плашек влезает в ячейку высоты h; не влезли все — остаётся место под «+N more». */
+function fitChips(meets: CalendarMeet[], h: number): CalendarMeet[] {
+  let budget = h - CELL_FIXED;
+  const shown: CalendarMeet[] = [];
+  for (let i = 0; i < meets.length; i++) {
+    const cost = champMark(meets[i])?.kind === 'badge' ? BADGE_CHIP_COST : CHIP_COST;
+    const needMore = i < meets.length - 1 ? MORE_COST : 0;
+    if (cost + needMore > budget) break;
+    shown.push(meets[i]);
+    budget -= cost;
+  }
+  return shown;
+}
+
+function useCellHeight(gridRef: React.RefObject<HTMLDivElement>): number {
+  const [h, setH] = React.useState(CELL_H_MAX);
+  React.useLayoutEffect(() => {
+    const measure = () => {
+      const el = gridRef.current;
+      if (!el || el.offsetParent === null) return; // телефон: сетка скрыта
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const next = Math.round(Math.min(CELL_H_MAX, Math.max(CELL_H_MIN, (window.innerHeight - top) / 6 - 6)));
+      setH((prev) => (prev === next ? prev : next));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [gridRef]);
+  return h;
+}
+
 function MeetChip({ meet, iso, col }: { meet: CalendarMeet; iso: string; col: number }) {
   const { first, joinLeft, joinRight, dayNo } = chipShape(meet, iso);
   const mark = meet.is_championship ? champMark(meet) : null;
@@ -65,6 +112,7 @@ function DayCell({
   today,
   selected,
   onSelect,
+  height,
 }: {
   iso: string;
   col: number;
@@ -72,10 +120,11 @@ function DayCell({
   today: string;
   selected: boolean;
   onSelect: (iso: string) => void;
+  height: number;
 }) {
   const isToday = iso === today;
   const past = iso < today;
-  const shown = meets.slice(0, 3);
+  const shown = fitChips(meets, height);
 
   // Обводка «сегодня» слабее выбранного дня; сегодня + выбран — как выбранный.
   const outline = selected
@@ -93,13 +142,13 @@ function DayCell({
       aria-label={dayAriaLabel(iso, meets.length)}
       aria-pressed={selected}
       onClick={() => onSelect(iso)}
-      style={outline}
-      className={`cc-focus-ring flex min-h-[112px] cursor-pointer flex-col gap-1 rounded-[8px] px-[7px] py-[6px] text-left shadow-[var(--t-shadow)] backdrop-blur-[14px] hover:bg-[var(--t-nested)] ${
+      style={{ ...outline, height }}
+      className={`cc-focus-ring flex cursor-pointer flex-col gap-[3px] overflow-hidden rounded-[8px] px-[7px] py-[5px] text-left shadow-[var(--t-shadow)] backdrop-blur-[14px] hover:bg-[var(--t-nested)] ${
         selected ? 'bg-[var(--t-nested)]' : 'bg-[var(--t-surface)]'
       } ${past ? 'opacity-[.88]' : ''}`}
     >
       <span
-        className={`text-[12px] ${
+        className={`text-[12px] leading-4 ${
           isToday ? 'font-bold text-[var(--t-accent-text)]' : 'font-medium text-[var(--t-text)]'
         }`}
       >
@@ -108,8 +157,8 @@ function DayCell({
       {shown.map((meet) => (
         <MeetChip key={meet.key} meet={meet} iso={iso} col={col} />
       ))}
-      {meets.length > 3 && (
-        <span className="text-[11px] text-[var(--t-accent-text)]">{`+${meets.length - 3} more`}</span>
+      {meets.length > shown.length && (
+        <span className="text-[11px] leading-[14px] text-[var(--t-accent-text)]">{`+${meets.length - shown.length} more`}</span>
       )}
     </button>
   );
@@ -141,6 +190,28 @@ function MonthView({
 }) {
   const weeks = React.useMemo(() => monthGrid(month), [month]);
   const dayMeets = selectedDay ? meetsOnDay(meets, selectedDay) : [];
+  const gridRef = React.useRef<HTMLDivElement>(null);
+  const cellH = useCellHeight(gridRef);
+
+  // Клик по дню (десктоп) → плавный скролл к кубам дня: месяц теперь занимает экран, и кубы
+  // ниже края (Б12). Скроллим после перерисовки — кубы нового дня уже на месте. Шапка сайта
+  // липкая, её высоту вычитаем.
+  const cubesRef = React.useRef<HTMLDivElement>(null);
+  const [scrollRequest, setScrollRequest] = React.useState(0);
+  const pickDay = (iso: string) => {
+    onSelectDay(iso);
+    setScrollRequest((n) => n + 1);
+  };
+  React.useEffect(() => {
+    const el = cubesRef.current;
+    if (!scrollRequest || !el) return;
+    const topbar = document.querySelector<HTMLElement>('[data-app-topbar]')?.offsetHeight ?? 0;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({
+      top: el.getBoundingClientRect().top + window.scrollY - topbar - 12,
+      behavior: reduced ? 'auto' : 'smooth',
+    });
+  }, [scrollRequest]);
 
   return (
     <div>
@@ -166,7 +237,7 @@ function MonthView({
           </span>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div ref={gridRef} className="grid grid-cols-7 gap-1">
         {weeks.flatMap((week, wi) =>
           week.map((iso, col) =>
             iso ? (
@@ -177,10 +248,11 @@ function MonthView({
                 meets={meetsOnDay(meets, iso)}
                 today={today}
                 selected={iso === selectedDay}
-                onSelect={onSelectDay}
+                onSelect={pickDay}
+                height={cellH}
               />
             ) : (
-              <div key={`blank-${wi}-${col}`} aria-hidden="true" className="min-h-[112px]" />
+              <div key={`blank-${wi}-${col}`} aria-hidden="true" style={{ height: cellH }} />
             ),
           ),
         )}
@@ -191,7 +263,7 @@ function MonthView({
 
       {meets.length === 0 && <p className="mt-4 text-[13px] text-[var(--t-text-2)]">No meets this month</p>}
 
-      <div aria-live="polite" className="mt-4">
+      <div ref={cubesRef} aria-live="polite" className="mt-4">
         {meets.length > 0 && selectedDay && dayMeets.length === 0 && (
           <p className="m-0 text-[13px] text-[var(--t-text-2)]">No meets on this day.</p>
         )}
