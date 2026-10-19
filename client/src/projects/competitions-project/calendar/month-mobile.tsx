@@ -48,7 +48,7 @@ function Cell({
       aria-pressed={selected}
       onClick={() => onSelect(iso)}
       className={`cc-focus flex h-[52px] cursor-pointer flex-col items-center justify-center gap-1 rounded-[8px] border p-0 ${border} ${bg} ${
-        iso < today ? 'opacity-60' : ''
+        iso < today ? 'opacity-[.88]' : ''
       }`}
     >
       <span className={`text-[12px] ${isToday ? 'font-bold text-[var(--t-accent-text)]' : 'font-medium text-[var(--t-text)]'}`}>

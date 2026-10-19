@@ -81,6 +81,9 @@ function DayCell({
       ? { outline: '1.5px solid var(--t-accent)', outlineOffset: '-1.5px' }
       : undefined;
 
+  // Прошедшее — opacity .88, а не .6 из макета: при .6 золотая плашка чемпионата давала 3.0
+  // (светлая) / 3.6 (тёмная), а 9px подписи ленты телефона в тёмной держат 4.5 только с .88 —
+  // замер Б9. Одно значение на все виды: месяцы Year, ячейки и тайлы телефона.
   return (
     <button
       type="button"
@@ -90,7 +93,7 @@ function DayCell({
       style={outline}
       className={`cc-focus-ring flex min-h-[112px] cursor-pointer flex-col gap-1 rounded-[8px] px-[7px] py-[6px] text-left shadow-[var(--t-shadow)] backdrop-blur-[14px] hover:bg-[var(--t-nested)] ${
         selected ? 'bg-[var(--t-nested)]' : 'bg-[var(--t-surface)]'
-      } ${past ? 'opacity-60' : ''}`}
+      } ${past ? 'opacity-[.88]' : ''}`}
     >
       <span
         className={`text-[12px] ${

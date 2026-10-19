@@ -46,7 +46,7 @@ function MonthCard({
         current
           ? 'border-[var(--t-accent)] bg-[var(--t-nested)]'
           : 'border-[var(--t-border-2)] bg-[var(--t-surface)]'
-      } ${past ? 'opacity-60' : ''}`}
+      } ${past ? 'opacity-[.88]' : ''}`}
     >
       <span className="flex items-baseline justify-between">
         <span className="flex items-baseline gap-[6px]">
@@ -93,7 +93,7 @@ function MonthCard({
           })}
         </span>
       ) : (
-        <span className="min-h-[29px] border-t border-[var(--t-border-2)] pt-[6px] text-[11px] text-[var(--t-text-3)]">
+        <span className="min-h-[29px] border-t border-[var(--t-border-2)] pt-[6px] text-[11px] text-[var(--t-text-2)]">
           No championships
         </span>
       )}

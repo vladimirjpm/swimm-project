@@ -68,7 +68,7 @@ function MeetDaysView({ month, meets, today }: { month: CalendarMonth; meets: Ca
                       : champ
                         ? 'border-[var(--t-champ-strip-border)] bg-[var(--t-champ-strip-bg)]'
                         : 'border-[var(--t-border-2)] bg-[var(--t-surface)]'
-                  } ${iso < today ? 'opacity-60' : ''}`}
+                  } ${iso < today ? 'opacity-[.88]' : ''}`}
                 >
                   <span className="text-[9px] uppercase text-[var(--t-text-2)]">{weekdayShortOf(iso)}</span>
                   <span className="text-[17px] font-medium text-[var(--t-text)]">{Number(iso.slice(8))}</span>
