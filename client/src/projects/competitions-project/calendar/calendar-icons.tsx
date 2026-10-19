@@ -90,3 +90,44 @@ export function IconLotus(props: IconProps) {
     </Svg>
   );
 }
+
+/** Зима — снежинка (иконка сезона на бейдже группы). */
+export function IconSnowflake(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9" />
+      <path d="m9.5 4.5 2.5 2 2.5-2M9.5 19.5l2.5-2 2.5 2" />
+    </Svg>
+  );
+}
+
+/** Лето — солнце: круг и восемь лучей. */
+export function IconSun(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" />
+    </Svg>
+  );
+}
+
+/**
+ * Кубок — ЗАЛИТЫЙ (в 6–9px контур не читается): чаша с ручками, ножка и основание.
+ * Остальные иконки файла — контурные, эта единственная с fill.
+ */
+export function IconTrophy({ size = 16, className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M6 3h12v6.5a6 6 0 0 1-12 0V3Z" />
+      <path d="M6 5H2.5v2.2c0 2.2 1.6 3.8 4 4l.3-2c-1.1-.2-1.8-.9-1.8-2V7H6V5Zm12 0h3.5v2.2c0 2.2-1.6 3.8-4 4l-.3-2c1.1-.2 1.8-.9 1.8-2V7H18V5Z" />
+      <path d="M10.8 15h2.4v3h-2.4zM7.5 18.5h9V21h-9z" />
+    </svg>
+  );
+}

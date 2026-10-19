@@ -1,5 +1,5 @@
 import { seasonStartYear } from '../../../utils/helpers/season-helper';
-import type { CalendarMeet, CalendarMonth, MeetType } from './calendar-types';
+import type { CalendarGroup, CalendarMeet, CalendarMonth, MeetType } from './calendar-types';
 
 /*
  * Чистые функции календаря: даты, месяцы, фильтры, счётчики. Без React и без обращений к
@@ -146,4 +146,30 @@ export function monthIndex(m: CalendarMonth): number {
 export function dayLabel(iso: string): string {
   const [, mm, dd] = iso.split('-');
   return `${dd} ${MONTH_NAMES[Number(mm) - 1].slice(0, 3)}`;
+}
+
+/** Месяц «сегодня» (today — yyyy-MM-dd из ответа). */
+export function isCurrentMonth(m: CalendarMonth, today: string): boolean {
+  return isDayInMonth(today, m);
+}
+
+/** Месяц целиком раньше месяца «сегодня». */
+export function isPastMonth(m: CalendarMonth, today: string): boolean {
+  return monthKey(m) < today.slice(0, 7);
+}
+
+/**
+ * Чем помечаем чемпионат: бейджем группы (только чемпионат БАССЕЙНА с группой) или текстом
+ * («Open water championship», «Artistic championship», «Championship» — бассейн без группы).
+ * Вызывать для meets с `is_championship`. Одно правило для Year, Month и кубов (Б3–Б6).
+ */
+export type ChampMark =
+  | { kind: 'badge'; group: CalendarGroup }
+  | { kind: 'text'; text: string };
+
+export function champMark(meet: CalendarMeet): ChampMark {
+  if (meet.type === 'pool') {
+    return meet.group ? { kind: 'badge', group: meet.group } : { kind: 'text', text: 'Championship' };
+  }
+  return { kind: 'text', text: meet.type === 'open_water' ? 'Open water championship' : 'Artistic championship' };
 }

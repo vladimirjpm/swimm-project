@@ -1,6 +1,8 @@
 import React from 'react';
 import './competition-calendar.css';
 import CalendarControls from './calendar-controls';
+import CalendarLegend from './calendar-legend';
+import YearView from './year-view';
 import {
   addMonths,
   applyTypeFilter,
@@ -13,9 +15,7 @@ import {
   monthIndex,
   monthKey,
   monthLabel,
-  monthShort,
   navBounds,
-  seasonMonths,
   seasonOfMonth,
   seasonTitle,
   typeCounts,
@@ -27,38 +27,10 @@ import { useCompetitionCalendar } from './use-competition-calendar';
 /*
  * Календарь сезона на /competitions — оркестратор: состояние вида (синхронизировано с query),
  * загрузка сезона месяца, область/счётчики/недоступные виды, строка управления и тело вида.
- * Тела видов в Б2 — временные заглушки (YearStub / MonthStub / MeetsStub), их заменят Б3–Б5.
+ * Year — настоящий вид (Б3); Month / Meet days — пока временные заглушки (MonthStub / MeetsStub), их заменят Б4–Б5.
  */
 
 const MUTED = 'text-[14px] text-[var(--t-text-2)]';
-
-function YearStub({
-  season,
-  meets,
-  onPickMonth,
-}: {
-  season: number;
-  meets: CalendarMeet[];
-  onPickMonth: (m: CalendarMonth) => void;
-}) {
-  return (
-    <div className="flex flex-col items-start gap-1">
-      {seasonMonths(season).map((m) => {
-        const n = meets.filter((meet) => meetInMonth(meet, m)).length;
-        return (
-          <button
-            key={monthKey(m)}
-            type="button"
-            onClick={() => onPickMonth(m)}
-            className="cc-focus cursor-pointer text-[14px] text-[var(--t-text)]"
-          >
-            {`${monthShort(m)} ${m.year} — ${n} meets`}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 function MonthStub({
   month,
@@ -219,9 +191,10 @@ function CompetitionCalendar() {
         {error ? (
           <p className={MUTED}>Could not load the calendar.</p>
         ) : !data ? null : state.view === 'year' ? (
-          <YearStub
+          <YearView
             season={season}
             meets={filteredSeason}
+            today={today}
             onPickMonth={(m) => setState((s) => ({ ...s, view: 'month', month: m }))}
           />
         ) : state.view === 'month' ? (
@@ -235,6 +208,8 @@ function CompetitionCalendar() {
           <MeetsStub month={state.month} meets={filteredMonth} />
         )}
       </div>
+
+      {data && !error && <CalendarLegend />}
     </section>
   );
 }
