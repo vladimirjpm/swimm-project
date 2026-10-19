@@ -15,11 +15,14 @@ export interface CompetitionCalendarResult {
   data: CompetitionCalendar | null;
   loading: boolean;
   error: boolean;
+  /** Повторить запрос после ошибки (кэш ошибку не хранит). */
+  retry: () => void;
 }
 
 export function useCompetitionCalendar(season: number): CompetitionCalendarResult {
   const [, bump] = React.useState(0);
   const [failedSeason, setFailedSeason] = React.useState<number | null>(null);
+  const [attempt, setAttempt] = React.useState(0);
 
   React.useEffect(() => {
     if (cache.has(season)) return;
@@ -40,9 +43,10 @@ export function useCompetitionCalendar(season: number): CompetitionCalendarResul
     return () => {
       cancelled = true;
     };
-  }, [season]);
+  }, [season, attempt]);
 
   const data = cache.get(season) ?? null;
   const error = !data && failedSeason === season;
-  return { data, loading: !data && !error, error };
+  const retry = React.useCallback(() => setAttempt((n) => n + 1), []);
+  return { data, loading: !data && !error, error, retry };
 }

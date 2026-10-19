@@ -44,7 +44,7 @@ function CompetitionCalendar() {
   const [monthExpanded, setMonthExpanded] = React.useState(false);
 
   const season = seasonOfMonth(state.month);
-  const { data, error } = useCompetitionCalendar(season);
+  const { data, error, retry } = useCompetitionCalendar(season);
   const today = data?.today ?? fallbackToday;
 
   React.useEffect(() => {
@@ -112,15 +112,21 @@ function CompetitionCalendar() {
   // Навигация ‹ ›: Year — на сезон (тот же календарный месяц), остальное — на месяц.
   const step = state.view === 'year' ? 12 : 1;
   const bounds = navBounds(data?.seasons ?? knownSeasons);
-  const prevDisabled = !bounds || monthIndex(addMonths(state.month, -step)) < monthIndex(bounds.min);
-  const nextDisabled = !bounds || monthIndex(addMonths(state.month, step)) > monthIndex(bounds.max);
+  // Пока сезон грузится, ‹ › недоступны; после ошибки — нет (иначе из неё не выйти ничем, кроме Try again).
+  const loadingSeason = !data && !error;
+  const prevDisabled = loadingSeason || !bounds || monthIndex(addMonths(state.month, -step)) < monthIndex(bounds.min);
+  const nextDisabled = loadingSeason || !bounds || monthIndex(addMonths(state.month, step)) > monthIndex(bounds.max);
 
   const goMonth = (m: CalendarMonth) => setState((s) => ({ ...s, month: m }));
 
   const title = state.view === 'year' ? seasonTitle(season) : monthLabel(state.month);
 
   return (
-    <section className="relative px-4 pt-[26px] lg:px-16 lg:pt-12" aria-label="Competition calendar">
+    <section
+      className="relative px-4 pt-[26px] lg:px-16 lg:pt-12"
+      aria-label="Competition calendar"
+      aria-busy={!data && !error}
+    >
       {demoOn && (
         <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-[var(--t-warn)]">DEMO DATA</p>
       )}
@@ -142,8 +148,21 @@ function CompetitionCalendar() {
 
       <div className="mt-6">
         {error ? (
-          <p className={MUTED}>Could not load the calendar.</p>
-        ) : !data ? null : state.view === 'year' ? (
+          <div className="flex min-h-[120px] flex-col items-start gap-3">
+            <p className={`m-0 ${MUTED}`}>Could not load the calendar.</p>
+            <button
+              type="button"
+              onClick={retry}
+              className="cc-focus cursor-pointer rounded-[10px] border border-[var(--t-border)] bg-[var(--t-surface)] px-4 py-2 text-[13px] font-semibold text-[var(--t-text)] hover:border-[var(--t-accent)]"
+            >
+              Try again
+            </button>
+          </div>
+        ) : !data ? (
+          <div className="flex min-h-[320px] items-start">
+            <p className={`m-0 ${MUTED}`}>Loading calendar…</p>
+          </div>
+        ) : state.view === 'year' ? (
           <YearView
             season={season}
             meets={filteredSeason}

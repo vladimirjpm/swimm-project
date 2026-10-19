@@ -88,7 +88,7 @@ function DayCell({
       aria-pressed={selected}
       onClick={() => onSelect(iso)}
       style={outline}
-      className={`cc-focus flex min-h-[112px] cursor-pointer flex-col gap-1 rounded-[8px] px-[7px] py-[6px] text-left shadow-[var(--t-shadow)] backdrop-blur-[14px] hover:bg-[var(--t-nested)] ${
+      className={`cc-focus-ring flex min-h-[112px] cursor-pointer flex-col gap-1 rounded-[8px] px-[7px] py-[6px] text-left shadow-[var(--t-shadow)] backdrop-blur-[14px] hover:bg-[var(--t-nested)] ${
         selected ? 'bg-[var(--t-nested)]' : 'bg-[var(--t-surface)]'
       } ${past ? 'opacity-60' : ''}`}
     >

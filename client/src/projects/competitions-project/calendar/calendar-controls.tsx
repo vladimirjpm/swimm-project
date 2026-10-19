@@ -89,6 +89,87 @@ function NavButton({
   );
 }
 
+/**
+ * Сегмент видов: radiogroup с roving tabindex (Tab попадает только на выбранный вид),
+ * ←/→ (и ↑/↓) переключают вид, пропуская disabled; Home/End — крайние. Disabled-вид остаётся
+ * в порядке Tab (aria-disabled), но клик по нему ничего не делает.
+ */
+function ViewSegment({
+  variant,
+  view,
+  onView,
+  disabledViews,
+}: {
+  variant: 'desktop' | 'mobile';
+  view: CalendarView;
+  onView: (view: CalendarView) => void;
+  disabledViews: CalendarView[];
+}) {
+  const refs = React.useRef<Record<string, HTMLButtonElement | null>>({});
+  const mobile = variant === 'mobile';
+
+  const move = (e: React.KeyboardEvent, from: number, step: 1 | -1) => {
+    e.preventDefault();
+    for (let k = 1; k <= VIEW_OPTIONS.length; k++) {
+      const next = VIEW_OPTIONS[(from + step * k + VIEW_OPTIONS.length * 2) % VIEW_OPTIONS.length];
+      if (disabledViews.includes(next.value)) continue;
+      onView(next.value);
+      refs.current[next.value]?.focus();
+      return;
+    }
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') move(e, index, 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') move(e, index, -1);
+    else if (e.key === 'Home') move(e, VIEW_OPTIONS.length - 1, 1);
+    else if (e.key === 'End') move(e, 0, -1);
+  };
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Calendar view"
+      className={
+        mobile
+          ? 'grid h-[38px] grid-cols-3 overflow-hidden rounded-[10px] border border-[var(--t-divider)]'
+          : 'inline-flex h-[38px] overflow-hidden rounded-[10px] border border-[var(--t-divider)]'
+      }
+    >
+      {VIEW_OPTIONS.map((opt, i) => {
+        const selected = view === opt.value;
+        const disabled = disabledViews.includes(opt.value);
+        return (
+          <button
+            key={opt.value}
+            ref={(el) => {
+              refs.current[opt.value] = el;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-disabled={disabled || undefined}
+            tabIndex={selected ? 0 : -1}
+            onKeyDown={(e) => onKeyDown(e, i)}
+            onClick={() => {
+              if (!disabled) onView(opt.value);
+            }}
+            className={`cc-focus cc-focus-inset font-bold ${mobile ? 'text-[14px]' : 'px-4 text-[15px]'} ${
+              i > 0 ? 'border-l border-solid border-l-[var(--t-divider)]' : ''
+            } ${
+              selected
+                ? 'bg-[var(--deep-seg-active-bg)] text-[var(--deep-seg-active-fg)]'
+                : 'bg-transparent text-[var(--t-text)]'
+            } ${disabled ? 'cursor-not-allowed opacity-[.45]' : 'cursor-pointer'}`}
+          >
+            {mobile ? VIEW_SHORT[opt.value] : opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function CalendarControls({
   title,
   onPrev,
@@ -136,37 +217,7 @@ function CalendarControls({
           </NavButton>
         </div>
 
-        <div
-          role="radiogroup"
-          aria-label="Calendar view"
-          className="inline-flex h-[38px] overflow-hidden rounded-[10px] border border-[var(--t-divider)]"
-        >
-          {VIEW_OPTIONS.map((opt, i) => {
-            const selected = view === opt.value;
-            const disabled = disabledViews.includes(opt.value);
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-disabled={disabled || undefined}
-                onClick={() => {
-                  if (!disabled) onView(opt.value);
-                }}
-                className={`cc-focus px-4 text-[15px] font-bold ${
-                  i > 0 ? 'border-l border-solid border-l-[var(--t-divider)]' : ''
-                } ${
-                  selected
-                    ? 'bg-[var(--deep-seg-active-bg)] text-[var(--deep-seg-active-fg)]'
-                    : 'bg-transparent text-[var(--t-text)]'
-                } ${disabled ? 'cursor-not-allowed opacity-[.45]' : 'cursor-pointer'}`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+        <ViewSegment variant="desktop" view={view} onView={onView} disabledViews={disabledViews} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Meet type">
@@ -203,11 +254,10 @@ function CalendarControls({
           <button
             type="button"
             aria-expanded={monthExpanded}
-            aria-label={`${title}, ${monthExpanded ? 'collapse' : 'expand'} month`}
             onClick={onToggleMonth}
             className="cc-focus flex cursor-pointer items-center gap-[6px] rounded-[8px] border-0 bg-transparent px-2 py-1 text-[16px] font-medium text-[var(--t-text)]"
           >
-            {title}
+            <span aria-live="polite">{title}</span>
             {monthExpanded ? (
               <IconCaretUp size={13} className="text-[var(--t-text-2)]" />
             ) : (
@@ -225,37 +275,7 @@ function CalendarControls({
       </div>
 
       <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-        <div
-          role="radiogroup"
-          aria-label="Calendar view"
-          className="grid h-[38px] grid-cols-3 overflow-hidden rounded-[10px] border border-[var(--t-divider)]"
-        >
-          {VIEW_OPTIONS.map((opt, i) => {
-            const selected = view === opt.value;
-            const disabled = disabledViews.includes(opt.value);
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-disabled={disabled || undefined}
-                onClick={() => {
-                  if (!disabled) onView(opt.value);
-                }}
-                className={`cc-focus text-[14px] font-bold ${
-                  i > 0 ? 'border-l border-solid border-l-[var(--t-divider)]' : ''
-                } ${
-                  selected
-                    ? 'bg-[var(--deep-seg-active-bg)] text-[var(--deep-seg-active-fg)]'
-                    : 'bg-transparent text-[var(--t-text)]'
-                } ${disabled ? 'cursor-not-allowed opacity-[.45]' : 'cursor-pointer'}`}
-              >
-                {VIEW_SHORT[opt.value]}
-              </button>
-            );
-          })}
-        </div>
+        <ViewSegment variant="mobile" view={view} onView={onView} disabledViews={disabledViews} />
 
         <button
           type="button"
@@ -274,7 +294,7 @@ function CalendarControls({
 
       <div id={typesId} aria-hidden={!typesOpen} className={`cc-types ${typesOpen ? 'cc-types--open' : ''}`}>
         <div>
-          <div className="grid grid-cols-4 gap-[6px] p-[3px] pt-2">
+          <div className="grid grid-cols-4 gap-[6px] p-1 pt-2">
             {TYPE_OPTIONS.map(({ value, label, Icon }) => {
               const selected = value === 'all' ? typeFilter.length === 0 : typeFilter.includes(value);
               return (

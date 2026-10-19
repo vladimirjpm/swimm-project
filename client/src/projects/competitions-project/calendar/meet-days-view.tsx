@@ -50,7 +50,7 @@ function MeetDaysView({ month, meets, today }: { month: CalendarMonth; meets: Ca
     <div>
       {days.length > 0 && (
         <div className="lg:hidden">
-          <div className="cc-strip -mx-4 flex gap-[6px] overflow-x-auto px-4">
+          <div className="cc-strip -mx-4 -my-1 flex gap-[6px] overflow-x-auto px-4 py-1">
             {days.map((iso) => {
               const dayMeets = meetsOnDay(inMonth, iso);
               const champ = dayMeets.some((m) => m.is_championship);
@@ -83,15 +83,17 @@ function MeetDaysView({ month, meets, today }: { month: CalendarMonth; meets: Ca
         </div>
       )}
 
-      {inMonth.length === 0 ? (
-        <p className="m-0 text-[13px] text-[var(--t-text-2)]">No meets this month</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-[10px] sm:grid-cols-2 lg:grid-cols-4">
-          {shown.map((meet) => (
-            <MeetCube key={meet.key} meet={meet} today={today} />
-          ))}
-        </div>
-      )}
+      <div aria-live="polite">
+        {inMonth.length === 0 ? (
+          <p className="m-0 text-[13px] text-[var(--t-text-2)]">No meets this month</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-[10px] sm:grid-cols-2 lg:grid-cols-4">
+            {shown.map((meet) => (
+              <MeetCube key={meet.key} meet={meet} today={today} />
+            ))}
+          </div>
+        )}
+      </div>
       <CalendarLegend />
     </div>
   );
