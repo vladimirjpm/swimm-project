@@ -26,7 +26,7 @@ function FavoritesUpcomingSection() {
   if (!auth.isAuthenticated || !data || data.length === 0) return null;
 
   return (
-    <section className="relative px-4 pt-[38px] lg:px-16" aria-label="Your favorites — upcoming starts">
+    <section className="relative pt-[38px]" aria-label="Your favorites — upcoming starts">
       <h2 className="mb-[14px] text-[18px] font-black tracking-[-0.02em] text-[var(--t-text)]">
         Your favorites — upcoming starts
       </h2>
@@ -57,23 +57,30 @@ function Competitions() {
 
       <AppTopbar active="competitions" />
 
-      <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
-        <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent-text)] lg:text-[15px] lg:tracking-[0.3em]">
-          {`Season ${seasonLabel(seasonStartYear())} · ${HOME_REGION_LABEL}`}
-        </p>
-        <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[var(--t-text)] lg:text-[88px] lg:leading-[0.9]">
-          Competitions
-        </h1>
-        <p className="mt-5 max-w-[560px] text-[14.5px] leading-[1.55] text-[var(--t-text-2)] lg:text-[18px] lg:leading-[1.6]">
-          Pick a meet — results are live from the pool.
-        </p>
-      </section>
+      {/* Весь контент — колонка 1180 по центру (хендофф competitions_home-2, «Layout на широких
+          экранах»): на всю ширину ячейки календаря на 1980 растягивались до 280px, и текст 11px в
+          них терялся. Отступ ≥24px — от обёртки, как у топбара (`PAGE_CONTAINER`). */}
+      <div className="relative px-4 lg:px-6">
+        <div className="content-box-xl">
+          <section className="relative pt-[26px] lg:pt-[46px]">
+            <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent-text)] lg:text-[15px] lg:tracking-[0.3em]">
+              {`Season ${seasonLabel(seasonStartYear())} · ${HOME_REGION_LABEL}`}
+            </p>
+            <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[var(--t-text)] lg:text-[88px] lg:leading-[0.9]">
+              Competitions
+            </h1>
+            <p className="mt-5 max-w-[560px] text-[14.5px] leading-[1.55] text-[var(--t-text-2)] lg:text-[18px] lg:leading-[1.6]">
+              Pick a meet — results are live from the pool.
+            </p>
+          </section>
 
-      <CompetitionCalendar />
+          <CompetitionCalendar />
 
-      <FavoritesUpcomingSection />
+          <FavoritesUpcomingSection />
 
-      <RecordsStandards />
+          <RecordsStandards />
+        </div>
+      </div>
 
       <RecordTicker />
       {/* Переключатель тем. На витрине он единственный способ сменить режим: топбар его

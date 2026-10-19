@@ -372,3 +372,17 @@ export function daysWithMeets(meets: CalendarMeet[], m: CalendarMonth): string[]
   }
   return Array.from(days).sort();
 }
+
+/**
+ * Название без даты: «ליגה 1 שוהם - 16/10/2026» → «ליגה 1 שוהם» (хендофф competitions_home-2). Дата
+ * и так стоит в ячейке и в кубе, а в плашке 12px съедала само имя. ⚠ В данных дата — в КОНЦЕ
+ * строки (бывает и без тире: «…וייסגל 30/10»); в RTL конец рисуется слева, поэтому в хендоффе она
+ * описана как префикс. Чистим оба края; без даты название не трогаем.
+ */
+const DATE_PREFIX_RX = /^\d{1,2}\/\d{1,2}(\/\d{2,4})?\s*[-–]\s*/;
+const DATE_SUFFIX_RX = /\s*[-–]?\s*\d{1,2}\/\d{1,2}(\/\d{2,4})?\s*$/;
+
+export function meetDisplayName(name: string): string {
+  const cleaned = name.replace(DATE_PREFIX_RX, '').replace(DATE_SUFFIX_RX, '').trim();
+  return cleaned.length > 0 ? cleaned : name;
+}

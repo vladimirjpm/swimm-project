@@ -123,7 +123,7 @@ function CompetitionCalendar() {
 
   return (
     <section
-      className="relative px-4 pt-[26px] lg:px-16 lg:pt-12"
+      className="cc-root relative pt-[26px] lg:pt-12"
       aria-label="Competition calendar"
       aria-busy={!data && !error}
     >

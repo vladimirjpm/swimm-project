@@ -1,5 +1,6 @@
 import React from 'react';
 import type { CompetitionCalendar } from './calendar-types';
+import { meetDisplayName } from './calendar-model';
 
 /*
  * Загрузка сезона календаря: GET /api/competitions/calendar?season=<год начала>.
@@ -33,7 +34,8 @@ export function useCompetitionCalendar(season: number): CompetitionCalendarResul
         const resp = await fetch(`/api/competitions/calendar?season=${season}`, { credentials: 'same-origin' });
         if (!resp.ok) throw new Error(`API /api/competitions/calendar returned ${resp.status}`);
         const body = (await resp.json()) as CompetitionCalendar;
-        cache.set(season, body);
+        // Имя чистится один раз здесь: так его видят все виды, aria-label и сортировка Meet days.
+        cache.set(season, { ...body, meets: body.meets.map((m) => ({ ...m, name: meetDisplayName(m.name) })) });
         if (!cancelled) bump((n) => n + 1);
       } catch (e) {
         console.error('Error loading /api/competitions/calendar', e);

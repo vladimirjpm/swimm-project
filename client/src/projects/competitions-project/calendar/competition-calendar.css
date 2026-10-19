@@ -70,3 +70,14 @@
   outline-offset: -2px;
   box-shadow: 0 0 0 2px var(--t-surface), 0 0 0 4px var(--t-accent);
 }
+
+/* Плотные поверхности календаря в тёмной теме (хендофф competitions_home-2: «ячейки и кубы —
+   непрозрачный surface или blur + surface ≥85%»). Фото бассейна у /competitions — на всю
+   страницу (решение Влада 19.10: «бассейн должно быть видно»), а стекло тёмной (белый 5% и 3%)
+   на нём давало текст поверх картинки. Тон тот же — белый 5% / 9% по фону страницы, — но
+   88–90% плотности; blur ячеек остаётся. В светлой поверхность и так белая непрозрачная.
+   Оверрайд роли — только внутри календаря: остальные deep-страницы остаются стеклом. */
+.theme-deep .cc-root {
+  --t-surface: color-mix(in srgb, color-mix(in srgb, var(--deep-text) 5%, var(--deep-page-bg)) 88%, transparent);
+  --t-nested: color-mix(in srgb, color-mix(in srgb, var(--deep-text) 9%, var(--deep-page-bg)) 90%, transparent);
+}

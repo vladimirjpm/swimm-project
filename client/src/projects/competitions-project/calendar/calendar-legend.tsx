@@ -6,7 +6,7 @@ import React from 'react';
  */
 function CalendarLegend() {
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-[14px] text-[11px] text-[var(--t-text-2)]">
+    <div className="mt-2 flex flex-wrap items-center gap-[14px] text-[12px] text-[var(--t-text-2)]">
       <span className="flex items-center gap-[6px]">
         <span
           aria-hidden="true"

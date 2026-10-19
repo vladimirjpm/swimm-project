@@ -28,15 +28,18 @@ function MeetChip({ meet, iso, col }: { meet: CalendarMeet; iso: string; col: nu
   const overL = joinLeft ? (col === 0 ? CELL_PAD : CELL_PAD + GAP_HALF) : 0;
   const overR = joinRight ? (col === 6 ? CELL_PAD : CELL_PAD + GAP_HALF) : 0;
   const baseL = mark ? 2 : 6;
+  const padY = mark?.kind === 'badge' ? 2 : 0;
 
   return (
     <span
       title={meet.name}
-      className={`flex items-center gap-[5px] overflow-hidden whitespace-nowrap text-[11px] ${
+      className={`flex min-h-[22px] shrink-0 items-center gap-[5px] overflow-hidden whitespace-nowrap text-[12px] leading-none ${
         mark ? 'bg-[var(--t-champ-chip-bg)] text-[var(--t-champ-ink)]' : 'bg-[var(--t-nested)] text-[var(--t-text)]'
       }`}
       style={{
-        padding: mark ? `2px ${6 + overR}px 2px ${baseL + overL}px` : `3px ${6 + overR}px 3px ${baseL + overL}px`,
+        // Высота 22px (хендофф competitions_home-2) — без вертикального паддинга; плашку с бейджем
+        // группы (29px) держит сам бейдж, ей оставлен зазор 2px.
+        padding: `${padY}px ${6 + overR}px ${padY}px ${baseL + overL}px`,
         marginLeft: -overL,
         marginRight: -overR,
         borderRadius: `${joinLeft ? 0 : 4}px ${joinRight ? 0 : 4}px ${joinRight ? 0 : 4}px ${joinLeft ? 0 : 4}px`,

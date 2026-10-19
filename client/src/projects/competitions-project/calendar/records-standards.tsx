@@ -27,7 +27,7 @@ function SoonTag() {
 
 function RecordsStandards() {
   return (
-    <section className="relative px-4 pt-[38px] lg:px-16 lg:pt-16" aria-label="Records and standards">
+    <section className="relative pt-[38px] lg:pt-16" aria-label="Records and standards">
       <h2 className="m-0 mb-3 text-[20px] font-extrabold text-[var(--t-text)]">Records &amp; standards</h2>
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-5 lg:gap-3">
