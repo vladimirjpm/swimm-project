@@ -122,7 +122,7 @@ function MeetsSection() {
 
   return (
     <section className="relative px-4 pt-[38px] lg:px-16 lg:pt-16" aria-label="Meets">
-      <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent)] lg:text-[13px] lg:tracking-[0.3em]">
+      <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent-text)] lg:text-[13px] lg:tracking-[0.3em]">
         {`Season ${seasonLabel(seasonStartYear(now))} · ${HOME_REGION_LABEL}`}
       </p>
       <h2 className="mb-[18px] text-[26px] font-black tracking-[-0.02em] text-[var(--t-text)] lg:mb-6 lg:text-[36px]">
@@ -184,7 +184,7 @@ function UpcomingSection() {
 
   return (
     <section className="relative px-4 pt-[38px] lg:px-16 lg:pt-16" aria-label="Upcoming">
-      <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent)] lg:text-[13px] lg:tracking-[0.3em]">
+      <p className="mb-[14px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent-text)] lg:text-[13px] lg:tracking-[0.3em]">
         Start lists are in
       </p>
       <h2 className="mb-[18px] text-[26px] font-black tracking-[-0.02em] text-[var(--t-text)] lg:mb-6 lg:text-[36px]">
@@ -270,7 +270,7 @@ function Competitions() {
       <AppTopbar active="competitions" />
 
       <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
-        <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent)] lg:text-[15px] lg:tracking-[0.3em]">
+        <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent-text)] lg:text-[15px] lg:tracking-[0.3em]">
           {`Season ${seasonLabel(seasonStartYear())} · ${HOME_REGION_LABEL}`}
         </p>
         <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[var(--t-text)] lg:text-[88px] lg:leading-[0.9]">

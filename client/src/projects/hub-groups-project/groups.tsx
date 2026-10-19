@@ -69,7 +69,7 @@ function GroupsList({ groups, favorites }: { groups: HubGroupListItem[]; favorit
   return (
     <>
       <section className="relative px-5 pt-[26px] lg:px-16 lg:pt-[46px]">
-        <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent)] lg:text-[15px] lg:tracking-[0.3em]">
+        <p className="mb-[18px] text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent-text)] lg:text-[15px] lg:tracking-[0.3em]">
           Train together · Follow together
         </p>
         <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[var(--t-text)] lg:text-[88px] lg:leading-[0.9]">

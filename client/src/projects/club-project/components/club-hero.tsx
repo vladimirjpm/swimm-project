@@ -71,7 +71,7 @@ function ClubHero({ club, kpi, competitions, scopeLabel, onCompetitions }: Props
             <a
               href={routes.group(club.official_group_slug)}
               title={club.official_group_name ?? undefined}
-              className="mt-1 flex items-center gap-1.5 self-start text-[12px] font-extrabold no-underline min-[960px]:text-[13px]"
+              className="deep-on-hero mt-1 flex items-center gap-1.5 self-start text-[12px] font-extrabold no-underline min-[960px]:text-[13px]"
               style={{ color: 'var(--deep-accent)' }}
             >
               <span

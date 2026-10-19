@@ -90,37 +90,49 @@
 }
 
 .theme-deep-light {
-  --deep-page-bg: #f4f9fc;
-  --deep-hero-grad: linear-gradient(160deg,#dceff7 0%,#f0f8fc 55%,#f4f9fc 100%);
-  --deep-waterline: rgba(14,116,144,.10);
+  /* Pool Day (хендофф competitions_home, 19.10.2026): насыщенный синий вместо бледного teal.
+     Значения стоят на ПАЛИТРЕ, а не на ролях: роли --t-* выводятся отсюда, а рецепты
+     (.deep-card, табы, пилюли, SwimRow через --sr-*) берут --deep-* напрямую — поставь синий
+     только ролям, и карточки остались бы teal. Не тронуты: золото, ow, danger, live, пол. */
+  --deep-page-bg: #c9e2f7;
+  --deep-hero-grad: linear-gradient(160deg,#4fa8ee 0%,#9fcdf3 30%,#c9e2f7 70%,#c9e2f7 100%);
+  --deep-waterline: rgba(0,87,224,.10);
   --deep-card-bg: #ffffff;
-  --deep-card-bg-raised: #f9fbfd;
-  --deep-card-bg-row: #fbfdfe;
-  --deep-card-border: #e0ecf2;
-  --deep-card-border-soft: #e9f1f6;
-  --deep-divider: #eef4f8;
-  --deep-text: #04283e;
-  --deep-text-mute: #7b95a3;
-  --deep-text-faint: #9db0bb;
-  --deep-text-ghost: #b8c7d0;
-  --deep-accent: #0e7490;
-  --deep-accent-hover: #0c6379;
+  --deep-card-bg-raised: #f2f7ff;
+  --deep-card-bg-row: #f7faff;
+  --deep-card-border: #7fa4d4;
+  --deep-card-border-soft: #c3d8f2;
+  --deep-divider: #d6e5f7;
+  /* Все четыре ступени текста ≥ 4.5 на белом и на #e8f1ff (старые #7b95a3 / #9db0bb давали
+     3.1 и 2.2). Иерархию несут кегль и жирность, а не бледность. */
+  --deep-text: #021638;
+  --deep-text-mute: #1c355c;   /* хендофф #1f3a63; на тон темнее — 4.8 на самом верху градиента */
+  --deep-text-faint: #2b4670;
+  --deep-text-ghost: #415b88;
+  --deep-accent: #0057e0;
+  --deep-accent-hover: #0048b8;
   --deep-accent-ink: #ffffff;
-  --deep-accent-soft: rgba(14,116,144,.06);
-  --deep-accent-chip: rgba(14,116,144,.10);
-  --deep-accent-border: rgba(14,116,144,.45);
-  --deep-accent-glow: 0 2px 12px rgba(8,60,84,.10);
-  --deep-accent-grad: linear-gradient(180deg,#0e7490,#0a4f61);
-  --deep-accent-bar: #0e7490;
-  --deep-accent-bar-dim: rgba(14,116,144,.30);
-  --deep-gold: #b17d11;                            /* текст-голд, контраст ≥4.5 на белом */
+  --deep-accent-soft: #e0ebff;
+  /* Хендофф даёт #c7dcff, но акцент текстом на нём — 4.39; #d3e3ff даёт 4.7 и на глаз тот же. */
+  --deep-accent-chip: #d3e3ff;
+  --deep-accent-border: #003f9e;
+  --deep-accent-glow: 0 2px 12px rgba(0,40,110,.14);
+  --deep-accent-grad: linear-gradient(135deg,#0057e0,#003f9e);
+  --deep-accent-bar: #0057e0;
+  --deep-accent-bar-dim: rgba(0,87,224,.30);
+  /* Текст-голд (--t-warn, --t-level-family, --t-prelim): 5.9 на белом, 5.2 на #e8f1ff, 4.4 на фоне
+     страницы; белый текст на нём (--t-warn-ink) — 5.9. Было #b17d11 — 3.6 на белом и 2.7 на фоне
+     Pool Day; выбрано Владом по сравнению вживую 19.10.2026. */
+  --deep-gold: #8a5a00;
   --deep-gold-soft: rgba(217,164,32,.12);
   --deep-gold-chip: rgba(217,164,32,.14);
   --deep-gold-border: rgba(178,125,17,.35);
   --deep-gold-grad: linear-gradient(180deg,#d9a420,#92600a);
   --deep-gold-bar: #d9a420;
   --deep-gold-bar-dim: rgba(217,164,32,.35);
-  --deep-ow: #7c3aed;
+  /* На ступень темнее, чем до Pool Day (#7c3aed): табы правки полупрозрачные и лежат на
+     голубом фоне страницы — там прежний фиолетовый давал 3.6–3.9. Полосы (-bar) не тронуты. */
+  --deep-ow: #6d28d9;
   --deep-ow-soft: rgba(124,58,237,.06);
   --deep-ow-chip: rgba(124,58,237,.08);
   --deep-ow-border: rgba(124,58,237,.45);
@@ -128,40 +140,45 @@
   --deep-ow-bar-dim: rgba(124,58,237,.30);
   --deep-danger: #b23b3b;
   --deep-danger-soft: rgba(178,59,59,.08);
-  --deep-live: #0f7a52;                            /* зелёный тёмной темы на белом даёт 1.4 */
+  /* Зелёный тёмной темы на белом даёт 1.4. С Pool Day на тон темнее (#0f7a52 → #0d6e4a):
+     «LIVE» 11px на голубых подложках карточек давал 4.3. */
+  --deep-live: #0d6e4a;
   --deep-live-border: rgba(15,122,82,.35);
   --deep-male: #1d4ed8;  --deep-male-soft: rgba(29,78,216,.05);  --deep-male-border: rgba(29,78,216,.2);
   --deep-female: #be185d; --deep-female-soft: rgba(190,24,93,.04); --deep-female-border: rgba(190,24,93,.18);
-  --deep-pool-water: linear-gradient(180deg, #e3f3fa, #d3ecf6);
-  --deep-pool-border: #b9dcea;
-  --deep-pool-label: #5b8aa0;
+  /* Вода доски дорожек на тон темнее карточки (предложение хендоффа): бледная #e3f3fa на
+     голубом фоне страницы терялась. */
+  --deep-pool-water: linear-gradient(180deg, #d6e8fb, #c3d8f2);
+  --deep-pool-border: #7fa4d4;
+  --deep-pool-label: #2b4f85;
   --deep-pool-rope: rgba(178,59,59,.35);
-  --deep-seg-track: #eef4f8;
-  --deep-seg-active-bg: #0e7490;
+  --deep-seg-track: #e8f1ff;
+  --deep-seg-active-bg: #003f9e;
   --deep-seg-active-fg: #fff;
-  --deep-card-shadow: 0 2px 10px rgba(8,60,84,.05);
+  --deep-card-shadow: 0 2px 8px rgba(0,40,110,.14);
   /* Табы в светлой теме: подложка — прохладный тон страницы, а не чёрное стекло
      (0,0,0,.28 на белом даёт серую плашку и убивает контраст подписей). */
-  --deep-tabs-bg: #eaf3f8;
-  --deep-tabs-hairline: rgba(14,116,144,.18);
-  --deep-tab-glow: 0 -4px 14px rgba(8,60,84,.10);
+  --deep-tabs-bg: #e8f1ff;
+  --deep-tabs-hairline: rgba(0,87,224,.18);
+  --deep-tab-glow: 0 -4px 14px rgba(0,40,110,.12);
   --deep-tab-text-glow: none;
   --deep-panel-bg: #ffffff;
-  --deep-panel-border: rgba(14,116,144,.45);
-  --deep-panel-glow: 0 2px 12px rgba(8,60,84,.08);
+  --deep-panel-border: rgba(0,87,224,.45);
+  --deep-panel-glow: 0 2px 12px rgba(0,40,110,.12);
   /* В светлой теме свечения нет: на белом «сияющий» текст читается как размытие,
      роль «выбран» несут цвет-акцент и размер. */
-  --deep-strip-bg: #f0f6fa;
+  --deep-strip-bg: #e8f1ff;
   --deep-wheel-glow: none;
   --deep-wheel-glow-sm: none;
-  --deep-wheel-d1: #5b7684;
-  --deep-wheel-d2: #8ea4b0;
-  --deep-wheel-d3: #b0c1cb;
-  --deep-wheel-off: #7b95a3;
+  /* Лесенка соседей карусели тоже ≥ 4.5 на полосе — «глубину» даёт кегль. */
+  --deep-wheel-d1: #1f3a63;
+  --deep-wheel-d2: #34507c;
+  --deep-wheel-d3: #415b88;
+  --deep-wheel-off: #34507c;
   --deep-dock-bg: rgba(255,255,255,.96);
   --deep-dock-shadow: 0 -6px 20px rgba(76,29,149,.10);
-  --deep-sticky-bg: rgba(244,249,252,.97);
-  --deep-sticky-shadow: 0 4px 14px rgba(8,60,84,.08);
+  --deep-sticky-bg: rgba(201,226,247,.97);
+  --deep-sticky-shadow: 0 4px 14px rgba(0,40,110,.12);
 }
 
 .theme-deep, .theme-deep-light {
@@ -190,6 +207,9 @@
   --t-accent-soft: var(--deep-accent-chip);
   --t-accent-ink: var(--deep-accent-ink);
   --t-accent-grad: var(--deep-accent-grad);
+  /* Акцент МЕЛКИМ текстом (подпись месяца, ссылка 11px). В тёмной — тот же акцент; в светлой
+     темнее (оверрайд ниже): #0057e0 на белом 5.9, а на подложках-чипах и голубом — на грани. */
+  --t-accent-text: var(--deep-accent);
 
   --t-surface: var(--deep-card-bg);
   --t-surface2: var(--deep-card-bg-raised);
@@ -202,11 +222,14 @@
   --t-border-2: var(--deep-card-border-soft);
   --t-scrim: color-mix(in srgb, var(--deep-page-bg) 72%, transparent);
   --t-shadow: var(--deep-card-shadow);
+  /* Тень крупного окна над страницей (поповер, модалка). Тёмная — тень карточки, она там
+     и так глубокая; в светлой своя (оверрайд ниже). */
+  --t-shadow-lg: var(--deep-card-shadow);
 
   --t-text: var(--deep-text);
   --t-text-2: var(--deep-text-mute);
-  /* Третий тон в СВЕТЛОЙ теме схлопывается во второй — см. оверрайд ниже: `--deep-text-faint`
-     (#9db0bb) на белом даёт 2.16 и на 11px не читается. Ступеней в светлой остаётся две. */
+  /* До Pool Day третий тон светлой темы схлопывался во второй (старый `--deep-text-faint`
+     #9db0bb давал на белом 2.16). Теперь faint светлой — #2b4670 (9.6), оверрайд снят. */
   --t-text-3: var(--deep-text-faint);
 
   /* Пометка предварительного заплыва. Значение по умолчанию — тот самый амбер, что жил
@@ -230,13 +253,13 @@
 
   /* Подложка ВЛОЖЕННОЙ панели (раскрытый блок внутри карточки). В тёмной теме это тот же
      тон, что у строк списка, — там карточка сама стекло, и панель отделяется. На белой
-     карточке светлой темы `--deep-card-bg-row` (#fbfdfe) от белого неотличим, поэтому там
+     карточке светлой темы `--deep-card-bg-row` (#f7faff) от белого почти неотличим, поэтому там
      встаёт прохладный тон полосы: панель читается вложенной, но легче шапки списка. */
   --t-nested: var(--deep-card-bg-row);
 
   /* Подпись колонки таблицы (PLACE / TIME / MEDIA). В тёмной теме это рамочный тон акцента
      — так нарисовано в хендоффе и там читается. На белой карточке тот же токен даёт 1.96:
-     45% бирюзы по белому. В светлой берём вторичный текст (3.15) — тон всех приглушённых
+     45% бирюзы по белому. В светлой берём вторичный текст (11.6 у Pool Day) — тон всех приглушённых
      подписей продукта. */
   --t-col-label: var(--t-accent-border);
 
@@ -277,8 +300,54 @@
   --t-list-head: var(--deep-tabs-bg);
   --t-nested: var(--deep-strip-bg);
   --t-col-label: var(--t-text-2);
-  --t-text-3: var(--deep-text-mute);
   --t-prelim: var(--deep-gold);
+  --t-accent-text: #0048b8;
+  --t-shadow-lg: 0 14px 36px rgba(0,40,110,.22);
+}
+
+/* ── Роли без палитрового источника (хендофф competitions_home, Pool Day) ─────────
+   Разделитель сегмент-контрола, золото чемпионатов и чернила бейджа группы K/Y/J/A/M.
+   Своих токенов палитры у них нет — значения прямо здесь, по паре на тему, и ПОСЛЕ общего
+   блока ролей.
+   Чемпионат — золото, но не `--t-warn`: «внимание» и «это чемпионат» разные смыслы, и
+   перекрашивать их придётся порознь. Золото на сайте = медали, SB, WR/NR, «это я»/семья
+   и чемпионаты (последние — только через `--t-champ-*`). */
+.theme-deep {
+  --t-divider: rgba(255,255,255,.16);
+  --t-champ-bg: rgba(251,191,36,.08);          /* слой поверх --t-surface */
+  --t-champ-border: rgba(251,191,36,.45);
+  --t-champ-chip-bg: rgba(251,191,36,.16);
+  --t-champ-ink: #fbbf24;
+  --t-champ-strip-bg: rgba(251,191,36,.12);
+  --t-champ-strip-border: rgba(251,191,36,.45);
+  --t-badge-ink: #0a4f61;
+}
+.theme-deep-light {
+  --t-divider: #3d6fb8;
+  --t-champ-bg: #fff6d6;
+  --t-champ-border: #d99a00;
+  --t-champ-chip-bg: #ffe58a;
+  --t-champ-ink: #5c3d00;
+  --t-champ-strip-bg: #ffe9a3;
+  --t-champ-strip-border: #d99a00;
+  --t-badge-ink: #00265e;
+}
+
+/* ── Текст прямо на ЯРКОМ градиенте шапки (Pool Day, только светлая) ─────────────
+   Верх `--deep-hero-grad` светлой — насыщенный #4fa8ee: на нём держит контраст только
+   тёмный текст, а акцент (2.4), «бледные» подписи (2.3–3.7) и ссылки проваливаются.
+   Класс ставится на элемент, который лежит на градиенте БЕЗ своей подложки (надзаголовок
+   страницы, «‹ назад», ссылка и подписи KPI в шапке клуба/группы): там акцент и все бледные
+   тона становятся вторичным текстом (≥ 4.5 в любой точке градиента). В тёмной класс ничего
+   не делает. Роли переобъявлены и сами (`--t-*`), и их палитра: роль вычислена на корне
+   темы, и сменой одной палитры у потомка её уже не перекрасить. */
+.theme-deep-light .deep-on-hero {
+  --deep-accent: var(--deep-text-mute);
+  --deep-text-faint: var(--deep-text-mute);
+  --deep-text-ghost: var(--deep-text-mute);
+  --t-accent: var(--deep-text-mute);
+  --t-accent-text: var(--deep-text-mute);
+  --t-text-3: var(--deep-text-mute);
 }
 
 /* Нативные контролы (раскрытый список <select>, календарь <input type="date">, скроллбар)

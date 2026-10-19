@@ -45,6 +45,9 @@ function DeepKpi({
   shortLabel?: string;
   value: number | string;
   hint: string;
+  /** Число чемпионским золотом (`--t-champ-ink`): единственная такая плитка — «Championship
+   *  wins». Не `--deep-gold`: плитка стоит на ярком градиенте шапки, и текст-голд светлой
+   *  темы там давал 2.2; в тёмной обе роли — один и тот же #fbbf24. */
   gold?: boolean;
   /** Нативный тултип плитки — для оговорки, которая в подпись не влезает. */
   title?: string;
@@ -55,7 +58,7 @@ function DeepKpi({
         className="text-[24px] leading-none min-[960px]:text-[34px]"
         style={{
           fontFamily: 'var(--deep-font-display)',
-          color: gold ? 'var(--deep-gold)' : 'var(--deep-text)',
+          color: gold ? 'var(--t-champ-ink)' : 'var(--deep-text)',
         }}
       >
         {value}
@@ -71,7 +74,7 @@ function DeepKpi({
           </>
         ) : label}
       </div>
-      <div className="truncate text-[9.5px] font-bold min-[960px]:text-[10.5px]" style={{ color: 'var(--deep-text-ghost)' }}>
+      <div className="deep-on-hero truncate text-[9.5px] font-bold min-[960px]:text-[10.5px]" style={{ color: 'var(--deep-text-ghost)' }}>
         {hint}
       </div>
     </div>
