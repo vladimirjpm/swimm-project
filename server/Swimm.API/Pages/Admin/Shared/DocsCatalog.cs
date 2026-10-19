@@ -33,6 +33,7 @@ public static class DocsCatalog
             new(".github/copilot-instructions.md", "Архитектура и конвенции кода", "где какой код и как называть"),
             new("docs/season-boundary-rule.md", "Сезон", "календарный и витринный сезон"),
             new("docs/ui-components.md", "Реестр UI-компонентов", "что уже есть — перед тем, как верстать своё"),
+            new("docs/design-colors.md", "Цвета сайта", "обе палитры (Deep / Results) в светлой и тёмной теме, медали, рекорды, метки — справочник для дизайна"),
             new("docs/admin-pages/README.md", "Карта админки", "одна справка на страницу"),
         ]),
         new("decisions", "Решения", "что решено, почему, и журналы решений",

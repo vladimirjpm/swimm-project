@@ -37,7 +37,7 @@ function GuestCreateHint({ policy }: { policy: GroupCreationPolicy | null }) {
     <section className="px-4 pt-[26px] lg:px-16" aria-label="Create a group">
       <div className={`${cardCls} flex flex-wrap items-center justify-between gap-4`}>
         <div className="min-w-0 max-w-[640px]">
-          <h2 className="mb-1.5 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">
+          <h2 className="mb-1.5 text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent-text)]">
             Create your own group
           </h2>
           <p className="m-0 text-[13px] text-[var(--t-text-2)]">
@@ -92,7 +92,7 @@ export default function MyGroupsPanel() {
     <section className="px-4 pt-[26px] lg:px-16" aria-label="My groups">
       <div className={cardCls}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent)]">My groups</h2>
+          <h2 className="text-[15px] font-black uppercase tracking-[0.2em] text-[var(--t-accent-text)]">My groups</h2>
           <div className="flex flex-wrap items-center gap-3">
             <GuideLink />
             {eligibility?.limit != null && (

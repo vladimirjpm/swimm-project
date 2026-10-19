@@ -391,7 +391,7 @@ function MyMediaContent({ deep }: { deep: string }) {
           второй уехал в меню аватара топбара, третий обещал несуществующее. */}
       <header className="mm-head">
         <div className="mm-head__id">
-          <p className="mm-head__eyebrow">My profile · {auth.displayName || auth.email}</p>
+          <p className="mm-head__eyebrow deep-on-hero">My profile · {auth.displayName || auth.email}</p>
           <h1 className="mm-head__title">My media</h1>
         </div>
 

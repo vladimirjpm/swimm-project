@@ -107,6 +107,10 @@
   font-size: 10px; font-weight: 900;
 }
 .mm-tab__sub--warn { color: var(--t-warn); }
+/* Pool Day: неактивная папка стоит прямо на ярком градиенте шапки, а прозрачная давала
+   подписям 1.5–3 (золотое «waiting» — 1.47). В светлой ей своя подложка, как у `.deep-tab`;
+   в тёмной папка остаётся стеклом. */
+.my-media.theme-deep-light .mm-tab:not(.mm-tab--on) { background: var(--t-surface2); }
 
 .mm-add {
   margin: 0 0 12px auto;

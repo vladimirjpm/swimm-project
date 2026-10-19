@@ -48,7 +48,7 @@ function Help() {
       <AppTopbar active={key === 'groups' ? 'groups' : undefined} />
       <main className="mx-auto w-full max-w-[760px] px-4 pt-24">
         {back && (
-          <a href={back.href} className="flex items-center gap-1 text-[13px] text-[var(--t-text-3)] hover:text-[var(--t-text-2)]">
+          <a href={back.href} className="deep-on-hero flex items-center gap-1 text-[13px] text-[var(--t-text-3)] hover:text-[var(--t-text-2)]">
             <span aria-hidden="true">‹</span> {back.label}
           </a>
         )}

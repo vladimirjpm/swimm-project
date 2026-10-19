@@ -12,7 +12,7 @@ export function SwimHubLogo() {
     <a href={routes.home()} className="flex items-center gap-3 no-underline">
       <UI_BrandMark className="h-[30px] w-[30px] lg:h-9 lg:w-9" />
       <span className="text-[12px] font-black tracking-[0.22em] text-[var(--t-text)] lg:text-[14px]">
-        SWIM<span className="text-[var(--t-accent)]">HUB</span>
+        SWIM<span className="text-[var(--t-accent-text)]">HUB</span>
       </span>
     </a>
   );
@@ -233,7 +233,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
                 key={link.label}
                 href={link.href}
                 className={`text-[14px] font-bold no-underline ${
-                  link.key === active ? 'text-[var(--t-accent)]' : 'text-[var(--t-text)] hover:text-[var(--t-accent)]'
+                  link.key === active ? 'text-[var(--t-accent-text)]' : 'text-[var(--t-text)] hover:text-[var(--t-accent-text)]'
                 }`}
               >
                 {link.label}
@@ -266,7 +266,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
                 {showSetup && <SetupDot warn={warnSetup} />}
               </span>
               <span className="max-w-[140px] truncate text-[13px] font-bold text-[var(--t-text)]">{userName}</span>
-              <span className="text-[10px] text-[var(--t-accent)]">▾</span>
+              <span className="text-[10px] text-[var(--t-accent-text)]">▾</span>
             </button>
             {userMenuOpen && (
               <div className="absolute right-0 top-[42px] z-40 w-[220px] rounded-[16px] border border-[var(--t-accent-border)] bg-[var(--t-surface-strong)] p-2 shadow-[var(--t-shadow)] backdrop-blur-[18px]">
