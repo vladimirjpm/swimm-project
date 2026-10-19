@@ -100,6 +100,7 @@ public static class CachePolicyCatalog
     {
         ["CategoriesController"] = "названия и бейджи категорий — на всех страницах результатов",
         ["ClubPointsController"] = "клубные очки в таблице результатов",
+        ["CompetitionCalendarController"] = "/competitions — календарь сезона (Year / Month / Meet days)",
         ["ClubsPublicController"] = "/clubs/{id} — страница клуба (правится из её таба Admin)",
         ["HubGroupsController"] = "/groups и /groups/{slug} — список и страница группы (правится из её таба Admin)",
         ["RecordsController"] = "справочник рекордов, попап нормативов; дуги уровня и метки рекордов на всех страницах",
