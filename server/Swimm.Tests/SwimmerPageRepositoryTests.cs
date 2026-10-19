@@ -237,6 +237,49 @@ public class SwimmerPageRepositoryTests
         Assert.Contains(mastersPeers, p => p.SwimmerId == peer.Id && p.MastersAgeGroup == "40-44");
     }
 
+    /// <summary>
+    /// Р84: с 18 лет когорта — все взрослые на обычных стартах разом, а не один год рождения.
+    /// Регрессия 19.10.2026: 24-летняя была «#1 of 2» среди двух ровесниц.
+    /// </summary>
+    [Fact]
+    public async Task AdultCohort_MergesAllAdultBirthYears_ButNotJuniorsOrMasters()
+    {
+        await using var db = CreateDb(nameof(AdultCohort_MergesAllAdultBirthYears_ButNotJuniorsOrMasters));
+        var style = new Style { Name = "freestyle" };
+        var regular = Comp("Open", "16/02/2026");
+        var masters = Comp("Masters", "10/01/2026");
+        masters.IsMasters = true;
+        // Сезон 2025/26: возраст = 2026 − год рождения.
+        var she = new Swimmer { FirstName = "Аня", LastName = "24", BirthYear = 2002, Gender = "female" };
+        var older = new Swimmer { FirstName = "Вера", LastName = "30", BirthYear = 1996, Gender = "female" };
+        var eighteen = new Swimmer { FirstName = "Галя", LastName = "18", BirthYear = 2008, Gender = "female" };
+        var junior = new Swimmer { FirstName = "Даша", LastName = "17", BirthYear = 2009, Gender = "female" };
+        db.AddRange(style, regular, masters, she, older, eighteen, junior);
+        await db.SaveChangesAsync();
+
+        var mastersSwim = Swim(masters, older, style, new DateTime(2026, 1, 10), 28000);
+        mastersSwim.AgeGroup = "30-34";
+        db.AddRange(
+            Swim(regular, she, style, new DateTime(2026, 2, 16), 30000),
+            Swim(regular, older, style, new DateTime(2026, 2, 16), 31000),
+            Swim(regular, eighteen, style, new DateTime(2026, 2, 16), 29000),
+            Swim(regular, junior, style, new DateTime(2026, 2, 16), 27000),
+            mastersSwim);
+        await db.SaveChangesAsync();
+
+        var cohort = await Repo(db).GetAgeCohortSeasonBestsAsync(2025, 2002);
+
+        Assert.Equal(
+            new[] { she.Id, older.Id, eighteen.Id }.OrderBy(id => id),
+            cohort.Select(p => p.SwimmerId).OrderBy(id => id));
+        // Мастерский старт взрослого в обычный круг не идёт: его лучшее здесь — 31.00.
+        Assert.Equal(31000, cohort.Single(p => p.SwimmerId == older.Id).TimeMs);
+
+        // Юниорская когорта по-прежнему — ровно свой год рождения.
+        var juniors = await Repo(db).GetAgeCohortSeasonBestsAsync(2025, 2009);
+        Assert.Equal(junior.Id, Assert.Single(juniors).SwimmerId);
+    }
+
     [Fact]
     public async Task UnknownSwimmer_ReturnsEmpty_NotNull()
     {

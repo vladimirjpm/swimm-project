@@ -73,4 +73,20 @@ public static class SeasonMath
         var age = startYear + 1 - birthYear;
         return age > 0 ? age : null;
     }
+
+    /// <summary>
+    /// С этого возраста в сезоне сверстники — уже не «тот же год рождения», а все взрослые
+    /// разом (решение Влада 19.10.2026, Р84 в <c>docs/data-integrity.md</c>): после Juniors
+    /// (14–17) немастерские старты — одна категория Adults. Иначе 24-летняя оказывалась
+    /// «#1 of 2» среди двух ровесниц, хотя плывёт в одном зачёте со всеми взрослыми.
+    /// Зеркало на клиенте — <c>SEASON_ADULT_AGE</c> в <c>season-helper.ts</c>.
+    /// </summary>
+    public const int AdultPeerAge = 18;
+
+    /// <summary>
+    /// Ступень сверстников для сезонного возраста: до 17 — сам возраст, с 18 —
+    /// <see cref="AdultPeerAge"/> (одна взрослая ступень). Ею меряются Season best пловца,
+    /// бейдж SB и таблица <c>/api/season-best/table</c> — правило одно на все три.
+    /// </summary>
+    public static int PeerStepAge(int age) => age >= AdultPeerAge ? AdultPeerAge : age;
 }

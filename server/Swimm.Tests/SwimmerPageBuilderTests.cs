@@ -585,8 +585,35 @@ public class SwimmerPageBuilderTests
 
         var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 2001, "female", cohort);
 
-        Assert.Equal("women 25", dto.GroupLabel);
+        // С 18 лет круг — все взрослые (Р84): подпись хвостом, ссылка — срез 18…99.
+        Assert.Equal("women 18+", dto.GroupLabel);
+        Assert.Equal(25, dto.Age);
+        Assert.Equal(18, dto.PeerAgeFrom);
+        Assert.Equal(99, dto.PeerAgeTo);
     }
+
+    [Fact]
+    public void SeasonRanks_LastJuniorYear_StaysOneBirthYear()
+    {
+        // 17 — последний год Juniors: круг ещё год рождения, взрослый хвост начинается с 18 (Р84).
+        var rows = new[] { Row(1, "2026-02-16", ms: 60000) };
+        var cohort = new[] { Peer(Swimmer, 60000), Peer(7, 61000) };
+
+        var dto = SwimmerPageBuilder.SeasonRanks(rows, season: 2025, birthYear: 2009, "male", cohort);
+
+        Assert.Equal("boys 17", dto.GroupLabel);
+        Assert.Equal(17, dto.PeerAgeFrom);
+        Assert.Equal(17, dto.PeerAgeTo);
+    }
+
+    [Theory]
+    [InlineData(9, 9)]
+    [InlineData(17, 17)]
+    [InlineData(18, 18)]
+    [InlineData(24, 18)]
+    [InlineData(60, 18)]
+    public void PeerStepAge_FoldsAdultsIntoOneStep(int age, int step) =>
+        Assert.Equal(step, Swimm.Domain.SeasonMath.PeerStepAge(age));
 
     // ── Season best: мастерский заплыв меряется своей группой протокола ─────────
 
@@ -637,7 +664,7 @@ public class SwimmerPageBuilderTests
         Assert.Equal(1, rank.Rank);
         Assert.Equal(2, rank.PeerCount);
         Assert.Null(rank.AgeGroup);
-        Assert.Equal("women 25", rank.GroupLabel);
+        Assert.Equal("women 18+", rank.GroupLabel);
     }
 
     [Fact]

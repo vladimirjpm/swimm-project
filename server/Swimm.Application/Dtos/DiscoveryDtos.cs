@@ -20,6 +20,10 @@ public sealed class DiscoverySyncResult
     public int Added { get; set; }
     public int Updated { get; set; }
     public int TotalOnSite { get; set; }
+    /// <summary>Будущих стартов, у которых в этот раз увидели перенос даты (В4, <c>DiscoverySyncRules</c>).</summary>
+    public int Postponed { get; set; }
+    /// <summary>Будущих стартов сезона, впервые пропавших из списка сайта (кандидаты в отменённые).</summary>
+    public int Missing { get; set; }
 }
 
 /// <summary>Строка «входящих» для админки.</summary>

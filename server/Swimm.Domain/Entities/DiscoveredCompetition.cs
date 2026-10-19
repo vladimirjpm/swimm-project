@@ -86,4 +86,25 @@ public class DiscoveredCompetition
     /// <summary>Кто/что поставило пометку: «auto» (разбор) или email админа (вручную).</summary>
     [MaxLength(200)]
     public string? EmptySourceBy { get; set; }
+
+    /// <summary>
+    /// Перенос (В4, часть В плана главной): ПЕРВАЯ объявленная дата начала старта, если сайт
+    /// сдвинул ещё не прошедший старт. null — переноса нет (или его отменили — дату вернули).
+    /// Правило — <c>DiscoverySyncRules.ClassifyDateChange</c>; календарь рисует по ней «призрак»
+    /// Postponed на прежних датах.
+    /// </summary>
+    public DateTime? PreviousDateStart { get; set; }
+
+    /// <summary>Последний день по первой объявленной дате (пара к <see cref="PreviousDateStart"/>).</summary>
+    public DateTime? PreviousDateEnd { get; set; }
+
+    /// <summary>Когда синхронизация последний раз увидела перенос (или его отмену).</summary>
+    public DateTime? DateChangedAt { get; set; }
+
+    /// <summary>
+    /// Отмена (В4): с какого момента будущий старт текущего сезона пропал из списка isr.org.il
+    /// при успешном заборе обоих списков. Снова увиден — null. Календарь отдаёт такой
+    /// предстоящий старт со статусом cancelled. Правило — <c>DiscoverySyncRules.FindMissing</c>.
+    /// </summary>
+    public DateTime? MissingSince { get; set; }
 }

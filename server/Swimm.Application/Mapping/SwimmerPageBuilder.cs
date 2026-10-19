@@ -332,7 +332,8 @@ public static class SwimmerPageBuilder
 
     /// <summary>
     /// Фильтр «Season best»: место пловца среди СВЕРСТНИКОВ в каждой дисциплине, где он плавал
-    /// в выбранном сезоне. Сверстники — пловцы того же года рождения на обычных стартах, у
+    /// в выбранном сезоне. Сверстники — пловцы того же года рождения на обычных стартах (с 18
+    /// лет — все взрослые, Р84), у
     /// мастерского заплыва — его группа протокола (<see cref="RankAmongPeers"/>); пол разделяет
     /// сам ключ дисциплины, поэтому отдельного фильтра по полу тут нет.
     ///
@@ -353,6 +354,9 @@ public static class SwimmerPageBuilder
     {
         var age = season is int s ? SeasonMath.AgeInSeason(s, birthYear) : null;
         var sex = NormalizeGender(gender);
+        // С 18 лет круг — все взрослые (Р84): ступень 18, в списке /season-best это 18…99.
+        var step = age is int a ? SeasonMath.PeerStepAge(a) : (int?)null;
+        var adult = step == SeasonMath.AdultPeerAge;
         var dto = new SwimmerSeasonRankDto
         {
             Season = season,
@@ -360,6 +364,8 @@ public static class SwimmerPageBuilder
             Age = age,
             Gender = sex,
             GroupLabel = PeerGroupLabel(age, sex),
+            PeerAgeFrom = step,
+            PeerAgeTo = adult ? AdultListAgeTo : step,
         };
 
         // Карьера — не сезон: «где я среди сверстников» имеет смысл только внутри одного
@@ -397,20 +403,25 @@ public static class SwimmerPageBuilder
     }
 
     /// <summary>
-    /// Подпись группы сверстников для UI: «girls 9», у взрослых — «women 25» (иначе
-    /// мастерс читался бы как «boys 45»). null — возраст или пол неизвестны.
+    /// Подпись группы сверстников для UI: «girls 9», у взрослых — «women 18+»: с 18 лет круг
+    /// один на всех немастерских взрослых (Р84), и «women 25» соврала бы, что сравнивают
+    /// только с ровесницами. null — возраст или пол неизвестны.
     /// </summary>
     private static string? PeerGroupLabel(int? age, string? gender)
     {
         if (age is not int a || gender is null) return null;
+        var adult = a >= SeasonMath.AdultPeerAge;
         var noun = gender == "female"
-            ? (a >= AdultAge ? "women" : "girls")
-            : (a >= AdultAge ? "men" : "boys");
-        return $"{noun} {a}";
+            ? (adult ? "women" : "girls")
+            : (adult ? "men" : "boys");
+        return adult ? $"{noun} {SeasonMath.AdultPeerAge}+" : $"{noun} {a}";
     }
 
-    /// <summary>С этого возраста группа называется «women/men», а не «girls/boys».</summary>
-    private const int AdultAge = 18;
+    /// <summary>
+    /// Верх взрослого круга в адресе <c>/season-best</c> (<c>age_to</c>) — тот же, что у
+    /// кнопки «18+» витрины (<c>SB_ADULT_TO</c> в <c>sb-filters-model.ts</c>).
+    /// </summary>
+    private const int AdultListAgeTo = 99;
 
     /// <summary>Подпись мастерского круга: «women 45-49». Без пола — просто группа.</summary>
     private static string MastersGroupLabel(string ageGroup, string? gender) => gender switch
@@ -437,7 +448,8 @@ public static class SwimmerPageBuilder
     ///
     /// Круг выбирается по заплыву, а не по пловцу, и повторяет срезы списка
     /// <c>/season-best</c>, куда ведёт строка: мастерский старт — его группа протокола
-    /// («45-49», срез с <c>age_group</c>), обычный — ровесники того же года рождения на
+    /// («45-49», срез с <c>age_group</c>), обычный — ровесники того же года рождения (с 18 лет —
+    /// все взрослые, срез 18+) на
     /// обычных стартах (срез с <c>age</c>). Раньше мастерский заплыв ранжировался среди
     /// ровесников по году рождения — такой выборки нет ни в одном срезе списка, и ссылка
     /// «#1 of 3» открывала пустую страницу (24.09.2026).
@@ -807,7 +819,7 @@ public static class SwimmerPageBuilder
     ///
     /// SB считается ТОЙ ЖЕ арифметикой, что фильтр «Season best» (<see cref="SeasonRanks"/>):
     /// место — «сколько строго быстрее + 1», круг — <see cref="RankAmongPeers"/> (свой год
-    /// рождения и пол, у мастерского старта — его группа протокола). За карьеру
+    /// рождения и пол, с 18 лет — все взрослые, у мастерского старта — группа протокола). За карьеру
     /// бейджа нет вовсе: сравнение живёт внутри одного сезона.
     /// </summary>
     private static CompareFlags Flags(

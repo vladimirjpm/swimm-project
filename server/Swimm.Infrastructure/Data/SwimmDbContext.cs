@@ -83,6 +83,8 @@ public class SwimmDbContext : DbContext
     public DbSet<DataCheckFinding> DataCheckFindings => Set<DataCheckFinding>();
     public DbSet<DataCheckState> DataCheckStates => Set<DataCheckState>();
     public DbSet<DiscoveredCompetition> DiscoveredCompetitions => Set<DiscoveredCompetition>();
+    /// <summary>Журнал запусков фоновых задач по расписанию (В12): «последний запуск» переживает рестарт.</summary>
+    public DbSet<JobRun> JobRuns => Set<JobRun>();
 
     /* === Фавориты и медиа пользователей === */
     public DbSet<UserFavorite> UserFavorites => Set<UserFavorite>();

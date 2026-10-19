@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -9,7 +10,8 @@ namespace Swimm.Infrastructure.Services;
 /// нормализованному имени с таблицей Competitions (OrgCompId у PDF-импортов не заполняется —
 /// имя+дата единственный шов). Используется и списком /Admin/Discovery (<see cref="CompetitionDiscoveryService"/>),
 /// и карточкой дашборда (<see cref="DashboardStatusService"/>) — не должно быть двух копий,
-/// которые могут разойтись.
+/// которые могут разойтись. Само правило (нормализация + сравнение) — чистая функция
+/// <see cref="DiscoveryNameMatch"/> в Application: его же зовёт календарь главной.
 /// </summary>
 /// <summary>Совпавшее соревнование: его Id и отображаемое имя.</summary>
 internal readonly record struct CompetitionMatch(int CompetitionId, string Name);
@@ -21,10 +23,8 @@ internal class DiscoveryCompetitionMatcher(SwimmDbContext db)
     public async Task<Dictionary<int, CompetitionMatch?>> MatchAsync(
         IReadOnlyList<DiscoveredCompetition> rows, CancellationToken ct = default)
     {
-        // Матч «уже импортировано»: дата дня попадает в [DateStart..DateEnd] и имя совпадает
-        // после нормализации ЛИБО имя Discovery начинается с имени соревнования — сайт дописывает
-        // суффикс района («…- מחוז צפון»), которого в протоколе/БД нет. Нормализация выкидывает
-        // кавычки и бэкслеши: в БД встречаются «ארנה», «"ארנה"» и «\"ארנה\"» (артефакт импорта).
+        // Правило — DiscoveryNameMatch: дата дня в [DateStart..DateEnd] и имя совпадает после
+        // нормализации ЛИБО имя Discovery начинается с имени соревнования (суффикс района).
         // Дни в Competitions.Date — строка dd/MM/yyyy.
         var competitions = await db.Competitions
             .AsNoTracking()
@@ -43,7 +43,7 @@ internal class DiscoveryCompetitionMatcher(SwimmDbContext db)
             foreach (var c in candidates)
             {
                 if (c.Date < d.DateStart || c.Date > d.DateEnd) continue;
-                if (dKey == c.Key || dKey.StartsWith(c.Key, StringComparison.Ordinal))
+                if (DiscoveryNameMatch.KeysMatch(dKey, c.Key))
                 {
                     matched = new CompetitionMatch(c.Id, c.Name);
                     break;
@@ -54,13 +54,8 @@ internal class DiscoveryCompetitionMatcher(SwimmDbContext db)
         return result;
     }
 
-    /// <summary>Trim/lower, схлопнуть пробелы, выкинуть кавычки/бэкслеши/гереш-гершаим —
-    /// они непоследовательны между сайтом и импортированными именами.</summary>
-    internal static string Normalize(string name)
-    {
-        var cleaned = new string(name.Where(c => c is not ('"' or '\\' or '\'' or '׳' or '״' or '`' or '’' or '“' or '”')).ToArray());
-        return string.Join(' ', cleaned.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
-    }
+    /// <summary>См. <see cref="DiscoveryNameMatch.Normalize"/>.</summary>
+    internal static string Normalize(string name) => DiscoveryNameMatch.Normalize(name);
 
     private static DateTime? ParseDdMmYyyy(string date)
     {

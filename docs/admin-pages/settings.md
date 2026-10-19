@@ -8,12 +8,20 @@
 
 **Блок «Почта»** — карточка вверху страницы, раздел [ниже](#почта-блок-статуса-и-тестовое-письмо-2026-10-14).
 
-Ключевые ключи: DiscoveryEnabled/DiscoveryIntervalHours,
+Ключевые ключи: DiscoveryEnabled/DiscoveryIntervalHours (дефолт ВЫКЛ/**24ч** — с 19.10.2026, было 12),
 LogligVerifyEnabled/LogligVerifyIntervalHours (дефолт вкл/24ч),
 LogligBatchEnabled/LogligBatchPerRun/LogligBatchIntervalHours (дефолт ВЫКЛ/50/24ч),
 **RecordAgeAxis** (дефолт `calendar`, значения `calendar`/`season`),
 **CacheRowPrecision** / **CacheColumnPrecision** / **CacheHitVerifyPercent** (кэш, раздел ниже).
 Scope: admin / livesite / both.
+
+**Фоновые расписания (часть В, 19.10.2026).** Discovery (+ StartList), LogligVerify и LogligBatch
+работают только там, где включены фоновые расписания — `HostingMode.BackgroundJobsEnabled`: явный
+`BackgroundJobs:Enabled` важнее, без него — выкл в Development и вкл в остальных; на проде false,
+в ProdAdmin true. То есть тумблеры этих ключей действуют в **ProdAdmin**; в локальной разработке
+таймеров нет вовсе (В10). Интервал считается от последнего успеха в журнале `Sys_JobRuns`
+(В12), не от старта процесса: перезапуск API задачу заново не запускает; после неудачи — повтор
+не раньше чем через час. `DiscoveryEnabled` по умолчанию выключен — включается здесь под ProdAdmin.
 
 ## Почта: блок статуса и тестовое письмо (2026-10-14)
 

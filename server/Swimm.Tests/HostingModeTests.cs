@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Swimm.API.Hosting;
 using Swimm.Application.Abstractions;
 using Xunit;
@@ -20,12 +22,43 @@ public class HostingModeTests
 
     // ── Выключатели ──────────────────────────────────────────────────────────
 
-    [Fact]
-    public void Flags_DefaultOn_SoDevelopmentIsUnchanged()
+    private sealed class Env(string name) : IHostEnvironment
     {
+        public string EnvironmentName { get; set; } = name;
+        public string ApplicationName { get; set; } = "Swimm.API";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static readonly IHostEnvironment Development = new Env(Environments.Development);
+    private static readonly IHostEnvironment Production = new Env(Environments.Production);
+    private static readonly IHostEnvironment ProdAdmin = new Env(HostingMode.ProdAdminEnvironment);
+
+    [Fact]
+    public void Admin_DefaultOn()
+    {
+        Assert.True(HostingMode.AdminEnabled(Config()));
+    }
+
+    [Fact]
+    public void Jobs_WithoutKey_OffInDevelopment_OnElsewhere()
+    {
+        // В10: локальный API по таймеру наружу не ходит, если явно не попросить.
         var cfg = Config();
-        Assert.True(HostingMode.AdminEnabled(cfg));
-        Assert.True(HostingMode.BackgroundJobsEnabled(cfg));
+        Assert.False(HostingMode.BackgroundJobsEnabled(cfg, Development));
+        Assert.True(HostingMode.BackgroundJobsEnabled(cfg, Production));
+        Assert.True(HostingMode.BackgroundJobsEnabled(cfg, ProdAdmin));
+    }
+
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    public void Jobs_ExplicitKey_WinsInAnyEnvironment(string value, bool expected)
+    {
+        var cfg = Config(("BackgroundJobs:Enabled", value));
+        Assert.Equal(expected, HostingMode.BackgroundJobsEnabled(cfg, Development));
+        Assert.Equal(expected, HostingMode.BackgroundJobsEnabled(cfg, Production));
+        Assert.Equal(expected, HostingMode.BackgroundJobsEnabled(cfg, ProdAdmin));
     }
 
     [Fact]
@@ -33,18 +66,30 @@ public class HostingModeTests
     {
         var cfg = Config(("Admin:Enabled", "false"), ("BackgroundJobs:Enabled", "false"));
         Assert.False(HostingMode.AdminEnabled(cfg));
-        Assert.False(HostingMode.BackgroundJobsEnabled(cfg));
+        Assert.False(HostingMode.BackgroundJobsEnabled(cfg, ProdAdmin));
     }
 
     [Fact]
     public void ProductionConfig_ShipsWithAdminAndJobsOff()
     {
         // Выключатель приезжает с кодом: appsettings.Production.json закоммичен и едет в publish.
+        // Без админки нет и очередей (они регистрируются под AdminEnabled), без флага — расписаний.
         var path = Path.Combine(RepoRoot(), "server", "Swimm.API", "appsettings.Production.json");
         var cfg = new ConfigurationBuilder().AddJsonFile(path).Build();
 
         Assert.False(HostingMode.AdminEnabled(cfg));
-        Assert.False(HostingMode.BackgroundJobsEnabled(cfg));
+        Assert.False(HostingMode.BackgroundJobsEnabled(cfg, Production));
+    }
+
+    [Fact]
+    public void ProdAdminConfig_ShipsWithAdminAndJobsOn()
+    {
+        // ProdAdmin — единственное место, где расписания ходят наружу (В12): и очереди, и расписания.
+        var path = Path.Combine(RepoRoot(), "server", "Swimm.API", "appsettings.ProdAdmin.json");
+        var cfg = new ConfigurationBuilder().AddJsonFile(path).Build();
+
+        Assert.True(HostingMode.AdminEnabled(cfg));
+        Assert.True(HostingMode.BackgroundJobsEnabled(cfg, ProdAdmin));
     }
 
     [Theory]

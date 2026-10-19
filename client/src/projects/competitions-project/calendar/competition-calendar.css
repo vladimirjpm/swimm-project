@@ -1,0 +1,72 @@
+/* Календарь сезона на /competitions — то, что неудобно писать на Tailwind. */
+
+/* Фокус с клавиатуры — одна обводка на все кликабельные элементы календаря.
+   ⚠ Фон/рамку кнопок здесь НЕ задаём: правила вне @layer перебивают утилиты Tailwind,
+   а сброс нативной кнопки уже делает preflight. */
+.cc-focus:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+}
+
+/* Куб чемпионата: золотой слой ПОВЕРХ поверхности (в тёмной --t-champ-bg полупрозрачный,
+   поэтому градиент из двух слоёв, а не просто цвет). Вне @layer — перебивает bg-утилиты
+   Tailwind, это нужно. Hover чемпионата — без смены фона, только рамка. */
+.cc-cube--champ {
+  background: linear-gradient(var(--t-champ-bg), var(--t-champ-bg)), var(--t-surface);
+  border-color: var(--t-champ-border);
+}
+.cc-cube--champ:hover {
+  border-color: var(--t-accent);
+}
+
+/* Имя соревнования в кубе — ровно две строки. */
+.cc-clamp2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em;
+}
+
+/* Панель типов на телефоне: плавное раскрытие через grid-template-rows 0fr → 1fr (не height).
+   Внутренний блок обязан иметь overflow:hidden и min-height:0, иначе 0fr не схлопнется. */
+.cc-types {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.28s ease, opacity 0.22s ease;
+}
+.cc-types--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.cc-types > div {
+  overflow: hidden;
+  min-height: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-types {
+    transition: none;
+  }
+}
+
+/* Лента дней Meet на телефоне: горизонтальная прокрутка без полосы. */
+.cc-strip {
+  scrollbar-width: none;
+}
+.cc-strip::-webkit-scrollbar {
+  display: none;
+}
+
+/* Фокус в сегменте с overflow:hidden — обводка внутрь, иначе её срежет рамка группы. */
+.cc-focus-inset:focus-visible {
+  outline-offset: -3px;
+}
+
+/* Фокус ячейки дня: у неё уже есть обводка «сегодня»/«выбран» (inline outline), поэтому фокус —
+   кольцом из box-shadow, чтобы не спорить с ней. */
+.cc-focus-ring:focus-visible {
+  outline: none; /* у «сегодня»/«выбран» своя inline-обводка — она перебьёт это правило, и так задумано */
+  outline-offset: -2px;
+  box-shadow: 0 0 0 2px var(--t-surface), 0 0 0 4px var(--t-accent);
+}

@@ -82,3 +82,16 @@ internal sealed class ImportReconciliationConfiguration : IEntityTypeConfigurati
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+// Журнал запусков фоновых задач по расписанию (В12). Sys_: служебное, гранта swimm_ro нет; в
+// прод-наполнение и синхронизацию не едет — у каждой базы свой журнал (seed-tables.txt).
+internal sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
+{
+    public void Configure(EntityTypeBuilder<JobRun> entity)
+    {
+        entity.ToTable("Sys_JobRuns");
+        entity.HasKey(e => e.Name);
+        entity.Property(e => e.Name).HasMaxLength(100);
+        entity.Property(e => e.LastError).HasMaxLength(1000);
+    }
+}

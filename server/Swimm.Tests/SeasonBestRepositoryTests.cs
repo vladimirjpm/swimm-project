@@ -875,6 +875,39 @@ public class SeasonBestRepositoryTests
     }
 
     /// <summary>
+    /// Р84: с 18 лет все взрослые — одна ступень «18». 24-летний и 30-летний делят её, и SB
+    /// получает быстрейший взрослый, а не каждый, кто один в своём году рождения.
+    /// 17-летний остаётся на своей ступени.
+    /// </summary>
+    [Fact]
+    public async Task TableFoldsAdultsIntoOneStep()
+    {
+        using var db = CreateDb(nameof(TableFoldsAdultsIntoOneStep));
+        var style = FreestyleStyle();
+        var club = new Club { Name = "Alpha", NameEn = "Alpha" };
+        var comp = MakeCompetition();
+        // Сезон 2025/26: возраст = 2026 − год рождения.
+        var age24 = MakeSwimmer(club, "TwentyFour", 2002);
+        var age30 = MakeSwimmer(club, "Thirty", 1996);
+        var age17 = MakeSwimmer(club, "Seventeen", 2009);
+        foreach (var s in new[] { age24, age30, age17 }) s.Gender = "male";
+
+        db.AddRange(style, club, comp, age24, age30, age17);
+        db.Add(Swim(comp, club, age24, style, new DateTime(2026, 2, 15), timeMs: 25_000));
+        db.Add(Swim(comp, club, age30, style, new DateTime(2026, 2, 15), timeMs: 24_000));
+        db.Add(Swim(comp, club, age17, style, new DateTime(2026, 2, 15), timeMs: 23_000));
+        await db.SaveChangesAsync();
+
+        var table = await Repo(db).GetSeasonBestTableAsync(Season);
+
+        Assert.Equal(new[] { 17, 18 }, table.Data.Select(i => i.Age).OrderBy(a => a));
+        var adults = table.Data.Single(i => i.Age == 18);
+        Assert.Equal(24_000, adults.TimeMs);
+        Assert.Equal(2, adults.Peers);
+        Assert.Equal(1, table.Data.Single(i => i.Age == 17).Peers);
+    }
+
+    /// <summary>
     /// 25м и 50м — разные ступени: одно время в них несравнимо, и слить их значило бы
     /// выдать бейдж SB короткому бассейну за результат длинного.
     /// </summary>

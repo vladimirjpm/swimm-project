@@ -205,8 +205,13 @@ internal static class DiscoveryCli
     {
         using var scope = app.Services.CreateScope();
         var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
+        var startedAt = DateTime.UtcNow;
         var sync = await discovery.SyncAsync();
-        Console.WriteLine($"Discovery: на сайте {sync.TotalOnSite}, добавлено {sync.Added}, обновлено {sync.Updated}");
+        // Текущий сезон проверен — успех в журнал расписаний (В12), как у кнопки «Проверить сейчас».
+        await scope.ServiceProvider.GetRequiredService<IJobRunStore>()
+            .RecordAsync(Swimm.Application.Mapping.JobNames.Discovery, startedAt, success: true, error: null);
+        Console.WriteLine($"Discovery: на сайте {sync.TotalOnSite}, добавлено {sync.Added}, обновлено {sync.Updated}, " +
+                          $"перенесено {sync.Postponed}, пропало {sync.Missing}");
         return;
     }
 }

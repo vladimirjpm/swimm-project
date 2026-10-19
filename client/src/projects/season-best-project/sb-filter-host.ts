@@ -56,7 +56,7 @@ export function useSeasonBestFilterHost(params: {
       pool_type: filters.poolType ?? 'all',
       gender: filters.gender ?? 'all',
       // Возраст в общей модели — одна строка, поэтому три состояния витрины кодируются ею:
-      // конкретный год, хвост «21+» и мастерская группа «25-29».
+      // конкретный год, хвост «18+» и мастерская группа «25-29».
       age: filters.ageGroup
         ? filters.ageGroup
         : filters.ageTo != null
@@ -152,7 +152,7 @@ export function useSeasonBestFilterHost(params: {
       poolTypes: ['all', '25m', '50m'],
       ages: {
         mode: 'age',
-        // Хвост «21+» — взрослые в обычных стартах; до него они были видны только под «All».
+        // Хвост «18+» — взрослые в обычных стартах, одним кругом (Р84).
         values: ['all', ...SB_AGES.map(String), SB_AGE_ADULT],
         // Подпись «сколько лет на стартах» здесь не нужна: возраст и так сезонный.
         compYears: [],

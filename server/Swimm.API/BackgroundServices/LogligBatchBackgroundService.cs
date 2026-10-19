@@ -1,4 +1,5 @@
 using Swimm.Application.Abstractions;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.BackgroundServices;
 
@@ -8,6 +9,7 @@ namespace Swimm.API.BackgroundServices;
 /// прогонами). Управляется настройками Admin/Settings, проверяются каждый тик. ВЫКЛЮЧЕНО по
 /// умолчанию: каждый пловец — 1–3 платных запроса Serper, включать осознанно
 /// (LogligBatchEnabled = true; 50 пловцов за прогон ≈ до 150 запросов ≈ копейки).
+/// «Последний запуск» — в журнале Sys_JobRuns (В12, <see cref="ScheduledJob"/>).
 /// </summary>
 public sealed class LogligBatchBackgroundService : BackgroundService
 {
@@ -27,8 +29,6 @@ public sealed class LogligBatchBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var lastRun = DateTime.MinValue;
-
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -38,17 +38,17 @@ public sealed class LogligBatchBackgroundService : BackgroundService
 
                 if (settings.GetValue("LogligBatchEnabled", false))
                 {
-                    var intervalHours = Math.Max(1, settings.GetValue("LogligBatchIntervalHours", 24));
-                    if (DateTime.UtcNow - lastRun >= TimeSpan.FromHours(intervalHours))
+                    var interval = TimeSpan.FromHours(Math.Max(1, settings.GetValue("LogligBatchIntervalHours", 24)));
+                    // «Последний запуск» — в журнале Sys_JobRuns (В12): рестарт API не тратит Serper заново.
+                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.LogligBatch, interval, async ct =>
                     {
                         var perRun = Math.Clamp(settings.GetValue("LogligBatchPerRun", 50), 1, 500);
                         var linkService = scope.ServiceProvider.GetRequiredService<ILogligLinkService>();
-                        var report = await linkService.RunBatchAsync(perRun, stoppingToken);
-                        lastRun = DateTime.UtcNow;
+                        var report = await linkService.RunBatchAsync(perRun, ct);
                         _logger.LogInformation(
                             "Loglig batch (фон): обработано {Processed}, привязано {Linked}, с кандидатами {WithCandidates}, впустую {NothingFound}",
                             report.Processed, report.Linked, report.WithCandidates, report.NothingFound);
-                    }
+                    }, _logger, stoppingToken);
                 }
             }
             catch (OperationCanceledException)
@@ -57,8 +57,8 @@ public sealed class LogligBatchBackgroundService : BackgroundService
             }
             catch (Exception ex)
             {
-                // Ошибка сети/вёрстки не должна убить сервис — увидим в логах.
-                _logger.LogWarning(ex, "Loglig batch (фон): прогон не удался");
+                // Сюда — только сбой журнала/настроек (база лежит): ошибки прогона ловит ScheduledJob.
+                _logger.LogWarning(ex, "Loglig batch (фон): тик не удался");
             }
 
             try

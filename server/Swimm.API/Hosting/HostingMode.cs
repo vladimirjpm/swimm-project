@@ -5,9 +5,10 @@ namespace Swimm.API.Hosting;
 /// на проде — только публичный сайт и API, админка и фоновые джобы выключены флагами; админка
 /// живёт у Влада локально и в режиме <see cref="ProdAdminEnvironment"/> пишет прямо в прод-БД.
 ///
-/// Флаги по умолчанию ВКЛЮЧЕНЫ: в разработке ничего не меняется. Выключает их
-/// <c>appsettings.Production.json</c> (закоммичен — прод получает выключенную админку сам, даже
-/// если в App Service забыли переменную); переменная окружения <c>Admin__Enabled</c> его перебивает.
+/// Админка по умолчанию ВКЛЮЧЕНА, фоновые расписания — включены везде, кроме Development (В10).
+/// Выключает их на проде <c>appsettings.Production.json</c> (закоммичен — прод получает выключенную
+/// админку сам, даже если в App Service забыли переменную); переменная окружения
+/// <c>Admin__Enabled</c> его перебивает.
 /// </summary>
 public static class HostingMode
 {
@@ -33,11 +34,20 @@ public static class HostingMode
     public static bool AdminEnabled(IConfiguration config) => config.GetValue(AdminEnabledKey, true);
 
     /// <summary>
-    /// Фоновые джобы: очередь импорта, прогон рекордов по странам, автозабор isr.org.il,
-    /// ночная сверка loglig-id, пакетный забор. На проде — false: все обращения к loglig и долгие
-    /// операции идут из локальной админки. Пинг БД и мост сброса кэша от флага НЕ зависят.
+    /// Фоновые РАСПИСАНИЯ — то, что само ходит наружу по таймеру: автозабор isr.org.il (+ проход
+    /// стартового протокола), ночная сверка loglig-id, пакетный забор loglig-id.
+    /// Явный ключ <c>BackgroundJobs:Enabled</c> важнее всего: прод — false
+    /// (<c>appsettings.Production.json</c>), ProdAdmin — true (<c>appsettings.ProdAdmin.json</c>).
+    /// Без ключа — false в Development (решение В10, docs/plans/competitions-home-plan.md, часть В:
+    /// локальный API не ходит на isr.org.il и loglig при каждом перезапуске; «Входящие» приезжают
+    /// синхронизацией с прода или кнопкой) и true в остальных окружениях.
+    ///
+    /// ОЧЕРЕДИ (импорт, прогон рекордов по странам) от этого флага НЕ зависят — они исполняют то,
+    /// что поставила админка, и живут вместе с ней (<see cref="AdminEnabled"/>). Пинг БД и мост
+    /// сброса кэша — тоже не зависят.
     /// </summary>
-    public static bool BackgroundJobsEnabled(IConfiguration config) => config.GetValue(BackgroundJobsEnabledKey, true);
+    public static bool BackgroundJobsEnabled(IConfiguration config, IHostEnvironment env) =>
+        config.GetValue<bool?>(BackgroundJobsEnabledKey) ?? !env.IsDevelopment();
 
     /// <summary>
     /// Путь принадлежит админке. Регистр не важен (<see cref="PathString.StartsWithSegments(PathString)"/>

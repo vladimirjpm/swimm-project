@@ -144,7 +144,8 @@ origin**, App Service раздаёт прод-сборку клиента из `
 Отступления от постановки выше помечены **⚑** — с причиной.
 
 **1. Прод без админки.** `Swimm.API/Hosting/HostingMode.cs`: флаги `Admin:Enabled`,
-`BackgroundJobs:Enabled` (по умолчанию `true` — разработка не меняется). Выключает их
+`BackgroundJobs:Enabled` (по умолчанию `true`; с 19.10.2026 без ключа в Development — `false`, а очереди
+импорта живут под `Admin:Enabled` — часть В [competitions-home-plan.md](competitions-home-plan.md)). Выключает их
 **закоммиченный `appsettings.Production.json`** ⚑ (а не переменная App Service): выключатель
 приезжает с кодом, забыть нельзя. Без админки `/admin*`, `/api/admin*`, `/admin-home.html`,
 `/js/admin/*` → 404 (страница `/error`) раньше аутентификации; `MapRazorPages` не вызывается;

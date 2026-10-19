@@ -141,7 +141,11 @@ public sealed class SeasonBestTableItemDto
     [JsonPropertyName("gender")]
     public string Gender { get; set; } = "";
 
-    /// <summary>Возраст В СЕЗОНЕ (SeasonMath.AgeInSeason) — ось этой витрины, не календарная.</summary>
+    /// <summary>
+    /// Ступень возраста В СЕЗОНЕ (SeasonMath.AgeInSeason) — ось этой витрины, не календарная.
+    /// С 18 лет все взрослые — одна ступень <c>18</c> (SeasonMath.PeerStepAge, Р84): ищущий
+    /// обязан свернуть возраст так же.
+    /// </summary>
     [JsonPropertyName("age")]
     public int Age { get; set; }
 

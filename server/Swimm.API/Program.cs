@@ -36,8 +36,9 @@ if (builder.Environment.IsProdAdmin())
     builder.Configuration.AddJsonFile("appsettings.ProdAdmin.Local.json", optional: true, reloadOnChange: false);
 
 // Форма процесса (В17): на проде админка и фоновые джобы выключены — appsettings.Production.json.
+// Фоновые расписания без явного ключа выключены и в Development (В10): локальный API наружу сам не ходит.
 var adminEnabled = HostingMode.AdminEnabled(builder.Configuration);
-var backgroundJobsEnabled = HostingMode.BackgroundJobsEnabled(builder.Configuration);
+var backgroundJobsEnabled = HostingMode.BackgroundJobsEnabled(builder.Configuration, builder.Environment);
 
 // Сжатие ответов. Замер 2026-08-25: справочники, которые тянет КАЖДАЯ страница
 // (records + normative-standards), весят 1.9 МБ несжатыми и 118 КБ в gzip — 94%.
@@ -111,15 +112,23 @@ builder.Services.AddSingleton(_ => ProdAdminGuard.Describe(builder.Configuration
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentActor, Swimm.API.Services.HttpCurrentActor>();
 
-// Фоновые джобы — только где есть админка, которая их ставит и смотрит (В17). На проде из
-// фоновых остаются пинг БД (ниже) и мост сброса кэша (AddInfrastructure): от флага они не зависят.
-if (backgroundJobsEnabled)
+// Фоновые службы — два сорта (В10, docs/plans/competitions-home-plan.md, часть В).
+// ОЧЕРЕДИ исполняют то, что поставила админка, — живут вместе с ней (adminEnabled): без них
+// импорт из локальной админки встал бы. На проде админки нет — нет и очередей.
+if (adminEnabled)
 {
     builder.Services.AddHostedService<ImportBackgroundService>();
 
     // Прогон рекордов по странам (11.1.2) — 470 файлов, час-два; в HTTP-запрос не пролезет.
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.RecordCountryRunBackgroundService>();
+}
 
+// РАСПИСАНИЯ сами ходят наружу по таймеру (isr.org.il, loglig) — только под backgroundJobsEnabled:
+// ProdAdmin — да; прод и локальная разработка — нет. «Последний запуск» — в Sys_JobRuns (В12).
+// На проде из фоновых остаются пинг БД (ниже) и мост сброса кэша (AddInfrastructure): от флагов
+// они не зависят.
+if (backgroundJobsEnabled)
+{
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.CompetitionDiscoveryBackgroundService>();
     // Публичная кнопка «предложить loglig-id» на проде остаётся: предложения копятся в БД
     // (Suggested) и проверяются этим джобом, когда запущена локальная админка (ProdAdmin).
@@ -640,11 +649,17 @@ app.MapGet("/api/client-config",
     // Форма процесса — одной строкой в лог при каждом старте, в любом окружении: по логу App
     // Service сразу видно, не приехала ли на прод включённая админка.
     var modeLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Swimm.Startup");
-    modeLog.LogInformation("Окружение {Environment}: админка {Admin}, фоновые джобы {Jobs}.",
-        app.Environment.EnvironmentName, adminEnabled ? "ВКЛ" : "выкл", backgroundJobsEnabled ? "ВКЛ" : "выкл");
-    if (adminEnabled && !backgroundJobsEnabled)
+    modeLog.LogInformation(
+        "Окружение {Environment}: админка {Admin}, очереди (импорт, рекорды по странам) {Queues}, фоновые расписания (isr.org.il, loglig) {Jobs}.",
+        app.Environment.EnvironmentName, adminEnabled ? "ВКЛ" : "выкл", adminEnabled ? "ВКЛ" : "выкл",
+        backgroundJobsEnabled ? "ВКЛ" : "выкл");
+    // В Development расписания выключены нарочно (В10) — это норма, а не забытый флаг.
+    if (adminEnabled && !backgroundJobsEnabled && !app.Environment.IsDevelopment())
         modeLog.LogWarning(
-            "Админка включена, а фоновые джобы — нет: импорт из очереди, прогон по странам и пакетный забор loglig встанут в очередь и не выполнятся.");
+            "Админка включена, а фоновые расписания — нет: автозабор isr.org.il, стартовые протоколы и сверка loglig-id по таймеру не пойдут (кнопки админки работают).");
+    else if (adminEnabled && !backgroundJobsEnabled)
+        modeLog.LogInformation(
+            "Фоновые расписания в Development выключены (В10): «Входящие» — /db-sync-from-prod или кнопкой «Проверить сейчас». Включить: BackgroundJobs:Enabled=true.");
 }
 
 if (!app.Environment.IsDevelopment())

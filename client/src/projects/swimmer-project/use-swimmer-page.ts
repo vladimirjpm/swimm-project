@@ -158,8 +158,14 @@ export interface SwimmerSeasonRanks {
   /** Возраст в сезоне; null — года рождения нет в базе, мест не будет. */
   age?: number | null;
   gender?: string | null;
-  /** Подпись группы («girls 9») — её обязан показать UI рядом с местом. */
+  /** Подпись группы («girls 9», «women 18+») — её обязан показать UI рядом с местом. */
   groupLabel?: string | null;
+  /**
+   * Круг на оси возраста — для ссылки в `/season-best?age=&age_to=`. До 17 оба равны
+   * возрасту; с 18 — 18…99, все взрослые разом (Р84). null — возраста нет.
+   */
+  peerAgeFrom?: number | null;
+  peerAgeTo?: number | null;
   /** «Новый сезон откроется после зимнего чемпионата»; null — сезон открыт. */
   season_notice?: ShowcaseSeasonNotice | null;
   rows: SwimmerDisciplineRank[];

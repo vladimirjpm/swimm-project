@@ -1,4 +1,5 @@
 using Swimm.Application.Abstractions;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.BackgroundServices;
 
@@ -8,7 +9,8 @@ namespace Swimm.API.BackgroundServices;
 /// (имя + год рождения; спорные — полной сверкой результатов) → Verified / Rejected.
 /// Управляется настройками LogligVerifyEnabled / LogligVerifyIntervalHours (Admin/Settings,
 /// проверяются каждый тик). Включено по умолчанию: без джоба предложения пользователей
-/// зависали бы в Suggested навсегда.
+/// зависали бы в Suggested навсегда. «Последний запуск» — в журнале Sys_JobRuns (В12,
+/// <see cref="ScheduledJob"/>); работает только при включённых фоновых расписаниях (ProdAdmin).
 /// </summary>
 public sealed class LogligSuggestionVerificationBackgroundService : BackgroundService
 {
@@ -28,8 +30,6 @@ public sealed class LogligSuggestionVerificationBackgroundService : BackgroundSe
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var lastRun = DateTime.MinValue;
-
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -39,17 +39,17 @@ public sealed class LogligSuggestionVerificationBackgroundService : BackgroundSe
 
                 if (settings.GetValue("LogligVerifyEnabled", true))
                 {
-                    var intervalHours = Math.Max(1, settings.GetValue("LogligVerifyIntervalHours", 24));
-                    if (DateTime.UtcNow - lastRun >= TimeSpan.FromHours(intervalHours))
+                    var interval = TimeSpan.FromHours(Math.Max(1, settings.GetValue("LogligVerifyIntervalHours", 24)));
+                    // «Последний запуск» — в журнале Sys_JobRuns (В12): рестарт API не гонит сверку заново.
+                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.LogligVerify, interval, async ct =>
                     {
                         var suggestions = scope.ServiceProvider.GetRequiredService<ILogligSuggestionService>();
-                        var report = await suggestions.VerifySuggestedAsync(stoppingToken);
-                        lastRun = DateTime.UtcNow;
+                        var report = await suggestions.VerifySuggestedAsync(ct);
                         if (report.Checked > 0)
                             _logger.LogInformation(
                                 "Loglig verify (фон): проверено {Checked}, подтверждено {Verified}, отклонено {Rejected}, отложено {Skipped}",
                                 report.Checked, report.Verified, report.Rejected, report.Skipped);
-                    }
+                    }, _logger, stoppingToken);
                 }
             }
             catch (OperationCanceledException)
@@ -58,8 +58,8 @@ public sealed class LogligSuggestionVerificationBackgroundService : BackgroundSe
             }
             catch (Exception ex)
             {
-                // Ошибка сети/вёрстки не должна убить сервис — увидим в логах.
-                _logger.LogWarning(ex, "Loglig verify (фон): проверка предложений не удалась");
+                // Сюда — только сбой журнала/настроек (база лежит): ошибки сверки ловит ScheduledJob.
+                _logger.LogWarning(ex, "Loglig verify (фон): тик не удался");
             }
 
             try

@@ -126,8 +126,10 @@ public class AdminSettingsService : ISettingsService, IReloadableSettings
                 "ВЫДУМАННЫЕ имена и времена (заглушка до реальных данных), поэтому на проде её нет и при true"),
             new("DiscoveryEnabled", "false", "bool", "admin",
                 "Автозабор isr.org.il: true — фоновая проверка списка соревнований по расписанию"),
-            new("DiscoveryIntervalHours", "12", "int", "admin",
-                "Интервал фоновой проверки isr.org.il в часах (минимум 1)"),
+            new("DiscoveryIntervalHours", "24", "int", "admin",
+                "Интервал фоновой проверки isr.org.il в часах (минимум 1). Список стартов меняется " +
+                "редко — раз в сутки (В12); «последний запуск» хранится в базе (Sys_JobRuns), рестарт " +
+                "API заново не проверяет. Работает только там, где включены фоновые расписания (ProdAdmin)"),
             new("StartListEnabled", "false", "bool", "admin",
                 "Автозабор стартового протокола (docs/plans/start-list-plan.md): true — фоновый " +
                 "проход добывает logligId будущих стартов и тянет их стартовые протоколы по расписанию"),

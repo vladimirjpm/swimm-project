@@ -704,7 +704,13 @@
                 info.textContent = year ? `Проверяю сезон ${year} на сайте…` : 'Проверяю сайт…';
                 try {
                     const r = await apiJson(`${API}/sync${year ? `?year=${encodeURIComponent(year)}` : ''}`, { method: 'POST' });
-                    info.textContent = `На сайте: ${r.totalOnSite}, новых: ${r.added}, обновлено: ${r.updated}. Обновляю…`;
+                    // Перенос/пропажа будущих стартов (В4) — только если что-то нашлось.
+                    const moved = [
+                        r.postponed ? `перенесено: ${r.postponed}` : '',
+                        r.missing ? `пропало: ${r.missing}` : '',
+                    ].filter(Boolean).join(', ');
+                    info.textContent = `На сайте: ${r.totalOnSite}, новых: ${r.added}, обновлено: ${r.updated}`
+                        + (moved ? `, ${moved}` : '') + '. Обновляю…';
                     // После забора прошлого сезона сразу показываем его — иначе новые строки
                     // тонут в общем списке на 19 страницах.
                     if (year) {

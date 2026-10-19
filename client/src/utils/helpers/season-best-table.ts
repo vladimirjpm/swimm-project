@@ -6,7 +6,7 @@
  * сервер отдаёт всю таблицу сезона одним ответом (`GET /api/season-best/table`, ~1,1 тыс.
  * ступеней), она кладётся в память и дальше работает чистой функцией.
  *
- * Ключ ступени — «пол × возраст в сезоне × стиль × дистанция × бассейн», ровно тот, по
+ * Ключ ступени — «пол × ступень возраста в сезоне (с 18 — одна взрослая) × стиль × дистанция × бассейн», ровно тот, по
  * которому лидера считает сервер. Три вещи, в которых легко ошибиться:
  *
  *  • **ось возраста здесь СЕЗОННАЯ** (`SeasonMath.AgeInSeason` / `ageInSeason` на клиенте),
@@ -21,6 +21,8 @@
  * эстафеты и помеченные `SuspectReason` заплывы в таблицу не входят. Вызывающий обязан
  * пропускать такие строки сам (см. `results-table.tsx`).
  */
+
+import { peerStepAge } from './season-helper';
 
 /** Минимум РАЗНЫХ пловцов на ступени, ниже которого бейдж не выдаётся. */
 export const MIN_PEERS_FOR_SEASON_BEST = 2;
@@ -64,8 +66,10 @@ const normPool = (pool: unknown): string =>
 const normDistance = (distance: unknown): string =>
   String(distance ?? '').trim().toLowerCase().replace(/m$/, '');
 
+// Возраст в ключе — СТУПЕНЬ: с 18 лет все взрослые одна ступень (Р84). Сервер уже отдаёт
+// её свёрнутой, а вызывающие передают голый возраст в сезоне — сворачиваем здесь, в одном месте.
 const keyOf = (k: SeasonBestKey): string =>
-  `${k.styleName}|${normDistance(k.distance)}|${normPool(k.poolType)}|${k.gender}|${k.age}`;
+  `${k.styleName}|${normDistance(k.distance)}|${normPool(k.poolType)}|${k.gender}|${k.age == null ? k.age : peerStepAge(k.age)}`;
 
 /**
  * Разбор строки времени в миллисекунды. Свой, а не `parseTimeToSeconds`: сравнение с
