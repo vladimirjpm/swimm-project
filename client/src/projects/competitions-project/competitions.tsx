@@ -13,6 +13,7 @@ import { useFavorites } from '../../hooks/useFavorites';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import { formatApproxTime, swimLabel } from '../results-main-project/components/start-list/start-list-helpers';
 import CompetitionCalendar from './calendar/competition-calendar';
+import RecordsStandards from './calendar/records-standards';
 
 // Избранные пловцы залогиненного — ближайшие старты (С8.4). Живёт на /competitions,
 // а не на главной (вне скоупа — В9 говорит только про общий список соревнований).
@@ -72,7 +73,7 @@ function Competitions() {
 
       <FavoritesUpcomingSection />
 
-      {/* Здесь встанет полоса «Records & standards» (шаг Б7). */}
+      <RecordsStandards />
 
       <RecordTicker />
       {/* Переключатель тем. На витрине он единственный способ сменить режим: топбар его

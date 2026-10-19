@@ -206,7 +206,7 @@ Asia/Jerusalem.
 | ✅ Б4 | Full month десктоп + кубы дня | Sonnet | многодневные плашки, «+N more», сегодня/прошедшие/выбранный |
 | ✅ Б5 | Куб соревнования (все варианты) + Meet days | Sonnet | чемпионат, многодневный 2 колонки/1 колонка, Cancelled/Postponed на фейковых данных |
 | ✅ Б6 | Телефон: неделя/месяц, лента дней Meet, анимация Type | Sonnet | 375px, `prefers-reduced-motion` |
-| Б7 | Records & standards | Sonnet | 4 ссылки + Normatives «Soon», не кликается (В7) |
+| ✅ Б7 | Records & standards | Sonnet | 4 ссылки + Normatives «Soon», не кликается (В7) |
 | Б8 | Пустые состояния, фокус, клавиатура, RTL-имена | Sonnet | QA-чеклист ниже |
 | Б9 | Проверка всего: светлая/тёмная, телефон, контраст, дифф; доки (`docs/design-colors.md`, `docs/ui-components.md` §6 для новых блоков) | Opus | QA-чеклист пройден |
 | Б10 | Коммит, PR, CI, деплой; Влад смотрит | Opus → Влад | принято |

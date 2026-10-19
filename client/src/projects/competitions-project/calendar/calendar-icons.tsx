@@ -158,3 +158,53 @@ export function IconFunnel(props: IconProps) {
     </Svg>
   );
 }
+
+/** Национальные рекорды — флаг на древке. */
+export function IconFlag(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 21V4" />
+      <path d="M5 4.5c3-1.6 5 1.6 8 0s4.5-.6 6 0v9c-1.5-.6-3-1.6-6 0s-5-1.6-8 0" />
+    </Svg>
+  );
+}
+
+/** Мировые рекорды — глобус. */
+export function IconGlobe(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3Z" />
+    </Svg>
+  );
+}
+
+/** Юниорские рекорды — звезда. */
+export function IconStar(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8L3.5 9.7l5.9-.8L12 3.5Z" />
+    </Svg>
+  );
+}
+
+/** Сравнение двух стран — две стрелки в разные стороны. */
+export function IconArrowsLeftRight(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 8h15m-3.5-3.5L19 8l-3.5 3.5" />
+      <path d="M20 16H5m3.5-3.5L5 16l3.5 3.5" />
+    </Svg>
+  );
+}
+
+/** Нормативы — линейка. */
+export function IconRuler(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="2.5" y="8" width="19" height="8" rx="1.5" />
+      <path d="M7 8v3M11 8v4M15 8v3M19 8v4" />
+    </Svg>
+  );
+}
