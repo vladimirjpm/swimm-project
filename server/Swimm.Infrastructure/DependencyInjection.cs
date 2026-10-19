@@ -172,6 +172,8 @@ public static class DependencyInjection
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
         services.AddScoped<IClubPublicRepository, ClubPublicRepository>();
         services.AddScoped<IStartListPublicRepository, StartListPublicRepository>();
+        // Календарь сезона главной /competitions (competitions-home-plan, Б1).
+        services.AddScoped<ICompetitionCalendarRepository, CompetitionCalendarRepository>();
         services.AddScoped<IClubOverviewRepository, ClubOverviewRepository>();
         services.AddScoped<ISeasonBestRepository, SeasonBestRepository>();
         // Витринный сезон — ОДИН на продукт (docs/season-boundary-rule.md): его спрашивают
