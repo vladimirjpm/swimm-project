@@ -28,7 +28,7 @@ export const RESULTS_VIEWS: ResultsViewMeta[] = [
     id: 'season-best',
     icon: '☀',
     label: 'Season best',
-    caption: 'where you stand among swimmers born the same year',
+    caption: 'where you stand among peers: same birth year, adults 18+ together',
   },
   {
     id: 'records',

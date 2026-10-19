@@ -55,6 +55,22 @@ export function recordStepAge(birthYear: number | string, date: Date = new Date(
 }
 
 /**
+ * С этого возраста в сезоне сверстники — все взрослые разом, а не один год рождения:
+ * после Juniors (14–17) немастерские старты — одна категория Adults (решение Влада
+ * 19.10.2026, Р84 в docs/data-integrity.md). Зеркало серверного `SeasonMath.AdultPeerAge`.
+ */
+export const SEASON_ADULT_AGE = 18;
+
+/**
+ * Ступень сверстников для возраста в сезоне: до 17 — сам возраст, с 18 — одна взрослая
+ * ступень `SEASON_ADULT_AGE`. Ключ бейджа SB и таблицы `/api/season-best/table`; зеркало
+ * серверного `SeasonMath.PeerStepAge`.
+ */
+export function peerStepAge(age: number): number {
+  return age >= SEASON_ADULT_AGE ? SEASON_ADULT_AGE : age;
+}
+
+/**
  * Подпись сезона для UI: 2025 → «2025/26». Сезон идёт через границу года, поэтому одним
  * числом его не назвать: старт 31/10/2025 и старт 15/02/2026 — ОДИН сезон.
  *
@@ -75,17 +91,17 @@ export function seasonLabel(startYear: number): string {
 }
 
 /**
- * Подпись круга сверстников: «girls 12», «men 21+», «masters 45-49». Та же формула, что у
+ * Подпись круга сверстников: «girls 12», «men 18+», «masters 45-49». Та же формула, что у
  * серверного `SwimmerPageBuilder` — и единственная на клиенте: подпись появляется уже на трёх
  * экранах (`/season-best`, панель Season best, дельты личников), и три копии одних и тех же
  * существительных разошлись бы на первой же правке.
  *
- * Три оси возраста дают три разные подписи: год («girls 12»), взрослый хвост («men 21+») и
+ * Три оси возраста дают три разные подписи: год («girls 12»), взрослый хвост («men 18+») и
  * мастерская группа («masters 45-49»), где пол в подпись не идёт — группа уже сама себе круг.
  */
 export function peerGroupLabel(input: {
   age?: number | null;
-  /** Задана — возрастной хвост «21+» (верхняя граница есть только у него). */
+  /** Задана — возрастной хвост «18+» (верхняя граница есть только у него). */
   ageTo?: number | null;
   /** Возрастная группа мастерского протокола («45-49»). */
   ageGroup?: string | null;
@@ -94,9 +110,11 @@ export function peerGroupLabel(input: {
   if (input.ageGroup) return `masters ${input.ageGroup}`;
   const { age, gender } = input;
   if (age == null) return null;
-  const label = input.ageTo != null ? `${age}+` : String(age);
+  const adult = age >= SEASON_ADULT_AGE;
+  // С 18 лет круг один на всех взрослых (Р84): «women 24» соврала бы, что сравнивают только
+  // с ровесницами, — поэтому взрослый возраст всегда подписывается хвостом «18+».
+  const label = adult ? `${SEASON_ADULT_AGE}+` : input.ageTo != null ? `${age}+` : String(age);
   if (gender == null) return `age ${label}`;
-  const adult = age >= 18;
   const noun = gender === 'female' ? (adult ? 'women' : 'girls') : (adult ? 'men' : 'boys');
   return `${noun} ${label}`;
 }

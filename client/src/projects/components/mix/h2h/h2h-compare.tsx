@@ -218,7 +218,8 @@ const UI_H2HCompare: React.FC<Props> = ({
         One card per distance, one line per pool: the best time each of them swam there. Short
         course and long course are never compared with each other — a 25m time is faster by the
         pool alone. The gap is the left swimmer minus the right one, so a negative number means
-        the left is faster. SB marks the fastest time among swimmers born the same year; REC
+        the left is faster. SB marks the fastest time among swimmers born the same year (from 18 —
+        among all adults); REC
         means the time is not slower than the national record of that age. Relays, DSQ and
         flagged swims are left out.
       </div>

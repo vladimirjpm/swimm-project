@@ -257,7 +257,8 @@ public class MySwimsRepository : IMySwimsRepository
             var gender = NormalizeGender(meta.Gender);
             var age = meta.BirthYear > 0 ? SeasonMath.AgeInSeason(swimSeason, meta.BirthYear) : null;
             if (gender == null || age == null || string.IsNullOrWhiteSpace(s.PoolType)) continue;
-            if (stepByKey.TryGetValue((s.Style, s.Distance, s.PoolType, gender, age.Value), out var step)
+            // Ключ таблицы — ступень (с 18 лет одна взрослая, Р84), а не голый возраст.
+            if (stepByKey.TryGetValue((s.Style, s.Distance, s.PoolType, gender, SeasonMath.PeerStepAge(age.Value)), out var step)
                 && step.Peers >= MinPeersForSeasonBest
                 && step.TimeMs == meta.TimeMillisecond.Value)
                 s.IsSb = true;
