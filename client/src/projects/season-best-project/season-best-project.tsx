@@ -12,7 +12,7 @@ import { peerGroupLabel, seasonLabel } from '../../utils/helpers/season-helper';
 import { useSeasonBestList, useSeasonBestOptions } from '../../hooks/useSeasonBestList';
 import SEASON_BEST_MODULES from './season-best-modules';
 import UI_SeasonNotice from '../components/mix/season-notice/season-notice';
-import { strokeLabel, type SbFilters } from './sb-filters-model';
+import { normalizeAdultAge, strokeLabel, type SbFilters } from './sb-filters-model';
 import { useSeasonBestFilterHost } from './sb-filter-host';
 import SbFilterPanel from './components/sb-filter-panel';
 import SbFilterBar from './components/sb-filter-bar';
@@ -56,8 +56,8 @@ function SeasonBestProject() {
     distance: query.distance,
     poolType: query.poolType,
     gender: query.gender,
-    age: query.age,
-    ageTo: query.ageTo,
+    // `age=24` и старый хвост `age=21` — это круг «18+» (Р84); адрес перепишется ниже.
+    ...normalizeAdultAge(query.age, query.ageTo),
     ageGroup: query.ageGroup,
     clubId: query.clubId,
     bestPerSwimmer: query.bestPerSwimmer,

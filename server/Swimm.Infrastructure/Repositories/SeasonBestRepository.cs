@@ -172,7 +172,11 @@ public class SeasonBestRepository : ISeasonBestRepository
                 // Пол — у ПЛОВЦА, а не у строки: Results.Gender это пол зачёта заплыва, и
                 // кривая шапка протокола уводила пловца в чужую колонку витрины.
                 Gender = r.Swimmer.Gender ?? r.Gender,
-                Age = ageBase - r.Swimmer.BirthYear,
+                // Ступень, а не голый возраст: с 18 лет все взрослые — одна ступень
+                // (SeasonMath.PeerStepAge, Р84). Выражение — его зеркало для SQL.
+                Age = ageBase - r.Swimmer.BirthYear >= SeasonMath.AdultPeerAge
+                    ? SeasonMath.AdultPeerAge
+                    : ageBase - r.Swimmer.BirthYear,
             })
             .Select(g => new TableRow(
                 g.Key.Style,

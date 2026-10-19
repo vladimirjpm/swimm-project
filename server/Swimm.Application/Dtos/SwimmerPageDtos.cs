@@ -610,7 +610,8 @@ public sealed class SwimmerSummaryDto
 
 /// <summary>
 /// Фильтр «Season best» страницы спортсмена: где пловец стоит СРЕДИ СВЕРСТНИКОВ — пловцов
-/// того же года рождения и того же пола — по лучшим временам выбранного сезона.
+/// того же года рождения (с 18 лет — всех взрослых) и того же пола — по лучшим временам
+/// выбранного сезона.
 ///
 /// Ответ намеренно НЕ повторяет строки результатов: клиент уже держит их из
 /// <c>/best-times</c> за тот же сезон и склеивает по <c>disciplineKey</c>. Второй набор тех же
@@ -634,9 +635,20 @@ public sealed class SwimmerSeasonRankDto
     [JsonPropertyName("gender")]
     public string? Gender { get; set; }
 
-    /// <summary>Готовая подпись группы («girls 9»): её обязан показать UI рядом с местом.</summary>
+    /// <summary>Готовая подпись группы («girls 9», «women 18+»): её обязан показать UI рядом с местом.</summary>
     [JsonPropertyName("groupLabel")]
     public string? GroupLabel { get; set; }
+
+    /// <summary>
+    /// Круг сверстников на оси возраста — для ссылки в <c>/season-best?age=&amp;age_to=</c>.
+    /// До 17 лет From = To = возраст; с 18 — From = 18, To = 99: все взрослые разом (Р84).
+    /// null — возраста нет.
+    /// </summary>
+    [JsonPropertyName("peerAgeFrom")]
+    public int? PeerAgeFrom { get; set; }
+
+    [JsonPropertyName("peerAgeTo")]
+    public int? PeerAgeTo { get; set; }
 
     /// <summary>
     /// Новый сезон уже идёт, но витрина держит прошлый — пояснение «season best откроется
@@ -681,7 +693,7 @@ public sealed class SwimmerDisciplineRankDto
     /// <summary>
     /// Группа протокола («45-49»), если лучший заплыв мастерский: место посчитано внутри неё,
     /// и ссылка строки обязана вести в мастерский срез <c>/season-best?age_group=</c>.
-    /// null — обычный старт, круг — ровесники того же года рождения.
+    /// null — обычный старт, круг — ровесники того же года рождения (с 18 лет — все взрослые).
     /// </summary>
     [JsonPropertyName("ageGroup")]
     public string? AgeGroup { get; set; }

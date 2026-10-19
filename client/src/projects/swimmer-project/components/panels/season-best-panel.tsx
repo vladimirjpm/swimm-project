@@ -8,7 +8,7 @@ import { holdsSeasonBest, type PanelLoad, noDataText, PanelEmpty, PanelHead } fr
 
 /**
  * Фильтр Season best: не «моё лучшее время», а МЕСТО среди сверстников — пловцов того же
- * года рождения и пола — по их лучшим временам сезона.
+ * года рождения (с 18 лет — всех взрослых, Р84) и пола — по их лучшим временам сезона.
  *
  * Строки результатов берутся из того же ответа `/best-times`, что и фильтр Best time:
  * второго «лучшего времени сезона» на клиенте быть не должно. Дисциплины, которых нет в
@@ -72,11 +72,14 @@ export function SeasonBestPanel({
   const oneCircle = circles.size === 1 ? [...circles][0] : null;
   const anyMasters = ranked.some((r) => r.ageGroup);
   const allMasters = ranked.length > 0 && ranked.every((r) => r.ageGroup);
+  // С 18 лет круг — все взрослые на обычных стартах, а не ровесники (Р84).
+  const adultCircle = ranks.peerAgeTo != null && ranks.peerAgeTo !== ranks.peerAgeFrom;
+  const peersText = adultCircle ? 'all adult swimmers 18+' : 'swimmers born the same year';
   const circleHint = allMasters
     ? 'same masters age group of the meet protocol'
     : anyMasters
-      ? 'swimmers born the same year; masters swims — their protocol age group'
-      : 'swimmers born the same year';
+      ? `${peersText}; masters swims — their protocol age group`
+      : peersText;
 
   return (
     <>
@@ -116,7 +119,13 @@ export function SeasonBestPanel({
                   season,
                   // Мастерский заплыв ведёт в мастерский срез: место посчитано в группе
                   // протокола, и список обязан показать ровно этот круг.
-                  age: rank.ageGroup ? null : ranks.age,
+                  // Обычный — в круг сверстников: год рождения, а с 18 лет — хвост «18+»
+                  // (age=18&age_to=99, Р84). Одиночный age=24 открыл бы список, по которому
+                  // место НЕ считалось.
+                  age: rank.ageGroup ? null : (ranks.peerAgeFrom ?? ranks.age),
+                  ageTo: rank.ageGroup || ranks.peerAgeTo === ranks.peerAgeFrom
+                    ? null
+                    : (ranks.peerAgeTo ?? null),
                   ageGroup: rank.ageGroup ?? null,
                   gender: ranks.gender,
                   stroke: row.stroke,
@@ -162,8 +171,9 @@ export function SeasonBestPanel({
       <div className="deep-legend deep-legend--block">
         Open a row to see the full list for that event and age group. Places are counted among
         the meets we have imported, not from an official ranking. Equal times share a place;
-        «alone» means nobody born the same year swam this event in our data, so there is no
-        place to award. Masters swims are placed within their age group of the meet protocol.
+        «alone» means nobody else in the group swam this event in our data, so there is no
+        place to award. From 18, the group is all adults in regular meets, not one birth year.
+        Masters swims are placed within their age group of the meet protocol.
       </div>
     </>
   );

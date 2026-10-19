@@ -311,9 +311,14 @@ public class SwimmerPageRepository : ISwimmerPageRepository
     {
         if (clubId <= 0 || age <= 0) return new Dictionary<string, int>();
 
-        // Возраст В КЛЮЧЕ кэша: выборка разная для каждой ступени, и общий ключ отдавал бы
+        // Ступень, а не голый возраст: с 18 лет все взрослые — одна ступень (Р84), и клубная
+        // дельта взрослого меряется лучшим взрослым клуба — как и дельта страны (открытый рекорд).
+        var step = SeasonMath.PeerStepAge(age);
+        var adult = step == SeasonMath.AdultPeerAge;
+
+        // Ступень В КЛЮЧЕ кэша: выборка разная для каждой ступени, и общий ключ отдавал бы
         // девятилетке минимум семнадцатилетних.
-        var key = $"club-best-ms:{clubId}:age{age}";
+        var key = $"club-best-ms:{clubId}:age{step}";
         // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
         // сама (К3, docs/plans/cache-tags-plan.md) — от кого бы её ни позвали.
         return await _cache.GetOrCreateAsync(key, LoadAsync, Ttl);
@@ -334,10 +339,15 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                             && r.SuspectReason == null
                             && r.TimeMillisecond > 0
                             && r.Swimmer.BirthYear > 0
-                            && (r.CompetitionDate.Month >= SeasonMath.SeasonStartMonth
-                                    ? r.CompetitionDate.Year
-                                    : r.CompetitionDate.Year - 1)
-                                + 1 - r.Swimmer.BirthYear == age)
+                            && (adult
+                                ? (r.CompetitionDate.Month >= SeasonMath.SeasonStartMonth
+                                        ? r.CompetitionDate.Year
+                                        : r.CompetitionDate.Year - 1)
+                                    + 1 - r.Swimmer.BirthYear >= SeasonMath.AdultPeerAge
+                                : (r.CompetitionDate.Month >= SeasonMath.SeasonStartMonth
+                                        ? r.CompetitionDate.Year
+                                        : r.CompetitionDate.Year - 1)
+                                    + 1 - r.Swimmer.BirthYear == step))
                 .GroupBy(r => new { r.StyleId, r.Distance, r.Competition.PoolType, r.Gender })
                 .Select(g => new
                 {
@@ -432,11 +442,20 @@ public class SwimmerPageRepository : ISwimmerPageRepository
     public async Task<IReadOnlyList<PeerSeasonBest>> GetAgeCohortSeasonBestsAsync(
         int seasonStartYear, int birthYear)
     {
-        if (birthYear <= 0) return [];
+        if (SeasonMath.AgeInSeason(seasonStartYear, birthYear) is not int age) return [];
+
+        // С 18 лет когорта — все взрослые разом, а не один год рождения (Р84): после
+        // Juniors немастерские старты — одна категория Adults. Граница в годах рождения:
+        // «18 и старше» = родился не позже seasonStartYear + 1 − 18.
+        var adult = SeasonMath.PeerStepAge(age) == SeasonMath.AdultPeerAge;
+        var birthYearMax = adult ? seasonStartYear + 1 - SeasonMath.AdultPeerAge : birthYear;
+        var birthYearMin = adult ? 1 : birthYear;
 
         // Ключ КОГОРТЫ, а не пловца: у 326 сверстников 2017 года одна и та же выборка,
-        // и считать её 326 раз незачем.
-        var key = $"age-cohort-season-bests:{seasonStartYear}:{birthYear}";
+        // и считать её 326 раз незачем. У взрослых когорта одна на сезон.
+        var key = adult
+            ? $"age-cohort-season-bests:{seasonStartYear}:adult"
+            : $"age-cohort-season-bests:{seasonStartYear}:{birthYear}";
         // GetOrCreate: запись собирается в своём контексте и получает метки своих таблиц
         // сама (К3, docs/plans/cache-tags-plan.md) — от кого бы её ни позвали.
         return await _cache.GetOrCreateAsync(key, LoadAsync, Ttl);
@@ -456,7 +475,8 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             var grouped = await _read.Results.AsNoTracking()
                 .Where(r => r.CompetitionDate >= start
                             && r.CompetitionDate < endExclusive
-                            && r.Swimmer.BirthYear == birthYear
+                            && r.Swimmer.BirthYear >= birthYearMin
+                            && r.Swimmer.BirthYear <= birthYearMax
                             && !r.Competition.IsMasters
                             && r.RelayId == null
                             && !r.TimeFail
