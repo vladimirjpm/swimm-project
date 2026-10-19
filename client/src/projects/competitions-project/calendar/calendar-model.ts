@@ -243,11 +243,26 @@ export function dayAriaLabel(iso: string, n: number): string {
   return `${WEEKDAYS_LONG[weekdayOf(iso)]}, ${d} ${MONTH_NAMES[m - 1]} — ${tail}`;
 }
 
-/** Ссылка куба: событие → результаты события, однодневный → соревнование, предстоящий → его страница. */
-export function meetHref(meet: CalendarMeet): string {
-  if (meet.kind === 'event') return `${routes.results()}?eventId=${meet.id}`;
-  if (meet.kind === 'competition') return routes.competition(meet.id);
-  return routes.competitionUpcoming(meet.id);
+/**
+ * Куда ведёт куб — одно место правды для ссылки, подписи действия и разметки.
+ *  • cancelled — никуда (null);
+ *  • postponed (призрак на прежних датах) — страница федерации `source_url` (внешняя), без неё — null;
+ *  • upcoming из входящих: с заявками — наша страница старта, без заявок — страница федерации
+ *    (`source_url`, внешняя); если и её нет — наша страница старта как запасной вариант;
+ *  • event → результаты события, competition → соревнование.
+ */
+export function meetLink(meet: CalendarMeet): { href: string; external: boolean } | null {
+  if (meet.status === 'cancelled') return null;
+  if (meet.status === 'postponed') return meet.source_url ? { href: meet.source_url, external: true } : null;
+  if (meet.kind === 'event') return { href: `${routes.results()}?eventId=${meet.id}`, external: false };
+  if (meet.kind === 'competition') return { href: routes.competition(meet.id), external: false };
+  if (!meet.has_start_list && meet.source_url) return { href: meet.source_url, external: true };
+  return { href: routes.competitionUpcoming(meet.id), external: false };
+}
+
+/** Адрес куба (без признака «внешняя»); null — куб не ссылка. */
+export function meetHref(meet: CalendarMeet): string | null {
+  return meetLink(meet)?.href ?? null;
 }
 
 /**
@@ -284,7 +299,7 @@ export function shortDate(iso: string): string {
   return `${d} ${MONTH_NAMES[m - 1].slice(0, 3)}`;
 }
 
-export type StatusTone = 'live' | 'startlist' | 'progress' | 'complete' | 'cancelled' | 'postponed';
+export type StatusTone = 'live' | 'startlist' | 'progress' | 'complete' | 'cancelled' | 'postponed' | 'noresults';
 
 /** Тег статуса куба; null — без тега (`done` и прочее). */
 export function statusTag(meet: CalendarMeet): { text: string; tone: StatusTone } | null {
@@ -293,6 +308,10 @@ export function statusTag(meet: CalendarMeet): { text: string; tone: StatusTone 
   if (meet.status === 'in_progress') return { text: 'In progress', tone: 'progress' };
   if (meet.status === 'complete') return { text: 'Complete', tone: 'complete' };
   if (meet.status === 'cancelled') return { text: 'Cancelled', tone: 'cancelled' };
+  // Прошедший старт из входящих, который мы не затянули: честно говорим, что результатов у нас нет.
+  if (meet.kind === 'upcoming' && meet.status === 'done' && meet.days_loaded === 0) {
+    return { text: 'No results', tone: 'noresults' };
+  }
   if (meet.status === 'postponed') {
     return { text: meet.postponed_to ? `Postponed → ${shortDate(meet.postponed_to)}` : 'Postponed', tone: 'postponed' };
   }
@@ -301,9 +320,11 @@ export function statusTag(meet: CalendarMeet): { text: string; tone: StatusTone 
 
 /** Подпись действия в низу куба (сам куб — ссылка целиком); null — действия нет. */
 export function actionLabel(meet: CalendarMeet): string | null {
-  if (meet.status === 'cancelled') return null;
+  const link = meetLink(meet);
+  if (!link) return null;
+  if (link.external) return 'Details ↗';
   if (meet.status === 'postponed') return 'Details →';
-  if (meet.kind === 'upcoming') return 'Startlist →';
+  if (meet.kind === 'upcoming') return meet.has_start_list ? 'Startlist →' : 'Details →';
   if (meet.status === 'in_progress') return `Day ${meet.days_loaded} results →`;
   if (meet.status === 'complete') return 'Full results →';
   if (meet.status === 'live' || meet.status === 'done') return 'Results →';

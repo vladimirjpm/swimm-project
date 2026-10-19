@@ -6,7 +6,7 @@ import {
   dateRangeLabel,
   dateTile,
   isWideCube,
-  meetHref,
+  meetLink,
   shortDate,
   statusTag,
   type StatusTone,
@@ -26,6 +26,7 @@ const TAG_CLASS: Record<StatusTone, string> = {
   startlist: 'bg-[var(--t-accent-soft)] text-[var(--t-accent-text)]',
   progress: 'border border-[var(--t-accent)] text-[var(--t-accent-text)]',
   complete: 'bg-[var(--t-nested)] text-[var(--t-text-2)]',
+  noresults: 'bg-[var(--t-nested)] text-[var(--t-text-2)]',
   cancelled: 'bg-[var(--t-nested)] text-[var(--t-text-2)]',
   postponed: 'border border-[var(--t-accent)] text-[var(--t-accent-text)]',
 };
@@ -76,10 +77,11 @@ function MeetCube({ meet }: { meet: CalendarMeet; today?: string }) {
   const action = actionLabel(meet);
   const meta = [meet.pool, meet.venue, meet.group?.label].filter(Boolean) as string[];
   const cancelled = meet.status === 'cancelled';
+  const link = meetLink(meet);
   const wide = isWideCube(meet);
 
   const className = `cc-focus flex flex-col overflow-hidden rounded-[14px] border border-[var(--t-border-2)] text-inherit no-underline shadow-[var(--t-shadow)] backdrop-blur-[14px] lg:min-h-[180px] ${
-    mark ? 'cc-cube--champ' : cancelled ? 'bg-[var(--t-surface)]' : 'bg-[var(--t-surface)] hover:bg-[var(--t-nested)]'
+    mark ? 'cc-cube--champ' : link ? 'bg-[var(--t-surface)] hover:bg-[var(--t-nested)]' : 'bg-[var(--t-surface)]'
   } ${wide ? 'sm:col-span-2' : ''} ${cancelled ? 'opacity-50' : ''}`;
 
   const body = (
@@ -139,17 +141,36 @@ function MeetCube({ meet }: { meet: CalendarMeet; today?: string }) {
     </>
   );
 
-  // Cancelled — не ссылка: открывать нечего.
-  if (cancelled) {
+  // Без ссылки (cancelled, перенос без страницы федерации) — не <a>: открывать нечего.
+  if (!link) {
     return (
-      <div aria-disabled="true" aria-label={`${meet.name}, ${dateRangeLabel(meet)} — cancelled`} className={className}>
+      <div
+        aria-disabled="true"
+        aria-label={`${meet.name}, ${dateRangeLabel(meet)}${cancelled ? ' — cancelled' : ''}`}
+        className={className}
+      >
         {body}
       </div>
     );
   }
 
+  // Внешняя ссылка (страница федерации у незатянутых без заявок) — в новой вкладке.
+  if (link.external) {
+    return (
+      <a
+        href={link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`${meet.name}, ${dateRangeLabel(meet)} (opens isr.org.il)`}
+        className={className}
+      >
+        {body}
+      </a>
+    );
+  }
+
   return (
-    <a href={meetHref(meet)} aria-label={`${meet.name}, ${dateRangeLabel(meet)}`} className={className}>
+    <a href={link.href} aria-label={`${meet.name}, ${dateRangeLabel(meet)}`} className={className}>
       {body}
     </a>
   );

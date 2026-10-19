@@ -2,8 +2,10 @@ import type { CalendarMeet, CalendarMonth } from './calendar-types';
 import { monthKey } from './calendar-model';
 
 /*
- * Фейковые meets для проверки вариантов куба, которых сервер пока не отдаёт
- * (`cancelled` / `postponed` — решение В4). Включается ТОЛЬКО в dev-сборке и параметром
+ * Фейковые meets для проверки вариантов куба на любом месяце, даже без таких стартов в базе:
+ * призрак переноса (`postponed`), `cancelled` и будущий старт без заявок (`Details ↗` на сайт
+ * федерации) — в том же виде, в каком их отдаёт сервер (`kind: 'upcoming'` + `source_url`).
+ * Включается ТОЛЬКО в dev-сборке и параметром
  * `?calendarDemo=1`; в прод-сборке `import.meta.env.DEV` ложно, и query даже не читается.
  */
 
@@ -15,6 +17,11 @@ export function isCalendarDemo(): boolean {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
+/** Фейковый compID / id: уникален в пределах страницы, не пересекается с настоящими. */
+let demoIdSeq = 1;
+
+const DEMO_SOURCE = 'https://isr.org.il/';
+
 type DemoPatch = Partial<CalendarMeet> & Pick<CalendarMeet, 'key' | 'name'>;
 
 /** Демо-meet на днях `from..to` (числа внутри месяца); остальные поля — «обычное событие бассейна». */
@@ -23,7 +30,7 @@ function demoMeet(month: CalendarMonth, from: number, to: number, patch: DemoPat
   const days = Array.from({ length: to - from + 1 }, (_, i) => ({ date: iso(from + i), loaded: false }));
   return {
     kind: 'competition',
-    id: 900000 + Number(patch.key.split(':')[1]),
+    id: 900000 + demoIdSeq++,
     start: iso(from),
     end: iso(to),
     days,
@@ -42,14 +49,15 @@ function demoMeet(month: CalendarMonth, from: number, to: number, patch: DemoPat
   };
 }
 
-/** Добавляет в показанный месяц 4 демо-meets и сортирует всё по старту и имени. */
+/** Добавляет в показанный месяц 5 демо-meets и сортирует всё по старту и имени. */
 export function withDemoMeets(meets: CalendarMeet[], month: CalendarMonth, _today: string): CalendarMeet[] {
+  demoIdSeq = 1;
   // Перенос — через 4 недели от 15-го числа.
   const moved = new Date(Date.UTC(month.year, month.month - 1, 15 + 28));
   const postponedTo = `${moved.getUTCFullYear()}-${pad2(moved.getUTCMonth() + 1)}-${pad2(moved.getUTCDate())}`;
 
   const multi = demoMeet(month, 10, 12, {
-    key: 'demo:1',
+    key: 'demo:multi',
     name: 'אליפות ישראל לנוער — דמו',
     kind: 'event',
     pool: '50m',
@@ -63,16 +71,27 @@ export function withDemoMeets(meets: CalendarMeet[], month: CalendarMonth, _toda
 
   const demo: CalendarMeet[] = [
     multi,
-    demoMeet(month, 14, 14, { key: 'demo:2', name: 'ליגה אזורית — מבוטל (דמו)', status: 'cancelled', venue: 'בריכת וייסגל רחובות' }),
+    demoMeet(month, 14, 14, {
+      key: 'demo:cancelled',
+      pool: '',
+      name: 'ליגה אזורית — מבוטל (דמו)',
+      kind: 'upcoming',
+      status: 'cancelled',
+      source_url: DEMO_SOURCE,
+      venue: 'בריכת וייסגל רחובות',
+    }),
     demoMeet(month, 15, 15, {
-      key: 'demo:3',
+      key: 'demo:postponed',
+      pool: '',
       name: 'גביע הנוער — נדחה (דמו)',
+      kind: 'upcoming',
       status: 'postponed',
+      source_url: DEMO_SOURCE,
       postponed_to: postponedTo,
       venue: 'בריכת עמידר',
     }),
     demoMeet(month, 21, 21, {
-      key: 'demo:4',
+      key: 'demo:openwater',
       name: 'אליפות ישראל מים פתוחים — דמו',
       kind: 'upcoming',
       pool: '',
@@ -81,6 +100,16 @@ export function withDemoMeets(meets: CalendarMeet[], month: CalendarMonth, _toda
       status: 'upcoming',
       has_start_list: true,
       venue: 'חוף הים, אילת',
+    }),
+    // Будущий старт из входящих без заявок: ведёт на сайт федерации (Details ↗).
+    demoMeet(month, 25, 25, {
+      key: 'demo:details',
+      pool: '',
+      name: 'ליגת נוער — פרטים באתר הפדרציה (דמו)',
+      kind: 'upcoming',
+      status: 'upcoming',
+      source_url: DEMO_SOURCE,
+      venue: 'בריכת גבעתיים',
     }),
   ];
 
