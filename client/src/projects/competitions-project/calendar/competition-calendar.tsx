@@ -2,16 +2,15 @@ import React from 'react';
 import './competition-calendar.css';
 import CalendarControls from './calendar-controls';
 import CalendarLegend from './calendar-legend';
+import MonthView from './month-view';
 import YearView from './year-view';
 import {
   addMonths,
   applyTypeFilter,
-  dayLabel,
   defaultSelectedDay,
   israelToday,
   isDayInMonth,
   meetInMonth,
-  meetOnDay,
   monthIndex,
   monthKey,
   monthLabel,
@@ -27,55 +26,10 @@ import { useCompetitionCalendar } from './use-competition-calendar';
 /*
  * Календарь сезона на /competitions — оркестратор: состояние вида (синхронизировано с query),
  * загрузка сезона месяца, область/счётчики/недоступные виды, строка управления и тело вида.
- * Year — настоящий вид (Б3); Month / Meet days — пока временные заглушки (MonthStub / MeetsStub), их заменят Б4–Б5.
+ * Year (Б3) и Month (Б4) — настоящие виды; Meet days — пока временная заглушка (MeetsStub), её заменит Б5.
  */
 
 const MUTED = 'text-[14px] text-[var(--t-text-2)]';
-
-function MonthStub({
-  month,
-  meets,
-  selectedDay,
-  onPickDay,
-}: {
-  month: CalendarMonth;
-  meets: CalendarMeet[];
-  selectedDay: string | null;
-  onPickDay: (iso: string) => void;
-}) {
-  const byDay = new Map<string, CalendarMeet[]>();
-  for (const meet of meets) {
-    for (const d of meet.days) {
-      if (!isDayInMonth(d.date, month)) continue;
-      byDay.set(d.date, [...(byDay.get(d.date) ?? []), meet]);
-    }
-  }
-  const days = Array.from(byDay.keys()).sort();
-  if (days.length === 0) return <p className={MUTED}>No meets this month</p>;
-
-  const onSelected = selectedDay ? meets.filter((meet) => meetOnDay(meet, selectedDay)) : [];
-
-  return (
-    <div className="flex flex-col items-start gap-1">
-      {days.map((iso) => (
-        <button
-          key={iso}
-          type="button"
-          onClick={() => onPickDay(iso)}
-          className="cc-focus cursor-pointer text-left text-[14px] text-[var(--t-text)]"
-        >
-          {`${dayLabel(iso)} — `}
-          <span dir="auto">{byDay.get(iso)!.map((meet) => meet.name).join(', ')}</span>
-        </button>
-      ))}
-      <p className={`mt-2 ${MUTED}`}>
-        {selectedDay && onSelected.length > 0
-          ? `Selected: ${selectedDay} · ${onSelected.length} meets`
-          : 'No meets on this day.'}
-      </p>
-    </div>
-  );
-}
 
 function MeetsStub({ month, meets }: { month: CalendarMonth; meets: CalendarMeet[] }) {
   const inMonth = meets.filter((meet) => meetInMonth(meet, month));
@@ -198,18 +152,20 @@ function CompetitionCalendar() {
             onPickMonth={(m) => setState((s) => ({ ...s, view: 'month', month: m }))}
           />
         ) : state.view === 'month' ? (
-          <MonthStub
+          <MonthView
             month={state.month}
             meets={filteredMonth}
+            today={today}
             selectedDay={selectedDay}
-            onPickDay={(iso) => setState((s) => ({ ...s, selectedDay: iso }))}
+            onSelectDay={(iso) => setState((s) => ({ ...s, selectedDay: iso }))}
           />
         ) : (
           <MeetsStub month={state.month} meets={filteredMonth} />
         )}
       </div>
 
-      {data && !error && <CalendarLegend />}
+      {/* В Month легенда стоит внутри вида: кубы дня идут под ней. */}
+      {data && !error && state.view !== 'month' && <CalendarLegend />}
     </section>
   );
 }

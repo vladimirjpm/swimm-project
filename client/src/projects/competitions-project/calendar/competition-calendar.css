@@ -7,3 +7,23 @@
   outline: 2px solid var(--t-accent);
   outline-offset: 2px;
 }
+
+/* Куб чемпионата: золотой слой ПОВЕРХ поверхности (в тёмной --t-champ-bg полупрозрачный,
+   поэтому градиент из двух слоёв, а не просто цвет). Вне @layer — перебивает bg-утилиты
+   Tailwind, это нужно. Hover чемпионата — без смены фона, только рамка. */
+.cc-cube--champ {
+  background: linear-gradient(var(--t-champ-bg), var(--t-champ-bg)), var(--t-surface);
+  border-color: var(--t-champ-border);
+}
+.cc-cube--champ:hover {
+  border-color: var(--t-accent);
+}
+
+/* Имя соревнования в кубе — ровно две строки. */
+.cc-clamp2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em;
+}

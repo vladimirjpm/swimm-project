@@ -153,7 +153,7 @@ meets — «No meets this month»; карточка месяца в Year — 0 �
 var(--t-accent); outline-offset: 2px`. Hover ячейки/куба — фон `--t-nested`; hover чипа —
 рамка `--t-accent`. Анимации уважают `prefers-reduced-motion`.
 
-**Имена.** Название meet: `dir="rtl"` + `text-align: left` (иврит и мета под ним начинаются с
+**Имена.** Название meet: `dir="auto"` + `text-align: left` (не `rtl`: у части стартов имя латиницей — «Maccabiah 2026 Masters», и с `rtl` многоточие отрезало начало) (иврит и мета под ним начинаются с
 одного края). Плашки в ячейках — одна строка с `…`; в кубе — ровно 2 строки
 (line-clamp 2, min-height 2.7em). Интерфейс — только английский.
 

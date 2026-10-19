@@ -11,14 +11,15 @@ import type { CalendarGroup } from './calendar-types';
 
 interface GroupBadgeProps {
   group: CalendarGroup;
-  /** full — куб соревнования (Б5); mini — полоса месяца и ячейка календаря. */
-  size: 'full' | 'mini';
+  /** full — куб соревнования; mini — полоса месяца; cell — плашка в ячейке дня (24px). */
+  size: 'full' | 'mini' | 'cell';
   className?: string;
 }
 
 const DIMS = {
   full: { w: 40, radius: 6, top: 11, mid: 19, bot: 11, icon: 9, padX: 4, letter: 14, age: 8, ageTrack: '-0.02em' },
   mini: { w: 26, radius: 4, top: 8, mid: 13, bot: 8, icon: 6, padX: 2, letter: 10, age: 6.5, ageTrack: undefined },
+  cell: { w: 24, radius: 4, top: 8, mid: 13, bot: 8, icon: 6, padX: 2, letter: 10, age: 6.5, ageTrack: undefined },
 } as const;
 
 /** Подпись для скринридера: «Kids 8–11 · winter championship». */
