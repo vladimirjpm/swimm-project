@@ -278,8 +278,8 @@ export function dateRangeLabel(meet: CalendarMeet): string {
   return `${wd} ${t.day} ${t.mon}`;
 }
 
-/** «21 Nov» из yyyy-MM-dd — без нуля впереди, для тега Postponed. */
-function shortDate(iso: string): string {
+/** «21 Nov» из yyyy-MM-dd — без нуля впереди (тег Postponed, подписи дней). */
+export function shortDate(iso: string): string {
   const [, m, d] = parseIso(iso);
   return `${d} ${MONTH_NAMES[m - 1].slice(0, 3)}`;
 }
@@ -308,4 +308,9 @@ export function actionLabel(meet: CalendarMeet): string | null {
   if (meet.status === 'complete') return 'Full results →';
   if (meet.status === 'live' || meet.status === 'done') return 'Results →';
   return 'Details →';
+}
+
+/** Многодневка в процессе (частично загружена) — куб на 2 колонки с полосой дней. */
+export function isWideCube(meet: CalendarMeet): boolean {
+  return meet.status === 'in_progress';
 }

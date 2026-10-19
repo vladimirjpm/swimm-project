@@ -2,6 +2,8 @@ import React from 'react';
 import './competition-calendar.css';
 import CalendarControls from './calendar-controls';
 import CalendarLegend from './calendar-legend';
+import { isCalendarDemo, withDemoMeets } from './calendar-demo';
+import MeetDaysView from './meet-days-view';
 import MonthView from './month-view';
 import YearView from './year-view';
 import {
@@ -26,25 +28,10 @@ import { useCompetitionCalendar } from './use-competition-calendar';
 /*
  * Календарь сезона на /competitions — оркестратор: состояние вида (синхронизировано с query),
  * загрузка сезона месяца, область/счётчики/недоступные виды, строка управления и тело вида.
- * Year (Б3) и Month (Б4) — настоящие виды; Meet days — пока временная заглушка (MeetsStub), её заменит Б5.
+ * Виды: Year (Б3), Month (Б4), Meet days (Б5).
  */
 
 const MUTED = 'text-[14px] text-[var(--t-text-2)]';
-
-function MeetsStub({ month, meets }: { month: CalendarMonth; meets: CalendarMeet[] }) {
-  const inMonth = meets.filter((meet) => meetInMonth(meet, month));
-  if (inMonth.length === 0) return <p className={MUTED}>No meets this month</p>;
-  return (
-    <ul className="m-0 flex list-none flex-col gap-1 p-0">
-      {inMonth.map((meet) => (
-        <li key={meet.key} className="text-[14px] text-[var(--t-text)]">
-          {`${meet.start} — `}
-          <span dir="auto">{meet.name}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 function CompetitionCalendar() {
   const [fallbackToday] = React.useState(israelToday);
@@ -63,7 +50,12 @@ function CompetitionCalendar() {
   }, [data]);
 
   // Область вида: сезон (Year) или месяц (Month, Meet days). Счётчики чипов — без фильтра типа.
-  const seasonMeets = React.useMemo(() => data?.meets ?? [], [data]);
+  // Dev-демо (?calendarDemo=1, только dev-сборка): в показанный месяц добавляются выдуманные meets.
+  const demoOn = React.useMemo(isCalendarDemo, []);
+  const seasonMeets = React.useMemo(
+    () => (data ? (demoOn ? withDemoMeets(data.meets, state.month, data.today) : data.meets) : []),
+    [data, demoOn, state.month],
+  );
   const monthMeets = React.useMemo(
     () => seasonMeets.filter((meet) => meetInMonth(meet, state.month)),
     [seasonMeets, state.month],
@@ -127,6 +119,9 @@ function CompetitionCalendar() {
 
   return (
     <section className="relative px-4 pt-[26px] lg:px-16 lg:pt-12" aria-label="Competition calendar">
+      {demoOn && (
+        <p className="mb-3 text-[11px] font-bold uppercase tracking-[.08em] text-[var(--t-warn)]">DEMO DATA</p>
+      )}
       <CalendarControls
         title={title}
         onPrev={() => goMonth(addMonths(state.month, -step))}
@@ -160,12 +155,12 @@ function CompetitionCalendar() {
             onSelectDay={(iso) => setState((s) => ({ ...s, selectedDay: iso }))}
           />
         ) : (
-          <MeetsStub month={state.month} meets={filteredMonth} />
+          <MeetDaysView month={state.month} meets={filteredMonth} today={today} />
         )}
       </div>
 
-      {/* В Month легенда стоит внутри вида: кубы дня идут под ней. */}
-      {data && !error && state.view !== 'month' && <CalendarLegend />}
+      {/* В Month и Meet days легенда стоит внутри вида: кубы идут под ней. */}
+      {data && !error && state.view === 'year' && <CalendarLegend />}
     </section>
   );
 }
