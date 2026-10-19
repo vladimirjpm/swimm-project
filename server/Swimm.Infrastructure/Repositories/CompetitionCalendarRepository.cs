@@ -15,7 +15,9 @@ namespace Swimm.Infrastructure.Repositories;
 /// Два контекста намеренно, как у <see cref="HubGroupPublicRepository"/>: всё публичное — через
 /// <see cref="SwimmReadDbContext"/> (swimm_ro), а площадка (решение В5) лежит только во «Входящих»
 /// (<c>Sys_DiscoveredCompetitions</c>, гранта swimm_ro нет) — её читает <see cref="SwimmDbContext"/>,
-/// и только безопасные поля: compID, площадка, даты, вид спорта.
+/// и только безопасные поля: compID, имя, площадка, даты (и первая объявленная — перенос), вид
+/// спорта, статус, «пропал ли из списка». С части В (решение В9) — ещё и весь сезон «Входящих»:
+/// будущие старты, которых нет в справочнике, тоже идут в календарь.
 ///
 /// Кэш — в контроллере (<c>CachedJson</c>); метки таблиц запись получает сама (К3), включая
 /// «Входящие», так что новая площадка или затянутый день сбрасывают календарь.
@@ -126,12 +128,26 @@ public class CompetitionCalendarRepository : ICompetitionCalendarRepository
             .Distinct()
             .ToList();
 
-        var discovered = orgCompIds.Count == 0 ? [] : await _rw.DiscoveredCompetitions.AsNoTracking()
-            .Where(d => orgCompIds.Contains(d.OrgCompId))
-            .Select(d => new { d.OrgCompId, d.Venue, d.DateStart, d.DateEnd, d.Discipline })
+        // Плюс весь сезон «Входящих» (В9): строки, у которых дата начала — нынешняя или первая
+        // объявленная (перенос, В4) — в сезоне. Даты там — timestamptz с UTC-полночью, поэтому
+        // границы сезона — Utc (не Unspecified, как у CompDate выше).
+        var seasonFromUtc = DateTime.SpecifyKind(from, DateTimeKind.Utc);
+        var seasonToUtc = DateTime.SpecifyKind(toExclusive, DateTimeKind.Utc);
+        var discovered = await _rw.DiscoveredCompetitions.AsNoTracking()
+            .Where(d => orgCompIds.Contains(d.OrgCompId)
+                        || (d.DateStart >= seasonFromUtc && d.DateStart < seasonToUtc)
+                        || (d.PreviousDateStart != null && d.PreviousDateStart >= seasonFromUtc && d.PreviousDateStart < seasonToUtc))
+            .Select(d => new
+            {
+                d.OrgCompId, d.Name, d.Venue, d.DateStart, d.DateEnd, d.Discipline, d.Status,
+                d.PreviousDateStart, d.PreviousDateEnd, Missing = d.MissingSince != null,
+            })
             .ToListAsync(ct);
 
-        var entryOrgCompIds = entries.Select(e => e.OrgCompId).Distinct().ToList();
+        // Справка о старте (чемпионат) — для заявок и для будущих стартов из «Входящих».
+        var entryOrgCompIds = entries.Select(e => e.OrgCompId)
+            .Concat(discovered.Select(d => d.OrgCompId))
+            .Distinct().ToList();
         var meetInfos = entryOrgCompIds.Count == 0 ? [] : await _read.CompetitionMeetInfos.AsNoTracking()
             .Where(m => entryOrgCompIds.Contains(m.OrgCompId))
             .Select(m => new { m.OrgCompId, m.IsChampionship, m.IsChampionshipOverride })
@@ -165,10 +181,15 @@ public class CompetitionCalendarRepository : ICompetitionCalendarRepository
             Discovered = discovered.Select(d => new CalendarDiscoveredRow
             {
                 OrgCompId = d.OrgCompId,
+                Name = d.Name,
                 Venue = d.Venue,
                 Start = DateOnly.FromDateTime(d.DateStart),
                 End = DateOnly.FromDateTime(d.DateEnd),
                 Discipline = d.Discipline,
+                PreviousStart = d.PreviousDateStart is DateTime ps ? DateOnly.FromDateTime(ps) : null,
+                PreviousEnd = d.PreviousDateEnd is DateTime pe ? DateOnly.FromDateTime(pe) : null,
+                Missing = d.Missing,
+                Status = d.Status,
             }).ToList(),
             MeetInfoChampionship = meetInfos
                 .GroupBy(m => m.OrgCompId)

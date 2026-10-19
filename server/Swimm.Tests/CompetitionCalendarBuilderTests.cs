@@ -8,7 +8,7 @@ namespace Swimm.Tests;
 /// <summary>
 /// Календарь сезона главной /competitions (docs/plans/competitions-home-plan.md, Б1):
 /// тип по названию (В3), буква группы и сезон (В6), статус многодневки (В8), заявки (В2),
-/// площадка (В5), Cancelled/Postponed не отдаются (В4).
+/// площадка (В5); часть В — будущие старты из «Входящих» (В9), перенос и отмена (В4).
 /// </summary>
 public class CompetitionCalendarBuilderTests
 {
@@ -147,7 +147,7 @@ public class CompetitionCalendarBuilderTests
             DateOnly.Parse(start), DateOnly.Parse(end), Today, loaded, total));
 
     [Fact]
-    public void Never_emits_cancelled_or_postponed()
+    public void Without_discovered_marks_never_cancelled_or_postponed()
     {
         var cal = Build(
             comps: [Day(1, "2026-10-09"), Day(2, "2026-10-16", eventId: 7), Day(3, "2026-10-17", eventId: 7, results: false)],
@@ -327,4 +327,237 @@ public class CompetitionCalendarBuilderTests
     [InlineData(null, null, null)]
     public void AgesLabel_formats(int? min, int? max, string? expected) =>
         Assert.Equal(expected, CompetitionCalendarBuilder.AgesLabel(new CalendarCategoryBand(min, max)));
+
+    // ── «Входящие» в календаре (часть В: В9 — будущие старты, В4 — перенос и отмена) ──────────
+
+    private static CalendarDiscoveredRow Disc(int id, string name, string start, string? end = null,
+        string? venue = null, string? prevStart = null, string? prevEnd = null, bool missing = false,
+        string status = "new", string discipline = Disciplines.Swimming) => new()
+    {
+        OrgCompId = id,
+        Name = name,
+        Venue = venue,
+        Start = DateOnly.Parse(start),
+        End = DateOnly.Parse(end ?? start),
+        PreviousStart = prevStart is null ? null : DateOnly.Parse(prevStart),
+        PreviousEnd = prevEnd is null ? null : DateOnly.Parse(prevEnd),
+        Missing = missing,
+        Status = status,
+        Discipline = discipline,
+    };
+
+    [Fact]
+    public void Discovered_row_without_imported_or_entries_becomes_upcoming_with_source_url()
+    {
+        var cal = Build(discovered: [Disc(16950, "ליגה מס 2 צעירים", "2026-11-14", "2026-11-15", venue: "בריכת וינגייט")]);
+
+        var m = Assert.Single(cal.Meets);
+        Assert.Equal("upcoming:16950", m.Key);
+        Assert.Equal(CalendarMeetKinds.Upcoming, m.Kind);
+        Assert.Equal(16950, m.Id);
+        Assert.Equal("ליגה מס 2 צעירים", m.Name);
+        Assert.Equal(["2026-11-14", "2026-11-15"], m.Days.Select(d => d.Date));
+        Assert.All(m.Days, d => Assert.False(d.Loaded));
+        Assert.Equal(CalendarMeetStatuses.Upcoming, m.Status);
+        Assert.Equal("", m.Pool);
+        Assert.Equal("בריכת וינגייט", m.Venue);
+        Assert.Equal(CalendarMeetTypes.Pool, m.Type);
+        Assert.False(m.HasStartList);
+        Assert.Equal("Y", m.Group!.Letter);
+        Assert.Equal("https://isr.org.il/comp.asp?compID=16950", m.SourceUrl);
+    }
+
+    [Fact]
+    public void Discovered_long_span_gives_only_start_and_end()
+    {
+        var m = Assert.Single(Build(discovered: [Disc(1, "סדרת גביע", "2026-11-01", "2026-11-30")]).Meets);
+        Assert.Equal(["2026-11-01", "2026-11-30"], m.Days.Select(d => d.Date));
+        Assert.Equal("2026-11-30", m.End);
+    }
+
+    [Fact]
+    public void Discovered_row_claimed_by_compId_is_not_duplicated()
+    {
+        var cal = Build(
+            comps: [Day(1, "2026-10-09", name: "ליגה מס 1", orgCompId: 16845)],
+            discovered: [Disc(16845, "ליגה מס 1 - מחוז מרכז", "2026-10-09", venue: "Netanya")]);
+
+        var m = Assert.Single(cal.Meets);
+        Assert.Equal("competition:1", m.Key);
+        Assert.Null(m.SourceUrl); // затянутому ссылка наружу не нужна
+    }
+
+    [Fact]
+    public void Discovered_row_matched_by_name_and_date_is_not_duplicated_and_lends_venue()
+    {
+        // Протокол затянут PDF-импортом без compID: шов — имя+дата, как в /Admin/Competitions.
+        var cal = Build(
+            comps: [Day(1, "2026-10-09", name: "אליפות \\\"ארנה\\\" ילדים")],
+            discovered: [Disc(16846, "אליפות \"ארנה\" ילדים - מחוז צפון", "2026-10-09", venue: "Haifa")]);
+
+        var m = Assert.Single(cal.Meets);
+        Assert.Equal("competition:1", m.Key);
+        Assert.Equal("Haifa", m.Venue);
+    }
+
+    [Fact]
+    public void Same_name_other_date_is_not_a_match()
+    {
+        var cal = Build(
+            comps: [Day(1, "2026-10-09", name: "ליגה מס 1")],
+            discovered: [Disc(16847, "ליגה מס 1", "2026-12-09")]);
+        Assert.Equal(["competition:1", "upcoming:16847"], cal.Meets.Select(m => m.Key));
+    }
+
+    [Fact]
+    public void Discovered_row_claimed_by_entries_stays_one_meet_with_source_url()
+    {
+        var cal = Build(
+            entries: [new CalendarEntryRow { OrgCompId = 16900, Date = new(2026, 10, 24), CompName = "גביע" }],
+            discovered: [Disc(16900, "גביע", "2026-10-24")]);
+        var m = Assert.Single(cal.Meets);
+        Assert.Equal("upcoming:16900", m.Key);
+        Assert.True(m.HasStartList);
+        Assert.Equal("https://isr.org.il/comp.asp?compID=16900", m.SourceUrl);
+    }
+
+    [Fact]
+    public void Entries_upcoming_without_discovered_row_has_no_source_url() =>
+        Assert.Null(Assert.Single(Build(
+            entries: [new CalendarEntryRow { OrgCompId = 1, Date = new(2026, 11, 1), CompName = "x" }]).Meets).SourceUrl);
+
+    [Fact]
+    public void Ignored_discovered_row_is_not_shown()
+    {
+        var cal = Build(discovered:
+        [
+            Disc(1, "מסיבת סיום", "2026-11-01", status: "ignored"),
+            Disc(2, "פוסטפון", "2026-11-20", prevStart: "2026-11-05", status: "ignored"),
+        ]);
+        Assert.Empty(cal.Meets);
+    }
+
+    [Fact]
+    public void Discovered_outside_season_is_dropped() =>
+        Assert.Empty(Build(discovered: [Disc(1, "קיץ", "2027-09-05")]).Meets);
+
+    [Fact]
+    public void Discovered_championship_by_name_unless_meet_info_says_otherwise()
+    {
+        var cal = Build(
+            discovered:
+            [
+                Disc(1, "אליפות \"ארנה\" ישראל לילדים 8-11 חורף", "2026-12-10"),
+                Disc(2, "אליפות ישראל לנוער", "2026-12-20"),
+                Disc(3, "אליפות מכבי חדרה", "2026-12-30"),
+            ],
+            meetInfo: new Dictionary<int, bool> { [2] = false }); // ручная правка «не чемпионат» сильнее имени
+
+        Assert.Equal([true, false, false], cal.Meets.Select(m => m.IsChampionship));
+        Assert.Equal(StandingKinds.Winter, cal.Meets[0].Group!.Season);
+    }
+
+    [Fact]
+    public void Discovered_artistic_and_open_water_types()
+    {
+        var cal = Build(discovered:
+        [
+            Disc(1, "תחרות", "2026-11-01", discipline: Disciplines.Artistic),
+            Disc(2, "צליחת הכנרת", "2026-11-02"),
+        ]);
+        Assert.Equal([CalendarMeetTypes.Artistic, CalendarMeetTypes.OpenWater], cal.Meets.Select(m => m.Type));
+    }
+
+    [Fact]
+    public void Postponed_row_adds_ghost_on_previous_dates()
+    {
+        var cal = Build(discovered:
+        [
+            Disc(16960, "גביע הנוער", "2026-12-12", "2026-12-13", venue: "בריכת עמידר",
+                prevStart: "2026-11-14", prevEnd: "2026-11-15"),
+        ]);
+
+        Assert.Equal(["postponed:16960", "upcoming:16960"], cal.Meets.Select(m => m.Key));
+        var ghost = cal.Meets[0];
+        Assert.Equal(CalendarMeetKinds.Upcoming, ghost.Kind);
+        Assert.Equal(16960, ghost.Id);
+        Assert.Equal(CalendarMeetStatuses.Postponed, ghost.Status);
+        Assert.Equal("2026-12-12", ghost.PostponedTo);
+        Assert.Equal("2026-11-14", ghost.Start);
+        Assert.Equal("2026-11-15", ghost.End);
+        Assert.Equal(2, ghost.DaysTotal);
+        Assert.Equal("גביע הנוער", ghost.Name);
+        Assert.Equal("בריכת עמידר", ghost.Venue);
+        Assert.Equal("J", ghost.Group!.Letter);
+        Assert.Equal("https://isr.org.il/comp.asp?compID=16960", ghost.SourceUrl);
+
+        var meet = cal.Meets[1];
+        Assert.Equal(CalendarMeetStatuses.Upcoming, meet.Status);
+        Assert.Null(meet.PostponedTo);
+        Assert.Equal("2026-12-12", meet.Start);
+    }
+
+    [Fact]
+    public void Postponed_ghost_stays_in_its_season_when_start_moved_out()
+    {
+        // Перенесли с августа на сентябрь: призрак — в сезоне 2026/27, сам старт — в следующем.
+        var cal = Build(discovered: [Disc(5, "גביע קיץ", "2027-09-05", prevStart: "2027-08-20")]);
+        var ghost = Assert.Single(cal.Meets);
+        Assert.Equal("postponed:5", ghost.Key);
+        Assert.Equal("2027-09-05", ghost.PostponedTo);
+    }
+
+    [Fact]
+    public void Postponed_imported_meet_ghost_copies_meet_fields()
+    {
+        var cal = Build(
+            comps: [Day(1, "2026-10-30", name: "ליגה מס 3", orgCompId: 70, pool: "50m", categories: ["results-main"])],
+            discovered: [Disc(70, "ליגה מס 3", "2026-10-30", prevStart: "2026-10-16")]);
+
+        Assert.Equal(["postponed:70", "competition:1"], cal.Meets.Select(m => m.Key));
+        var ghost = cal.Meets[0];
+        Assert.Equal("50m", ghost.Pool);
+        Assert.Equal("A", ghost.Group!.Letter);
+        Assert.Equal(CalendarMeetStatuses.Upcoming, cal.Meets[1].Status); // сам старт — по датам, не postponed
+    }
+
+    [Fact]
+    public void Missing_discovered_row_is_cancelled()
+    {
+        var cal = Build(
+            entries: [new CalendarEntryRow { OrgCompId = 2, Date = new(2026, 11, 8), CompName = "ליגה" }],
+            discovered:
+            [
+                Disc(1, "ליגה אזורית", "2026-11-07", missing: true),
+                Disc(2, "ליגה", "2026-11-08", missing: true),     // по заявкам, но с сайта пропал
+                Disc(3, "גביע", "2026-11-09"),
+            ]);
+        Assert.Equal(
+            [CalendarMeetStatuses.Cancelled, CalendarMeetStatuses.Cancelled, CalendarMeetStatuses.Upcoming],
+            cal.Meets.Select(m => m.Status));
+    }
+
+    [Fact]
+    public void Imported_meet_is_never_cancelled()
+    {
+        var cal = Build(
+            comps: [Day(1, "2026-10-09", orgCompId: 9)],
+            discovered: [Disc(9, "ליגה", "2026-10-09", missing: true)]);
+        Assert.Equal(CalendarMeetStatuses.Done, Assert.Single(cal.Meets).Status);
+    }
+
+    // ── Матч «уже затянуто» по имени+дате (DiscoveryNameMatch) ─────────────────
+
+    [Theory]
+    [InlineData(" ליגה  מס 4 ", "ליגה מס 4", true)]                       // пробелы
+    [InlineData("ליגה מס 4 - מחוז צפון", "ליגה מס 4", true)]             // суффикс района
+    [InlineData("אליפות \"ארנה\" 2026", "אליפות \\\"ארנה\\\" 2026", true)] // кавычки и бэкслеши
+    [InlineData("ליגה מס 4", "ליגה מס 4 - מחוז צפון", false)]            // наоборот — нет
+    [InlineData("ליגה", "", false)]                                       // пустое имя дня
+    public void NameMatch_rules(string discovered, string competition, bool expected) =>
+        Assert.Equal(expected, DiscoveryNameMatch.Matches(discovered, new(2026, 7, 3), new(2026, 7, 4), competition, new(2026, 7, 4)));
+
+    [Fact]
+    public void NameMatch_needs_date_inside_span() =>
+        Assert.False(DiscoveryNameMatch.Matches("ליגה", new(2026, 7, 3), new(2026, 7, 4), "ליגה", new(2026, 7, 5)));
 }

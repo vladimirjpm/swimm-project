@@ -2,6 +2,7 @@ using System.Globalization;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Domain;
+using Swimm.Domain.Entities;
 
 namespace Swimm.Application.Mapping;
 
@@ -45,10 +46,19 @@ public sealed class CalendarEntryRow
 public sealed class CalendarDiscoveredRow
 {
     public int OrgCompId { get; init; }
+    /// <summary>Название с сайта федерации (иврит) — имя будущего старта и матч с затянутым.</summary>
+    public string Name { get; init; } = "";
     public string? Venue { get; init; }
     public DateOnly Start { get; init; }
     public DateOnly End { get; init; }
     public string Discipline { get; init; } = Disciplines.Swimming;
+    /// <summary>Первая объявленная дата перенесённого старта (<c>PreviousDateStart</c>); null — переноса нет.</summary>
+    public DateOnly? PreviousStart { get; init; }
+    public DateOnly? PreviousEnd { get; init; }
+    /// <summary>Пропал из списка сайта (<c>MissingSince</c> не пуст) — отменён.</summary>
+    public bool Missing { get; init; }
+    /// <summary>new | imported | ignored; ignored (скрыт админом) в календарь не идёт.</summary>
+    public string Status { get; init; } = DiscoveredCompetitionStatus.New;
 }
 
 /// <summary>Возрастная полоса категории (<c>Categories.MinAge/MaxAge</c>).</summary>
@@ -78,6 +88,12 @@ public sealed class CalendarInputs
 ///   события или источника стартового протокола), принадлежат этому старту: у него
 ///   <c>has_start_list</c>, а у события их дни дополняют полосу дней.</item>
 /// <item>Остальные заявки — предстоящий старт (kind=upcoming) на каждый compID (решение В2).</item>
+/// <item>Строка «Входящих» сезона, которую никто не забрал (ни по compID, ни по имени+дате дня
+///   справочника — <see cref="DiscoveryNameMatch"/>), — тоже предстоящий старт (решение В9), с
+///   <c>source_url</c> на страницу федерации. Скрытые админом (ignored) не показываются.</item>
+/// <item>Перенос (В4): у строки есть первая объявленная дата — дополнительный «призрак»
+///   <c>postponed:{compID}</c> на прежних датах. Отмена: строка пропала из списка сайта — старт
+///   kind=upcoming получает <c>cancelled</c>. Затянутые отменёнными не бывают.</item>
 /// <item>Многодневка: дни справочника с результатами «загружены», дни программы (заявки) и
 ///   промежуток дат из «Входящих» — нет. Так событие, у которого затянут один день из трёх,
 ///   получает <c>in_progress</c> (решение В8: загружено всё — <c>complete</c>).</item>
@@ -93,6 +109,10 @@ public static class CompetitionCalendarBuilder
 
     /// <summary>Мастерс в справочнике категорий без полосы возраста — подпись из макета.</summary>
     public const string MastersAgesFallback = "25+";
+
+    /// <summary>Страница старта на сайте федерации — <c>source_url</c> у kind=upcoming.</summary>
+    public static string SourceUrlFor(int orgCompId) =>
+        $"https://isr.org.il/comp.asp?compID={orgCompId.ToString(CultureInfo.InvariantCulture)}";
 
     public static CompetitionCalendarDto Build(
         int season, DateOnly today, IReadOnlyList<int> seasons, CalendarInputs inputs)
@@ -171,15 +191,80 @@ public static class CompetitionCalendarBuilder
         }
         meets.AddRange(upcoming.Values);
 
+        // ── «Входящие» без затянутого и без заявок — будущий старт (В9) ─────────────
+        // Затянута = compID уже у какого-то старта ИЛИ имя+дата совпали с днём справочника
+        // (то же правило, что «уже импортировано» в /Admin/Competitions). Совпавшая по имени строка
+        // становится источником этого старта: площадка и промежуток дат — от неё.
+        var claimed = meets.SelectMany(m => m.OrgCompIds).ToHashSet();
+        var dated = inputs.Competitions.Where(c => c.Date is not null).ToList();
+        foreach (var dc in discovered.Values.OrderBy(d => d.OrgCompId))
+        {
+            if (claimed.Contains(dc.OrgCompId)) continue;
+
+            var day = dated.FirstOrDefault(c => DiscoveryNameMatch.Matches(dc.Name, dc.Start, dc.End, c.Name, c.Date!.Value));
+            if (day is not null && meetByCompetitionId.TryGetValue(day.Id, out var byName))
+            {
+                byName.OrgCompIds.Add(dc.OrgCompId);
+                claimed.Add(dc.OrgCompId);
+                continue;
+            }
+
+            if (dc.Status == IgnoredStatus) continue; // скрыт админом — не наш старт
+
+            var draft = new MeetDraft(CalendarMeetKinds.Upcoming, dc.OrgCompId)
+            {
+                Name = dc.Name,
+                SpanFromDiscovered = true,
+                PrimaryOrgCompId = dc.OrgCompId,
+                FromDiscovered = true,
+            };
+            draft.OrgCompIds.Add(dc.OrgCompId);
+            meets.Add(draft);
+            claimed.Add(dc.OrgCompId);
+        }
+
         // ── Сборка DTO ───────────────────────────────────────────────────────────
         var result = new List<CalendarMeetDto>(meets.Count);
+        var dtoByOrgCompId = new Dictionary<int, CalendarMeetDto>();
         foreach (var m in meets)
         {
             var dto = BuildMeet(m, today, discovered, inputs);
             if (dto is null) continue;
-            if (!DateOnly.TryParseExact(dto.Start, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start)) continue;
-            if (SeasonMath.StartYearOf(start.ToDateTime(TimeOnly.MinValue)) != season) continue;
-            result.Add(dto);
+            foreach (var oc in m.PrimaryOrgCompId is int p ? m.OrgCompIds.Prepend(p) : m.OrgCompIds)
+                dtoByOrgCompId.TryAdd(oc, dto);
+            if (InSeason(dto.Start, season)) result.Add(dto);
+        }
+
+        // ── Перенос (В4): «призрак» на прежних датах, поля — как у самого старта ─────
+        foreach (var dc in discovered.Values)
+        {
+            if (dc.PreviousStart is not DateOnly prevStart || dc.Status == IgnoredStatus) continue;
+            if (!dtoByOrgCompId.TryGetValue(dc.OrgCompId, out var moved)) continue;
+
+            var prevEnd = dc.PreviousEnd is DateOnly pe && pe >= prevStart ? pe : prevStart;
+            var ghostDays = SpanDays(prevStart, prevEnd);
+            var ghost = new CalendarMeetDto
+            {
+                Key = $"postponed:{dc.OrgCompId}",
+                Kind = CalendarMeetKinds.Upcoming,
+                Id = dc.OrgCompId,
+                Name = moved.Name,
+                Start = Iso(prevStart),
+                End = Iso(prevEnd),
+                Days = ghostDays.Select(d => new CalendarMeetDayDto { Date = Iso(d), Loaded = false }).ToList(),
+                DaysLoaded = 0,
+                DaysTotal = ghostDays.Count,
+                Pool = moved.Pool,
+                Venue = moved.Venue,
+                Type = moved.Type,
+                IsChampionship = moved.IsChampionship,
+                Group = moved.Group,
+                Status = CalendarMeetStatuses.Postponed,
+                PostponedTo = Iso(dc.Start),
+                HasStartList = moved.HasStartList,
+                SourceUrl = SourceUrlFor(dc.OrgCompId),
+            };
+            if (InSeason(ghost.Start, season)) result.Add(ghost);
         }
 
         return new CompetitionCalendarDto
@@ -220,6 +305,12 @@ public static class CompetitionCalendarBuilder
                     for (var d = dc.Start; d <= dc.End; d = d.AddDays(1)) days.TryAdd(d, false);
                 }
             }
+
+            // Старт только из «Входящих» с промежутком длиннее недели: не программа, но старт и
+            // конец — факт с сайта, без них старта в календаре не было бы вовсе.
+            if (days.Count == 0 && m.FromDiscovered && m.PrimaryOrgCompId is int ownId
+                && discovered.TryGetValue(ownId, out var self))
+                foreach (var d in SpanDays(self.Start, self.End)) days.TryAdd(d, false);
         }
         else if (days.Count == 0)
         {
@@ -256,13 +347,26 @@ public static class CompetitionCalendarBuilder
             var dc = m.OrgCompIds.Select(oc => discovered.GetValueOrDefault(oc)).FirstOrDefault(d => d is not null);
             var discipline = dc?.Discipline ?? Disciplines.GuessFromName(m.Name);
             type = TypeFor(m.Name, discipline, null);
-            isChampionship = m.OrgCompIds.Any(oc => inputs.MeetInfoChampionship.GetValueOrDefault(oc));
+            // Чемпионат: справка о старте (с ручной правкой), а у старта только из «Входящих» без
+            // справки — по названию (то же правило, что в админке).
+            isChampionship = m.FromDiscovered
+                && !m.OrgCompIds.Any(oc => inputs.MeetInfoChampionship.ContainsKey(oc))
+                ? CompetitionNameRules.IsChampionship(m.Name)
+                : m.OrgCompIds.Any(oc => inputs.MeetInfoChampionship.GetValueOrDefault(oc));
             pool = "";
             group = GroupFor(false, [], m.Name, isChampionship, pool, null, inputs.CategoryBands);
         }
 
         // Длина бассейна у моря и артистики — не факт о старте (в справочнике там стоит что попало).
         if (type != CalendarMeetTypes.Pool) pool = "";
+
+        // Предстоящий со строкой «Входящих»: ссылка на федерацию и отмена (пропал из списка сайта).
+        // Затянутые (event/competition) отменёнными не бывают и ссылки наружу не получают.
+        var own = m.Kind == CalendarMeetKinds.Upcoming && m.PrimaryOrgCompId is int p
+            ? discovered.GetValueOrDefault(p)
+            : null;
+        var status = StatusFor(start, end, today, loaded, days.Count);
+        if (own is { Missing: true } && own.Status != IgnoredStatus) status = CalendarMeetStatuses.Cancelled;
 
         return new CalendarMeetDto
         {
@@ -280,16 +384,18 @@ public static class CompetitionCalendarBuilder
             Type = type,
             IsChampionship = isChampionship,
             Group = group,
-            Status = StatusFor(start, end, today, loaded, days.Count),
+            Status = status,
             PostponedTo = null,
             HasStartList = m.HasStartList,
+            SourceUrl = own is null ? null : SourceUrlFor(own.OrgCompId),
         };
     }
 
     // ── Правила (публичные — их и проверяют тесты) ─────────────────────────────
 
     /// <summary>
-    /// Статус старта. Cancelled/Postponed здесь не возникают: источника нет (решение В4).
+    /// Статус старта по датам. Cancelled/Postponed здесь не возникают — их ставит сборка по
+    /// пометкам «Входящих» (шаг В4′): отмена у kind=upcoming, перенос — отдельным «призраком».
     /// Многодневка с частью загруженных дней — <c>in_progress</c>, со всеми — <c>complete</c>
     /// (В8), независимо от того, прошли ли даты: протокол дня мог приехать раньше остальных.
     /// </summary>
@@ -425,6 +531,22 @@ public static class CompetitionCalendarBuilder
 
     private static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
+    private const string IgnoredStatus = DiscoveredCompetitionStatus.Ignored;
+
+    private static bool InSeason(string isoStart, int season) =>
+        DateOnly.TryParseExact(isoStart, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start)
+        && SeasonMath.StartYearOf(start.ToDateTime(TimeOnly.MinValue)) == season;
+
+    /// <summary>Дни промежутка «Входящих»: весь, если не длиннее <see cref="MaxSpanDays"/>, иначе только старт и конец.</summary>
+    private static List<DateOnly> SpanDays(DateOnly start, DateOnly end)
+    {
+        if (end < start) return [start];
+        if (end.DayNumber - start.DayNumber >= MaxSpanDays) return [start, end];
+        var days = new List<DateOnly>();
+        for (var d = start; d <= end; d = d.AddDays(1)) days.Add(d);
+        return days;
+    }
+
     private sealed class MeetDraft(string kind, int id)
     {
         public string Kind { get; } = kind;
@@ -436,5 +558,7 @@ public static class CompetitionCalendarBuilder
         public HashSet<int> OrgCompIds { get; } = [];
         public HashSet<DateOnly> EntryDates { get; } = [];
         public bool HasStartList { get; set; }
+        /// <summary>Старт только из «Входящих» (ни справочника, ни заявок) — В9.</summary>
+        public bool FromDiscovered { get; init; }
     }
 }

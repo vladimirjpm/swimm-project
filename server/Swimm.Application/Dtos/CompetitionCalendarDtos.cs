@@ -4,9 +4,10 @@ namespace Swimm.Application.Dtos;
 
 /// <summary>
 /// Календарь сезона для главной <c>/competitions</c> (docs/plans/competitions-home-plan.md,
-/// часть Б, шаг Б1). Источник — только наша база (решение В2): справочник <c>Competitions</c>
+/// часть Б, шаг Б1; часть В). Источник — только наша база: справочник <c>Competitions</c>
 /// (дни события свёрнуты в одну запись) + предстоящие старты, у которых уже есть стартовый
-/// протокол (<c>CompetitionEntries</c>), но ещё нет строки в справочнике.
+/// протокол (<c>CompetitionEntries</c>), но ещё нет строки в справочнике, + старты сезона из
+/// «Входящих» (<c>Sys_DiscoveredCompetitions</c>, решение В9), которых нет ни там, ни там.
 /// Даты — ISO <c>yyyy-MM-dd</c>: календарю нужна арифметика по дням, а не подпись.
 /// </summary>
 public sealed class CompetitionCalendarDto
@@ -35,12 +36,13 @@ public sealed class CompetitionCalendarDto
 /// <summary>Один старт календаря — куб, плашка в ячейке, строка в карточке месяца.</summary>
 public sealed class CalendarMeetDto
 {
-    /// <summary>Уникальный ключ строки: <c>event:12</c> | <c>competition:1766</c> | <c>upcoming:16900</c>.</summary>
+    /// <summary>Уникальный ключ строки: <c>event:12</c> | <c>competition:1766</c> | <c>upcoming:16900</c> |
+    /// <c>postponed:16900</c> («призрак» перенесённого старта на прежних датах).</summary>
     [JsonPropertyName("key")]
     public string Key { get; init; } = string.Empty;
 
     /// <summary>"event" — многодневное событие (ссылка <c>/results?eventId=</c>); "competition" —
-    /// однодневное (<c>/competitions/{id}</c>); "upcoming" — только стартовый протокол
+    /// однодневное (<c>/competitions/{id}</c>); "upcoming" — не затянут: стартовый протокол и/или строка «Входящих»
     /// (<c>/competitions/upcoming/{orgCompId}</c>).</summary>
     [JsonPropertyName("kind")]
     public string Kind { get; init; } = CalendarMeetKinds.Competition;
@@ -90,17 +92,24 @@ public sealed class CalendarMeetDto
     public CalendarGroupDto? Group { get; init; }
 
     /// <summary>"upcoming" | "live" | "in_progress" | "complete" | "done" | "cancelled" | "postponed".
-    /// Последние два — в контракте, но сервер их пока не отдаёт (решение В4, источника нет).</summary>
+    /// Последние два — только у kind=upcoming (шаг В4′): cancelled — старт пропал из списка
+    /// isr.org.il; postponed — «призрак» на прежних датах перенесённого старта.</summary>
     [JsonPropertyName("status")]
     public string Status { get; init; } = CalendarMeetStatuses.Done;
 
-    /// <summary>Новая дата перенесённого старта (статус postponed). Пока всегда null (В4).</summary>
+    /// <summary>Новая дата начала перенесённого старта (ISO) — только у «призрака» postponed.</summary>
     [JsonPropertyName("postponed_to")]
     public string? PostponedTo { get; init; }
 
     /// <summary>Есть стартовый протокол (заявки в <c>CompetitionEntries</c>).</summary>
     [JsonPropertyName("has_start_list")]
     public bool HasStartList { get; init; }
+
+    /// <summary>Страница старта на сайте федерации (<c>https://isr.org.il/comp.asp?compID=</c>) — только
+    /// у kind=upcoming со строкой «Входящих»; клиент ведёт туда <c>Details ↗</c>, если заявок нет.
+    /// У затянутых (event/competition) — null.</summary>
+    [JsonPropertyName("source_url")]
+    public string? SourceUrl { get; init; }
 }
 
 public sealed class CalendarMeetDayDto

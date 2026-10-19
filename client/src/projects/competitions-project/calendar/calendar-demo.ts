@@ -37,6 +37,7 @@ function demoMeet(month: CalendarMonth, from: number, to: number, patch: DemoPat
     status: 'upcoming',
     postponed_to: null,
     has_start_list: false,
+    source_url: null,
     ...patch,
   };
 }

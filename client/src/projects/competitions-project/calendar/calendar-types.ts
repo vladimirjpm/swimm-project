@@ -36,7 +36,7 @@ export interface CalendarMeetDay {
 }
 
 export interface CalendarMeet {
-  /** Уникален: `event:{id}` | `competition:{id}` | `upcoming:{orgCompId}`. */
+  /** Уникален: `event:{id}` | `competition:{id}` | `upcoming:{orgCompId}` | `postponed:{orgCompId}` (призрак переноса). */
   key: string;
   kind: MeetKind;
   id: number;
@@ -59,6 +59,8 @@ export interface CalendarMeet {
   /** ISO-дата переноса при `postponed`. */
   postponed_to: string | null;
   has_start_list: boolean;
+  /** Страница старта на isr.org.il — только у `upcoming` со строкой «Входящих»; ведёт `Details ↗`, если заявок нет. */
+  source_url: string | null;
 }
 
 export interface CompetitionCalendar {
