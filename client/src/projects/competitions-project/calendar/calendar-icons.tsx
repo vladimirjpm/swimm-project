@@ -131,3 +131,30 @@ export function IconTrophy({ size = 16, className }: IconProps) {
     </svg>
   );
 }
+
+/** Раскрытие вниз (подпись месяца на телефоне). */
+export function IconCaretDown(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m5 9 7 7 7-7" />
+    </Svg>
+  );
+}
+
+/** Сворачивание вверх. */
+export function IconCaretUp(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m5 15 7-7 7 7" />
+    </Svg>
+  );
+}
+
+/** Воронка — кнопка Type на телефоне. */
+export function IconFunnel(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3.5 5h17l-6.5 7.8V19l-4 2v-8.2L3.5 5Z" />
+    </Svg>
+  );
+}

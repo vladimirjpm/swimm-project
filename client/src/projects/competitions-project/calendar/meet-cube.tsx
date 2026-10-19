@@ -85,15 +85,18 @@ function MeetCube({ meet }: { meet: CalendarMeet; today?: string }) {
   const body = (
     <>
       <span className="flex items-start justify-between">
-        <span className="flex min-w-[64px] flex-col items-center gap-px rounded-br-[10px] border-b border-r border-[var(--t-border-2)] px-[14px] py-2">
-          <span className="text-[10px] uppercase tracking-[.08em] text-[var(--t-text-2)]">{tile.wd}</span>
-          <span className="text-[20px] font-semibold leading-tight text-[var(--t-text)]">{tile.day}</span>
-          <span className="text-[11px] text-[var(--t-accent-text)]">{tile.mon}</span>
+        <span className="flex min-w-[54px] flex-col items-center gap-px rounded-br-[10px] border-b border-r border-[var(--t-border-2)] lg:min-w-[64px] px-[10px] py-[7px] lg:px-[14px] lg:py-2">
+          <span className="text-[9px] uppercase tracking-[.08em] text-[var(--t-text-2)] lg:text-[10px]">{tile.wd}</span>
+          <span className="text-[17px] font-semibold leading-tight text-[var(--t-text)] lg:text-[20px]">{tile.day}</span>
+          <span className="text-[10px] text-[var(--t-accent-text)] lg:text-[11px]">{tile.mon}</span>
         </span>
         {mark && (
           <span className="flex max-w-[60%] justify-end pr-[10px] pt-[10px]">
             {mark.kind === 'badge' ? (
-              <GroupBadge group={mark.group} size="full" />
+              <>
+                <GroupBadge group={mark.group} size="full-sm" className="lg:hidden" />
+                <GroupBadge group={mark.group} size="full" className="hidden lg:flex" />
+              </>
             ) : (
               <span className="flex items-center gap-1 text-[11px] font-medium text-[var(--t-champ-ink)]">
                 <IconTrophy size={11} className="shrink-0" />
@@ -104,15 +107,15 @@ function MeetCube({ meet }: { meet: CalendarMeet; today?: string }) {
         )}
       </span>
 
-      <span className="flex flex-1 flex-col gap-[6px] px-[14px] pb-[14px] pt-3">
+      <span className="flex flex-1 flex-col gap-[6px] px-[10px] pb-3 pt-[10px] lg:px-[14px] lg:pb-[14px] lg:pt-3">
         <span
           dir="auto"
-          className="cc-clamp2 text-left text-[14px] font-semibold leading-[1.35] text-[var(--t-text)]"
+          className="cc-clamp2 text-left text-[13px] font-semibold leading-[1.35] lg:text-[14px] text-[var(--t-text)]"
         >
           {meet.name}
         </span>
         {meta.length > 0 && (
-          <span className="text-[12px] text-[var(--t-text-2)]">
+          <span className="text-[11px] text-[var(--t-text-2)] lg:text-[12px]">
             {meta.map((part, i) => (
               <React.Fragment key={i}>
                 {i > 0 && ' · '}

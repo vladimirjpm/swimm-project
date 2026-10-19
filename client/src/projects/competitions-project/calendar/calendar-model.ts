@@ -314,3 +314,40 @@ export function actionLabel(meet: CalendarMeet): string | null {
 export function isWideCube(meet: CalendarMeet): boolean {
   return meet.status === 'in_progress';
 }
+
+/** Индекс недели сетки месяца (`monthGrid`), в которой лежит дата; -1 — нет. */
+export function weekIndexOf(grid: (string | null)[][], iso: string | null): number {
+  if (!iso) return -1;
+  return grid.findIndex((week) => week.includes(iso));
+}
+
+/**
+ * Подпись недели сетки месяца: «18–24 Oct»; через границу месяца — «28 Sep – 4 Oct».
+ * Неделя сетки на краях месяца содержит null — реальные границы недели достраиваем от
+ * первой/последней непустой клетки.
+ */
+export function weekLabel(week: (string | null)[]): string {
+  const first = week.findIndex((d) => d !== null);
+  const last = week.length - 1 - [...week].reverse().findIndex((d) => d !== null);
+  if (first < 0) return '';
+  const start = shiftIso(week[first]!, -first);
+  const end = shiftIso(week[last]!, week.length - 1 - last);
+  const [, sm, sd] = parseIso(start);
+  const [, em, ed] = parseIso(end);
+  const monE = MONTH_NAMES[em - 1].slice(0, 3);
+  return sm === em ? `${sd}–${ed} ${monE}` : `${sd} ${MONTH_NAMES[sm - 1].slice(0, 3)} – ${ed} ${monE}`;
+}
+
+/** Короткое имя дня недели для даты: «Sat» (по UTC). */
+export function weekdayShortOf(iso: string): string {
+  return WEEKDAYS_SHORT[weekdayOf(iso)];
+}
+
+/** Все даты месяца, в которые есть хотя бы один из meets, по возрастанию. */
+export function daysWithMeets(meets: CalendarMeet[], m: CalendarMonth): string[] {
+  const days = new Set<string>();
+  for (const meet of meets) {
+    for (const d of meet.days) if (isDayInMonth(d.date, m)) days.add(d.date);
+  }
+  return Array.from(days).sort();
+}

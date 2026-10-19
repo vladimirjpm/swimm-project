@@ -40,6 +40,8 @@ function CompetitionCalendar() {
   );
   // Последние известные сезоны: чтобы границы ‹ › не мигали, пока грузится соседний сезон.
   const [knownSeasons, setKnownSeasons] = React.useState<number[]>([]);
+  // Телефон, вид Month: месяц развёрнут целиком (иначе одна неделя). В адрес не пишется.
+  const [monthExpanded, setMonthExpanded] = React.useState(false);
 
   const season = seasonOfMonth(state.month);
   const { data, error } = useCompetitionCalendar(season);
@@ -134,6 +136,8 @@ function CompetitionCalendar() {
         typeFilter={state.typeFilter}
         onTypeFilter={(typeFilter: MeetType[]) => setState((s) => ({ ...s, typeFilter }))}
         counts={counts}
+        monthExpanded={monthExpanded}
+        onToggleMonth={() => setMonthExpanded((v) => !v)}
       />
 
       <div className="mt-6">
@@ -153,6 +157,11 @@ function CompetitionCalendar() {
             today={today}
             selectedDay={selectedDay}
             onSelectDay={(iso) => setState((s) => ({ ...s, selectedDay: iso }))}
+            expanded={monthExpanded}
+            onPrevMonth={() => goMonth(addMonths(state.month, -1))}
+            onNextMonth={() => goMonth(addMonths(state.month, 1))}
+            prevDisabled={prevDisabled}
+            nextDisabled={nextDisabled}
           />
         ) : (
           <MeetDaysView month={state.month} meets={filteredMonth} today={today} />

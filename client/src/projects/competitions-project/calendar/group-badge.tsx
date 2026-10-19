@@ -11,8 +11,12 @@ import type { CalendarGroup } from './calendar-types';
 
 interface GroupBadgeProps {
   group: CalendarGroup;
-  /** full — куб соревнования; mini — полоса месяца; cell — плашка в ячейке дня (24px). */
-  size: 'full' | 'mini' | 'cell';
+  /**
+   * full — куб соревнования (десктоп); full-sm — то же на телефоне (34px); mini — полоса месяца;
+   * cell — плашка в ячейке дня (24px); dot — метка дня на телефоне (14×18: только буква,
+   * без иконок и возраста).
+   */
+  size: 'full' | 'full-sm' | 'mini' | 'cell' | 'dot';
   className?: string;
 }
 
@@ -20,6 +24,8 @@ const DIMS = {
   full: { w: 40, radius: 6, top: 11, mid: 19, bot: 11, icon: 9, padX: 4, letter: 14, age: 8, ageTrack: '-0.02em' },
   mini: { w: 26, radius: 4, top: 8, mid: 13, bot: 8, icon: 6, padX: 2, letter: 10, age: 6.5, ageTrack: undefined },
   cell: { w: 24, radius: 4, top: 8, mid: 13, bot: 8, icon: 6, padX: 2, letter: 10, age: 6.5, ageTrack: undefined },
+  'full-sm': { w: 34, radius: 5, top: 9, mid: 15, bot: 9, icon: 7, padX: 3, letter: 11, age: 7, ageTrack: '-0.02em' },
+  dot: { w: 14, radius: 3, top: 4, mid: 10, bot: 4, icon: 0, padX: 0, letter: 9, age: 0, ageTrack: undefined },
 } as const;
 
 /** Подпись для скринридера: «Kids 8–11 · winter championship». */
@@ -31,6 +37,7 @@ export function groupBadgeLabel(group: CalendarGroup): string {
 
 function GroupBadge({ group, size, className }: GroupBadgeProps) {
   const d = DIMS[size];
+  const bare = size === 'dot';
   const SeasonIcon = group.season === 'winter' ? IconSnowflake : group.season === 'summer' ? IconSun : null;
 
   return (
@@ -44,8 +51,8 @@ function GroupBadge({ group, size, className }: GroupBadgeProps) {
         className="flex items-center justify-between bg-[var(--t-plate)] text-[var(--t-badge-ink)]"
         style={{ height: d.top, padding: `0 ${d.padX}px` }}
       >
-        {SeasonIcon ? <SeasonIcon size={d.icon} /> : <span />}
-        <IconTrophy size={d.icon} />
+        {!bare && (SeasonIcon ? <SeasonIcon size={d.icon} /> : <span />)}
+        {!bare && <IconTrophy size={d.icon} />}
       </span>
       <span
         className="flex items-center justify-center bg-[var(--t-accent)] font-bold leading-none text-[var(--t-accent-ink)]"
@@ -57,7 +64,7 @@ function GroupBadge({ group, size, className }: GroupBadgeProps) {
         className="flex items-center justify-center whitespace-nowrap bg-[var(--t-plate)] font-bold leading-none text-[var(--t-badge-ink)]"
         style={{ height: d.bot, fontSize: d.age, letterSpacing: d.ageTrack }}
       >
-        {group.ages}
+        {!bare && group.ages}
       </span>
     </span>
   );

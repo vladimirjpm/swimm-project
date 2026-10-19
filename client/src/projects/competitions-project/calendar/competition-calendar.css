@@ -27,3 +27,33 @@
   overflow: hidden;
   min-height: 2.7em;
 }
+
+/* Панель типов на телефоне: плавное раскрытие через grid-template-rows 0fr → 1fr (не height).
+   Внутренний блок обязан иметь overflow:hidden и min-height:0, иначе 0fr не схлопнется. */
+.cc-types {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.28s ease, opacity 0.22s ease;
+}
+.cc-types--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.cc-types > div {
+  overflow: hidden;
+  min-height: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-types {
+    transition: none;
+  }
+}
+
+/* Лента дней Meet на телефоне: горизонтальная прокрутка без полосы. */
+.cc-strip {
+  scrollbar-width: none;
+}
+.cc-strip::-webkit-scrollbar {
+  display: none;
+}

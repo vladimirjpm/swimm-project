@@ -5,9 +5,11 @@ import { champMark, chipShape, dayAriaLabel, meetsOnDay, monthGrid } from './cal
 import type { CalendarMeet, CalendarMonth } from './calendar-types';
 import GroupBadge from './group-badge';
 import MeetCube from './meet-cube';
+import MonthMobile from './month-mobile';
 
 /*
- * Вид Full month (десктоп): сетка месяца с плашками meets, легенда и кубы выбранного дня.
+ * Вид Full month: сетка месяца с плашками meets (десктоп, ≥ lg) или неделя/месяц с метками
+ * (телефон, `MonthMobile`), под ними общие легенда и кубы выбранного дня.
  * `meets` — meets месяца уже после фильтра по типу.
  */
 
@@ -113,18 +115,44 @@ function MonthView({
   today,
   selectedDay,
   onSelectDay,
+  expanded,
+  onPrevMonth,
+  onNextMonth,
+  prevDisabled,
+  nextDisabled,
 }: {
   month: CalendarMonth;
   meets: CalendarMeet[];
   today: string;
   selectedDay: string | null;
   onSelectDay: (iso: string) => void;
+  /** Телефон: месяц развёрнут целиком. */
+  expanded: boolean;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  prevDisabled: boolean;
+  nextDisabled: boolean;
 }) {
   const weeks = React.useMemo(() => monthGrid(month), [month]);
   const dayMeets = selectedDay ? meetsOnDay(meets, selectedDay) : [];
 
   return (
     <div>
+      <div className="lg:hidden">
+        <MonthMobile
+          month={month}
+          meets={meets}
+          today={today}
+          selectedDay={selectedDay}
+          onSelectDay={onSelectDay}
+          expanded={expanded}
+          onPrevMonth={onPrevMonth}
+          onNextMonth={onNextMonth}
+          prevDisabled={prevDisabled}
+          nextDisabled={nextDisabled}
+        />
+      </div>
+      <div className="hidden lg:block">
       <div className="mb-[2px] grid grid-cols-7 gap-1">
         {WEEKDAYS.map((wd) => (
           <span key={wd} className="px-2 pb-[6px] text-[11px] uppercase tracking-[.08em] text-[var(--t-text-2)]">
@@ -150,6 +178,7 @@ function MonthView({
             ),
           ),
         )}
+      </div>
       </div>
 
       <CalendarLegend />
