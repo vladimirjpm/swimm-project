@@ -34,6 +34,7 @@ public class DiscoveryAdminController : ControllerBase
     private readonly IAdminAuditService _audit;
     private readonly IStartListPullService _startList;
     private readonly IMeetInfoAdminService _meetInfo;
+    private readonly IJobRunStore _jobRuns;
     private readonly ILogger<DiscoveryAdminController> _logger;
 
     public DiscoveryAdminController(
@@ -53,6 +54,7 @@ public class DiscoveryAdminController : ControllerBase
         IAdminAuditService audit,
         IStartListPullService startList,
         IMeetInfoAdminService meetInfo,
+        IJobRunStore jobRuns,
         ILogger<DiscoveryAdminController> logger)
     {
         _discovery = discovery;
@@ -71,6 +73,7 @@ public class DiscoveryAdminController : ControllerBase
         _audit = audit;
         _startList = startList;
         _meetInfo = meetInfo;
+        _jobRuns = jobRuns;
         _logger = logger;
     }
 
@@ -87,7 +90,13 @@ public class DiscoveryAdminController : ControllerBase
             return BadRequest(new { error = "Сезон вне диапазона 2000–2100." });
         try
         {
-            return Ok(await _discovery.SyncAsync(year, ct));
+            var startedAt = DateTime.UtcNow;
+            var result = await _discovery.SyncAsync(year, ct);
+            // Текущий сезон проверен руками — это тот же успех, что у фона (В12): иначе фоновое
+            // расписание тут же сходило бы на сайт второй раз. Прошлый сезон (year) — другой список.
+            if (year is null)
+                await _jobRuns.RecordAsync(JobNames.Discovery, startedAt, success: true, error: null, ct);
+            return Ok(result);
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
         {

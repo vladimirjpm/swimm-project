@@ -1,12 +1,19 @@
 using Swimm.Application.Abstractions;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.BackgroundServices;
 
 /// <summary>
 /// Фоновая проверка isr.org.il (B3, фаза 6): по расписанию синхронизирует «входящие»
 /// Sys_DiscoveredCompetitions. Управляется настройками DiscoveryEnabled /
-/// DiscoveryIntervalHours (Admin/Settings, in-memory) — проверяются каждый тик,
-/// перезапуск не нужен. Выключено по умолчанию.
+/// DiscoveryIntervalHours (Admin/Settings) — проверяются каждый тик, перезапуск не нужен.
+/// Выключено по умолчанию.
+///
+/// «Последний запуск» — в журнале <c>Sys_JobRuns</c> (В12, <see cref="ScheduledJob"/>), задачи
+/// <see cref="JobNames.Discovery"/> и <see cref="JobNames.StartList"/>: перезапуск API наружу не
+/// ходит. Кнопка «Проверить сейчас» (текущий сезон) пишет в тот же журнал успех discovery.
+/// Регистрируется только там, где включены фоновые расписания (<c>HostingMode.BackgroundJobsEnabled</c>:
+/// ProdAdmin — да, прод и локальная разработка — нет).
 ///
 /// С10 (docs/plans/start-list-plan.md): второй проход в том же цикле, отдельного сервиса
 /// не заводим. Управляется StartListEnabled / StartListDaysAhead, тоже выключен по
@@ -16,8 +23,11 @@ namespace Swimm.API.BackgroundServices;
 /// </summary>
 public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
 {
-    /// <summary>Как часто перечитываем настройки в выключенном состоянии.</summary>
+    /// <summary>Как часто перечитываем настройки и журнал.</summary>
     private static readonly TimeSpan IdleCheck = TimeSpan.FromMinutes(5);
+
+    /// <summary>Интервал по умолчанию: список стартов меняется редко — раз в сутки (В12).</summary>
+    public const int DefaultIntervalHours = 24;
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CompetitionDiscoveryBackgroundService> _logger;
@@ -32,47 +42,45 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var lastRun = DateTime.MinValue;
-        var lastStartListRun = DateTime.MinValue;
-
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
                 var settings = scope.ServiceProvider.GetRequiredService<ISettingsService>();
+                var interval = TimeSpan.FromHours(Math.Max(1, settings.GetValue("DiscoveryIntervalHours", DefaultIntervalHours)));
 
                 if (settings.GetValue("DiscoveryEnabled", false))
                 {
-                    var intervalHours = Math.Max(1, settings.GetValue("DiscoveryIntervalHours", 12));
-                    if (DateTime.UtcNow - lastRun >= TimeSpan.FromHours(intervalHours))
+                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.Discovery, interval, async ct =>
                     {
-                        var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
-                        var result = await discovery.SyncAsync(year: null, stoppingToken); // фон тянет только текущий сезон
-                        lastRun = DateTime.UtcNow;
+                        await using var jobScope = _scopeFactory.CreateAsyncScope();
+                        var discovery = jobScope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
+                        var result = await discovery.SyncAsync(year: null, ct); // фон тянет только текущий сезон
                         _logger.LogInformation(
-                            "Discovery (фон): на сайте {Total}, новых {Added}", result.TotalOnSite, result.Added);
-                    }
+                            "Discovery (фон): на сайте {Total}, новых {Added}, перенесено {Postponed}, пропало {Missing}",
+                            result.TotalOnSite, result.Added, result.Postponed, result.Missing);
+                    }, _logger, stoppingToken);
                 }
 
                 // С10: второй проход, стартовый протокол будущих стартов. Своя настройка
                 // «включено», интервал — тот же DiscoveryIntervalHours (отдельного не заводим,
                 // решение 5: меньше движущихся частей). Забор одного соревнования занимает
                 // минуты, поэтому идёт следом, а не параллельно с discovery.SyncAsync выше.
+                // Своя строка журнала: упавший забор списка не откладывает протоколы и наоборот.
                 if (settings.GetValue("StartListEnabled", false))
                 {
-                    var intervalHours = Math.Max(1, settings.GetValue("DiscoveryIntervalHours", 12));
-                    if (DateTime.UtcNow - lastStartListRun >= TimeSpan.FromHours(intervalHours))
+                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.StartList, interval, async ct =>
                     {
+                        await using var jobScope = _scopeFactory.CreateAsyncScope();
                         var daysAhead = Math.Max(1, settings.GetValue("StartListDaysAhead", 14));
-                        var sweep = scope.ServiceProvider.GetRequiredService<IStartListScheduleService>();
-                        var sweepReport = await sweep.RunAsync(daysAhead, stoppingToken);
+                        var sweep = jobScope.ServiceProvider.GetRequiredService<IStartListScheduleService>();
+                        var sweepReport = await sweep.RunAsync(daysAhead, ct);
                         _logger.LogInformation(
                             "Стартовый протокол (фон): loglig-id добыт у {Resolved}/{Checked}, заборов {Pulled}/{Total}",
                             sweepReport.DetailsResolved, sweepReport.DetailsChecked,
                             sweepReport.Pulled, sweepReport.Total);
-                        lastStartListRun = DateTime.UtcNow;
-                    }
+                    }, _logger, stoppingToken);
                 }
             }
             catch (OperationCanceledException)
@@ -81,8 +89,8 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
             }
             catch (Exception ex)
             {
-                // Ошибка сети/вёрстки не должна убить сервис — увидим в логах и на странице Discovery.
-                _logger.LogWarning(ex, "Discovery (фон): синхронизация не удалась");
+                // Сюда — только сбой самого журнала/настроек (база лежит): работа ловит свои ошибки сама.
+                _logger.LogWarning(ex, "Discovery (фон): тик не удался");
             }
 
             try

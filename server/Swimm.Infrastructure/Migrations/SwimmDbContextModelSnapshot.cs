@@ -1140,6 +1140,9 @@ namespace Swimm.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("DateChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("DateEnd")
                         .HasColumnType("timestamp with time zone");
 
@@ -1175,6 +1178,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("LogligId")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("MissingSince")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(300)
@@ -1182,6 +1188,12 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.Property<int>("OrgCompId")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("PreviousDateEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PreviousDateStart")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1981,6 +1993,27 @@ namespace Swimm.Infrastructure.Migrations
                         .HasFilter("\"Status\" = 'mismatch'");
 
                     b.ToTable("Sys_ImportReconciliation", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.JobRun", b =>
+                {
+                    b.Property<string>("Name")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("LastSuccessAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Name");
+
+                    b.ToTable("Sys_JobRuns", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.LanePlan", b =>

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -33,9 +34,27 @@ public class CompetitionDiscoveryService(
 
         var result = new DiscoverySyncResult { TotalOnSite = items.Count };
         var now = DateTime.UtcNow;
+        // «Сегодня» — по Израилю: старт 20-го в 01:00 по Тель-Авиву уже «сегодня», а по UTC ещё 19-е.
+        var today = DateOnly.FromDateTime(IsraelTime.ToLocal(now));
 
         var known = await db.DiscoveredCompetitions
             .ToDictionaryAsync(d => d.OrgCompId, ct);
+
+        // Отмена (В4) — до апсерта: правилу нужны строки, какими они были до этого забора
+        // (новые строки увидены по определению и кандидатами не бывают).
+        // Только текущий сезон: забор прошлого (year) видит чужой список и пропавших не знает.
+        var missingIds = new HashSet<int>();
+        if (year is null)
+        {
+            var decision = DiscoverySyncRules.FindMissing(
+                known.Values.Select(d => new DiscoveryKnownRow(d.OrgCompId, DateOnly.FromDateTime(d.DateStart), d.Status)),
+                items.Select(i => i.OrgCompId).ToHashSet(),
+                upcoming.Count,
+                today);
+            if (decision.Suppressed)
+                logger.LogWarning("Discovery sync: предохранитель отмены — {Reason}", decision.Reason);
+            missingIds.UnionWith(decision.Missing);
+        }
 
         foreach (var item in items)
         {
@@ -44,12 +63,42 @@ public class CompetitionDiscoveryService(
                 // Имя/даты на сайте могут править — обновляем, статус не трогаем.
                 if (existing.Name != item.Name || existing.DateStart != item.DateStart || existing.DateEnd != item.DateEnd)
                 {
+                    // Перенос (В4): сдвинули ещё не прошедший старт — помним ПЕРВУЮ объявленную дату;
+                    // вернули на неё — перенос отменён. Правка даты прошедшего — опечатка, не перенос.
+                    switch (DiscoverySyncRules.ClassifyDateChange(
+                                DateOnly.FromDateTime(existing.DateStart), DateOnly.FromDateTime(item.DateStart),
+                                existing.PreviousDateStart is DateTime p ? DateOnly.FromDateTime(p) : null, today))
+                    {
+                        case DiscoveryDateChange.Postponed:
+                            if (existing.PreviousDateStart is null)
+                            {
+                                existing.PreviousDateStart = existing.DateStart;
+                                existing.PreviousDateEnd = existing.DateEnd;
+                            }
+                            existing.DateChangedAt = now;
+                            result.Postponed++;
+                            logger.LogInformation(
+                                "Discovery sync: перенос compID={OrgCompId} {Old:yyyy-MM-dd} → {New:yyyy-MM-dd}",
+                                item.OrgCompId, existing.DateStart, item.DateStart);
+                            break;
+                        case DiscoveryDateChange.Restored:
+                            existing.PreviousDateStart = null;
+                            existing.PreviousDateEnd = null;
+                            existing.DateChangedAt = now;
+                            logger.LogInformation(
+                                "Discovery sync: перенос compID={OrgCompId} отменён — старт вернулся на {New:yyyy-MM-dd}",
+                                item.OrgCompId, item.DateStart);
+                            break;
+                    }
+
                     existing.Name = item.Name;
                     existing.DateStart = item.DateStart;
                     existing.DateEnd = item.DateEnd;
                     result.Updated++;
                 }
                 existing.LastSeenAt = now;
+                // Снова в списке — не отменён (и после ложной тревоги тоже).
+                existing.MissingSince = null;
             }
             else
             {
@@ -70,10 +119,21 @@ public class CompetitionDiscoveryService(
             }
         }
 
+        foreach (var id in missingIds)
+        {
+            var row = known[id];
+            if (row.MissingSince is not null) continue; // уже помечен прошлым забором
+            row.MissingSince = now;
+            result.Missing++;
+            logger.LogInformation(
+                "Discovery sync: будущий старт compID={OrgCompId} ({Date:yyyy-MM-dd}) пропал из списка сайта — отменён?",
+                id, row.DateStart);
+        }
+
         await db.SaveChangesAsync(ct);
         logger.LogInformation(
-            "Discovery sync (сезон {Season}): на сайте {Total}, добавлено {Added}, обновлено {Updated}",
-            year?.ToString() ?? "текущий", result.TotalOnSite, result.Added, result.Updated);
+            "Discovery sync (сезон {Season}): на сайте {Total}, добавлено {Added}, обновлено {Updated}, перенесено {Postponed}, пропало {Missing}",
+            year?.ToString() ?? "текущий", result.TotalOnSite, result.Added, result.Updated, result.Postponed, result.Missing);
         return result;
     }
 

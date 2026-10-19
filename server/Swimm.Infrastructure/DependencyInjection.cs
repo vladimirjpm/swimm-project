@@ -307,6 +307,8 @@ public static class DependencyInjection
 
         // «Входящие» автозабора isr.org.il (фаза 6); провайдер живёт в Swimm.Parsing
         services.AddScoped<ICompetitionDiscoveryService, CompetitionDiscoveryService>();
+        // Журнал запусков фоновых задач по расписанию (В12): «последний запуск» в базе, не в памяти
+        services.AddScoped<IJobRunStore, JobRunStore>();
         services.AddScoped<IStartListPullService, StartListPullService>();
         services.AddScoped<IStartListStitchService, StartListStitchService>();
         services.AddScoped<IStartListScheduleService, StartListScheduleService>();

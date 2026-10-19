@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
@@ -386,5 +388,131 @@ public class CompetitionDiscoveryServiceTests
         var svc = CreateService(db, new FakeProvider());
         Assert.Equal(16786, await svc.GetOrgCompIdAsync(10));
         Assert.Null(await svc.GetOrgCompIdAsync(999));
+    }
+
+    // ── Перенос / отмена (шаг В4′, docs/plans/competitions-home-plan.md, часть В) ──
+
+    /// <summary>«Сегодня» по Израилю — как считает сервис.</summary>
+    private static DateTime TodayUtcMidnight() =>
+        DateTime.SpecifyKind(IsraelTime.ToLocal(DateTime.UtcNow).Date, DateTimeKind.Utc);
+
+    private static DiscoveredListItem At(int id, DateTime start) => new(id, "תחרות " + id, start, start);
+
+    [Fact]
+    public async Task Sync_FutureDateMoved_KeepsFirstDate_ThenRestoreClears()
+    {
+        await using var db = CreateDb(nameof(Sync_FutureDateMoved_KeepsFirstDate_ThenRestoreClears));
+        var provider = new FakeProvider();
+        var first = TodayUtcMidnight().AddDays(10);
+        provider.Upcoming.Add(At(500, first));
+        var svc = CreateService(db, provider);
+        await svc.SyncAsync();
+
+        provider.Upcoming[0] = At(500, first.AddDays(10));
+        var moved = await svc.SyncAsync();
+        Assert.Equal(1, moved.Postponed);
+        var row = await db.DiscoveredCompetitions.SingleAsync();
+        Assert.Equal(first, row.PreviousDateStart);
+        Assert.Equal(first, row.PreviousDateEnd);
+        Assert.NotNull(row.DateChangedAt);
+
+        // Ещё раз — первая объявленная дата остаётся.
+        provider.Upcoming[0] = At(500, first.AddDays(20));
+        Assert.Equal(1, (await svc.SyncAsync()).Postponed);
+        Assert.Equal(first, (await db.DiscoveredCompetitions.SingleAsync()).PreviousDateStart);
+
+        // Вернули на первую — перенос отменён.
+        provider.Upcoming[0] = At(500, first);
+        var restored = await svc.SyncAsync();
+        Assert.Equal(0, restored.Postponed);
+        row = await db.DiscoveredCompetitions.SingleAsync();
+        Assert.Null(row.PreviousDateStart);
+        Assert.Null(row.PreviousDateEnd);
+        Assert.Equal(first, row.DateStart);
+    }
+
+    [Fact]
+    public async Task Sync_PastDateEdited_IsNotPostponed()
+    {
+        await using var db = CreateDb(nameof(Sync_PastDateEdited_IsNotPostponed));
+        var provider = new FakeProvider();
+        var past = TodayUtcMidnight().AddDays(-10);
+        provider.Finished.Add(At(501, past));
+        var svc = CreateService(db, provider);
+        await svc.SyncAsync();
+
+        provider.Finished[0] = At(501, past.AddDays(1)); // опечатку на сайте поправили
+        var r = await svc.SyncAsync();
+        Assert.Equal(1, r.Updated);
+        Assert.Equal(0, r.Postponed);
+        Assert.Null((await db.DiscoveredCompetitions.SingleAsync()).PreviousDateStart);
+    }
+
+    /// <summary>Будущие даты текущего сезона (не дальше его последнего дня, чтобы тест не зависел от даты прогона).</summary>
+    private static DateTime InSeason(int days)
+    {
+        var today = TodayUtcMidnight();
+        var lastDay = DateTime.SpecifyKind(
+            SeasonMath.EndExclusiveOf(SeasonMath.StartYearOf(today)).AddDays(-1), DateTimeKind.Utc);
+        var d = today.AddDays(days);
+        return d > lastDay ? lastDay : d;
+    }
+
+    [Fact]
+    public async Task Sync_FutureRowGone_MarksMissing_SeenAgainClears()
+    {
+        await using var db = CreateDb(nameof(Sync_FutureRowGone_MarksMissing_SeenAgainClears));
+        var provider = new FakeProvider();
+        provider.Finished.Add(At(600, TodayUtcMidnight().AddDays(-5)));
+        for (var i = 1; i <= 4; i++) provider.Upcoming.Add(At(600 + i, InSeason(i * 7)));
+        var svc = CreateService(db, provider);
+        await svc.SyncAsync();
+
+        var gone = provider.Upcoming[3];
+        provider.Upcoming.RemoveAt(3);
+        var r = await svc.SyncAsync();
+        Assert.Equal(1, r.Missing);
+        Assert.NotNull((await db.DiscoveredCompetitions.SingleAsync(d => d.OrgCompId == 604)).MissingSince);
+        Assert.Null((await db.DiscoveredCompetitions.SingleAsync(d => d.OrgCompId == 600)).MissingSince); // прошедший
+
+        // Повторный забор без него — не считается заново.
+        Assert.Equal(0, (await svc.SyncAsync()).Missing);
+
+        provider.Upcoming.Add(gone);
+        await svc.SyncAsync();
+        Assert.Null((await db.DiscoveredCompetitions.SingleAsync(d => d.OrgCompId == 604)).MissingSince);
+    }
+
+    [Fact]
+    public async Task Sync_EmptyUpcomingList_DoesNotCancelAnything()
+    {
+        await using var db = CreateDb(nameof(Sync_EmptyUpcomingList_DoesNotCancelAnything));
+        var provider = new FakeProvider();
+        provider.Finished.Add(At(700, TodayUtcMidnight().AddDays(-5)));
+        provider.Upcoming.Add(At(701, InSeason(14)));
+        var svc = CreateService(db, provider);
+        await svc.SyncAsync();
+
+        provider.Upcoming.Clear(); // сайт отдал пустую страницу «будущих»
+        var r = await svc.SyncAsync();
+        Assert.Equal(0, r.Missing);
+        Assert.All(await db.DiscoveredCompetitions.ToListAsync(), d => Assert.Null(d.MissingSince));
+    }
+
+    [Fact]
+    public async Task Sync_PastSeason_NeverMarksMissing()
+    {
+        await using var db = CreateDb(nameof(Sync_PastSeason_NeverMarksMissing));
+        var provider = new FakeProvider();
+        for (var i = 1; i <= 4; i++) provider.Upcoming.Add(At(800 + i, InSeason(i * 7)));
+        var svc = CreateService(db, provider);
+        await svc.SyncAsync();
+
+        // Забор прошлого сезона (cYear) видит совсем другой список — это не пропажа.
+        provider.Upcoming.Clear();
+        provider.Upcoming.Add(At(900, TodayUtcMidnight().AddYears(-1)));
+        var r = await svc.SyncAsync(2026);
+        Assert.Equal(0, r.Missing);
+        Assert.All(await db.DiscoveredCompetitions.ToListAsync(), d => Assert.Null(d.MissingSince));
     }
 }
