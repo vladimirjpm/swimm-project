@@ -61,6 +61,8 @@ const base = (groupId: number) => `/api/hub-groups/${groupId}/lane-plans`;
 export const lanePlansApi = {
   list: (groupId: number) => request<LanePlanSummary[]>('GET', base(groupId)),
   get: (groupId: number, date: string) => request<LanePlan>('GET', `${base(groupId)}/${date}`),
+  /** Кто в день плана «не в воде» (On break / Doesn't train) — в «Not today» нового плана. Только управляющему. */
+  away: (groupId: number, date: string) => request<{ swimmer_ids: number[] }>('GET', `${base(groupId)}/${date}/away`),
   save: (groupId: number, date: string, input: LanePlanInput) =>
     request<LanePlan>('PUT', `${base(groupId)}/${date}`, input),
   distribute: (

@@ -404,6 +404,28 @@ public class LanePlanTests
     }
 
     [Fact]
+    public async Task Away_DoesntTrainAndBreakOnPlanDay_NotEndedBreaksOrHidden()
+    {
+        await using var db = CreateDb(nameof(Away_DoesntTrainAndBreakOnPlanDay_NotEndedBreaksOrHidden));
+        var s = await SeedAsync(db);
+        db.HubGroupBreaks.AddRange(
+            // A — «Doesn't train» бессрочно: в «Not today» нового плана на любой день.
+            new HubGroupBreak { HubGroupId = s.GroupId, SwimmerId = s.A, Kind = HubGroupBreakKind.NotTraining, SetByUserId = s.UserId },
+            // B — перерыв до дня плана включительно; на следующий день он уже в воде.
+            new HubGroupBreak { HubGroupId = s.GroupId, SwimmerId = s.B, Until = Day, SetByUserId = s.UserId },
+            // Скрытый из состава на перерыве — его и в редакторе нет.
+            new HubGroupBreak { HubGroupId = s.GroupId, SwimmerId = s.Hidden, SetByUserId = s.UserId },
+            // C — перерыв закрыт: вернулся.
+            new HubGroupBreak { HubGroupId = s.GroupId, SwimmerId = s.C, EndedAt = DateTime.UtcNow, SetByUserId = s.UserId });
+        await db.SaveChangesAsync();
+        var service = new LanePlanService(db);
+
+        Assert.Equal([s.A, s.B], (await service.GetAwayAsync(s.GroupId, Day)).SwimmerIds);
+        Assert.Equal([s.A], (await service.GetAwayAsync(s.GroupId, Day.AddDays(1))).SwimmerIds);
+        Assert.Empty((await service.GetAwayAsync(s.OtherGroupId, Day)).SwimmerIds);
+    }
+
+    [Fact]
     public async Task Snapshot_KeepsSwimmerWhoLeftTheGroup()
     {
         await using var db = CreateDb(nameof(Snapshot_KeepsSwimmerWhoLeftTheGroup));

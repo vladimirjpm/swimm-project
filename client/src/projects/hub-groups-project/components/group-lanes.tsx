@@ -11,8 +11,8 @@ import { formatPlanDate, lanePlansApi, pickDefaultDate, todayInIsrael } from './
  *
  * Шапка — навигация по датам: стрелки ходят по существующим планам (участнику — только
  * опубликованные, сервер черновики не отдаёт), управляющий открывает любой день полем даты
- * (прозрачный `<input type="date">` поверх даты). По умолчанию — ближайший план с сегодняшнего
- * дня (по Израилю), иначе последний.
+ * (прозрачный `<input type="date">` поверх даты). Пришли с занятия («✎ Edit lanes», «Lanes ›») —
+ * его дата (`initialDate`); иначе ближайший план с сегодняшнего дня (по Израилю), иначе последний.
  *
  * Участник видит доску (`GroupLaneBoard`), управляющий — сразу редактор (`GroupLaneEditor`): режима
  * правки нет. Плана на дату нет — управляющему карточка «Create plan / Copy from …». Правит только
@@ -41,12 +41,14 @@ function statusInfo(status: LanePlanStatus | null): { text: string; color: strin
 }
 
 function GroupLanes({
-  groupId, manages, desktop, onDirtyChange, onPlansChanged, onPlanShown,
+  groupId, manages, desktop, initialDate = null, onDirtyChange, onPlansChanged, onPlanShown,
 }: {
   groupId: number;
   manages: boolean;
   /** ≥960px: шапка в одну строку с тулбаром, редактор колонками. */
   desktop: boolean;
+  /** Дата занятия, с которого открыли Lanes; `null` — дата по умолчанию (`pickDefaultDate`). Читается при монтировании. */
+  initialDate?: string | null;
   /** В редакторе есть несохранённые правки (каркас таба спрашивает при смене вида). */
   onDirtyChange?: (dirty: boolean) => void;
   /** План создан / сохранён / опубликован / удалён — вид Next тренера перечитывает статус плана. */
@@ -60,7 +62,7 @@ function GroupLanes({
 }) {
   const [plans, setPlans] = useState<LanePlanSummary[] | null>(null);
   const [listError, setListError] = useState(false);
-  const [date, setDate] = useState<string | null>(null);
+  const [date, setDate] = useState<string | null>(initialDate);
   const [state, setState] = useState<PlanState>({ kind: 'loading' });
   /** Тренер нажал «Create plan» на дате без плана — открыт пустой редактор. */
   const [creating, setCreating] = useState(false);
@@ -108,6 +110,19 @@ function GroupLanes({
     });
     return () => { cancelled = true; };
   }, [groupId, manages]);
+
+  // Кто в этот день «не в воде» (On break / Doesn't train) — редактор кладёт их в «Not today»
+  // нового плана и копии. Ошибка — пустой список: раскладку из-за неё не блокируем.
+  const [away, setAway] = useState<{ date: string; ids: ReadonlySet<number> } | null>(null);
+  useEffect(() => {
+    if (!manages || !date) return undefined;
+    let cancelled = false;
+    lanePlansApi.away(groupId, date).then((result) => {
+      if (!cancelled) setAway({ date, ids: new Set(result.ok ? result.data?.swimmer_ids ?? [] : []) });
+    });
+    return () => { cancelled = true; };
+  }, [groupId, date, manages]);
+  const awayIds = away?.date === date ? away.ids : null;
 
   // Смена даты — план на неё.
   useEffect(() => {
@@ -332,7 +347,8 @@ function GroupLanes({
         )}
 
         {editable && (state.kind === 'ready' || (state.kind === 'none' && creating)) && (
-          levels ? (
+          // Новый план и копия ждут ещё и `away`: редактор читает его один раз при монтировании.
+          levels && (awayIds || (plan && !template)) ? (
             <GroupLaneEditor
               key={`${date}:${editorNonce}`}
               groupId={groupId}
@@ -342,6 +358,7 @@ function GroupLanes({
               levels={levels}
               laneCountHint={laneCountHint}
               maxPerLaneHint={maxPerLaneHint}
+              away={awayIds ?? undefined}
               desktop={desktop}
               toolbarHost={toolbarHost}
               copyFrom={copySource?.date ?? null}

@@ -42,6 +42,18 @@ public class LanePlanService : ILanePlanService
         }).ToList();
     }
 
+    public async Task<LanePlanAwayDto> GetAwayAsync(int hubGroupId, DateOnly date)
+    {
+        var onBreak = await HubGroupBreakQuery.LoadAsync(_db, hubGroupId, date);
+        if (onBreak.SwimmerIds.Count == 0) return new LanePlanAwayDto();
+
+        var roster = await LoadRosterAsync(hubGroupId);
+        return new LanePlanAwayDto
+        {
+            SwimmerIds = roster.Select(r => r.SwimmerId).Where(onBreak.SwimmerIds.Contains).ToList(),
+        };
+    }
+
     public async Task<LanePlanDto?> GetAsync(int hubGroupId, DateOnly date, bool isManager, int? viewerUserId = null)
     {
         var plan = await _db.LanePlans.AsNoTracking()

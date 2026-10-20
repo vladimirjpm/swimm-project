@@ -106,6 +106,19 @@ public class HubGroupLanePlansController : ControllerBase
         return plan == null ? NotFound() : Ok(plan);
     }
 
+    /// <summary>
+    /// Кто в день плана «не в воде» (On break / Doesn't train) — редактор кладёт их в «Not today»
+    /// нового плана. Только управляющему: статусы людей участникам не раздаём.
+    /// </summary>
+    [HttpGet("{date}/away")]
+    public async Task<IActionResult> Away(int id, string date)
+    {
+        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        return Ok(await _plans.GetAwayAsync(id, day));
+    }
+
     /// <summary>Сохранить план целиком (новый — черновиком); отвечает свежей доской.</summary>
     [HttpPut("{date}")]
     public async Task<IActionResult> Save(int id, string date, [FromBody] LanePlanInputDto input)

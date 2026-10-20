@@ -70,16 +70,21 @@ const field: React.CSSProperties = {
   borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg)', color: 'var(--deep-text)',
 };
 
+const NO_AWAY: ReadonlySet<number> = new Set();
+
 const emptyLanes = (): LaneDraft[] => Array.from({ length: MAX_LANES }, () => ({ levelId: null, workout: '' }));
 
 /**
  * Черновик: из сохранённого плана, из заготовки (копия прошлого) или пустой (весь состав — в
  * Unassigned). Не разложенный никуда из состава: в своём плане — «Not today» (пришёл в группу
  * после сохранения), в копии — Unassigned (новенький, тренер должен его заметить).
+ * Кто в этот день «не в воде» (`away`: On break / Doesn't train) — в новом плане и копии сразу
+ * «Not today»: иначе Auto lanes и Distribute ставят их на дорожки. Сохранённый план не трогаем —
+ * там тренер решил сам.
  */
 function initialDraft(
   plan: LanePlan | null, template: LanePlan | null, levels: HubGroupLevels, laneCountHint: number,
-  maxPerLaneHint: number | null,
+  maxPerLaneHint: number | null, away: ReadonlySet<number>,
 ) {
   const lanes = emptyLanes();
   const buckets: Buckets = { lanes: Array.from({ length: MAX_LANES }, () => []), unassigned: [], out: [] };
@@ -117,6 +122,13 @@ function initialDraft(
     else buckets.unassigned.push(...rest);
   } else {
     buckets.unassigned = levels.swimmers.map((s) => s.swimmerId);
+  }
+
+  if (!plan && away.size > 0) {
+    const isAway = (id: number) => away.has(id);
+    buckets.out.push(...[...buckets.lanes.flat(), ...buckets.unassigned].filter(isAway));
+    buckets.lanes = buckets.lanes.map((l) => l.filter((id) => !isAway(id)));
+    buckets.unassigned = buckets.unassigned.filter((id) => !isAway(id));
   }
 
   return {
@@ -160,8 +172,8 @@ function inputKey(input: LanePlanInput): string {
 }
 
 function GroupLaneEditor({
-  groupId, date, plan, template = null, levels, laneCountHint, maxPerLaneHint = null, desktop, toolbarHost, copyFrom,
-  onSaved, onSetStatus, onDelete, onCopy, onDirtyChange,
+  groupId, date, plan, template = null, levels, laneCountHint, maxPerLaneHint = null, away = NO_AWAY, desktop, toolbarHost,
+  copyFrom, onSaved, onSetStatus, onDelete, onCopy, onDirtyChange,
 }: {
   groupId: number;
   date: string;
@@ -174,6 +186,8 @@ function GroupLaneEditor({
   laneCountHint: number;
   /** Лимит людей на дорожку нового плана (как в прошлом плане); null — без лимита. */
   maxPerLaneHint?: number | null;
+  /** Кто в этот день «не в воде» — в «Not today» нового плана и копии. Читается при монтировании. */
+  away?: ReadonlySet<number>;
   desktop: boolean;
   /** Десктоп: узел шапки вида, куда выносится тулбар (портал); пока его нет — тулбар не рисуем. */
   toolbarHost?: HTMLElement | null;
@@ -190,13 +204,13 @@ function GroupLaneEditor({
 }) {
   // Исходный вид черновика: копия (если есть) или сохранённый план. Читается только при монтировании.
   const init = useMemo(
-    () => initialDraft(template ? null : plan, template, levels, laneCountHint, maxPerLaneHint),
-    [plan, template, levels, laneCountHint, maxPerLaneHint],
+    () => initialDraft(template ? null : plan, template, levels, laneCountHint, maxPerLaneHint, away),
+    [plan, template, levels, laneCountHint, maxPerLaneHint, away],
   );
   // С чем сравниваем: сохранённый план (его нет — пустой черновик).
   const base = useMemo(
-    () => initialDraft(plan, null, levels, laneCountHint, maxPerLaneHint),
-    [plan, levels, laneCountHint, maxPerLaneHint],
+    () => initialDraft(plan, null, levels, laneCountHint, maxPerLaneHint, away),
+    [plan, levels, laneCountHint, maxPerLaneHint, away],
   );
 
   const [laneCount, setLaneCount] = useState(init.laneCount);
