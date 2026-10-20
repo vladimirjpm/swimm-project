@@ -208,3 +208,37 @@ export function IconRuler(props: IconProps) {
     </Svg>
   );
 }
+
+/** Результаты — клетчатый финишный флаг, ЗАЛИТЫЙ (как Phosphor `ph-fill ph-flag-checkered`). */
+export function IconFlagCheckered({ size = 16, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M4 3h1.8v18H4z" />
+      <path
+        fillRule="evenodd"
+        d="M6.5 4h14v10h-14V4Zm0 0h3.5v2.5H6.5V4Zm7 0H17v2.5h-3.5V4Zm-3.5 2.5h3.5V9H10V6.5Zm7 0h3.5V9H17V6.5ZM6.5 9H10v2.5H6.5V9Zm7 0H17v2.5h-3.5V9ZM10 11.5h3.5V14H10v-2.5Zm7 0h3.5V14H17v-2.5Z"
+      />
+    </svg>
+  );
+}
+
+/** Стартлист — нумерованный список. */
+export function IconListNumbers(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M10 6h10M10 12h10M10 18h10" />
+      <path d="M4 5l1.5-1V9" />
+      <path d="M3.8 13.2c.3-.8 2.7-.9 2.4.6-.2.8-2.4 2.2-2.4 2.2h2.6" />
+    </Svg>
+  );
+}
+
+/** Результаты скоро — песочные часы. */
+export function IconHourglass(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 3h12M6 21h12" />
+      <path d="M7 3h10l-5 9 5 9H7l5-9-5-9Z" />
+    </Svg>
+  );
+}

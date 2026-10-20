@@ -4,78 +4,39 @@ import '../components/deep/deep-theme.css';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import RecordTicker from '../home-project/components/record-ticker';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
-import { HOME_REGION_LABEL } from '../../utils/constants/home-region';
-import { routes } from '../../utils/routes';
-import { seasonLabel, seasonStartYear } from '../../utils/helpers/season-helper';
-import { useUpcomingStarts } from '../results-main-project/components/start-list/use-start-list';
-import { useAuth } from '../../hooks/useAuth';
-import { useFavorites } from '../../hooks/useFavorites';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
-import { formatApproxTime, swimLabel } from '../results-main-project/components/start-list/start-list-helpers';
 import CompetitionCalendar from './calendar/competition-calendar';
-import RecordsStandards from './calendar/records-standards';
+import CompetitionsHero from './components/competitions-hero';
+import FavoritesUpcoming from './components/favorites-upcoming';
+import RecordsStandards from './components/records-standards';
 
-// Избранные пловцы залогиненного — ближайшие старты (С8.4). Живёт на /competitions,
-// а не на главной (вне скоупа — В9 говорит только про общий список соревнований).
-function FavoritesUpcomingSection() {
-  const auth = useAuth();
-  const { favoriteSwimmerIds } = useFavorites();
-  const swimmerIds = React.useMemo(() => Array.from(favoriteSwimmerIds), [favoriteSwimmerIds]);
-  const { data } = useUpcomingStarts(auth.isAuthenticated ? swimmerIds : []);
-
-  if (!auth.isAuthenticated || !data || data.length === 0) return null;
-
-  return (
-    <section className="relative pt-[38px]" aria-label="Your favorites — upcoming starts">
-      <h2 className="mb-[14px] text-[18px] font-black tracking-[-0.02em] text-[var(--t-text)]">
-        Your favorites — upcoming starts
-      </h2>
-      <div className="flex flex-col gap-2">
-        {data.map((s) => (
-          <a
-            key={s.id}
-            href={`${routes.competitionUpcoming(s.org_comp_id)}?tab=startlist&swimmer=${s.swimmer_id}`}
-            className="hp-card-std flex items-center justify-between gap-3 rounded-[12px] border border-[var(--t-border)] px-4 py-2.5 text-inherit no-underline"
-          >
-            <span className="text-[13px] font-bold">{s.swimmer_name}</span>
-            <span className="text-[12px] text-[var(--t-text-2)]">
-              {formatApproxTime(s.heat_start_at)} · {swimLabel(s.distance, s.style_name)}
-            </span>
-          </a>
-        ))}
-      </div>
-    </section>
-  );
-}
-
+/*
+ * Страница /competitions — только раскладка: оболочка deep-темы и колонка 1180, внутри
+ * независимые блоки сверху вниз. Блок не знает о соседях и берёт данные сам, поэтому любой
+ * можно убрать, переставить или взять на другую страницу:
+ *   CompetitionsHero    — заголовок и сезон            (components/competitions-hero.tsx)
+ *   CompetitionCalendar — календарь сезона             (calendar/, карта его блоков — в competition-calendar.tsx)
+ *   FavoritesUpcoming   — старты избранных пловцов     (components/favorites-upcoming.tsx)
+ *   RecordsStandards    — плитки рекордов и нормативов (components/records-standards.tsx)
+ */
 function Competitions() {
   const deep = useDeepThemeClass();
 
   return (
-    <div className={`home-page ${deep} relative min-h-screen overflow-x-clip pb-[96px] text-[var(--t-text)]`}>
+    <div className={`home-page hp-bg-vivid ${deep} relative min-h-screen overflow-x-clip pb-[96px] text-[var(--t-text)]`}>
       <div className="hp-shimmer" aria-hidden="true" />
 
       <AppTopbar active="competitions" />
 
-      {/* Весь контент — колонка 1180 по центру (хендофф competitions_home-2, «Layout на широких
-          экранах»): на всю ширину ячейки календаря на 1980 растягивались до 280px, и текст 11px в
-          них терялся. Отступ ≥24px — от обёртки, как у топбара (`PAGE_CONTAINER`). Hero компактный (≤140px,
-          без подзаголовка): календарь должен влезать в экран по высоте (Б12). */}
+      {/* Весь контент — колонка 1180 по центру (хендофф competitions_home-2): шире ячейки и кубы
+          растягиваются, и мелкий текст в них теряется. Отступ ≥24px — от обёртки, как у топбара. */}
       <div className="relative px-4 lg:px-6">
-        <div className="content-box-xl">
-          <section className="relative pt-5 lg:pt-7">
-            <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[0.28em] text-[var(--t-accent-text)] lg:text-[13px] lg:tracking-[0.3em]">
-              {`Season ${seasonLabel(seasonStartYear())} · ${HOME_REGION_LABEL}`}
-            </p>
-            <h1 className="text-[44px] font-black leading-[0.92] tracking-[-0.045em] text-[var(--t-text)] lg:text-[56px] lg:leading-[0.95]">
-              Competitions
-            </h1>
-          </section>
-
-          <CompetitionCalendar />
-
-          <FavoritesUpcomingSection />
-
+        <div className="content-box-xl pt-5 lg:pt-4">
+          <CompetitionsHero />
+          <div className="mt-5 lg:mt-[14px]">
+            <CompetitionCalendar />
+          </div>
+          <FavoritesUpcoming />
           <RecordsStandards />
         </div>
       </div>

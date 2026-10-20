@@ -13,17 +13,15 @@ interface GroupBadgeProps {
   group: CalendarGroup;
   /**
    * full — куб соревнования (десктоп); full-sm — то же на телефоне (34px); mini — полоса месяца;
-   * cell — плашка в ячейке дня (24px); dot — метка дня на телефоне (14×18: только буква,
-   * без иконок и возраста).
+   * dot — метка дня в ленте Meet на телефоне (14×18: только буква, без иконок и возраста).
    */
-  size: 'full' | 'full-sm' | 'mini' | 'cell' | 'dot';
+  size: 'full' | 'full-sm' | 'mini' | 'dot';
   className?: string;
 }
 
 const DIMS = {
   full: { w: 40, radius: 6, top: 11, mid: 19, bot: 11, icon: 9, padX: 4, letter: 14, age: 8, ageTrack: '-0.02em' },
   mini: { w: 26, radius: 4, top: 8, mid: 13, bot: 8, icon: 6, padX: 2, letter: 10, age: 6.5, ageTrack: undefined },
-  cell: { w: 24, radius: 4, top: 8, mid: 13, bot: 8, icon: 6, padX: 2, letter: 10, age: 6.5, ageTrack: undefined },
   'full-sm': { w: 34, radius: 5, top: 9, mid: 15, bot: 9, icon: 7, padX: 3, letter: 11, age: 7, ageTrack: '-0.02em' },
   dot: { w: 14, radius: 3, top: 4, mid: 10, bot: 4, icon: 0, padX: 0, letter: 9, age: 0, ageTrack: undefined },
 } as const;

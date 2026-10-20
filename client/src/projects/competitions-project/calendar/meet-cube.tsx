@@ -3,6 +3,7 @@ import { IconTrophy } from './calendar-icons';
 import {
   actionLabel,
   champMark,
+  cubeAction,
   dateRangeLabel,
   dateTile,
   isWideCube,
@@ -13,9 +14,11 @@ import {
 } from './calendar-model';
 import type { CalendarMeet } from './calendar-types';
 import GroupBadge from './group-badge';
+import { StatusButton } from './status-mark';
 
 /*
- * Куб соревнования: дата-плитка + имя + мета + статус + действие. Весь куб — ссылка.
+ * Куб соревнования: дата-плитка + имя + мета + кнопка статуса (10c: Results / Startlist / Results
+ * soon / Startlist not yet — `cubeAction`, `StatusButton`). Весь куб — ссылка, кнопка — её визуал.
  * Варианты: обычный; чемпионат (золото, бейдж/метка справа); многодневка в процессе —
  * на 2 колонки с полосой дней; Cancelled — приглушён и не ссылка; Postponed — ссылка на
  * СТАРОЙ дате с тегом переноса.
@@ -23,10 +26,6 @@ import GroupBadge from './group-badge';
 
 const TAG_CLASS: Record<StatusTone, string> = {
   live: 'border border-[var(--t-live)] text-[var(--t-live)]',
-  startlist: 'bg-[var(--t-accent-soft)] text-[var(--t-accent-text)]',
-  progress: 'border border-[var(--t-accent)] text-[var(--t-accent-text)]',
-  complete: 'bg-[var(--t-nested)] text-[var(--t-text-2)]',
-  noresults: 'bg-[var(--t-nested)] text-[var(--t-text-2)]',
   cancelled: 'bg-[var(--t-nested)] text-[var(--t-text-2)]',
   postponed: 'border border-[var(--t-accent)] text-[var(--t-accent-text)]',
 };
@@ -70,11 +69,13 @@ function MeetDayStrip({ meet }: { meet: CalendarMeet }) {
   );
 }
 
-function MeetCube({ meet }: { meet: CalendarMeet; today?: string }) {
+function MeetCube({ meet, today }: { meet: CalendarMeet; today: string }) {
   const tile = dateTile(meet);
   const mark = meet.is_championship ? champMark(meet) : null;
   const tag = statusTag(meet);
-  const action = actionLabel(meet);
+  const status = cubeAction(meet, today);
+  // Текстовое действие — только без кнопки статуса (перенос: «Details ↗»).
+  const action = status ? null : actionLabel(meet);
   const meta = [meet.pool, meet.venue, meet.group?.label].filter(Boolean) as string[];
   const cancelled = meet.status === 'cancelled';
   const link = meetLink(meet);
@@ -127,15 +128,20 @@ function MeetCube({ meet }: { meet: CalendarMeet; today?: string }) {
           </span>
         )}
         {wide && meet.days.length > 1 && <MeetDayStrip meet={meet} />}
-        <span className="mt-auto flex flex-wrap items-center justify-between gap-[6px] pt-[6px]">
-          {tag ? (
-            <span className={`rounded-[6px] px-2 py-[3px] text-[11px] font-semibold ${TAG_CLASS[tag.tone]}`}>
-              {tag.text}
+        <span className="mt-auto flex flex-col gap-[6px] pt-1">
+          {(tag || action) && (
+            <span className="flex flex-wrap items-center justify-between gap-[6px]">
+              {tag ? (
+                <span className={`rounded-[6px] px-2 py-[3px] text-[11px] font-semibold ${TAG_CLASS[tag.tone]}`}>
+                  {tag.text}
+                </span>
+              ) : (
+                <span />
+              )}
+              {action && <span className="text-[12px] font-semibold text-[var(--t-accent-text)]">{action}</span>}
             </span>
-          ) : (
-            <span />
           )}
-          {action && <span className="text-[12px] font-semibold text-[var(--t-accent-text)]">{action}</span>}
+          {status && <StatusButton kind={status.kind} label={status.label} />}
         </span>
       </span>
     </>

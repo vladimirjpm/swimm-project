@@ -113,7 +113,7 @@ function YearView({
   onPickMonth: (m: CalendarMonth) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-[10px] lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-[10px] sm:grid-cols-3 xl:grid-cols-4">
       {seasonMonths(season).map((m) => (
         <MonthCard
           key={monthKey(m)}

@@ -104,6 +104,8 @@
 | `--t-champ-ink` | текст плашки, 🏆 у типа, число «Championship wins» | `#5c3d00` | `#fbbf24` |
 | `--t-champ-strip-bg` / `-border` | полоса бейджей чемпионатов, день-ячейка на телефоне | `#ffe9a3` / `#d99a00` | `rgba(251,191,36,.12)` / `rgba(251,191,36,.45)` |
 | `--t-badge-ink` | возраст на бейдже группы K/Y/J/A/M | `#00265e` | `#0a4f61` |
+| `--t-res` / `--t-res-ink` | статус «протокол есть» календаря: метка RES, кнопка Results, угол-флажок дня / текст НА нём. Цвет = `--deep-live`, роль своя (не LIVE) | `#0d6e4a` / `#ffffff` | `#38ef8f` / `#04180c` |
+| `--t-sl` | статус «есть стартлист»: метка SL, контурная кнопка Startlist | = `--t-accent` (`#0057e0`) | = `--t-accent` (`#22d3ee`) |
 
 Как календарь `/competitions` их применяет (код — `client/src/projects/competitions-project/calendar/`,
 правила — `docs/tasks/competitions-home-calendar-spec.md` §5):
