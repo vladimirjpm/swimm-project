@@ -20,6 +20,8 @@ internal sealed class HubGroupLevelConfiguration : IEntityTypeConfiguration<HubG
             .WithMany()
             .HasForeignKey(e => e.HubGroupId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        entity.HasCheckConstraint("CK_HubGroupLevels_SubLevels", @"""SubLevels"" BETWEEN 1 AND 5");
     }
 }
 
@@ -48,6 +50,8 @@ internal sealed class HubGroupSwimmerLevelConfiguration : IEntityTypeConfigurati
             .HasForeignKey(e => new { e.HubGroupId, e.LevelId })
             .HasPrincipalKey(l => new { l.HubGroupId, l.Id })
             .OnDelete(DeleteBehavior.Cascade);
+
+        entity.HasCheckConstraint("CK_HubGroupSwimmerLevels_SubLevel", @"""SubLevel"" IS NULL OR ""SubLevel"" BETWEEN 1 AND 5");
     }
 }
 
@@ -102,6 +106,7 @@ internal sealed class LanePlanConfiguration : IEntityTypeConfiguration<LanePlan>
 
         entity.HasCheckConstraint("CK_LanePlans_Status", @"""Status"" IN ('draft', 'published')");
         entity.HasCheckConstraint("CK_LanePlans_LaneCount", @"""LaneCount"" BETWEEN 1 AND 12");
+        entity.HasCheckConstraint("CK_LanePlans_MaxPerLane", @"""MaxPerLane"" IS NULL OR ""MaxPerLane"" BETWEEN 1 AND 20");
     }
 }
 

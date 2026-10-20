@@ -7,6 +7,7 @@ import HelperResults from '../../../utils/helpers/helper-results';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
 import { GROUP_DISCLAIMER, ROLE_LABEL, memberChips, publicationsApiFetch, swimmerDisplayName } from './group-bits';
 import { levelColor } from './level-color';
+import LevelSelect from './level-select';
 import PersonStatusSelect, { type RosterStatus } from './person-status';
 import { useGroupLevels } from './use-group-levels';
 import { useGroupBreaks } from './use-group-breaks';
@@ -105,7 +106,7 @@ function GroupMembersCard({ group, editLevels = false, insider = false }: {
   // Уровень ставится только пловцу видимого состава (сервер) — у кого строки в ответе
   // уровней нет, выпадашку не рисуем.
   const levelBySwimmer = useMemo(
-    () => new Map((levels.data?.swimmers ?? []).map((s) => [s.swimmerId, s.levelId])),
+    () => new Map((levels.data?.swimmers ?? []).map((s) => [s.swimmerId, s])),
     [levels.data],
   );
   const levelById = useMemo(
@@ -114,9 +115,9 @@ function GroupMembersCard({ group, editLevels = false, insider = false }: {
   );
   const noLevelCount = levels.data ? levels.data.swimmers.filter((s) => s.levelId == null).length : 0;
 
-  const setLevel = async (swimmerId: number, levelId: number | null) => {
+  const setLevel = async (swimmerId: number, levelId: number | null, subLevel: number | null) => {
     setLevelError(null);
-    setLevelError(await levels.setSwimmerLevel(swimmerId, levelId));
+    setLevelError(await levels.setSwimmerLevel(swimmerId, levelId, subLevel));
   };
 
   return (
@@ -145,7 +146,8 @@ function GroupMembersCard({ group, editLevels = false, insider = false }: {
         <ul className="m-0 mt-4 flex list-none flex-col gap-1.5 p-0">
           {group.members.map((m) => {
             const hasLevelRow = levelBySwimmer.has(m.swimmer_id);
-            const levelId = levelBySwimmer.get(m.swimmer_id) ?? null;
+            const levelRow = levelBySwimmer.get(m.swimmer_id);
+            const levelId = levelRow?.levelId ?? null;
             const level = levelId != null ? levelById.get(levelId) : undefined;
             const name = m.name || m.name_en;
             return (
@@ -202,18 +204,15 @@ function GroupMembersCard({ group, editLevels = false, insider = false }: {
                     className="inline-block h-[10px] w-[10px] shrink-0 rounded-full"
                     style={{ background: level ? levelColor(level) : 'var(--t-border)' }}
                   />
-                  <select
-                    value={levelId ?? ''}
-                    onChange={(e) => setLevel(m.swimmer_id, e.target.value === '' ? null : Number(e.target.value))}
+                  <LevelSelect
+                    levels={levels.data.levels}
+                    levelId={levelId}
+                    subLevel={levelRow?.subLevel}
+                    onChange={(next, sub) => setLevel(m.swimmer_id, next, sub)}
                     disabled={levels.pendingSwimmer === m.swimmer_id}
-                    aria-label={`Level of ${name}`}
+                    ariaLabel={`Level of ${name}`}
                     className="max-w-[160px] cursor-pointer rounded-[9px] border border-[var(--t-border)] bg-[var(--t-input-bg)] px-2 py-[4px] text-[12px] font-bold text-[var(--t-text)] disabled:opacity-60"
-                  >
-                    <option value="">No level</option>
-                    {levels.data.levels.map((l) => (
-                      <option key={l.id} value={l.id}>{l.rank} · {l.name}</option>
-                    ))}
-                  </select>
+                  />
                 </span>
               )}
             </li>

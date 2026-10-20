@@ -511,6 +511,8 @@ export interface HubGroupLevel {
   description?: string | null;
   /** «#rrggbb»; null — цвет по рангу (`levelColor`). */
   color?: string | null;
+  /** Сколько подуровней: 1 — нет, 2..5 — «Advanced 1», «Advanced 2»… (порядок перелива). */
+  subLevels?: number;
   /** Пловцов состава на этом уровне. */
   swimmerCount: number;
   /** Аккаунтов-участников на этом уровне (Ш3.1). */
@@ -526,6 +528,8 @@ export interface HubGroupLevelSwimmer {
   gender?: string | null;
   clubName?: string | null;
   levelId: number | null;
+  /** Подуровень (1 — верхний); null — не задан или у уровня подуровней нет. */
+  subLevel?: number | null;
 }
 
 /** Активный участник-аккаунт со своим уровнем — действует, когда у него нет пловца на дорожке. */
@@ -553,6 +557,8 @@ export interface LanePlanSummary {
   date: string;
   status: LanePlanStatus;
   lane_count: number;
+  /** Лимит людей на дорожку (перелив по подуровням); null — без лимита. */
+  max_per_lane?: number | null;
 }
 
 export interface LanePlanLevel {
@@ -570,6 +576,8 @@ export interface LanePlanSwimmer {
   birth_year: number;
   /** ТЕКУЩИЙ уровень пловца в группе (не снимок). */
   level_id?: number | null;
+  /** ТЕКУЩИЙ подуровень (1 — верхний); null — не задан. */
+  sub_level?: number | null;
   /** Ушёл из состава — в плане остался (план — снимок). */
   left_group?: boolean;
   /** На перерыве в день плана (Ш3.1): в Unassigned новой раскладки не кладётся. */
@@ -588,6 +596,7 @@ export interface LanePlan {
   date: string;
   status: LanePlanStatus;
   lane_count: number;
+  max_per_lane?: number | null;
   note?: string | null;
   updated_at: string;
   lanes: LanePlanLane[];
@@ -612,6 +621,8 @@ export interface LanePlan {
 
 export interface LanePlanInput {
   lane_count: number;
+  /** Лимит людей на дорожку; null — без лимита (перелива по подуровням нет). */
+  max_per_lane: number | null;
   note: string | null;
   lanes: { lane_no: number; level_id: number | null; workout: string | null }[];
   /** Порядок в массиве = порядок внутри дорожки; кого нет — «Not today». */

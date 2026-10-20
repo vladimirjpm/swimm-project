@@ -18,6 +18,10 @@ public sealed class LanePlanSummaryDto
 
     [JsonPropertyName("lane_count")]
     public int LaneCount { get; set; }
+
+    /// <summary>Лимит людей на дорожку (перелив по подуровням); null — без лимита.</summary>
+    [JsonPropertyName("max_per_lane")]
+    public int? MaxPerLane { get; set; }
 }
 
 /// <summary>Уровень на дорожке — подпись и цвет (null-цвет клиент красит по рангу).</summary>
@@ -54,6 +58,10 @@ public sealed class LanePlanSwimmerDto
     /// <summary>ТЕКУЩИЙ уровень пловца в группе (не снимок) — точка цвета в редакторе.</summary>
     [JsonPropertyName("level_id")]
     public int? LevelId { get; set; }
+
+    /// <summary>ТЕКУЩИЙ подуровень (1 — верхний); null — не задан или у уровня подуровней нет.</summary>
+    [JsonPropertyName("sub_level")]
+    public int? SubLevel { get; set; }
 
     /// <summary>Пловца уже нет в составе группы — в плане он остался (план — снимок).</summary>
     [JsonPropertyName("left_group")]
@@ -94,6 +102,10 @@ public sealed class LanePlanDto
 
     [JsonPropertyName("lane_count")]
     public int LaneCount { get; set; }
+
+    /// <summary>Лимит людей на дорожку (перелив по подуровням); null — без лимита.</summary>
+    [JsonPropertyName("max_per_lane")]
+    public int? MaxPerLane { get; set; }
 
     [JsonPropertyName("note")]
     public string? Note { get; set; }
@@ -180,6 +192,10 @@ public sealed class LanePlanInputDto
     [JsonPropertyName("lane_count")]
     public int LaneCount { get; set; }
 
+    /// <summary>Лимит людей на дорожку (перелив по подуровням); null — без лимита.</summary>
+    [JsonPropertyName("max_per_lane")]
+    public int? MaxPerLane { get; set; }
+
     [JsonPropertyName("note")]
     public string? Note { get; set; }
 
@@ -199,6 +215,10 @@ public sealed class LanePlanDistributeInputDto
     [JsonPropertyName("lane_count")]
     public int LaneCount { get; set; }
 
+    /// <summary>Лимит людей на дорожку (перелив по подуровням); null — без лимита.</summary>
+    [JsonPropertyName("max_per_lane")]
+    public int? MaxPerLane { get; set; }
+
     [JsonPropertyName("lanes")]
     public List<LanePlanLaneInputDto> Lanes { get; set; } = [];
 
@@ -214,6 +234,10 @@ public sealed class LanePlanAutoLanesInputDto
 {
     [JsonPropertyName("lane_count")]
     public int LaneCount { get; set; }
+
+    /// <summary>Лимит людей на дорожку (перелив по подуровням); null — без лимита.</summary>
+    [JsonPropertyName("max_per_lane")]
+    public int? MaxPerLane { get; set; }
 
     [JsonPropertyName("swimmer_ids")]
     public List<int>? SwimmerIds { get; set; }

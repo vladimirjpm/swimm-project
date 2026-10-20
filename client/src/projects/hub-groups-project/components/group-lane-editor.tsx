@@ -23,7 +23,10 @@ import { levelColor } from './level-color';
  * Порядок внутри дорожки = кто ведёт. «Distribute» раскладывает пришедших по уровням дорожек на
  * сервере и НЕ сохраняет — сохраняет Save. «Auto lanes» — шаг раньше: тренер задал только число
  * дорожек, сервер сам делит их между уровнями по числу пришедших (соседние уровни при нехватке
- * дорожек — вместе) и раскладывает людей; задания дорожек остаются на своих номерах. Дорожки сверх
+ * дорожек — вместе) и раскладывает людей; задания дорожек остаются на своих номерах. «Max per lane»
+ * (лимит людей на дорожку, решение Влада 20.10.2026) обе кнопки отдают серверу: дорожка полна —
+ * нижний подуровень её уровня по одному переходит на дорожку следующего уровня; счётчик дорожки
+ * тогда «5 / 6», переполненная — цветом тревоги. Дорожки сверх
  * числа не выбрасываются из черновика: уменьшил и вернул — задания и люди на месте; пока дорожка
  * убрана, её люди показываются и сохраняются как Unassigned (считается на лету, а не переносом —
  * иначе два быстрых «−» теряли шаг).
@@ -76,18 +79,24 @@ const emptyLanes = (): LaneDraft[] => Array.from({ length: MAX_LANES }, () => ({
  */
 function initialDraft(
   plan: LanePlan | null, template: LanePlan | null, levels: HubGroupLevels, laneCountHint: number,
+  maxPerLaneHint: number | null,
 ) {
   const lanes = emptyLanes();
   const buckets: Buckets = { lanes: Array.from({ length: MAX_LANES }, () => []), unassigned: [], out: [] };
   const info = new Map<number, LanePlanSwimmer>();
 
   // Текущий уровень — из карточки уровней (свежее снимка).
-  const levelOf = new Map(levels.swimmers.map((s) => [s.swimmerId, s.levelId]));
-  const remember = (s: LanePlanSwimmer) =>
-    info.set(s.swimmer_id, { ...s, level_id: levelOf.has(s.swimmer_id) ? levelOf.get(s.swimmer_id) : s.level_id });
+  const levelOf = new Map(levels.swimmers.map((s) => [s.swimmerId, s]));
+  const remember = (s: LanePlanSwimmer) => {
+    const current = levelOf.get(s.swimmer_id);
+    info.set(s.swimmer_id, current
+      ? { ...s, level_id: current.levelId, sub_level: current.subLevel ?? null }
+      : s);
+  };
 
   levels.swimmers.forEach((s) => remember({
     swimmer_id: s.swimmerId, name: s.name, name_en: s.nameEn, birth_year: s.birthYear, level_id: s.levelId,
+    sub_level: s.subLevel ?? null,
   }));
 
   const source = plan ?? template;
@@ -112,6 +121,7 @@ function initialDraft(
 
   return {
     laneCount: source?.lane_count ?? laneCountHint,
+    maxPerLane: source ? source.max_per_lane ?? null : maxPerLaneHint,
     note: source?.note ?? '',
     lanes,
     buckets,
@@ -120,11 +130,14 @@ function initialDraft(
 }
 
 /** Вход сохранения из черновика: видимые дорожки; люди убранных дорожек — в Unassigned. */
-function buildInput(laneCount: number, note: string, lanes: LaneDraft[], buckets: Buckets): LanePlanInput {
+function buildInput(
+  laneCount: number, maxPerLane: number | null, note: string, lanes: LaneDraft[], buckets: Buckets,
+): LanePlanInput {
   const laneNos = Array.from({ length: laneCount }, (_, i) => i + 1);
   const unassigned = [...buckets.unassigned, ...buckets.lanes.slice(laneCount).flat()];
   return {
     lane_count: laneCount,
+    max_per_lane: maxPerLane,
     note: note.trim() || null,
     lanes: laneNos.map((no) => ({
       lane_no: no, level_id: lanes[no - 1].levelId, workout: lanes[no - 1].workout.trim() || null,
@@ -147,7 +160,7 @@ function inputKey(input: LanePlanInput): string {
 }
 
 function GroupLaneEditor({
-  groupId, date, plan, template = null, levels, laneCountHint, desktop, toolbarHost, copyFrom,
+  groupId, date, plan, template = null, levels, laneCountHint, maxPerLaneHint = null, desktop, toolbarHost, copyFrom,
   onSaved, onSetStatus, onDelete, onCopy, onDirtyChange,
 }: {
   groupId: number;
@@ -159,6 +172,8 @@ function GroupLaneEditor({
   levels: HubGroupLevels;
   /** Число дорожек нового плана (как в прошлом плане). */
   laneCountHint: number;
+  /** Лимит людей на дорожку нового плана (как в прошлом плане); null — без лимита. */
+  maxPerLaneHint?: number | null;
   desktop: boolean;
   /** Десктоп: узел шапки вида, куда выносится тулбар (портал); пока его нет — тулбар не рисуем. */
   toolbarHost?: HTMLElement | null;
@@ -175,13 +190,17 @@ function GroupLaneEditor({
 }) {
   // Исходный вид черновика: копия (если есть) или сохранённый план. Читается только при монтировании.
   const init = useMemo(
-    () => initialDraft(template ? null : plan, template, levels, laneCountHint),
-    [plan, template, levels, laneCountHint],
+    () => initialDraft(template ? null : plan, template, levels, laneCountHint, maxPerLaneHint),
+    [plan, template, levels, laneCountHint, maxPerLaneHint],
   );
   // С чем сравниваем: сохранённый план (его нет — пустой черновик).
-  const base = useMemo(() => initialDraft(plan, null, levels, laneCountHint), [plan, levels, laneCountHint]);
+  const base = useMemo(
+    () => initialDraft(plan, null, levels, laneCountHint, maxPerLaneHint),
+    [plan, levels, laneCountHint, maxPerLaneHint],
+  );
 
   const [laneCount, setLaneCount] = useState(init.laneCount);
+  const [maxPerLane, setMaxPerLane] = useState<number | null>(init.maxPerLane);
   const [note, setNote] = useState(init.note);
   const [lanes, setLanes] = useState<LaneDraft[]>(init.lanes);
   const [buckets, setBuckets] = useState<Buckets>(init.buckets);
@@ -219,9 +238,9 @@ function GroupLaneEditor({
 
   // ── Несохранённые правки ──────────────────────────────────────────────────
 
-  const draftKey = inputKey(buildInput(laneCount, note, lanes, buckets));
+  const draftKey = inputKey(buildInput(laneCount, maxPerLane, note, lanes, buckets));
   const baseKey = useMemo(
-    () => inputKey(buildInput(base.laneCount, base.note, base.lanes, base.buckets)),
+    () => inputKey(buildInput(base.laneCount, base.maxPerLane, base.note, base.lanes, base.buckets)),
     [base],
   );
   const dirty = draftKey !== baseKey;
@@ -266,7 +285,7 @@ function GroupLaneEditor({
 
   // ── Distribute / Auto lanes / Save ────────────────────────────────────────
 
-  const lanesInput = () => buildInput(laneCount, note, lanes, buckets).lanes;
+  const lanesInput = () => buildInput(laneCount, maxPerLane, note, lanes, buckets).lanes;
 
   const present = () => [...buckets.lanes.slice(0, laneCount).flat(), ...unassigned];
 
@@ -274,7 +293,7 @@ function GroupLaneEditor({
     setDistributing(true);
     setError(null);
     const result = await lanePlansApi.distribute(groupId, {
-      lane_count: laneCount, lanes: lanesInput(), swimmer_ids: present(),
+      lane_count: laneCount, max_per_lane: maxPerLane, lanes: lanesInput(), swimmer_ids: present(),
     });
     setDistributing(false);
     setConfirm(null);
@@ -299,7 +318,9 @@ function GroupLaneEditor({
   const autoLanes = async () => {
     setDistributing(true);
     setError(null);
-    const result = await lanePlansApi.autoLanes(groupId, { lane_count: laneCount, swimmer_ids: present() });
+    const result = await lanePlansApi.autoLanes(groupId, {
+      lane_count: laneCount, max_per_lane: maxPerLane, swimmer_ids: present(),
+    });
     setDistributing(false);
     setConfirm(null);
     if (!result.ok || !result.data) {
@@ -346,7 +367,7 @@ function GroupLaneEditor({
   const save = async () => {
     setSaving(true);
     setError(null);
-    const result = await lanePlansApi.save(groupId, date, buildInput(laneCount, note, lanes, buckets));
+    const result = await lanePlansApi.save(groupId, date, buildInput(laneCount, maxPerLane, note, lanes, buckets));
     setSaving(false);
     if (result.ok && result.data) onSaved(result.data);
     else setError(result.error ?? 'Could not save. Try again.');
@@ -404,6 +425,7 @@ function GroupLaneEditor({
         name={s.name}
         nameEn={s.name_en}
         color={circleColor(swimmerId)}
+        subLevel={s.sub_level ?? null}
         leftGroup={!!s.left_group}
         selected={selected === swimmerId}
         desktop={desktop}
@@ -459,6 +481,7 @@ function GroupLaneEditor({
     const lane = lanes[no - 1];
     const prev = no > 1 ? lanes[no - 2] : null;
     const ids = buckets.lanes[no - 1];
+    const over = maxPerLane != null && ids.length > maxPerLane;
     return (
       <section
         key={no}
@@ -481,8 +504,15 @@ function GroupLaneEditor({
             <option value="">No level</option>
             {levels.levels.map((l: HubGroupLevel) => <option key={l.id} value={l.id}>{l.rank} · {l.name}</option>)}
           </select>
-          <span className="hp-mono ml-auto text-[10.5px]" style={{ color: 'var(--t-text-3)' }}>
-            {desktop ? `${ids.length} ${ids.length === 1 ? 'swimmer' : 'swimmers'}` : ids.length}
+          {/* С лимитом — «5 / 6»; переполнена (вниз перелиться некому или некуда) — цветом тревоги. */}
+          <span
+            className="hp-mono ml-auto text-[10.5px]"
+            style={{ color: over ? 'var(--t-danger)' : 'var(--t-text-3)', fontWeight: over ? 800 : undefined }}
+            title={over ? `More than  in this lane` : undefined}
+          >
+            {maxPerLane != null
+              ? `${ids.length} / ${maxPerLane}`
+              : desktop ? `${ids.length} ${ids.length === 1 ? 'swimmer' : 'swimmers'}` : ids.length}
           </span>
         </header>
         <textarea
@@ -569,6 +599,8 @@ function GroupLaneEditor({
       minLanes={1}
       maxLanes={MAX_LANES}
       onLaneCount={changeLaneCount}
+      maxPerLane={maxPerLane}
+      onMaxPerLane={setMaxPerLane}
       working={distributing}
       canRun={present().length > 0}
       onDistribute={askDistribute}
@@ -665,6 +697,12 @@ function GroupLaneEditor({
             by how many are coming, the strongest on the lowest numbers, neighbouring levels share a
             lane when there are too few. Workouts stay on their lanes; “Not today” stays as is.
           </p>
+          {maxPerLane != null && (
+            <p className="m-0 mt-2 text-[13px] text-[var(--t-text-2)]">
+              With {maxPerLane} per lane, people from the bottom sub-level of a full lane move down to the next
+              level’s lane, one by one, while it has room.
+            </p>
+          )}
         </ConfirmDialog>
       )}
       {confirm === 'copy' && copyFrom && (

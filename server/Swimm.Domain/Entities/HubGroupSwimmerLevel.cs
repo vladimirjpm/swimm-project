@@ -23,4 +23,10 @@ public class HubGroupSwimmerLevel
     public int LevelId { get; set; }
 
     public HubGroupLevel? Level { get; set; }
+
+    /// <summary>
+    /// Подуровень внутри уровня, 1 — верхний (≤ <see cref="HubGroupLevel.SubLevels"/>); null — не
+    /// задан (у уровня без подуровней всегда null). Без подуровня пловец не переливается.
+    /// </summary>
+    public int? SubLevel { get; set; }
 }

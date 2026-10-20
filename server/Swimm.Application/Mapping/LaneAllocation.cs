@@ -16,12 +16,15 @@ namespace Swimm.Application.Mapping;
 /// слабые, сильные остаются отдельно.</item>
 /// <item>Сильные — на меньших номерах. Внутри группы дорожек люди режутся на подряд идущие куски,
 /// как в <see cref="LaneDistribution"/>; на общей дорожке сперва сильнейший уровень.</item>
+/// <item>Задан лимит людей на дорожку — дорожки делятся так же, а затем нижний подуровень
+/// переполненной группы переливается на дорожки следующей (<see cref="LaneOverflow"/>).</item>
 /// </list>
 /// У дорожки в модели один уровень: общей дорожке подписью ставится сильнейший из слитых.
 /// </summary>
 public static class LaneAllocation
 {
-    public sealed record Level(int LevelId, int Rank);
+    /// <summary>Уровень группы: ранг (1 — сильнейший) и сколько у него подуровней (1 — нет).</summary>
+    public sealed record Level(int LevelId, int Rank, int SubLevels = 1);
 
     public sealed record Result(
         IReadOnlyList<LaneDistribution.Lane> Lanes, IReadOnlyList<LaneDistribution.Placement> Placements);
@@ -29,7 +32,8 @@ public static class LaneAllocation
     /// <summary>Группа соседних уровней и сколько дорожек ей досталось.</summary>
     private sealed record Group(List<Level> Levels, int Count, int Lanes);
 
-    public static Result AutoLanes(int laneCount, IEnumerable<Level> levels, IEnumerable<LaneDistribution.Swimmer> swimmers)
+    public static Result AutoLanes(
+        int laneCount, IEnumerable<Level> levels, IEnumerable<LaneDistribution.Swimmer> swimmers, int? maxPerLane = null)
     {
         var people = swimmers.OrderBy(s => s.SortKey).ThenBy(s => s.SwimmerId).ToList();
         var countOf = people.Where(s => s.LevelId != null)
@@ -47,8 +51,9 @@ public static class LaneAllocation
             : Merge(laneCount, present, countOf);
 
         var lanes = new List<LaneDistribution.Lane>(laneCount);
-        var laneOf = new Dictionary<int, int?>();
+        var blocks = new List<LaneOverflow.Block>(groups.Count);
         var rankOf = present.ToDictionary(l => l.LevelId, l => l.Rank);
+        var subLevelsOf = present.ToDictionary(l => l.LevelId, l => l.SubLevels);
         var next = 1;
         foreach (var g in groups)
         {
@@ -56,19 +61,26 @@ public static class LaneAllocation
             next += g.Lanes;
             numbers.ForEach(no => lanes.Add(new LaneDistribution.Lane(no, g.Levels[0].LevelId)));
 
-            // Сперва сильнейший уровень группы, внутри — порядок состава.
+            // Сперва сильнейший уровень группы, внутри — подуровень, затем порядок состава
+            // (OrderBy устойчив). Уйти вниз может только нижний подуровень слабейшего уровня группы.
             var ids = g.Levels.Select(l => l.LevelId).ToHashSet();
+            var weakest = g.Levels[^1].LevelId;
             var members = people.Where(s => s.LevelId is int id && ids.Contains(id))
-                .OrderBy(s => rankOf[s.LevelId!.Value]).ToList();   // OrderBy устойчив — порядок состава сохраняется
-            int size = members.Count / g.Lanes, extra = members.Count % g.Lanes, index = 0;
-            for (var i = 0; i < g.Lanes; i++)
-                for (var k = 0; k < size + (i < extra ? 1 : 0); k++) laneOf[members[index++].SwimmerId] = numbers[i];
+                .OrderBy(s => rankOf[s.LevelId!.Value]).ThenBy(LaneOverflow.SubLevelOrder).ToList();
+            blocks.Add(new LaneOverflow.Block(
+                numbers,
+                members.Select(s => s.SwimmerId).ToList(),
+                members.Where(s => s.LevelId == weakest && LaneOverflow.IsBottom(s, subLevelsOf))
+                    .Select(s => s.SwimmerId).ToHashSet()));
         }
+        var placed = LaneOverflow.Place(blocks, maxPerLane);
+        var onLane = placed.Select(p => p.SwimmerId).ToHashSet();
         for (; next <= laneCount; next++) lanes.Add(new LaneDistribution.Lane(next, null));
 
+        // По дорожкам, внутри — кто ведёт; в конце Unassigned в порядке состава.
         return new Result(
             lanes,
-            people.Select(s => new LaneDistribution.Placement(s.SwimmerId, laneOf.GetValueOrDefault(s.SwimmerId))).ToList());
+            [.. placed, .. people.Where(s => !onLane.Contains(s.SwimmerId)).Select(s => new LaneDistribution.Placement(s.SwimmerId, null))]);
     }
 
     /// <summary>Дорожек не меньше уровней: по одной каждому, остальные — самым загруженным.</summary>

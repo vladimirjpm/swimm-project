@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
 import type { HubGroupLevel, HubGroupLevels, HubGroupLevelSwimmer } from '../types';
 import { levelColor, rankColor } from './level-color';
+import LevelSelect from './level-select';
 import { useGroupLevels } from './use-group-levels';
 
 /**
@@ -52,6 +53,8 @@ interface LevelDraft {
   name: string;
   description: string;
   color: string | null;
+  /** 1 — без подуровней, 2..5 — «Advanced 1», «Advanced 2»… */
+  subLevels: number;
 }
 
 type Filter = 'all' | 'none' | number;
@@ -64,10 +67,13 @@ const iconBtn =
   'cursor-pointer rounded-[7px] border border-[var(--t-border)] bg-transparent px-2 py-[4px] text-[12px] font-extrabold text-[var(--t-text-2)] hover:bg-[var(--t-surface2)] disabled:cursor-not-allowed disabled:opacity-30';
 
 const MAX_LEVELS = 12;
+/** Подуровней у уровня — до 5 (сервер: HubGroupLevelRules.MaxSubLevels). */
+const MAX_SUB_LEVELS = 5;
 
 let draftSeq = 0;
 const toDraft = (l: HubGroupLevel): LevelDraft => ({
   key: `l${l.id}`, id: l.id, name: l.name, description: l.description ?? '', color: l.color ?? null,
+  subLevels: l.subLevels ?? 1,
 });
 
 function Dot({ color }: { color: string }) {
@@ -126,7 +132,7 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
     return next;
   });
   const add = () => setDraft((d) => d && [...d, {
-    key: `n${++draftSeq}`, id: null, name: '', description: '', color: null,
+    key: `n${++draftSeq}`, id: null, name: '', description: '', color: null, subLevels: 1,
   }]);
   const remove = (key: string) => setDraft((d) => d && d.filter((x) => x.key !== key));
 
@@ -136,7 +142,7 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
     setError(null);
     const result = await apiPut<HubGroupLevels>(`/api/me/hub-groups/${groupId}/levels`, {
       levels: draft.map((d) => ({
-        id: d.id, name: d.name, description: d.description || null, color: d.color,
+        id: d.id, name: d.name, description: d.description || null, color: d.color, subLevels: d.subLevels,
       })),
     });
     setSaving(false);
@@ -163,9 +169,9 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
 
   // ── Состав ────────────────────────────────────────────────────────────────
 
-  const setSwimmerLevel = async (swimmer: HubGroupLevelSwimmer, levelId: number | null) => {
+  const setSwimmerLevel = async (swimmer: HubGroupLevelSwimmer, levelId: number | null, subLevel: number | null) => {
     setError(null);
-    setError(await saveSwimmerLevel(swimmer.swimmerId, levelId));
+    setError(await saveSwimmerLevel(swimmer.swimmerId, levelId, subLevel));
   };
 
   const noLevelCount = data.swimmers.filter((s) => s.levelId == null).length;
@@ -212,6 +218,9 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
               <span className="hp-mono w-[18px] shrink-0 text-right font-extrabold text-[var(--t-text-3)]">{l.rank}</span>
               <span className="self-center"><Dot color={levelColor(l)} /></span>
               <span className="font-black text-[var(--t-text)]">{l.name}</span>
+              {(l.subLevels ?? 1) > 1 && (
+                <span className="hp-mono shrink-0 text-[11px] font-bold text-[var(--t-text-3)]">{l.subLevels} sub-levels</span>
+              )}
               {l.description && <span className="min-w-0 truncate text-[var(--t-text-2)]">{l.description}</span>}
               <span className="hp-mono ml-auto shrink-0 text-[11.5px] text-[var(--t-text-3)]">
                 {levelPeople(l)}
@@ -248,6 +257,18 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
                 aria-label={`Description of level ${i + 1}`}
                 className={`${inputCls} flex-1 basis-[160px]`}
               />
+              <select
+                value={d.subLevels}
+                onChange={(e) => patch(d.key, { subLevels: Number(e.target.value) })}
+                aria-label={`Sub-levels of level ${i + 1}`}
+                title="Sub-levels set who moves to the next level’s lane first when a lane is full"
+                className={`${inputCls} cursor-pointer`}
+              >
+                <option value={1}>No sub-levels</option>
+                {Array.from({ length: MAX_SUB_LEVELS - 1 }, (_, k) => k + 2).map((n) => (
+                  <option key={n} value={n}>{n} sub-levels</option>
+                ))}
+              </select>
               <span className="flex gap-1">
                 <button type="button" className={iconBtn} onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
                 <button type="button" className={iconBtn} onClick={() => move(i, 1)} disabled={i === draft.length - 1} aria-label="Move down">↓</button>
@@ -307,19 +328,16 @@ function GroupLevelsCard({ groupId }: { groupId: number }) {
                       <bdi className="text-[13px] font-bold text-[var(--t-text)]">{s.name || s.nameEn}</bdi>
                       <span className="hp-mono ml-2 text-[11px] text-[var(--t-text-3)]">{s.birthYear}</span>
                     </span>
-                    <select
-                      value={s.levelId ?? ''}
-                      onChange={(e) => setSwimmerLevel(s, e.target.value === '' ? null : Number(e.target.value))}
+                    <LevelSelect
+                      levels={data.levels}
+                      levelId={s.levelId}
+                      subLevel={s.subLevel}
+                      onChange={(levelId, subLevel) => setSwimmerLevel(s, levelId, subLevel)}
                       disabled={pendingSwimmer === s.swimmerId || draft != null}
-                      aria-label={`Level of ${s.name || s.nameEn}`}
+                      ariaLabel={`Level of ${s.name || s.nameEn}`}
                       title={draft != null ? 'Save or cancel the level list first' : undefined}
                       className={`${inputCls} cursor-pointer disabled:opacity-60`}
-                    >
-                      <option value="">No level</option>
-                      {data.levels.map((l) => (
-                        <option key={l.id} value={l.id}>{l.rank} · {l.name}</option>
-                      ))}
-                    </select>
+                    />
                   </li>
                 );
               })}

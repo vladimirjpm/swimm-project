@@ -14,6 +14,9 @@ public static partial class HubGroupLevelRules
     public const int NameMaxLength = 50;
     public const int DescriptionMaxLength = 300;
 
+    /// <summary>Подуровни уровня (решение Влада 20.10.2026): 1 — нет подуровней, до 5.</summary>
+    public const int MaxSubLevels = 5;
+
     /// <summary>
     /// Стандартный набор при первом открытии (решение Влада 26.09.2026): 4 уровня, первый —
     /// сильнейший. Названия — видимый UI, поэтому по-английски; тренер переименует.
@@ -26,8 +29,11 @@ public static partial class HubGroupLevelRules
         ("Beginner", "New to structured training"),
     ];
 
-    /// <summary>Уровень после проверки: ранг = место в списке (1..N).</summary>
-    public sealed record NormalizedLevel(int? Id, int Rank, string Name, string? Description, string? Color);
+    /// <summary>
+    /// Уровень после проверки: ранг = место в списке (1..N). <c>SubLevels</c> null — не прислан
+    /// (новому — 1, существующему — как было).
+    /// </summary>
+    public sealed record NormalizedLevel(int? Id, int Rank, string Name, string? Description, string? Color, int? SubLevels = null);
 
     /// <summary>
     /// Проверить и нормализовать список уровней. Ошибка — текст для тренера (видимый UI,
@@ -62,7 +68,10 @@ public static partial class HubGroupLevelRules
             else if (!ColorRx().IsMatch(color)) return (null, $"Color of “{name}” must look like #1e88e5.");
             else color = color.ToLowerInvariant();
 
-            result.Add(new NormalizedLevel(items[i].Id, i + 1, name, description, color));
+            if (items[i].SubLevels is < 1 or > MaxSubLevels)
+                return (null, $"Sub-levels of “{name}”: from 1 (none) to {MaxSubLevels}.");
+
+            result.Add(new NormalizedLevel(items[i].Id, i + 1, name, description, color, items[i].SubLevels));
         }
         return (result, null);
     }

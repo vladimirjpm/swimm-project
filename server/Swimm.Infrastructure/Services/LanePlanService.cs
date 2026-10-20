@@ -33,12 +33,12 @@ public class LanePlanService : ILanePlanService
             .Where(p => p.HubGroupId == hubGroupId && (isManager || p.Status == LanePlanStatus.Published))
             .OrderByDescending(p => p.Date)
             .Take(ListLimit)
-            .Select(p => new { p.Date, p.Status, p.LaneCount })
+            .Select(p => new { p.Date, p.Status, p.LaneCount, p.MaxPerLane })
             .ToListAsync();
 
         return rows.Select(p => new LanePlanSummaryDto
         {
-            Date = LanePlanRules.FormatDate(p.Date), Status = p.Status, LaneCount = p.LaneCount,
+            Date = LanePlanRules.FormatDate(p.Date), Status = p.Status, LaneCount = p.LaneCount, MaxPerLane = p.MaxPerLane,
         }).ToList();
     }
 
@@ -82,7 +82,8 @@ public class LanePlanService : ILanePlanService
                 Name = row?.Name ?? "",
                 NameEn = row?.NameEn ?? "",
                 BirthYear = row?.BirthYear ?? 0,
-                LevelId = levels.TryGetValue(swimmerId, out var levelId) ? levelId : null,
+                LevelId = levels.TryGetValue(swimmerId, out var level) ? level.LevelId : null,
+                SubLevel = level?.SubLevel,
                 LeftGroup = !inRoster,
                 OnBreak = onBreak.SwimmerIds.Contains(swimmerId),
             };
@@ -111,6 +112,7 @@ public class LanePlanService : ILanePlanService
             Date = LanePlanRules.FormatDate(plan.Date),
             Status = plan.Status,
             LaneCount = plan.LaneCount,
+            MaxPerLane = plan.MaxPerLane,
             Note = plan.Note,
             UpdatedAt = plan.UpdatedAt,
             Lanes = plan.Lanes
@@ -202,6 +204,7 @@ public class LanePlanService : ILanePlanService
             }
 
             plan.LaneCount = normalized.LaneCount;
+            plan.MaxPerLane = normalized.MaxPerLane;
             plan.Note = normalized.Note;
             plan.UpdatedAt = now;
 
@@ -267,6 +270,8 @@ public class LanePlanService : ILanePlanService
     {
         var (lanes, error) = LanePlanRules.NormalizeLanes(input.LaneCount, input.Lanes);
         if (lanes == null) return (null, error);
+        var perLaneError = LanePlanRules.CheckMaxPerLane(input.MaxPerLane);
+        if (perLaneError != null) return (null, perLaneError);
 
         var levelError = await CheckLevelsAsync(hubGroupId, lanes);
         if (levelError != null) return (null, levelError);
@@ -283,10 +288,9 @@ public class LanePlanService : ILanePlanService
 
         var placements = LaneDistribution.Distribute(
             lanes.Select(l => new LaneDistribution.Lane(l.LaneNo, l.LevelId)),
-            present.Select(id => new LaneDistribution.Swimmer(
-                id,
-                levels.TryGetValue(id, out var levelId) ? levelId : null,
-                sortKeys.TryGetValue(id, out var key) ? key : int.MaxValue)));
+            present.Select(id => ToSwimmer(id, levels, sortKeys)),
+            await LoadGroupLevelsAsync(hubGroupId),
+            input.MaxPerLane);
 
         return (new LanePlanDistributionDto
         {
@@ -299,28 +303,24 @@ public class LanePlanService : ILanePlanService
     {
         if (input.LaneCount is < LanePlanRules.MinLanes or > LanePlanRules.MaxLanes)
             return (null, $"Lanes: from {LanePlanRules.MinLanes} to {LanePlanRules.MaxLanes}.");
+        var perLaneError = LanePlanRules.CheckMaxPerLane(input.MaxPerLane);
+        if (perLaneError != null) return (null, perLaneError);
 
         var roster = await LoadRosterAsync(hubGroupId);
         var levels = await LoadSwimmerLevelsAsync(hubGroupId);
-        var groupLevels = await _db.HubGroupLevels.AsNoTracking()
-            .Where(l => l.HubGroupId == hubGroupId)
-            .Select(l => new LaneAllocation.Level(l.Id, l.Rank))
-            .ToListAsync();
+        var groupLevels = await LoadGroupLevelsAsync(hubGroupId);
 
         // Кто пришёл — как в Distribute: весь состав или названные (ушедший, но стоявший в плане, — в конец).
         var sortKeys = roster.ToDictionary(r => r.SwimmerId, r => r.SortKey);
         var present = input.SwimmerIds == null
             ? await PresentByDefaultAsync(hubGroupId, roster)
             : input.SwimmerIds.Distinct().ToList();
-        var swimmers = present.Select(id => new LaneDistribution.Swimmer(
-            id,
-            levels.TryGetValue(id, out var levelId) ? levelId : null,
-            sortKeys.TryGetValue(id, out var key) ? key : int.MaxValue)).ToList();
+        var swimmers = present.Select(id => ToSwimmer(id, levels, sortKeys)).ToList();
 
         if (!swimmers.Any(s => s.LevelId != null))
             return (null, "Nobody coming today has a level yet — set levels in Admin → Levels first.");
 
-        var result = LaneAllocation.AutoLanes(input.LaneCount, groupLevels, swimmers);
+        var result = LaneAllocation.AutoLanes(input.LaneCount, groupLevels, swimmers, input.MaxPerLane);
         return (new LanePlanAutoLanesDto
         {
             Lanes = result.Lanes.Select(l => new LanePlanLaneInputDto { LaneNo = l.LaneNo, LevelId = l.LevelId }).ToList(),
@@ -384,10 +384,28 @@ public class LanePlanService : ILanePlanService
         return rows.Select((r, i) => new RosterRow(r.SwimmerId, r.Name, r.NameEn, r.BirthYear, i)).ToList();
     }
 
-    private Task<Dictionary<int, int>> LoadSwimmerLevelsAsync(int hubGroupId) =>
+    /// <summary>Уровень и подуровень пловца в группе.</summary>
+    private sealed record SwimmerLevel(int LevelId, int? SubLevel);
+
+    private Task<Dictionary<int, SwimmerLevel>> LoadSwimmerLevelsAsync(int hubGroupId) =>
         _db.HubGroupSwimmerLevels.AsNoTracking()
             .Where(l => l.HubGroupId == hubGroupId)
-            .ToDictionaryAsync(l => l.SwimmerId, l => l.LevelId);
+            .ToDictionaryAsync(l => l.SwimmerId, l => new SwimmerLevel(l.LevelId, l.SubLevel));
+
+    private Task<List<LaneAllocation.Level>> LoadGroupLevelsAsync(int hubGroupId) =>
+        _db.HubGroupLevels.AsNoTracking()
+            .Where(l => l.HubGroupId == hubGroupId)
+            .Select(l => new LaneAllocation.Level(l.Id, l.Rank, l.SubLevels))
+            .ToListAsync();
+
+    /// <summary>Пришедший для раскладки: уровень, подуровень, место в порядке состава (не из состава — в конец).</summary>
+    private static LaneDistribution.Swimmer ToSwimmer(
+        int swimmerId, Dictionary<int, SwimmerLevel> levels, Dictionary<int, int> sortKeys)
+    {
+        levels.TryGetValue(swimmerId, out var level);
+        return new LaneDistribution.Swimmer(
+            swimmerId, level?.LevelId, sortKeys.TryGetValue(swimmerId, out var key) ? key : int.MaxValue, level?.SubLevel);
+    }
 
     /// <summary>Уровни дорожек — только этой группы (FK на уровень простой, группу он не держит).</summary>
     private async Task<string?> CheckLevelsAsync(int hubGroupId, IEnumerable<LanePlanRules.NormalizedLane> lanes)

@@ -140,6 +140,16 @@
       "autoPort": false
     },
     {
+      "name": "stack-5185-api5084-migr",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "start /b dotnet run --project server/Swimm.API --no-build --configuration Migr -- --urls http://localhost:5084 & set SWIMM_API_TARGET=http://localhost:5084&& npm --prefix client run dev -- --port 5185 --strictPort"
+      ],
+      "port": 5185,
+      "autoPort": false
+    },
+    {
       "name": "stack-5181-api5079",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [

@@ -41,6 +41,9 @@ public sealed class HubGroupLevelDto
     public string? Description { get; set; }
     public string? Color { get; set; }
 
+    /// <summary>Сколько подуровней: 1 — нет, 2..5 — «Advanced 1», «Advanced 2»…</summary>
+    public int SubLevels { get; set; } = 1;
+
     /// <summary>Сколько пловцов СОСТАВА на этом уровне — для подтверждения удаления.</summary>
     public int SwimmerCount { get; set; }
 
@@ -59,6 +62,9 @@ public sealed class HubGroupLevelSwimmerDto
     public string? Gender { get; set; }
     public string? ClubName { get; set; }
     public int? LevelId { get; set; }
+
+    /// <summary>Подуровень (1 — верхний); null — не задан или у уровня подуровней нет.</summary>
+    public int? SubLevel { get; set; }
 }
 
 /// <summary>Весь список уровней разом: порядок в списке = ранг. Нет в списке — удаляется.</summary>
@@ -74,10 +80,16 @@ public sealed class HubGroupLevelInputDto
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? Color { get; set; }
+
+    /// <summary>Сколько подуровней (1..5); null — у нового 1, у существующего как было.</summary>
+    public int? SubLevels { get; set; }
 }
 
 /// <summary>Уровень одного пловца; null — снять уровень.</summary>
 public sealed class HubGroupSwimmerLevelInputDto
 {
     public int? LevelId { get; set; }
+
+    /// <summary>Подуровень 1..SubLevels уровня; null — не задан (у уровня без подуровней — всегда).</summary>
+    public int? SubLevel { get; set; }
 }

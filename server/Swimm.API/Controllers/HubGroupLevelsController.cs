@@ -63,13 +63,13 @@ public class HubGroupLevelsController : ControllerBase
         return Ok(await _levels.GetAsync(id));
     }
 
-    /// <summary>Поставить/снять уровень пловцу (<c>levelId: null</c> — снять).</summary>
+    /// <summary>Поставить/снять уровень пловцу (<c>levelId: null</c> — снять) и подуровень (<c>subLevel</c>).</summary>
     [HttpPut("swimmer-levels/{swimmerId:int}")]
     public async Task<IActionResult> SetSwimmerLevel(int id, int swimmerId, [FromBody] HubGroupSwimmerLevelInputDto input)
     {
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
-        var result = await _levels.SetSwimmerLevelAsync(id, swimmerId, input.LevelId);
+        var result = await _levels.SetSwimmerLevelAsync(id, swimmerId, input.LevelId, input.SubLevel);
         return result.Success ? NoContent() : BadRequest(new { error = result.Error });
     }
 

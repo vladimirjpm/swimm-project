@@ -29,15 +29,17 @@ export function useGroupLevels(groupId: number, enabled = true) {
     return () => { cancelled = true; };
   }, [groupId, enabled]);
 
-  /** Ставит уровень (null — «без уровня»). Возвращает текст ошибки или null. */
-  const setSwimmerLevel = useCallback(async (swimmerId: number, levelId: number | null): Promise<string | null> => {
-    const previous = data?.swimmers.find((s) => s.swimmerId === swimmerId)?.levelId ?? null;
-    setData((d) => d && applySwimmerLevel(d, swimmerId, levelId));
+  /** Ставит уровень и подуровень (null — «без уровня»). Возвращает текст ошибки или null. */
+  const setSwimmerLevel = useCallback(async (
+    swimmerId: number, levelId: number | null, subLevel: number | null = null,
+  ): Promise<string | null> => {
+    const was = data?.swimmers.find((s) => s.swimmerId === swimmerId);
+    setData((d) => d && applySwimmerLevel(d, swimmerId, levelId, subLevel));
     setPendingSwimmer(swimmerId);
-    const result = await lanePlansApi.setSwimmerLevel(groupId, swimmerId, levelId);
+    const result = await lanePlansApi.setSwimmerLevel(groupId, swimmerId, levelId, subLevel);
     setPendingSwimmer(null);
     if (result.ok) return null;
-    setData((d) => d && applySwimmerLevel(d, swimmerId, previous));
+    setData((d) => d && applySwimmerLevel(d, swimmerId, was?.levelId ?? null, was?.subLevel ?? null));
     return result.error ?? 'Could not save the level. Try again.';
   }, [data, groupId]);
 
@@ -57,8 +59,10 @@ export function useGroupLevels(groupId: number, enabled = true) {
 }
 
 /** Уровень пловца + пересчёт счётчиков — локально, до ответа сервера. */
-export function applySwimmerLevel(data: HubGroupLevels, swimmerId: number, levelId: number | null): HubGroupLevels {
-  const swimmers = data.swimmers.map((s) => (s.swimmerId === swimmerId ? { ...s, levelId } : s));
+export function applySwimmerLevel(
+  data: HubGroupLevels, swimmerId: number, levelId: number | null, subLevel: number | null = null,
+): HubGroupLevels {
+  const swimmers = data.swimmers.map((s) => (s.swimmerId === swimmerId ? { ...s, levelId, subLevel } : s));
   const counts = new Map<number, number>();
   swimmers.forEach((s) => { if (s.levelId != null) counts.set(s.levelId, (counts.get(s.levelId) ?? 0) + 1); });
   return {

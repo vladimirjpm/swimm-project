@@ -32,4 +32,11 @@ public class HubGroupLevel
     /// <summary>Цвет метки «#rrggbb»; null — клиент красит по рангу.</summary>
     [MaxLength(9)]
     public string? Color { get; set; }
+
+    /// <summary>
+    /// Сколько подуровней (решение Влада 20.10.2026): 1 — подуровней нет, 2..5 — «Advanced 1»,
+    /// «Advanced 2»… Подуровень — порядок перелива: при лимите людей на дорожку нижний подуровень
+    /// переходит на дорожку следующего уровня (<c>LaneOverflow</c>).
+    /// </summary>
+    public int SubLevels { get; set; } = 1;
 }

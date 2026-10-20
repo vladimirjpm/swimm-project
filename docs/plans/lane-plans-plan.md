@@ -41,14 +41,15 @@
 ## Модель
 
 ```
-Sys_HubGroupLevels          Id, HubGroupId, Rank (1 = сильнейший), Name(50), Description(300)?, Color(9)?
+Sys_HubGroupLevels          Id, HubGroupId, Rank (1 = сильнейший), Name(50), Description(300)?, Color(9)?,
+                            SubLevels (1..5, 1 = нет подуровней; 20.10.2026)
                             индекс (HubGroupId, Rank) НЕ уникальный (список сохраняется целиком с
                             перенумерацией — уникальный падал бы на перестановке); AK (HubGroupId, Id)
                             — цель составного FK уровня пловца
-Sys_HubGroupSwimmerLevels   HubGroupId, SwimmerId, LevelId            PK (HubGroupId, SwimmerId)
+Sys_HubGroupSwimmerLevels   HubGroupId, SwimmerId, LevelId, SubLevel? (1..5)            PK (HubGroupId, SwimmerId)
                             FK (HubGroupId, LevelId) → уровень ЭТОЙ ЖЕ группы, ON DELETE CASCADE
                             (строка уходит = «без уровня»)
-Sys_LanePlans               Id, HubGroupId, Date (date), LaneCount (1..12), Note(500)?,
+Sys_LanePlans               Id, HubGroupId, Date (date), LaneCount (1..12), Note(500)?, MaxPerLane? (1..20),
                             Status (draft|published), CreatedByUserId? (SET NULL), CreatedAt, UpdatedAt
                             UNIQUE (HubGroupId, Date)   ← снять, когда появится StartTime
 Sys_LanePlanLanes           PlanId, LaneNo, LevelId?, Workout(4000)?       PK (PlanId, LaneNo)
@@ -195,6 +196,7 @@ DELETE /api/hub-groups/{id}/lane-plans/{date}              CanEdit → 204 / 404
 | ✅ **L4** | Таб `Lanes`: доска участника + «Your lane» (`my_swimmers` на сервере); замок не участнику; `utest`-персонажи | сделано 26.09.2026 — см. «Сделано» ниже | `utest-member` видит опубликованный план и не видит черновик; гость — замок; pending — замок |
 | ✅ **L5** | «Copy from previous plan»; footguns: склейка пловцов, delete-impact | сделано 26.09.2026 — см. «Сделано» ниже |
 | ✅ **Auto lanes** | Дорожки между уровнями по числу пришедших (`LaneAllocation`), кнопка в редакторе | сделано 27.09.2026 (PR #99) — см. «Сделано» ниже |
+| ✅ **Подуровни** | «Advanced 1 / Advanced 2…», лимит «Max per lane», перелив нижнего подуровня вниз (`LaneOverflow`), миграция `AddLevelSubLevels` | сделано 20.10.2026 — см. «Сделано» ниже |
 
 Тесты (`Swimm.Tests`): `LaneDistribution` (поровну ±1, уровень без дорожек → Unassigned,
 без уровня → Unassigned, детерминизм, пустой уровень), права (участник/pending/гость/
@@ -382,22 +384,85 @@ DELETE /api/hub-groups/{id}/lane-plans/{date}              CanEdit → 204 / 404
   сохраняет как раньше; `utest-member` — выпадашек нет, запросов к `/levels` нет; 375 px без
   горизонтальной прокрутки. Тестовые уровни удалены.
 
-## Как вернуться к работе (27.09.2026)
+### Подуровни и перелив (запрос и решения Влада 20.10.2026)
+
+Запрос: «Advanced 1, Advanced 2 — в случае чего (нет мест) Advanced 2 перейдёт на дорожку
+Intermediate». Подуровень — это порядок перелива, когда на дорожке не хватает мест.
+
+**Решения Влада (20.10.2026):**
+1. **Модель — номер внутри уровня**, а не отдельные записи уровней с родителем: у уровня
+   «сколько подуровней» (1 = нет, до 5), у пловца — номер (1 = верхний). Подпись дорожки —
+   по-прежнему уровень.
+2. **«Нет мест» = лимит людей на дорожку** — поле «Max per lane» в плане (1..20, по умолчанию
+   «No limit»). Без лимита перелива нет вовсе (решение 26.09 «лимита нет» осталось поведением
+   по умолчанию).
+3. **Только вниз**: «Advanced 2 → дорожка Intermediate». Вверх («Intermediate 1 → дорожка
+   Advanced») никто не поднимается.
+4. **По одному человеку**, а не подуровнем целиком: уходит столько, сколько нужно, первым —
+   последний в порядке.
+
+**Правила перелива** (`LaneOverflow`, Application, чистая функция; общая для Distribute и Auto lanes):
+- блок — дорожки одного уровня (у Auto lanes при нехватке дорожек — группа слитых соседних),
+  блоки по силе (по рангу, не по номеру дорожки);
+- уйти может только **нижний подуровень** уровня, у которого подуровней 2+ (в слитом блоке —
+  только слабейшего уровня); без подуровня и у уровня без подуровней — никто;
+- уходят, **только если внизу есть место** — с учётом цепочки: нижний блок может сам отдать своих
+  нижних дальше вниз и так освободить место; места нет нигде — дорожка остаётся переполненной
+  (в редакторе счётчик «7 / 6» цветом тревоги);
+- **только на соседний блок**: перешедший дальше не идёт, даже если ниже свободно;
+- пришедшие сверху **ведут** дорожку (они сильнее); внутри уровня подуровень 1 первым, без
+  подуровня — в конце;
+- на дорожку уровня, у которого сегодня никого нет, перелиться тоже можно (блоки строятся от
+  дорожек, а не от людей).
+
+Ответ Distribute / Auto lanes теперь идёт **по дорожкам** (внутри — кто ведёт), Unassigned в
+конце: редактор кладёт людей в дорожку в порядке ответа, а прежний «порядок состава» не дал бы
+подуровню 1 и пришедшим сверху встать первыми.
+
+- **Модель** — миграция `AddLevelSubLevels`: `Sys_HubGroupLevels.SubLevels` (int, default 1,
+  CK 1..5), `Sys_HubGroupSwimmerLevels.SubLevel` (int?, CK 1..5), `Sys_LanePlans.MaxPerLane`
+  (int?, CK 1..20). Применена к локальной базе. У аккаунтов без пловца подуровня нет: в план они
+  не попадают и на перелив не влияют.
+- **Сервер** — `PUT …/levels` принимает `subLevels` (null — у существующего как было); подуровней
+  стало меньше — «Advanced 3» становится нижним, подуровней не стало — подуровень снимается.
+  `PUT …/swimmer-levels/{id}` принимает `subLevel` (у уровня без подуровней не хранится, вне
+  1..N — 400). План: `max_per_lane` во входе PUT / distribute / auto-lanes и в ответах списка и
+  доски; у пловца доски — `sub_level`. Склейка пловцов переносит подуровень.
+- **Клиент** — `level-select.tsx` (общая выпадашка «1 · Advanced 2» для карточки Levels и таба
+  Swimmers); в редакторе уровней — выбор «No sub-levels / 2…5 sub-levels»; в тулбаре плана —
+  «Max per lane» (новый план берёт лимит соседнего); на плашке пловца — цифра подуровня рядом
+  с точкой цвета уровня (видно, кто пришёл сверху).
+- **Тесты** — `LaneOverflowTests` (24 случая): пример Влада 9/3 → 6/6, без лимита никто не двигается, по
+  одному, только вниз, нет места — остаётся переполненным, цепочка, один шаг вниз, без подуровня
+  не двигается, ранг важнее номера дорожки, перелив на пустой уровень, Auto lanes, порядок ответа;
+  правила лимита и подуровней; сервисы (подуровень пловца, сжатие подуровней, лимит в плане).
+  `LanePlanPgTests.SubLevelsAndMaxPerLane_OnPostgres` — запись, сжатие и CK на живой базе.
+- **Проверено вживую** (стенд `stack-5185-api5084-migr`, `utest-open`, теперь id 289): Advanced и
+  Intermediate по 2 подуровня, 6 пловцов (A1, A1, A2, A2, I1, I2), 2 дорожки, лимит 3, Auto lanes →
+  дорожка 1: A1, A1, A2 («3 / 3»), дорожка 2: A2 (ведёт), I1, I2; Save — лимит и подуровни в
+  ответе; таб Swimmers показывает «1 · Advanced 2»; 375 px без горизонтальной прокрутки. Тестовые
+  план и уровни удалены.
+- **Не тронуто сознательно** — вид по дорожкам на занятие без плана (`TrainingLaneView`, Ш3.2):
+  он раскладывает на лету без лимита, подуровни на него не влияют.
+
+## Как вернуться к работе (27.09.2026; подуровни — 20.10.2026)
 
 **Состояние.** Всё в master: PR #98 (L1–L5 + починка кэша после #97, merge `dd629385`) и PR #99
 (Auto lanes, merge `d6ec402c`). Миграции `AddHubGroupLevels`, `AddLanePlans` применены к локальной
 базе. Незакоммиченного по этой работе нет. Открытых решений Влада нет.
+**20.10.2026:** подуровни и перелив (см. «Сделано» → «Подуровни и перелив») — миграция
+`AddLevelSubLevels` применена к локальной базе; на проде — при выкладке. Не закоммичено на момент записи.
 
 **Где что лежит.**
 
 | Слой | Файлы |
 |---|---|
 | Домен | `Swimm.Domain/Entities/HubGroupLevel.cs`, `HubGroupSwimmerLevel.cs`, `LanePlan.cs` (+ `LanePlanLane`, `LanePlanSwimmer`, `LanePlanStatus`) |
-| Правила (чистые) | `Swimm.Application/Mapping/HubGroupLevelRules.cs`, `LanePlanRules.cs`, `LaneDistribution.cs` (Distribute), `LaneAllocation.cs` (Auto lanes) |
+| Правила (чистые) | `Swimm.Application/Mapping/HubGroupLevelRules.cs`, `LanePlanRules.cs`, `LaneDistribution.cs` (Distribute), `LaneAllocation.cs` (Auto lanes), `LaneOverflow.cs` (перелив по подуровням) |
 | DTO / порты | `Dtos/HubGroupLevelDtos.cs` (camelCase), `Dtos/LanePlanDtos.cs` (snake_case); `Abstractions/IHubGroupLevelService.cs`, `ILanePlanService.cs` |
 | Сервисы | `Swimm.Infrastructure/Services/HubGroupLevelService.cs`, `LanePlanService.cs` (в т.ч. `my_swimmers`), `GroupAdvisoryLock.cs` (транзакция + блокировка группы) |
 | Контроллеры | `HubGroupLevelsController` (`/api/me/hub-groups/{id}/levels`), `HubGroupLanePlansController` (`/api/hub-groups/{id}/lane-plans`) |
-| Клиент | `client/src/projects/hub-groups-project/components/`: `group-levels.tsx` (карточка Levels), `use-group-levels.ts` (уровни — общий хук Levels и Swimmers), `group-cards.tsx` (`GroupMembersCard editLevels`), `group-lanes.tsx` (таб, даты, статус), `group-lane-editor.tsx`, `group-lane-board.tsx` (+ «Your lane»), `lane-plans-api.ts`, `level-color.ts`; таб — в `group-page.tsx` |
+| Клиент | `client/src/projects/hub-groups-project/components/`: `group-levels.tsx` (карточка Levels), `use-group-levels.ts` (уровни — общий хук Levels и Swimmers), `group-cards.tsx` (`GroupMembersCard editLevels`), `group-lanes.tsx` (таб, даты, статус), `group-lane-editor.tsx`, `group-lane-board.tsx` (+ «Your lane»), `lane-plans-api.ts`, `level-color.ts`, `level-select.tsx` (выпадашка уровня с подуровнями); таб — в `group-page.tsx` |
 | Задетое чужое | `SwimmerMergeService` (перенос уровней и мест), `HubGroupAdminService.GetDeleteImpactAsync` + `_DeleteConfirm.cshtml` + `delete-group-dialog.tsx` (перечень потерь), `seed-tables.txt` |
 | Тесты | `HubGroupLevelTests`, `LanePlanTests` (в т.ч. Auto lanes), `LanePlanPgTests` (живой PG), дополнения в `SwimmerMergeServiceTests`, `HubGroupDeleteTests` |
 
@@ -415,6 +480,10 @@ DELETE /api/hub-groups/{id}/lane-plans/{date}              CanEdit → 204 / 404
   `dotnet build server/Swimm.sln`; если :5078 из Debug запущен — сборка упрётся в лок, тогда
   тесты гонять `dotnet test server/Swimm.Tests --artifacts-path <scratchpad>/art` (тестовый
   проект тянет API), а стенд — после остановки :5078.
+  Когда Debug занят (ProdAdmin Влада) — стенд `stack-5185-api5084-migr`: API из конфигурации
+  `Migr` (`dotnet build server/Swimm.API -c Migr`, свой `bin/Migr`, лок не мешает) + Vite 5185.
+  ⚠ Тесты, читающие исходники (HostingMode, DataVersionPg, DirectMemoryCache…), с
+  `--artifacts-path` вне репо падают «корень не найден» — их гонять `dotnet test -c Migr`.
 - Персонажи: `GET /api/dev/persona?as=utest-coach` (владелец тест-групп), `utest-member`
   (участник обеих), `utest-newbie` (вошёл, не в группе — замок), `utest-pending` (заявка в
   `utest-approval` — замок), `default` — вернуть. Тест-группы: `utest-open` (id 285),

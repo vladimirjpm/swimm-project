@@ -10,12 +10,14 @@ import LaneCircle from './group-lane-circle';
  * Выбранная плашка — рамка `--deep-ow`, фон `--deep-ow-chip`.
  */
 function LaneChip({
-  name, nameEn, color, leftGroup, selected, desktop, onSelect, dragProps, dropActive,
+  name, nameEn, color, subLevel = null, leftGroup, selected, desktop, onSelect, dragProps, dropActive,
 }: {
   name: string;
   nameEn: string;
   /** Цвет ТЕКУЩЕГО уровня пловца; null — без уровня. */
   color: string | null;
+  /** ТЕКУЩИЙ подуровень (1 — верхний): мелкая цифра после имени — видно, кто перешёл с уровня выше. */
+  subLevel?: number | null;
   /** Ушёл из группы (план — снимок): имя приглушено. */
   leftGroup: boolean;
   selected: boolean;
@@ -31,6 +33,11 @@ function LaneChip({
   const bg = selected ? 'var(--deep-ow-chip)' : 'var(--deep-card-bg)';
   const nameColor = leftGroup ? 'var(--t-text-3)' : 'var(--deep-text)';
   const outline = dropActive ? '2px solid var(--deep-accent)' : undefined;
+  const sub = subLevel != null && (
+    <span className="hp-mono flex-none text-[10.5px] font-extrabold" style={{ color: 'var(--t-text-3)' }} title={`Sub-level ${subLevel}`}>
+      {subLevel}
+    </span>
+  );
 
   if (!desktop) {
     return (
@@ -46,6 +53,7 @@ function LaneChip({
         <span dir="auto" className="min-w-0 truncate text-[12px] font-extrabold" style={{ color: nameColor }}>
           <bdi>{label}</bdi>
         </span>
+        {sub}
       </button>
     );
   }
@@ -61,6 +69,7 @@ function LaneChip({
       <span dir="auto" className="min-w-0 flex-1 truncate text-[12px] font-extrabold" style={{ color: nameColor }}>
         <bdi>{label}</bdi>
       </span>
+      {sub}
       <button
         type="button"
         onClick={onSelect}

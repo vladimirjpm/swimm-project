@@ -211,6 +211,8 @@ function GroupLanes({
   const nextPlan = ascending.find((p) => p.date > date);
   // Новый план — с числом дорожек последнего плана до этой даты (обычно бассейн тот же).
   const laneCountHint = prevPlan?.lane_count ?? nextPlan?.lane_count ?? 6;
+  // И лимит людей на дорожку — тот же, что у соседнего плана.
+  const maxPerLaneHint = (prevPlan ?? nextPlan)?.max_per_lane ?? null;
   // Откуда копировать: ближайший план до этой даты, иначе самый свежий из других.
   const copySource = prevPlan ?? plans.find((p) => p.date !== date) ?? null;
 
@@ -339,6 +341,7 @@ function GroupLanes({
               template={template}
               levels={levels}
               laneCountHint={laneCountHint}
+              maxPerLaneHint={maxPerLaneHint}
               desktop={desktop}
               toolbarHost={toolbarHost}
               copyFrom={copySource?.date ?? null}
