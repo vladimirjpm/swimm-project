@@ -95,6 +95,8 @@ public class BulkPullServiceTests
 
         public ImportJobStatus? GetStatus(Guid jobId) => _statuses.GetValueOrDefault(jobId);
 
+        public IReadOnlyList<ImportJobStatus> Snapshot() => [.. _statuses.Values];
+
         /// <summary>Очередь «забыла» задачи — как после перезапуска API.</summary>
         public void Forget() => _statuses.Clear();
     }

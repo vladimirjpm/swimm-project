@@ -95,3 +95,21 @@ internal sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
         entity.Property(e => e.LastError).HasMaxLength(1000);
     }
 }
+
+// История прогонов фоновых задач (/Admin/Jobs): строка на прогон, обрезается до последних
+// JobRunLog.KeepPerJob на задачу. Как и Sys_JobRuns — без гранта swimm_ro и не в seed-tables.
+internal sealed class JobRunLogEntryConfiguration : IEntityTypeConfiguration<JobRunLogEntry>
+{
+    public void Configure(EntityTypeBuilder<JobRunLogEntry> entity)
+    {
+        entity.ToTable("Sys_JobRunLog", t => t.HasCheckConstraint(
+            "CK_Sys_JobRunLog_Trigger",
+            @"""Trigger"" IN ('schedule', 'manual', 'cli')"));
+        entity.Property(e => e.Name).HasMaxLength(100);
+        entity.Property(e => e.Trigger).HasMaxLength(20);
+        entity.Property(e => e.Summary).HasMaxLength(1000);
+        entity.Property(e => e.Error).HasMaxLength(1000);
+        // Страница и обрезка спрашивают «последние N этой задачи».
+        entity.HasIndex(e => new { e.Name, e.StartedAt });
+    }
+}

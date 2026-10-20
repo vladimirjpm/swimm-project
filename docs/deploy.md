@@ -95,6 +95,11 @@ swimhub-pg-restore --yes`), он стоит денег. Самая ранняя 
   сменился домашний IP. Добавить правило firewall (старое потом удалить):
   `az postgres flexible-server firewall-rule create -g swimm-rg -s swimhub-pg -n home-<дата> --start-ip-address <ip> --end-ip-address <ip>`;
   текущий IP — `(Invoke-RestMethod https://api.ipify.org)`.
+  **С 20.10.2026 это делает кнопка `swimm-api-prodadmin` сама** (`server/run-prodadmin.ps1` →
+  `server/db/prodadmin-firewall.ps1`): IP не покрыт ни одним правилом — заводит или обновляет одно
+  правило `auto-<имя машины>`, правила не копятся. Руками — тот же скрипт. Нужен `az login`.
+  Диапазоном провайдера не открываем: рабочий IP — из пула частных клиентов Bezeq
+  (147.235.192.0/19, ~8 тыс. чужих адресов), и завтрашний может прийти из другого блока.
 - **`az` — только из PowerShell.** Git Bash переписывает аргументы `/home/...` в Windows-пути
   (так однажды сломался путь ключей Data Protection); если всё-таки bash — `MSYS_NO_PATHCONV=1`.
 - **Секреты в чат и в git не попадают** — значения вводятся `Read-Host -AsSecureString` (вставка правой

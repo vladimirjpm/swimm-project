@@ -2016,6 +2016,51 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_JobRuns", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.JobRunLogEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name", "StartedAt");
+
+                    b.ToTable("Sys_JobRunLog", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Sys_JobRunLog_Trigger", "\"Trigger\" IN ('schedule', 'manual', 'cli')");
+                        });
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.LanePlan", b =>
                 {
                     b.Property<int>("Id")

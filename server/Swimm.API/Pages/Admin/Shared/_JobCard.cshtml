@@ -1,0 +1,84 @@
+@using Swimm.API.Pages.Admin
+@using Swimm.API.Pages.Admin.Shared
+@using Swimm.Application.Dtos
+@using Swimm.Application.Mapping
+@model JobCard
+@*
+    Карточка фоновой службы на /Admin/Jobs: бейдж состояния, «подпись — значение» и (у расписаний)
+    история прогонов из Sys_JobRunLog.
+*@
+@functions {
+    static string FactClass(string? variant) => variant switch
+    {
+        "success" => "text-admin-success",
+        "danger" => "text-admin-danger",
+        "warning" => "text-admin-warning",
+        "info" => "text-admin-accent",
+        "neutral" => "text-admin-text-muted",
+        _ => "text-admin-text",
+    };
+}
+<div class="admin-card p-4 min-w-0 scroll-mt-4" id="job-@Model.Key">
+    <div class="flex flex-wrap items-center gap-2 mb-1">
+        <span class="text-base font-semibold text-admin-text">@Model.Title</span>
+        <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel(Model.Badge.Text, Model.Badge.Variant)' />
+        <code class="ml-auto text-xs text-admin-text-muted">@Model.Service</code>
+    </div>
+    <p class="mt-0 mb-3 text-[0.85rem] leading-relaxed text-admin-text-muted">@Model.What</p>
+
+    <dl class="grid grid-cols-[minmax(8rem,max-content)_1fr] gap-x-4 gap-y-1 m-0 text-[0.85rem]">
+        @foreach (var fact in Model.Facts)
+        {
+            <dt class="text-admin-text-muted">@fact.Label</dt>
+            <dd class="m-0 break-words @FactClass(fact.Variant)">@fact.Value</dd>
+        }
+    </dl>
+
+    @if (Model.Kind == "schedule")
+    {
+        <div class="mt-3 border-t border-admin-border pt-2">
+            @if (Model.History.Count == 0)
+            {
+                <div class="text-xs text-admin-text-muted">Истории прогонов пока нет.</div>
+            }
+            else
+            {
+                <div class="overflow-x-auto">
+                    <table class="admin-table">
+                        <thead>
+                            <tr><th>Начало</th><th>Кто</th><th>Длилось</th><th>Что сделала</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var run in Model.History)
+                        {
+                            <tr>
+                                <td class="whitespace-nowrap text-xs">@JobTimeText.Format(run.StartedAt)</td>
+                                <td class="whitespace-nowrap text-xs">@JobTimeText.Trigger(run.Trigger)</td>
+                                <td class="whitespace-nowrap text-xs">@JobTimeText.Duration(run.StartedAt, run.FinishedAt)</td>
+                                <td class="text-xs">
+                                    @if (!run.Success)
+                                    {
+                                        <partial name="/Pages/Admin/Shared/_StatusBadge.cshtml" model='new StatusBadgeModel("ошибка", "danger")' />
+                                        <span class="text-admin-danger">@run.Error</span>
+                                    }
+                                    @if (run.Summary is not null)
+                                    {
+                                        <span>@run.Summary</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    @if (Model.Link is not null)
+    {
+        <div class="mt-3">
+            <a href="@Model.Link.Url" class="text-xs text-admin-accent hover:underline">@Model.Link.Text →</a>
+        </div>
+    }
+</div>

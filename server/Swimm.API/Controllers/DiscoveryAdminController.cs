@@ -88,20 +88,30 @@ public class DiscoveryAdminController : ControllerBase
         // чтобы случайный ?year=1 не гонял чужой прод впустую.
         if (year is not null and (< 2000 or > 2100))
             return BadRequest(new { error = "Сезон вне диапазона 2000–2100." });
+        var startedAt = DateTime.UtcNow;
+        var seasonPrefix = year is null ? "" : $"сезон {year}: ";
         try
         {
-            var startedAt = DateTime.UtcNow;
             var result = await _discovery.SyncAsync(year, ct);
+            var run = new JobRunRecord(JobNames.Discovery, JobTriggers.Manual, startedAt, DateTime.UtcNow,
+                Success: true, seasonPrefix + JobRunSummaries.Discovery(result), Error: null);
             // Текущий сезон проверен руками — это тот же успех, что у фона (В12): иначе фоновое
-            // расписание тут же сходило бы на сайт второй раз. Прошлый сезон (year) — другой список.
+            // расписание тут же сходило бы на сайт второй раз. Прошлый сезон (year) — другой
+            // список: только строка истории, расписание не сдвигаем.
             if (year is null)
-                await _jobRuns.RecordAsync(JobNames.Discovery, startedAt, success: true, error: null, ct);
+                await _jobRuns.RecordAsync(run, ct);
+            else
+                await _jobRuns.AppendLogAsync(run, ct);
             return Ok(result);
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
         {
             // B4: ошибка вёрстки/сети — явным текстом в админку, не тихий ноль.
             _logger.LogWarning(ex, "Discovery sync failed");
+            // В историю — да (/Admin/Jobs), в расписание — нет: упавшая кнопка не должна
+            // переводить фон на «повтор через час».
+            await _jobRuns.AppendLogAsync(new JobRunRecord(JobNames.Discovery, JobTriggers.Manual, startedAt,
+                DateTime.UtcNow, Success: false, Summary: year is null ? null : $"сезон {year}", ex.Message), ct);
             return StatusCode(502, new { error = ex.Message });
         }
     }

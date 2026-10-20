@@ -6,7 +6,9 @@ namespace Swimm.API.BackgroundServices;
 /// <summary>
 /// Общий шаг фоновых РАСПИСАНИЙ (В12, docs/plans/competitions-home-plan.md, часть В): спросить
 /// журнал <c>Sys_JobRuns</c>, пора ли (<see cref="JobSchedule.IsDue"/>), выполнить и записать итог.
-/// «Последний запуск» в базе, а не в памяти — перезапуск API задачу заново не запускает.
+/// «Последний запуск» в базе, а не в памяти — перезапуск API задачу заново не запускает. Что
+/// прогон сделал (строка, которую вернула работа), ложится в историю <c>Sys_JobRunLog</c> —
+/// её показывает /Admin/Jobs.
 ///
 /// Журнал читается и пишется в СВОЁМ скоупе (свой DbContext): упавшая работа могла оставить в
 /// контексте недописанные изменения, и запись «неудача» не должна их сохранить заодно.
@@ -14,14 +16,15 @@ namespace Swimm.API.BackgroundServices;
 internal static class ScheduledJob
 {
     /// <summary>
-    /// Выполнить <paramref name="work"/>, если задаче <paramref name="name"/> пора. Ошибка работы
-    /// не летит наружу: пишется в журнал (повтор — через <see cref="JobSchedule.RetryAfterFailure"/>)
-    /// и в лог. Отмена (остановка приложения) летит — её не записываем.
+    /// Выполнить <paramref name="work"/>, если задаче <paramref name="name"/> пора. Работа
+    /// возвращает итог одной строкой (<see cref="JobRunSummaries"/>). Ошибка работы не летит
+    /// наружу: пишется в журнал (повтор — через <see cref="JobSchedule.RetryAfterFailure"/>) и в
+    /// лог. Отмена (остановка приложения) летит — её не записываем.
     /// </summary>
     /// <returns>true — работа запускалась (успешно или нет).</returns>
     public static async Task<bool> RunIfDueAsync(
         IServiceScopeFactory scopeFactory, string name, TimeSpan interval,
-        Func<CancellationToken, Task> work, ILogger logger, CancellationToken ct)
+        Func<CancellationToken, Task<string?>> work, ILogger logger, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         await using (var scope = scopeFactory.CreateAsyncScope())
@@ -32,9 +35,10 @@ internal static class ScheduledJob
         }
 
         string? error = null;
+        string? summary = null;
         try
         {
-            await work(ct);
+            summary = await work(ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -49,8 +53,9 @@ internal static class ScheduledJob
         }
 
         await using (var scope = scopeFactory.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<IJobRunStore>()
-                .RecordAsync(name, now, success: error is null, error, ct);
+            await scope.ServiceProvider.GetRequiredService<IJobRunStore>().RecordAsync(
+                new JobRunRecord(name, JobTriggers.Schedule, now, DateTime.UtcNow,
+                    Success: error is null, summary, error), ct);
         return true;
     }
 }

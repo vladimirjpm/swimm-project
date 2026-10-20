@@ -54,6 +54,7 @@
 
     let dashStatus = null;
     let dashCache = null;   // сводка кэша — отдельным живым запросом (buildCacheBlock)
+    let dashJobs = null;    // сводка фоновых служб — отдельным живым запросом (buildJobsBlock)
     // Свежесть источников рекордов из журнала проверок (records-freshness-plan U4) — тоже
     // своим запросом: сбой журнала не роняет блок «Рекорды».
     let recFresh = null;
@@ -137,7 +138,46 @@
                 ],
             },
             buildCacheBlock(dashCache),
+            buildJobsBlock(dashJobs),
         ];
+    }
+
+    // Блок «Jobs» (docs/admin-pages/index.md): сводка фоновых служб из GET /api/admin/jobs/summary —
+    // та же, что плитки вверху /Admin/Jobs (JobsOverviewBuilder), здесь её не пересчитываем.
+    // Главная цифра — служб с проблемой (ошибка, просрочка, база/мост лежат, локальная отстаёт).
+    function buildJobsBlock(j) {
+        if (!j) return { key: 'jobs', title: 'Jobs', href: '/Admin/Jobs', heroValue: '—',
+                         heroSubs: 'сводка фоновых служб не загрузилась', metrics: [] };
+
+        const problems = j.problems || [];
+        const tone = j.tone === 'danger' ? 'text-admin-danger' : 'text-admin-warning';
+        const st = j.stats;
+        const list = problems.map(p =>
+            `<a href="/Admin/Jobs#job-${esc(p.key)}" class="flex items-baseline gap-2 py-1.5 px-2 rounded-md text-[12px] no-underline hover:bg-admin-surface-hover">
+                <span class="${p.tone === 'danger' ? 'text-admin-danger' : 'text-admin-warning'} font-semibold whitespace-nowrap">${esc(p.title)}</span>
+                <span class="flex-1 min-w-0 text-admin-text-muted">${esc(p.text)}</span>
+            </a>`).join('');
+
+        return {
+            key: 'jobs', title: 'Jobs', href: '/Admin/Jobs',
+            // В строке колонка под цифру узкая — сама цифра короткая, слова — в подписи.
+            heroValue: problems.length
+                ? `<span class="${tone}">${fmtN(problems.length)}</span>`
+                : '<span class="text-admin-success">✓</span>',
+            heroSubs: `${problems.length ? `служб с проблемой: ${fmtN(problems.length)}` : 'все в порядке'} · ` +
+                      `${fmtN(j.total)} служб, работают ${fmtN(j.active)} · ошибок за 24 ч: ${fmtN(st.failed24h)}`,
+            rowNote: `${fmtN(j.total)} служб · ${fmtN(st.failed24h)} ошибок за 24 ч`,
+            metrics: [
+                { v: j.failedSchedules, label: 'Расписания с ошибкой', sub: 'последняя попытка упала', tone: 'danger', href: '/Admin/Jobs#schedules' },
+                { v: j.overdueSchedules, label: 'Просрочены', sub: 'пора дольше 30 мин, а прогона нет', tone: 'warn', href: '/Admin/Jobs#schedules' },
+                { v: st.failed24h, label: 'Ошибок за 24 ч', sub: `прогонов ${fmtN(st.runs24h)}, за 7 дней ${fmtN(st.runs7d)}`, tone: 'danger', href: '/Admin/Jobs#schedules' },
+            ],
+            extraDetailHtml: problems.length
+                ? `<div class="mt-3 px-2 text-[11px] uppercase tracking-wide text-admin-text-muted">Службы с проблемой</div><div class="mt-1 flex flex-col">${list}</div>`
+                : `<div class="mt-3 px-2 text-[12px] text-admin-text-muted">${j.nextTitle
+                      ? `Следующий запуск: <strong class="text-admin-text">${esc(j.nextTitle)}</strong>, ${fmtDT(j.nextAt)}`
+                      : 'Расписания в этом процессе не работают — они идут в ProdAdmin.'}</div>`,
+        };
     }
 
     // Блок «Кэш» (docs/admin-pages/index.md): сводка из GET /api/admin/cache/summary — живая, не из
@@ -682,9 +722,10 @@
 
     async function loadStatus() {
         // Сводка кэша — своим запросом: сбой её не роняет остальные блоки.
-        [dashStatus, dashCache, recFresh] = await Promise.all([
+        [dashStatus, dashCache, dashJobs, recFresh] = await Promise.all([
             api(`${API}/dashboard/status`),
             api(`${API}/cache/summary`).catch(() => null),
+            api(`${API}/jobs/summary`).catch(() => null),
             api(`${API}/records/freshness`).catch(() => null),
         ]);
         renderRows();

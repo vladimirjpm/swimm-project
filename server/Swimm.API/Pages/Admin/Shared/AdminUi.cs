@@ -41,6 +41,8 @@ public static class AdminNav
         new("API Reference", "radio", "/Admin/Api", "System"),
         // Как устроен кэш и кто сколько кэширует; держится в синхроне по docs/pre-push-rules.md.
         new("Cache", "database", "/Admin/Cache", "System"),
+        // Фоновые службы процесса: расписания, очереди, служебные — когда и что сделали.
+        new("Jobs", "activity", "/Admin/Jobs", "System"),
         new("Settings", "settings", "/Admin/Settings", "System"),
         new("Services", "globe", "/Admin/Services", "System"),
 

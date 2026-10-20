@@ -37,18 +37,18 @@ public sealed class LogligSuggestionVerificationBackgroundService : BackgroundSe
                 await using var scope = _scopeFactory.CreateAsyncScope();
                 var settings = scope.ServiceProvider.GetRequiredService<ISettingsService>();
 
-                if (settings.GetValue("LogligVerifyEnabled", true))
+                var job = JobNames.Get(JobNames.LogligVerify);
+                if (job.IsEnabled(settings))
                 {
-                    var interval = TimeSpan.FromHours(Math.Max(1, settings.GetValue("LogligVerifyIntervalHours", 24)));
                     // «Последний запуск» — в журнале Sys_JobRuns (В12): рестарт API не гонит сверку заново.
-                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.LogligVerify, interval, async ct =>
+                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.LogligVerify, job.Interval(settings), async ct =>
                     {
                         var suggestions = scope.ServiceProvider.GetRequiredService<ILogligSuggestionService>();
                         var report = await suggestions.VerifySuggestedAsync(ct);
+                        var summary = JobRunSummaries.LogligVerify(report);
                         if (report.Checked > 0)
-                            _logger.LogInformation(
-                                "Loglig verify (фон): проверено {Checked}, подтверждено {Verified}, отклонено {Rejected}, отложено {Skipped}",
-                                report.Checked, report.Verified, report.Rejected, report.Skipped);
+                            _logger.LogInformation("Loglig verify (фон): {Summary}", summary);
+                        return summary;
                     }, _logger, stoppingToken);
                 }
             }
