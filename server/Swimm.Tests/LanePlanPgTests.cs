@@ -120,4 +120,88 @@ public class LanePlanPgTests
             await cleanup.Swimmers.Where(s => s.Id == canon.Id || s.Id == dup.Id).ExecuteDeleteAsync();
         }
     }
+
+    /// <summary>
+    /// Подуровни и лимит на дорожку (20.10.2026) на живой базе: запись подуровней уровня и пловца,
+    /// сжатие подуровней, план с MaxPerLane — и check-ограничения, которых InMemory не видит.
+    /// </summary>
+    [Fact]
+    public async Task SubLevelsAndMaxPerLane_OnPostgres()
+    {
+        await using var probe = TryCreate();
+        if (probe == null) return; // PG недоступен — пропуск
+        var ownerId = await probe.AppUsers.OrderBy(u => u.Id).Select(u => (int?)u.Id).FirstOrDefaultAsync();
+        if (ownerId == null) return;
+
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var group = new HubGroup { Name = "PG sublevels test", Slug = $"pg-sub-{tag}", OwnerUserId = ownerId.Value };
+        var first = new Swimmer { LastName = "PgSub", FirstName = $"One {tag}", BirthYear = 1980, Origin = "local" };
+        var second = new Swimmer { LastName = "PgSub", FirstName = $"Two {tag}", BirthYear = 1981, Origin = "local" };
+        probe.AddRange(group, first, second);
+        await probe.SaveChangesAsync();
+
+        try
+        {
+            probe.HubGroupMembers.AddRange(
+                new HubGroupMember { HubGroupId = group.Id, SwimmerId = first.Id, SortOrder = 1 },
+                new HubGroupMember { HubGroupId = group.Id, SwimmerId = second.Id, SortOrder = 2 });
+            await probe.SaveChangesAsync();
+
+            await using (var db = NewContext())
+            {
+                var levels = new HubGroupLevelService(db);
+                var seeded = (await levels.GetAsync(group.Id))!.Levels;
+                Assert.All(seeded, l => Assert.Equal(1, l.SubLevels));   // стандартный набор — без подуровней
+                var input = seeded.Select(l => new HubGroupLevelInputDto { Id = l.Id, Name = l.Name }).ToList();
+                input[0].SubLevels = 3;
+                Assert.True((await levels.SaveLevelsAsync(group.Id, new() { Levels = input })).Success);
+                var advanced = seeded[0].Id;
+                Assert.True((await levels.SetSwimmerLevelAsync(group.Id, first.Id, advanced, 3)).Success);
+                Assert.True((await levels.SetSwimmerLevelAsync(group.Id, second.Id, advanced, 1)).Success);
+
+                input[0].SubLevels = 2;
+                Assert.True((await levels.SaveLevelsAsync(group.Id, new() { Levels = input })).Success);
+
+                var plans = new LanePlanService(db);
+                var day = new DateOnly(2026, 10, 20);
+                var lanes = new List<LanePlanLaneInputDto>
+                {
+                    new() { LaneNo = 1, LevelId = advanced }, new() { LaneNo = 2, LevelId = seeded[1].Id },
+                };
+                var (dist, error) = await plans.DistributeAsync(group.Id,
+                    new LanePlanDistributeInputDto { LaneCount = 2, MaxPerLane = 1, Lanes = lanes });
+                Assert.Null(error);
+                // Advanced 1 ведёт; Advanced 2 при лимите 1 уходит на дорожку Intermediate.
+                Assert.Equal([(second.Id, (int?)1), (first.Id, 2)], dist!.Swimmers.Select(s => (s.SwimmerId, s.LaneNo)));
+                var save = await plans.SaveAsync(group.Id, day,
+                    new LanePlanInputDto { LaneCount = 2, MaxPerLane = 1, Lanes = lanes, Swimmers = dist.Swimmers }, ownerId.Value);
+                Assert.True(save.Success, save.Error);
+            }
+
+            await using (var check = NewContext())
+            {
+                Assert.Equal(1, await check.LanePlans.Where(p => p.HubGroupId == group.Id).Select(p => p.MaxPerLane).SingleAsync());
+                var subOfFirst = await check.HubGroupSwimmerLevels
+                    .Where(l => l.HubGroupId == group.Id && l.SwimmerId == first.Id).Select(l => l.SubLevel).SingleAsync();
+                Assert.Equal(2, subOfFirst);   // 3 → 2 при сжатии
+
+                // Check-ограничения: подуровень вне 1..5 и лимит вне 1..20 база не примет.
+                var row = await check.HubGroupSwimmerLevels.SingleAsync(l => l.HubGroupId == group.Id && l.SwimmerId == first.Id);
+                row.SubLevel = 6;
+                await Assert.ThrowsAsync<DbUpdateException>(() => check.SaveChangesAsync());
+            }
+            await using (var check = NewContext())
+            {
+                var plan = await check.LanePlans.SingleAsync(p => p.HubGroupId == group.Id);
+                plan.MaxPerLane = 0;
+                await Assert.ThrowsAsync<DbUpdateException>(() => check.SaveChangesAsync());
+            }
+        }
+        finally
+        {
+            await using var cleanup = NewContext();
+            await cleanup.HubGroups.Where(g => g.Id == group.Id).ExecuteDeleteAsync();
+            await cleanup.Swimmers.Where(s => s.Id == first.Id || s.Id == second.Id).ExecuteDeleteAsync();
+        }
+    }
 }

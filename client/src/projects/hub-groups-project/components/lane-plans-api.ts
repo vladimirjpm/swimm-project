@@ -65,10 +65,14 @@ export const lanePlansApi = {
     request<LanePlan>('PUT', `${base(groupId)}/${date}`, input),
   distribute: (
     groupId: number,
-    input: { lane_count: number; lanes: LanePlanInput['lanes']; swimmer_ids: number[] | null },
+    input: {
+      lane_count: number; max_per_lane: number | null; lanes: LanePlanInput['lanes']; swimmer_ids: number[] | null;
+    },
   ) => request<{ swimmers: LanePlanInput['swimmers'] }>('POST', `${base(groupId)}/distribute`, input),
   /** «Auto lanes»: сервер сам делит дорожки между уровнями и раскладывает людей. Ничего не сохраняет. */
-  autoLanes: (groupId: number, input: { lane_count: number; swimmer_ids: number[] | null }) =>
+  autoLanes: (
+    groupId: number, input: { lane_count: number; max_per_lane: number | null; swimmer_ids: number[] | null },
+  ) =>
     request<{ lanes: { lane_no: number; level_id: number | null }[]; swimmers: LanePlanInput['swimmers'] }>(
       'POST', `${base(groupId)}/auto-lanes`, input),
   publish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/publish`),
@@ -77,9 +81,9 @@ export const lanePlansApi = {
   /** Зритель открыл вид Lanes (Т1б): гаснет «тебя перенесли». GET плана метку не гасит. */
   markSeen: (groupId: number) => request<void>('PUT', `${base(groupId)}/seen`),
   levels: (groupId: number) => request<HubGroupLevels>('GET', `/api/me/hub-groups/${groupId}/levels`),
-  /** Уровень пловца: null — «без уровня». Тело camelCase, как у всей ручки уровней. */
-  setSwimmerLevel: (groupId: number, swimmerId: number, levelId: number | null) =>
-    request<void>('PUT', `/api/me/hub-groups/${groupId}/swimmer-levels/${swimmerId}`, { levelId }),
+  /** Уровень и подуровень пловца: null — «без уровня». Тело camelCase, как у всей ручки уровней. */
+  setSwimmerLevel: (groupId: number, swimmerId: number, levelId: number | null, subLevel: number | null = null) =>
+    request<void>('PUT', `/api/me/hub-groups/${groupId}/swimmer-levels/${swimmerId}`, { levelId, subLevel }),
   /** Уровень аккаунта-участника без пловца (Ш3.1); null — «без уровня». */
   setAccountLevel: (groupId: number, userId: number, levelId: number | null) =>
     request<void>('PUT', `/api/me/hub-groups/${groupId}/account-levels/${userId}`, { levelId }),

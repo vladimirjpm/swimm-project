@@ -1591,11 +1591,17 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("Rank")
                         .HasColumnType("integer");
 
+                    b.Property<int>("SubLevels")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("HubGroupId", "Rank");
 
-                    b.ToTable("Sys_HubGroupLevels", (string)null);
+                    b.ToTable("Sys_HubGroupLevels", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_HubGroupLevels_SubLevels", "\"SubLevels\" BETWEEN 1 AND 5");
+                        });
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupMedia", b =>
@@ -1733,13 +1739,19 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("LevelId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("SubLevel")
+                        .HasColumnType("integer");
+
                     b.HasKey("HubGroupId", "SwimmerId");
 
                     b.HasIndex("SwimmerId");
 
                     b.HasIndex("HubGroupId", "LevelId");
 
-                    b.ToTable("Sys_HubGroupSwimmerLevels", (string)null);
+                    b.ToTable("Sys_HubGroupSwimmerLevels", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_HubGroupSwimmerLevels_SubLevel", "\"SubLevel\" IS NULL OR \"SubLevel\" BETWEEN 1 AND 5");
+                        });
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupTrainingCancellation", b =>
@@ -2084,6 +2096,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("LaneCount")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("MaxPerLane")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Note")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -2106,6 +2121,8 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_LanePlans", null, t =>
                         {
                             t.HasCheckConstraint("CK_LanePlans_LaneCount", "\"LaneCount\" BETWEEN 1 AND 12");
+
+                            t.HasCheckConstraint("CK_LanePlans_MaxPerLane", "\"MaxPerLane\" IS NULL OR \"MaxPerLane\" BETWEEN 1 AND 20");
 
                             t.HasCheckConstraint("CK_LanePlans_Status", "\"Status\" IN ('draft', 'published')");
                         });

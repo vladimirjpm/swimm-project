@@ -12,6 +12,8 @@ public static class LanePlanRules
 {
     public const int MinLanes = 1;
     public const int MaxLanes = 12;
+    public const int MinPerLane = 1;
+    public const int MaxPerLane = 20;
     public const int NoteMaxLength = 500;
     public const int WorkoutMaxLength = 4000;
     public const string DateFormat = "yyyy-MM-dd";
@@ -29,7 +31,7 @@ public static class LanePlanRules
     public sealed record NormalizedSwimmer(int SwimmerId, int? LaneNo, int OrderNo);
 
     public sealed record NormalizedPlan(
-        int LaneCount, string? Note, IReadOnlyList<NormalizedLane> Lanes, IReadOnlyList<NormalizedSwimmer> Swimmers);
+        int LaneCount, int? MaxPerLane, string? Note, IReadOnlyList<NormalizedLane> Lanes, IReadOnlyList<NormalizedSwimmer> Swimmers);
 
     /// <summary>
     /// Проверить план и привести к полному виду: дорожки 1..LaneCount все (недостающие — пустые),
@@ -41,6 +43,9 @@ public static class LanePlanRules
 
         var laneError = CheckLaneCount(input.LaneCount);
         if (laneError != null) return (null, laneError);
+
+        var perLaneError = CheckMaxPerLane(input.MaxPerLane);
+        if (perLaneError != null) return (null, perLaneError);
 
         var note = input.Note?.Trim();
         if (string.IsNullOrEmpty(note)) note = null;
@@ -64,7 +69,7 @@ public static class LanePlanRules
             swimmers.Add(new NormalizedSwimmer(s.SwimmerId, s.LaneNo, order));
         }
 
-        return (new NormalizedPlan(input.LaneCount, note, lanes, swimmers), null);
+        return (new NormalizedPlan(input.LaneCount, input.MaxPerLane, note, lanes, swimmers), null);
     }
 
     /// <summary>Дорожки «Distribute»/плана: номера в 1..LaneCount без повторов, задание ≤ лимита.</summary>
@@ -93,6 +98,12 @@ public static class LanePlanRules
         }
         return (result, null);
     }
+
+    /// <summary>Лимит людей на дорожку (перелив по подуровням): null — нет лимита, иначе 1..20.</summary>
+    public static string? CheckMaxPerLane(int? maxPerLane) =>
+        maxPerLane is < MinPerLane or > MaxPerLane
+            ? $"Max per lane: from {MinPerLane} to {MaxPerLane}, or no limit."
+            : null;
 
     private static string? CheckLaneCount(int laneCount) =>
         laneCount is < MinLanes or > MaxLanes ? $"Lanes: from {MinLanes} to {MaxLanes}." : null;

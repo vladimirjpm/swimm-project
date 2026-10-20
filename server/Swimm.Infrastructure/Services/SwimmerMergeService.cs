@@ -229,7 +229,7 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
                 }
                 db.HubGroupSwimmerLevels.Add(new HubGroupSwimmerLevel
                 {
-                    HubGroupId = l.HubGroupId, SwimmerId = canonical.Id, LevelId = l.LevelId,
+                    HubGroupId = l.HubGroupId, SwimmerId = canonical.Id, LevelId = l.LevelId, SubLevel = l.SubLevel,
                 });
             }
             Note(res, "Sys_HubGroupSwimmerLevels", dupLevels.Count);

@@ -36,6 +36,12 @@ public class LanePlan
     [MaxLength(500)]
     public string? Note { get; set; }
 
+    /// <summary>
+    /// Лимит людей на дорожку (1..20) — вход перелива по подуровням в Distribute / Auto lanes
+    /// (решение Влада 20.10.2026); null — лимита нет, перелива нет.
+    /// </summary>
+    public int? MaxPerLane { get; set; }
+
     /// <summary><see cref="LanePlanStatus.Draft"/> | <see cref="LanePlanStatus.Published"/>.</summary>
     [Required, MaxLength(10)]
     public string Status { get; set; } = LanePlanStatus.Draft;

@@ -25,9 +25,10 @@ public interface IHubGroupLevelService
 
     /// <summary>
     /// Поставить/снять уровень пловцу. Пловец должен быть в видимом составе группы, уровень —
-    /// из этой же группы; null снимает.
+    /// из этой же группы; null снимает. <paramref name="subLevel"/> — подуровень 1..SubLevels уровня
+    /// (у уровня без подуровней игнорируется), null — не задан.
     /// </summary>
-    Task<HubGroupMemberSaveResult> SetSwimmerLevelAsync(int hubGroupId, int swimmerId, int? levelId);
+    Task<HubGroupMemberSaveResult> SetSwimmerLevelAsync(int hubGroupId, int swimmerId, int? levelId, int? subLevel = null);
 
     /// <summary>
     /// Поставить/снять уровень АККАУНТУ-участнику (Ш3.1) — тому, кто стоит на дорожке без

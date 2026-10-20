@@ -47,6 +47,10 @@ public class HubGroupLevelService : IHubGroupLevelService
                     .Where(l => l.HubGroupId == hubGroupId && l.SwimmerId == m.SwimmerId)
                     .Select(l => (int?)l.LevelId)
                     .FirstOrDefault(),
+                SubLevel = _db.HubGroupSwimmerLevels
+                    .Where(l => l.HubGroupId == hubGroupId && l.SwimmerId == m.SwimmerId)
+                    .Select(l => l.SubLevel)
+                    .FirstOrDefault(),
             })
             .ToListAsync();
 
@@ -56,6 +60,7 @@ public class HubGroupLevelService : IHubGroupLevelService
             .Select(l => new HubGroupLevelDto
             {
                 Id = l.Id, Rank = l.Rank, Name = l.Name, Description = l.Description, Color = l.Color,
+                SubLevels = l.SubLevels,
             })
             .ToListAsync();
 
@@ -131,6 +136,25 @@ public class HubGroupLevelService : IHubGroupLevelService
                 _db.HubGroupLevels.RemoveRange(removedIds.Select(id => existing[id]));
             }
 
+            // Подуровней стало меньше — у пловцов ниже нового нижнего он и становится нижним
+            // («Advanced 3» → «Advanced 2»); подуровней не стало вовсе — подуровень снимается.
+            var shrunk = normalized
+                .Where(n => n.Id is int id && n.SubLevels is int count && count < existing[id].SubLevels)
+                .ToDictionary(n => n.Id!.Value, n => n.SubLevels!.Value);
+            if (shrunk.Count > 0)
+            {
+                var shrunkIds = shrunk.Keys.ToList();
+                var rows = await _db.HubGroupSwimmerLevels
+                    .Where(s => s.HubGroupId == hubGroupId && shrunkIds.Contains(s.LevelId) && s.SubLevel != null)
+                    .ToListAsync();
+                foreach (var row in rows)
+                {
+                    var count = shrunk[row.LevelId];
+                    if (count <= 1) row.SubLevel = null;
+                    else if (row.SubLevel > count) row.SubLevel = count;
+                }
+            }
+
             foreach (var n in normalized)
             {
                 var level = n.Id is int id ? existing[id] : new HubGroupLevel { HubGroupId = hubGroupId };
@@ -138,6 +162,7 @@ public class HubGroupLevelService : IHubGroupLevelService
                 level.Name = n.Name;
                 level.Description = n.Description;
                 level.Color = n.Color;
+                if (n.SubLevels is int subLevels) level.SubLevels = subLevels;
                 if (n.Id == null) _db.HubGroupLevels.Add(level);
             }
 
@@ -146,7 +171,7 @@ public class HubGroupLevelService : IHubGroupLevelService
         });
     }
 
-    public async Task<HubGroupMemberSaveResult> SetSwimmerLevelAsync(int hubGroupId, int swimmerId, int? levelId)
+    public async Task<HubGroupMemberSaveResult> SetSwimmerLevelAsync(int hubGroupId, int swimmerId, int? levelId, int? subLevel = null)
     {
         var inRoster = await _db.HubGroupMembers
             .AnyAsync(m => m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId && !m.IsExcluded);
@@ -154,8 +179,18 @@ public class HubGroupLevelService : IHubGroupLevelService
 
         return await InGroupTransactionAsync(hubGroupId, async () =>
         {
-            if (levelId is int id
-                && !await _db.HubGroupLevels.AnyAsync(l => l.HubGroupId == hubGroupId && l.Id == id))
+            int? subLevels = levelId is int id
+                ? await _db.HubGroupLevels
+                    .Where(l => l.HubGroupId == hubGroupId && l.Id == id)
+                    .Select(l => (int?)l.SubLevels)
+                    .FirstOrDefaultAsync()
+                : null;
+            if (levelId != null && subLevels == null)
+                return HubGroupMemberSaveResult.Fail("Levels were changed elsewhere. Reload and try again.");
+
+            // У уровня без подуровней подуровня нет; номер вне 1..SubLevels — устаревшая форма.
+            if (subLevels is not int count || count <= 1) subLevel = null;
+            else if (subLevel is < 1 || subLevel > count)
                 return HubGroupMemberSaveResult.Fail("Levels were changed elsewhere. Reload and try again.");
 
             var row = await _db.HubGroupSwimmerLevels
@@ -169,13 +204,14 @@ public class HubGroupLevelService : IHubGroupLevelService
             {
                 _db.HubGroupSwimmerLevels.Add(new HubGroupSwimmerLevel
                 {
-                    HubGroupId = hubGroupId, SwimmerId = swimmerId, LevelId = levelId.Value,
+                    HubGroupId = hubGroupId, SwimmerId = swimmerId, LevelId = levelId.Value, SubLevel = subLevel,
                 });
             }
-            else if (row.LevelId != levelId.Value)
+            else
             {
                 // Часть ключа FK на уровень — обычное поле, не PK строки: правится на месте.
                 row.LevelId = levelId.Value;
+                row.SubLevel = subLevel;
             }
 
             await _db.SaveChangesAsync();
