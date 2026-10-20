@@ -342,6 +342,10 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
           <a href={routes.myFavorites()} className={dropdownItemClass}>
             My favorites
           </a>
+          {/* Напоминания о тренировках через Web Push (web-push-reminders-plan.md). */}
+          <a href={routes.reminders()} className={dropdownItemClass}>
+            Reminders
+          </a>
           <MenuDivider />
           {onLogout ? (
             <button type="button" className={dropdownItemClass} onClick={() => { setUserMenuOpen(false); onLogout(); }}>
@@ -434,6 +438,12 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
                 className="block rounded-[10px] px-4 py-[10px] text-[14px] font-extrabold text-[var(--theme-topbar-text)] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)]"
               >
                 My favorites
+              </a>
+              <a
+                href={routes.reminders()}
+                className="block rounded-[10px] px-4 py-[10px] text-[14px] font-extrabold text-[var(--theme-topbar-text)] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)]"
+              >
+                Reminders
               </a>
               <MenuDivider />
               {onLogout ? (

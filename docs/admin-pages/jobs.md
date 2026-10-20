@@ -25,6 +25,7 @@
 | Вид | Службы | Откуда состояние |
 |---|---|---|
 | **Расписания** — сами ходят наружу по таймеру | `discovery`, `start-list` (`CompetitionDiscoveryBackgroundService`), `loglig-verify`, `loglig-batch` | журнал `Sys_JobRuns` (пора ли) + история `Sys_JobRunLog` (что сделали) |
+| **Прод-расписание** — идёт с ПРОДА круглосуточно | `training-reminders` (`TrainingReminderBackgroundService`, напоминания о тренировках через Web Push, [web-push-reminders-plan.md](../plans/web-push-reminders-plan.md)) | тот же журнал; флаг свой — `PushReminders:Enabled` (true только на проде). Тик 5 мин: каждый сдвигает «последний тик» (`IJobRunStore.RecordStateAsync`), строку истории пишет только тик, который что-то отправил или упал. В ProdAdmin карточка «следит» за прод-джобом: тик старше 35 мин — «молчит» (жёлтая) |
 | **Очереди** — исполняют то, что поставила админка | импорт (`ImportBackgroundService`), рекорды по странам (`RecordCountryRunBackgroundService`) | снимок очереди в памяти + их собственные таблицы: `Sys_ImportHistory`, журнал свежести рекордов `Sys_RecordSourceChecks` (`worldrecords-countries`) |
 | **Служебные** | пинг БД (`DbPingBackgroundService`), отставание от прода (`DataSyncCheckBackgroundService`, только Development), мост кэша (`CacheBridgeListener`) | память процесса: `DbStatusService.LastPing`, `IDataSyncStatus.Current`, `ICacheBridgeStatus.State()` |
 
@@ -92,5 +93,9 @@
   умолчанию»): из админки пакетную привязку пока не включить.
 - «Следующий» — момент, когда задаче станет пора; реальный запуск — ближайшая проверка журнала
   (раз в 5 мин у discovery, раз в 15 мин у loglig).
+- **Напоминания (`training-reminders`) в ProdAdmin НЕ запущены, и это норма** — их шлёт прод;
+  карточка в ProdAdmin показывает прод-журнал. «Ключи VAPID НЕ заданы» в ProdAdmin — тоже норма
+  (ключи живут только в App Service). Дубль, если флаг всё же включат в двух местах, отсекает
+  UNIQUE `Sys_ReminderDeliveries`.
 - **Новая фоновая служба** → карточка в `BackgroundJobsStatusService` (с `Status` и `Alert`), правило №14 в
   [pre-push-rules.md](../pre-push-rules.md).

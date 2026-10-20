@@ -281,6 +281,19 @@ public static class DependencyInjection
 
         services.AddScoped<ILocalAuthService, LocalAuthService>();
 
+        // Web Push (docs/plans/web-push-reminders-plan.md): ключи VAPID — секция WebPush; без них
+        // отправитель «не настроен», и подписки, «Send test» и напоминания молчат.
+        var pushSection = configuration.GetSection(WebPushOptions.SectionName);
+        services.AddSingleton(new WebPushOptions
+        {
+            PublicKey = pushSection["PublicKey"]?.Trim() ?? "",
+            PrivateKey = pushSection["PrivateKey"]?.Trim() ?? "",
+            Subject = string.IsNullOrWhiteSpace(pushSection["Subject"]) ? "mailto:noreply@swimhub.co.il" : pushSection["Subject"]!.Trim(),
+        });
+        services.AddHttpClient<IPushSender, WebPushSender>(c => c.Timeout = TimeSpan.FromSeconds(15));
+        services.AddScoped<IPushSubscriptionService, PushSubscriptionService>();
+        services.AddScoped<ITrainingReminderService, TrainingReminderService>();
+
         // DB migrator
         services.AddScoped<IDbMigrator, DbMigrator>();
 

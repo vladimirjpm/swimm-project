@@ -46,6 +46,9 @@ public class TrainingResultsPrivacyTests
         ["Swimm.Infrastructure/Services/TrainingRsvpService.cs"] =
             "разовые занятия (Р9): из сессий группы с галкой «Ask who's coming» читает только дату, начало, " +
             "название, тип и бассейн — занятие для Next и ответов; времён (Results) не трогает",
+        ["Swimm.Infrastructure/Services/TrainingReminderService.cs"] =
+            "напоминания о тренировках (web-push-reminders-plan): те же разовые занятия, что у TrainingRsvpService, " +
+            "— дата, начало, название, тип, бассейн; push получают только активные участники группы; времён не трогает",
         ["Swimm.Infrastructure/Services/SwimmerMergeService.cs"] =
             "склейка пловцов переносит тренировочные строки на оставшегося",
         ["Swimm.Infrastructure/Services/SwimmerDedupService.cs"] =

@@ -28,7 +28,7 @@ const cleanUrlRewrite = () => ({
       const seg = pathname.split('/').filter(Boolean);
       if (seg.length === 1) {
         return { results: '/results_main.html', competitions: '/competitions.html',
-          groups: '/groups.html', clubs: '/results_main.html', 'my-media': '/media.html', 'my-favorites': '/my-favorites.html', 'setup-profile': '/setup-profile.html', about: '/about.html', privacy: '/help.html', terms: '/help.html',
+          groups: '/groups.html', clubs: '/results_main.html', 'my-media': '/media.html', 'my-favorites': '/my-favorites.html', reminders: '/reminders.html', 'setup-profile': '/setup-profile.html', about: '/about.html', privacy: '/help.html', terms: '/help.html',
           'season-best': '/season-best.html', h2h: '/h2h.html',
           records: '/records.html' }[seg[0]] ?? null;
       }
@@ -102,6 +102,7 @@ export default defineConfig(({ command }) => ({
         groups: resolve(__dirname, 'groups.html'),
         media: resolve(__dirname, 'media.html'),
         my_favorites: resolve(__dirname, 'my-favorites.html'),
+        reminders: resolve(__dirname, 'reminders.html'),
         setup_profile: resolve(__dirname, 'setup-profile.html'),
         swimmer: resolve(__dirname, 'swimmer.html'),
         club: resolve(__dirname, 'club.html'),

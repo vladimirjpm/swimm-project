@@ -15,6 +15,7 @@ internal static class CliCommands
     [
         (args => args.Contains("--migrate"), (app, args) => { DatabaseCli.Migrate(app, args); return Task.CompletedTask; }),
         (args => args.Contains("--grant-admin"), DatabaseCli.GrantAdminAsync),
+        (args => args.Contains("--generate-vapid-keys"), PushCli.GenerateVapidKeysAsync),
         (args => args.Contains("--recalc-combined"), RecalcCli.RecalcCombinedAsync),
         (args => args.Contains("--para-points-scan"), RecalcCli.ParaPointsScanAsync),
         (args => args.Contains("--rebuild-club-standings"), RecalcCli.RebuildClubStandingsAsync),

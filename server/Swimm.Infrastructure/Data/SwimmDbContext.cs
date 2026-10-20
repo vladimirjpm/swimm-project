@@ -96,6 +96,14 @@ public class SwimmDbContext : DbContext
     public DbSet<UserMedia> UserMedia => Set<UserMedia>();
     public DbSet<UserMediaPublication> UserMediaPublications => Set<UserMediaPublication>();
 
+    /* === Напоминания о тренировках через Web Push (docs/plans/web-push-reminders-plan.md) === */
+    /// <summary>Push-подписки браузеров. Привязаны к устройству — в seed и в синхронизацию не едут.</summary>
+    public DbSet<UserPushSubscription> UserPushSubscriptions => Set<UserPushSubscription>();
+    public DbSet<UserNotificationSettings> UserNotificationSettings => Set<UserNotificationSettings>();
+    public DbSet<HubGroupReminderMute> HubGroupReminderMutes => Set<HubGroupReminderMute>();
+    /// <summary>Журнал доставки напоминаний; UNIQUE по занятию — защита от двойной отправки.</summary>
+    public DbSet<ReminderDelivery> ReminderDeliveries => Set<ReminderDelivery>();
+
     /* === Реакции (лайки на медиа, поздравления на заплывы) === */
     public DbSet<UserReaction> UserReactions => Set<UserReaction>();
     public DbSet<MediaReport> MediaReports => Set<MediaReport>();

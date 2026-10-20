@@ -10,6 +10,7 @@ Disallow: /groups
 Disallow: /my-media
 Disallow: /my-favorites
 Disallow: /setup-profile
+Disallow: /reminders
 Disallow: /Admin/
 Disallow: /admin/
 Disallow: /auth/

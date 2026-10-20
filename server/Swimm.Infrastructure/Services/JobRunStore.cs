@@ -21,6 +21,12 @@ public class JobRunStore(SwimmDbContext db) : IJobRunStore
 
     public async Task RecordAsync(JobRunRecord run, CancellationToken ct = default)
     {
+        await RecordStateAsync(run, ct);
+        await AppendLogAsync(run, ct);
+    }
+
+    public async Task RecordStateAsync(JobRunRecord run, CancellationToken ct = default)
+    {
         try
         {
             await UpsertAsync(run, ct);
@@ -32,8 +38,6 @@ public class JobRunStore(SwimmDbContext db) : IJobRunStore
             db.ChangeTracker.Clear();
             await UpsertAsync(run, ct);
         }
-
-        await AppendLogAsync(run, ct);
     }
 
     public async Task AppendLogAsync(JobRunRecord run, CancellationToken ct = default)
