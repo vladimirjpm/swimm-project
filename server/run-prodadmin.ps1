@@ -39,6 +39,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ("ProdAdmin из master {0} — красная полоса PRODUCTION DATABASE, все правки идут на сайт." -f (git rev-parse --short HEAD))
+
+# IP меняется (на работе — каждый день): без правила файрвола прод-база отвечает «Connection refused».
+powershell -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/db/prodadmin-firewall.ps1"
+if ($LASTEXITCODE -ne 0) { Stop-WithMessage "файрвол прод-базы не пускает этот IP (см. сообщение выше)." }
+
 if ($DryRun) { Write-Host "DryRun: ProdAdmin не запускаю."; exit 0 }
 
 dotnet run --project server/Swimm.API --launch-profile ProdAdmin

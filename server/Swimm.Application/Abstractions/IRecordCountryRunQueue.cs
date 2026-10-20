@@ -15,4 +15,7 @@ public interface IRecordCountryRunQueue
     Guid Enqueue(IReadOnlyList<string>? codes);
 
     RecordCountryRunStatus? GetStatus(Guid runId);
+
+    /// <summary>Все прогоны, которые очередь помнит с запуска процесса (/Admin/Jobs).</summary>
+    IReadOnlyList<RecordCountryRunStatus> Snapshot();
 }

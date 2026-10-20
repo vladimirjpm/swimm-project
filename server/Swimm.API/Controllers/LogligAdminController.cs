@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;
 
@@ -12,7 +13,8 @@ namespace Swimm.API.Controllers;
 [Route("api/admin/loglig")]
 [Authorize(Roles = "Admin")]
 [AutoValidateAntiforgeryToken]
-public class LogligAdminController(ILogligLinkService linkService, ICandidateSearchProvider searchProvider) : ControllerBase
+public class LogligAdminController(
+    ILogligLinkService linkService, ICandidateSearchProvider searchProvider, IJobRunStore jobRuns) : ControllerBase
 {
     /// <summary>Конфигурация для UI: доступен ли автопоиск кандидатов (задан ли CandidateSearch:ApiKey).</summary>
     [HttpGet("config")]
@@ -49,7 +51,13 @@ public class LogligAdminController(ILogligLinkService linkService, ICandidateSea
     public async Task<IActionResult> RunBatch([FromBody] BatchRequest request, CancellationToken ct)
     {
         var take = Math.Clamp(request.Take <= 0 ? 20 : request.Take, 1, 200);
-        return Ok(await linkService.RunBatchAsync(take, ct));
+        var startedAt = DateTime.UtcNow;
+        var report = await linkService.RunBatchAsync(take, ct);
+        // В историю задачи (/Admin/Jobs) — да, в расписание — нет: ручной батч другого размера
+        // не должен откладывать ночной.
+        await jobRuns.AppendLogAsync(new JobRunRecord(JobNames.LogligBatch, JobTriggers.Manual, startedAt,
+            DateTime.UtcNow, Success: true, JobRunSummaries.LogligBatch(report, take), Error: null), ct);
+        return Ok(report);
     }
 
     public sealed record UnlinkRequest(int SwimmerId);

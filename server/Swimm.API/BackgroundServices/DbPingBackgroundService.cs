@@ -43,11 +43,7 @@ public sealed class DbPingBackgroundService : BackgroundService
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<SwimmDbContext>();
-            var ok = await db.Database.CanConnectAsync(ct);
-            if (ok)
-                _dbStatus.MarkAvailable();
-            else
-                _dbStatus.MarkUnavailable();
+            _dbStatus.RecordPing(await db.Database.CanConnectAsync(ct));
         }
         catch (OperationCanceledException)
         {
@@ -55,7 +51,7 @@ public sealed class DbPingBackgroundService : BackgroundService
         }
         catch (Exception ex)
         {
-            _dbStatus.MarkUnavailable();
+            _dbStatus.RecordPing(false, ex.Message);
             _logger.LogWarning(ex, "DB ping завершился ошибкой — БД недоступна.");
         }
     }

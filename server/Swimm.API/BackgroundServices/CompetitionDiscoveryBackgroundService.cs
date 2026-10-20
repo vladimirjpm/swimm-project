@@ -26,9 +26,6 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
     /// <summary>Как часто перечитываем настройки и журнал.</summary>
     private static readonly TimeSpan IdleCheck = TimeSpan.FromMinutes(5);
 
-    /// <summary>Интервал по умолчанию: список стартов меняется редко — раз в сутки (В12).</summary>
-    public const int DefaultIntervalHours = 24;
-
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CompetitionDiscoveryBackgroundService> _logger;
 
@@ -48,18 +45,17 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
                 var settings = scope.ServiceProvider.GetRequiredService<ISettingsService>();
-                var interval = TimeSpan.FromHours(Math.Max(1, settings.GetValue("DiscoveryIntervalHours", DefaultIntervalHours)));
-
-                if (settings.GetValue("DiscoveryEnabled", false))
+                var discoveryJob = JobNames.Get(JobNames.Discovery);
+                if (discoveryJob.IsEnabled(settings))
                 {
-                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.Discovery, interval, async ct =>
+                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.Discovery, discoveryJob.Interval(settings), async ct =>
                     {
                         await using var jobScope = _scopeFactory.CreateAsyncScope();
                         var discovery = jobScope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
                         var result = await discovery.SyncAsync(year: null, ct); // фон тянет только текущий сезон
-                        _logger.LogInformation(
-                            "Discovery (фон): на сайте {Total}, новых {Added}, перенесено {Postponed}, пропало {Missing}",
-                            result.TotalOnSite, result.Added, result.Postponed, result.Missing);
+                        var summary = JobRunSummaries.Discovery(result);
+                        _logger.LogInformation("Discovery (фон): {Summary}", summary);
+                        return summary;
                     }, _logger, stoppingToken);
                 }
 
@@ -68,18 +64,18 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
                 // решение 5: меньше движущихся частей). Забор одного соревнования занимает
                 // минуты, поэтому идёт следом, а не параллельно с discovery.SyncAsync выше.
                 // Своя строка журнала: упавший забор списка не откладывает протоколы и наоборот.
-                if (settings.GetValue("StartListEnabled", false))
+                var startListJob = JobNames.Get(JobNames.StartList);
+                if (startListJob.IsEnabled(settings))
                 {
-                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.StartList, interval, async ct =>
+                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.StartList, startListJob.Interval(settings), async ct =>
                     {
                         await using var jobScope = _scopeFactory.CreateAsyncScope();
                         var daysAhead = Math.Max(1, settings.GetValue("StartListDaysAhead", 14));
                         var sweep = jobScope.ServiceProvider.GetRequiredService<IStartListScheduleService>();
                         var sweepReport = await sweep.RunAsync(daysAhead, ct);
-                        _logger.LogInformation(
-                            "Стартовый протокол (фон): loglig-id добыт у {Resolved}/{Checked}, заборов {Pulled}/{Total}",
-                            sweepReport.DetailsResolved, sweepReport.DetailsChecked,
-                            sweepReport.Pulled, sweepReport.Total);
+                        var summary = JobRunSummaries.StartList(sweepReport, daysAhead);
+                        _logger.LogInformation("Стартовый протокол (фон): {Summary}", summary);
+                        return summary;
                     }, _logger, stoppingToken);
                 }
             }

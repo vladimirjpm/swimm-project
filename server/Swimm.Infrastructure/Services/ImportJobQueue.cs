@@ -51,6 +51,8 @@ public sealed class ImportJobQueue : IImportJobQueue
     public ImportJobStatus? GetStatus(Guid jobId) =>
         _statuses.TryGetValue(jobId, out var s) ? s : null;
 
+    public IReadOnlyList<ImportJobStatus> Snapshot() => [.. _statuses.Values];
+
     // Вызывается только из ImportBackgroundService:
 
     public async IAsyncEnumerable<(Guid JobId, byte[] Data, string FileName, IReadOnlyList<string> CategoryKeys, ImportEventOptions? EventOptions, int? DiscoveredId, int? OrgCompId)> ConsumeAsync(

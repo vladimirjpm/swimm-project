@@ -85,6 +85,8 @@ public class SwimmDbContext : DbContext
     public DbSet<DiscoveredCompetition> DiscoveredCompetitions => Set<DiscoveredCompetition>();
     /// <summary>Журнал запусков фоновых задач по расписанию (В12): «последний запуск» переживает рестарт.</summary>
     public DbSet<JobRun> JobRuns => Set<JobRun>();
+    /// <summary>История прогонов фоновых задач с итогом (/Admin/Jobs); последние N на задачу.</summary>
+    public DbSet<JobRunLogEntry> JobRunLog => Set<JobRunLogEntry>();
 
     /* === Фавориты и медиа пользователей === */
     public DbSet<UserFavorite> UserFavorites => Set<UserFavorite>();

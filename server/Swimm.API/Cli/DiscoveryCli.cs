@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Cli;
 
@@ -207,9 +208,11 @@ internal static class DiscoveryCli
         var discovery = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
         var startedAt = DateTime.UtcNow;
         var sync = await discovery.SyncAsync();
-        // Текущий сезон проверен — успех в журнал расписаний (В12), как у кнопки «Проверить сейчас».
-        await scope.ServiceProvider.GetRequiredService<IJobRunStore>()
-            .RecordAsync(Swimm.Application.Mapping.JobNames.Discovery, startedAt, success: true, error: null);
+        // Текущий сезон проверен — успех в журнал расписаний (В12) и строка истории (/Admin/Jobs),
+        // как у кнопки «Проверить сейчас».
+        await scope.ServiceProvider.GetRequiredService<IJobRunStore>().RecordAsync(new JobRunRecord(
+            JobNames.Discovery, JobTriggers.Cli, startedAt, DateTime.UtcNow,
+            Success: true, JobRunSummaries.Discovery(sync), Error: null));
         Console.WriteLine($"Discovery: на сайте {sync.TotalOnSite}, добавлено {sync.Added}, обновлено {sync.Updated}, " +
                           $"перенесено {sync.Postponed}, пропало {sync.Missing}");
         return;

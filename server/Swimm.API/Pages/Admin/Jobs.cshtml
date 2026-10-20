@@ -1,0 +1,187 @@
+@page
+@model Swimm.API.Pages.Admin.JobsModel
+@using Swimm.API.Pages.Admin
+@using Swimm.API.Pages.Admin.Shared
+@using Swimm.Application.Dtos
+@using Swimm.Application.Mapping
+@{
+    ViewData["Title"] = "Jobs";
+    ViewData["PageSubtitle"] = "Фоновые службы: когда запускались, чем кончилось и что сделали";
+    var r = Model.Report;
+    var now = DateTime.UtcNow;
+}
+
+@* Справка — docs/admin-pages/jobs.md. Карточки и сводку собирает IBackgroundJobsStatus
+   (Services/BackgroundJobsStatusService.cs); новая фоновая служба = карточка там
+   (docs/pre-push-rules.md №14). *@
+
+@functions {
+    static (string Frame, string Value) TileTone(string tone) => tone switch
+    {
+        "danger" => ("border-admin-danger/60 bg-admin-danger/5", "text-admin-danger"),
+        "warning" => ("border-admin-warning/60 bg-admin-warning/5", "text-admin-warning"),
+        "ok" => ("border-admin-border", "text-admin-success"),
+        "info" => ("border-admin-accent/50", "text-admin-accent"),
+        _ => ("border-admin-border", "text-admin-text"),
+    };
+}
+
+@* Сводка: плитки считает JobsOverviewBuilder (та же сводка — в блоке «Jobs» дашборда).
+   Проблема (ошибка, просрочка, база лежит) — цветная рамка и число. «Службы» открывает список
+   всех служб, остальные плитки — якорь к карточке. *@
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+    @foreach (var t in Model.Overview)
+    {
+        var (frame, value) = TileTone(t.Tone);
+        var tileCls = $"admin-card block w-full min-w-0 p-3 text-left no-underline transition-colors hover:border-admin-accent/60 hover:bg-admin-surface-hover {frame}";
+        if (t.Key == "services")
+        {
+            <button type="button" id="btn-services-list" aria-haspopup="dialog" class="@tileCls cursor-pointer">
+                <div class="text-[11px] font-semibold uppercase tracking-wide text-admin-text-muted">@t.Label</div>
+                <div class="mt-1 truncate text-2xl font-bold leading-tight @value">@t.Value</div>
+                <div class="mt-0.5 text-[11px] leading-snug text-admin-text-muted">@t.Sub · <span class="text-admin-accent">список ›</span></div>
+            </button>
+        }
+        else
+        {
+            <a href="@t.Href" class="@tileCls">
+                <div class="text-[11px] font-semibold uppercase tracking-wide text-admin-text-muted">@t.Label</div>
+                <div class="mt-1 truncate text-2xl font-bold leading-tight @value">@t.Value</div>
+                <div class="mt-0.5 text-[11px] leading-snug text-admin-text-muted">@t.Sub</div>
+            </a>
+        }
+    }
+</div>
+
+@* Список всех служб с коротким статусом (плитка «Службы»). Нативный <dialog>, как _ConfirmDialog:
+   Esc закрывает сам, клик по фону и ссылке-якорю — скриптом ниже. *@
+<dialog id="services-list" aria-labelledby="services-list-title"
+        class="m-auto w-[min(44rem,calc(100vw-2rem))] max-h-[calc(100vh-4rem)] rounded-lg border border-admin-border bg-admin-surface p-0 text-admin-text shadow-xl shadow-black/50">
+    <div class="flex items-center gap-3 border-b border-admin-border px-5 py-3">
+        <h2 id="services-list-title" class="m-0 flex-1 text-base font-semibold text-white">
+            Службы <span class="text-sm font-normal text-admin-text-muted">— работают @r.Summary.Active из @r.Summary.Total</span>
+        </h2>
+        <button type="button" data-close class="admin-btn admin-btn-ghost py-1 px-2.5" aria-label="Закрыть">✕</button>
+    </div>
+    <ul class="m-0 list-none p-0">
+        @foreach (var c in r.All)
+        {
+            var statusCls = c.Alert switch
+            {
+                "danger" => "text-admin-danger",
+                "warning" => "text-admin-warning",
+                _ => c.Active ? "text-admin-text" : "text-admin-text-muted",
+            };
+            <li class="border-b border-admin-border/70 last:border-b-0">
+                <a href="#job-@c.Key" data-close class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-5 py-2.5 no-underline hover:bg-admin-surface-hover">
+                    <span class="w-2 h-2 shrink-0 self-center rounded-full @(c.Alert == "danger" ? "bg-admin-danger" : c.Alert == "warning" ? "bg-admin-warning" : c.Active ? "bg-admin-success" : "bg-admin-border")"></span>
+                    <span class="min-w-[12rem] font-semibold text-admin-text">@c.Title</span>
+                    <span class="ml-auto text-[11px] uppercase tracking-wide text-admin-text-muted">@JobKinds.Title(c.Kind)</span>
+                    <span class="basis-full pl-5 text-[0.8rem] leading-snug @statusCls">@c.Status</span>
+                </a>
+            </li>
+        }
+    </ul>
+</dialog>
+
+<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
+    <div class="mb-1">
+        Процесс: <strong class="text-admin-text">@r.EnvironmentName</strong> ·
+        админка и очереди — <strong class="@(r.AdminEnabled ? "text-admin-success" : "text-admin-text")">@(r.AdminEnabled ? "включены" : "выключены")</strong> ·
+        фоновые расписания — <strong class="@(r.BackgroundJobsEnabled ? "text-admin-success" : "text-admin-text")">@(r.BackgroundJobsEnabled ? "включены" : "выключены")</strong>
+        (<code>BackgroundJobs:Enabled</code>).
+    </div>
+    <div>
+        Расписания сами ходят наружу (isr.org.il, loglig) и работают только в <strong class="text-admin-text">ProdAdmin</strong>:
+        на проде их нет, в локальной разработке они выключены (В10, В17). Журнал и история — в базе,
+        к которой подключён процесс: в ProdAdmin это журнал прод-базы. Очереди и служебные службы
+        живут в памяти процесса — их счётчики с перезапуском обнуляются.
+    </div>
+</div>
+
+<h2 id="schedules" class="text-lg text-admin-accent m-0 mb-1 scroll-mt-4">Расписания</h2>
+<p class="text-xs text-admin-text-muted mt-0 mb-3 leading-relaxed">
+    Пора ли запускать — по журналу <code>Sys_JobRuns</code>: интервал считается от последнего успеха,
+    после неудачи — повтор через @JobTimeText.Human(JobSchedule.RetryAfterFailure). История —
+    <code>Sys_JobRunLog</code>, последние @JobRunLog.KeepPerJob прогонов на задачу; здесь — последние @JobsModel.HistoryRows.
+    Включают и меняют интервал в <a href="/Admin/Settings" class="text-admin-accent hover:underline">Settings</a>.
+</p>
+<div class="grid gap-4 mb-8">
+    @foreach (var card in r.Schedules)
+    {
+        <partial name="/Pages/Admin/Shared/_JobCard.cshtml" model="card" />
+    }
+</div>
+
+<h2 id="queues" class="text-lg text-admin-accent m-0 mb-1 scroll-mt-4">Очереди</h2>
+<p class="text-xs text-admin-text-muted mt-0 mb-3 leading-relaxed">
+    Исполняют то, что поставила админка, и живут вместе с ней (<code>Admin:Enabled</code>).
+    Своего журнала у них нет — постоянная история уже лежит в их таблицах.
+</p>
+<div class="grid gap-4 lg:grid-cols-2 mb-4">
+    @foreach (var card in r.Queues)
+    {
+        <partial name="/Pages/Admin/Shared/_JobCard.cshtml" model="card" />
+    }
+</div>
+@if (r.RecentImports.Count > 0)
+{
+    <div class="overflow-x-auto mb-8">
+        <table class="admin-table">
+            <thead>
+                <tr><th>Последние импорты (Sys_ImportHistory)</th><th>Соревнование</th><th>Когда</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var h in r.RecentImports)
+            {
+                <tr>
+                    <td class="text-xs break-all">@h.ImportFileName</td>
+                    <td>@h.CompetitionName <span class="text-xs text-admin-text-muted">@h.CompetitionDate</span></td>
+                    <td class="whitespace-nowrap text-xs">@JobTimeText.When(h.ImportDate, now)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <div class="mb-8"></div>
+}
+
+<h2 id="services" class="text-lg text-admin-accent m-0 mb-1 scroll-mt-4">Служебные</h2>
+<p class="text-xs text-admin-text-muted mt-0 mb-3 leading-relaxed">
+    Работают всегда (или по своему условию) и наружу не ходят. Состояние — из памяти этого процесса.
+</p>
+<div class="grid gap-4 lg:grid-cols-2 mb-6">
+    @foreach (var card in r.Services)
+    {
+        <partial name="/Pages/Admin/Shared/_JobCard.cshtml" model="card" />
+    }
+</div>
+
+@section Scripts {
+<script>
+// Список служб (плитка «Службы»): открыть, фокус на «Закрыть»; закрыть — Esc (сам <dialog>),
+// клик по фону, кнопка ✕ или ссылка на карточку (якорь отработает после закрытия).
+(() => {
+    const dlg = document.getElementById('services-list');
+    const open = document.getElementById('btn-services-list');
+    if (!dlg || !open) return;
+    let toCard = false;
+    open.addEventListener('click', () => {
+        toCard = false;
+        dlg.showModal();
+        dlg.querySelector('button[data-close]').focus();
+    });
+    dlg.addEventListener('click', e => {
+        const close = e.target.closest('[data-close]');
+        if (e.target !== dlg && !close) return;
+        toCard = close?.tagName === 'A';
+        dlg.close();
+    });
+    // Ушли к карточке — фокус остаётся там, куда привёл якорь; иначе — обратно на плитку.
+    dlg.addEventListener('close', () => { if (!toCard) open.focus({ preventScroll: true }); });
+})();
+</script>
+}

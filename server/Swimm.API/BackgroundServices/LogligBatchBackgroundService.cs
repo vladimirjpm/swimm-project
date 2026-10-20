@@ -36,18 +36,18 @@ public sealed class LogligBatchBackgroundService : BackgroundService
                 await using var scope = _scopeFactory.CreateAsyncScope();
                 var settings = scope.ServiceProvider.GetRequiredService<ISettingsService>();
 
-                if (settings.GetValue("LogligBatchEnabled", false))
+                var job = JobNames.Get(JobNames.LogligBatch);
+                if (job.IsEnabled(settings))
                 {
-                    var interval = TimeSpan.FromHours(Math.Max(1, settings.GetValue("LogligBatchIntervalHours", 24)));
                     // «Последний запуск» — в журнале Sys_JobRuns (В12): рестарт API не тратит Serper заново.
-                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.LogligBatch, interval, async ct =>
+                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.LogligBatch, job.Interval(settings), async ct =>
                     {
                         var perRun = Math.Clamp(settings.GetValue("LogligBatchPerRun", 50), 1, 500);
                         var linkService = scope.ServiceProvider.GetRequiredService<ILogligLinkService>();
                         var report = await linkService.RunBatchAsync(perRun, ct);
-                        _logger.LogInformation(
-                            "Loglig batch (фон): обработано {Processed}, привязано {Linked}, с кандидатами {WithCandidates}, впустую {NothingFound}",
-                            report.Processed, report.Linked, report.WithCandidates, report.NothingFound);
+                        var summary = JobRunSummaries.LogligBatch(report, perRun);
+                        _logger.LogInformation("Loglig batch (фон): {Summary}", summary);
+                        return summary;
                     }, _logger, stoppingToken);
                 }
             }

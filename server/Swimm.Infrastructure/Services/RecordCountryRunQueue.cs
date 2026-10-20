@@ -50,6 +50,8 @@ public sealed class RecordCountryRunQueue : IRecordCountryRunQueue
     public RecordCountryRunStatus? GetStatus(Guid runId) =>
         _statuses.TryGetValue(runId, out var s) ? s : null;
 
+    public IReadOnlyList<RecordCountryRunStatus> Snapshot() => [.. _statuses.Values];
+
     // Ниже — только для RecordCountryRunBackgroundService:
 
     public IAsyncEnumerable<(Guid RunId, IReadOnlyList<string>? Codes)> ConsumeAsync(CancellationToken ct) =>
