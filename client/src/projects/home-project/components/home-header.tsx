@@ -274,6 +274,9 @@ function HomeHeader({ active }: { active: ActivePage }) {
                 <a href={routes.myMedia()} className={dropdownItemClass}>
                   My media
                 </a>
+                <a href={routes.reminders()} className={dropdownItemClass}>
+                  Reminders
+                </a>
                 <a href={logoutHref} className={dropdownItemClass}>
                   Sign out
                 </a>
@@ -363,6 +366,12 @@ function HomeHeader({ active }: { active: ActivePage }) {
                     className="block rounded-[13px] px-4 py-[12px] text-[15px] font-extrabold text-[var(--t-text)] no-underline transition-colors hover:bg-[var(--t-accent-soft)]"
                   >
                     My media
+                  </a>
+                  <a
+                    href={routes.reminders()}
+                    className="block rounded-[13px] px-4 py-[12px] text-[15px] font-extrabold text-[var(--t-text)] no-underline transition-colors hover:bg-[var(--t-accent-soft)]"
+                  >
+                    Reminders
                   </a>
                   <a
                     href={logoutHref}

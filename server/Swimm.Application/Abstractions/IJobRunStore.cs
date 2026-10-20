@@ -19,6 +19,12 @@ public interface IJobRunStore
     Task RecordAsync(JobRunRecord run, CancellationToken ct = default);
 
     /// <summary>
+    /// Только состояние задачи, без строки истории: частый тик, который чаще всего ничего не
+    /// делает (напоминания — раз в 5 минут), не должен вытеснять историю пустыми прогонами.
+    /// </summary>
+    Task RecordStateAsync(JobRunRecord run, CancellationToken ct = default);
+
+    /// <summary>
     /// Только строка истории, состояние задачи не трогается: ручной прогон, который не должен
     /// сдвигать расписание (упавшая кнопка, прошлый сезон вместо текущего).
     /// </summary>

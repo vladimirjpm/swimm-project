@@ -136,6 +136,13 @@ if (backgroundJobsEnabled)
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligBatchBackgroundService>();
 }
 
+// ПРОД-РАСПИСАНИЕ — третий сорт (docs/plans/web-push-reminders-plan.md §4): напоминания о
+// тренировках должны идти с прода круглосуточно, а ProdAdmin запущен не всегда. Свой флаг
+// PushReminders:Enabled: прод — true (appsettings.Production.json), ProdAdmin и разработка — false.
+var pushRemindersEnabled = HostingMode.PushRemindersEnabled(builder.Configuration);
+if (pushRemindersEnabled)
+    builder.Services.AddHostedService<TrainingReminderBackgroundService>();
+
 // Rate limiting для чувствительных к перебору auth-эндпоинтов (login/register/forgot/reset).
 // Фиксированное окно по IP: 10 запросов в минуту, лишнее — 429.
 builder.Services.AddRateLimiter(options =>
@@ -201,6 +208,20 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+    // Push-подписки и «Send test» (docs/plans/web-push-reminders-plan.md §6): каждый тест — по
+    // запросу на каждое устройство человека к push-службам. Ключ — userId ([Authorize]).
+    options.AddPolicy(PushRules.RateLimitPolicy, httpContext =>
+        HttpMethods.IsGet(httpContext.Request.Method)
+            ? RateLimitPartition.GetNoLimiter("read")
+            : RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                              ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = PushRules.RateLimitPerMinute,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
     // Тело отказа — { error }: так его читают клиентские обработчики (saveResultFrom, RSVP);
     // вход (login-modal) смотрит только на статус 429, тело ему не мешает.
     options.OnRejected = async (context, ct) =>
@@ -468,6 +489,7 @@ app.Use(async (context, next) =>
                 "clubs" => "/results_main.html",     // /clubs без id — пусть падает штатно
                 "my-media" => "/media.html",
                 "my-favorites" => "/my-favorites.html", // своё избранное и пометка «семья»
+                "reminders" => "/reminders.html",       // напоминания о тренировках (Web Push)
                 "setup-profile" => "/setup-profile.html", // «Set up profile»: три шага + опрос
                 "about" => "/about.html",
                 "privacy" => "/help.html",              // политика приватности — справка с ключом privacy
@@ -512,6 +534,13 @@ app.UseStaticFiles(new StaticFileOptions
         var path = ctx.File.PhysicalPath;
         if (!string.IsNullOrEmpty(path) && path.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
             ctx.Context.Response.ContentType = "text/html; charset=utf-8";
+        // Service worker push-напоминаний (docs/plans/web-push-reminders-plan.md §8): браузер
+        // должен видеть новую версию сразу, иначе починка sw.js доедет до телефонов через сутки.
+        if (ctx.Context.Request.Path.Equals("/sw.js", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers.CacheControl = "no-cache";
+            ctx.Context.Response.ContentType = "text/javascript; charset=utf-8";
+        }
     }
 });
 
@@ -655,6 +684,12 @@ app.MapGet("/api/client-config",
         "Окружение {Environment}: админка {Admin}, очереди (импорт, рекорды по странам) {Queues}, фоновые расписания (isr.org.il, loglig) {Jobs}.",
         app.Environment.EnvironmentName, adminEnabled ? "ВКЛ" : "выкл", adminEnabled ? "ВКЛ" : "выкл",
         backgroundJobsEnabled ? "ВКЛ" : "выкл");
+    modeLog.LogInformation("Напоминания о тренировках (Web Push, PushReminders:Enabled): {Reminders}.",
+        pushRemindersEnabled ? "ВКЛ" : "выкл");
+    // На проде без ключей VAPID напоминания включены, но слать нечем — молча.
+    if (pushRemindersEnabled && string.IsNullOrWhiteSpace(app.Configuration["WebPush:PrivateKey"]))
+        modeLog.LogCritical(
+            "Напоминания включены, а ключи VAPID не заданы (WebPush__PublicKey / WebPush__PrivateKey): push не уходят, кнопка Reminders на сайте скрыта. Сгенерировать: --generate-vapid-keys.");
     // В Development расписания выключены нарочно (В10) — это норма, а не забытый флаг.
     if (adminEnabled && !backgroundJobsEnabled && !app.Environment.IsDevelopment())
         modeLog.LogWarning(

@@ -1728,6 +1728,24 @@ namespace Swimm.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupReminderMute", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HubGroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "HubGroupId");
+
+                    b.HasIndex("HubGroupId");
+
+                    b.ToTable("Sys_HubGroupReminderMutes", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupSwimmerLevel", b =>
                 {
                     b.Property<int>("HubGroupId")
@@ -3083,6 +3101,75 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("RelayMembers", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.ReminderDelivery", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Delivered")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Devices")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HubGroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("SessionDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("SessionStart")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("HubGroupId");
+
+                    b.HasIndex("UserId", "HubGroupId", "SessionDate", "SessionStart", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Sys_ReminderDeliveries_Session");
+
+                    b.ToTable("Sys_ReminderDeliveries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Sys_ReminderDeliveries_Channel", "\"Channel\" IN ('push', 'email')");
+
+                            t.HasCheckConstraint("CK_Sys_ReminderDeliveries_Kind", "\"Kind\" IN ('reminder', 'cancelled')");
+
+                            t.HasCheckConstraint("CK_Sys_ReminderDeliveries_Result", "\"Result\" IN ('pending', 'sent', 'gone', 'failed')");
+                        });
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.ResultRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -3922,6 +4009,85 @@ namespace Swimm.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.UserNotificationSettings", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("EmailFallback")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LeadKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("RemindersEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("Sys_UserNotificationSettings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Sys_UserNotificationSettings_LeadKind", "\"LeadKind\" IN ('1h', '2h', 'evening')");
+                        });
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.UserPushSubscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Auth")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceLabel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("FailureCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LastFailureAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastSuccessAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("P256dh")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Endpoint")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Sys_UserPushSubscriptions", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.UserReaction", b =>
                 {
                     b.Property<long>("Id")
@@ -4482,6 +4648,25 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Swimmer");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.HubGroupReminderMute", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
+                        .WithMany()
+                        .HasForeignKey("HubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("HubGroup");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.HubGroupSwimmerLevel", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
@@ -4760,6 +4945,25 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Swimmer");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.ReminderDelivery", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
+                        .WithMany()
+                        .HasForeignKey("HubGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("HubGroup");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.ResultRecord", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.Club", "Club")
@@ -5006,6 +5210,28 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("HubGroup");
 
                     b.Navigation("Media");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.UserNotificationSettings", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.UserPushSubscription", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.UserReaction", b =>

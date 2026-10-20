@@ -1000,6 +1000,7 @@ register→verify (письмо приходит, ссылка на `https://swi
 | `ConnectionStrings__ReadConnection` | то же |
 | `Authentication__Google__ClientSecret` | вход + админка (Б10) |
 | `Email__Smtp__User`, `Email__Smtp__Password` | письма |
+| `WebPush__PublicKey`, `WebPush__PrivateKey` (+ не секрет `WebPush__Subject=mailto:noreply@swimhub.co.il`) | **20.10, напоминания о тренировках** ([web-push-reminders-plan.md](web-push-reminders-plan.md)): без них push не уходят, а пункт Reminders показывает «not available yet»; в логе старта — Critical. Сгенерировать ОДИН раз: `dotnet run --project server/Swimm.API -- --generate-vapid-keys`. ⚠ Смена пары аннулирует все подписки. Приватный — в менеджер паролей; в ProdAdmin не нужен (джоб там выключен) |
 | ~~`CandidateSearch__ApiKey`~~ | **14.10: на App Service не нужен** — читают его только админка и пакетный забор, а их на проде нет (В17); ключ — в `appsettings.ProdAdmin.Local.json` |
 
 Все четыре строки — с `SslMode=Require` и `Maximum Pool Size`.

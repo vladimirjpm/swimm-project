@@ -18,6 +18,14 @@ public static class JobNames
     /// <summary>Пакетная привязка loglig-id.</summary>
     public const string LogligBatch = "loglig-batch";
 
+    /// <summary>
+    /// Напоминания о тренировках через Web Push (docs/plans/web-push-reminders-plan.md). НЕ в
+    /// <see cref="All"/>: тик — минуты, а не часы из Admin/Settings, и работает она на ПРОДЕ под
+    /// своим флагом (<c>PushReminders:Enabled</c>), а не под фоновыми расписаниями ProdAdmin.
+    /// Карточка /Admin/Jobs — своя.
+    /// </summary>
+    public const string TrainingReminders = "training-reminders";
+
     /// <summary>Все задачи по расписанию в порядке показа на /Admin/Jobs.</summary>
     public static readonly IReadOnlyList<JobDefinition> All =
     [
@@ -98,6 +106,10 @@ public static class JobRunSummaries
         r.Checked == 0
             ? "предложений нет"
             : $"проверено {r.Checked}, подтверждено {r.Verified}, отклонено {r.Rejected}, отложено {r.Skipped}";
+
+    public static string TrainingReminders(TrainingReminderReport r) =>
+        $"групп {r.Groups}: к отправке {r.Planned}, отправлено {r.Sent}, уже было {r.Skipped}, " +
+        $"не доставлено {r.Failed}, умерших устройств удалено {r.RemovedDevices}";
 
     public static string LogligBatch(LogligBatchReport r, int perRun) =>
         $"лимит {perRun}: обработано {r.Processed}, привязано {r.Linked}, с кандидатами {r.WithCandidates}, впустую {r.NothingFound}";

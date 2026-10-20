@@ -14,6 +14,7 @@
 //   /clubs/{id}             → club.html
 //   /my-media               → media.html
 //   /my-favorites           → my-favorites.html (своё избранное, пометка «семья»)
+//   /reminders              → reminders.html (напоминания о тренировках через Web Push)
 //   /setup-profile          → setup-profile.html (три шага «Set up profile» + опрос)
 //   /about                  → about.html
 //   /season-best            → season-best.html (списки лучших в сезоне; всё в query)
@@ -60,6 +61,8 @@ export const routes = {
   club: (id: string | number) => `/clubs/${enc(String(id))}`,
   myMedia: () => '/my-media',
   myFavorites: () => '/my-favorites',
+  /** Напоминания о тренировках: push на этом устройстве, время, устройства (docs/plans/web-push-reminders-plan.md). */
+  reminders: () => '/reminders',
   /** «Set up profile»: три шага и опрос (docs/plans/profile-setup-plan.md). */
   setupProfile: () => '/setup-profile',
 

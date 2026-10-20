@@ -29,7 +29,8 @@ public sealed class BackgroundJobsStatusService(
     IImportJobQueue importQueue,
     IRecordCountryRunQueue countryRunQueue,
     IAdminRepository adminRepository,
-    IRecordSourceCheckService recordChecks) : IBackgroundJobsStatus
+    IRecordSourceCheckService recordChecks,
+    IPushSender pushSender) : IBackgroundJobsStatus
 {
     /// <summary>Сколько строк истории показывать на задачу (в базе держится <see cref="JobRunLog.KeepPerJob"/>).</summary>
     public const int HistoryRows = 15;
@@ -110,7 +111,67 @@ public sealed class BackgroundJobsStatusService(
         Func<string, IReadOnlyList<JobRunLogRow>> history, DateTime now, CancellationToken ct)
     {
         var states = (await jobRuns.ListStatesAsync(ct)).ToDictionary(s => s.Name);
-        return JobNames.All.Select(j => BuildSchedule(j, states.GetValueOrDefault(j.Name), history(j.Name), now)).ToList();
+        return
+        [
+            .. JobNames.All.Select(j => BuildSchedule(j, states.GetValueOrDefault(j.Name), history(j.Name), now)),
+            BuildTrainingReminders(states.GetValueOrDefault(JobNames.TrainingReminders), history(JobNames.TrainingReminders), now),
+        ];
+    }
+
+    /// <summary>
+    /// Напоминания о тренировках (docs/plans/web-push-reminders-plan.md) — ПРОД-РАСПИСАНИЕ: работает
+    /// на проде под <c>PushReminders:Enabled</c>, а не в ProdAdmin. В ProdAdmin карточка всё равно
+    /// «следит»: журнал Sys_JobRuns — прод-базы, и замолчавший прод-джоб (тик раз в 5 минут) виден
+    /// здесь просрочкой. История — только тики, которые что-то отправили или упали.
+    /// </summary>
+    private JobCard BuildTrainingReminders(JobRunStateRow? state, IReadOnlyList<JobRunLogRow> history, DateTime now)
+    {
+        var processOn = HostingMode.PushRemindersEnabled(configuration);
+        var watchingProd = environment.IsProdAdmin();
+        var tick = TrainingReminderRules.Tick;
+        var failed = state?.LastAttemptAt is { } attempt && (state.LastSuccessAt is null || attempt > state.LastSuccessAt.Value);
+        var next = state?.LastAttemptAt is { } last ? last + tick : (DateTime?)null;
+        var active = processOn || watchingProd;
+        var silent = active && next is { } due && now - due > JobsOverviewBuilder.OverdueAfter;
+
+        var facts = new List<JobFact>
+        {
+            new("В этом процессе", processOn ? "запущена (PushReminders:Enabled = true)"
+                : watchingProd ? "не запущена — работает на ПРОДЕ; здесь журнал прод-базы"
+                : "не запущена — PushReminders:Enabled = false (работает только на проде)",
+                processOn ? "success" : "neutral"),
+            new("Ключи VAPID", pushSender.IsConfigured ? "заданы (WebPush:PublicKey / PrivateKey)" : "НЕ заданы — push не уходят",
+                pushSender.IsConfigured ? "success" : processOn ? "danger" : "neutral"),
+            new("Тик", $"{JobTimeText.Human(tick)}; от дубля — UNIQUE журнала Sys_ReminderDeliveries"),
+            new("Последний тик", JobTimeText.When(state?.LastAttemptAt, now), silent ? "warning" : null),
+            new("Последний успех", JobTimeText.When(state?.LastSuccessAt, now)),
+        };
+        if (failed && state?.LastError is { } error)
+            facts.Add(new("Ошибка", error, "danger"));
+
+        var badge = !active ? new JobBadge("не в этом процессе", "neutral")
+            : failed ? new JobBadge("последний тик упал", "danger")
+            : state?.LastAttemptAt is null ? new JobBadge("ещё не запускалась", "warning")
+            : silent ? new JobBadge("молчит", "warning")
+            : new JobBadge("работает", "success");
+
+        var lastText = state?.LastAttemptAt is { } at
+            ? (failed ? $"ошибка {JobTimeText.Ago(at, now)}" : $"тик {JobTimeText.Ago(at, now)}")
+            : "ещё не запускалась";
+        return new JobCard(JobNames.TrainingReminders, "Напоминания о тренировках (push)", JobKinds.Schedule,
+            "TrainingReminderBackgroundService",
+            "Раз в 5 минут смотрит занятия групп и шлёт Web Push участникам, которым пора напомнить " +
+            "(за 1–2 часа или вечером накануне; не ответившим «No», не на перерыве; тихие часы 22–07). " +
+            "Работает НА ПРОДЕ круглосуточно — свой флаг PushReminders:Enabled, не BackgroundJobs.",
+            badge, facts, history, null)
+        {
+            Active = active,
+            Failed = failed,
+            NextDueAt = active ? next : null,
+            Status = !active ? "работает только на проде (PushReminders:Enabled)"
+                : silent ? $"молчит: {lastText}" : lastText,
+            Alert = active && failed ? "danger" : silent ? "warning" : null,
+        };
     }
 
     private JobCard BuildSchedule(JobDefinition job, JobRunStateRow? state, IReadOnlyList<JobRunLogRow> history, DateTime now)

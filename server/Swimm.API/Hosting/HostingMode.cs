@@ -49,6 +49,18 @@ public static class HostingMode
     public static bool BackgroundJobsEnabled(IConfiguration config, IHostEnvironment env) =>
         config.GetValue<bool?>(BackgroundJobsEnabledKey) ?? !env.IsDevelopment();
 
+    public const string PushRemindersEnabledKey = "PushReminders:Enabled";
+
+    /// <summary>
+    /// Третий сорт фоновых служб — ПРОД-РАСПИСАНИЕ (docs/plans/web-push-reminders-plan.md §4):
+    /// напоминания о тренировках обязаны идти с прода круглосуточно, а ProdAdmin запущен не всегда.
+    /// По умолчанию ВЫКЛЮЧЕНО везде; включает <c>appsettings.Production.json</c>. В ProdAdmin
+    /// (та же прод-база) и в разработке (локальная база) не включать: в первом случае — дубль
+    /// (его всё равно отсечёт UNIQUE журнала доставки), во втором — push живым людям, если в
+    /// локальную базу когда-нибудь приедут подписки.
+    /// </summary>
+    public static bool PushRemindersEnabled(IConfiguration config) => config.GetValue(PushRemindersEnabledKey, false);
+
     /// <summary>
     /// Путь принадлежит админке. Регистр не важен (<see cref="PathString.StartsWithSegments(PathString)"/>
     /// сравнивает без учёта регистра): <c>/ADMIN</c> не должен проскочить мимо выключателя.
