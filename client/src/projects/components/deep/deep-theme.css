@@ -374,6 +374,14 @@
 .theme-deep-light input,
 .theme-deep-light textarea { color-scheme: light; }
 
+/* Второй слой той же беды: Chrome красит раскрытый список ФОНОМ САМОГО <select>, и
+   `color-scheme` тогда не решает. Фон полей в тёмной — полупрозрачный `--t-input-bg`
+   (rgba .03), а у всплывающего списка подложки нет — прозрачность ложится на белое, и наш
+   светлый текст опять на белом. Опциям — непрозрачная панель темы. Пойман 20.10.2026 на
+   выборе уровня пловца в табе Swimmers группы. */
+.theme-deep select option,
+.theme-deep select optgroup { background-color: var(--deep-panel-bg); color: var(--deep-text); }
+
 /* ── Рецепты (все карточки собираются из них) ── */
 .deep-card { background: var(--deep-card-bg); border: 1px solid var(--deep-card-border); border-radius: var(--deep-radius-card); padding: 20px 22px; box-shadow: var(--deep-card-shadow); }
 .deep-card-title { font-family: var(--deep-font-display); font-size: 17px; color: var(--deep-text); }
