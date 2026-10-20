@@ -187,7 +187,7 @@ style»; чип «⚠ Under review» вместо голого значка вк
 `--t-text` / `--t-text-2` / `--t-text-3`, `--t-surface` / `--t-surface-strong` / `--t-card` /
 `--t-input-bg`, `--t-border` / `--t-divider`, `--t-shadow` / `--t-shadow-lg`, `--t-scrim`, `--t-warn`,
 `--t-danger`, `--t-live`, `--t-good`, `--t-like`, `--t-list-head`, `--t-plate`, золото чемпионатов
-`--t-champ-*` и `--t-badge-ink` (бейдж группы K/Y/J/A/M). Карта ролей на палитру — **одна
+`--t-champ-*`, `--t-badge-ink` (бейдж группы K/Y/J/A/M) и статусы старта календаря `--t-res` / `--t-res-ink` / `--t-sl`. Карта ролей на палитру — **одна
 на продукт**, в [`deep-theme.css`](src/projects/components/deep/deep-theme.css), объявлена на
 тех же `.theme-deep` / `.theme-deep-light`: у кого есть класс темы — у того есть и роли.
 Таблица значений обеих тем — [`../docs/design-colors.md`](../docs/design-colors.md) §3.

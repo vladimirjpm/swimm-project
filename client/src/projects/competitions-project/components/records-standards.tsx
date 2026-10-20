@@ -1,6 +1,6 @@
 import React from 'react';
 import { routes } from '../../../utils/routes';
-import { IconArrowsLeftRight, IconFlag, IconGlobe, IconRuler, IconStar } from './calendar-icons';
+import { IconArrowsLeftRight, IconFlag, IconGlobe, IconRuler, IconStar } from '../calendar/calendar-icons';
 
 /*
  * Полоса «Records & standards» под календарём: четыре ссылки на рекорды и плитка Normatives.

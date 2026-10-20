@@ -212,25 +212,6 @@ function shiftIso(iso: string, delta: number): string {
   return `${t.getUTCFullYear()}-${pad2(t.getUTCMonth() + 1)}-${pad2(t.getUTCDate())}`;
 }
 
-/**
- * Форма плашки meet в ячейке дня. `first` — день первый в `meet.days` (подпись = имя, иначе
- * «↳ Day N»); `dayNo` — порядковый номер даты в `meet.days` (1-based, дни бывают не подряд, так
- * что это НЕ разница дат); `joinLeft/joinRight` — соседняя календарная дата тоже в `days`
- * (плашка тянется на соседнюю ячейку и там плоская).
- */
-export function chipShape(
-  meet: CalendarMeet,
-  iso: string,
-): { first: boolean; joinLeft: boolean; joinRight: boolean; dayNo: number } {
-  const index = Math.max(0, meet.days.findIndex((d) => d.date === iso));
-  return {
-    first: index === 0,
-    joinLeft: meetOnDay(meet, shiftIso(iso, -1)),
-    joinRight: meetOnDay(meet, shiftIso(iso, 1)),
-    dayNo: index + 1,
-  };
-}
-
 /** Meets, у которых в этот день есть запись в `days`, в исходном порядке. */
 export function meetsOnDay(meets: CalendarMeet[], iso: string): CalendarMeet[] {
   return meets.filter((meet) => meetOnDay(meet, iso));
@@ -299,36 +280,84 @@ export function shortDate(iso: string): string {
   return `${d} ${MONTH_NAMES[m - 1].slice(0, 3)}`;
 }
 
-export type StatusTone = 'live' | 'startlist' | 'progress' | 'complete' | 'cancelled' | 'postponed' | 'noresults';
+export type StatusTone = 'live' | 'cancelled' | 'postponed';
 
-/** Тег статуса куба; null — без тега (`done` и прочее). */
+/**
+ * Тег куба — только то, чего не скажет кнопка статуса (`cubeAction`): идёт сейчас, отменён,
+ * перенесён. «Startlist», «In progress», «Complete», «No results» с хендоффа -4 (10c) говорит кнопка.
+ */
 export function statusTag(meet: CalendarMeet): { text: string; tone: StatusTone } | null {
   if (meet.status === 'live') return { text: 'Live', tone: 'live' };
-  if (meet.has_start_list && meet.status === 'upcoming') return { text: 'Startlist', tone: 'startlist' };
-  if (meet.status === 'in_progress') return { text: 'In progress', tone: 'progress' };
-  if (meet.status === 'complete') return { text: 'Complete', tone: 'complete' };
   if (meet.status === 'cancelled') return { text: 'Cancelled', tone: 'cancelled' };
-  // Прошедший старт из входящих, который мы не затянули: честно говорим, что результатов у нас нет.
-  if (meet.kind === 'upcoming' && meet.status === 'done' && meet.days_loaded === 0) {
-    return { text: 'No results', tone: 'noresults' };
-  }
   if (meet.status === 'postponed') {
     return { text: meet.postponed_to ? `Postponed → ${shortDate(meet.postponed_to)}` : 'Postponed', tone: 'postponed' };
   }
   return null;
 }
 
-/** Подпись действия в низу куба (сам куб — ссылка целиком); null — действия нет. */
+/**
+ * Статус старта для меток дня и кнопки куба (хендофф competitions_home-4, 10c), по убыванию
+ * важности: results — есть протокол; startlist — впереди и есть стартлист; pending — уже начался
+ * или прошёл, протокола нет; upcoming — впереди, стартлиста нет.
+ */
+export type MeetStatusKind = 'results' | 'startlist' | 'pending' | 'upcoming';
+
+const STATUS_RANK: Record<MeetStatusKind, number> = { results: 3, startlist: 2, pending: 1, upcoming: 0 };
+
+/** Статус старта в конкретный день: у многодневки RES только на загруженных днях. */
+export function meetDayStatus(meet: CalendarMeet, iso: string, today: string): MeetStatusKind {
+  if (meet.status === 'cancelled' || meet.status === 'postponed') return 'upcoming';
+  if (meet.days.some((d) => d.date === iso && d.loaded)) return 'results';
+  if (meet.has_start_list && iso >= today) return 'startlist';
+  return iso <= today ? 'pending' : 'upcoming';
+}
+
+/**
+ * Метка дня — по лучшему статусу среди его стартов (null — стартов нет); `hasResults` — угол-флажок:
+ * хоть у одного старта дня есть протокол этого дня.
+ */
+export function dayStatus(
+  meets: CalendarMeet[],
+  iso: string,
+  today: string,
+): { status: MeetStatusKind | null; hasResults: boolean } {
+  let best: MeetStatusKind | null = null;
+  for (const meet of meets) {
+    const s = meetDayStatus(meet, iso, today);
+    if (best === null || STATUS_RANK[s] > STATUS_RANK[best]) best = s;
+  }
+  return { status: best, hasResults: best === 'results' };
+}
+
+/** Сколько дней после конца старта без протокола пишем «Results soon»; дальше — «No results». */
+const RESULTS_SOON_DAYS = 7;
+
+/**
+ * Кнопка статуса в кубе (10c) — заменяет текстовое действие. null — кнопки нет (cancelled и
+ * перенос: у них тег и прежняя ссылка). «Results soon» — только неделю после старта: прошлый
+ * незатянутый сезон иначе вечно обещал бы протокол (честное «No results» — решение В5′).
+ */
+export function cubeAction(meet: CalendarMeet, today: string): { kind: MeetStatusKind; label: string } | null {
+  if (meet.status === 'cancelled' || meet.status === 'postponed') return null;
+  if (meet.days_loaded > 0) {
+    return { kind: 'results', label: meet.status === 'in_progress' ? `Day ${meet.days_loaded} results` : 'Results' };
+  }
+  if (meet.has_start_list && meet.end >= today) return { kind: 'startlist', label: 'Startlist' };
+  if (meet.start <= today) {
+    const soon = meet.end >= shiftIso(today, -RESULTS_SOON_DAYS);
+    return { kind: 'pending', label: soon ? 'Results soon' : 'No results' };
+  }
+  return { kind: 'upcoming', label: 'Startlist not yet' };
+}
+
+/**
+ * Текстовое действие куба — только там, где нет кнопки статуса (`cubeAction` → null): перенос
+ * ведёт на страницу федерации «Details ↗»; cancelled без ссылки — null.
+ */
 export function actionLabel(meet: CalendarMeet): string | null {
   const link = meetLink(meet);
   if (!link) return null;
-  if (link.external) return 'Details ↗';
-  if (meet.status === 'postponed') return 'Details →';
-  if (meet.kind === 'upcoming') return meet.has_start_list ? 'Startlist →' : 'Details →';
-  if (meet.status === 'in_progress') return `Day ${meet.days_loaded} results →`;
-  if (meet.status === 'complete') return 'Full results →';
-  if (meet.status === 'live' || meet.status === 'done') return 'Results →';
-  return 'Details →';
+  return link.external ? 'Details ↗' : 'Details →';
 }
 
 /** Многодневка в процессе (частично загружена) — куб на 2 колонки с полосой дней. */
@@ -357,6 +386,42 @@ export function weekLabel(week: (string | null)[]): string {
   const [, em, ed] = parseIso(end);
   const monE = MONTH_NAMES[em - 1].slice(0, 3);
   return sm === em ? `${sd}–${ed} ${monE}` : `${sd} ${MONTH_NAMES[sm - 1].slice(0, 3)} – ${ed} ${monE}`;
+}
+
+/** Неделя месяца со стартами — группа правой колонки десктопа (лейаут 9a). */
+export interface WeekGroup {
+  /** Неделя сетки месяца (`monthGrid`): 7 клеток, вне месяца — null. */
+  week: (string | null)[];
+  /** «18–24 Oct» — как у недели телефона (`weekLabel`). */
+  label: string;
+  meets: CalendarMeet[];
+}
+
+/**
+ * Meets месяца по неделям (с воскресенья): meet попадает в неделю своего ПЕРВОГО дня в этом
+ * месяце — старт, начавшийся в прошлом месяце, открывает первую неделю этого. Недели без meets
+ * не отдаём; внутри недели — по этому дню, при равенстве — как пришли.
+ */
+export function weekGroups(meets: CalendarMeet[], m: CalendarMonth): WeekGroup[] {
+  const grid = monthGrid(m);
+  const buckets = grid.map(() => [] as { meet: CalendarMeet; day: string }[]);
+  for (const meet of meets) {
+    const day = meet.days.find((d) => isDayInMonth(d.date, m))?.date;
+    const index = weekIndexOf(grid, day ?? null);
+    if (day && index >= 0) buckets[index].push({ meet, day });
+  }
+  return grid
+    .map((week, i) => ({
+      week,
+      label: weekLabel(week),
+      meets: buckets[i].sort((a, b) => a.day.localeCompare(b.day)).map((x) => x.meet),
+    }))
+    .filter((g) => g.meets.length > 0);
+}
+
+/** Заголовок выбранного дня: «Sat · 24 Oct». */
+export function dayHeading(iso: string): string {
+  return `${weekdayShortOf(iso)} · ${shortDate(iso)}`;
 }
 
 /** Короткое имя дня недели для даты: «Sat» (по UTC). */
