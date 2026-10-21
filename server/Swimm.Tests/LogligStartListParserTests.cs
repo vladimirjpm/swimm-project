@@ -333,4 +333,46 @@ public class LogligStartListParserTests
         Assert.Equal("backstroke", row.StyleName);
         Assert.Equal(0, row.Registered);
     }
+
+    // ── Предстоящий старт до посева (И-54) ───────────────────────────────────
+    // Живые страницы 20.10.2026: «ליגה הפועל בית שמש» (isr compID 16853, loglig 15748,
+    // 22.10.2026). Программа выложена, «נרשמים» заполнены, а посева ещё нет.
+
+    [Fact]
+    public void Grid_UpcomingNotSeeded_AllEventsWithRegistrations()
+    {
+        var grid = LogligStartListParser.ParseDisciplineGrid(
+            Fixture("disciplines-15748-upcoming-not-seeded.html"));
+
+        Assert.Equal(8, grid.Count);
+        Assert.Equal(grid.Count, grid.Select(r => r.DisciplineId).Distinct().Count());
+
+        var first = grid.Single(r => r.DisciplineId == 84669);
+        Assert.Equal(1, first.EventNumber);
+        Assert.Equal("freestyle", first.StyleName);
+        Assert.Equal("50", first.Distance);
+        Assert.Equal("female", first.Gender);
+        // Записались, но ещё никто не «участвует»: участники появляются только с посевом.
+        Assert.Equal(5, first.Registered);
+        Assert.Equal(0, first.Participants);
+        // Источник печатает у заплывов №1 и №6 дату НЕДЕЛЕЙ раньше соревнования (22.10).
+        // Парсер отдаёт её как есть — отсеивает забор (StartListPullService.TrustedEventStart).
+        var dated = grid.Where(r => r.StartAtLocal is not null).ToList();
+        Assert.Equal([1, 6], dated.Select(r => r.EventNumber!.Value).Order().ToArray());
+        Assert.All(dated, r => Assert.Equal(new DateTime(2026, 10, 15, 16, 30, 0), r.StartAtLocal));
+
+        Assert.All(grid, r => Assert.Equal(0, r.Participants));
+    }
+
+    [Fact]
+    public void StartList_NotSeededYet_IsEmptyNotAFailure()
+    {
+        // «Start list» до посева — шапка есть, строк нет. Это «тянуть пока нечего».
+        var sl = LogligStartListParser.ParseStartList(Fixture("startlist-84669-not-seeded.html"));
+
+        Assert.Equal("15/10/2026", sl.Date);
+        Assert.Equal("freestyle", sl.StyleName);
+        Assert.Equal("50", sl.Distance);
+        Assert.Empty(sl.Rows);
+    }
 }

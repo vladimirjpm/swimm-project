@@ -17,7 +17,12 @@ interface FetchState<T> {
 
 function useJson<T>(url: string | null): FetchState<T> {
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Есть адрес — значит, С ПЕРВОГО рендера уже грузимся. Начни с false — и до эффекта,
+  // который ставит true, кадр выглядит как «загрузилось, данных нет»: программа сообщала
+  // «протокол не опубликован» (и таб прятал зону фильтров с чипами плана насовсем, если
+  // успевал уйти в карточку), а автооткрытие плана решало по ещё не загруженному составу.
+  // Ловилось только на холодной загрузке ссылки `?plan=` — после Ctrl+R порядок другой.
+  const [loading, setLoading] = useState(url != null);
   const [notFound, setNotFound] = useState(false);
   const [tick, setTick] = useState(0);
 

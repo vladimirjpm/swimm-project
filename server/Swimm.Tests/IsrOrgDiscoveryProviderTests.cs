@@ -60,6 +60,17 @@ public class IsrOrgDiscoveryProviderTests
     }
 
     [Fact]
+    public void ParseDetails_Upcoming_HasLogligIframeBeforeStart()
+    {
+        // Риск №1 плана стартового протокола (§1.6) снят: iframe loglig стоит на странице
+        // и ДО старта. Живая страница 20.10.2026, соревнование 22.10.2026 (И-54).
+        var d = IsrOrgDiscoveryProvider.ParseDetails(Fixture("isrorg-comp-16853-upcoming.html"));
+        Assert.Equal(15748, d.LogligId);
+        Assert.Equal("בריכת קאנטרי בית שמש", d.Venue);
+        Assert.Equal(1, d.DayCount);
+    }
+
+    [Fact]
     public void ParseDetails_MultiDay_FiveDayTabs()
     {
         var d = IsrOrgDiscoveryProvider.ParseDetails(Fixture("isrorg-comp-16812-multiday.html"));

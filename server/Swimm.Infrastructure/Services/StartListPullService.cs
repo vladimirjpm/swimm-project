@@ -71,12 +71,24 @@ public sealed class StartListPullService : IStartListPullService
             return await FinishAsync(Fail(orgCompId, null,
                 $"Соревнование {orgCompId} не значится во «Входящих» — сначала синхронизируйте список."), ct);
 
-        // Риск №1 плана (§1.6): единственный известный путь к logligId — iframe на comp.asp,
-        // и появляется ли он ДО старта, неизвестно. Это не сбой забора, а «тянуть пока нечего».
+        // Риск №1 плана (§1.6): единственный путь к logligId — iframe на comp.asp. Он есть и
+        // ДО старта (проверено 20.10 на compID 16853), но дочитывает его только фон, а фон
+        // работает лишь в ProdAdmin. Поэтому кнопка дочитывает страницу сама, а не отсылает
+        // админа к «Обновить» (И-54).
+        if (discovered.LogligId is null)
+        {
+            var detailsError = await RefreshDetailsAsync(discovered, ct);
+            if (detailsError is not null)
+                return await FinishAsync(Fail(orgCompId, null,
+                    $"Страница соревнования isr.org.il (compID {orgCompId}) не прочиталась: {detailsError}"), ct);
+        }
+
+        // iframe нет и на свежей странице — федерация ещё не выложила программу. Это не сбой
+        // забора, а «тянуть пока нечего».
         if (discovered.LogligId is not int logligId)
             return await FinishAsync(Empty(orgCompId, null,
-                "У соревнования нет loglig-id: детальная страница ещё не читалась либо на ней " +
-                "нет iframe. Нажмите «Обновить» во «Входящих»."), ct);
+                $"На странице соревнования (isr.org.il/comp.asp?compID={orgCompId}) пока нет " +
+                "программы loglig — федерация её ещё не выложила. Повторите позже."), ct);
 
         // Справка о старте (Т1): чемпионат ли это — по регламенту. Делается ДО заплывов и
         // независимо от того, сделан ли посев: флаг нужен табу Start list и тогда, когда
@@ -121,7 +133,10 @@ public sealed class StartListPullService : IStartListPullService
         // старта это норма, и красить её в ошибку значит приучить не смотреть на статус.
         if (raw.Count == 0 && failed == 0)
             return await FinishAsync(
-                Empty(orgCompId, logligId, "Посев ещё не сделан: в заплывах нет ни одной строки.")
+                Empty(orgCompId, logligId,
+                    $"Посев ещё не сделан: программа ({grid.Count} заплывов) выложена, записалось " +
+                    $"{grid.Sum(e => e.Registered)} (графа «נרשמים»), но «Start list» у всех заплывов " +
+                    "пуст. Заявки без заплыва и дорожки не тянем (решение В4) — повторите ближе к старту.")
                     with { Events = grid.Count, EventsFetched = fetchedDisciplines.Count }, ct);
 
         // ── Фаза B: справочники. Пловцы и стили могут создаваться, клубы — нет ──
@@ -387,15 +402,16 @@ public sealed class StartListPullService : IStartListPullService
             // Npgsql на такой паре бросает ArgumentException. Ловится только на протоколах,
             // где хоть у одного заплыва не назначено время старта (пример — compID 16787:
             // соседние округа того же чемпионата затянулись, а этот падал).
+            var eventStart = TrustedEventStart(ev.StartAtLocal, discovered);
             var compDate = DateTime.SpecifyKind(
-                ev.StartAtLocal?.Date ?? discovered.DateStart.Date, DateTimeKind.Unspecified);
+                eventStart?.Date ?? discovered.DateStart.Date, DateTimeKind.Unspecified);
 
             drafts.Add(new EntryDraft(
                 discovered.OrgCompId, compDate, discovered.Name,
                 ev.DisciplineId, ev.EventNumber, row.Heat, row.Lane,
                 swimmer.Id, club.Id, style.Id,
                 ev.Distance, ev.Gender, ev.Category, ev.AgeBand,
-                ToUtc(ev.StartAtLocal, row.HeatStartAt), row.Round,
+                ToUtc(eventStart, row.HeatStartAt), row.Round,
                 ParseSeedMs(row.SeedTime), row.SeedTime ?? string.Empty));
         }
 
@@ -447,6 +463,29 @@ public sealed class StartListPullService : IStartListPullService
     /// Перевод не удался (несуществующий час при переводе часов) — null: приблизительное
     /// время на витрине и так помечено «≈», а врать точным моментом нельзя.
     /// </summary>
+    /// <summary>
+    /// Время старта заплыва из сетки — только если его ДАТА лежит в днях соревнования.
+    /// Иначе это опечатка источника, а не день: у compID 16853 (22.10.2026) заплыв №1 стоит
+    /// на «15/10/2026 16:30», остальные без времени (И-54). Поверь мы ей — заявки заплыва
+    /// уехали бы на неделю раньше, в прошлое. Такое время считаем неназначенным: день —
+    /// <c>DateStart</c>, время старта — нет.
+    ///
+    /// Вперёд граница мягче: федерация бывает скупее программы. compID 16854 на isr.org.il —
+    /// один день 23.10.2026, а у loglig заплывы №37–70 стоят на 24.10 (Р86, поправка 21.10).
+    /// Отбрось мы их — половина протокола осталась бы без времени. Поэтому за <c>DateEnd</c>
+    /// пускаем ещё <see cref="ExtraDaysAfterEnd"/> дня; дальше — уже опечатка месяца/года.
+    /// </summary>
+    private static DateTime? TrustedEventStart(DateTime? startLocal, DiscoveredCompetition discovered)
+    {
+        if (startLocal is not DateTime start) return null;
+        var day = start.Date;
+        return day >= discovered.DateStart.Date && day <= discovered.DateEnd.Date.AddDays(ExtraDaysAfterEnd)
+            ? start : null;
+    }
+
+    /// <summary>Сколько дней после <c>DateEnd</c> «Входящих» ещё считаем днями соревнования (Р86).</summary>
+    private const int ExtraDaysAfterEnd = 3;
+
     private static DateTime? ToUtc(DateTime? eventStartLocal, string? heatStartHhmm)
     {
         if (eventStartLocal is not DateTime eventStart) return null;
@@ -463,6 +502,36 @@ public sealed class StartListPullService : IStartListPullService
         seed is null ? null : LogligClient.ParseTimeToMilliseconds(seed);
 
     // ── Журнал заборов ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Дочитать детальную страницу comp.asp (venue + logligId) прямо в строку «Входящих» —
+    /// то же, что «Обновить» (<see cref="CompetitionDiscoveryService.RefreshDetailsAsync"/>),
+    /// но со своей развилкой: здесь «страница не прочиталась» и «на ней нет iframe» — разные
+    /// ответы админу. Возвращает текст ошибки чтения либо null.
+    /// </summary>
+    private async Task<string?> RefreshDetailsAsync(DiscoveredCompetition discovered, CancellationToken ct)
+    {
+        try
+        {
+            var details = await _provider.FetchDetailsAsync(discovered.OrgCompId, ct);
+            discovered.Venue = details.Venue;
+            discovered.LogligId = details.LogligId;
+            discovered.LastError = details.LogligId is null
+                ? "На странице нет loglig-iframe (программа ещё не выложена)."
+                : null;
+            await _db.SaveChangesAsync(ct);
+            return null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException
+                                       || ex is TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Стартовый протокол {OrgCompId}: детальная страница не прочиталась",
+                discovered.OrgCompId);
+            discovered.LastError = ex.Message;
+            await _db.SaveChangesAsync(ct);
+            return ex.Message;
+        }
+    }
 
     private static StartListPullReport Fail(int orgCompId, int? logligId, string error) =>
         new(orgCompId, logligId, StartListPullStatus.Error, error, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, DateTime.UtcNow);
