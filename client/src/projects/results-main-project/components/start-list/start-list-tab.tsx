@@ -74,6 +74,8 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
   };
 
   const [state, setState] = useState(readQuery);
+  // Автооткрытие карточки плана уже не нужно (см. эффект ниже): таб открыт не на программе.
+  const autoOpened = useRef(state.zoom !== 'programme');
 
   const setUrl = useCallback((params: { swimmer?: number | null; heat?: number | null }) => {
     const url = new URL(window.location.href);
@@ -84,7 +86,11 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     window.history.replaceState(null, '', url.toString());
   }, []);
 
-  const openProgramme = useCallback(() => { setUrl({}); setState({ zoom: 'programme', swimmerId: null, orgDisciplineId: null, heat: null }); }, [setUrl]);
+  const openProgramme = useCallback(() => {
+    autoOpened.current = true;   // вернулся на программу сам — план поверх не открываем
+    setUrl({});
+    setState({ zoom: 'programme', swimmerId: null, orgDisciplineId: null, heat: null });
+  }, [setUrl]);
   const openEvent = useCallback((orgDisciplineId: number) => { setUrl({ heat: orgDisciplineId }); setState({ zoom: 'heat', swimmerId: null, orgDisciplineId, heat: null }); }, [setUrl]);
   const openSwimmer = useCallback((swimmerId: number) => { setUrl({ swimmer: swimmerId }); setState({ zoom: 'swimmer', swimmerId, orgDisciplineId: null, heat: null }); }, [setUrl]);
 
@@ -151,7 +157,10 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     setState((s) => ({ ...s, zoom: 'plan' }));
     setPickerOpen(true);
   }, []);
-  const backToProgramme = useCallback(() => setState((s) => ({ ...s, zoom: 'programme' })), []);
+  const backToProgramme = useCallback(() => {
+    autoOpened.current = true;   // «All programme» нажат руками — план поверх не открываем
+    setState((s) => ({ ...s, zoom: 'programme' }));
+  }, []);
 
   // Токены темы Deep (`--deep-*`) объявлены НА КЛАССЕ, а не на :root, поэтому их надо
   // включить на контейнере — иначе весь принятый дизайн таба (карточки, cyan-акценты)
@@ -325,7 +334,11 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
   // мой», и заставлять его сперва накликать состав неправильно. Как только состав известен
   // (свой план или дефолт из избранного), открываем её сами — но ровно один раз и только
   // если человек ещё никуда не ушёл сам (адрес не указывает на заплыв/пловца).
-  const autoOpened = useRef(false);
+  //
+  // «Ещё никуда не ушёл» держит флаг `autoOpened` (объявлен у состояния зума): он взведён
+  // сразу, если таб открылся НЕ на программе (`?plan=`, `?swimmer=`, `?heat=`), и при любом
+  // ручном возврате на программу. Иначе ожидание загрузки доживало до клика «All programme»
+  // и через секунду возвращало человека в план (поймано на проде 21.10.2026, 16854).
   useEffect(() => {
     if (autoOpened.current || planLoading || effective.loading) return;
     autoOpened.current = true;
