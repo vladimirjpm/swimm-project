@@ -534,13 +534,13 @@ app.UseStaticFiles(new StaticFileOptions
         var path = ctx.File.PhysicalPath;
         if (!string.IsNullOrEmpty(path) && path.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
             ctx.Context.Response.ContentType = "text/html; charset=utf-8";
-        // Service worker push-напоминаний (docs/plans/web-push-reminders-plan.md §8): браузер
-        // должен видеть новую версию сразу, иначе починка sw.js доедет до телефонов через сутки.
+        // html и входные js без хэша в имени — no-cache, иначе после деплоя браузер держит
+        // прошлую сборку (StaticFileCaching). Сюда же попадает sw.js push-напоминаний
+        // (docs/plans/web-push-reminders-plan.md §8): починка должна доехать до телефонов сразу.
+        if (StaticFileCaching.CacheControlFor(ctx.Context.Request.Path.Value) is { } cacheControl)
+            ctx.Context.Response.Headers.CacheControl = cacheControl;
         if (ctx.Context.Request.Path.Equals("/sw.js", StringComparison.OrdinalIgnoreCase))
-        {
-            ctx.Context.Response.Headers.CacheControl = "no-cache";
             ctx.Context.Response.ContentType = "text/javascript; charset=utf-8";
-        }
     }
 });
 
