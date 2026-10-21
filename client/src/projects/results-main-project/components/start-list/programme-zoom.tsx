@@ -85,7 +85,12 @@ export default function ProgrammeZoom({ orgCompId, day, startsLabel, notify, onP
               styleName={g.styleName}
               styleType="icon-len"
               styleLen={g.distance}
-              className="src-programme-zoom w-[72px] shrink-0 text-[16px] sm:w-[84px] sm:text-[18px]"
+              // Дистанция ПОД картинкой, а не поверх (решение Влада 21.10.2026): на рисунке
+              // число спорило с силуэтом пловца и читалось хуже.
+              lenPlacement="below"
+              iconSize={72}
+              lenSize={16}
+              className="src-programme-zoom shrink-0"
             />
             {/* Заголовок переносится, а не обрезается: «100m individual medley» на узком
                 экране не влезает, и «100m individual …» — худшее из двух зол. */}
