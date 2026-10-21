@@ -60,7 +60,11 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     const heat = Number(q.get('heat'));
     if (Number.isFinite(swimmer) && swimmer > 0) return { zoom: 'swimmer' as Zoom, swimmerId: swimmer, orgDisciplineId: null as number | null, heat: null as number | null };
     if (Number.isFinite(heat) && heat > 0) return { zoom: 'heat' as Zoom, swimmerId: null as number | null, orgDisciplineId: heat, heat: null as number | null };
-    return { zoom: 'programme' as Zoom, swimmerId: null as number | null, orgDisciplineId: null as number | null, heat: null as number | null };
+    // Ссылка «Share» (`?plan=`) ведёт в карточку плана СРАЗУ, без ожидания загрузок:
+    // состав в ней уже известен, и ждать автооткрытия незачем — оно зависит от порядка
+    // ответов и на холодной загрузке промахивалось.
+    const zoom: Zoom = parsePlanParam(q.get('plan')) != null ? 'plan' : 'programme';
+    return { zoom, swimmerId: null as number | null, orgDisciplineId: null as number | null, heat: null as number | null };
   };
 
   const [state, setState] = useState(readQuery);

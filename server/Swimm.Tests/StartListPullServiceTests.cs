@@ -30,8 +30,11 @@ public class StartListPullServiceTests
     private sealed class FakeProvider(
         IReadOnlyList<LogligDisciplineGridRowDto> grid,
         Dictionary<int, LogligStartListDto> startLists,
-        HashSet<int>? failing = null) : ICompetitionDiscoveryProvider
+        HashSet<int>? failing = null,
+        Func<int, DiscoveredDetails>? details = null) : ICompetitionDiscoveryProvider
     {
+        public int DetailsCalls { get; private set; }
+
         public Task<IReadOnlyList<LogligDisciplineGridRowDto>> FetchDisciplineGridAsync(
             int logligId, CancellationToken ct = default) => Task.FromResult(grid);
 
@@ -48,7 +51,12 @@ public class StartListPullServiceTests
         public Task<IReadOnlyList<DiscoveredListItem>> FetchListAsync(bool finished, int? year = null, CancellationToken ct = default)
             => throw new NotSupportedException();
         public Task<DiscoveredDetails> FetchDetailsAsync(int orgCompId, CancellationToken ct = default)
-            => throw new NotSupportedException();
+        {
+            DetailsCalls++;
+            return details is null
+                ? throw new NotSupportedException("детальную страницу читать не должны")
+                : Task.FromResult(details(orgCompId));
+        }
         public Task<byte[]> FetchResultsPdfAsync(int logligId, string culture = "he-IL", CancellationToken ct = default)
             => throw new NotSupportedException();
         public Task<IReadOnlyList<int>> FetchEventIdsAsync(int logligId, CancellationToken ct = default)
@@ -189,6 +197,8 @@ public class StartListPullServiceTests
         // У многодневки день заплыва зашит в его собственное время старта — это точнее,
         // чем дата начала всего события.
         await using var db = await SeedAsync(nameof(Pull_TakesDayFromEventStart_NotFromEventRange));
+        db.DiscoveredCompetitions.Single().DateEnd = new DateTime(2026, 2, 21);
+        await db.SaveChangesAsync();
         var provider = new FakeProvider(
             [Event(1, startAt: new DateTime(2026, 2, 21, 9, 0, 0))],
             new() { [1] = StartList(Row(1, 1, 1, "Пловец", heatStart: "09:00")) });
@@ -374,23 +384,132 @@ public class StartListPullServiceTests
 
     // ── Ожидаемые состояния источника ────────────────────────────────────────
 
-    [Fact]
-    public async Task Pull_WithoutLogligId_IsEmptyNotError()
+    private static async Task<SwimmDbContext> SeedWithoutLogligIdAsync(string name)
     {
-        // Риск №1 плана: у предстоящего старта loglig-id может ещё не быть. Это «тянуть
-        // пока нечего», а не сбой — иначе админка краснеет всю неделю до соревнования.
-        await using var db = CreateDb(nameof(Pull_WithoutLogligId_IsEmptyNotError));
+        var db = CreateDb(name);
         db.DiscoveredCompetitions.Add(new DiscoveredCompetition
         {
             OrgCompId = OrgCompId, Name = "Будущий старт",
-            DateStart = new DateTime(2026, 10, 9), DateEnd = new DateTime(2026, 10, 9)
+            DateStart = new DateTime(2026, 10, 22), DateEnd = new DateTime(2026, 10, 22)
         });
+        db.Clubs.Add(new Club { Name = "Клуб", NameEn = "Club" });
+        db.Styles.Add(new Style { Name = "freestyle" });
         await db.SaveChangesAsync();
+        return db;
+    }
 
-        var report = await Service(db, new FakeProvider([], new())).PullAsync(OrgCompId);
+    [Fact]
+    public async Task Pull_WithoutLogligId_ReadsDetailsPageItself_AndPulls()
+    {
+        // И-54 (compID 16853): iframe на comp.asp был, но страницу дочитывает только фон,
+        // а фон живёт лишь в ProdAdmin. Кнопка обязана дочитать её сама, а не слать админа
+        // к «Обновить».
+        await using var db = await SeedWithoutLogligIdAsync(nameof(Pull_WithoutLogligId_ReadsDetailsPageItself_AndPulls));
+        var provider = new FakeProvider(
+            [Event(84669, startAt: new DateTime(2026, 10, 22, 16, 30, 0))],
+            new() { [84669] = StartList(Row(1, 4, 129737, "הודיה מנשורי")) },
+            details: _ => new DiscoveredDetails("ליגה הפועל בית שמש", "בריכת קאנטרי בית שמש", 15748, 1));
+
+        var report = await Service(db, provider).PullAsync(OrgCompId);
+
+        Assert.Equal(1, provider.DetailsCalls);
+        Assert.Equal(StartListPullStatus.Ok, report.Status);
+        Assert.Equal(15748, report.LogligId);
+        var discovered = await db.DiscoveredCompetitions.SingleAsync();
+        Assert.Equal(15748, discovered.LogligId);
+        Assert.Equal("בריכת קאנטרי בית שמש", discovered.Venue);
+        Assert.Null(discovered.LastError);
+        Assert.Equal(1, await db.CompetitionEntries.CountAsync());
+    }
+
+    [Fact]
+    public async Task Pull_NoIframeOnFreshPage_IsEmptyNotError()
+    {
+        // Программа ещё не выложена — «тянуть пока нечего», а не сбой: иначе админка
+        // краснеет всю неделю до соревнования.
+        await using var db = await SeedWithoutLogligIdAsync(nameof(Pull_NoIframeOnFreshPage_IsEmptyNotError));
+        var provider = new FakeProvider([], new(),
+            details: _ => new DiscoveredDetails("Будущий старт", null, null, 1));
+
+        var report = await Service(db, provider).PullAsync(OrgCompId);
 
         Assert.Equal(StartListPullStatus.Empty, report.Status);
+        Assert.Contains("федерация её ещё не выложила", report.Error);
         Assert.Equal(0, await db.CompetitionEntries.CountAsync());
+    }
+
+    [Fact]
+    public async Task Pull_DetailsPageUnreadable_IsErrorWithReason()
+    {
+        // Сеть/вёрстка — это сбой, и его текст должен дойти до админа, а не утонуть в
+        // «нет loglig-id».
+        await using var db = await SeedWithoutLogligIdAsync(nameof(Pull_DetailsPageUnreadable_IsErrorWithReason));
+        var provider = new FakeProvider([], new(),
+            details: _ => throw new InvalidOperationException("isr.org.il/comp.asp: заголовок comp_title не найден"));
+
+        var report = await Service(db, provider).PullAsync(OrgCompId);
+
+        Assert.Equal(StartListPullStatus.Error, report.Status);
+        Assert.Contains("comp_title", report.Error);
+        Assert.Contains("comp_title", (await db.DiscoveredCompetitions.SingleAsync()).LastError);
+    }
+
+    [Fact]
+    public async Task Pull_KnownLogligId_DoesNotRereadDetailsPage()
+    {
+        // Детальную страницу дочитываем только когда loglig-id нет: лишний запрос к
+        // федерации на каждый плановый забор не нужен.
+        await using var db = await SeedAsync(nameof(Pull_KnownLogligId_DoesNotRereadDetailsPage));
+        var provider = new FakeProvider([Event(1)], new() { [1] = StartList() });
+
+        var report = await Service(db, provider).PullAsync(OrgCompId);
+
+        Assert.Equal(StartListPullStatus.Empty, report.Status);
+        Assert.Equal(0, provider.DetailsCalls);
+    }
+
+    [Fact]
+    public async Task Pull_EventDateOutsideCompetitionDays_FallsBackToCompetitionDay()
+    {
+        // И-54: у compID 16853 (22.10) заплыв №1 стоит в сетке на «15/10/2026 16:30».
+        // Поверь мы этой дате — заявки уехали бы на неделю раньше, в прошлое. Такое время
+        // считаем неназначенным: день — DateStart, времени старта нет.
+        await using var db = await SeedWithoutLogligIdAsync(nameof(Pull_EventDateOutsideCompetitionDays_FallsBackToCompetitionDay));
+        (await db.DiscoveredCompetitions.SingleAsync()).LogligId = LogligId;
+        await db.SaveChangesAsync();
+
+        var provider = new FakeProvider(
+            [Event(84669, startAt: new DateTime(2026, 10, 15, 16, 30, 0))],
+            new() { [84669] = StartList(Row(1, 4, 129737, "הודיה מנשורי", heatStart: "16:30")) });
+
+        await Service(db, provider).PullAsync(OrgCompId);
+
+        var entry = await db.CompetitionEntries.SingleAsync();
+        Assert.Equal(new DateTime(2026, 10, 22), entry.CompDate);
+        Assert.Null(entry.HeatStartAt);
+    }
+
+    [Theory]
+    [InlineData(23, true)]    // день после DateEnd — второй день, которого нет у федерации (16854)
+    [InlineData(25, true)]    // край окна: DateEnd + 3
+    [InlineData(26, false)]   // дальше — опечатка, а не день соревнования
+    public async Task Pull_EventDateShortlyAfterCompetitionEnd_IsTrusted(int day, bool trusted)
+    {
+        // Р86, поправка 21.10: compID 16854 на isr.org.il — однодневка 23.10, а у loglig
+        // заплывы №37–70 стоят на 24.10. Это второй день, а не опечатка.
+        await using var db = await SeedWithoutLogligIdAsync($"{nameof(Pull_EventDateShortlyAfterCompetitionEnd_IsTrusted)}_{day}");
+        (await db.DiscoveredCompetitions.SingleAsync()).LogligId = LogligId;
+        await db.SaveChangesAsync();
+
+        var provider = new FakeProvider(
+            [Event(85316, startAt: new DateTime(2026, 10, day, 9, 0, 0))],
+            new() { [85316] = StartList(Row(1, 4, 129737, "הודיה מנשורי", heatStart: "09:00")) });
+
+        await Service(db, provider).PullAsync(OrgCompId);
+
+        var entry = await db.CompetitionEntries.SingleAsync();
+        Assert.Equal(new DateTime(2026, 10, trusted ? day : 22), entry.CompDate);
+        Assert.Equal(trusted, entry.HeatStartAt is not null);
     }
 
     [Fact]
@@ -403,6 +522,9 @@ public class StartListPullServiceTests
 
         Assert.Equal(StartListPullStatus.Empty, report.Status);
         Assert.Equal(1, report.Events);
+        // Админ должен понять, что заявки у федерации ЕСТЬ и что ждём: посев, а не кнопку.
+        Assert.Contains("נרשמים", report.Error);
+        Assert.Contains("повторите ближе к старту", report.Error);
     }
 
     [Fact]
