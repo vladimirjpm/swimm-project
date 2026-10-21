@@ -31,7 +31,7 @@ import type { StartListPlan } from './use-start-list-plan';
  *
  */
 export default function PlanCard({
-  orgCompIds, plan, swims, activeOrgCompId, loading, shared, onChange, onOpenHeat,
+  orgCompIds, plan, swims, activeOrgCompId, activeDay, loading, shared, onChange, onOpenHeat,
 }: {
   /**
    * ВСЕ источники соревнования. Программу спрашиваем у каждого: у составного старта дни
@@ -43,8 +43,10 @@ export default function PlanCard({
   plan: StartListPlan;
   /** Собранные заплывы плана — считает таб (их число нужно и чипам сессий в зоне фильтров). */
   swims: PlanSwim[];
-  /** Открытая сессия (протокол) — общий выбор с чипами зоны фильтров. */
+  /** Открытая сессия (протокол × день) — общий выбор с чипами зоны фильтров. */
   activeOrgCompId: number;
+  /** yyyy-MM-dd открытой сессии; null — день ещё не известен, весь протокол. */
+  activeDay: string | null;
   loading: boolean;
   /** true — карточку открыли ПО ЧУЖОЙ ссылке: показываем её состав, свой план не трогаем. */
   shared: boolean;
@@ -62,17 +64,19 @@ export default function PlanCard({
     [programmes],
   );
 
-  // Заплывы ОТКРЫТОЙ СЕССИИ. Сессию выбирают чипами в зоне фильтров — здесь её только
-  // применяем.
+  // Заплывы ОТКРЫТОЙ СЕССИИ — протокол × день. Сессию выбирают чипами в зоне фильтров —
+  // здесь её только применяем. Без фильтра по дню двухдневный протокол (16854) шёл одной
+  // лентой: после 16:26 пятницы — 14:00 субботы, под шапкой пятницы.
   const sessionSwims = useMemo(
-    () => swims.filter((s) => s.swim.org_comp_id === activeOrgCompId),
-    [swims, activeOrgCompId],
+    () => swims.filter((s) => s.swim.org_comp_id === activeOrgCompId
+      && (activeDay == null || s.swim.comp_date.slice(0, 10) === activeDay)),
+    [swims, activeOrgCompId, activeDay],
   );
 
-  // День сессии — из её же заплывов: он подписывает hero и выбирает разминку. У протокола
-  // федерации день один, но берём его из данных, а не из привязки: у сшитых источников
-  // дата привязки и дата заплывов расходились.
-  const day = sessionSwims[0]?.swim.comp_date.slice(0, 10) ?? null;
+  // День сессии подписывает hero и выбирает разминку. Пока дня сессии не знаем (программа
+  // не загрузилась) — из её же заплывов: у сшитых источников дата привязки и дата заплывов
+  // расходились.
+  const day = activeDay ?? sessionSwims[0]?.swim.comp_date.slice(0, 10) ?? null;
 
   // Справка о старте (Т1): чемпионат — хотя бы по одному протоколу; разминка — своя у дня.
   const isChampionship = programmes.some((p) => p.is_championship);

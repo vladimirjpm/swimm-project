@@ -4,7 +4,7 @@ import NotPublished from './not-published';
 import RefreshBar from './refresh-bar';
 import { useStartListProgramme } from './use-start-list';
 import { bandLabel } from './plan-model';
-import { dayLabel, formatApproxTime, formatExactTime, groupEventsByDiscipline, swimLabel } from './start-list-helpers';
+import { formatApproxTime, formatExactTime, groupEventsByDiscipline, swimLabel } from './start-list-helpers';
 
 /**
  * Зум 1 — программа соревнования по времени (§4.1 плана), умолчание таба.
@@ -16,8 +16,10 @@ import { dayLabel, formatApproxTime, formatExactTime, groupEventsByDiscipline, s
  * ввода рядом — по имени и по дисциплине, — и родитель регулярно печатал имя не в то.
  * Остался один поиск, по имени, в панели над зумами.
  */
-export default function ProgrammeZoom({ orgCompId, startsLabel, notify, onPublished, onOpenEvent }: {
+export default function ProgrammeZoom({ orgCompId, day, startsLabel, notify, onPublished, onOpenEvent }: {
   orgCompId: number;
+  /** yyyy-MM-dd открытой сессии; null — первый день программы. */
+  day: string | null;
   /** «Sun 15 Feb» для экрана «ещё не опубликован»; null — дату отсюда не знаем. */
   startsLabel: string | null;
   /** Подписка «Notify me» на экране S3. onToggle=null — гость, кнопки нет. */
@@ -28,7 +30,6 @@ export default function ProgrammeZoom({ orgCompId, startsLabel, notify, onPublis
   onOpenEvent: (orgDisciplineId: number) => void;
 }) {
   const { data, loading, notFound, refresh } = useStartListProgramme(orgCompId);
-  const [dayIdx, setDayIdx] = useState(0);
 
   // «Last checked» — отметка КАЖДОЙ завершённой попытки, а не только успешной: экран S3
   // иначе выглядит так, будто кнопка «Check again» ничего не делает.
@@ -59,33 +60,17 @@ export default function ProgrammeZoom({ orgCompId, startsLabel, notify, onPublis
     );
   }
 
-  const day = data.days[dayIdx] ?? data.days[0];
-  const groups = day ? groupEventsByDiscipline(day.events) : [];
+  // День выбирают чипы СЕССИЙ в зоне фильтров (сессия = протокол × день, 21.10.2026), здесь
+  // его только применяем. Своих дней-чипов у программы больше нет: они жили внутри экрана, и
+  // в My plan выбранный день терялся.
+  const shownDay = data.days.find((d) => d.date.slice(0, 10) === day) ?? data.days[0];
+  const groups = shownDay ? groupEventsByDiscipline(shownDay.events) : [];
 
   return (
     <div>
       {/* Заголовок-счётчик («N entries · имя протокола») уехал в зону фильтров 5d — он
           нужен и в режиме плана, а тут был только на программе. */}
       <RefreshBar updatedAt={data.updated_at} onRefresh={refresh} />
-      {data.days.length > 1 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {data.days.map((d, i) => (
-            <button
-              key={d.date}
-              type="button"
-              onClick={() => setDayIdx(i)}
-              className="rounded-full border px-3 py-1 text-xs font-black"
-              style={{
-                borderColor: i === dayIdx ? 'var(--deep-accent-border)' : 'var(--deep-card-border)',
-                background: i === dayIdx ? 'var(--deep-accent-soft)' : 'transparent',
-                color: i === dayIdx ? 'var(--deep-accent)' : 'var(--deep-text-mute)',
-              }}
-            >
-              {dayLabel(d.date)}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Дисциплина = карточка, внутри — её возрасты. Оформление то же, что у строки плана
           (D3): плитка времени слева, метки справа — чтобы два экрана таба читались как один. */}
