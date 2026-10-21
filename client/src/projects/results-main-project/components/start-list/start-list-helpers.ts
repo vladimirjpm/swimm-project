@@ -220,12 +220,14 @@ export function dayLabel(iso: string): string {
  * сверяться с календарём. Год для расчёта дня недели есть только в ISO-дате (`date_iso`),
  * `date` приходит как dd/MM — поэтому без ISO день недели просто опускаем, а не угадываем.
  */
-export function sessionLabel(iso: string | null, ddmm: string | null, index: number): string {
+export function sessionLabel(iso: string | null, ddmm: string | null, index: number | null): string {
   const d = iso ? new Date(iso) : null;
   const weekday = d && !Number.isNaN(d.getTime())
     ? d.toLocaleDateString(undefined, { weekday: 'short' })
     : null;
   const date = [weekday, ddmm].filter(Boolean).join(' ');
-  return date ? `${date} · #${index}` : `#${index}`;
+  // index null — протокол один, номер не нужен (buildSessions); без даты чипу нужен хоть он.
+  if (!date) return `#${index ?? 1}`;
+  return index != null ? `${date} · #${index}` : date;
 }
 

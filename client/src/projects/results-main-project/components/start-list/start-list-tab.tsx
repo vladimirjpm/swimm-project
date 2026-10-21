@@ -7,7 +7,7 @@ import PlanCard from './plan-card';
 import HeatZoom from './heat-zoom';
 import ProgrammeZoom from './programme-zoom';
 import SwimmerZoom from './swimmer-zoom';
-import { useStartListClubSwims } from './use-start-list';
+import { useStartListClubSwims, useStartListProgrammes } from './use-start-list';
 import { useStartListPlan } from './use-start-list-plan';
 import { useEffectivePlan } from './use-effective-plan';
 import { useDeepThemeClass } from '../../../components/deep/use-deep-theme-class';
@@ -15,7 +15,7 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { useFavoritesContext } from '../../../../hooks/favorites-context';
 import { sortByFavoriteRank } from '../../../../utils/helpers/favorites-order';
 import {
-  assemblePlanSwims, parsePlanParam, planRowsBySession, serializePlanParam,
+  assemblePlanSwims, buildSessions, parsePlanParam, planRowsBySession, serializePlanParam, sessionKey,
 } from './plan-model';
 import type { StartListSource } from '../competition-header/types';
 
@@ -52,7 +52,13 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     const raw = Number(new URLSearchParams(window.location.search).get('src'));
     return sources.some((s) => s.org_comp_id === raw) ? raw : orgCompId;
   });
-  const effectiveOrgCompId = sources.some((s) => s.org_comp_id === activeSource) ? activeSource : orgCompId;
+  // День открытой сессии (сессия = протокол × день) — тоже в адресе, `?day=yyyy-MM-dd`.
+  // Проверять его здесь нечем (дни приходят с программой): чужой день просто не найдёт
+  // сессию, и откроется первый день протокола.
+  const [activeDay, setActiveDay] = useState<string | null>(() => {
+    const raw = new URLSearchParams(window.location.search).get('day');
+    return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+  });
 
   const readQuery = () => {
     const q = new URLSearchParams(window.location.search);
@@ -96,16 +102,22 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     setState({ zoom: 'heat', swimmerId: null, orgDisciplineId, heat });
   }, []);
 
-  // Смена источника всегда возвращает на зум 1: heat/swimmer принадлежат ПРОШЛОМУ
-  // протоколу, и в новом их идентификаторов может не быть вовсе.
-  const selectSource = useCallback((next: number) => {
+  // Открыть сессию (протокол × день): адрес `?src=&day=` + состояние. `resetZoom` — в All
+  // смена сессии возвращает на зум 1: heat/swimmer принадлежат ПРОШЛОМУ протоколу, и в
+  // новом их идентификаторов может не быть вовсе. В плане экран тот же, меняется фильтр.
+  const applySession = useCallback((s: FilterZoneSession, resetZoom: boolean) => {
     const url = new URL(window.location.href);
-    url.searchParams.set('src', String(next));
-    url.searchParams.delete('swimmer');
-    url.searchParams.delete('heat');
+    url.searchParams.set('src', String(s.orgCompId));
+    if (s.day) url.searchParams.set('day', s.day);
+    else url.searchParams.delete('day');
+    if (resetZoom) {
+      url.searchParams.delete('swimmer');
+      url.searchParams.delete('heat');
+    }
     window.history.replaceState(null, '', url.toString());
-    setActiveSource(next);
-    setState({ zoom: 'programme', swimmerId: null, orgDisciplineId: null, heat: null });
+    setActiveSource(s.orgCompId);
+    setActiveDay(s.day);
+    if (resetZoom) setState({ zoom: 'programme', swimmerId: null, orgDisciplineId: null, heat: null });
   }, []);
 
   // Все источники соревнования: поиск и карточка пловца работают по ним ЦЕЛИКОМ, а не по
@@ -211,23 +223,29 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     [planSwims],
   );
 
-  // Сессия = один протокол федерации. Сервер отдаёт хотя бы одну всегда (синтетическую по
-  // org_comp_id, когда привязок в CompetitionSources нет), но подстраховка дешевле бага.
-  const sessions: FilterZoneSession[] = useMemo(() => {
-    const list = sources.length > 0 ? sources : [];
-    if (list.length === 0) {
-      return [{ orgCompId, index: 1, date: null, dateIso: null, sourceName: null, entries: 0, mine: planRows.get(orgCompId) ?? 0 }];
-    }
-    return list.map((s) => ({
-      orgCompId: s.org_comp_id,
-      index: s.index,
-      date: s.date,
-      dateIso: s.date_iso,
-      sourceName: s.source_name,
-      entries: s.entry_count,
-      mine: planRows.get(s.org_comp_id) ?? 0,
-    }));
-  }, [sources, orgCompId, planRows]);
+  // Сессия = один ДЕНЬ одного протокола (`buildSessions`). Дни — из программ протоколов:
+  // привязка знает одну дату, а протокол бывает двухдневным (16854). Без привязок (страница
+  // предстоящего старта) протокол один — сам orgCompId; его заявки тоже из программы, а не
+  // нулём, как было до 21.10.
+  const { data: programmes } = useStartListProgrammes(allOrgCompIds);
+  const sessions: FilterZoneSession[] = useMemo(() => buildSessions(
+    sources.length > 0
+      ? sources.map((s) => ({
+        orgCompId: s.org_comp_id, index: s.index, date: s.date, dateIso: s.date_iso,
+        sourceName: s.source_name, entries: s.entry_count,
+      }))
+      : [{ orgCompId, index: 1, date: null, dateIso: null, sourceName: null, entries: 0 }],
+    programmes,
+    planRows,
+  ), [sources, orgCompId, programmes, planRows]);
+
+  // Открытая сессия: точное совпадение протокол+день, иначе первый день протокола (день из
+  // адреса чужой или дни ещё не загружены), иначе первая сессия.
+  const activeSession = sessions.find((s) => s.key === sessionKey(activeSource, activeDay))
+    ?? sessions.find((s) => s.orgCompId === activeSource)
+    ?? sessions[0];
+  const effectiveOrgCompId = activeSession?.orgCompId ?? orgCompId;
+  const activeDayIso = activeSession?.day ?? null;
 
   const { favorites, primarySwimmerId: favPrimaryId, familySwimmerIds } = useFavoritesContext();
   // Строка 3 в All — избранные: пловцы, заявленные на этом старте, и избранные клубы.
@@ -269,16 +287,22 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
     else openPicker();
   }, [backToProgramme, hasPlan, openPlan, openPicker]);
 
-  // Выбор сессии. В All это смена ИСТОЧНИКА и возврат на программу (heat/swimmer
-  // принадлежат прошлому протоколу). В плане экран тот же, меняется только фильтр —
-  // сбрасывать зум там нечего и незачем.
-  const selectSession = useCallback((next: number) => {
-    if (!inPlan) { selectSource(next); return; }
-    const url = new URL(window.location.href);
-    url.searchParams.set('src', String(next));
-    window.history.replaceState(null, '', url.toString());
-    setActiveSource(next);
-  }, [inPlan, selectSource]);
+  // Выбор сессии — ОДИН на оба режима (день, выбранный в All, остаётся и в My plan). В All
+  // это ещё и возврат на программу; в плане меняется только фильтр.
+  const selectSession = useCallback((key: string) => {
+    const next = sessions.find((s) => s.key === key);
+    if (next) applySession(next, !inPlan);
+  }, [sessions, inPlan, applySession]);
+
+  // В плане чип дня без моих заплывов некликабелен — и открытым он оставаться не должен:
+  // «Nothing on this day», когда в соседний день плывут, читается как «плана нет». Уводим
+  // на первый день, где мои есть. Выбор человека это не перебивает: на пустой день в плане
+  // он сам попасть не может.
+  useEffect(() => {
+    if (!inPlan || !activeSession || activeSession.mine > 0) return;
+    const withMine = sessions.find((s) => s.mine > 0);
+    if (withMine) applySession(withMine, false);
+  }, [inPlan, activeSession, sessions, applySession]);
 
   // Экран «протокол не опубликован» (Т9): подписка «Notify me» живёт в плане и только у
   // залогиненного — гостю её негде хранить. Рассылки за флагом пока нет, он копится.
@@ -334,7 +358,7 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
           onModeChange={setMode}
           planSwims={planSwimsTotal}
           sessions={sessions}
-          activeOrgCompId={effectiveOrgCompId}
+          activeSessionKey={activeSession?.key ?? ''}
           onSelectSession={selectSession}
           shareUrl={shareUrl}
           orgCompIds={allOrgCompIds}
@@ -372,6 +396,7 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
           plan={shownPlan}
           swims={planSwims}
           activeOrgCompId={effectiveOrgCompId}
+          activeDay={activeDayIso}
           loading={effective.loading || clubSwimsLoading}
           shared={sharedPlan != null}
           onChange={saveOwn}
@@ -381,6 +406,7 @@ export default function StartListTab({ orgCompId, sources = [] }: Props) {
       {state.zoom === 'programme' && (
         <ProgrammeZoom
           orgCompId={effectiveOrgCompId}
+          day={activeDayIso}
           startsLabel={startsLabel}
           notify={notify}
           onPublished={setPublished}

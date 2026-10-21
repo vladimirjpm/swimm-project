@@ -23,10 +23,19 @@ import { dayLabel, formatApproxTime, sessionLabel } from './start-list-helpers';
  * а не про фильтр) и футер «времена приблизительные».
  */
 
-/** Сессия = один протокол федерации. У окружных чемпионатов их несколько на один старт. */
+/**
+ * Сессия = один ДЕНЬ одного протокола федерации (`buildSessions` в plan-model). У окружных
+ * чемпионатов протоколов несколько на старт, а один протокол бывает на несколько дней
+ * (compID 16854: 23 и 24.10) — поэтому ключ пара, а не compID.
+ */
 export interface FilterZoneSession {
+  /** `sessionKey(orgCompId, day)` — идентичность чипа. */
+  key: string;
   orgCompId: number;
-  index: number;
+  /** yyyy-MM-dd дня; null — программа не загружена, сессия = протокол целиком. */
+  day: string | null;
+  /** Номер протокола в подписи; null — протокол один, номер не пишем. */
+  index: number | null;
   /** dd/MM; null — даты у привязки нет. */
   date: string | null;
   /** yyyy-MM-dd — из неё берётся день недели. */
@@ -59,8 +68,9 @@ interface Props {
   planSwims: number;
 
   sessions: FilterZoneSession[];
-  activeOrgCompId: number;
-  onSelectSession: (orgCompId: number) => void;
+  /** Ключ открытой сессии (`sessionKey`) — общий выбор для All и My plan. */
+  activeSessionKey: string;
+  onSelectSession: (key: string) => void;
 
   shareUrl: string;
 
@@ -83,7 +93,7 @@ interface Props {
 }
 
 export default function FilterZone({
-  mode, onModeChange, planSwims, sessions, activeOrgCompId, onSelectSession, shareUrl,
+  mode, onModeChange, planSwims, sessions, activeSessionKey, onSelectSession, shareUrl,
   orgCompIds, onOpenSwimmer, planSwimmerIds, favSwimmers, favClubs, planSwimmers, planClubs,
   onRemoveSwimmer, onRemoveClub, onEditPlan,
 }: Props) {
@@ -161,11 +171,11 @@ export default function FilterZone({
     return () => setStickyBarSuppressed(false);
   }, [stuck]);
 
-  const activeSession = sessions.find((s) => s.orgCompId === activeOrgCompId) ?? sessions[0];
+  const activeSession = sessions.find((s) => s.key === activeSessionKey) ?? sessions[0];
   const peopleNames = [...swimmerChips.map((p) => p.name), ...clubChips.map((c) => c.name)];
 
   const title = (() => {
-    const active = sessions.find((s) => s.orgCompId === activeOrgCompId) ?? sessions[0];
+    const active = sessions.find((s) => s.key === activeSessionKey) ?? sessions[0];
     if (!active) return null;
     // В All считаем ЗАЯВКИ сессии, в плане — СВОИ ЗАПЛЫВЫ, и слово меняется вместе с
     // числом: «39 entries» про свой план читалось бы как «в сессии 39 заявок».
@@ -289,17 +299,17 @@ export default function FilterZone({
             // внутри рамки не стояла полоса обрезанных чипов.
             <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 sm:mx-0 sm:flex-wrap sm:px-0">
               {sessions.map((s) => {
-                const active = s.orgCompId === activeOrgCompId;
+                const active = s.key === activeSessionKey;
                 const count = plan ? s.mine : s.entries;
                 // Сессия без моих заплывов в плане некликабельна: открывать там нечего.
                 const dead = plan && s.mine === 0;
                 return (
                   <button
-                    key={s.orgCompId}
+                    key={s.key}
                     type="button"
                     disabled={dead}
                     title={s.sourceName ?? undefined}
-                    onClick={() => onSelectSession(s.orgCompId)}
+                    onClick={() => onSelectSession(s.key)}
                     className="flex-none whitespace-nowrap rounded-full px-3 py-[7px] text-[12.5px] font-extrabold"
                     style={{
                       border: `${active ? 1.5 : 1}px solid ${

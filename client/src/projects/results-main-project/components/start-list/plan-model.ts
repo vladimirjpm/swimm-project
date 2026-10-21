@@ -4,6 +4,7 @@
 
 import type { StartListPlan } from './use-start-list-plan';
 import type { StartListSwim, StartListSwimmer } from './types';
+import type { FilterZoneSession } from './filter-zone';
 
 /**
  * Состав плана «по умолчанию» — из избранного, когда СВОЕГО плана на это соревнование ещё
@@ -127,17 +128,102 @@ export function planDays(programmeDays: readonly string[], swims: readonly PlanS
 }
 
 /**
- * Сколько СТРОК плана приходится на каждую сессию (протокол) — счётчик чипа сессии в зоне
- * фильтров 5d. Считаем строки, а не заявки, по той же причине, что и в `planDays`: ноги
+ * Ключ сессии зоны фильтров: ПРОТОКОЛ × ДЕНЬ (21.10.2026).
+ *
+ * Раньше сессией был протокол, а день считался его свойством — у окружных чемпионатов так
+ * и есть (день = свой compID). compID 16854 сломал это: один протокол на два дня
+ * (23 и 24.10). Карточка плана склеивала оба дня в одну ленту («после 16:26 идёт 14:00»),
+ * а выбор дня жил только внутри программы и в My plan терялся. `day` null — дня пока не
+ * знаем (программа не загрузилась / не опубликована): сессия = протокол целиком.
+ */
+export function sessionKey(orgCompId: number, day: string | null): string {
+  return `${orgCompId}|${day ?? ''}`;
+}
+
+/**
+ * Сколько СТРОК плана приходится на каждую сессию (протокол × день) — счётчик чипа сессии в
+ * зоне фильтров 5d. Считаем строки, а не заявки, по той же причине, что и в `planDays`: ноги
  * эстафеты и несколько выбранных в одном заплыве складываются в одну строку, и число на
  * чипе спорило бы с тем, что видно под ним.
  */
-export function planRowsBySession(swims: readonly PlanSwim[]): Map<number, number> {
-  const by = new Map<number, number>();
+export function planRowsBySession(swims: readonly PlanSwim[]): Map<string, number> {
+  const by = new Map<string, number>();
   for (const row of groupPlanRows(swims)) {
-    by.set(row.orgCompId, (by.get(row.orgCompId) ?? 0) + 1);
+    const key = sessionKey(row.orgCompId, row.day);
+    by.set(key, (by.get(key) ?? 0) + 1);
   }
   return by;
+}
+
+/** Источник протокола для сборки сессий — подтаб соревнования либо синтетический один. */
+export interface SessionSource {
+  orgCompId: number;
+  index: number;
+  /** dd/MM привязки — подпись, пока программа протокола не загрузилась. */
+  date: string | null;
+  dateIso: string | null;
+  sourceName: string | null;
+  /** Заявок по привязке — тот же фоллбек до загрузки программы. */
+  entries: number;
+}
+
+/**
+ * Сессии зоны фильтров: по чипу на каждый день каждого протокола.
+ *
+ * Дни берутся из ПРОГРАММЫ протокола (`/api/start-list/{id}` → `days`), а не из привязки:
+ * у привязки одна дата, а протокол может идти несколько дней. Пока программы нет (грузится
+ * или не опубликована), протокол — один чип с датой привязки, как было до 21.10.
+ *
+ * Номер протокола («· #2») в подписи — только когда протоколов больше одного: у окружного
+ * чемпионата на одну дату их два, и без номера чипы не различить; у одиночного старта
+ * «#1» — шум.
+ */
+export function buildSessions(
+  sources: readonly SessionSource[],
+  programmes: readonly { org_comp_id: number; days: readonly { date: string; events: readonly { entries: number }[] }[] }[],
+  planRows: ReadonlyMap<string, number>,
+): FilterZoneSession[] {
+  const many = sources.length > 1;
+  const sessions: FilterZoneSession[] = [];
+
+  for (const src of [...sources].sort((a, b) => a.index - b.index)) {
+    const days = programmes.find((p) => p.org_comp_id === src.orgCompId)?.days ?? [];
+    if (days.length === 0) {
+      // Дня не знаем — на чип идут ВСЕ мои строки протокола, по каким бы дням они ни были.
+      let mine = 0;
+      for (const [key, n] of planRows) if (key.startsWith(`${src.orgCompId}|`)) mine += n;
+      sessions.push({
+        key: sessionKey(src.orgCompId, null),
+        orgCompId: src.orgCompId,
+        day: null,
+        index: many ? src.index : null,
+        date: src.date,
+        dateIso: src.dateIso,
+        sourceName: src.sourceName,
+        entries: src.entries,
+        mine,
+      });
+      continue;
+    }
+
+    for (const d of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
+      const iso = d.date.slice(0, 10);
+      const key = sessionKey(src.orgCompId, iso);
+      sessions.push({
+        key,
+        orgCompId: src.orgCompId,
+        day: iso,
+        index: many ? src.index : null,
+        date: `${iso.slice(8, 10)}/${iso.slice(5, 7)}`,
+        dateIso: iso,
+        sourceName: src.sourceName,
+        entries: d.events.reduce((sum, e) => sum + e.entries, 0),
+        mine: planRows.get(key) ?? 0,
+      });
+    }
+  }
+
+  return sessions;
 }
 
 /** Первый старт плана в этот день — из него строится hero карточки (и ARRIVE BY в Т8). */
@@ -187,6 +273,8 @@ export interface PlanRowMember {
 export interface PlanRow {
   key: string;
   orgCompId: number;
+  /** yyyy-MM-dd — день заплыва (из `comp_date`); половина ключа сессии (`sessionKey`). */
+  day: string;
   orgDisciplineId: number;
   heat: number;
   /** UTC; null — время заплыву не назначено (полночь в источнике). */
@@ -239,6 +327,7 @@ export function groupPlanRows(swims: readonly PlanSwim[]): PlanRow[] {
       row = {
         key: rowKey,
         orgCompId: swim.org_comp_id,
+        day: swim.comp_date.slice(0, 10),
         orgDisciplineId: swim.org_discipline_id,
         heat: swim.heat,
         startAt: swim.heat_start_at,
