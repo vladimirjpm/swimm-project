@@ -140,6 +140,18 @@ public sealed class LanePlanDto
     public List<LanePlanMySwimmerDto> MySwimmers { get; set; } = [];
 }
 
+/// <summary>
+/// Кто из видимого состава в день плана «не в воде» — On break или Doesn't train (Р74; «Going» на
+/// эту дату их возвращает), либо ответил «Can't come» на все свои занятия этой даты. Редактор
+/// кладёт их в «Not today» нового плана и копии, а не в Unassigned: иначе «Auto lanes» и
+/// «Distribute» ставят их на дорожки. Сохранённый план не трогается — там решил тренер.
+/// </summary>
+public sealed class LanePlanAwayDto
+{
+    [JsonPropertyName("swimmer_ids")]
+    public List<int> SwimmerIds { get; set; } = [];
+}
+
 /// <summary>«Мой» пловец плана: <c>me</c> — сам зритель, <c>family</c> — за кого он смотрит.</summary>
 public sealed class LanePlanMySwimmerDto
 {

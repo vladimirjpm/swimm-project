@@ -8,7 +8,7 @@ import { MarkDot } from '../trainings-section';
 
 /**
  * Бассейн вида тренера (Т6, хендофф Trainings Tab, 2a / 3b): мини-бассейн (телефон) или полный
- * (десктоп) выбранного занятия + статус плана дорожек НА ЕГО ДАТУ и вход в Lanes. Вид по
+ * (десктоп) выбранного занятия + статус плана дорожек НА ЕГО ДАТУ и вход в Lanes на ту же дату. Вид по
  * дорожкам считает сервер (`lane_view` ответа занятия) — здесь только рисуем.
  *
  * Статус плана берём из `lanePlans` контекста (`Draft` / `Published` / нет плана). Число
@@ -63,7 +63,7 @@ function PlanPill({ state, unassigned = 0 }: { state: PlanState; unassigned?: nu
 }
 
 function CoachPoolBlock({ session, roll }: { session: NextTraining; roll: TrainingRsvpState | null }) {
-  const { group, isDesktop, setView, lanePlans, reloadLanePlans, upcomingPlans, marks } = useTrainingsTab();
+  const { group, isDesktop, openLanes, lanePlans, reloadLanePlans, upcomingPlans, marks } = useTrainingsTab();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,7 +100,7 @@ function CoachPoolBlock({ session, roll }: { session: NextTraining; roll: Traini
         {state ? <PlanPill state={state} unassigned={unassigned} /> : <span />}
         <button
           type="button"
-          onClick={() => setView('lanes')}
+          onClick={() => openLanes(session.date)}
           className="-my-[7px] inline-flex h-10 cursor-pointer items-center gap-1.5 border-0 bg-transparent px-2 text-[11px] font-extrabold"
           style={{ color: 'var(--deep-ow)' }}
         >
@@ -128,7 +128,7 @@ function CoachPoolBlock({ session, roll }: { session: NextTraining; roll: Traini
         <span className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setView('lanes')}
+            onClick={() => openLanes(session.date)}
             className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 whitespace-nowrap border px-3 text-[12px] font-extrabold"
             style={{ borderRadius: 9, borderColor: 'var(--deep-ow-border)', background: 'var(--deep-ow-chip)', color: 'var(--deep-ow)' }}
           >

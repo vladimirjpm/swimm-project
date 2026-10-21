@@ -59,6 +59,13 @@ export interface TrainingsTabState {
    * любые `setView('next')` из секций.
    */
   setView: (view: TrainingsView) => void;
+  /**
+   * Открыть Lanes на дату занятия («✎ Edit lanes» / «Lanes ›» у бассейна): редактор и доска
+   * встают на день того занятия, из которого пришли, а не на дату по умолчанию (`pickDefaultDate`).
+   */
+  openLanes: (date: string) => void;
+  /** Дата, с которой открыт Lanes (`openLanes`); `null` — вход без даты (сегмент участника, `?view=lanes`). */
+  lanesDate: string | null;
   /** В редакторе Lanes есть несохранённые правки; ставит сам редактор (через секцию), Т7. */
   lanesDirty: boolean;
   setLanesDirty: (dirty: boolean) => void;
@@ -144,9 +151,12 @@ export function TrainingsTabProvider({
   const reloadNextTrainings = useCallback(() => { onNextTrainingsChanged?.(); }, [onNextTrainingsChanged]);
   const isDesktop = useMediaQuery(DEEP_DESKTOP_QUERY);
   const [view, setViewState] = useState<TrainingsView>(() => readViewParam(VIEWS, DEFAULT_VIEW));
+  const [lanesDate, setLanesDate] = useState<string | null>(null);
   const applyView = useCallback((next: TrainingsView) => {
     setViewState(next);
     writeViewParam(next, DEFAULT_VIEW);
+    // Ушли из Lanes — дата занятия отработала: следующий вход без даты (сегмент) берёт дату по умолчанию.
+    if (next !== 'lanes') setLanesDate(null);
   }, []);
 
   // Несохранённые правки редактора Lanes (Т7): флаг дублируется в ref, чтобы `setView` оставался
@@ -167,6 +177,10 @@ export function TrainingsTabProvider({
       return;
     }
     applyView(next);
+  }, [applyView]);
+  const openLanes = useCallback((date: string) => {
+    setLanesDate(date);
+    applyView('lanes');
   }, [applyView]);
 
   const [sheet, setSheet] = useState<TrainingsSheet | null>(null);
@@ -295,11 +309,11 @@ export function TrainingsTabProvider({
   }, [rsvp, slot0, slot1, slot2, slot3, slot4, slot5, sharedId, upcomingIds.map((s) => s.id).join(',')]);
 
   const value = useMemo<TrainingsTabState>(() => ({
-    group, manages, isDesktop, view, setView, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
+    group, manages, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
     rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown,
     onRollChange, setRollChangeListener, sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
-    group, manages, isDesktop, view, setView, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, lanePlans, reloadLanePlans,
+    group, manages, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, lanePlans, reloadLanePlans,
     lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sessions,
     breaks, marks, closeSheet, sheet,
   ]);

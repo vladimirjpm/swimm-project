@@ -184,10 +184,10 @@ function MiniRow({
  * внутри той же рамки, но ВНЕ кнопки: в нём свои кнопки («Lanes ›»), вложить их в «Open lanes» нельзя.
  */
 export function MiniPool({ r, footer }: { r: TrainingRsvp; footer?: React.ReactNode }) {
-  const { setView } = useTrainingsTab();
+  const { openLanes } = useTrainingsTab();
   const view = r.lane_view;
   if (!view) return null;
-  const open = () => setView('lanes');
+  const open = () => openLanes(r.date);
   const water = view.source === 'water';
 
   return (
@@ -227,7 +227,7 @@ export function MiniPool({ r, footer }: { r: TrainingRsvp; footer?: React.ReactN
 
 /** Под мини-бассейном: «5 going · 1 maybe» слева, «Lanes ›» справа. */
 export function PoolFooter({ r }: { r: TrainingRsvp }) {
-  const { setView, marks } = useTrainingsTab();
+  const { openLanes, marks } = useTrainingsTab();
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="hp-mono flex flex-wrap items-center gap-x-1.5 text-[12px] font-bold" style={{ color: 'var(--t-text-3)' }}>
@@ -237,7 +237,7 @@ export function PoolFooter({ r }: { r: TrainingRsvp }) {
       </div>
       <button
         type="button"
-        onClick={() => setView('lanes')}
+        onClick={() => openLanes(r.date)}
         className="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-[12px] font-extrabold"
         style={{ color: 'var(--deep-accent)' }}
       >
@@ -291,7 +291,7 @@ function FullRow({
  * и без колонки YOU / подсветки «моей» дорожки.
  */
 export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolean }) {
-  const { setView, marks } = useTrainingsTab();
+  const { openLanes, marks } = useTrainingsTab();
   const view = r.lane_view;
   if (!view) return null;
   const water = view.source === 'water';
@@ -307,7 +307,7 @@ export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolea
           </span>
           <button
             type="button"
-            onClick={() => setView('lanes')}
+            onClick={() => openLanes(r.date)}
             className="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-[12px] font-extrabold"
             style={{ color: 'var(--deep-accent)' }}
           >

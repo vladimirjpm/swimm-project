@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTrainingsTab, type TrainingsView } from './trainings-context';
 import { MarkDot } from './trainings-section';
+import { nextSessions } from './next/next-format';
 
 /**
  * Переключатель видов таба Trainings на телефоне: `Next · Trainings · Lanes` (хендофф 2a), вид
@@ -17,7 +18,14 @@ const SEGMENTS: { id: TrainingsView; label: string }[] = [
 ];
 
 function TrainingsSegments() {
-  const { view, setView, manages, marks, lanesHidden } = useTrainingsTab();
+  const { group, view, setView, openLanes, manages, marks, lanesHidden, rollIndex } = useTrainingsTab();
+  // Тренеру Lanes открывается на дату занятия, выбранного в Next (как «Lanes ›» у бассейна);
+  // участнику и без занятий — дата по умолчанию.
+  const coachDate = manages ? nextSessions(group)[rollIndex]?.date : undefined;
+  const select = (id: TrainingsView) => {
+    if (id === 'lanes' && view !== 'lanes' && coachDate) openLanes(coachDate);
+    else setView(id);
+  };
   return (
     <div className="deep-panel-row mb-3">
       <div
@@ -34,7 +42,7 @@ function TrainingsSegments() {
               key={id}
               type="button"
               aria-pressed={active}
-              onClick={() => setView(id)}
+              onClick={() => select(id)}
               className="relative flex min-h-[40px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border-0 px-2 text-[13px] font-extrabold"
               style={active
                 ? manages

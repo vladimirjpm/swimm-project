@@ -21,6 +21,13 @@ public interface ILanePlanService
     /// </summary>
     Task<LanePlanDto?> GetAsync(int hubGroupId, DateOnly date, bool isManager, int? viewerUserId = null);
 
+    /// <summary>
+    /// Кто из видимого состава в день <paramref name="date"/> «не в воде» (On break / Doesn't
+    /// train без «Going» на эту дату, или «Can't come» на занятия этой даты) — для «Not today»
+    /// нового плана в редакторе. Только управляющему.
+    /// </summary>
+    Task<LanePlanAwayDto> GetAwayAsync(int hubGroupId, DateOnly date);
+
     /// <summary>Зритель открыл вид Lanes (Т1б): гаснет золотая метка «тебя перенесли».</summary>
     Task MarkSeenAsync(int hubGroupId, int viewerUserId);
 
