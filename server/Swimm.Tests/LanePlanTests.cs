@@ -426,6 +426,34 @@ public class LanePlanTests
     }
 
     [Fact]
+    public async Task Away_CantComeOnPlanDay_GoingBringsDoesntTrainBack()
+    {
+        await using var db = CreateDb(nameof(Away_CantComeOnPlanDay_GoingBringsDoesntTrainBack));
+        var s = await SeedAsync(db);
+        var parent = await ParentOfAAsync(db, s);
+        HubGroupTrainingRsvp Answer(DateOnly day, string start, string answer, int? userId = null, int? swimmerId = null) =>
+            new() { HubGroupId = s.GroupId, SessionDate = day, SessionStart = start, UserId = userId, SwimmerId = swimmerId, Answer = answer };
+        db.HubGroupTrainingRsvps.AddRange(
+            // A — «Can't come» аккаунтом, привязанным к пловцу A.
+            Answer(Day, "10:00", TrainingRsvpAnswer.No, userId: parent),
+            // B — «нет» утром, «не уверен» вечером: в этот день может прийти, не away. На завтра — «нет».
+            Answer(Day, "10:00", TrainingRsvpAnswer.No, swimmerId: s.B),
+            Answer(Day, "20:00", TrainingRsvpAnswer.Maybe, swimmerId: s.B),
+            Answer(Day.AddDays(1), "10:00", TrainingRsvpAnswer.No, swimmerId: s.B),
+            // C — «Doesn't train», но на Day ответил «Going»: в этот день он в воде.
+            Answer(Day, "10:00", TrainingRsvpAnswer.Yes, swimmerId: s.C));
+        db.HubGroupBreaks.Add(new HubGroupBreak
+        {
+            HubGroupId = s.GroupId, SwimmerId = s.C, Kind = HubGroupBreakKind.NotTraining, SetByUserId = s.UserId,
+        });
+        await db.SaveChangesAsync();
+        var service = new LanePlanService(db);
+
+        Assert.Equal([s.A], (await service.GetAwayAsync(s.GroupId, Day)).SwimmerIds);
+        Assert.Equal([s.B, s.C], (await service.GetAwayAsync(s.GroupId, Day.AddDays(1))).SwimmerIds);
+    }
+
+    [Fact]
     public async Task Snapshot_KeepsSwimmerWhoLeftTheGroup()
     {
         await using var db = CreateDb(nameof(Snapshot_KeepsSwimmerWhoLeftTheGroup));

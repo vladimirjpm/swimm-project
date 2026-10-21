@@ -23,7 +23,8 @@ public interface ILanePlanService
 
     /// <summary>
     /// Кто из видимого состава в день <paramref name="date"/> «не в воде» (On break / Doesn't
-    /// train) — для «Not today» нового плана в редакторе. Только управляющему.
+    /// train без «Going» на эту дату, или «Can't come» на занятия этой даты) — для «Not today»
+    /// нового плана в редакторе. Только управляющему.
     /// </summary>
     Task<LanePlanAwayDto> GetAwayAsync(int hubGroupId, DateOnly date);
 

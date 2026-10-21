@@ -45,12 +45,32 @@ public class LanePlanService : ILanePlanService
     public async Task<LanePlanAwayDto> GetAwayAsync(int hubGroupId, DateOnly date)
     {
         var onBreak = await HubGroupBreakQuery.LoadAsync(_db, hubGroupId, date);
-        if (onBreak.SwimmerIds.Count == 0) return new LanePlanAwayDto();
+
+        // Ответы на занятия этой даты (их может быть несколько — план один на день). Ответ аккаунта
+        // — его пловцу состава (тот же резолвер, что у вида по дорожкам), за пловца группы — ему.
+        var answers = await _db.HubGroupTrainingRsvps.AsNoTracking()
+            .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date)
+            .Select(r => new { r.UserId, r.SwimmerId, r.Answer })
+            .ToListAsync();
+        var userIds = answers.Where(a => a.UserId != null).Select(a => a.UserId!.Value).Distinct().ToList();
+        var swimmerOf = await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, userIds);
+        var bySwimmer = answers
+            .Select(a => (SwimmerId: a.SwimmerId ?? (a.UserId is int uid ? swimmerOf[uid] : null), a.Answer))
+            .Where(a => a.SwimmerId != null)
+            .GroupBy(a => a.SwimmerId!.Value, a => a.Answer)
+            .ToList();
+        // «Can't come» — только если на эту дату нет другого ответа: «нет» утром и «иду» вечером — в воде.
+        var cantCome = bySwimmer.Where(g => g.All(a => a == TrainingRsvpAnswer.No)).Select(g => g.Key).ToHashSet();
+        // «Going» на эту дату перебивает «Doesn't train» (Р74: человек посчитан на этот день).
+        var going = bySwimmer.Where(g => g.Contains(TrainingRsvpAnswer.Yes)).Select(g => g.Key).ToHashSet();
+
+        var away = onBreak.SwimmerIds.Where(id => !going.Contains(id)).Concat(cantCome).ToHashSet();
+        if (away.Count == 0) return new LanePlanAwayDto();
 
         var roster = await LoadRosterAsync(hubGroupId);
         return new LanePlanAwayDto
         {
-            SwimmerIds = roster.Select(r => r.SwimmerId).Where(onBreak.SwimmerIds.Contains).ToList(),
+            SwimmerIds = roster.Select(r => r.SwimmerId).Where(away.Contains).ToList(),
         };
     }
 

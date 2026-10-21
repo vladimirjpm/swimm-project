@@ -455,7 +455,13 @@ Intermediate». Подуровень — это порядок перелива,
   плана «не в воде» (On break до этой даты или Doesn't train; `HubGroupBreakQuery`). Редактор кладёт
   их в «Not today» нового плана и копии («Copy from …»); сохранённый план не трогает. Тренер может
   вернуть человека руками.
-- Тест `LanePlanTests.Away_DoesntTrainAndBreakOnPlanDay_NotEndedBreaksOrHidden`. Проверено вживую
+- **И «Can't come»** (решение Влада 21.10.2026): кто ответил «не приду» на занятия этой даты — тоже
+  в away. Ответ аккаунта — его пловцу (`HubGroupPersonResolver`), за пловца группы — ему. Away
+  только если ВСЕ ответы на дату «нет» («нет» утром и «не уверен» вечером — не away). «Going» на
+  дату перебивает «Doesn't train» (Р74: человек посчитан на этот день). Ответы на занятие (Going /
+  Not sure) раскладку не меняют — только «Not today» стартового черновика.
+- Тесты `LanePlanTests.Away_DoesntTrainAndBreakOnPlanDay_NotEndedBreaksOrHidden`,
+  `Away_CantComeOnPlanDay_GoingBringsDoesntTrainBack`. Проверено вживую
   на `dolphin-netanya-masters` (локально): Аня «Doesn't train» → Create plan → «Not today · 1» →
   Auto lanes — она там же, не на дорожке.
 - Там же (20.10): «✎ Edit lanes» / «Lanes ›» / сегмент Lanes тренера открывают редактор на дату

@@ -107,7 +107,7 @@ public class HubGroupLanePlansController : ControllerBase
     }
 
     /// <summary>
-    /// Кто в день плана «не в воде» (On break / Doesn't train) — редактор кладёт их в «Not today»
+    /// Кто в день плана «не в воде» (On break / Doesn't train / «Can't come») — редактор кладёт их в «Not today»
     /// нового плана. Только управляющему: статусы людей участникам не раздаём.
     /// </summary>
     [HttpGet("{date}/away")]

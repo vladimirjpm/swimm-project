@@ -111,7 +111,7 @@ function GroupLanes({
     return () => { cancelled = true; };
   }, [groupId, manages]);
 
-  // Кто в этот день «не в воде» (On break / Doesn't train) — редактор кладёт их в «Not today»
+  // Кто в этот день «не в воде» (On break / Doesn't train / «Can't come») — редактор кладёт их в «Not today»
   // нового плана и копии. Ошибка — пустой список: раскладку из-за неё не блокируем.
   const [away, setAway] = useState<{ date: string; ids: ReadonlySet<number> } | null>(null);
   useEffect(() => {
