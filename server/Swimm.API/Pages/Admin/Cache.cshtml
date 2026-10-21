@@ -58,6 +58,12 @@
     <code>private, no-store</code> — не хранить вовсе (приватная группа).
     Таблица собрана из кода при открытии страницы — цифры не устаревают.
 </p>
+<p class="text-xs text-admin-text-muted mt-0 mb-3 leading-relaxed">
+    Статики витрины в таблице нет — это не контроллер. Её правило (<code>StaticFileCaching</code>):
+    страницы <code>*.html</code> и входные скрипты без хэша в имени (<code>results_main.js</code>,
+    <code>sw.js</code>…) — <code>no-cache</code>, иначе после деплоя браузер держит прошлую сборку;
+    чанки <code>/assets/*-хэш.js</code> — без заголовка, новая сборка = новые имена.
+</p>
 
 <div class="overflow-x-auto mb-6">
 <table class="admin-table">
