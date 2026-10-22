@@ -16,8 +16,20 @@ import { formatApproxTime, formatExactTime, groupEventsByDiscipline, swimLabel }
  * ввода рядом — по имени и по дисциплине, — и родитель регулярно печатал имя не в то.
  * Остался один поиск, по имени, в панели над зумами.
  */
-export default function ProgrammeZoom({ orgCompId, day, startsLabel, notify, onPublished, onOpenEvent }: {
+/**
+ * В каких заплывах (`org_discipline_id`) плывут «свои» — состав плана: ссылка `?plan=`, свой
+ * сохранённый план или дефолт из избранного. Считает таб (те же данные, что у My plan).
+ */
+export interface FollowedEvents {
+  /** Плывёт хотя бы один выбранный ПЛОВЕЦ — золотая точка. */
+  swimmerEvents: ReadonlySet<number>;
+  /** Плывёт кто-то из выбранного КЛУБА — синяя точка. */
+  clubEvents: ReadonlySet<number>;
+}
+
+export default function ProgrammeZoom({ orgCompId, day, followed, startsLabel, notify, onPublished, onOpenEvent }: {
   orgCompId: number;
+  followed: FollowedEvents;
   /** yyyy-MM-dd открытой сессии; null — первый день программы. */
   day: string | null;
   /** «Sun 15 Feb» для экрана «ещё не опубликован»; null — дату отсюда не знаем. */
@@ -121,8 +133,12 @@ export default function ProgrammeZoom({ orgCompId, day, startsLabel, notify, onP
               </span>
               {/* Категория ПО-АНГЛИЙСКИ: `event_category` источника ивритский («בנות 11»),
                   и на витрину он не идёт — то же правило, что в строке плана. */}
-              <span className="min-w-0 flex-1 truncate text-[14px] font-bold">
-                {bandLabel(e.gender, e.age_band)}
+              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span className="min-w-0 truncate text-[14px] font-bold">{bandLabel(e.gender, e.age_band)}</span>
+                <FollowDots
+                  swimmer={followed.swimmerEvents.has(e.org_discipline_id)}
+                  club={followed.clubEvents.has(e.org_discipline_id)}
+                />
               </span>
               <span className="shrink-0 text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                 {e.event_number != null ? `#${e.event_number} · ` : ''}{e.entries} entries
@@ -139,5 +155,23 @@ export default function ProgrammeZoom({ orgCompId, day, startsLabel, notify, onP
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Метки «здесь плывут свои» у строки программы (решение Влада 22.10.2026): золотая — пловец
+ * из состава, синяя — кто-то из клуба состава. Цвета те же, что у чипов людей в зоне
+ * фильтров: золото (`--deep-gold-bar` — графический токен, текстовый `--theme-personal-accent` в
+ * светлой теме тёмно-оливковый и на точке читался как коричневый) и акцент клуба (`--deep-accent`).
+ * Ни одной — ничего не рисуем: у гостя без состава программа выглядит как раньше.
+ */
+function FollowDots({ swimmer, club }: { swimmer: boolean; club: boolean }) {
+  if (!swimmer && !club) return null;
+  const label = [swimmer && 'your swimmer', club && 'your club'].filter(Boolean).join(' and ');
+  return (
+    <span className="flex flex-none items-center gap-1" title={`Swims here: ${label}`} aria-label={`Swims here: ${label}`}>
+      {swimmer && <span className="h-2 w-2 rounded-full" style={{ background: 'var(--deep-gold-bar)' }} />}
+      {club && <span className="h-2 w-2 rounded-full" style={{ background: 'var(--deep-accent)' }} />}
+    </span>
   );
 }
