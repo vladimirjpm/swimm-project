@@ -11,7 +11,7 @@ namespace Swimm.Tests;
 public class AdminUsersFilterTests
 {
     // Зависимости странице для Matches не нужны — фильтр читает только саму строку.
-    private static readonly IndexModel Page = new(null!, null!, null!, null!, null!);
+    private static readonly IndexModel Page = new(null!, null!, null!, null!, null!, null!);
 
     private static UserDto U(string email, bool active = true, params string[] roles) =>
         new() { Email = email, IsActive = active, Roles = roles };

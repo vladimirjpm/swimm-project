@@ -26,8 +26,11 @@ public class HubGroupAdmin
     [ForeignKey(nameof(UserId))]
     public AppUser? User { get; set; }
 
-    /// <summary>Кто назначил админа группы (владелец или site-админ).</summary>
-    public int GrantedByUserId { get; set; }
+    /// <summary>
+    /// Кто назначил админа группы (владелец или site-админ). null — назначивший удалил аккаунт
+    /// (SetNull, docs/plans/account-deletion-plan.md): админство остаётся, автор пропадает.
+    /// </summary>
+    public int? GrantedByUserId { get; set; }
 
     [ForeignKey(nameof(GrantedByUserId))]
     public AppUser? GrantedBy { get; set; }

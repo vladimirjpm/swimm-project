@@ -1,6 +1,6 @@
 # Terms of use
 
-Last updated: 16 October 2026.
+Last updated: 23 October 2026.
 
 SwimHub (swimhub.co.il) is a free site with results of swimming competitions in Israel and swimming records, run by a private individual in Israel. By using the site you agree to these terms. How we handle personal information is described in the [Privacy policy](route:privacy).
 
@@ -15,7 +15,7 @@ SwimHub (swimhub.co.il) is a free site with results of swimming competitions in 
 - There is no minimum age for an account. If you are under 18, use SwimHub with the permission of a parent or legal guardian; a parent or guardian may ask us to delete a minor’s account. A parent can also follow their children’s results from the parent’s own account.
 - One account per person; the details you give must be your own.
 - Keep your sign-in details safe and don’t share them. If you suspect someone else is using your account, change your password and tell us at privacy@swimhub.co.il.
-- You can stop using the site at any time and ask us to delete your account — see the [Privacy policy](route:privacy).
+- You can stop using the site at any time and delete your account yourself (**Delete account** on **My profile**) or ask us to — see the [Privacy policy](route:privacy).
 
 ## What you add
 

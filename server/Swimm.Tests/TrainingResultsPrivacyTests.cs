@@ -35,6 +35,9 @@ public class TrainingResultsPrivacyTests
         ["Swimm.Infrastructure/Services/HubGroupAdminService.cs"] =
             "перечень потерь при удалении группы — только ЧИСЛО сессий и результатов; удаление сессий " +
             "своей группы перед её удалением (Р71: каскад на пловцов группы упирался в RESTRICT)",
+        ["Swimm.Infrastructure/Services/AccountDeletionService.cs"] =
+            "удаление аккаунта — только ЧИСЛО сессий, созданных им в чужих группах (останутся без автора); " +
+            "свои группы удаляет через HubGroupAdminService",
         ["Swimm.Infrastructure/Services/HubGroupCrudCore.cs"] =
             "удаление пловца группы (Р71) из состава = удаление насовсем вместе с его временами; не чтение",
         ["Swimm.Infrastructure/Services/HubGroupMediaService.cs"] =

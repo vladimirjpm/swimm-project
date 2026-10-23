@@ -23,4 +23,11 @@ public interface ILocalAuthService
 
     /// <summary>Сброс пароля по токену. На Ok бампает SecurityStamp (инвалидация всех сессий) и возвращает UserId.</summary>
     Task<ResetResult> ResetPasswordAsync(string token, string newPassword, CancellationToken ct = default);
+
+    /// <summary>
+    /// Пароль уже вошедшего пользователя для опасного действия (удаление аккаунта). Тот же счётчик
+    /// неудач и lockout, что у <see cref="LoginAsync"/>: иначе такая проверка — оракул для подбора
+    /// пароля из чужой открытой сессии, мимо блокировки входа.
+    /// </summary>
+    Task<PasswordCheckResult> VerifyPasswordAsync(int userId, string password, CancellationToken ct = default);
 }
