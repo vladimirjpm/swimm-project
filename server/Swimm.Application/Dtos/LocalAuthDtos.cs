@@ -6,6 +6,11 @@ public enum LoginStatus { Ok, InvalidCredentials, LockedOut, EmailNotConfirmed }
 
 public enum ResetStatus { Ok, InvalidOrExpiredToken, WeakPassword }
 
+/// <summary>Проверка пароля вошедшего пользователя (опасное действие). NoPassword — локального входа нет.</summary>
+public enum PasswordCheckStatus { Ok, Wrong, LockedOut, NoPassword }
+
+public sealed record PasswordCheckResult(PasswordCheckStatus Status, DateTime? LockoutEnd = null);
+
 /// <summary>Результат регистрации. Намеренно НЕ раскрывает, существовал ли уже email
 /// (anti-enumeration): контроллер всегда отвечает одинаково при Ok.</summary>
 public class RegisterResult

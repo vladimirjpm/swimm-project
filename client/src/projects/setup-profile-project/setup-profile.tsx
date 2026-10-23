@@ -18,6 +18,7 @@ import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import ProfileEditPopup, { type EditKind, type EditRequest } from './components/profile-edit-popup';
+import DeleteAccountDialog from './components/delete-account-dialog';
 import * as api from './profile-api';
 import { routes } from '../../utils/routes';
 
@@ -212,6 +213,16 @@ function SetupProfile() {
   const [toast, setToast] = useState<Toast | null>(null);
   // Группы, уход из которых ждёт конца тоста (Р9) — их строк в итоге уже не видно.
   const [leaving, setLeaving] = useState<Set<number>>(new Set());
+  // «Delete account» (docs/plans/account-deletion-plan.md). `?delete=1` — возврат после повторного
+  // входа через Google: окно открывается само, а параметр уходит из адреса.
+  const [deleteOpen, setDeleteOpen] = useState(() => new URLSearchParams(window.location.search).get('delete') === '1');
+  const [deleted, setDeleted] = useState(false);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('delete')) return;
+    url.searchParams.delete('delete');
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+  }, []);
 
   const toastRef = useRef<Toast | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -272,6 +283,24 @@ function SetupProfile() {
       <UI_ModeToggle />
     </div>
   );
+
+  // Аккаунт удалён — сессии уже нет, и useAuth о ней ещё не знает: показываем итог, а не гостя.
+  if (deleted) {
+    return shell(
+      <div className="flex min-h-[70vh] items-center justify-center px-4">
+        <div className="deep-card w-full max-w-md text-center">
+          <h1 className="deep-card-title mb-2">Your account was deleted</h1>
+          <p className="mb-4 text-sm text-[var(--t-text-2)]">You&apos;re signed out. Thanks for swimming with us.</p>
+          <a
+            href={routes.home()}
+            className="hp-mono inline-block rounded-[11px] bg-[var(--t-accent)] px-4 py-2 text-sm font-extrabold text-[var(--t-accent-ink)] no-underline"
+          >
+            Go to home page
+          </a>
+        </div>
+      </div>,
+    );
+  }
 
   if (auth.loading || (auth.isAuthenticated && !setup)) {
     return <div className="min-h-screen bg-[var(--deep-page-bg)]" />;
@@ -546,9 +575,30 @@ function SetupProfile() {
     );
   };
 
+  // Опасное действие — тихой ссылкой под карточкой, отдельно от дела страницы (Р1 плана удаления).
+  const deleteAccountLink = (
+    <div className="mt-10 flex justify-center">
+      <button
+        type="button"
+        onClick={() => setDeleteOpen(true)}
+        className="rounded-[8px] border border-[var(--t-danger-border)] bg-transparent px-3 py-1.5 text-[12px] font-bold text-[var(--t-danger)] hover:bg-[var(--t-danger-soft)]"
+      >
+        Delete account
+      </button>
+    </div>
+  );
+
   // Попап и тост — общие для чек-листа и итога.
   const overlays = (
     <>
+      {deleteOpen && (
+        <DeleteAccountDialog
+          email={auth.email ?? ''}
+          // refresh — чтобы топбар перестал показывать имя: сессии уже нет.
+          onDeleted={() => { setDeleteOpen(false); setDeleted(true); void auth.refresh(); }}
+          onClose={() => setDeleteOpen(false)}
+        />
+      )}
       <ProfileEditPopup
         request={edit}
         takenClubIds={takenClubIds}
@@ -771,6 +821,7 @@ function SetupProfile() {
             </a>
           </div>
         </section>
+        {deleteAccountLink}
         {overlays}
       </main>,
     );
@@ -808,6 +859,7 @@ function SetupProfile() {
         )}
       </div>
 
+      {deleteAccountLink}
       {overlays}
     </main>,
   );

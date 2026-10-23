@@ -17,6 +17,8 @@ internal sealed class HubGroupConfiguration : IEntityTypeConfiguration<HubGroup>
 
         // FK на Sys_AppUsers допустим (FK на уровне БД не требует SELECT-права у swimm_ro);
         // навигацию Owner не Include-ить нигде за пределами админки.
+        // Restrict намеренно: удаление аккаунта обязано решить судьбу его групп явно
+        // (AccountDeletionRules), а не потерять их молча.
         entity.HasOne(e => e.Owner)
             .WithMany()
             .HasForeignKey(e => e.OwnerUserId)
@@ -126,10 +128,11 @@ internal sealed class HubGroupAdminConfiguration : IEntityTypeConfiguration<HubG
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // SetNull: назначивший удалил аккаунт — админство остаётся, автор пропадает.
         entity.HasOne(e => e.GrantedBy)
             .WithMany()
             .HasForeignKey(e => e.GrantedByUserId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 
@@ -151,10 +154,12 @@ internal sealed class HubGroupUserMemberConfiguration : IEntityTypeConfiguration
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // SetNull: добавивший удалил аккаунт — участие остаётся. ⚠ После этого AddedByUserId == null
+        // читается как «вступил сам» (SelfJoined в админке) — принято, account-deletion-plan.md У0.
         entity.HasOne(e => e.AddedBy)
             .WithMany()
             .HasForeignKey(e => e.AddedByUserId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);
 
         entity.HasOne(e => e.Swimmer)
             .WithMany()
@@ -181,6 +186,8 @@ internal sealed class HubGroupClubRequestConfiguration : IEntityTypeConfiguratio
             .HasForeignKey(e => e.HubGroupId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Restrict намеренно: заявитель — владелец группы на момент подачи; передачи групп нет,
+        // поэтому при удалении аккаунта его заявки уходят каскадом вместе с его группой.
         entity.HasOne(e => e.User)
             .WithMany()
             .HasForeignKey(e => e.UserId)
@@ -191,10 +198,11 @@ internal sealed class HubGroupClubRequestConfiguration : IEntityTypeConfiguratio
             .HasForeignKey(e => e.ClubId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // SetNull: решивший (админ сайта) удалил аккаунт — решение остаётся без автора.
         entity.HasOne(e => e.DecidedByUser)
             .WithMany()
             .HasForeignKey(e => e.DecidedByUserId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 

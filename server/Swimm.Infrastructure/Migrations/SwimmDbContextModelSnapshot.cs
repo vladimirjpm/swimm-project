@@ -1399,7 +1399,7 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("GrantedByUserId")
+                    b.Property<int?>("GrantedByUserId")
                         .HasColumnType("integer");
 
                     b.Property<int>("HubGroupId")
@@ -4472,8 +4472,7 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasOne("Swimm.Domain.Entities.AppUser", "GrantedBy")
                         .WithMany()
                         .HasForeignKey("GrantedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
                         .WithMany("Admins")
@@ -4537,7 +4536,7 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasOne("Swimm.Domain.Entities.AppUser", "DecidedByUser")
                         .WithMany()
                         .HasForeignKey("DecidedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
                         .WithMany()
@@ -4750,7 +4749,7 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasOne("Swimm.Domain.Entities.AppUser", "AddedBy")
                         .WithMany()
                         .HasForeignKey("AddedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Swimm.Domain.Entities.HubGroup", "HubGroup")
                         .WithMany("UserMembers")

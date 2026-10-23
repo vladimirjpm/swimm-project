@@ -42,14 +42,16 @@ public static class ApiCatalog
         new("🔐 Auth",
         [
             new("GET", "/auth/login/google",
-                "Перенаправление на Google OAuth. После авторизации редирект на returnUrl.",
-                [new ApiParam("returnUrl", "string", "query", "URL для редиректа после входа (по умолчанию \"/\")", "/")]),
+                "Перенаправление на Google OAuth. После авторизации редирект на returnUrl — только на свой сайт " +
+                "(ReturnUrlRules), чужой адрес → «/». reauth=true — Google спросит выбор аккаунта (удаление аккаунта).",
+                [new ApiParam("returnUrl", "string", "query", "Путь или адрес своего сайта для редиректа после входа (по умолчанию \"/\")", "/"),
+                 new ApiParam("reauth", "bool", "query", "Повторный вход для подтверждения: prompt=select_account", "false", BoolFalseFirst: true)]),
 
             new("GET", "/auth/me", "Текущий пользователь. Возвращает профиль или { isAuthenticated: false }."),
 
             new("GET", "/auth/logout",
-                "Выход из системы. Редирект на returnUrl.",
-                [new ApiParam("returnUrl", "string", "query", "URL для редиректа после выхода (по умолчанию \"/\")", "/")],
+                "Выход из системы. Редирект на returnUrl — только на свой сайт (ReturnUrlRules), чужой адрес → «/».",
+                [new ApiParam("returnUrl", "string", "query", "Путь или адрес своего сайта для редиректа после выхода (по умолчанию \"/\")", "/")],
                 AuthBadge: "Auth"),
         ]),
 

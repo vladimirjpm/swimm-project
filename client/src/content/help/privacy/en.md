@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 16 October 2026.
+Last updated: 23 October 2026.
 
 SwimHub (swimhub.co.il) shows results of swimming competitions in Israel and swimming records. This policy explains what information we hold, why, who can see or receive it and what you can ask of us. Using the site is also governed by the [Terms of use](route:terms).
 
@@ -72,7 +72,9 @@ Pages of competitions, clubs and adult swimmers can appear in search engines suc
 
 ## Deleting your account
 
-Write to privacy@swimhub.co.il from the account’s email address. We delete the account details and what is linked only to you — favorites, your media links and reactions. For groups you manage we will agree with you whether to hand them over or delete them. Deleting an account does not remove published competition results.
+Open **My profile** (**Set up profile**) in the account menu and press **Delete account** at the bottom of the page. You confirm with your email and password, or by signing in with Google again. The account is deleted at once and for good, together with what is linked only to you — favorites, your media links (also where you shared them), reactions, group memberships and notification settings. Groups you own that have no other members are deleted too. If a group you own has other members, delete it first or write to us to hand it over. Links and trainings you added to other people’s groups stay there without your name. Deleting an account does not remove published competition results.
+
+You can also write to privacy@swimhub.co.il from the account’s email address — for example, when a parent or legal guardian asks to delete a minor’s account.
 
 ## Your rights
 

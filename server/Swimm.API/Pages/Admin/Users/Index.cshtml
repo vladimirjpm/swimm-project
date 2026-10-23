@@ -131,20 +131,23 @@
                                 ? "Изменено: " + string.Join(", ", Model.PersonaChanges[u.Id]) + ". Сбросить — вернуть в исходное состояние (id не меняется)"
                                 : "Не менялся — совпадает с исходным состоянием";
                             <form method="post" asp-page-handler="ResetPersona" asp-route-show="@Model.Show" class="inline"
-                                  onsubmit="return confirm('Вернуть @u.DisplayName в исходное состояние? Всё, что на нём поменяли руками (избранное, группы, медиа, опрос), будет стёрто.');">
+                                  data-confirm="Вернуть @u.DisplayName в исходное состояние? Всё, что на нём поменяли руками (избранное, группы, медиа, опрос), будет стёрто."
+                                  onsubmit="return confirm(this.dataset.confirm);">
                                 <input type="hidden" name="userId" value="@u.Id" />
                                 <button type="submit" class="admin-btn @(changed ? "admin-btn-primary" : "admin-btn-ghost opacity-50") py-1 px-2.5" title="@resetTitle">Сбросить</button>
                             </form>
                         }
                         <form method="post" asp-page-handler="ForceSignOut" asp-route-show="@Model.Show" class="inline"
-                              onsubmit="return confirm('Отозвать все сессии пользователя @u.Email?');">
+                              data-confirm="Отозвать все сессии пользователя @u.Email?"
+                              onsubmit="return confirm(this.dataset.confirm);">
                             <input type="hidden" name="userId" value="@u.Id" />
                             <button type="submit" class="admin-btn admin-btn-ghost py-1 px-2.5" title="Разлогинить со всех устройств (аккаунт остаётся активным)">Выход везде</button>
                         </form>
                         @if (u.IsActive)
                         {
                             <form method="post" asp-page-handler="SetActive" asp-route-show="@Model.Show" class="inline"
-                                  onsubmit="return confirm('Отключить пользователя @u.Email? Все сессии будут отозваны немедленно.');">
+                                  data-confirm="Отключить пользователя @u.Email? Все сессии будут отозваны немедленно."
+                                  onsubmit="return confirm(this.dataset.confirm);">
                                 <input type="hidden" name="userId" value="@u.Id" />
                                 <input type="hidden" name="isActive" value="false" />
                                 <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Отключить</button>
@@ -245,6 +248,49 @@
                 пользователь владеет (официальные тоже); уже созданные при снижении лимита остаются.
             </p>
         </div>
+        @* ── Удаление аккаунта по просьбе (privacy@, родитель) — тот же сервис и правило, что у
+              кнопки «Delete account» на /setup-profile. docs/plans/account-deletion-plan.md, Р7 ── *@
+        @if (Model.DeletionImpact is { } del)
+        {
+            var isAdminTarget = del.BlockReasons.Contains(Swimm.Application.Mapping.AccountDeletionRules.ReasonSiteAdmin);
+            <div class="mb-4 rounded-md border border-admin-border p-3">
+                <div class="mb-2 text-sm font-semibold text-admin-danger">Удалить аккаунт — насовсем</div>
+                <p class="mb-2 text-xs text-admin-text-muted">
+                    Уйдёт: избранное @del.Favorites, медиа @del.Media (опубликованных @del.PublishedMedia),
+                    реакций @del.Reactions, участий в группах @del.GroupMemberships, админств @del.GroupAdminships,
+                    своих групп без других людей @del.GroupsDeleted.Count.
+                    Добавленное в чужие группы (@del.GroupContentKept) останется без автора. Результаты и пловцы не трогаются.
+                </p>
+                @if (isAdminTarget)
+                {
+                    <p class="text-xs text-admin-danger">У пользователя роль Admin — удалить нельзя, сначала снимите роль.</p>
+                }
+                else
+                {
+                    <form method="post" asp-page-handler="DeleteAccount" asp-route-show="@Model.Show" class="flex flex-wrap items-center gap-2"
+                          data-confirm="Удалить аккаунт @d.Email насовсем? Отменить будет нельзя."
+                          onsubmit="return confirm(this.dataset.confirm);">
+                        <input type="hidden" name="userId" value="@d.Id" />
+                        @if (del.SharedGroups.Count > 0)
+                        {
+                            <div class="mb-1 w-full text-xs text-admin-warning">
+                                Владеет группами с другими людьми:
+                                @string.Join(", ", del.SharedGroups.Select(g => $"«{g.Name}» (ещё {g.OtherPeople})")).
+                                <label class="ml-1">
+                                    <input type="checkbox" name="deleteSharedGroups" value="true" /> удалить и их
+                                </label>
+                            </div>
+                        }
+                        <input name="reason" placeholder="Причина: письмо privacy@@ от …" class="admin-input w-64" autocomplete="off" />
+                        <input name="confirmEmail" placeholder="email удаляемого" class="admin-input w-64" autocomplete="off" />
+                        <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
+                    </form>
+                    <p class="mt-2 text-xs text-admin-text-muted">
+                        Причина пишется в аудит <code>user.delete</code> — без email: аудит не должен хранить удалённое.
+                    </p>
+                }
+            </div>
+        }
         @if (d.LoginHistory.Count == 0)
         {
             <p class="text-sm text-admin-text-muted">Событий нет (журнал хранится 90 дней).</p>

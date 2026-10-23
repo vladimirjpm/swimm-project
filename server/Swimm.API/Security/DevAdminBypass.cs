@@ -236,6 +236,10 @@ public static class DevAdminBypass
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Name, user.DisplayName),
             new(CookieSecurityStampValidator.SecurityStampClaim, user.SecurityStamp),
+            // Персонаж «вошёл только что» на каждом запросе: в Development повторный вход через
+            // Google персонажу недоступен, а удаление аккаунта без пароля требует свежего входа.
+            new(AccountDeletionRules.AuthTimeClaim,
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)),
         };
         foreach (var ur in user.UserRoles)
             claims.Add(new Claim(ClaimTypes.Role, ur.Role.Name));
