@@ -4,6 +4,7 @@ import { useFavoritesContext } from '../../../../hooks/favorites-context';
 import type { AllUserMediaDto } from '../../../my-media-project/use-all-my-media';
 import { HelperMedia } from '../../../../utils/helpers';
 import HelperSwimmer from '../../../../utils/helpers/helper-swimmer';
+import HelperResults from '../../../../utils/helpers/helper-results';
 import type { CompetitionOverview } from './types';
 import { PAGE_CONTAINER } from '../../../../utils/layout';
 
@@ -84,6 +85,9 @@ export default function CompetitionPersonalStrip({ overview, onOpenSwims, onOpen
   const favIds = [...favoriteSwimmerIds].filter((id) => id !== primarySwimmerId);
   const favSwims = results.filter((r: any) => favIds.some((id) => matches(r, id)));
   const favHere = favIds.filter((id) => results.some((r: any) => matches(r, id))).length;
+  // «2/3», когда часть строк протокола — неявки (NS): заявлен, но не проплыл.
+  const swimsLabelOf = (rows: any[]) =>
+    HelperResults.swimsLabel(rows.filter((r) => !HelperResults.isNoStart(r)).length, rows.length);
 
   const primaryName =
     favorites.find((f) => f.swimmer_id === primarySwimmerId)?.swimmer_name ?? 'Me';
@@ -129,7 +133,7 @@ export default function CompetitionPersonalStrip({ overview, onOpenSwims, onOpen
             )}
           </span>
           <span className="text-[12px] font-extrabold" style={{ color: 'var(--theme-personal-accent)' }}>
-            My swims here — {mySwims.length} →
+            My swims here — {swimsLabelOf(mySwims)} →
           </span>
         </button>
       )}
@@ -144,7 +148,7 @@ export default function CompetitionPersonalStrip({ overview, onOpenSwims, onOpen
         >
           <Badge>❤️ Favorites</Badge>
           <span className="text-[12px] font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>
-            {favSwims.length} swims by {favHere} swimmers
+            {swimsLabelOf(favSwims)} swims by {favHere} swimmers
           </span>
           <span className="text-[12px] font-extrabold" style={{ color: 'var(--theme-personal-accent)' }}>
             My favorites here — {favHere} →

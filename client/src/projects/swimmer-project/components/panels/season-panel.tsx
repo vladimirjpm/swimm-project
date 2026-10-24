@@ -1,6 +1,7 @@
 import UI_MedalIcon from '../../../components/mix/medal-icon/medal-icon';
 import { routes } from '../../../../utils/routes';
 import { seasonLabel } from '../../../../utils/helpers/season-helper';
+import HelperResults from '../../../../utils/helpers/helper-results';
 import type { SwimmerCompetition, SwimmerSummary } from '../../use-swimmer-page';
 import { type PanelLoad, noDataText, PanelEmpty, PanelHead } from '../swimmer-panels';
 
@@ -12,7 +13,7 @@ export function SeasonBanner({ summary }: { summary: SwimmerSummary }) {
         <div className="deep-season-banner__points">{summary.points.toLocaleString('en-US')}</div>
         <div className="deep-season-banner__sub">
           {summary.season == null ? 'career' : `season ${summary.label}`}
-          {' · '}{summary.swims} swims · {summary.events} events
+          {' · '}{HelperResults.swimsLabel(summary.swims, summary.entered ?? summary.swims)} swims · {summary.events} events
         </div>
       </div>
       <div className="deep-season-banner__medals">
@@ -47,7 +48,7 @@ function CompetitionRow({ meet, swimmerId }: { meet: SwimmerCompetition; swimmer
         {meet.name}
       </span>
       <span className="deep-meet-row__stats">
-        {meet.swims} swims · {meet.points} pts
+        {HelperResults.swimsLabel(meet.swims, meet.entered ?? meet.swims)} swims · {meet.points} pts
         {meet.bestPlace != null ? ` · best #${meet.bestPlace}` : ''}
       </span>
       <span className="deep-meet-row__medals">

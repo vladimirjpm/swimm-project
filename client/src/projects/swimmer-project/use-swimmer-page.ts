@@ -40,7 +40,10 @@ export interface SwimmerCompetition {
   kind?: string | null;
   poolType: string;
   waterKind: string;
+  /** Проплытых: неявки (NS/DNS) не в счёт. */
   swims: number;
+  /** Строк в протоколе, включая неявки. Больше `swims` — пишем «2/3». */
+  entered: number;
   points: number;
   medals: MedalCounts;
   bestPlace?: number | null;
@@ -51,7 +54,10 @@ export interface SwimmerSummary {
   label: string;
   points: number;
   medals: MedalCounts;
+  /** Проплытых: неявки (NS/DNS) не в счёт. */
   swims: number;
+  /** Строк в протоколе, включая неявки. */
+  entered: number;
   events: number;
   competitionCount: number;
   personalBests: number;

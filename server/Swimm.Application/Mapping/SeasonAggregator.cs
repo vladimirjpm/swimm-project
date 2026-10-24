@@ -77,6 +77,13 @@ public sealed record SeasonSwimRow(
 
     /// <summary>Возраст события — настоящая ось заплыва (см. <c>ResultRecord.EventStyleAge</c>).</summary>
     public string? EventStyleAge { get; init; }
+
+    /// <summary>Причина снятия как в протоколе («NS», «DQ / SW 4.4»). Нужна, чтобы отличить
+    /// неявку от снятого (<see cref="StartStatus.IsNoStart"/>): по одному TimeFail их не различить.</summary>
+    public string? TimeFailNote { get; init; }
+
+    /// <summary>Пловец не вышел на старт (NS/DNS): строка в протоколе есть, заплыва не было.</summary>
+    public bool IsNoStart => StartStatus.IsNoStart(TimeFail, TimeFailNote);
 }
 
 /// <summary>

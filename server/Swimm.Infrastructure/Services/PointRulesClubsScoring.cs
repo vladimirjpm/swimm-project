@@ -1,3 +1,4 @@
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 
 namespace Swimm.Infrastructure.Services;
@@ -133,8 +134,7 @@ public static class PointRulesClubsScoring
     }
 
     /// <summary>Стартовал ли пловец: неявка (NS/DNS) участником категории не считается, DQ и DNF — считаются.</summary>
-    private static bool Started(ClubPointsContextRow r) =>
-        !(r.TimeFail && r.FailNote?.Trim().ToUpperInvariant() is "NS" or "DNS");
+    private static bool Started(ClubPointsContextRow r) => !StartStatus.IsNoStart(r.TimeFail, r.FailNote);
 
     /// <summary>Секция «כללי» протокола: парсер метит её программой mix-… (пола нет) или open.</summary>
     private static bool IsOpenSection(string category) =>

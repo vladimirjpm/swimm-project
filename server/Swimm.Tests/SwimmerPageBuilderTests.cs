@@ -81,6 +81,31 @@ public class SwimmerPageBuilderTests
     }
 
     [Fact]
+    public void Summary_NoStartIsEnteredButNotSwum_DqIsSwum()
+    {
+        // Сабина ברנצב 24.10.2026: заявлена на 3, на третий не вышла (NS) — витрина пишет
+        // «2/3». Снятый (DQ) стартовал и проплыл, его заплыв считается.
+        var rows = new[]
+        {
+            Row(1, "2026-10-24", competitionId: 20, eventId: 54),
+            Row(2, "2026-10-24", competitionId: 20, eventId: 54, ms: null, timeFail: true) with { TimeFailNote = "NS" },
+            Row(3, "2026-10-23", competitionId: 19, eventId: 54, ms: null, timeFail: true) with { TimeFailNote = "DQ / SW 4.4" },
+            Row(4, "2026-10-10", competitionId: 18, ms: null, timeFail: true) with { TimeFailNote = " dns " },
+        };
+
+        var summary = SwimmerPageBuilder.Summary(rows, season: 2026, NoKinds);
+
+        Assert.Equal(2, summary.Swims);
+        Assert.Equal(4, summary.Entered);
+        var meet = summary.Competitions.Single(c => c.EventId == 54);
+        Assert.Equal(2, meet.Swims);
+        Assert.Equal(3, meet.Entered);
+        var noShowMeet = summary.Competitions.Single(c => c.CompetitionId == 18);
+        Assert.Equal(0, noShowMeet.Swims);
+        Assert.Equal(1, noShowMeet.Entered);
+    }
+
+    [Fact]
     public void Summary_MedalsCountedOnlyWhereAwarded()
     {
         var rows = new[]

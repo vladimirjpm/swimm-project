@@ -41,6 +41,23 @@ export default class HelperResults {
   }
 
   /**
+   * Пловец не вышел на старт (NS/DNS): строка в протоколе есть, заплыва не было. DQ и DNF —
+   * стартовал (проплыл, но сняли / сошёл). Зеркало серверного `StartStatus.IsNoStart`.
+   */
+  static isNoStart(res: { time_fail?: boolean | null; time_fail_note?: string | null }): boolean {
+    const note = (res.time_fail_note ?? '').trim().toUpperCase();
+    return !!res.time_fail && (note === 'NS' || note === 'DNS');
+  }
+
+  /**
+   * Счётчик заплывов: «2/3», когда часть заявленных не проплыта (неявки), иначе просто «3».
+   * `swum` — без неявок, `entered` — все строки протокола.
+   */
+  static swimsLabel(swum: number, entered: number): string {
+    return entered > swum ? `${swum}/${entered}` : `${swum}`;
+  }
+
+  /**
    * ЕДИНСТВЕННОЕ место, где живёт правило «за это место дают медаль».
    *
    * До 08.09.2026 оно было написано трижды и трижды по-разному: таблица результатов знала

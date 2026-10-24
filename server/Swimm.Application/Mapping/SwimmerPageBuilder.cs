@@ -70,7 +70,9 @@ public static class SwimmerPageBuilder
             // Очки — как напечатаны в протоколе, помеченные заплывы тоже (Р76): данные протокола
             // показываем везде, оговорку несёт пометка строки, а не пропажа цифры.
             Points = rows.Sum(r => r.InternationalPoints),
-            Swims = rows.Count,
+            // Неявка — строка протокола без заплыва: в «проплыл» не идёт, в «заявлен» идёт.
+            Swims = rows.Count(r => !r.IsNoStart),
+            Entered = rows.Count,
             // Дисциплины считаются ТЕМ ЖЕ ключом, что строки таба Results (без категории
             // заплыва), иначе плитка «11 events» не сходилась бы с «11 best times».
             Events = rows
@@ -118,7 +120,8 @@ public static class SwimmerPageBuilder
                     Kind = standingKinds.TryGetValue(first.CompetitionId, out var kind) ? kind : null,
                     PoolType = first.PoolType,
                     WaterKind = PoolWaterKind,
-                    Swims = g.Count(),
+                    Swims = g.Count(r => !r.IsNoStart),
+                    Entered = g.Count(),
                     Points = g.Sum(r => r.InternationalPoints),
                     Medals = Medals(g.ToList()),
                     BestPlace = places.Count > 0 ? places.Min() : null,
