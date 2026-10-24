@@ -418,6 +418,24 @@ public class StartListPublicRepositoryTests
     }
 
     [Fact]
+    public async Task Upcoming_SkipsDayWithImportedProtocol_KeepsTheNextDay()
+    {
+        // Протокол первого дня затянут, сшивка привязала его заявки к дню справочника
+        // (CompetitionId). Календарный день ещё идёт, но старт уже прошёл и результат в
+        // базе — в «ближайших» ему не место. Второй день многодневки ещё не импортирован.
+        // Поймано 24.10.2026: пловец 6066 видел «Upcoming starts» по уже затянутому дню.
+        await using var db = await SeedAsync(nameof(Upcoming_SkipsDayWithImportedProtocol_KeepsTheNextDay));
+        foreach (var e in await db.CompetitionEntries.Where(e => e.CompDate == new DateTime(2026, 2, 19)).ToListAsync())
+            e.CompetitionId = 501;
+        await db.SaveChangesAsync();
+        var repo = new StartListPublicRepository(db);
+
+        Assert.Empty(await repo.GetUpcomingAsync([10], new DateTime(2026, 2, 19), 7));
+        var nextDay = Assert.Single(await repo.GetUpcomingAsync([12], new DateTime(2026, 2, 19), 7));
+        Assert.Equal(12, nextDay.SwimmerId);
+    }
+
+    [Fact]
     public async Task Upcoming_NoSwimmers_IsEmpty()
     {
         await using var db = await SeedAsync(nameof(Upcoming_NoSwimmers_IsEmpty));
@@ -456,6 +474,28 @@ public class StartListPublicRepositoryTests
             .GetUpcomingCompetitionsAsync(new DateTime(2026, 3, 1), 30);
 
         Assert.Empty(list);
+    }
+
+    [Fact]
+    public async Task UpcomingCompetitions_ImportedDayDropsOut()
+    {
+        await using var db = await SeedAsync(nameof(UpcomingCompetitions_ImportedDayDropsOut));
+        foreach (var e in await db.CompetitionEntries.Where(e => e.CompDate == new DateTime(2026, 2, 19)).ToListAsync())
+            e.CompetitionId = 501;
+        await db.SaveChangesAsync();
+
+        // Первый день импортирован — соревнование остаётся в списке только вторым днём.
+        var comp = Assert.Single(await new StartListPublicRepository(db)
+            .GetUpcomingCompetitionsAsync(new DateTime(2026, 2, 19), 30));
+        Assert.Equal(new DateTime(2026, 2, 20), comp.DateStart);
+        Assert.Equal(1, comp.Days);
+        Assert.Equal(1, comp.Entries);
+
+        // Импортированы оба дня — соревнования в «предстоящих» нет вовсе.
+        foreach (var e in await db.CompetitionEntries.ToListAsync()) e.CompetitionId = 502;
+        await db.SaveChangesAsync();
+        Assert.Empty(await new StartListPublicRepository(db)
+            .GetUpcomingCompetitionsAsync(new DateTime(2026, 2, 19), 30));
     }
 
     [Fact]
