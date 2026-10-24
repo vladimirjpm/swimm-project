@@ -255,6 +255,48 @@ public class LocalAuthService : ILocalAuthService
         return ResetResult.Success(user.Id);
     }
 
+    public async Task<PasswordCheckResult> VerifyPasswordAsync(int userId, string password, CancellationToken ct = default)
+    {
+        var cred = await _db.UserLocalCredentials.FirstOrDefaultAsync(c => c.UserId == userId, ct);
+        if (cred?.PasswordHash == null) return new PasswordCheckResult(PasswordCheckStatus.NoPassword);
+
+        // Тот же lockout, что у входа: во время блокировки пароль не проверяем вовсе.
+        if (cred.LockoutEnd is { } until && until > DateTime.UtcNow)
+        {
+            _db.UserLoginHistory.Add(new UserLoginHistory
+            {
+                UserId = userId, Provider = "Local", Success = false, LoginAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync(ct);
+            return new PasswordCheckResult(PasswordCheckStatus.LockedOut, until);
+        }
+
+        if (!_hasher.Verify(password ?? "", cred.PasswordHash))
+        {
+            cred.FailedLoginCount++;
+            var locked = cred.FailedLoginCount >= MaxFailedLogins;
+            if (locked)
+            {
+                cred.LockoutEnd = DateTime.UtcNow.Add(LockoutDuration);
+                cred.FailedLoginCount = 0;
+            }
+            cred.UpdatedAt = DateTime.UtcNow;
+            _db.UserLoginHistory.Add(new UserLoginHistory
+            {
+                UserId = userId, Provider = "Local", Success = false, LoginAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync(ct);
+            return locked
+                ? new PasswordCheckResult(PasswordCheckStatus.LockedOut, cred.LockoutEnd)
+                : new PasswordCheckResult(PasswordCheckStatus.Wrong);
+        }
+
+        cred.FailedLoginCount = 0;
+        cred.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return new PasswordCheckResult(PasswordCheckStatus.Ok);
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private async Task<string> IssueTokenAsync(int userId, SecurityTokenPurpose purpose, TimeSpan ttl, CancellationToken ct)

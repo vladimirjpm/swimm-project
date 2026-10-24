@@ -16,16 +16,24 @@ public class IndexModel : PageModel
     private readonly IAdminAuditService _audit;
     private readonly IPersonaSeeder _personas;
     private readonly IWebHostEnvironment _env;
+    private readonly IAccountDeletionService _deletion;
 
     public IndexModel(IAdminRepository repo, ISettingsService settings, IAdminAuditService audit,
-        IPersonaSeeder personas, IWebHostEnvironment env)
+        IPersonaSeeder personas, IWebHostEnvironment env, IAccountDeletionService deletion)
     {
         _repo = repo;
         _settings = settings;
         _audit = audit;
         _personas = personas;
         _env = env;
+        _deletion = deletion;
     }
+
+    /// <summary>
+    /// Что уйдёт при удалении раскрытого пользователя и можно ли (правило — то же, что у кнопки
+    /// на сайте, <see cref="AccountDeletionRules"/>). docs/plans/account-deletion-plan.md, У5.
+    /// </summary>
+    public AccountDeletionImpactDto? DeletionImpact { get; private set; }
 
     /// <summary>
     /// Кнопка «Сбросить» у тестового персонажа (просьба Влада 17.10.2026) — только Development:
@@ -137,7 +145,50 @@ public class IndexModel : PageModel
         AllUsers = await _repo.GetUsersAsync();
         Users = AllUsers.Where(u => Matches(u, Show)).ToList();
         if (UserId != null)
+        {
             Detail = await _repo.GetUserDetailsAsync(UserId.Value);
+            if (Detail != null) DeletionImpact = await _deletion.GetImpactAsync(UserId.Value);
+        }
+    }
+
+    /// <summary>
+    /// Удалить аккаунт по просьбе (письмо на privacy@, родитель за ребёнка) — Р7. Тот же сервис,
+    /// что у кнопки на сайте, без пароля. Защита от промаха — ввести email удаляемого. Причина
+    /// уходит в аудит `user.delete` — писать её без email (аудит не должен хранить удалённое).
+    /// </summary>
+    public async Task<IActionResult> OnPostDeleteAccountAsync(int userId, string? confirmEmail, string? reason, bool deleteSharedGroups)
+    {
+        var detail = await _repo.GetUserDetailsAsync(userId);
+        if (detail == null)
+        {
+            TempData["Flash"] = "Пользователь не найден";
+            return RedirectToPage(new { show = Show });
+        }
+        if (!AccountDeletionRules.EmailMatches(confirmEmail, detail.Email))
+        {
+            TempData["Flash"] = "Email не совпал — аккаунт не удалён";
+            return RedirectToPage(new { userId, show = Show });
+        }
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            TempData["Flash"] = "Укажите причину (например: письмо на privacy@ от 23.10)";
+            return RedirectToPage(new { userId, show = Show });
+        }
+
+        var result = await _deletion.DeleteByAdminAsync(userId, reason.Trim(), deleteSharedGroups);
+        if (!result.Deleted)
+        {
+            TempData["Flash"] = result.Code switch
+            {
+                AccountDeletionRules.ReasonSiteAdmin => "У пользователя роль Admin — сначала снимите её",
+                AccountDeletionRules.ReasonSharedGroup => "У пользователя группы с другими людьми — отметьте «удалить и их» или откажите",
+                _ => "Удаление не прошло (подробности в логе API) — ничего не удалено",
+            };
+            return RedirectToPage(new { userId, show = Show });
+        }
+
+        TempData["Flash"] = $"Аккаунт #{userId} удалён";
+        return RedirectToPage(new { show = Show });
     }
 
     public async Task<IActionResult> OnPostSetActiveAsync(int userId, bool isActive)

@@ -8,10 +8,12 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using Swimm.API.Hosting;
 using Swimm.API.Security;
 using Swimm.API.Services;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 using Swimm.Domain.Entities;
 
@@ -25,24 +27,44 @@ public class AuthController : Controller
     private readonly SwimmDbContext _db;
     private readonly ILocalAuthService _localAuth;
     private readonly DbStatusService _dbStatus;
+    private readonly IConfiguration _config;
+    private readonly IWebHostEnvironment _env;
 
-    public AuthController(SwimmDbContext db, ILocalAuthService localAuth, DbStatusService dbStatus)
+    public AuthController(SwimmDbContext db, ILocalAuthService localAuth, DbStatusService dbStatus,
+        IConfiguration config, IWebHostEnvironment env)
     {
         _db = db;
         _localAuth = localAuth;
         _dbStatus = dbStatus;
+        _config = config;
+        _env = env;
+    }
+
+    /// <summary>
+    /// returnUrl — только на свой сайт (<see cref="ReturnUrlRules"/>): иначе ссылка на наш вход или
+    /// выход уводила бы после него на чужой сайт.
+    /// </summary>
+    private string SafeReturnUrl(string? returnUrl)
+    {
+        var baseUrl = _config[SeoPages.BaseUrlKey] ?? SeoPages.DefaultBaseUrl;
+        var canonicalHost = Uri.TryCreate(baseUrl, UriKind.Absolute, out var b) ? b.Host : null;
+        return ReturnUrlRules.Safe(returnUrl, Request.Host.Host, canonicalHost, _env.IsLocalMachine());
     }
 
     /// <summary>
     /// Перенаправление входа через Google OAuth. После авторизации Google перенаправит на returnUrl.
     /// </summary>
+    /// <param name="reauth">
+    /// Повторный вход для подтверждения (удаление аккаунта, Р3): Google показывает выбор аккаунта,
+    /// а не проходит молча по своей сессии.
+    /// </param>
     [HttpGet("login/google")]
-    public IActionResult LoginGoogle([FromQuery] string? returnUrl = "/")
+    public IActionResult LoginGoogle([FromQuery] string? returnUrl = "/", [FromQuery] bool reauth = false)
     {
-        var properties = new AuthenticationProperties
-        {
-            RedirectUri = Url.Action(nameof(GoogleCallback), new { returnUrl })
-        };
+        var properties = reauth
+            ? new GoogleChallengeProperties { Prompt = "select_account" }
+            : new AuthenticationProperties();
+        properties.RedirectUri = Url.Action(nameof(GoogleCallback), new { returnUrl = SafeReturnUrl(returnUrl) });
         return Challenge(properties, GoogleDefaults.AuthenticationScheme);
     }
 
@@ -187,7 +209,8 @@ public class AuthController : Controller
         // Чистим транзитную куку OAuth-рукопожатия — она больше не нужна.
         await HttpContext.SignOutAsync(AuthSchemes.External);
 
-        return Redirect(returnUrl ?? "/");
+        // Ещё раз здесь, а не только в LoginGoogle: на callback можно прийти и прямой ссылкой.
+        return Redirect(SafeReturnUrl(returnUrl));
     }
 
     /// <summary>
@@ -202,7 +225,11 @@ public class AuthController : Controller
             new(ClaimTypes.Name, user.DisplayName),
             // Штамп безопасности — сверяется при каждой ре-валидации куки (OnValidatePrincipal).
             // Несовпадение с БД → принудительный sign-out (отзыв доступа / смена ролей / сброс пароля).
-            new(CookieSecurityStampValidator.SecurityStampClaim, user.SecurityStamp)
+            new(CookieSecurityStampValidator.SecurityStampClaim, user.SecurityStamp),
+            // Момент входа — для «свежего входа» при удалении аккаунта без пароля (Р3,
+            // docs/plans/account-deletion-plan.md). Claim переживает перевыпуск куки, IssuedUtc — нет.
+            new(AccountDeletionRules.AuthTimeClaim,
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture))
         };
         foreach (var ur in user.UserRoles)
             appClaims.Add(new Claim(ClaimTypes.Role, ur.Role.Name));
@@ -270,7 +297,7 @@ public class AuthController : Controller
     public async Task<IActionResult> Logout([FromQuery] string? returnUrl = "/")
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return Redirect(returnUrl ?? "/");
+        return Redirect(SafeReturnUrl(returnUrl));
     }
 
     /// <summary>
