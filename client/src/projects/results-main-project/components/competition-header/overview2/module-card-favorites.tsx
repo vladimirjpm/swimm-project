@@ -4,6 +4,7 @@ import { useAppSelector } from '../../../../../store/store';
 import { useFavoritesContext } from '../../../../../hooks/favorites-context';
 import { sortByFavoriteRank } from '../../../../../utils/helpers/favorites-order';
 import HelperSwimmer from '../../../../../utils/helpers/helper-swimmer';
+import HelperResults from '../../../../../utils/helpers/helper-results';
 import { initials } from './module-defs';
 import UI_SwimmerNameCell from '../../../../components/mix/swimmer-name-cell/swimmer-name-cell';
 
@@ -60,7 +61,9 @@ export default function ModuleCardFavorites({ onOpenSwimsScoped, onOpenClub }: P
         ageGroup: best?.age_group ?? '',
         best,
         medals,
-        count: swims.length,
+        // Неявки (NS) — строки протокола без заплыва: «2/3», а не «3».
+        swum: swims.filter((r: any) => !HelperResults.isNoStart(r)).length,
+        entered: swims.length,
       };
     })
     .filter((v): v is NonNullable<typeof v> => v != null);
@@ -142,8 +145,9 @@ export default function ModuleCardFavorites({ onOpenSwimsScoped, onOpenClub }: P
                       {c.best.international_points ? ` · ${c.best.international_points} pts` : ''}
                     </span>
                   )}
-                  <span className="text-[11px] font-bold" style={{ color: 'var(--m-solid)' }}>
-                    {c.count} swims
+                  <span className="text-[11px] font-bold" style={{ color: 'var(--m-solid)' }}
+                    title={c.entered > c.swum ? `${c.swum} swum of ${c.entered} entered` : undefined}>
+                    {HelperResults.swimsLabel(c.swum, c.entered)} swims
                   </span>
                 </span>
               </button>
@@ -181,7 +185,9 @@ export default function ModuleCardFavorites({ onOpenSwimsScoped, onOpenClub }: P
             style={{ borderColor: 'var(--theme-mode-border)' }}
           >
             <span className="text-[12px] font-bold" style={{ color: 'var(--theme-mode-text-secondary)' }}>
-              Favorite swims here — {favSwims.length} (by {favHere} swimmers)
+              Favorite swims here — {HelperResults.swimsLabel(
+                favSwims.filter((r: any) => !HelperResults.isNoStart(r)).length, favSwims.length,
+              )} (by {favHere} swimmers)
             </span>
             <span className="flex-1" />
             <button

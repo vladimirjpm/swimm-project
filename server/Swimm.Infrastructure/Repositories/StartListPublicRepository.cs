@@ -56,8 +56,10 @@ public class StartListPublicRepository : IStartListPublicRepository
         // всегда — и падает уже на живой БД, потому что in-memory провайдер выполняет
         // её как обычный LINQ (тот же класс ловушки, что Kind=Utc выше).
         // Объём ограничен окном: это заявки на ближайшие недели, тысячи строк, не миллионы.
+        // Дни с уже импортированным протоколом (CompetitionId != null) не в счёт — та же
+        // причина, что в GetUpcomingAsync.
         var rows = await _read.CompetitionEntries.AsNoTracking()
-            .Where(e => e.CompDate >= fromDate && e.CompDate <= toDate)
+            .Where(e => e.CompDate >= fromDate && e.CompDate <= toDate && e.CompetitionId == null)
             .Select(e => new { e.OrgCompId, e.CompName, e.CompDate, e.SwimmerId, e.PulledAt })
             .ToListAsync(ct);
 
@@ -225,10 +227,16 @@ public class StartListPublicRepository : IStartListPublicRepository
 
         // Отбор по CompDate, а не по HeatStartAt: у заплыва время может быть ещё не назначено,
         // и такие старты обязаны попасть в «ближайшие» — родителю важно, что старт вообще есть.
+        //
+        // CompetitionId != null — протокол дня уже импортирован (сшивка ставит его сама после
+        // импорта, StartListStitchService): старт прошёл, результат лежит в базе, и «ближайшим»
+        // он больше не является, даже если календарный день ещё не кончился. Именно день, а не
+        // всё соревнование: у многодневки, затянутой по первому дню, второй день ещё впереди.
         var rows = await BaseQuery()
             .Where(e => swimmerIds.Contains(e.SwimmerId)
                         && e.CompDate >= fromDate
-                        && e.CompDate <= toDate)
+                        && e.CompDate <= toDate
+                        && e.CompetitionId == null)
             .ToListAsync(ct);
 
         return rows

@@ -96,8 +96,13 @@ public sealed class SwimmerCompetitionDto
     [JsonPropertyName("waterKind")]
     public string WaterKind { get; set; } = "pool";
 
+    /// <summary>Проплытых заплывов: неявки (NS/DNS) не в счёт, снятые (DQ) — в счёт.</summary>
     [JsonPropertyName("swims")]
     public int Swims { get; set; }
+
+    /// <summary>Строк в протоколе, включая неявки. Больше <see cref="Swims"/> — витрина пишет «2/3».</summary>
+    [JsonPropertyName("entered")]
+    public int Entered { get; set; }
 
     [JsonPropertyName("points")]
     public int Points { get; set; }
@@ -584,9 +589,13 @@ public sealed class SwimmerSummaryDto
     [JsonPropertyName("medals")]
     public MedalCountsDto Medals { get; set; } = new();
 
-    /// <summary>Заплывов, включая эстафетные ноги.</summary>
+    /// <summary>Проплытых заплывов, включая эстафетные ноги. Неявки (NS/DNS) не в счёт.</summary>
     [JsonPropertyName("swims")]
     public int Swims { get; set; }
+
+    /// <summary>Строк в протоколе, включая неявки. Больше <see cref="Swims"/> — витрина пишет «2/3».</summary>
+    [JsonPropertyName("entered")]
+    public int Entered { get; set; }
 
     /// <summary>Дисциплин (стиль × дистанция × бассейн × категория), в которых были старты.</summary>
     [JsonPropertyName("events")]

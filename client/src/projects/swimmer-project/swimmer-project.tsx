@@ -14,6 +14,7 @@ import type {
 import { parseRoute, H2H_PARAM } from '../../utils/routes';
 import Helper from '../../utils/helpers/data-helper';
 import { seasonLabel } from '../../utils/helpers/season-helper';
+import HelperResults from '../../utils/helpers/helper-results';
 import { useSwimmerProfile } from './use-swimmer-profile';
 import {
   useSwimmerBestTimes, useSwimmerCompare, useSwimmerPersonalBests, useSwimmerProgress,
@@ -380,7 +381,7 @@ function SwimmerProject() {
                         </div>
                         <div className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                           <UI_DateIcon styleType="row-style-1" date={m.date} paddingClass="" fontClassName="text-[11px] font-bold" />
-                          <span>· {m.swims} swims</span>
+                          <span>· {HelperResults.swimsLabel(m.swims, m.entered ?? m.swims)} swims</span>
                         </div>
                       </div>
                       <span className="hp-mono shrink-0 text-[11.5px] font-extrabold" style={{ color: 'var(--deep-accent)' }}>

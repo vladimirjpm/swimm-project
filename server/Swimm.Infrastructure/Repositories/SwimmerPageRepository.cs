@@ -723,6 +723,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             ClubId = r.ClubId,
             AgeGroup = r.AgeGroup,
             EventStyleAge = r.EventStyleAge,
+            TimeFailNote = r.TimeFailNote,
         })
         .ToListAsync();
 

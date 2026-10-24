@@ -83,6 +83,11 @@
   с `age`), мастерский — его группа протокола «45-49» (срез с `age_group`). Одно правило
   `RankAmongPeers` на панель Season best и SB в H2H.
   → [plans/athlete-page-plan.md](plans/athlete-page-plan.md), «Перф».
+- **Счётчик заплывов — «проплыл/заявлен» (решение Влада 24.10.2026).** Неявка (NS/DNS) —
+  строка протокола без заплыва: заявлен на 3, не вышел на один — «2/3», а не «3». DQ и DNF —
+  старт был, идут в «проплыл». Правило одно — `StartStatus.IsNoStart` (клиент —
+  `HelperResults.isNoStart`, подпись `swimsLabel`).
+  → [competition-overview-cards.md](competition-overview-cards.md), «Панель клуба в табе Clubs».
 
 ## Сезон и возраст
 

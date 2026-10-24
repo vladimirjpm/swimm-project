@@ -4,6 +4,7 @@ import { useClubSummary } from '../../../../hooks/useClubSummary';
 import { routes } from '../../../../utils/routes';
 import UI_ClubPointsUnofficialChip from '../../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
 import type { Result } from '../../../../utils/interfaces/results';
+import HelperResults from '../../../../utils/helpers/helper-results';
 
 // Таб Clubs: клубный зачёт источника (/api/club-summary, фаза 3.4) + drill-down по клубу:
 // клик по строке → панель клуба справа (пловцы + разбор очков из загруженных результатов)
@@ -98,11 +99,13 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub, uno
     // все эстафеты клуба схлопываются в одну строку с названием клуба. Без пометки она
     // читается как пловец-фантом («кто этот пловец с именем клуба на 8 заплывов?»).
     // Бейдж «relay» тут такой же, как на вкладке Points.
-    const bySwimmer = new Map<string, { name: string; swims: number; gold: number; silver: number; bronze: number; bestPts: number; isRelay: boolean }>();
+    // swims — проплытые, entered — все строки протокола: неявка (NS) даёт «2/3».
+    const bySwimmer = new Map<string, { name: string; swims: number; entered: number; gold: number; silver: number; bronze: number; bestPts: number; isRelay: boolean }>();
     for (const r of clubRows) {
       const name = entrantOf(r);
-      const e = bySwimmer.get(name) ?? { name, swims: 0, gold: 0, silver: 0, bronze: 0, bestPts: 0, isRelay: false };
-      e.swims += 1;
+      const e = bySwimmer.get(name) ?? { name, swims: 0, entered: 0, gold: 0, silver: 0, bronze: 0, bestPts: 0, isRelay: false };
+      e.entered += 1;
+      if (!HelperResults.isNoStart(r)) e.swims += 1;
       if (r.is_relay) e.isRelay = true;
       const pos = placeOf(r);
       if (pos === 1) e.gold += 1;
@@ -287,7 +290,10 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub, uno
                           </span>
                         )}
                       </td>
-                      <td className="py-1.5 pr-2">{s.swims}</td>
+                      <td className="py-1.5 pr-2"
+                        title={s.entered > s.swims ? `${s.swims} swum of ${s.entered} entered` : undefined}>
+                        {HelperResults.swimsLabel(s.swims, s.entered)}
+                      </td>
                       <td className="py-1.5 pr-2 whitespace-nowrap">
                         {s.gold > 0 && `🥇${s.gold} `}
                         {s.silver > 0 && `🥈${s.silver} `}
