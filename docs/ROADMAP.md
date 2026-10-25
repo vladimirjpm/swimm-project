@@ -244,7 +244,7 @@
   Ручки `api/me/profile-setup`, правило `ProfileSetupRules`. `/privacy` дополнен. После завершения в меню тихий «My profile», новый шаг возвращает «Set up profile» с «New: …» (3b); у шагов есть отказ («Not a swimmer», «No club», «No group»).
   17.10 (хендофф ex3, не закоммичено): «I'm a parent» добавляет шаг «My family» — отметить детей
   семьёй, до 4; осталась выкатка миграции `AddUserProfileSkipFamily`. План — [plans/profile-setup-plan.md](plans/profile-setup-plan.md).
-- ✅ 4.7. (23.10.2026, не на проде) Кнопка «Delete account» на `/setup-profile` + удаление по письму
+- ✅ 4.7. (на проде с 24.10.2026, PR #140) Кнопка «Delete account» на `/setup-profile` + удаление по письму
   из `/Admin/Users` тем же сервисом (Р1–Р7 Влада); миграция `AccountDeletionSetNullUserRefs`.
   Передача группы (У6) — отдельно. План — [plans/account-deletion-plan.md](plans/account-deletion-plan.md).
 
