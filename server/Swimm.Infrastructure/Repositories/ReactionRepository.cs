@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
@@ -49,8 +50,14 @@ public class ReactionRepository : IReactionRepository
 
     public async Task<ReactionStateDto?> SetCheerAsync(int userId, long resultId, bool on)
     {
-        var exists = await _db.Results.AsNoTracking().AnyAsync(r => r.Id == resultId);
-        if (!exists) return null;
+        var row = await _db.Results.AsNoTracking()
+            .Where(r => r.Id == resultId)
+            .Select(r => new { r.TimeFail, r.TimeFailNote, Private = r.Swimmer.PrivateHubGroupId != null })
+            .FirstOrDefaultAsync();
+        if (row is null) return null;
+        // Поздравлять неявку не с чем (старта не было), пловца группы публично нет (Р71).
+        // Снять своё — можно всегда: иначе 🎉, поставленное до пометки, застряло бы навсегда.
+        if (on && (StartStatus.IsNoStart(row.TimeFail, row.TimeFailNote) || row.Private)) return null;
 
         await ToggleAsync(userId, on,
             r => r.Kind == "congrats" && r.ResultId == resultId,
@@ -61,6 +68,24 @@ public class ReactionRepository : IReactionRepository
             Count = await _db.UserReactions.CountAsync(r => r.Kind == "congrats" && r.ResultId == resultId),
             Mine = on,
         };
+    }
+
+    public async Task<IReadOnlyList<CheerStateDto>> GetCheersAsync(IReadOnlyCollection<long> resultIds, int? userId)
+    {
+        if (resultIds.Count == 0) return [];
+        var ids = resultIds.Distinct().ToList();
+
+        return await _db.UserReactions.AsNoTracking()
+            .Where(r => r.Kind == "congrats" && r.ResultId != null && ids.Contains(r.ResultId.Value))
+            .GroupBy(r => r.ResultId!.Value)
+            .Select(g => new CheerStateDto
+            {
+                ResultId = g.Key,
+                Count = g.Count(),
+                // Count(предикат), а не Any: агрегат с условием EF переводит в SQL по группе.
+                Mine = userId != null && g.Count(r => r.UserId == userId) > 0,
+            })
+            .ToListAsync();
     }
 
     private async Task ToggleAsync(

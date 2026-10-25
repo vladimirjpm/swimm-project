@@ -149,7 +149,6 @@ async function toggleReaction(url: string, on: boolean): Promise<{ count: number
 }
 
 export const toggleLike = (mediaId: number, on: boolean) => toggleReaction(`/api/media/${mediaId}/like`, on);
-/** Поздравить с заплывом. UI-вызова сейчас НЕТ: на `/my-media` 🎉 только показывается —
- *  страница про своих пловцов, и поздравлять там некого (решение Влада 08.09.2026).
- *  Обёртка остаётся под экран, где поздравляют ЧУЖОЙ заплыв (витрина группы). */
-export const toggleCheer = (resultId: number, on: boolean) => toggleReaction(`/api/results/${resultId}/cheer`, on);
+// Поздравить с заплывом — НЕ здесь: на `/my-media` 🎉 только показывается (страница про своих
+// пловцов, решение Влада 08.09.2026). Кнопка живёт в протоколе и `SwimRow` — `UI_CheerButton`
+// со своим хранилищем `hooks/useCheers.ts` (этап 1, 25.10.2026).

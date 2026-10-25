@@ -108,6 +108,9 @@ function SwimmerResultRow({ row, swimmerId, gender, extras }: Props) {
       points={row.points ?? null}
       extras={extras}
       level={{ gender, ageInSeason: row.ageInSeason, isMasters: !!row.isMasters }}
+      // Причины снятия в строке пловца нет — неявку от DQ не отличить, поэтому 🎉 нет у
+      // любой снятой строки. Здесь лучшие времена, снятых в них почти не бывает.
+      cheer={{ resultId: row.resultId, noStart: !!row.timeFail }}
     />
   );
 }

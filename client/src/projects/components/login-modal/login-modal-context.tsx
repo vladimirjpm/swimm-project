@@ -29,6 +29,14 @@ export function LoginModalProvider({ children }: { children: React.ReactNode }) 
   );
 }
 
+/**
+ * Тот же контекст, но без исключения: для общих компонентов (кнопка 🎉), которые стоят и на
+ * страницах без провайдера. null — провайдера нет, гостевой CTA просто не открывает окно.
+ */
+export function useOptionalLoginModal(): LoginModalContextValue | null {
+  return useContext(LoginModalContext);
+}
+
 export function useLoginModal(): LoginModalContextValue {
   const ctx = useContext(LoginModalContext);
   if (!ctx) {
