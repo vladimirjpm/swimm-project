@@ -265,12 +265,12 @@ public class JsonImportService : IImportService
 
                 // После коммита — шаги-приборы: каждый в своём try/catch, уронить загруженное не вправе.
                 await RecalcCombinedAsync();
+                await StitchStartListAsync();
                 await ScanQualityAsync();
                 await ClearImplausibleLegsAsync();
                 await ReconcileWithFileAsync();
                 await AlignGendersAsync();
                 await RerankOpenWaterAsync();
-                await StitchStartListAsync();
                 await SyncClubGroupsAsync();
                 await RunDataChecksAsync();
 
@@ -1347,8 +1347,10 @@ public class JsonImportService : IImportService
         }
 
         // Сшивка стартового протокола с результатами (шаг С9, docs/plans/start-list-plan.md):
-        // заявка получает свой результат либо становится неявкой. Идёт ДО прогона проверок,
-        // чтобы entries.no-show-unmatched увидел уже проставленные статусы. Как и соседи —
+        // заявка получает свой результат либо становится неявкой. Идёт ДО скана качества — правилу
+        // seed_time_jump (И-55) нужен уже проставленный ResultId — и ДО прогона проверок, чтобы
+        // entries.no-show-unmatched увидел проставленные статусы. Сшивка смотрит только на день,
+        // дисциплину, заплыв, дорожку и пловца, и шаги между ней и сканом её входа не меняют. Как и соседи —
         // после коммита и в try/catch: сшивка не имеет права уронить импорт.
         private async Task StitchStartListAsync()
         {

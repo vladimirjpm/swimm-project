@@ -61,6 +61,10 @@ internal static class StartListCli
             Console.WriteLine($"  сматчено по дисциплине, а не по дорожке: {report.MatchedByDiscipline}");
         if (report.Unlinked > 0)
             Console.WriteLine($"  не удалось отнести ни к одному дню: {report.Unlinked}");
+        // На импорте скан идёт сам, после сшивки. Здесь протокол лежал раньше заявок, и правило
+        // seed_time_jump (И-55) их ещё не видело.
+        if (report.Swum > 0)
+            Console.WriteLine("  заявочные времена появились — перепроверьте качество: --quality-scan <eventId>");
         return;
     }
 }

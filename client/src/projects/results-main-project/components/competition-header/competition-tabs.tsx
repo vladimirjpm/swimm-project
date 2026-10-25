@@ -1,5 +1,6 @@
 import React from 'react';
 import type { CompetitionOverview, CompetitionTab } from './types';
+import { isConfirmedRecord } from './types';
 import { PAGE_CONTAINER } from '../../../../utils/layout';
 
 // Табы шапки соревнования (паттерн GroupTabs: primary + внутренний bg-black/10).
@@ -22,9 +23,10 @@ export default function CompetitionTabs({ overview, activeTab, onTabChange, medi
     { tab: 'overview', label: 'Overview' },
     { tab: 'swims', label: 'Swims', count: overview?.summary.result_count },
     { tab: 'clubs', label: 'Clubs', count: overview?.summary.club_count },
-    // Records — только когда рекорды есть (v1 сервер отдаёт пусто → таба нет)
+    // Records — когда рекорды есть, хотя бы «под вопросом»; в счётчике — только без пометки
+    // (Р76, 25.10.2026): рекорд помеченной строки виден в табе, но не считается.
     ...(overview?.records.length
-      ? [{ tab: 'records' as const, label: 'Records', count: overview.records.length }]
+      ? [{ tab: 'records' as const, label: 'Records', count: overview.records.filter(isConfirmedRecord).length }]
       : []),
     { tab: 'media', label: 'Media', count: mediaCount },
     // Start list — когда у соревнования есть хоть один источник протокола: привязки в

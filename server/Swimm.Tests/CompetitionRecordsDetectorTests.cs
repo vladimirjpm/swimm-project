@@ -37,6 +37,42 @@ public class CompetitionRecordsDetectorTests
     }
 
     /// <summary>
+    /// И-55 (comp 1772, 200 вольным девушки 14-15, заплыв 1): сбой хронометража, строки
+    /// помечены. Решение Влада 25.10.2026 (Р76): рекорд, который заявляет помеченная строка,
+    /// показываем с её причиной, но чистый рекорд той же клетки он не вытесняет.
+    /// </summary>
+    [Fact]
+    public void FlaggedRow_RecordShownWithReason_CleanRecordKept()
+    {
+        var age14 = Rec("age", "14", "02:01.35", style: "freestyle", distance: "200m", gender: "female", pool: "25m");
+        var flagged = Row(114_380, birthYear: 2012, time: "01:54.38", style: "freestyle", distance: "200",
+            gender: "female", pool: "25m", resultId: 6133775) with { SuspectReason = "manual" };
+        var clean = Row(119_000, birthYear: 2012, time: "01:59.00", style: "freestyle", distance: "200",
+            gender: "female", pool: "25m", resultId: 7);
+
+        var result = CompetitionRecordsDetector.Detect([age14], [flagged, clean]);
+
+        // Чистый 01:59.00 — рекорд как был (раньше помеченный быстрее его бы «съел»).
+        Assert.Contains(result, r => r.ResultId == 7 && r.SuspectReason is null);
+        // Помеченный — тоже в списке, с причиной: витрина рисует чип и не считает его.
+        var shown = Assert.Single(result, r => r.ResultId == 6133775);
+        Assert.Equal("manual", shown.SuspectReason);
+        Assert.Equal("Age 14 record", shown.Kind);
+    }
+
+    [Fact]
+    public void FlaggedRow_SlowerThanCleanRecordOfSameCell_NotShown()
+    {
+        var rec = Rec("age", "10", "45.00");
+        var clean = Row(40_000, resultId: 1);
+        var flagged = Row(42_000, resultId: 2) with { SuspectReason = "manual" };
+
+        var result = CompetitionRecordsDetector.Detect([rec], [clean, flagged]);
+
+        Assert.Equal(1, Assert.Single(result).ResultId);
+    }
+
+    /// <summary>
     /// Реальный случай, на котором ось всплыла: מיה גרינברג, 2015 г.р., 50 брассом 39.02 на
     /// старте 31/10/2025. По календарю (ось федерации) ей 10, по сезону 2025/26 — 11, и
     /// сверка попадает в РАЗНЫЕ ступени справочника. Осень — единственное место, где оси

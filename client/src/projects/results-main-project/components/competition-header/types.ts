@@ -155,7 +155,8 @@ export interface OverviewRecord {
   distance: string;
   gender: string;
   time: string;
-  /** Ошибка протокола (И11). У рекорда почти всегда null: помеченные заплывы рекордов не бьют. */
+  /** Пометка качества строки (И11). Не null — рекорд заявлен протоколом, но строка под
+   *  сомнением: показываем с чипом «Under review», в счётчики не берём (Р76, 25.10.2026). */
   suspect_reason?: string | null;
   holder_name: string;
   swimmer_id: number;
@@ -165,6 +166,9 @@ export interface OverviewRecord {
   day_number: number | null;
   result_id: number | null;
 }
+
+/** Рекорд без пометки качества — только такие идут в счётчики («2 records», таб, плитка). */
+export const isConfirmedRecord = (r: OverviewRecord): boolean => !r.suspect_reason;
 
 /** Один источник стартового протокола: compID + подпись подтаба (дата и номер). */
 export interface StartListSource {
