@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import type { CompetitionOverview, OverviewRecord } from '../types';
+import { isConfirmedRecord } from '../types';
 import { initials } from './module-defs';
 import UI_SwimTime from '../../../../components/mix/swim-time/swim-time';
 
@@ -9,7 +10,8 @@ import UI_SwimTime from '../../../../components/mix/swim-time/swim-time';
 //
 // ПРАВИЛА КАРТОЧКИ — docs/competition-overview-cards.md (раздел New records). Кратко:
 //   рекорды ищет CompetitionRecordsDetector по оси пол|бассейн|стиль|дистанция|категория|
-//   возраст; результаты с пометкой качества (SuspectReason) рекорд НЕ бьют.
+//   возраст. Рекорд строки с пометкой качества (SuspectReason) виден с чипом «Under review»,
+//   но в счётчики («N records», «N rec», витрина лидера) не идёт (Р76, 25.10.2026).
 
 interface Props {
   overview: CompetitionOverview;
@@ -22,7 +24,10 @@ interface HolderGroup {
   swimmer_id: number;
   club: string | null;
   age_group: string;
+  /** Рекорды без пометки — только они в «N rec» и у лидера. */
   records: OverviewRecord[];
+  /** Рекорды помеченных строк: показываем чипом «Under review», не считаем. */
+  review: OverviewRecord[];
 }
 
 export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: Props) {
@@ -38,13 +43,19 @@ export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: P
           club: rec.club,
           age_group: rec.age_group,
           records: [],
+          review: [],
         };
         map.set(key, group);
       }
-      group.records.push(rec);
+      (isConfirmedRecord(rec) ? group.records : group.review).push(rec);
     }
-    return Array.from(map.values()).sort((a, b) => b.records.length - a.records.length);
+    return Array.from(map.values())
+      .sort((a, b) => b.records.length - a.records.length || b.review.length - a.review.length);
   }, [overview.records]);
+
+  const confirmedCount = holders.reduce((n, g) => n + g.records.length, 0);
+  const reviewCount = holders.reduce((n, g) => n + g.review.length, 0);
+  const confirmedHolders = holders.filter((g) => g.records.length > 0).length;
 
   if (overview.records.length === 0 || holders.length === 0) {
     return (
@@ -57,22 +68,24 @@ export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: P
     );
   }
 
-  const leader = holders[0];
+  // Витрина лидера — только среди подтверждённых; одни «под вопросом» — витрины нет.
+  const leader = holders[0].records.length > 0 ? holders[0] : null;
 
   function openHolder(group: HolderGroup) {
-    const first = group.records.find((r) => r.result_id != null);
+    const first = [...group.records, ...group.review].find((r) => r.result_id != null);
     if (first) onOpenSwim?.(first);
   }
 
   return (
     <section className="ov2-card" data-module="records">
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.7fr)_268px] gap-5 items-start">
+      <div className={`grid grid-cols-1 gap-5 items-start ${leader ? 'lg:grid-cols-[minmax(0,1.7fr)_268px]' : ''}`}>
         {/* Левая колонка: список рекордсменов */}
         <div className="min-w-0 flex flex-col">
           <div className="mb-2 flex items-baseline gap-2.5">
             <span className="ov2-card__title">New records</span>
             <span className="text-[12px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}>
-              {overview.records.length} records · {holders.length} swimmers
+              {confirmedCount} records · {confirmedHolders} swimmers
+              {reviewCount > 0 && ` · ${reviewCount} under review`}
             </span>
             <span className="flex-1" />
             <button type="button" className="ov2-card__link" onClick={() => onOpenTab('records')}>
@@ -81,11 +94,15 @@ export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: P
           </div>
 
           {holders.map((group, i) => (
-            <button
+            // div, а не button: внутри может стоять чип «Under review» — он сам кнопка
+            // (объяснялка), а кнопка в кнопке — невалидная разметка.
+            <div
               key={group.holder_name + i}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => openHolder(group)}
-              className="flex items-center gap-2.5 py-2 text-[13px] font-bold min-w-0 text-left"
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openHolder(group); } }}
+              className="flex cursor-pointer items-center gap-2.5 py-2 text-[13px] font-bold min-w-0 text-left"
               style={{
                 color: 'var(--theme-mode-text)',
                 borderTop: i > 0 ? '1px solid var(--theme-mode-border)' : undefined,
@@ -107,8 +124,12 @@ export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: P
                 </span>
               </span>
               <span className="flex-1" />
-              <span className="ov2-card__chip">{group.records.length} rec</span>
-            </button>
+              {group.records.length > 0 && <span className="ov2-card__chip">{group.records.length} rec</span>}
+              {group.review.length > 0 && (
+                <UI_SwimTime time="" marker="chip" chipSize="sm"
+                  quality={{ kind: 'protocol', reason: group.review[0].suspect_reason ?? 'manual' }} />
+              )}
+            </div>
           ))}
 
           <button
@@ -117,11 +138,12 @@ export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: P
             style={{ fontSize: '12.5px' }}
             onClick={() => onOpenTab('records')}
           >
-            All {holders.length} record breakers →
+            {confirmedHolders > 0 ? `All ${confirmedHolders} record breakers →` : 'Records tab →'}
           </button>
         </div>
 
         {/* Правая колонка: витрина лидера */}
+        {leader && (
         <button type="button" className="ov2-card__hero" onClick={() => openHolder(leader)}>
           <span
             className="rounded-full px-2.5 py-0.5 text-[10px] font-extrabold tracking-wide"
@@ -182,6 +204,7 @@ export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: P
             ))}
           </span>
         </button>
+        )}
       </div>
     </section>
   );

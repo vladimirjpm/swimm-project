@@ -88,6 +88,11 @@
   старт был, идут в «проплыл». Правило одно — `StartStatus.IsNoStart` (клиент —
   `HelperResults.isNoStart`, подпись `swimsLabel`).
   → [competition-overview-cards.md](competition-overview-cards.md), «Панель клуба в табе Clubs».
+- **Рекорд помеченной строки виден, но не считается (решение Влада 25.10.2026, исключение в Р76).**
+  New records и таб Records показывают рекорд, который заявляет строка с `SuspectReason`, с чипом
+  «⚠ Under review»; в счётчики он не идёт, чистый рекорд той же клетки не вытесняет, справочник
+  `Records` не трогается. Бейдж в строке протокола, Best swim, SB, High Point — по-прежнему нет.
+  → [competition-overview-cards.md](competition-overview-cards.md), «New records»; [data-integrity.md](data-integrity.md) Р76, И-55.
 
 ## Сезон и возраст
 

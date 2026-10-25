@@ -45,7 +45,8 @@ public sealed record RecordCandidateRow(
     string AgeGroup,
     bool IsRelay = false,
     IReadOnlyList<int>? MemberBirthYears = null,
-    string? TeamName = null);
+    string? TeamName = null,
+    string? SuspectReason = null);
 
 /// <summary>
 /// Детекция «новых рекордов» соревнования: результат быстрее (или равен) действующему
@@ -57,10 +58,29 @@ public sealed record RecordCandidateRow(
 /// </summary>
 public static class CompetitionRecordsDetector
 {
+    /// <summary>
+    /// Рекорды соревнования для карточки New records и таба Records.
+    ///
+    /// Строки с пометкой качества (<see cref="RecordCandidateRow.SuspectReason"/>) ищутся
+    /// ОТДЕЛЬНО от чистых (решение Влада 25.10.2026, Р76): рекорд, который заявляет
+    /// протокол, показываем с чипом «Under review», но в счётчики он не идёт и чистый
+    /// рекорд той же клетки не вытесняет. Иначе ложное 1:44.66 «перебило» бы настоящий
+    /// рекорд того же заплыва. Помеченный остаётся, только если чистого быстрее (или
+    /// равного) в той же клетке нет.
+    /// </summary>
     public static List<OverviewRecordDto> Detect(
         IReadOnlyCollection<Record> records, IReadOnlyCollection<RecordCandidateRow> rows,
-        RecordAgeAxis axis = RecordAgeAxis.Calendar) =>
-        DetectBest(records, rows, axis)
+        RecordAgeAxis axis = RecordAgeAxis.Calendar)
+    {
+        var clean = DetectBest(records, rows.Where(r => r.SuspectReason is null).ToList(), axis);
+        var flagged = DetectBest(records, rows.Where(r => r.SuspectReason is not null).ToList(), axis)
+            .Where(f => !clean.Any(c => ReferenceEquals(c.Rec, f.Rec)
+                                        && c.Row.TimeMilliseconds <= f.Row.TimeMilliseconds));
+
+        return clean.Concat(flagged)
+            .OrderBy(b => b.Row.DayNumber ?? int.MaxValue)
+            .ThenBy(b => b.Row.StyleName)
+            .ThenBy(b => TrimDistance(b.Row.Distance).Length)
             .Select(b => new OverviewRecordDto
             {
                 Kind = KindLabel(b.Rec),
@@ -68,6 +88,7 @@ public static class CompetitionRecordsDetector
                 Distance = b.Row.Distance,
                 Gender = b.Row.Gender,
                 Time = b.Row.TimeOriginal,
+                SuspectReason = b.Row.SuspectReason,
                 HolderName = b.Row.IsRelay
                     ? b.Row.TeamName ?? b.Row.Club
                     : $"{b.Row.FirstName} {b.Row.LastName}".Trim(),
@@ -78,6 +99,7 @@ public static class CompetitionRecordsDetector
                 ResultId = b.Row.ResultId
             })
             .ToList();
+    }
 
     /// <summary>
     /// Побитые рекорды парами «заплыв ↔ рекорд». Отдельно от <see cref="Detect"/>, потому что

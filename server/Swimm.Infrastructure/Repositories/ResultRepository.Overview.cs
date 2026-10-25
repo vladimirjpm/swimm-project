@@ -897,13 +897,13 @@ public partial class ResultRepository
     {
         var records = await GetIsraelRecordsAsync();
         // SuspectReason != null — строка помечена как недостоверная (ошибка источника,
-        // напр. 00:32.59 на 100 м баттерфляем в протоколе Маккабиады). Такие в рекорды
-        // не берём: иначе они «бьют» национальный рекорд. Из результатов соревнования
-        // при этом НЕ убираются — заплыв был, время в протоколе есть.
+        // напр. 00:32.59 на 100 м баттерфляем в протоколе Маккабиады). Её рекорд показываем
+        // с чипом «Under review», но в счётчики он не идёт и чистый рекорд не вытесняет —
+        // детектор ищет такие строки отдельно (решение Влада 25.10.2026, Р76).
         var candidateRows = await query
             // Эстафеты — с Э4б (records-relays-plan): состав и команда едут вместе со строкой,
             // пол «none» детектор сам пропустит.
-            .Where(r => !r.TimeFail && r.TimeMillisecond != null && r.SuspectReason == null)
+            .Where(r => !r.TimeFail && r.TimeMillisecond != null)
             .Select(r => new RecordCandidateRow(
                 r.Id, r.SwimmerId, r.Swimmer.FirstName, r.Swimmer.LastName, r.Club.Name,
                 r.Style.Name, r.Distance, r.Gender, r.Competition.PoolType,
@@ -911,7 +911,8 @@ public partial class ResultRepository
                 r.TimeOriginal, r.Competition.DayNumber, r.Competition.IsMasters, r.AgeGroup,
                 r.RelayId != null,
                 r.RelayId != null ? r.Relay!.Members.Select(m => m.Swimmer.BirthYear).ToList() : null,
-                r.RelayId != null ? r.Relay!.TeamName : null))
+                r.RelayId != null ? r.Relay!.TeamName : null,
+                r.SuspectReason))
             .ToListAsync();
         // Ось возраста для сверки со справочником — глобальная настройка RecordAgeAxis
         // (дефолт calendar = как ведёт справочник федерация), см. docs/data-integrity.md §13.

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CompetitionOverview } from '../types';
+import { isConfirmedRecord } from '../types';
 import type { CompetitionMediaItem } from '../../../../../hooks/useCompetitionMedia';
 import { useFavoritesContext } from '../../../../../hooks/favorites-context';
 import { MODULE_ORDER, MODULE_LABEL, isModuleKey, initials, type ModuleKey } from './module-defs';
@@ -123,8 +124,11 @@ export default function CompetitionOverview2({
   // --- итоги на плитках (9d): медальон + имя лидера + подпись ---
   const leaderClub = overview.top_clubs[0] ?? null;
 
+  // Плитка считает только рекорды без пометки; «под вопросом» — отдельной припиской (Р76).
+  const confirmedRecords = overview.records.filter(isConfirmedRecord);
+  const reviewRecords = overview.records.length - confirmedRecords.length;
   const recordsByHolder = new Map<string, number>();
-  for (const r of overview.records) {
+  for (const r of confirmedRecords) {
     recordsByHolder.set(r.holder_name, (recordsByHolder.get(r.holder_name) ?? 0) + 1);
   }
   const topHolder = [...recordsByHolder.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
@@ -157,7 +161,8 @@ export default function CompetitionOverview2({
     records: {
       medal: topHolder?.[1] ?? 0,
       name: topHolder?.[0] ?? '—',
-      sub: `${overview.records.length} records · ${recordsByHolder.size} swimmers`,
+      sub: `${confirmedRecords.length} records · ${recordsByHolder.size} swimmers`
+        + (reviewRecords ? ` · ${reviewRecords} under review` : ''),
     },
     champions: {
       medal: champion?.international_points ?? '—',

@@ -54,13 +54,14 @@ public class OverviewNewRecordsCardTests
     }
 
     /// <summary>
-    /// Помеченная ошибка протокола (32.59 на 100 батт. у Маккабиады) рекорд не бьёт, и
-    /// DSQ — тоже: время в протоколе есть, но заплыв не засчитан.
+    /// Помеченная ошибка протокола (32.59 на 100 батт. у Маккабиады) — рекорд, который заявляет
+    /// протокол, в списке есть, но с причиной пометки: витрина рисует чип «Under review» и не
+    /// считает его (решение Влада 25.10.2026, Р76). DSQ — не рекорд вовсе: заплыв не засчитан.
     /// </summary>
     [Fact]
-    public async Task SuspectAndTimeFailRows_DoNotBreakRecords()
+    public async Task SuspectRow_RecordListedWithReason_TimeFailRow_NotListed()
     {
-        var (kit, comp) = await SeedAsync(nameof(SuspectAndTimeFailRows_DoNotBreakRecords));
+        var (kit, comp) = await SeedAsync(nameof(SuspectRow_RecordListedWithReason_TimeFailRow_NotListed));
         await using var _ = kit;
         var typo = await kit.AddSwimmerAsync("Typo");
         var dsq = await kit.AddSwimmerAsync("Dsq");
@@ -70,7 +71,9 @@ public class OverviewNewRecordsCardTests
         failed.TimeFail = true;
         await kit.AddRowsAsync(suspect, failed);
 
-        Assert.Empty((await kit.OverviewAsync(comp)).Records);
+        var record = Assert.Single((await kit.OverviewAsync(comp)).Records);
+        Assert.Equal(suspect.Id, record.ResultId);
+        Assert.Equal("time_vs_distance", record.SuspectReason);
     }
 
     /// <summary>Строка без времени в мс (не распарсилось) — не кандидат, а не «рекорд за 0».</summary>

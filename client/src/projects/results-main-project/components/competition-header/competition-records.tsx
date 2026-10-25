@@ -1,10 +1,12 @@
 import React from 'react';
 import type { CompetitionOverview } from './types';
-import UI_SwimTime from '../../../components/mix/swim-time/swim-time';
+import UI_SwimTime, { swimFlaggedRowProps } from '../../../components/mix/swim-time/swim-time';
 
 // Таб Records: рекорды, установленные на соревновании (overview.records; сам таб
 // рендерится только когда список непуст). Строка: бейдж вида + событие+время +
 // пловец·клуб + Day N (НАВ-контракт: диплинк на заплыв — следующий шаг).
+// Рекорд помеченной строки (suspect_reason) — с чипом «Under review» и лентой помеченной
+// строки (Р76, 25.10.2026): протокол его заявляет, мы не подтверждаем.
 
 export default function CompetitionRecords({
   overview,
@@ -31,12 +33,16 @@ export default function CompetitionRecords({
           No records were set at this competition.
         </div>
       ) : (
-        records.map((r, i) => (
+        records.map((r, i) => {
+          const quality = r.suspect_reason ? { kind: 'protocol' as const, reason: r.suspect_reason } : null;
+          const flagged = swimFlaggedRowProps(quality);
+          return (
           <div
             key={i}
+            {...flagged}
             className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-t py-2.5 first:border-t-0 ${
               onOpenSwim && r.result_id != null ? 'cursor-pointer hover:underline' : ''
-            }`}
+            } ${quality ? `${flagged.className} pl-3` : ''}`}
             style={{ borderColor: 'var(--theme-mode-border)' }}
             onClick={onOpenSwim && r.result_id != null ? () => onOpenSwim(r) : undefined}
           >
@@ -51,10 +57,7 @@ export default function CompetitionRecords({
             </span>
             <span className="text-[13px] font-extrabold">
               {r.distance}m {r.style_name} —{' '}
-              <UI_SwimTime
-                time={r.time}
-                quality={r.suspect_reason ? { kind: 'protocol', reason: r.suspect_reason } : null}
-              />
+              <UI_SwimTime time={r.time} quality={quality} marker="chip" chipSize="sm" />
             </span>
             <span className="text-[12.5px] font-semibold" dir="auto" style={{ color: 'var(--theme-mode-text-secondary)' }}>
               {r.holder_name}
@@ -66,7 +69,8 @@ export default function CompetitionRecords({
               </span>
             )}
           </div>
-        ))
+          );
+        })
       )}
     </div>
   );
