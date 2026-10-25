@@ -15,6 +15,7 @@ import UI_PrelimLabel from '../../components/mix/prelim-label/prelim-label';
 import UI_RoundLabel from '../../components/mix/round-label/round-label';
 import HelperResults from '../../../utils/helpers/helper-results';
 import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-best-badge';
+import UI_CheerButton from '../../components/mix/cheer-button/cheer-button';
 
 const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
   res,
@@ -108,6 +109,7 @@ const ResultsTable2xl: React.FC<ResultsTableRowProps> = ({
             onToggleFavorite={onToggleFavorite}
             onTogglePrimary={onTogglePrimary}
           />
+          <UI_CheerButton className="ml-1" resultId={res.id} noStart={HelperResults.isNoStart(res)} />
         </div>
         <UI_SwimmerGallery gallery={res.gallery} />
       </div>

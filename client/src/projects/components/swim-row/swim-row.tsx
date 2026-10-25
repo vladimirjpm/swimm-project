@@ -14,6 +14,7 @@ import UI_SwimmerNameCell from '../mix/swimmer-name-cell/swimmer-name-cell';
 import UI_NormativeLevelIcon from '../mix/normative-level-icon/normative-level-icon';
 import UI_RankOfPeers from '../mix/rank-of-peers/rank-of-peers';
 import UI_RecordBadge, { type RecordKind } from '../mix/record-badge/record-badge';
+import UI_CheerButton from '../mix/cheer-button/cheer-button';
 import Helper from '../../../utils/helpers/data-helper';
 
 /**
@@ -176,6 +177,11 @@ export interface SwimRowProps {
   href?: string;
   /** Кнопка «есть видео» (пока передаёт только карточка спортсмена). */
   onOpenMedia?: (() => void) | null;
+  /**
+   * 🎉 «поздравить» (`UI_CheerButton`, этап 1, 25.10.2026) — во второй линии, рядом с видео.
+   * Нет id результата или неявка — кнопки нет. Счётчики кнопка спрашивает сама, пачкой.
+   */
+  cheer?: { resultId?: number | null; noStart?: boolean } | null;
   className?: string;
 }
 
@@ -239,8 +245,10 @@ function SwimRow({
   extras,
   href,
   onOpenMedia,
+  cheer = null,
   className = '',
 }: SwimRowProps) {
+  const showCheer = cheer?.resultId != null && !cheer.noStart;
   const flagged = swimFlaggedRowProps(quality);
 
   // Уровень считает клиент из NormativeStandard — вторая реализация на сервере разъехалась
@@ -274,6 +282,7 @@ function SwimRow({
     (meetSide === 'line2' && !!competition) ||
     !!extras ||
     !!onOpenMedia ||
+    showCheer ||
     !!levelInfo;
 
   const body = (
@@ -399,6 +408,8 @@ function SwimRow({
           </div>
 
           {extras && <span className="swim-row__extras">{extras}</span>}
+
+          {showCheer && <UI_CheerButton resultId={cheer!.resultId} noStart={cheer!.noStart} />}
 
           {onOpenMedia && (
             <button

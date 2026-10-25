@@ -42,6 +42,33 @@ public class ReactionsController : ControllerBase
     [HttpDelete("/api/results/{id:long}/cheer")]
     public Task<IActionResult> Uncheer(long id) => ToggleCheer(id, on: false);
 
+    /// <summary>Сколько id принимает чтение за раз: клиент режет длинные списки на пачки.</summary>
+    public const int MaxCheerIds = 500;
+
+    /// <summary>
+    /// 🎉 пачки заплывов для витрины: <c>?ids=1,2,3</c>. Читать может и гость (число публично,
+    /// имён в ответе нет) — <c>mine</c> у него всегда false. Ответ личный (<c>mine</c>), поэтому
+    /// без кэша; лимит реакций сюда не применяется — страница протокола спрашивает пачками, а
+    /// запрос дешёвый и ограничен <see cref="MaxCheerIds"/>.
+    /// </summary>
+    [HttpGet("/api/results/cheers")]
+    [AllowAnonymous]
+    [DisableRateLimiting]
+    public async Task<IActionResult> GetCheers([FromQuery] string? ids)
+    {
+        var parsed = (ids ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => long.TryParse(s, out var v) ? v : 0)
+            .Where(v => v > 0)
+            .Distinct()
+            .ToList();
+        if (parsed.Count == 0) return Ok(Array.Empty<object>());
+        if (parsed.Count > MaxCheerIds) return BadRequest(new { error = $"At most {MaxCheerIds} ids" });
+
+        Response.Headers.CacheControl = "private, no-store";
+        return Ok(await _reactions.GetCheersAsync(parsed, CurrentUserId()));
+    }
+
     private async Task<IActionResult> ToggleLike(int mediaId, bool on)
     {
         var userId = CurrentUserId();

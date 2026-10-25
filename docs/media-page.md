@@ -51,7 +51,7 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
   (список + add/remove) + standalone `addUserMedia()` + пикеры `fetchSwimmerCompetitionsBrief`/
   `fetchSwimmerResultsBrief`/`fetchPublishTargets`.
 - `client/src/projects/my-media-project/use-my-swims.ts` — хук `useMySwims` (агрегат
-  `GET /api/me/swims`) + `toggleLike`/`toggleCheer`.
+  `GET /api/me/swims`) + `toggleLike` (🎉 — в `hooks/useCheers.ts`).
 - `client/src/hooks/useUserMedia.ts` — более старый хук `useUserMedia(swimmerId)`
   (личное медиа одного пловца — используется на карточке пловца/результатов, НЕ на
   странице My media) + `useMyMediaPublications` (публикации — переиспользуется my-media.tsx).
@@ -127,7 +127,11 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 - `GET /api/swimmers/{id}/competitions-brief`, `GET /api/swimmers/{id}/results-brief?competitionId=` —
   пикер шага 3 Add link (`UserMediaRepository.GetSwimmerCompetitionsBriefAsync`/`GetSwimmerResultsBriefAsync`).
 - `POST/DELETE /api/media/{id}/like`, `POST/DELETE /api/results/{id}/cheer` — реакции,
-  политика `[EnableRateLimiting("reactions")]` (60/мин по userId, см. `Program.cs`).
+  политика `[EnableRateLimiting("reactions")]` (60/мин по userId, см. `Program.cs`). 🎉 нельзя
+  поставить неявке (NS/DNS) и пловцу группы (Р71) — 404; снять своё можно всегда.
+- `GET /api/results/cheers?ids=1,2,3` — 🎉 пачки заплывов (до 500 id): только ненулевые,
+  `{result_id, count, mine}`. Читает и гость (число публично, имён нет), без кэша (`mine`
+  личный) и без лимита реакций. Клиент — `hooks/useCheers.ts` + `UI_CheerButton`.
 - `GET /api/media/results?competitionId=|eventId=|group=` — публично видимое медиа
   результатов (свой + одобренные публикации), использует `useCompetitionMedia`.
 - `POST /api/admin/media/check-links` — админ-эндпоинт здоровья ссылок, см. §8.
@@ -250,8 +254,10 @@ mobile; `swimmers` = полный список (favorites + «has media»), бе
 `/api/me/swims` (`likeOverrides`, Map по id медиа) — тоггл сразу меняет счётчик локально, сервер
 подтверждает/поправляет асинхронно (`toggleLike` из `use-my-swims.ts`, идемпотентный,
 возвращает итоговый `{count, mine}`). 🎉 на странице только показывается (`CheerChip` в
-`swim-list.tsx`); `toggleCheer` в `use-my-swims.ts` есть, но страница его не зовёт, и
-оверрайдов для 🎉 нет (сверено 10.10.2026).
+`swim-list.tsx`), оверрайдов для 🎉 нет. Ставят 🎉 с 25.10.2026 в протоколе, на странице
+пловца и в группе — `UI_CheerButton` со своим хранилищем `hooks/useCheers.ts` (этап 1;
+этап 2 — имена поздравивших владельцу и push-сводка — не сделан). Старая обёртка
+`toggleCheer` из `use-my-swims.ts` убрана.
 
 ### Светлая тема: две роли только для неё
 

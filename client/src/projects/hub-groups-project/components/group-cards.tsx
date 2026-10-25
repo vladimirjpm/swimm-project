@@ -418,6 +418,7 @@ function GroupSwimRow({ r, showCompetition = false }: { r: HubGroupRecentResult;
       competition={showCompetition ? { name: r.competition } : null}
       date={r.date}
       points={r.international_points}
+      cheer={{ resultId: r.id, noStart: HelperResults.isNoStart(r) }}
       // Ссылки на старт у строки нет: лента отдаёт НАЗВАНИЕ соревнования, но не его
       // id (`HubGroupRecentResult`), а `routes.competitionSwims` просит именно id.
       // Кликабельной строку сделает добавление id в DTO, а не догадка на клиенте.

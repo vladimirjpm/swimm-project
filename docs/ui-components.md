@@ -60,6 +60,7 @@
 | `UI_AgeLabel` | «age: 13» + бейдж программы (`para`, `mix`) + `?` при неизвестном поле | `age`, `eventCategory`, `isRelay`, `gender`, `ageGroup` |
 | `UI_SwimmerTimeCell` | время + сплиты + отметка о незачёте | `time`, `time_split`, `time_fail`, `time_fail_note`, `qualityMarker`, `gapMs`/`gapClassName` (пробрасываются в `UI_SwimTime`) |
 | `UI_ExpectedTimeDiff` | разницу с ожидаемым временем | `time`, `expected_time` |
+| `UI_CheerButton` | 🎉 «поздравить с заплывом» + число поздравлений (25.10.2026, этап 1) | `resultId` (нет — кнопки нет), `noStart` (неявка NS/DNS — `HelperResults.isNoStart`; кнопки нет), `className`. Счётчики спрашивает сам, пачкой, через `hooks/useCheers.ts` — вызывающему id собирать не надо. Число — только когда поздравления есть (решение Влада: пустой счётчик не рисуем); своё 🎉 цветное, иначе серое; гость по клику — окно входа (`useOptionalLoginModal`, без провайдера просто молчит). Клик не всплывает. Стоит в строке протокола (`results-table-*`, рядом с сердечком) и в `SwimRow` через проп `cheer` (страница пловца, группа). Имён поздравивших нигде нет. ⚠ На `/my-media` 🎉 — отдельный `CheerChip` только для показа (решение 08.09.2026) |
 | `UI_NormativeLevelIcon` | значок разряда | `levelName`, `styleName`, `styleLen`, `poolType`, `normativeAgeGroup` |
 | `UI_LevelProgress` | прогресс до следующего разряда | `currentTime`, `nextTime`, `progressPercent` |
 | `UI_RecordCount` | счётчик рекордов пловца (открывает попап) | `swimmerName` |

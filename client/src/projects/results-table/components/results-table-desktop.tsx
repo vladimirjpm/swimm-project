@@ -17,6 +17,7 @@ import ResultRowDateInfo from './result-row-date-info';
 import UI_AddVideoIcon from '../../components/mix/add-video-icon/add-video-icon';
 import HelperResults from '../../../utils/helpers/helper-results';
 import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-best-badge';
+import UI_CheerButton from '../../components/mix/cheer-button/cheer-button';
 
 const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
   res,
@@ -81,6 +82,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           addBlockedHint={favoriteBlockedHint}
           showPrimary={false}
         />
+        <UI_CheerButton resultId={res.id} noStart={HelperResults.isNoStart(res)} />
         {onAddVideo && (
           <button
             type="button"

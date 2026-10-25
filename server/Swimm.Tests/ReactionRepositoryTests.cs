@@ -120,6 +120,86 @@ public class ReactionRepositoryTests
         Assert.False(state.Mine);
     }
 
+    // ── Кого поздравлять нельзя (этап 1 кнопки 🎉, 25.10.2026) ──
+
+    [Fact]
+    public async Task SetCheer_NoShow_Refused_ButOwnCheerCanBeRemoved()
+    {
+        await using var db = CreateDb(nameof(SetCheer_NoShow_Refused_ButOwnCheerCanBeRemoved));
+        var user = NewUser("ns@example.com");
+        db.AppUsers.Add(user);
+        await db.SaveChangesAsync();
+        var result = await SeedResultAsync(db);
+        var repo = new ReactionRepository(db);
+        // 🎉 поставлено, пока строка была заплывом; потом протокол оказался неявкой.
+        await repo.SetCheerAsync(user.Id, result.Id, on: true);
+        result.TimeFail = true;
+        result.TimeFailNote = "NS";
+        result.TimeMillisecond = null;
+        await db.SaveChangesAsync();
+
+        Assert.Null(await repo.SetCheerAsync(user.Id, result.Id, on: true));
+        var off = await repo.SetCheerAsync(user.Id, result.Id, on: false);
+        Assert.Equal(0, off!.Count);
+    }
+
+    [Fact]
+    public async Task SetCheer_Disqualified_IsAllowed()
+    {
+        await using var db = CreateDb(nameof(SetCheer_Disqualified_IsAllowed));
+        var user = NewUser("dq@example.com");
+        db.AppUsers.Add(user);
+        await db.SaveChangesAsync();
+        var result = await SeedResultAsync(db);
+        result.TimeFail = true;
+        result.TimeFailNote = "DQ / SW 4.4";
+        await db.SaveChangesAsync();
+
+        var state = await new ReactionRepository(db).SetCheerAsync(user.Id, result.Id, on: true);
+
+        Assert.Equal(1, state!.Count);
+    }
+
+    [Fact]
+    public async Task SetCheer_PrivateGroupSwimmer_Refused()
+    {
+        await using var db = CreateDb(nameof(SetCheer_PrivateGroupSwimmer_Refused));
+        var user = NewUser("pr@example.com");
+        db.AppUsers.Add(user);
+        await db.SaveChangesAsync();
+        var result = await SeedResultAsync(db);
+        var swimmer = await db.Swimmers.FindAsync(result.SwimmerId);
+        swimmer!.PrivateHubGroupId = 77;
+        await db.SaveChangesAsync();
+
+        Assert.Null(await new ReactionRepository(db).SetCheerAsync(user.Id, result.Id, on: true));
+    }
+
+    [Fact]
+    public async Task GetCheers_OnlyNonZero_MineForTheCaller()
+    {
+        await using var db = CreateDb(nameof(GetCheers_OnlyNonZero_MineForTheCaller));
+        var a = NewUser("a@example.com");
+        var b = NewUser("b@example.com");
+        db.AppUsers.AddRange(a, b);
+        await db.SaveChangesAsync();
+        var cheered = await SeedResultAsync(db);
+        var quiet = await SeedResultAsync(db);
+        var repo = new ReactionRepository(db);
+        await repo.SetCheerAsync(a.Id, cheered.Id, on: true);
+        await repo.SetCheerAsync(b.Id, cheered.Id, on: true);
+
+        var forA = await repo.GetCheersAsync([cheered.Id, quiet.Id], a.Id);
+        var forGuest = await repo.GetCheersAsync([cheered.Id, quiet.Id], null);
+
+        // Заплыв без поздравлений в ответ не попадает — витрина счётчик у него не рисует.
+        var one = Assert.Single(forA);
+        Assert.Equal(cheered.Id, one.ResultId);
+        Assert.Equal(2, one.Count);
+        Assert.True(one.Mine);
+        Assert.False(Assert.Single(forGuest).Mine);
+    }
+
     [Fact]
     public async Task SetCheer_UnknownResultId_ReturnsNull()
     {
