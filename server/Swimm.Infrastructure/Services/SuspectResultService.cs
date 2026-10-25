@@ -31,6 +31,14 @@ public class SuspectResultService(SwimmDbContext db) : ISuspectResultService
                 r.Competition.PoolType))
             .ToListAsync(ct);
 
+        var seeds = await LoadSeedsAsync(db, scope, ct);
+        if (seeds.Count > 0)
+            rows = rows
+                .Select(r => seeds.TryGetValue(r.ResultId, out var s)
+                    ? r with { SeedTimeMs = s.SeedTimeMs, EntryHeatKey = s.HeatKey }
+                    : r)
+                .ToList();
+
         var verdicts = SuspectResultDetector.Detect(
                 rows, await LoadPersonalHistoryAsync(rows, ct), await LoadWorldBestsAsync(db, ct))
             .ToDictionary(v => v.ResultId);
@@ -91,6 +99,31 @@ public class SuspectResultService(SwimmDbContext db) : ISuspectResultService
                 r.Club.Name, r.Style.Name, r.Distance, r.Gender, r.TimeOriginal,
                 r.SuspectReason!, r.SuspectIsManual, r.SuspectNote))
             .ToListAsync(ct);
+
+    /// <summary>
+    /// Заявочные времена строк скоупа — вход правила «заплыв намного быстрее заявок» (И-55).
+    /// Связь — <c>CompetitionEntries.ResultId</c>, её ставит сшивка стартового протокола;
+    /// поэтому на импорте сшивка идёт ДО скана. Заявки без сида («NT») не нужны правилу и
+    /// не грузятся.
+    /// </summary>
+    internal static async Task<IReadOnlyDictionary<long, (int SeedTimeMs, string HeatKey)>> LoadSeedsAsync(
+        SwimmDbContext db, IQueryable<ResultRecord> scope, CancellationToken ct)
+    {
+        var ids = scope.Select(r => (long?)r.Id);
+        var entries = await db.CompetitionEntries.AsNoTracking()
+            .Where(e => e.SeedTimeMs > 0 && ids.Contains(e.ResultId))
+            .Select(e => new { ResultId = e.ResultId!.Value, SeedTimeMs = e.SeedTimeMs!.Value, e.OrgDisciplineId, e.Heat })
+            .ToListAsync(ct);
+
+        // Сшивка не отдаёт результат двум заявкам, но схема этого не запрещает — первая побеждает.
+        return entries
+            .GroupBy(e => e.ResultId)
+            .ToDictionary(g => g.Key, g =>
+            {
+                var e = g.First();
+                return (e.SeedTimeMs, $"{e.OrgDisciplineId}/{e.Heat}");
+            });
+    }
 
     /// <summary>
     /// Личная история пловцов соревнования — вход правила «выброс относительно себя» (Б1).

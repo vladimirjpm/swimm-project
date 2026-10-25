@@ -32,6 +32,13 @@ public static class SuspectReasons
     /// </summary>
     public const string PersonalOutlier = "personal_outlier";
 
+    /// <summary>
+    /// Сразу несколько дорожек одного заплыва проплыли намного быстрее своих заявочных
+    /// времён — след сбоя хронометража заплыва, а не прогресса пловцов (И-55: comp 1772,
+    /// 200 вольным, пять дорожек на 14–29% быстрее заявок 2:26–2:27).
+    /// </summary>
+    public const string SeedTimeJump = "seed_time_jump";
+
     /// <summary>Поставлено человеком. Переживает переимпорт (в отличие от автоматических).</summary>
     public const string Manual = "manual";
 
@@ -39,6 +46,6 @@ public static class SuspectReasons
     public static readonly string[] Automatic =
     [
         TimeOutlier, TimeVsDistance, RelayTimeInIndividual, GenderMismatch, DuplicateSwim,
-        PersonalOutlier
+        PersonalOutlier, SeedTimeJump
     ];
 }
