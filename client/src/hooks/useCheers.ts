@@ -21,7 +21,9 @@ export interface CheerState {
 }
 
 const EMPTY: CheerState = { count: 0, mine: false };
-/** Столько id уходит в один запрос (сервер принимает до 500). */
+/** Столько id уходит в один запрос (сервер принимает до 500). Зеркало `CheerRules.ClientChunk`:
+ *  на нём посчитан лимит чтения по IP — поменял здесь, поменяй и там. Отказ по лимиту (429)
+ *  просто оставляет кнопки без чисел. */
 const CHUNK = 300;
 
 const states = new Map<number, CheerState>();

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;
 
@@ -42,18 +43,15 @@ public class ReactionsController : ControllerBase
     [HttpDelete("/api/results/{id:long}/cheer")]
     public Task<IActionResult> Uncheer(long id) => ToggleCheer(id, on: false);
 
-    /// <summary>Сколько id принимает чтение за раз: клиент режет длинные списки на пачки.</summary>
-    public const int MaxCheerIds = 500;
-
     /// <summary>
     /// 🎉 пачки заплывов для витрины: <c>?ids=1,2,3</c>. Читать может и гость (число публично,
     /// имён в ответе нет) — <c>mine</c> у него всегда false. Ответ личный (<c>mine</c>), поэтому
-    /// без кэша; лимит реакций сюда не применяется — страница протокола спрашивает пачками, а
-    /// запрос дешёвый и ограничен <see cref="MaxCheerIds"/>.
+    /// без кэша. Лимит СВОЙ, а не «reactions» класса: мягкий, по IP (<see cref="CheerRules"/>) —
+    /// страница протокола спрашивает пачками и в лимит кликов упиралась бы.
     /// </summary>
     [HttpGet("/api/results/cheers")]
     [AllowAnonymous]
-    [DisableRateLimiting]
+    [EnableRateLimiting(CheerRules.ReadRateLimitPolicy)]
     public async Task<IActionResult> GetCheers([FromQuery] string? ids)
     {
         var parsed = (ids ?? "")
@@ -63,7 +61,7 @@ public class ReactionsController : ControllerBase
             .Distinct()
             .ToList();
         if (parsed.Count == 0) return Ok(Array.Empty<object>());
-        if (parsed.Count > MaxCheerIds) return BadRequest(new { error = $"At most {MaxCheerIds} ids" });
+        if (parsed.Count > CheerRules.MaxIdsPerRead) return BadRequest(new { error = $"At most {CheerRules.MaxIdsPerRead} ids" });
 
         Response.Headers.CacheControl = "private, no-store";
         return Ok(await _reactions.GetCheersAsync(parsed, CurrentUserId()));

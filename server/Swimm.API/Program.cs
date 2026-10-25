@@ -222,6 +222,17 @@ builder.Services.AddRateLimiter(options =>
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0
                 }));
+    // Чтение счётчиков 🎉 (GET /api/results/cheers): отдельно от кликов «reactions», мягко и по
+    // IP — страница протокола спрашивает пачками и в лимит не упирается, бот упирается (CheerRules).
+    options.AddPolicy(CheerRules.ReadRateLimitPolicy, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = CheerRules.ReadPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
     // Тело отказа — { error }: так его читают клиентские обработчики (saveResultFrom, RSVP);
     // вход (login-modal) смотрит только на статус 429, тело ему не мешает.
     options.OnRejected = async (context, ct) =>
