@@ -11,6 +11,7 @@ import { chipClass, segmentClass } from './status-styles';
 import { HelperMedia } from '../../../utils/helpers';
 import { useDeepThemeClass } from '../../components/deep/use-deep-theme-class';
 import '../../components/deep/deep-theme.css';
+import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 
 export interface AddLinkSwimmerOption {
   id: number;
@@ -255,7 +256,7 @@ function AddLinkModal({
                   onClick={() => { setCompetitionId(c.id); setResultId(null); }}
                   className={chipClass(competitionId === c.id)}
                 >
-                  <span dir="rtl">{c.name}</span>
+                  <span dir="rtl"><UI_CompetitionName name={c.name} /></span>
                   <span className="opacity-60">{c.date}</span>
                 </button>
               ))}

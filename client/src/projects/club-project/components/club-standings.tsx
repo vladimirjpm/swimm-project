@@ -3,6 +3,7 @@ import type { ClubStandingsTable } from '../../../hooks/useClubOverview';
 import { routes } from '../../../utils/routes';
 import { seasonLabel } from '../../../utils/helpers/season-helper';
 import UI_ClubPointsUnofficialChip from '../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
+import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 
 /**
  * Standings — детализация выбранного зачёта (клик по линии в гриде «сезон × группа», или
@@ -45,12 +46,16 @@ function ClubStandings({ standings }: Props) {
           и какой именно чемпионат раскрыт — непонятно. Имя ведёт на само соревнование. */}
       <a
         href={routes.competition(standings.competition_id)}
-        dir="auto"
-        className="mt-1 block truncate text-[13px] font-extrabold no-underline hover:underline"
+        className="mt-1 block text-[13px] font-extrabold no-underline hover:underline"
         style={{ color: 'var(--deep-accent)' }}
-        title={standings.competition_name}
       >
-        {standings.competition_name}
+        {/* Обрезает сам компонент — иначе многоточие срезает начало названия с 🏆. */}
+        <UI_CompetitionName
+          as="div"
+          className="truncate"
+          name={standings.competition_name}
+          isChampionship={standings.is_championship}
+        />
       </a>
       <div className="deep-card-sub mt-0.5">
         {icon && `${icon} · `}

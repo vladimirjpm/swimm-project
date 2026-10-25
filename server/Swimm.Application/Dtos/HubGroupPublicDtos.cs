@@ -167,6 +167,10 @@ public sealed class HubGroupCompetitionDto
     [JsonPropertyName("name")]
     public string Name { get; set; } = "";
 
+    /// <summary>Чемпионат (хоть один день турнира) — 🏆 у названия (<c>UI_CompetitionName</c>).</summary>
+    [JsonPropertyName("is_championship")]
+    public bool IsChampionship { get; set; }
+
     /// <summary>Первый и последний день, в которые плыл ростер (dd/MM/yyyy).</summary>
     [JsonPropertyName("date_from")]
     public string DateFrom { get; set; } = "";

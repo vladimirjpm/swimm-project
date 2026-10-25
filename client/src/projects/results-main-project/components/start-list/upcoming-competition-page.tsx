@@ -5,6 +5,7 @@ import { useTheme } from '../../../../hooks/useTheme';
 import { useMode } from '../../../../hooks/useMode';
 import StartListTab from './start-list-tab';
 import { useStartListProgramme } from './use-start-list';
+import UI_CompetitionName from '../../../components/mix/competition-name/competition-name';
 
 /**
  * Страница предстоящего соревнования — `/competitions/upcoming/{orgCompId}` (С7б, шаг 3).
@@ -26,7 +27,11 @@ export default function UpcomingCompetitionPage({ orgCompId }: { orgCompId: numb
       <AppTopbar />
       <div className={PAGE_CONTAINER}>
         <div className="mt-4 mb-3">
-          <h1 className="text-xl font-black">{data?.comp_name ?? 'Upcoming competition'}</h1>
+          <h1 className="text-xl font-black">
+            {data?.comp_name
+              ? <UI_CompetitionName name={data.comp_name} isChampionship={data.is_championship} />
+              : 'Upcoming competition'}
+          </h1>
           <p className="text-xs" style={{ color: 'var(--theme-mode-text-secondary)' }}>
             This meet has not started yet — results are not available. Showing the start list only.
           </p>

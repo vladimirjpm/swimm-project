@@ -17,6 +17,8 @@ export interface ResultWrap {
     competition: string;
     is_masters?:boolean;
     is_award?:boolean;
+    /** Чемпионат (ручной флаг из админки, /api/results) — 🏆 у названия рисует `UI_CompetitionName`. */
+    is_championship?: boolean;
     /** per-competition: показывать объединённую таблицу (с серверного /api/results) */
     show_combine_all_results?: boolean;
     age_group: string;

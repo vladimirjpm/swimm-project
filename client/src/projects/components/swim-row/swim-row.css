@@ -221,7 +221,12 @@ a.swim-row:hover {
   font-weight: 700;
   color: var(--sr-text-faint, var(--theme-mode-text-muted));
 }
+.swim-row__meet-sep {
+  flex: none;
+  color: var(--sr-text-faint, var(--theme-mode-text-muted));
+}
 .swim-row__meet-inline {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

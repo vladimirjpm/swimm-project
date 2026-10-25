@@ -24,9 +24,10 @@ public class HubGroupCompetitionsBuilderTests
     private static HubGroupCompetitionSwim Swim(
         int competitionId, string date, int swimmer, int? position = null,
         int? eventId = null, string? name = null, bool isAward = true, string? heatType = null,
-        string? round = null, bool timeFail = false, int? relayId = null) =>
+        string? round = null, bool timeFail = false, int? relayId = null, bool isChampionship = false) =>
         new()
         {
+            IsChampionship = isChampionship,
             Id = ++_id,
             CompetitionId = competitionId,
             EventId = eventId,
@@ -67,6 +68,24 @@ public class HubGroupCompetitionsBuilderTests
         Assert.Null(list[1].EventId);
         Assert.Equal(10, list[1].CompetitionId);
         Assert.Equal(list[1].DateFrom, list[1].DateTo);
+    }
+
+    [Fact]
+    public void Championship_IfAnyDayOfTheEventIsFlagged()
+    {
+        // 🏆 у названия (UI_CompetitionName): флаг стоит на ДНЕ, а строка — турнир. Хоть один
+        // день чемпионат — чемпионат весь турнир; однодневка без флага — нет.
+        var swims = new[]
+        {
+            Swim(10, "01/06/2026", A),
+            Swim(20, "28/07/2026", A, eventId: 5, isChampionship: false),
+            Swim(21, "30/07/2026", B, eventId: 5, isChampionship: true),
+        };
+
+        var list = HubGroupCompetitionsBuilder.Build(swims, Roster, NoRelays, []);
+
+        Assert.True(list.Single(c => c.EventId == 5).IsChampionship);
+        Assert.False(list.Single(c => c.CompetitionId == 10).IsChampionship);
     }
 
     [Fact]

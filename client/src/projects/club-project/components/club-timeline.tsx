@@ -2,6 +2,7 @@ import React from 'react';
 import type { ClubTimelineItem } from '../../../hooks/useClubOverview';
 import { routes } from '../../../utils/routes';
 import UI_ClubPointsUnofficialChip from '../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
+import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 
 /**
  * Competition timeline — вертикальная линия зачётов клуба в выбранном скоупе
@@ -75,10 +76,11 @@ function ClubTimeline({ timeline }: Props) {
                     )}
                     <a
                       href={routes.competition(item.competition_id)}
-                      className="min-w-0 truncate text-[13px] font-extrabold no-underline"
+                      className="min-w-0 text-[13px] font-extrabold no-underline"
                       style={{ color: 'var(--deep-text)' }}
                     >
-                      {item.name}
+                      {/* Обрезает сам компонент — иначе многоточие срезает начало названия с 🏆. */}
+                      <UI_CompetitionName as="div" className="truncate" name={item.name} isChampionship={item.is_championship} />
                     </a>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>

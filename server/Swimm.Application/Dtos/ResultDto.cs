@@ -23,6 +23,11 @@ public class ResultDto
     [JsonPropertyName("is_award")]
     public bool IsAward { get; set; }
 
+    /// <summary>Чемпионат (ручной флаг <c>Competition.IsChampionship</c>) — 🏆 у названия
+    /// соревнования рисует <c>UI_CompetitionName</c> по этому полю, а не по имени.</summary>
+    [JsonPropertyName("is_championship")]
+    public bool IsChampionship { get; set; }
+
     /// <summary>Per-competition: показывать объединённую таблицу всех результатов.</summary>
     [JsonPropertyName("show_combine_all_results")]
     public bool ShowCombineAllResults { get; set; }

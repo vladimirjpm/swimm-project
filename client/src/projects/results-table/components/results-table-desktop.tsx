@@ -136,7 +136,7 @@ const ResultsTableDesktop: React.FC<ResultsTableRowProps> = ({
           isMe={isPrimaryFavorite}
         />
         {showDate && (
-          <ResultRowDateInfo date={res.date} competition={res.competition} showCompetition={showCompetition} />
+          <ResultRowDateInfo date={res.date} competition={res.competition} isChampionship={res.is_championship} showCompetition={showCompetition} />
         )}
         <UI_SwimmerGallery gallery={res.gallery} />
       </div>

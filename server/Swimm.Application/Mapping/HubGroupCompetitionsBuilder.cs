@@ -26,6 +26,8 @@ public sealed class HubGroupCompetitionSwim
     public string? HeatType { get; init; }
     public string? Round { get; init; }
     public bool IsAward { get; init; }
+    /// <summary>Чемпионат — 🏆 у названия в списке стартов группы.</summary>
+    public bool IsChampionship { get; init; }
 
     /// <summary>
     /// Медаль — по единому правилу продукта (зеркало клиентского <c>HelperResults.isMedalPlace</c>
@@ -86,6 +88,9 @@ public static class HubGroupCompetitionsBuilder
                         CompetitionId = last.CompetitionId,
                         EventId = last.EventId,
                         Name = last.Name,
+                        // Флаг ставится на ДЕНЬ, но у турнира он один; хоть один день чемпионат —
+                        // чемпионат весь турнир (так же 🏆 событию в календаре).
+                        IsChampionship = g.Any(r => r.IsChampionship),
                         DateFrom = g.Min(r => r.CompetitionDate).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
                         DateTo = last.CompetitionDate.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
                         Swimmers = swimmers.Count,

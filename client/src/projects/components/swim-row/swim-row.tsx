@@ -15,6 +15,7 @@ import UI_NormativeLevelIcon from '../mix/normative-level-icon/normative-level-i
 import UI_RankOfPeers from '../mix/rank-of-peers/rank-of-peers';
 import UI_RecordBadge, { type RecordKind } from '../mix/record-badge/record-badge';
 import UI_CheerButton from '../mix/cheer-button/cheer-button';
+import UI_CompetitionName from '../mix/competition-name/competition-name';
 import Helper from '../../../utils/helpers/data-helper';
 
 /**
@@ -340,10 +341,11 @@ function SwimRow({
           ) : (
             meetSide === 'line1' &&
             competition && (
-              <span className="swim-row__meet-name" dir="auto" title={competition.name}>
-                {competition.isChampionship && <span aria-hidden="true">🏆 </span>}
-                {competition.name}
-              </span>
+              <UI_CompetitionName
+                className="swim-row__meet-name"
+                name={competition.name}
+                isChampionship={competition.isChampionship}
+              />
             )
           )}
         </div>
@@ -397,11 +399,16 @@ function SwimRow({
                 )}
                 {/* Длинные названия стартов обрезаются многоточием — полное остаётся в title. */}
                 {meetSide === 'line2' && competition && (
-                  <span className="swim-row__meet-inline" dir="auto" title={competition.name}>
-                    {date ? '· ' : ''}
-                    {competition.isChampionship && <span aria-hidden="true">🏆 </span>}
-                    {competition.name}
-                  </span>
+                  <>
+                    {date && <span className="swim-row__meet-sep">·</span>}
+                    {/* Обрезает сам компонент: у него dir="auto", и многоточие встаёт в КОНЕЦ
+                        ивритского названия. Обёртка с обрезкой срезала бы начало вместе с 🏆. */}
+                    <UI_CompetitionName
+                      className="swim-row__meet-inline"
+                      name={competition.name}
+                      isChampionship={competition.isChampionship}
+                    />
+                  </>
                 )}
               </div>
             )}

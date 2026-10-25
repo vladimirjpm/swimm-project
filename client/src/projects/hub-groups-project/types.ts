@@ -114,6 +114,8 @@ export interface HubGroupCompetition {
   competition_id: number;
   event_id?: number | null;
   name: string;
+  /** Чемпионат (хоть один день турнира) — 🏆 у названия (`UI_CompetitionName`). */
+  is_championship?: boolean;
   date_from: string; // dd/MM/yyyy
   date_to: string;
   swimmers: number;

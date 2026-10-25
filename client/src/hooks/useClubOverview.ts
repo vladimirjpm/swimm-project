@@ -116,6 +116,8 @@ export interface ClubStandingsTable {
   season: number;
   /** winter | summer | openwater | null. */
   kind: string | null;
+  /** Чемпионат — 🏆 у названия (`UI_CompetitionName`). */
+  is_championship?: boolean;
   group_key: string | null;
   group_name: string | null;
   club_count: number;
@@ -130,6 +132,8 @@ export interface ClubTimelineItem {
   date: string;
   season: number;
   kind: string | null;
+  /** Чемпионат — 🏆 у названия (`UI_CompetitionName`). */
+  is_championship?: boolean;
   group_key: string | null;
   group_name: string | null;
   rank: number;

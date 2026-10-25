@@ -36,6 +36,7 @@ import FiltersFab from '../components/filter-section/filters-fab';
 import UI_SwimmStyleIcon from '../components/mix/swimm-style-icon/swimm-style-icon';
 import { useMyMediaFilterHost, type MyMediaHostState } from './my-media-filter-host';
 import MobileFiltersDrawer from '../components/filter-section/mobile-filters-drawer';
+import UI_CompetitionName from '../components/mix/competition-name/competition-name';
 import {
   hpCardCls, STATUS_COLORS, type CardStatus,
 } from './components/status-styles';
@@ -292,11 +293,10 @@ function MyMediaContent({ deep }: { deep: string }) {
       key: 'competition',
       label: 'Competition',
       active: competitionFilter !== 'all',
-      value: (
-        <span dir="auto">
-          {competitionOptions.find((c) => c.id === competitionFilter)?.name}
-        </span>
-      ),
+      value: (() => {
+        const c = competitionOptions.find((o) => o.id === competitionFilter);
+        return <UI_CompetitionName name={c?.name} isChampionship={c?.isChampionship} />;
+      })(),
       onClick: () => revealCard('competition'),
     },
     {
@@ -655,7 +655,9 @@ function MyMediaContent({ deep }: { deep: string }) {
             <span>
               <b>{addVideoSwim.distance}m {addVideoSwim.style}</b>
               <span className="hp-mono ml-2 text-[var(--t-accent)]">{addVideoSwim.time}</span>
-              <span dir="auto" className="ml-2 text-[var(--t-text-2)]">{addVideoSwim.competition_name} · {addVideoSwim.competition_date}</span>
+              <span className="ml-2 text-[var(--t-text-2)]">
+                <UI_CompetitionName name={addVideoSwim.competition_name} isChampionship={addVideoSwim.is_championship} /> · {addVideoSwim.competition_date}
+              </span>
             </span>
           }
           onClose={() => setAddVideoSwim(null)}

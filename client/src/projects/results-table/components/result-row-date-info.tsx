@@ -1,9 +1,12 @@
 import React from 'react';
 import UI_DateIcon from '../../components/mix/date-icon/date-icon';
+import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 
 interface ResultRowDateInfoProps {
   date: string;
   competition?: string;
+  /** Чемпионат — 🏆 у названия (`UI_CompetitionName`). */
+  isChampionship?: boolean;
   /** Название соревнования показываем только если загружено больше одного соревнования */
   showCompetition?: boolean;
   className?: string;
@@ -13,6 +16,7 @@ interface ResultRowDateInfoProps {
 const ResultRowDateInfo: React.FC<ResultRowDateInfoProps> = ({
   date,
   competition,
+  isChampionship = false,
   showCompetition,
   className = '',
 }) => (
@@ -23,7 +27,15 @@ const ResultRowDateInfo: React.FC<ResultRowDateInfoProps> = ({
       fontClassName="text-[var(--theme-mode-text-muted)] text-xs"
     />
     {showCompetition && competition && (
-      <span className="truncate text-xs text-[var(--theme-mode-text-muted)]">· {competition}</span>
+      <>
+        <span className="shrink-0 text-xs text-[var(--theme-mode-text-muted)]">·</span>
+        {/* Обрезает сам компонент: многоточие в конце ивритского названия, 🏆 не срезается. */}
+        <UI_CompetitionName
+          className="min-w-0 truncate text-xs text-[var(--theme-mode-text-muted)]"
+          name={competition}
+          isChampionship={isChampionship}
+        />
+      </>
     )}
   </div>
 );

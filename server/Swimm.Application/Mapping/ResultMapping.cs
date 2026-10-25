@@ -22,6 +22,7 @@ public static class ResultMapping
         CompetitionName = r.Competition.Name,
         IsMasters = r.Competition.IsMasters,
         IsAward = r.Competition.IsAward,
+        IsChampionship = r.Competition.IsChampionship,
         ShowCombineAllResults = r.Competition.ShowCombineAllResults,
         AgeGroup = r.AgeGroup,
         Date = r.Competition.Date,

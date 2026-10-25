@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import './filter-data-source-ddl.css';
+import UI_CompetitionName from '../mix/competition-name/competition-name';
 import { useAppSelector } from '../../../store/store';
 import { routes } from '../../../utils/routes';
 import { seasonLabel, seasonStartYear } from '../../../utils/helpers/season-helper';
@@ -171,11 +172,6 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
               ✓
             </span>
           )}
-          {isChampionshipSource(s) && (
-            <span className="shrink-0 text-sm" title="Israeli championship" aria-label="Israeli championship">
-              🏆
-            </span>
-          )}
           <span
             dir="rtl"
             className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm ${live || sel ? 'font-bold' : 'font-semibold'}`}
@@ -190,7 +186,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
               textAlign: 'left',
             }}
           >
-            {s.name}
+            <UI_CompetitionName name={s.name} isChampionship={isChampionshipSource(s)} />
           </span>
         </span>
         {live ? (
