@@ -131,7 +131,11 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
   поставить неявке (NS/DNS) и пловцу группы (Р71) — 404; снять своё можно всегда.
 - `GET /api/results/cheers?ids=1,2,3` — 🎉 пачки заплывов (до 500 id): только ненулевые,
   `{result_id, count, mine}`. Читает и гость (число публично, имён нет), без кэша (`mine`
-  личный) и без лимита реакций. Клиент — `hooks/useCheers.ts` + `UI_CheerButton`.
+  личный). Лимит — СВОЙ, не «reactions»: политика `cheers-read`, 300 запросов в минуту на IP
+  (`CheerRules`, решение Влада 25.10.2026) — самый большой протокол (~4000 строк) это 14
+  запросов, так что обычная страница не упирается, а бот — да; отказ (429) клиент молча
+  оставляет без чисел. Проверено вживую: 300 × 200, затем 429. Клиент — `hooks/useCheers.ts`
+  + `UI_CheerButton` (пачка `CHUNK` = `CheerRules.ClientChunk`).
 - `GET /api/media/results?competitionId=|eventId=|group=` — публично видимое медиа
   результатов (свой + одобренные публикации), использует `useCompetitionMedia`.
 - `POST /api/admin/media/check-links` — админ-эндпоинт здоровья ссылок, см. §8.
