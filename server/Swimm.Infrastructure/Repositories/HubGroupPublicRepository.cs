@@ -527,6 +527,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             HeatType = r.HeatType,
             Round = r.Round,
             IsAward = r.Competition.IsAward,
+            IsChampionship = r.Competition.IsChampionship,
         };
 
     /// <summary>

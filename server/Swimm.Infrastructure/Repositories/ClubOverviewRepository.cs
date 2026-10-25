@@ -64,7 +64,8 @@ public class ClubOverviewRepository : IClubOverviewRepository
         int Bronze,
         int SwimmerCount,
         int ScoringSwims,
-        bool Unofficial);
+        bool Unofficial,
+        bool IsChampionship);
 
     public async Task<ClubOverviewDto?> GetOverviewAsync(
         int resolvedClubId, int requestedId, int? season, string? groupKey,
@@ -256,7 +257,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 result.Add(new StandingRow(
                     r.CompetitionId, r.Name, r.Date, sortDate, seasonYear, kind,
                     null, null, null, int.MaxValue,
-                    r.Rank, r.Points, r.Gold, r.Silver, r.Bronze, r.SwimmerCount, r.ScoringSwims, unofficial));
+                    r.Rank, r.Points, r.Gold, r.Silver, r.Bronze, r.SwimmerCount, r.ScoringSwims, unofficial, r.IsChampionship));
                 continue;
             }
 
@@ -265,7 +266,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 result.Add(new StandingRow(
                     r.CompetitionId, r.Name, r.Date, sortDate, seasonYear, kind,
                     g.Key, g.Name, g.Badge, g.DisplayOrder,
-                    r.Rank, r.Points, r.Gold, r.Silver, r.Bronze, r.SwimmerCount, r.ScoringSwims, unofficial));
+                    r.Rank, r.Points, r.Gold, r.Silver, r.Bronze, r.SwimmerCount, r.ScoringSwims, unofficial, r.IsChampionship));
             }
         }
         return result;
@@ -408,6 +409,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
         Date = r.Date,
         Season = r.Season,
         Kind = r.Kind,
+        IsChampionship = r.IsChampionship,
         GroupKey = r.GroupKey,
         GroupName = r.GroupName,
         Rank = r.Rank,
@@ -463,6 +465,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
             Date = target.Date,
             Season = target.Season,
             Kind = target.Kind,
+            IsChampionship = target.IsChampionship,
             GroupKey = target.GroupKey,
             GroupName = target.GroupName,
             ClubCount = all.Count,

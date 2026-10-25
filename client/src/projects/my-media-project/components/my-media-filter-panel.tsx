@@ -7,6 +7,7 @@ import FilterCard from '../../components/filter-section/filter-card';
 import FilterSwimmingStyle from '../../components/filter-section/filter-swimming-style';
 import DeepSeasonCarousel from '../../components/deep/season-carousel';
 import type { CardStatus } from './status-styles';
+import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 
 /** Есть ли у заплыва видео. */
 export type Seg = 'all' | 'with' | 'without';
@@ -66,7 +67,7 @@ interface Props {
   groupOptions: GroupFilterOptions;
   competitionFilter: number | 'all';
   onCompetition: (v: number | 'all') => void;
-  competitionOptions: { id: number; name: string }[];
+  competitionOptions: { id: number; name: string; isChampionship?: boolean }[];
   dateFrom: string;
   dateTo: string;
   onDateFrom: (v: string) => void;
@@ -230,7 +231,7 @@ function MyMediaFilterPanel({
                   className={seg(competitionFilter === c.id)}
                   onClick={() => onCompetition(c.id)}
                 >
-                  {c.name}
+                  <UI_CompetitionName name={c.name} isChampionship={c.isChampionship} />
                 </button>
               ))}
             </div>

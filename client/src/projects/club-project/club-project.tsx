@@ -24,6 +24,7 @@ import ClubAvatar from './components/club-avatar';
 import UI_ClubLogo from '../components/mix/club-logo/club-logo';
 import ClubCacheCard from './components/club-cache-card';
 import DeepViewChips, { readViewParam, rewriteLegacyTab, writeViewParam } from '../components/deep/view-chips';
+import UI_CompetitionName from '../components/mix/competition-name/competition-name';
 import type {
   EntityPageStatus, EntityTabNav, EntityTabSpec,
 } from '../components/deep/entity-page-types';
@@ -127,9 +128,14 @@ function ClubProject() {
                     style={{ background: 'var(--deep-card-bg-row)', borderRadius: 'var(--deep-radius-row)' }}
                   >
                     <div className="min-w-0">
-                      <div className="truncate text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
-                        {t.name}
-                      </div>
+                      {/* Обрезает сам компонент — иначе многоточие срезает начало названия с 🏆. */}
+                      <UI_CompetitionName
+                        as="div"
+                        className="truncate text-[13px] font-extrabold text-[var(--deep-text)]"
+                        name={t.name}
+                        isChampionship={t.is_championship}
+                        kind={t.kind}
+                      />
                       <div className="hp-mono truncate text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                         {t.date}{t.group_name ? ` · ${t.group_name}` : ''}
                       </div>

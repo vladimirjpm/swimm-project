@@ -15,6 +15,7 @@ import { parseRoute, H2H_PARAM } from '../../utils/routes';
 import Helper from '../../utils/helpers/data-helper';
 import { seasonLabel } from '../../utils/helpers/season-helper';
 import HelperResults from '../../utils/helpers/helper-results';
+import UI_CompetitionName from '../components/mix/competition-name/competition-name';
 import { useSwimmerProfile } from './use-swimmer-profile';
 import {
   useSwimmerBestTimes, useSwimmerCompare, useSwimmerPersonalBests, useSwimmerProgress,
@@ -376,9 +377,15 @@ function SwimmerProject() {
                       style={{ background: 'var(--deep-card-bg-row)', borderRadius: 'var(--deep-radius-row)' }}
                     >
                       <div className="min-w-0">
-                        <div className="truncate text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
-                          {m.name}
-                        </div>
+                        {/* Обрезает сам компонент (dir="auto" — многоточие в конце ивритского
+                            названия); обёртка с truncate срезала бы начало вместе с 🏆. */}
+                        <UI_CompetitionName
+                          as="div"
+                          className="truncate text-[13px] font-extrabold text-[var(--deep-text)]"
+                          name={m.name}
+                          isChampionship={m.isChampionship}
+                          kind={m.kind}
+                        />
                         <div className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                           <UI_DateIcon styleType="row-style-1" date={m.date} paddingClass="" fontClassName="text-[11px] font-bold" />
                           <span>· {HelperResults.swimsLabel(m.swims, m.entered ?? m.swims)} swims</span>
@@ -425,7 +432,7 @@ function SwimmerProject() {
                       timeFail={!!r.timeFail}
                       badge={sbKeys.has(r.disciplineKey) ? 'sb' : null}
                       place={{ kind: 'none' }}
-                      competition={{ name: r.competition.name }}
+                      competition={{ name: r.competition.name, isChampionship: r.competition.isChampionship }}
                       date={r.date}
                       points={r.points}
                     />

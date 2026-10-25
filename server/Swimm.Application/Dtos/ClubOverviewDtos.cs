@@ -280,6 +280,10 @@ public sealed class ClubStandingsTableDto
     [JsonPropertyName("kind")]
     public string? Kind { get; set; }
 
+    /// <summary>Чемпионат — 🏆 у названия (<c>UI_CompetitionName</c>).</summary>
+    [JsonPropertyName("is_championship")]
+    public bool IsChampionship { get; set; }
+
     [JsonPropertyName("group_key")]
     public string? GroupKey { get; set; }
 
@@ -357,6 +361,11 @@ public sealed class ClubTimelineItemDto
     /// <summary>winter | summer | openwater | null — бейдж ❄/☀ рисуется только когда есть.</summary>
     [JsonPropertyName("kind")]
     public string? Kind { get; set; }
+
+    /// <summary>Чемпионат — 🏆 у названия (<c>UI_CompetitionName</c>). Не путать с <see cref="Kind"/>:
+    /// роль в сезонном зачёте может быть переопределена вручную.</summary>
+    [JsonPropertyName("is_championship")]
+    public bool IsChampionship { get; set; }
 
     [JsonPropertyName("group_key")]
     public string? GroupKey { get; set; }

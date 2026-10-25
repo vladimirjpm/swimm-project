@@ -2,6 +2,7 @@ import UI_MedalIcon from '../../../components/mix/medal-icon/medal-icon';
 import { routes } from '../../../../utils/routes';
 import { seasonLabel } from '../../../../utils/helpers/season-helper';
 import HelperResults from '../../../../utils/helpers/helper-results';
+import UI_CompetitionName from '../../../components/mix/competition-name/competition-name';
 import type { SwimmerCompetition, SwimmerSummary } from '../../use-swimmer-page';
 import { type PanelLoad, noDataText, PanelEmpty, PanelHead } from '../swimmer-panels';
 
@@ -33,20 +34,18 @@ export function SeasonBanner({ summary }: { summary: SwimmerSummary }) {
 
 /** Один старт в списке сезона/истории. */
 function CompetitionRow({ meet, swimmerId }: { meet: SwimmerCompetition; swimmerId: number }) {
-  const KIND_ICON: Record<string, string> = { winter: '❄', summer: '☀', openwater: '🌊' };
   return (
     <a
       className="deep-meet-row"
       href={routes.competitionSwims(meet.competitionId, { swimmerId, eventId: meet.eventId })}
     >
       <span className="deep-meet-row__date">{meet.date}</span>
-      <span className="deep-meet-row__name" dir="auto">
-        {meet.isChampionship && <span aria-hidden="true">🏆 </span>}
-        {meet.kind && KIND_ICON[meet.kind] && (
-          <span aria-hidden="true">{KIND_ICON[meet.kind]} </span>
-        )}
-        {meet.name}
-      </span>
+      <UI_CompetitionName
+        className="deep-meet-row__name"
+        name={meet.name}
+        isChampionship={meet.isChampionship}
+        kind={meet.kind}
+      />
       <span className="deep-meet-row__stats">
         {HelperResults.swimsLabel(meet.swims, meet.entered ?? meet.swims)} swims · {meet.points} pts
         {meet.bestPlace != null ? ` · best #${meet.bestPlace}` : ''}

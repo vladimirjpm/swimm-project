@@ -4,6 +4,7 @@ import { AllUserMediaDto } from '../use-all-my-media';
 import { UserMediaPublicationDto } from '../../../hooks/useUserMedia';
 import { HelperMedia } from '../../../utils/helpers';
 import { hpCardCls, STATUS_COLORS, CardStatus, visibilityLabel } from './status-styles';
+import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 
 interface Props {
   item: AllUserMediaDto;
@@ -66,7 +67,8 @@ function MediaCard({ item, publications, onOpenLightbox, onDelete, onWithdraw, o
                 <div className="text-[13px] font-extrabold text-[var(--t-text)]">{item.result_label}</div>
                 {item.competition_name && (
                   <div dir="rtl" className="truncate text-left text-[11.5px] text-[var(--t-text-2)]">
-                    {item.competition_name}
+                    {/* Флага чемпионата в ответе медиа нет — компонент ради единого вида. */}
+                    <UI_CompetitionName name={item.competition_name} />
                   </div>
                 )}
               </>

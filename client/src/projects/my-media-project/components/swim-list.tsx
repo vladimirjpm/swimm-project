@@ -17,6 +17,7 @@ import Helper from '../../../utils/helpers/data-helper';
 import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
 import CompetitionTile from '../../results-main-project/components/competition-header/competition-tile';
 import { competitionTileData } from '../../../utils/helpers/competition-source';
+import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 
 // Список заплывов, сгруппированный по соревнованиям — ядро My media.
 // Строка узкая на обеих ширинах, а всё управление медиа (share, withdraw, delete, ❤)
@@ -807,9 +808,11 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
               {selectedName}
             </span>
           )}
-          <span dir="auto" className="min-w-0 flex-1 text-[15px] font-black leading-tight text-[var(--t-text)] sm:flex-none sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap">
-            {first.competition_name}
-          </span>
+          <UI_CompetitionName
+            className="min-w-0 flex-1 text-[15px] font-black leading-tight text-[var(--t-text)] sm:flex-none sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap"
+            name={first.competition_name}
+            isChampionship={first.is_championship}
+          />
         </div>
         <span className="hp-mono text-[11px] font-extrabold text-[var(--t-accent)]">{first.competition_date}</span>
         <span className="text-[11.5px] text-[var(--t-text-2)]">{first.pool_type}</span>

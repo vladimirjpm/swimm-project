@@ -3,6 +3,7 @@ import { routes } from '../../../utils/routes';
 import DeepViewChips from '../../components/deep/view-chips';
 import { GroupRecordsCard } from './group-cards';
 import type { HubGroupDetails } from '../types';
+import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 
 /**
  * Список стартов группы — чип «≡ Results» таба Results (хендофф group-club-changes §3,
@@ -65,9 +66,12 @@ function GroupCompetitionsCard({ group }: { group: HubGroupDetails }) {
               >
                 <div className="min-w-0">
                   {/* dir="auto" — только на тексте: названия стартов бывают ивритскими. */}
-                  <div dir="auto" className="truncate text-left text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
-                    {c.name}
-                  </div>
+                  <UI_CompetitionName
+                    as="div"
+                    className="truncate text-left text-[13px] font-extrabold"
+                    name={c.name}
+                    isChampionship={c.is_championship}
+                  />
                   <div className="hp-mono truncate text-[11px] font-bold" style={{ color: 'var(--deep-text-mute)' }}>
                     {dates} · {c.swimmers} {c.swimmers === 1 ? 'swimmer' : 'swimmers'} · {c.swims} {c.swims === 1 ? 'swim' : 'swims'}
                   </div>

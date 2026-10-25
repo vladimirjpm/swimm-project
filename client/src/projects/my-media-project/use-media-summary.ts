@@ -27,9 +27,13 @@ export function useMediaSummary(params: {
 
   // ── Справочники фильтров (из заплывов сезона) ─────────────────────────────
   const competitionOptions = useMemo(() => {
-    const byId = new Map<number, string>();
-    for (const s of swims) if (!byId.has(s.competition_id)) byId.set(s.competition_id, s.competition_name);
-    return Array.from(byId.entries()).map(([id, name]) => ({ id, name }));
+    const byId = new Map<number, { name: string; isChampionship: boolean }>();
+    for (const s of swims) {
+      if (!byId.has(s.competition_id)) {
+        byId.set(s.competition_id, { name: s.competition_name, isChampionship: s.is_championship });
+      }
+    }
+    return Array.from(byId.entries()).map(([id, c]) => ({ id, ...c }));
   }, [swims]);
 
   // ── Группы: «куда я поднял медиа» ─────────────────────────────────────────

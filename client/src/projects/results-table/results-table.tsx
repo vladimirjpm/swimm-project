@@ -32,6 +32,7 @@ import { seasonStartYear, ageInSeason } from '../../utils/helpers/season-helper'
 import SeasonBestTable, { timeToMs } from '../../utils/helpers/season-best-table';
 import { useSeasonBestTable } from '../../hooks/useSeasonBestTable';
 import { addUserMedia } from '../my-media-project/use-all-my-media';
+import UI_CompetitionName from '../components/mix/competition-name/competition-name';
 
 function ResultsTable() {
   const dispatch = useAppDispatch();
@@ -641,7 +642,9 @@ function ResultsTable() {
                         <div className="flex flex-col gap-0.5">
                           <span className="font-bold">{swimmerLabel}</span>
                           <span>{res.event_style_len}m {res.event_style_name} · {res.time}</span>
-                          <span className="opacity-70">{res.competition} · {res.date}</span>
+                          <span className="opacity-70">
+                            <UI_CompetitionName name={res.competition} isChampionship={res.is_championship} /> · {res.date}
+                          </span>
                         </div>
                       ),
                     });
