@@ -344,9 +344,11 @@ function SwimmerProject() {
   const achievements = useMemo(() => ({
     scopeLabel: activeSeason == null ? 'All time' : seasonLabel(activeSeason),
     records: profile?.recordsHeld ?? 0,
-    seasonBests: (seasonRanks.data?.rows ?? []).filter(holdsSeasonBest).length,
+    // Карусель на новом сезоне, а места — за витринный: под подписью «2026/27» SB прошлого
+    // сезона врали бы («SB 2» в сезоне, где SB ещё не считаются). Плитка тогда без SB.
+    seasonBests: ranksHeldBack ? 0 : (seasonRanks.data?.rows ?? []).filter(holdsSeasonBest).length,
     seasonBestsLabel: seasonRanks.data?.label ?? '',
-  }), [activeSeason, profile, seasonRanks.data]);
+  }), [activeSeason, profile, seasonRanks.data, ranksHeldBack]);
 
   // Подпись плитки Season: тот же формат «2025/26», что у сервера и у остальных экранов —
   // голый год («2025») читался бы как календарный, а сезон идёт через границу года.
