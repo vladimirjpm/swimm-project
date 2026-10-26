@@ -25,13 +25,16 @@ public static class SwimmerPageBuilder
         rows.Where(r => season is null || SeasonAggregator.SeasonOf(r) == season).ToList();
 
     /// <summary>
-    /// Сезоны, в которых есть заплывы, — от свежих к старым. Витринный сезон помечается
-    /// <c>isDisplayDefault</c>; если заплывов в нём нет (пловец не стартовал), умолчание
-    /// съезжает на ближайший сезон СТАРШЕ него, а не на самый свежий: иначе карусель
-    /// открывалась бы на сезоне, который витрина ещё не считает состоявшимся.
+    /// Сезоны, в которых есть заплывы, — от свежих к старым. <c>isDisplayDefault</c> — у самого
+    /// свежего: страница пловца открывается на сезоне ПОСЛЕДНЕГО старта (решение Влада
+    /// 26.10.2026). Витринный сезон («новый откроется после зимнего чемпионата») на карусель
+    /// больше не влияет — он про сезонные рейтинги (Season best, места среди ровесников), чтобы
+    /// первый старт сезона не выдавался за лучший; их держит клиент по <c>showcaseSeason</c>
+    /// профиля. Раньше карусель стояла на витринном сезоне, и старт 24.10.2026 у пловца 6066
+    /// не было видно, пока не переключишь сезон руками.
     /// </summary>
     public static List<SwimmerSeasonOptionDto> Seasons(
-        IReadOnlyList<SeasonSwimRow> rows, int showcaseSeason, int currentSeason)
+        IReadOnlyList<SeasonSwimRow> rows, int currentSeason)
     {
         var options = rows
             .GroupBy(SeasonAggregator.SeasonOf)
@@ -45,10 +48,7 @@ public static class SwimmerPageBuilder
             })
             .ToList();
 
-        var defaultSeason = options.FirstOrDefault(o => o.Season == showcaseSeason)
-                            ?? options.FirstOrDefault(o => o.Season < showcaseSeason)
-                            ?? options.FirstOrDefault();
-        if (defaultSeason is not null) defaultSeason.IsDisplayDefault = true;
+        if (options.Count > 0) options[0].IsDisplayDefault = true;
 
         return options;
     }

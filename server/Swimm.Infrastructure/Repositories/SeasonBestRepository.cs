@@ -145,7 +145,14 @@ public class SeasonBestRepository : ISeasonBestRepository
     public async Task<SeasonBestTableDto> GetSeasonBestTableAsync(
         int? season, CancellationToken ct = default)
     {
-        var seasonYear = season ?? await _showcase.CurrentStartYearAsync(ct);
+        var showcaseYear = await _showcase.CurrentStartYearAsync(ct);
+        var seasonYear = season ?? showcaseYear;
+        // Сезон НОВЕЕ витринного (идёт, но зимний чемпионат ещё не проплыт) — эталона нет:
+        // таблица — источник бейджа SB в протоколе и My media, и первый же старт нового сезона
+        // иначе объявлялся бы «быстрейшим в стране» (решение Влада 26.10.2026, ради этого и
+        // заведён витринный сезон — docs/season-boundary-rule.md).
+        if (seasonYear > showcaseYear)
+            return new SeasonBestTableDto { Season = seasonYear, SeasonLabel = SeasonMath.Label(seasonYear) };
         var (start, endExclusive) = SeasonMath.RangeOf(seasonYear);
         // Возраст в сезоне = год ОКОНЧАНИЯ сезона − год рождения (SeasonMath.AgeInSeason).
         // Здесь он нужен внутри SQL — иначе группировку пришлось бы делать в памяти на всём

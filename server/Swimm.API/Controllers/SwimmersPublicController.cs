@@ -82,7 +82,11 @@ public class SwimmersPublicController : ControllerBase
 
         var showcase = await _showcase.CurrentStartYearAsync();
 
-        dto.Seasons = SwimmerPageBuilder.Seasons(rows, showcase, SeasonMath.CurrentStartYear());
+        dto.Seasons = SwimmerPageBuilder.Seasons(rows, SeasonMath.CurrentStartYear());
+        // Витринный сезон — клиенту для СЕЗОННЫХ РЕЙТИНГОВ (места среди ровесников, SB): пока
+        // карусель стоит на новом сезоне, а витрина ещё на прошлом, места берутся за прошлый
+        // и подписываются «Season 2025/26» (решение Влада 26.10.2026).
+        dto.ShowcaseSeason = showcase;
 
         // Возраст показываем для сезона, на котором стоит карусель: подпись «12 year (2014)»
         // обязана совпадать с тем, что человек видит в панели.
@@ -261,7 +265,8 @@ public class SwimmersPublicController : ControllerBase
     {
         var rows = await _swims.GetSwimsAsync(id);
         var profile = await _results.GetSwimmerProfileAsync(id);
-        var selected = await ResolveSeasonAsync(rows, season);
+        // Без явного сезона — витринный: это рейтинг, а не список (см. RanksDefaultSeasonAsync).
+        var selected = season is null ? await RanksDefaultSeasonAsync(rows) : await ResolveSeasonAsync(rows, season);
 
         // Когорта тянется только под конкретный сезон: за карьеру сравнивать не с чем, а
         // выборка недешёвая (её ключ — сезон + год рождения, общий на всех сверстников).
@@ -460,14 +465,30 @@ public class SwimmersPublicController : ControllerBase
         return await DefaultSeasonAsync(rows);
     }
 
-    /// <summary>Витринный сезон, приземлённый на сезоны, в которых пловец действительно плавал.</summary>
-    private async Task<int?> DefaultSeasonAsync(IReadOnlyList<SeasonSwimRow> rows)
+    /// <summary>
+    /// Сезон по умолчанию для СПИСКОВ (сводка, лучшие времена, возраст в шапке) — сезон
+    /// последнего старта, тот же, на котором открывается карусель (решение Влада 26.10.2026).
+    /// </summary>
+    private Task<int?> DefaultSeasonAsync(IReadOnlyList<SeasonSwimRow> rows)
+    {
+        if (rows.Count == 0) return Task.FromResult<int?>(null);
+        var seasons = SwimmerPageBuilder.Seasons(rows, SeasonMath.CurrentStartYear());
+        return Task.FromResult(seasons.FirstOrDefault(s => s.IsDisplayDefault)?.Season);
+    }
+
+    /// <summary>
+    /// Сезон по умолчанию для СЕЗОННЫХ РЕЙТИНГОВ (места среди ровесников) — витринный, приземлённый
+    /// на сезоны, где пловец плавал: до зимнего чемпионата первый старт нового сезона за «лучший
+    /// в сезоне» не выдаём (docs/season-boundary-rule.md). Нет заплывов в витринном — ближайший
+    /// сезон СТАРШЕ него, иначе самый свежий.
+    /// </summary>
+    private async Task<int?> RanksDefaultSeasonAsync(IReadOnlyList<SeasonSwimRow> rows)
     {
         if (rows.Count == 0) return null;
-
         var showcase = await _showcase.CurrentStartYearAsync();
-
-        var seasons = SwimmerPageBuilder.Seasons(rows, showcase, SeasonMath.CurrentStartYear());
-        return seasons.FirstOrDefault(s => s.IsDisplayDefault)?.Season;
+        var seasons = rows.Select(SeasonAggregator.SeasonOf).Distinct().OrderByDescending(s => s).ToList();
+        return seasons.Contains(showcase) ? showcase
+            : seasons.FirstOrDefault(s => s < showcase) is int older and > 0 ? older
+            : seasons[0];
     }
 }

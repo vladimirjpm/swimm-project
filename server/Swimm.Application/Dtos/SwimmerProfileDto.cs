@@ -98,9 +98,16 @@ public class SwimmerProfileDto
     [JsonPropertyName("underReviewCount")]
     public int UnderReviewCount { get; set; }
 
-    /// <summary>Сезоны с заплывами, от свежих к старым; ровно один — isDisplayDefault.</summary>
+    /// <summary>Сезоны с заплывами, от свежих к старым; ровно один — isDisplayDefault (самый свежий).</summary>
     [JsonPropertyName("seasons")]
     public List<SwimmerSeasonOptionDto> Seasons { get; set; } = [];
+
+    /// <summary>
+    /// Витринный сезон (год начала): за него считаются сезонные рейтинги — места среди ровесников
+    /// и SB, — пока новый сезон не открыт зимним чемпионатом. На карусель не влияет.
+    /// </summary>
+    [JsonPropertyName("showcaseSeason")]
+    public int? ShowcaseSeason { get; set; }
 
     /// <summary>
     /// Копия, в которую страница пловца дописывает поля шапки (сезоны, рекорды, программы).

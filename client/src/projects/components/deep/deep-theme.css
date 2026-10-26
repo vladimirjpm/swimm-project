@@ -975,3 +975,22 @@
   font-size: 11.5px; font-weight: 700; color: var(--deep-text-mute);
 }
 .deep-scope-note strong { color: var(--deep-accent); font-weight: 900; }
+
+/* ── Заголовок сезона витрины (`UI_SeasonTitle`) ─────────────────────────────
+   «Season 2025/26» над сезонным рейтингом, пока витрина держит прошлый сезон
+   (решение Влада 26.10.2026). Чип — у плиток и карточек; строка — там, где рядом другой
+   сезон (карусель пловца на новом, места — за прошлый). */
+.deep-season-chip {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--deep-accent-chip); color: var(--deep-accent);
+  font-size: 10.5px; font-weight: 900; letter-spacing: .02em; white-space: nowrap;
+}
+.deep-season-title {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  margin-bottom: 10px; padding: 8px 12px;
+  border-radius: var(--deep-radius-row);
+  background: var(--deep-accent-chip);
+}
+.deep-season-title__label { font-size: 15px; font-weight: 900; color: var(--deep-accent); }
+.deep-season-title__hint { font-size: 11.5px; font-weight: 700; color: var(--deep-text-mute); }

@@ -57,14 +57,15 @@ public class MySwimsRepository : IMySwimsRepository
             })
             .ToListAsync();
 
-        // Дефолт — ВИТРИННЫЙ сезон, не календарный: 1 сентября календарная граница уводит
-        // страницу в сезон, где стартов ещё нет, и она показывает пустоту
-        // (docs/season-boundary-rule.md, журнал 01.09.2026). Провайдер — общий на продукт.
-        var currentSeason = await _showcase.CurrentStartYearAsync();
+        // Дефолт — сезон ПОСЛЕДНЕГО старта моих пловцов (решение Влада 26.10.2026): после старта
+        // родитель приходит загрузить видео, и свежий заплыв обязан быть на экране. Витринный
+        // сезон остаётся только запасным — когда заплывов нет вовсе (1 сентября календарная
+        // граница уводила страницу в пустой сезон, docs/season-boundary-rule.md).
+        var showcaseSeason = await _showcase.CurrentStartYearAsync();
         var response = new MySwimsResponseDto
         {
             Swimmers = swimmers,
-            Season = season ?? currentSeason,
+            Season = season ?? showcaseSeason,
             AllSeasons = allSeasons,
         };
         if (swimmers.Count == 0) return response;
@@ -85,6 +86,7 @@ public class MySwimsRepository : IMySwimsRepository
             .Distinct()
             .OrderByDescending(y => y)
             .ToList();
+        if (season is null && response.Seasons.Count > 0) response.Season = response.Seasons[0];
 
         // CompetitionDate — timestamp WITHOUT time zone → Kind обязан быть Unspecified (см. SeasonMath).
         var (seasonStart, seasonEnd) = SeasonMath.RangeOf(response.Season);
