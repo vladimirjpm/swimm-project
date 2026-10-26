@@ -524,4 +524,31 @@ public class MySwimsRepositoryTests
         // Владелец строки в чипы (favorites) не попадает — он не в избранном.
         Assert.DoesNotContain(response.Swimmers, s => s.Id == owner.Id);
     }
+
+    [Fact]
+    public async Task DefaultSeason_IsTheSeasonOfTheLatestStart_NotTheShowcaseOne()
+    {
+        // Решение Влада 26.10.2026: после старта родитель приходит загрузить видео — свежий
+        // заплыв обязан быть на экране, даже если витрина ещё держит прошлый сезон. Тут
+        // последний старт — в 2023/24, а витрина (календарь фейка) — уже позже.
+        await using var db = CreateDb(nameof(DefaultSeason_IsTheSeasonOfTheLatestStart_NotTheShowcaseOne));
+        var user = NewUser("latest@example.com");
+        var swimmer = NewSwimmer("Last", "Season");
+        db.AppUsers.Add(user);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        var (style, club) = await SeedRefsAsync(db);
+        var older = await SeedCompetitionAsync(db, "Older", "15/01/2023");
+        var latest = await SeedCompetitionAsync(db, "Latest", "15/01/2024");
+        db.Results.AddRange(
+            NewResult(swimmer, older, style, club, new DateTime(2023, 1, 15)),
+            NewResult(swimmer, latest, style, club, new DateTime(2024, 1, 15)));
+        await db.SaveChangesAsync();
+        await AddFavoriteAsync(db, user, swimmer);
+
+        var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: null);
+
+        Assert.Equal(2023, response.Season);
+        Assert.Equal("Latest", Assert.Single(response.Swims).CompetitionName);
+    }
 }

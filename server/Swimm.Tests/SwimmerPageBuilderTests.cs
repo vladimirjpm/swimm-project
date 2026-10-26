@@ -33,34 +33,34 @@ public class SwimmerPageBuilderTests
     private static readonly Dictionary<int, string?> NoKinds = [];
 
     [Fact]
-    public void Seasons_DefaultIsTheShowcaseSeason_NotTheFreshestOne()
+    public void Seasons_DefaultIsTheSeasonOfTheLatestStart()
     {
-        // Октябрь нового сезона: заплывы 2026/27 уже есть, но зимние чемпионаты не проплыли,
-        // поэтому карусель обязана стоять на 2025/26.
+        // Решение Влада 26.10.2026: октябрь нового сезона, зимние чемпионаты не проплыты, но
+        // карусель открывается на сезоне ПОСЛЕДНЕГО старта — иначе старт 24.10 не видно.
+        // Витринный сезон держит только сезонные рейтинги (места, SB) — не карусель.
         var rows = new[]
         {
             Row(1, "2026-02-16"),          // сезон 2025
             Row(2, "2026-10-10"),          // сезон 2026
         };
 
-        var seasons = SwimmerPageBuilder.Seasons(rows, showcaseSeason: 2025, currentSeason: 2026);
+        var seasons = SwimmerPageBuilder.Seasons(rows, currentSeason: 2026);
 
         Assert.Equal([2026, 2025], seasons.Select(s => s.Season));
-        Assert.True(seasons.Single(s => s.Season == 2025).IsDisplayDefault);
+        Assert.True(seasons.Single(s => s.Season == 2026).IsDisplayDefault);
         Assert.True(seasons.Single(s => s.Season == 2026).IsCurrent);
-        Assert.False(seasons.Single(s => s.Season == 2026).IsDisplayDefault);
+        Assert.False(seasons.Single(s => s.Season == 2025).IsDisplayDefault);
     }
 
     [Fact]
-    public void Seasons_ShowcaseSeasonWithoutSwims_FallsBackToTheOlderOne()
+    public void Seasons_SwimmerOutOfTheWater_DefaultIsHisLastSeasonNotAnEmptyOne()
     {
-        // Пловец пропустил витринный сезон: умолчание съезжает НАЗАД, а не на свежий сезон,
-        // который витрина ещё не считает состоявшимся.
-        var rows = new[] { Row(1, "2024-02-16"), Row(2, "2026-10-10") };
+        // Последний старт в 2023/24 — карусель на нём, а не на пустом календарном сезоне.
+        var rows = new[] { Row(1, "2023-02-16"), Row(2, "2024-02-16") };
 
-        var seasons = SwimmerPageBuilder.Seasons(rows, showcaseSeason: 2025, currentSeason: 2026);
+        var seasons = SwimmerPageBuilder.Seasons(rows, currentSeason: 2026);
 
-        Assert.True(seasons.Single(s => s.Season == 2023).IsDisplayDefault);
+        Assert.True(Assert.Single(seasons, s => s.IsDisplayDefault).Season == 2023);
     }
 
     [Fact]

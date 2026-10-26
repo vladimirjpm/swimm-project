@@ -227,16 +227,32 @@ function SwimmerProject() {
   const underReview = useSwimmerUnderReview(swimmerId, onResults && view === 'under-review');
 
   /**
-   * Сезон, за который считаются МЕСТА. Обычно это выбранный сезон, но в режиме ∞ (All)
-   * мест не бывает — сравнение живёт внутри одного сезона. Вместо тупика показываем места
-   * за ВИТРИННЫЙ сезон и честно подписываем, за какой (решение Влада 2026-08-25).
+   * Сезон, за который считаются МЕСТА (и бейдж SB). Обычно это выбранный сезон, но:
+   *  • в режиме ∞ (All) мест не бывает — сравнение живёт внутри одного сезона; показываем места
+   *    за витринный сезон и честно подписываем, за какой (решение Влада 2026-08-25);
+   *  • карусель на НОВОМ сезоне, а витрина ещё на прошлом (до зимнего чемпионата) — места тоже
+   *    за витринный, с заголовком «Season 2025/26»: первый старт нового сезона за лучший в
+   *    группе не выдаём (решение Влада 26.10.2026). Карусель при этом стоит на новом сезоне —
+   *    список стартов к рейтингу отношения не имеет.
+   * Витринный сезон приземляется на сезоны, где пловец плавал (зеркало сервера,
+   * `RanksDefaultSeasonAsync`): нет заплывов в витринном — ближайший старше, иначе свежий.
    */
-  const displaySeason = useMemo(() => {
-    const list = profile?.seasons ?? [];
-    return (list.find((x) => x.isDisplayDefault) ?? list[0])?.season ?? null;
-  }, [profile]);
-  const ranksSeason = activeSeason ?? displaySeason;
+  const showcaseSeason = profile?.showcaseSeason ?? null;
+  const ranksSeason = useMemo(() => {
+    const list = (profile?.seasons ?? []).map((x) => x.season);
+    if (list.length === 0) return null;
+    const ratingDefault = showcaseSeason == null
+      ? list[0]
+      : list.includes(showcaseSeason)
+        ? showcaseSeason
+        : list.find((s) => s < showcaseSeason) ?? list[0];
+    if (activeSeason == null) return ratingDefault;
+    if (showcaseSeason != null && activeSeason > showcaseSeason) return ratingDefault;
+    return activeSeason;
+  }, [profile, showcaseSeason, activeSeason]);
   const seasonBestFallback = activeSeason == null && ranksSeason != null;
+  /** Карусель на новом сезоне, а места — за витринный: панель ставит заголовок «Season …». */
+  const ranksHeldBack = activeSeason != null && ranksSeason != null && ranksSeason !== activeSeason;
 
   // Места среди сверстников нужны ДВУМ видам: своей панели Season best и бейджу SB на
   // строках Best time. Один запрос на оба — иначе бейдж и таблица мест могли бы разойтись.
@@ -249,9 +265,11 @@ function SwimmerProject() {
    * поставить карьерное время рядом с сезонным местом значит показать место за один заплыв,
    * а время — за другой. Поэтому для этой панели строки того же сезона тянутся отдельно.
    */
+  // Сезон мест отличается от сезона таба (∞ или новый сезон) — строки того же сезона, что и места.
+  const ranksOwnRows = seasonBestFallback || ranksHeldBack;
   const fallbackBest = useSwimmerBestTimes(
-    swimmerId, ranksSeason, seasonReady && onResults && view === 'season-best' && seasonBestFallback);
-  const seasonBestRows = seasonBestFallback ? fallbackBest : bestTimes;
+    swimmerId, ranksSeason, seasonReady && onResults && view === 'season-best' && ranksOwnRows);
+  const seasonBestRows = ranksOwnRows ? fallbackBest : bestTimes;
 
   /**
    * Дисциплины, где пловец первый в своей возрастной группе, — носители бейджа SB.
@@ -261,11 +279,13 @@ function SwimmerProject() {
    * В режиме ∞ бейджей НЕТ: список Best time там карьерный, а место сезонное — SB на
    * карьерной строке утверждал бы то, чего никто не считал.
    */
+  // Места за ДРУГОЙ сезон (новый сезон до зимнего чемпионата) — бейджей тоже нет: SB прошлого
+  // сезона на строке нового утверждал бы, что этот заплыв быстрейший в группе.
   const sbKeys = useMemo(
-    () => (activeSeason == null
+    () => (activeSeason == null || ranksHeldBack
       ? new Set<string>()
       : new Set((seasonRanks.data?.rows ?? []).filter(holdsSeasonBest).map((r) => r.disciplineKey))),
-    [seasonRanks.data, activeSeason]);
+    [seasonRanks.data, activeSeason, ranksHeldBack]);
 
   /**
    * Лучшие времена ЗА КАРЬЕРУ. Грузим всегда, а не только на виде Progress: из них же
@@ -494,6 +514,7 @@ function SwimmerProject() {
                 swimmerId={profile.id}
                 season={ranksSeason}
                 isFallbackSeason={seasonBestFallback}
+                heldBack={ranksHeldBack}
                 state={{
                   loading: seasonBestRows.loading || seasonRanks.loading,
                   error: seasonBestRows.error || seasonRanks.error,

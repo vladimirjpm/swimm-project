@@ -1,5 +1,6 @@
 import SwimRow from '../../../components/swim-row/swim-row';
 import UI_SeasonNotice from '../../../components/mix/season-notice/season-notice';
+import UI_SeasonTitle from '../../../components/mix/season-notice/season-title';
 import { routes } from '../../../../utils/routes';
 import type { SwimmerBestTime, SwimmerSeasonRanks } from '../../use-swimmer-page';
 import { holdsSeasonBest, type PanelLoad, noDataText, PanelEmpty, PanelHead } from '../swimmer-panels';
@@ -15,7 +16,7 @@ import { holdsSeasonBest, type PanelLoad, noDataText, PanelEmpty, PanelHead } fr
  * ответе с местами, показываем БЕЗ места (прочерк), а не молча объявляем первыми.
  */
 export function SeasonBestPanel({
-  rows, ranks, swimmerId, season, isFallbackSeason = false, state,
+  rows, ranks, swimmerId, season, isFallbackSeason = false, heldBack = false, state,
 }: {
   rows: SwimmerBestTime[] | null;
   ranks: SwimmerSeasonRanks | null;
@@ -27,6 +28,12 @@ export function SeasonBestPanel({
    * вслух: иначе адрес говорит «за карьеру», а цифры — за один сезон.
    */
   isFallbackSeason?: boolean;
+  /**
+   * Карусель на НОВОМ сезоне, а места — за витринный (до зимнего чемпионата, решение Влада
+   * 26.10.2026). На экране два сезона сразу, поэтому заголовок «Season 2025/26» — строкой
+   * в шапке панели (`UI_SeasonTitle size="lg"`), а не мелкой оговоркой.
+   */
+  heldBack?: boolean;
   state: PanelLoad;
 }) {
   // Сезонов нет совсем — сравнивать не с чем, и запрос не уходил: без этой ветки панель
@@ -46,7 +53,11 @@ export function SeasonBestPanel({
 
   // Пустая панель в сентябре — это не «нет заплывов», а «сезон ещё не открыт»: оговорка
   // обязана стоять и здесь, иначе пловец читает пустоту как поломку.
-  const seasonNote = <UI_SeasonNotice notice={ranks.season_notice} season={season} />;
+  // Карусель на новом сезоне — заголовок «Season 2025/26» строкой (в нём и пояснение); иначе
+  // прежняя оговорка.
+  const seasonNote = heldBack
+    ? <UI_SeasonTitle size="lg" notice={ranks.season_notice} season={season} />
+    : <UI_SeasonNotice notice={ranks.season_notice} season={season} />;
 
   if (rows.length === 0) {
     return (
@@ -83,6 +94,8 @@ export function SeasonBestPanel({
 
   return (
     <>
+      {/* Другой сезон, чем у карусели, — заголовок первым, над шапкой панели. */}
+      {heldBack && seasonNote}
       <PanelHead
         title={`Among ${oneCircle ?? ranks.groupLabel}`}
         hint={`place by best time of season ${ranks.label}, ${circleHint}`}
@@ -99,7 +112,7 @@ export function SeasonBestPanel({
       {/* Сентябрь–февраль: витрина ещё держит прошлый сезон. Без этой строки пловец видит
           прошлогодние места как сегодняшние — или пустоту, если выбрал новый сезон руками
           (docs/season-boundary-rule.md). */}
-      {seasonNote}
+      {!heldBack && seasonNote}
 
       {ranked.length === 0 ? (
         <PanelEmpty>No comparable swims in this season yet.</PanelEmpty>

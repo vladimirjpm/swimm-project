@@ -70,7 +70,7 @@ export interface SwimmerHeldRecord {
   } | null;
 }
 
-/** Сезон для карусели. Ровно у одного `isDisplayDefault` — витринный (см. season-boundary-rule). */
+/** Сезон для карусели. Ровно у одного `isDisplayDefault` — самый свежий (сезон последнего старта, 26.10.2026). */
 export interface SwimmerSeasonOption {
   season: number;
   label: string;
@@ -106,6 +106,9 @@ export interface SwimmerProfile {
   /** Помеченных ошибок протокола за карьеру; больше нуля — у таба Results есть вид «Under review». */
   underReviewCount?: number;
   seasons?: SwimmerSeasonOption[];
+  /** Витринный сезон (год начала): за него — места среди ровесников и SB, пока новый сезон не
+   *  открыт зимним чемпионатом. На карусель не влияет. */
+  showcaseSeason?: number | null;
 }
 
 type State =
