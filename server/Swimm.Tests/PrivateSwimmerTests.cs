@@ -82,13 +82,23 @@ public class PrivateSwimmerTests
     // ── Правила ввода ─────────────────────────────────────────────────────────────
 
     [Theory]
-    [InlineData("", "Cohen", null, null, "First and last name are required")]
-    [InlineData("Dan", "  ", null, null, "First and last name are required")]
+    [InlineData("", "Cohen", null, null, "First name is required")]
+    [InlineData("  ", "", null, null, "First name is required")]
     [InlineData("Dan", "Cohen", "other", null, "Gender must be male or female")]
     [InlineData("Dan", "Cohen", null, 1800, "Birth year must be between 1920 and 2026")]
     public void Normalize_RejectsBadInput(string first, string last, string? gender, int? year, string error)
     {
         Assert.Equal(error, PrivateSwimmerRules.Normalize(first, last, gender, year, 2026).Error);
+    }
+
+    [Fact]
+    public void Normalize_LastNameIsOptional()
+    {
+        // Решение Влада 26.10.2026: тренер знает человека с дорожки по имени — фамилия не нужна.
+        var r = PrivateSwimmerRules.Normalize("Yair", "  ", null, null, 2026);
+        Assert.Null(r.Error);
+        Assert.Equal("Yair", r.First);
+        Assert.Equal("", r.Last);
     }
 
     [Fact]

@@ -21,8 +21,10 @@ public static class PrivateSwimmerRules
     {
         var first = Clean(firstName);
         var last = Clean(lastName);
-        if (first.Length == 0 || last.Length == 0)
-            return (first, last, null, 0, "First and last name are required");
+        // Обязательно только имя (решение Влада 26.10.2026): тренер часто знает человека с
+        // дорожки лишь по имени («Яир», «Гили»), и требование фамилии заставляло её выдумывать.
+        if (first.Length == 0)
+            return (first, last, null, 0, "First name is required");
         if (first.Length > MaxNameLength || last.Length > MaxNameLength)
             return (first, last, null, 0, $"Name is too long (max {MaxNameLength} characters)");
 
