@@ -96,9 +96,16 @@ function AddPrivateSwimmerForm({ onAdd }: { onAdd: (input: PrivateSwimmerInput) 
         inside this group — no public page, not in search.
       </p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <input id="private-swimmer-first" className={inputCls} placeholder="First name" dir="auto" maxLength={50}
-          value={input.firstName} onChange={(e) => setInput({ ...input, firstName: e.target.value })} />
-        <input id="private-swimmer-last" className={inputCls} placeholder="Last name" dir="auto" maxLength={50}
+        {/* Подписей у полей нет (только плейсхолдеры), поэтому обязательное помечено звёздочкой
+            внутри поля, справа; pe-6 — чтобы текст под неё не заезжал. */}
+        <div className="relative">
+          <input id="private-swimmer-first" className={`${inputCls} pe-6`} placeholder="First name" dir="auto" maxLength={50}
+            aria-required="true"
+            value={input.firstName} onChange={(e) => setInput({ ...input, firstName: e.target.value })} />
+          <span aria-hidden="true"
+            className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[14px] font-bold text-[var(--t-danger)]">*</span>
+        </div>
+        <input id="private-swimmer-last" className={inputCls} placeholder="Last name (optional)" dir="auto" maxLength={50}
           value={input.lastName} onChange={(e) => setInput({ ...input, lastName: e.target.value })} />
         <select id="private-swimmer-gender" className={inputCls} value={input.gender}
           onChange={(e) => setInput({ ...input, gender: e.target.value as PrivateSwimmerInput['gender'] })}>
@@ -116,7 +123,8 @@ function AddPrivateSwimmerForm({ onAdd }: { onAdd: (input: PrivateSwimmerInput) 
       {error && <p className="m-0 text-[12px] font-bold text-[var(--t-danger)]" role="alert">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" className={btnCls}
-          disabled={busy || !input.firstName.trim() || !input.lastName.trim()}>
+          // Обязательно только имя (решение Влада 26.10.2026) — фамилию тренер часто не знает.
+          disabled={busy || !input.firstName.trim()}>
           {busy ? 'Adding…' : 'Add to the group'}
         </button>
         <button type="button" className={btnCls} onClick={() => { setOpen(false); setError(null); }}>Cancel</button>
