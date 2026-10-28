@@ -1,0 +1,89 @@
+@page
+@model Swimm.API.Pages.Admin.Series.IndexModel
+@{
+    ViewData["Title"] = "Series";
+    ViewData["PageSubtitle"] = "Серии турниров и официальное награждение по регламенту";
+
+    var flash = TempData["Flash"] as string;
+    var error = TempData["Error"] as string;
+}
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">@error</div>
+}
+
+<div class="admin-card border-l-[3px] border-l-admin-accent bg-admin-accent/5 py-3 px-4 mb-4 text-xs text-admin-text-muted leading-relaxed">
+    Серия — турнир, который повторяется каждый год с теми же правилами. Награды регламента живут на
+    серии: новый выпуск привязывается к <strong class="text-admin-text">части</strong> серии и сам их получает,
+    на витрине — карточка «Official awards» рядом со стандартным High Point.
+    При импорте выпуск узнаётся по <strong class="text-admin-text">ключевой фразе</strong> в названии,
+    часть — по возрастам пловцов дня.
+</div>
+
+<div class="overflow-x-auto mb-5">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th class="w-16 text-right">#</th>
+                <th>Серия</th>
+                <th>Ключевые фразы</th>
+                <th class="text-right">Частей</th>
+                <th class="text-right">Версий регламента</th>
+                <th class="text-right">Дней выпусков</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Series.Count == 0)
+            {
+                <tr>
+                    <td colspan="6" class="text-admin-text-muted py-6 text-center text-sm">
+                        Серий пока нет — официальных наград на витрине нет.
+                    </td>
+                </tr>
+            }
+            @foreach (var s in Model.Series)
+            {
+                <tr>
+                    <td class="text-right tabular-nums text-admin-text-muted">@s.Id</td>
+                    <td>
+                        <a href="@Url.Page("Edit", new { id = s.Id })" class="text-admin-accent hover:underline font-medium" dir="auto">@s.Name</a>
+                        @if (!string.IsNullOrEmpty(s.NameEn))
+                        {
+                            <div class="text-xs text-admin-text-muted">@s.NameEn</div>
+                        }
+                    </td>
+                    <td class="text-xs text-admin-text-muted" dir="auto">@(s.MatchPhrases ?? "—")</td>
+                    <td class="text-right tabular-nums">@s.PartCount</td>
+                    <td class="text-right tabular-nums">@s.RegulationCount</td>
+                    <td class="text-right tabular-nums">@s.EditionDayCount</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<form method="post" asp-page-handler="Create" class="admin-card max-w-[720px]">
+    <h2 class="text-sm font-semibold text-admin-text mb-3">Новая серия</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label class="flex flex-col gap-1">
+            <span class="text-xs text-admin-text-muted">Имя (иврит) <span class="text-admin-danger">*</span></span>
+            <input name="name" class="admin-input" dir="auto" autocomplete="off" required
+                   placeholder="תחרות ע״ש גל רודובסקי ועדן נימרי" />
+        </label>
+        <label class="flex flex-col gap-1">
+            <span class="text-xs text-admin-text-muted">Имя (EN)</span>
+            <input name="nameEn" class="admin-input" autocomplete="off" placeholder="Gal Rudovsky & Eden Nimri Memorial" />
+        </label>
+    </div>
+    <div class="mt-4">
+        <button type="submit" class="admin-btn admin-btn-primary">Создать</button>
+    </div>
+</form>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}

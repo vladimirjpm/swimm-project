@@ -105,6 +105,13 @@ public sealed class CompetitionOverviewDto
     /// (design_handoff §High Point Award). Ничья по очкам → несколько на возраст (is_tie).
     /// Пусто, если возраст не вычислим (нет года рождения).</summary>
     [JsonPropertyName("high_point_awards")] public IReadOnlyList<OverviewHighPointDto> HighPointAwards { get; init; } = [];
+    /// <summary>
+    /// Официальное награждение по регламенту серии турнира — РЯДОМ со стандартным High Point, а
+    /// не вместо него (docs/plans/official-awards-plan.md §5.4). Блок на каждый день выборки,
+    /// привязанный к части серии; каждый считается по наградам СВОЕЙ части и строкам СВОЕГО дня.
+    /// Пусто — карточки нет.
+    /// </summary>
+    [JsonPropertyName("official_awards")] public IReadOnlyList<OverviewOfficialAwardsDayDto> OfficialAwards { get; init; } = [];
     /// <summary>Новые рекорды, установленные на соревновании. v1: всегда пусто — серверного
     /// сравнения результата с Record ещё нет (у Record нет FK на Competition); контракт
     /// зарезервирован, таб Records скрывается при пустом списке.</summary>
@@ -245,6 +252,76 @@ public sealed class OverviewPointsRuleDto
     /// <summary>Шкала «место → очки», по возрастанию места.</summary>
     [JsonPropertyName("points_by_place")]
     public IReadOnlyList<OverviewPointsRuleEntryDto> PointsByPlace { get; init; } = [];
+}
+
+/// <summary>Официальные награды одного дня — по регламенту серии, к части которой привязан день.</summary>
+public sealed class OverviewOfficialAwardsDayDto
+{
+    [JsonPropertyName("competition_id")] public int CompetitionId { get; init; }
+    [JsonPropertyName("day_number")] public int? DayNumber { get; init; }
+    /// <summary>Дата дня, dd/MM/yyyy (как Competition.Date).</summary>
+    [JsonPropertyName("date")] public string Date { get; init; } = "";
+    [JsonPropertyName("series_name")] public string SeriesName { get; init; } = "";
+    [JsonPropertyName("series_name_en")] public string? SeriesNameEn { get; init; }
+    [JsonPropertyName("part_name")] public string PartName { get; init; } = "";
+    [JsonPropertyName("part_name_en")] public string? PartNameEn { get; init; }
+    [JsonPropertyName("regulation")] public OverviewSeriesRegulationDto Regulation { get; init; } = new();
+    [JsonPropertyName("awards")] public IReadOnlyList<OverviewOfficialAwardDto> Awards { get; init; } = [];
+}
+
+/// <summary>Версия регламента, по которой посчитан день.</summary>
+public sealed class OverviewSeriesRegulationDto
+{
+    /// <summary>"yyyy-MM-dd".</summary>
+    [JsonPropertyName("effective_from")] public string EffectiveFrom { get; init; } = "";
+    /// <summary>PDF регламента — ссылка «per meet regulations».</summary>
+    [JsonPropertyName("source_url")] public string? SourceUrl { get; init; }
+    /// <summary>
+    /// Админ подтвердил, что этот выпуск идёт по этой версии регламента (§5.8, шаг 4). false —
+    /// новый выпуск считается по прошлогоднему регламенту без проверки.
+    /// </summary>
+    [JsonPropertyName("checked")] public bool Checked { get; init; }
+}
+
+public sealed class OverviewOfficialAwardDto
+{
+    /// <summary>Заголовок блока, по-английски («Outstanding young swimmers»).</summary>
+    [JsonPropertyName("title")] public string Title { get; init; } = "";
+    /// <summary>"points-sum" — сумма очков FINA лучших стартов.</summary>
+    [JsonPropertyName("kind")] public string Kind { get; init; } = "";
+    /// <summary>Сколько лучших стартов в сумме; null — все.</summary>
+    [JsonPropertyName("count_best")] public int? CountBest { get; init; }
+    [JsonPropertyName("groups")] public IReadOnlyList<OverviewOfficialAwardGroupDto> Groups { get; init; } = [];
+}
+
+/// <summary>Группа награды. Подпись («Girls 10–11», «Women 16+») строит клиент из пола и возрастов.</summary>
+public sealed class OverviewOfficialAwardGroupDto
+{
+    /// <summary>"male" | "female"; null — оба пола вместе.</summary>
+    [JsonPropertyName("gender")] public string? Gender { get; init; }
+    /// <summary>Сезонный возраст; null — без границы (у награды без полос — обе null).</summary>
+    [JsonPropertyName("min_age")] public int? MinAge { get; init; }
+    [JsonPropertyName("max_age")] public int? MaxAge { get; init; }
+    [JsonPropertyName("places")] public IReadOnlyList<OverviewOfficialAwardPlaceDto> Places { get; init; } = [];
+}
+
+public sealed class OverviewOfficialAwardPlaceDto
+{
+    /// <summary>Место по rank(): при ничьей двое на 2-м, следующий — 4-й.</summary>
+    [JsonPropertyName("place")] public int Place { get; init; }
+    [JsonPropertyName("swimmer_id")] public int SwimmerId { get; init; }
+    [JsonPropertyName("first_name")] public string FirstName { get; init; } = "";
+    [JsonPropertyName("last_name")] public string LastName { get; init; } = "";
+    [JsonPropertyName("first_name_en")] public string FirstNameEn { get; init; } = "";
+    [JsonPropertyName("last_name_en")] public string LastNameEn { get; init; } = "";
+    [JsonPropertyName("club")] public string Club { get; init; } = "";
+    [JsonPropertyName("club_id")] public int ClubId { get; init; }
+    [JsonPropertyName("points")] public int Points { get; init; }
+    /// <summary>Очки стартов, вошедших в сумму, по убыванию («674+650+598»).</summary>
+    [JsonPropertyName("parts")] public IReadOnlyList<int> Parts { get; init; } = [];
+    /// <summary>Приз за место — подпись из регламента; null — приза у места нет.</summary>
+    [JsonPropertyName("prize")] public string? Prize { get; init; }
+    [JsonPropertyName("is_tie")] public bool IsTie { get; init; }
 }
 
 /// <summary>Одна награда High Point Award: лучший по сумме очков в (возраст × пол).</summary>

@@ -19,6 +19,9 @@ import UI_ThemeDevTool from '../components/mix/theme-dev-tool/theme-dev-tool';
 import GroupHeader from './components/group-header/group-header';
 import CompetitionHeader from './components/competition-header/competition-header';
 import CompetitionOverview2 from './components/competition-header/overview2/competition-overview2';
+import OverviewDaySwitch, {
+  dayNumberOf, readOverviewDayParam, writeOverviewDayParam,
+} from './components/competition-header/overview2/overview-day-switch';
 import CompetitionClubs from './components/competition-header/competition-clubs';
 import CompetitionMedia from './components/competition-header/competition-media';
 import CompetitionRecords from './components/competition-header/competition-records';
@@ -28,6 +31,7 @@ import UpcomingCompetitionPage from './components/start-list/upcoming-competitio
 import { useCompetitionOverview } from './components/competition-header/use-competition-overview';
 import { useCompetitionAddMedia } from './components/competition-header/use-competition-add-media';
 import type { CompetitionTab } from './components/competition-header/types';
+import type { Result } from '../../utils/interfaces/results';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import type { HubGroupDetails } from '../hub-groups-project/types';
 import { useAuth } from '../../hooks/useAuth';
@@ -215,8 +219,9 @@ function ResultsMain() {
     setCompTab(tab);
     const url = new URL(window.location.href);
     url.searchParams.set('tab', tab);
-    // ?panel= принадлежит только Overview (активный модуль мозаики).
+    // ?panel= принадлежит только Overview (модуль мозаики), ?day= — Overview и Clubs.
     if (tab !== 'overview') url.searchParams.delete('panel');
+    if (tab !== 'overview' && tab !== 'clubs') url.searchParams.delete('day');
     window.history.replaceState(null, '', url.toString());
   }, []);
 
@@ -235,6 +240,32 @@ function ResultsMain() {
 
   const { overview: compOverview, loading: compOverviewLoading } =
     useCompetitionOverview(!groupSlug && !isTraining ? compSourceParams : undefined);
+
+  // Переключатель дней Overview и Clubs (official-awards-plan §5.6): только у события из
+  // нескольких дней. День — второй обзор с ?competitionId= дня; compOverview (всё событие)
+  // остаётся для шапки, Start list и таба Records — их переключатель не трогает.
+  const [overviewDay, setOverviewDay] = useState<number | null>(readOverviewDayParam);
+  const eventDays = compSourceParams?.eventId && (compOverview?.days.length ?? 0) > 1 ? compOverview!.days : [];
+  const selectedEventDay = eventDays.find((d) => dayNumberOf(eventDays, d) === overviewDay);
+  const overviewDayId = selectedEventDay?.competition_id;
+  // Таб Clubs за выбранный день: зачёт — по ?competitionId= дня, разбор клуба — строки этого дня
+  // из загруженных результатов события (day_number, у старых строк без него — дата).
+  const clubsSourceParams = useMemo(
+    () => (overviewDayId != null ? { competitionId: String(overviewDayId) } : compSourceParams),
+    [overviewDayId, compSourceParams],
+  );
+  const clubsDayFilter = useMemo(() => {
+    if (!selectedEventDay) return undefined;
+    const n = dayNumberOf(eventDays, selectedEventDay);
+    return (r: Result) => (r.day_number != null ? r.day_number === n : r.date === selectedEventDay.date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEventDay]);
+  const { overview: dayOverview, loading: dayOverviewLoading } =
+    useCompetitionOverview(overviewDayId != null ? { competitionId: String(overviewDayId) } : undefined);
+  const handleOverviewDay = useCallback((day: number | null) => {
+    setOverviewDay(day);
+    writeOverviewDayParam(day);
+  }, []);
 
   // Таб Start list (С7): счётчик заявок для бейджа таба. Программу грузим только когда
   // org_comp_id уже известен из Overview — иначе таба всё равно нет (см. competition-tabs.tsx).
@@ -545,9 +576,15 @@ function ResultsMain() {
       ) : !groupSlug && !isTraining && compSourceParams && compTab !== 'swims' ? (
         /* Не-Swims табы соревнования: контент под шапкой, фильтры/таблица не рендерятся */
         compTab === 'overview' ? (
+          <>
+          <OverviewDaySwitch
+            days={eventDays}
+            value={overviewDayId != null ? overviewDay : null}
+            onChange={handleOverviewDay}
+          />
           <CompetitionOverview2
-            overview={compOverview}
-            loading={compOverviewLoading}
+            overview={overviewDayId != null ? dayOverview : compOverview}
+            loading={overviewDayId != null ? dayOverviewLoading : compOverviewLoading}
             mediaItems={compMediaItems}
             onOpenTab={handleCompTabChange}
             onOpenSwim={handleOpenSwim}
@@ -555,13 +592,22 @@ function ResultsMain() {
             onOpenSwimsScoped={handleOpenSwimsScoped}
             onAddMedia={auth.isAuthenticated && addMedia.canAdd ? addMedia.openModal : undefined}
           />
+          </>
         ) : compTab === 'clubs' ? (
-          <CompetitionClubs
-            sourceParams={compSourceParams}
-            onOpenSwimsForClub={handleOpenSwimsForClub}
-            unofficial={clubPointsUnofficial}
+          <>
+          <OverviewDaySwitch
+            days={eventDays}
+            value={overviewDayId != null ? overviewDay : null}
+            onChange={handleOverviewDay}
           />
-        ) : compTab === 'media' ? (
+          <CompetitionClubs
+            sourceParams={clubsSourceParams}
+            rowFilter={clubsDayFilter}
+            onOpenSwimsForClub={handleOpenSwimsForClub}
+            unofficial={overviewDayId != null ? !!dayOverview?.club_points_unofficial : clubPointsUnofficial}
+          />
+          </>
+        ) :compTab === 'media' ? (
           <CompetitionMedia
             items={compMediaItems}
             isAuthenticated={auth.isAuthenticated}

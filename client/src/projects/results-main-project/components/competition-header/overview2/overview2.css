@@ -7,6 +7,9 @@
 .ov2-module--records   { --m: var(--theme-module-records, #6d28d9); }
 .ov2-module--champions { --m: var(--theme-module-champions, #b45309); }
 .ov2-module--hpa       { --m: var(--theme-module-hpa, #0f766e); }
+/* Official awards (награды по регламенту серии) — своего тем-токена нет: красится золотом
+   Champions, «кубковым» цветом продукта. Заведут токен — поменять здесь. */
+.ov2-module--official  { --m: var(--theme-module-official, var(--theme-module-champions, #b45309)); }
 .ov2-module--media     { --m: var(--theme-module-media, #be185d); }
 /* Favorites — шестой модуль, красится золотыми персональными токенами (та же семантика,
    что персональная полоса): цвет модуля = --theme-personal-accent. */

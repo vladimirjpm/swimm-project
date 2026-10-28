@@ -37,6 +37,9 @@ interface Props {
   /** Официального клубного зачёта нет — подписать зачёт чипом «Unofficial»
    *  (club_points_unofficial из overview, тот же флаг, что у карточки Top clubs). */
   unofficial?: boolean;
+  /** Сужение разбора клуба (выбран день события): зачёт слева уже за день по sourceParams,
+   *  а загруженные результаты — всего события, их фильтруем тем же днём. */
+  rowFilter?(r: Result): boolean;
 }
 
 function writeClubUrl(club: string | null) {
@@ -63,7 +66,7 @@ function eventOf(r: Result): string {
   return `${r.event_style_len ?? ''} ${r.event_style_name ?? ''}`.trim() || r.event || '—';
 }
 
-export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub, unofficial = false }: Props) {
+export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub, unofficial = false, rowFilter }: Props) {
   const clubs = useClubSummary(sourceParams, !!sourceParams);
   const selectedSource = useAppSelector((s) => s.dataSourceSelected);
   // Тоггл «Combine All Results»: он же управляет зачётом слева, поэтому разбор справа
@@ -83,8 +86,8 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub, uno
   // может быть не весь протокол — отсюда сноска под разбором очков).
   const clubRows = useMemo<Result[]>(() => {
     if (!selectedClub) return [];
-    return (selectedSource?.results ?? []).filter((r: Result) => clubKeyOf(r) === selectedClub);
-  }, [selectedClub, selectedSource]);
+    return (selectedSource?.results ?? []).filter((r: Result) => clubKeyOf(r) === selectedClub && (!rowFilter || rowFilter(r)));
+  }, [selectedClub, selectedSource, rowFilter]);
 
   /** Место с учётом тоггла: объединённое место дисциплины либо протокольное. */
   const placeOf = (r: Result): number | null =>

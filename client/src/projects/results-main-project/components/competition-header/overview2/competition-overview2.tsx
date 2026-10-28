@@ -9,6 +9,7 @@ import ModuleCardClubs from './module-card-clubs';
 import ModuleCardRecords from './module-card-records';
 import ModuleCardChampions from './module-card-champions';
 import ModuleCardHpa from './module-card-hpa';
+import ModuleCardOfficial from './module-card-official';
 import ModuleCardMedia from './module-card-media';
 import ModuleCardFavorites from './module-card-favorites';
 import UI_ClubIcon from '../../../../components/mix/club-icon/club-icon';
@@ -60,6 +61,7 @@ export default function CompetitionOverview2({
       || overview.top_medalists_female?.length);
     if (hasBestSwim || (hasAwards && hasMedalists)) set.add('champions');
     if (overview.high_point_awards.length) set.add('hpa');
+    if (overview.official_awards?.length) set.add('official');
     if (mediaItems.length) set.add('media');
     if (isAuthenticated && (primarySwimmerId != null || favoriteSwimmerIds.size > 0)) set.add('favorites');
     return set;
@@ -140,6 +142,12 @@ export default function CompetitionOverview2({
   const hpaAges = overview.high_point_awards.map((a) => a.age);
   const hpaRange = hpaAges.length ? `${Math.min(...hpaAges)}–${Math.max(...hpaAges)}` : '';
 
+  // Плитка Official awards: победитель первой награды первого дня — «кто взял главный приз».
+  const officialDays = overview.official_awards ?? [];
+  const officialTop = officialDays[0]?.awards[0]?.groups.flatMap((g) => g.places).find((p) => p.place === 1) ?? null;
+  const officialCount = officialDays.reduce((n, d) => n + d.awards.reduce((k, a) =>
+    k + a.groups.reduce((j, g) => j + g.places.length, 0), 0), 0);
+
   const videoCount = mediaItems.filter((m) => m.type === 'video').length;
   const photoCount = mediaItems.length - videoCount;
 
@@ -174,6 +182,11 @@ export default function CompetitionOverview2({
       medal: hasAwards ? (hpaRange || '—') : '—',
       name: hasAwards ? `${overview.high_point_awards.length} awards` : 'Not contested',
       sub: hasAwards ? 'each age · ♂ / ♀' : 'no awards at this competition',
+    },
+    official: {
+      medal: '🏅',
+      name: officialTop ? `${officialTop.first_name} ${officialTop.last_name}`.trim() : '—',
+      sub: `${officialCount} prize${officialCount === 1 ? '' : 's'} · per meet regulations`,
     },
     media: {
       medal: mediaItems.length,
@@ -214,6 +227,8 @@ export default function CompetitionOverview2({
         );
       case 'hpa':
         return <ModuleCardHpa overview={overview} onOpenClub={onOpenClub} />;
+      case 'official':
+        return <ModuleCardOfficial overview={overview} />;
       case 'media':
         return (
           <ModuleCardMedia

@@ -32,6 +32,12 @@ internal sealed class CompetitionConfiguration : IEntityTypeConfiguration<Compet
             .WithMany()
             .HasForeignKey(e => e.PointRuleSwimmersId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Часть серии: удаление части отвязывает дни, а не удаляет их.
+        entity.HasOne(e => e.SeriesPart)
+            .WithMany()
+            .HasForeignKey(e => e.SeriesPartId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 
