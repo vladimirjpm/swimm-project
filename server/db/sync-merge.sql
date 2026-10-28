@@ -14,6 +14,8 @@
 --      (dump-seed.sh их вырезает), локальные остаются; но если Id локального
 --      такого пловца занят на проде другим человеком — он уходит (иначе upsert
 --      превратил бы его в чужого), и его тренировки/членства вместе с ним.
+--      Ушедшая и та строка, что занимает второй уникальный ключ (не PK) прод-строки
+--      с другим Id: одно и то же затянуто и локально, и на проде (26.10.2026).
 --   2. Локальные строки вне переноса, которые держат ушедших через RESTRICT /
 --      NO ACTION, — удаляются (иначе удаление ушедших упадёт). CASCADE и
 --      SET NULL сделает сама база.
@@ -64,7 +66,10 @@ DECLARE
     cmp_l    text;
     cmp_r    text;
     gone_sql text;
+    clash    text;
+    ux       record;
     n        bigint;
+    n_clash  bigint;
     n_ins    bigint;
     n_upd    bigint;
     lvl_changed boolean;
@@ -138,6 +143,40 @@ BEGIN
                 'WHERE (l."PrivateHubGroupId" IS NULL AND NOT EXISTS (SELECT 1 FROM _sync."Swimmers" s WHERE s."Id" = l."Id")) '
                 '   OR (l."PrivateHubGroupId" IS NOT NULL AND EXISTS (SELECT 1 FROM _sync."Swimmers" s WHERE s."Id" = l."Id"))');
         END IF;
+        -- Второй уникальный ключ занят «не той» строкой: локальная строка держит ключ, который на
+        -- проде у строки с ДРУГИМ Id (одно и то же затянуто и тут, и на проде — Id разошлись).
+        -- Upsert идёт по Id, и прод-строка упёрлась бы в уникальный индекс (поймано 26.10.2026 на
+        -- CompetitionEntries: заявки 1772/1773 затянуты дважды, Id сдвинуты на 24, 2596 строк).
+        -- Такая строка — тоже ушедшая: дальше обычный путь (перевесить, удалить, upsert вставит
+        -- прод-строку). Индексы-выражения пропускаем; у частичных (LogligId WHERE NOT NULL)
+        -- равенство само не совпадает на NULL.
+        clash := NULL;
+        FOR ux IN
+            SELECT array_agg(a.attname ORDER BY array_position(x.indkey::int2[], a.attnum)) AS ucols
+              FROM pg_index x
+              JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = ANY(x.indkey)
+             WHERE x.indrelid = format('public.%I', t.tbl)::regclass
+               AND x.indisunique AND NOT x.indisprimary AND x.indexprs IS NULL
+             GROUP BY x.indexrelid
+        LOOP
+            clash := concat_ws(' OR ', clash, format(
+                'EXISTS (SELECT 1 FROM _sync.%I s WHERE %s AND ROW(%s) IS DISTINCT FROM ROW(%s))',
+                t.tbl,
+                (SELECT string_agg(format('s.%1$I = l.%1$I', c), ' AND ') FROM unnest(ux.ucols) c),
+                (SELECT string_agg(format('s.%I', c), ', ') FROM unnest(pk_cols) c),
+                (SELECT string_agg(format('l.%I', c), ', ') FROM unnest(pk_cols) c)));
+        END LOOP;
+        IF clash IS NOT NULL THEN
+            EXECUTE format('SELECT count(*) FROM public.%I l WHERE %s', t.tbl, clash) INTO n_clash;
+            IF n_clash > 0 THEN
+                -- Дописываем в тот же WHERE (у обоих видов gone_sql он последний), а не UNION:
+                -- у колонок json нет равенства, и UNION бы упал.
+                gone_sql := gone_sql || ' OR (' || clash || ')';
+                RAISE NOTICE 'ключ занят другой строкой прода: % — % (уйдут, прод-строки встанут на место)',
+                             t.tbl, n_clash;
+            END IF;
+        END IF;
+
         EXECUTE format('CREATE TEMP TABLE %I ON COMMIT DROP AS %s', '_gone_' || t.tbl, gone_sql);
         EXECUTE format('SELECT count(*) FROM %I', '_gone_' || t.tbl) INTO n;
         IF n > 0 THEN RAISE NOTICE 'уходит: % — %', t.tbl, n; END IF;
