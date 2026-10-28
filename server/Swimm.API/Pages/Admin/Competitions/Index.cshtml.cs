@@ -24,11 +24,14 @@ public class IndexModel : PageModel
     private readonly IConfiguration _config;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<IndexModel> _logger;
+    private readonly ISeriesAdminRepository _series;
 
     public IndexModel(ICompetitionAdminRepository repo, IImportService import,
         IPointRulesAdminRepository rules, IAdminAuditService audit,
-        IConfiguration config, IWebHostEnvironment env, ILogger<IndexModel> logger)
+        IConfiguration config, IWebHostEnvironment env, ILogger<IndexModel> logger,
+        ISeriesAdminRepository series)
     {
+        _series = series;
         _repo = repo;
         _import = import;
         _rules = rules;
@@ -116,6 +119,19 @@ public class IndexModel : PageModel
     public IReadOnlyList<PointRuleRowDto> SwimmerRules { get; private set; } = [];
     public IReadOnlyList<string> PoolTypeOptions => Swimm.Application.Constants.PoolTypes.All;
 
+    /// <summary>Серии с ключевыми фразами — чип «серия» у строки входящих (§5.8 плана official-awards).</summary>
+    public IReadOnlyList<SeriesRowDto> SeriesWithPhrases { get; private set; } = [];
+
+    /// <summary>Серия, под фразу которой подходит название с сайта; null — ни одной или несколько.</summary>
+    public SeriesRowDto? SeriesFor(string? name)
+    {
+        var matched = SeriesWithPhrases
+            .Where(x => Swimm.Application.Mapping.SeriesMatch.NameMatches(name,
+                (x.MatchPhrases ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)))
+            .Take(2).ToList();
+        return matched.Count == 1 ? matched[0] : null;
+    }
+
     public async Task OnGetAsync()
     {
         PublicSiteBaseUrl = PublicSite.BaseUrl(_config, _env);
@@ -145,6 +161,7 @@ public class IndexModel : PageModel
         Categories = await _repo.GetAllCategoriesAsync();
         ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
         SwimmerRules = await _rules.GetAllAsync(PointRuleKind.Swimmers);
+        SeriesWithPhrases = (await _series.GetAllAsync()).Where(x => !string.IsNullOrEmpty(x.MatchPhrases)).ToList();
     }
 
     /// <summary>

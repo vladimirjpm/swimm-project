@@ -161,6 +161,8 @@ public static class DependencyInjection
         services.AddScoped<ICategoryAdminRepository, CategoryAdminRepository>();
         services.AddScoped<IStyleAdminRepository, StyleAdminRepository>();
         services.AddScoped<IPointRulesAdminRepository, PointRulesAdminRepository>();
+        services.AddScoped<ISeriesAdminRepository, SeriesAdminRepository>();
+        services.AddScoped<ISeriesBinder, SeriesBinder>();
         services.AddScoped<IResultAdminRepository, ResultAdminRepository>();
         services.AddScoped<IResultTransferService, ResultTransferService>();
         // Деление схлопнутой многодневки по дням без переимпорта (multiday-split-plan, М2).
@@ -244,6 +246,9 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, SwimmerEnglishNameCheck>();
         services.AddScoped<IDataCheck, CompetitionWithoutClubPointRuleCheck>();
         services.AddScoped<IDataCheck, CountryDuplicateCheck>();
+        services.AddScoped<IDataCheck, SeriesUnboundMatchCheck>();
+        services.AddScoped<IDataCheck, SeriesPartMismatchCheck>();
+        services.AddScoped<IDataCheck, SeriesRegulationUncheckedCheck>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         // Открытие для поиска (A10): заголовки страниц, sitemap.xml, «скрыть пловца из поиска».

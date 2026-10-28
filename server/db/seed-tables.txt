@@ -18,6 +18,8 @@ CompetitionMeetInfos
 CompetitionNoteTexts
 CompetitionNotes
 CompetitionResultUrls
+CompetitionSeries
+CompetitionSeriesParts
 CompetitionSources
 CompetitionWarmUps
 Competitions
@@ -33,6 +35,10 @@ Records
 RelayMembers
 Relays
 Results
+SeriesAwardBands
+SeriesAwardPrizes
+SeriesAwards
+SeriesRegulations
 Styles
 Swimmers
 

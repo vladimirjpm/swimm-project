@@ -173,6 +173,28 @@ public class Competition
   [ForeignKey(nameof(PointRuleSwimmersId))]
   public PointRuleSwimmers? PointRuleSwimmers { get; set; }
 
+  // ── Серия турнира (официальное награждение, docs/plans/official-awards-plan.md §5) ──
+
+  /// <summary>
+  /// Часть серии, к которой относится этот день выпуска. Серия выводится через часть — своего
+  /// SeriesId у дня нет, иначе два источника правды. null — соревнование не из серии.
+  /// </summary>
+  public int? SeriesPartId { get; set; }
+
+  [ForeignKey(nameof(SeriesPartId))]
+  public CompetitionSeriesPart? SeriesPart { get; set; }
+
+  /// <summary>
+  /// Когда админ подтвердил, что этот выпуск идёт по действующему регламенту серии (§5.8, шаг 4):
+  /// привязка доказывает, что турнир тот же, но не что регламент не поменялся. null — не
+  /// подтверждено, Health напоминает.
+  /// </summary>
+  public DateTime? SeriesRegulationCheckedAt { get; set; }
+
+  /// <summary>Кто подтвердил регламент (логин админа).</summary>
+  [MaxLength(200)]
+  public string? SeriesRegulationCheckedBy { get; set; }
+
   // ── Ручная сверка очков (админская отметка, на публику не влияет) ──────────
 
   /// <summary>

@@ -23,6 +23,8 @@ public static class AdminNav
         new("Styles", "waves", "/Admin/Styles", "Data"),
         new("Records", "award", "/Admin/Records", "Data"),
         new("Points rules", "calculator", "/Admin/PointsRules", "Data"),
+        // Повторяющиеся турниры и их регламент официального награждения (карточка «Official awards»).
+        new("Series", "trophy", "/Admin/Series", "Data"),
         new("HubGroups", "users", "/Admin/HubGroups", "Data"),
         new("Club requests", "inbox", "/Admin/HubGroupClubRequests", "Data"),
         // Жалобы «Report» на медиа (Р62): очередь решений админа сайта.

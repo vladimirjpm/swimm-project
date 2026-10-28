@@ -148,6 +148,63 @@ export interface OverviewHighPoint {
   finals_only_unavailable?: boolean;
 }
 
+/** Призёр группы официальной награды (регламент серии турнира, official-awards-plan §5.4). */
+export interface OverviewOfficialAwardPlace {
+  /** Место по rank(): при ничьей двое на 2-м, следующий — 4-й. */
+  place: number;
+  swimmer_id: number;
+  first_name: string;
+  last_name: string;
+  first_name_en: string;
+  last_name_en: string;
+  club: string;
+  club_id: number;
+  points: number;
+  /** Очки стартов, вошедших в сумму, по убыванию («674+650+598»). */
+  parts: number[];
+  /** Приз из регламента («1,000 ₪ + Cup»); null — у места приза нет. */
+  prize: string | null;
+  is_tie: boolean;
+}
+
+/** Группа награды: пол и сезонный возраст (null — без границы). Подпись строит клиент. */
+export interface OverviewOfficialAwardGroup {
+  gender: 'male' | 'female' | null;
+  min_age: number | null;
+  max_age: number | null;
+  places: OverviewOfficialAwardPlace[];
+}
+
+export interface OverviewOfficialAward {
+  title: string;
+  /** "points-sum" — сумма очков FINA лучших стартов. */
+  kind: string;
+  /** Сколько лучших стартов в сумме; null — все. */
+  count_best: number | null;
+  groups: OverviewOfficialAwardGroup[];
+}
+
+/** Официальные награды одного дня — по регламенту серии, к части которой привязан день. */
+export interface OverviewOfficialAwardsDay {
+  competition_id: number;
+  day_number: number | null;
+  /** dd/MM/yyyy */
+  date: string;
+  series_name: string;
+  series_name_en: string | null;
+  part_name: string;
+  part_name_en: string | null;
+  regulation: {
+    /** yyyy-MM-dd */
+    effective_from: string;
+    /** PDF регламента — ссылка «per meet regulations». */
+    source_url: string | null;
+    /** Админ сверил регламент этого выпуска; false — считается по прошлой версии без проверки. */
+    checked: boolean;
+  };
+  awards: OverviewOfficialAward[];
+}
+
 /** Зарезервированный контракт карточки рекорда (v1 сервер отдаёт пусто). */
 export interface OverviewRecord {
   kind: string;
@@ -255,6 +312,9 @@ export interface CompetitionOverview {
   top_medalists_male: OverviewMedalist[];
   top_medalists_female: OverviewMedalist[];
   high_point_awards: OverviewHighPoint[];
+  /** Официальное награждение по регламенту серии турнира — РЯДОМ с High Point, по блоку на день.
+   *  Пусто — карточки нет. Старый сервер поля не знает → undefined. */
+  official_awards?: OverviewOfficialAwardsDay[];
   records: OverviewRecord[];
 }
 

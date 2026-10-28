@@ -23,6 +23,7 @@
 | /Admin/Styles | [styles.md](styles.md) | Справочник стилей плавания (CRUD, посевные защищены) |
 | /Admin/Records | [records.md](records.md) | Рекорды и нормативы уровней |
 | /Admin/PointsRules | [pointsrules.md](pointsrules.md) | Правила начисления очков: клубный зачёт и High Point (CRUD, шкалы, клонирование версий) |
+| /Admin/Series | [series.md](series.md) | **Серии турниров**: повторяющиеся соревнования, их части, версии регламента и награды («Official awards»), привязка выпусков |
 | /Admin/HubGroups | [hubgroups.md](hubgroups.md) | Группы SwimHub |
 | /Admin/HubGroupClubRequests | [hubgroupclubrequests.md](hubgroupclubrequests.md) | Заявки групп на статус клуба |
 | /Admin/MediaReports | [mediareports.md](mediareports.md) | Жалобы «Report» на фото/видео: кто, почему; «Оставить» / «Снять» |

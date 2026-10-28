@@ -549,6 +549,16 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<DateTime?>("QualityScannedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("SeriesPartId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("SeriesRegulationCheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SeriesRegulationCheckedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<bool>("ShowCombineAllResults")
                         .HasColumnType("boolean");
 
@@ -580,6 +590,8 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasIndex("PointRuleClubsId");
 
                     b.HasIndex("PointRuleSwimmersId");
+
+                    b.HasIndex("SeriesPartId");
 
                     b.HasIndex("Name", "Date", "PoolType")
                         .IsUnique();
@@ -846,6 +858,72 @@ namespace Swimm.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("CompetitionResultUrls", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionSeries", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("MatchPhrases")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("NameEn")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("CompetitionSeries", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionSeriesPart", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("MaxSeasonAge")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MinSeasonAge")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("NameEn")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SeriesId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeriesId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("CompetitionSeriesParts", (string)null);
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.CompetitionSource", b =>
@@ -3342,6 +3420,136 @@ namespace Swimm.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesAward", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CountBest")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("PartId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Places")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RegulationId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SplitByGender")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartId");
+
+                    b.HasIndex("RegulationId");
+
+                    b.ToTable("SeriesAwards", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesAwardBand", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AwardId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Gender")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<int?>("MaxSeasonAge")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MinSeasonAge")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AwardId");
+
+                    b.ToTable("SeriesAwardBands", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesAwardPrize", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AwardId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Place")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AwardId", "Place")
+                        .IsUnique();
+
+                    b.ToTable("SeriesAwardPrizes", (string)null);
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesRegulation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<int>("SeriesId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SeriesId", "EffectiveFrom")
+                        .IsUnique();
+
+                    b.ToTable("SeriesRegulations", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.StartListPull", b =>
                 {
                     b.Property<int>("Id")
@@ -4310,6 +4518,11 @@ namespace Swimm.Infrastructure.Migrations
                         .HasForeignKey("PointRuleSwimmersId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Swimm.Domain.Entities.CompetitionSeriesPart", "SeriesPart")
+                        .WithMany()
+                        .HasForeignKey("SeriesPartId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Country");
 
                     b.Navigation("Event");
@@ -4317,6 +4530,8 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("PointRuleClubs");
 
                     b.Navigation("PointRuleSwimmers");
+
+                    b.Navigation("SeriesPart");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.CompetitionEntry", b =>
@@ -4380,6 +4595,17 @@ namespace Swimm.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Note");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionSeriesPart", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.CompetitionSeries", "Series")
+                        .WithMany("Parts")
+                        .HasForeignKey("SeriesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Series");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.CompetitionSource", b =>
@@ -5019,6 +5245,58 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Swimmer");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesAward", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.CompetitionSeriesPart", "Part")
+                        .WithMany()
+                        .HasForeignKey("PartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.SeriesRegulation", "Regulation")
+                        .WithMany("Awards")
+                        .HasForeignKey("RegulationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Part");
+
+                    b.Navigation("Regulation");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesAwardBand", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.SeriesAward", "Award")
+                        .WithMany("Bands")
+                        .HasForeignKey("AwardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Award");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesAwardPrize", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.SeriesAward", "Award")
+                        .WithMany("Prizes")
+                        .HasForeignKey("AwardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Award");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesRegulation", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.CompetitionSeries", "Series")
+                        .WithMany("Regulations")
+                        .HasForeignKey("SeriesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Series");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.Swimmer", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.Club", "Club")
@@ -5309,6 +5587,13 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Texts");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionSeries", b =>
+                {
+                    b.Navigation("Parts");
+
+                    b.Navigation("Regulations");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.Gallery", b =>
                 {
                     b.Navigation("Items");
@@ -5345,6 +5630,18 @@ namespace Swimm.Infrastructure.Migrations
             modelBuilder.Entity("Swimm.Domain.Entities.Relay", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesAward", b =>
+                {
+                    b.Navigation("Bands");
+
+                    b.Navigation("Prizes");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesRegulation", b =>
+                {
+                    b.Navigation("Awards");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.TrainingSession", b =>

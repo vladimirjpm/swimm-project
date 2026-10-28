@@ -56,6 +56,7 @@ public partial class ResultRepository
         var topMedalistsFemale = BuildMedalists(medalRows, "female");
 
         var highPointAwards = await LoadHighPointAwardsAsync(query, filter);
+        var officialAwards = await LoadOfficialAwardsAsync(query, filter, days);
 
         // Клубный зачёт — переиспользуем GetClubSummaryAsync (свой кэш внутри);
         // по полу — тот же расчёт с Gender-фильтром. Значения в Results.Gender —
@@ -98,6 +99,7 @@ public partial class ResultRepository
             TopMedalistsMale = topMedalistsMale,
             TopMedalistsFemale = topMedalistsFemale,
             HighPointAwards = highPointAwards,
+            OfficialAwards = officialAwards,
             Records = newRecords
         };
 

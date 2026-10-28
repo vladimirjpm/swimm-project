@@ -2,15 +2,18 @@
 // Цвет модуля задаётся ТОЛЬКО css-классом ov2-module--<key> (см. overview2.css),
 // компоненты цветов не знают.
 
-export type ModuleKey = 'clubs' | 'records' | 'champions' | 'hpa' | 'media' | 'favorites';
+export type ModuleKey = 'clubs' | 'records' | 'champions' | 'hpa' | 'official' | 'media' | 'favorites';
 
-export const MODULE_ORDER: ModuleKey[] = ['clubs', 'records', 'champions', 'hpa', 'media', 'favorites'];
+// Official awards — сразу за High Point: это два зачёта одного вопроса «кто лучший по очкам»,
+// официальный (регламент серии) и наш стандартный, и смотреть их надо рядом.
+export const MODULE_ORDER: ModuleKey[] = ['clubs', 'records', 'champions', 'hpa', 'official', 'media', 'favorites'];
 
 export const MODULE_LABEL: Record<ModuleKey, string> = {
   clubs: 'Top clubs',
   records: 'New records',
   champions: 'Champions',
   hpa: 'High Point',
+  official: 'Official awards',
   media: 'Media',
   favorites: 'Favorites',
 };

@@ -27,6 +27,7 @@ public class JsonImportService : IImportService
     private readonly IHubGroupClubSubscriptionService? _clubSync;
     private readonly ISuspectResultService? _suspects;
     private readonly IRelayLegCleanupService? _legCleanup;
+    private readonly ISeriesBinder? _seriesBinder;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -62,7 +63,8 @@ public class JsonImportService : IImportService
         IStartListStitchService? stitch = null,
         IHubGroupClubSubscriptionService? clubSync = null,
         ISuspectResultService? suspects = null,
-        IRelayLegCleanupService? legCleanup = null)
+        IRelayLegCleanupService? legCleanup = null,
+        ISeriesBinder? seriesBinder = null)
     {
         _db    = db;
         _cache = cache;
@@ -72,6 +74,7 @@ public class JsonImportService : IImportService
         _clubSync = clubSync;
         _suspects = suspects;
         _legCleanup = legCleanup;
+        _seriesBinder = seriesBinder;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -140,6 +143,7 @@ public class JsonImportService : IImportService
         private readonly IHubGroupClubSubscriptionService? _clubSync;
         private readonly ISuspectResultService? _suspects;
         private readonly IRelayLegCleanupService? _legCleanup;
+        private readonly ISeriesBinder? _seriesBinder;
 
         // Аргументы ImportAsync.
         private readonly Stream jsonStream;
@@ -217,6 +221,7 @@ public class JsonImportService : IImportService
             _clubSync = svc._clubSync;
             _suspects = svc._suspects;
             _legCleanup = svc._legCleanup;
+            _seriesBinder = svc._seriesBinder;
             this.jsonStream = jsonStream;
             this.fileName = fileName;
             this.categoryKeys = categoryKeys;
@@ -268,6 +273,7 @@ public class JsonImportService : IImportService
                 await StitchStartListAsync();
                 await ScanQualityAsync();
                 await ClearImplausibleLegsAsync();
+                await BindSeriesAsync();
                 await ReconcileWithFileAsync();
                 await AlignGendersAsync();
                 await RerankOpenWaterAsync();
@@ -1223,6 +1229,33 @@ public class JsonImportService : IImportService
                         $"Качество: скан не удался ({ex.GetType().Name}: {ex.Message}). " +
                         "Импорт сохранён; выполните `dotnet run -- --quality-scan <eventId>`.");
                 }
+            }
+        }
+
+        // Выпуск серии турнира (docs/plans/official-awards-plan.md §5.8): серия — по ключевой фразе в
+        // названии, часть — по возрастам пловцов дня. Привязывает только однозначное и только
+        // непривязанные дни; почему не привязал — в лог. После коммита и в try/catch, как скан качества:
+        // ДО проверок Health, чтобы series.* видели привязку.
+        private async Task BindSeriesAsync()
+        {
+            if (_seriesBinder is null || touchedCompetitionKeys.Count == 0) return;
+            try
+            {
+                var ids = touchedCompetitionKeys.Select(k => competitionCache[k].Id).Distinct().ToList();
+                foreach (var b in await _seriesBinder.BindAsync(ids))
+                {
+                    if (b.BoundNow)
+                        diagnosticLog.Add($"Серия: #{b.CompetitionId} → «{b.SeriesName}» · {b.CurrentPartName} ({b.Reason}). " +
+                                          "Сверьте регламент выпуска на /Admin/Series");
+                    else if (b.CurrentPartId is null)
+                        diagnosticLog.Add($"Серия: #{b.CompetitionId} подходит под «{b.SeriesName ?? "?"}», не привязан — {b.Reason}. " +
+                                          "Привяжите на /Admin/Series");
+                }
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add($"Серия: привязка не удалась ({ex.GetType().Name}: {ex.Message}). " +
+                                  "Импорт сохранён; привяжите день на /Admin/Series");
             }
         }
 

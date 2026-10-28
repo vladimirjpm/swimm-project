@@ -1,0 +1,57 @@
+@using Swimm.Application.Dtos
+@using Swimm.Application.Validation
+@model (SeriesEditDto Series, SeriesAwardDto? Award)
+@{
+    // Поля награды — общие у правки и добавления (имена с префиксом award., см. EditModel.AwardForm).
+    var a = Model.Award;
+}
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <label class="flex flex-col gap-1">
+        <span class="text-[11px] text-admin-text-muted">Заголовок (EN, на витрине) <span class="text-admin-danger">*</span></span>
+        <input name="award.Title" value="@a?.Title" class="admin-input" placeholder="Outstanding young swimmers" required />
+    </label>
+    <label class="flex flex-col gap-1">
+        <span class="text-[11px] text-admin-text-muted">Часть (день)</span>
+        <select name="award.PartId" class="admin-input">
+            @foreach (var p in Model.Series.Parts)
+            {
+                if (a?.PartId == p.Id)
+                {
+                    <option value="@p.Id" selected>@p.Name</option>
+                }
+                else
+                {
+                    <option value="@p.Id">@p.Name</option>
+                }
+            }
+        </select>
+    </label>
+    <label class="flex flex-col gap-1">
+        <span class="text-[11px] text-admin-text-muted">Лучших стартов в сумме (FINA)</span>
+        <input name="award.CountBest" value="@(a is null ? 3 : a.CountBest)" type="number" min="1" class="admin-input" placeholder="пусто = все" />
+    </label>
+    <label class="flex flex-col gap-1">
+        <span class="text-[11px] text-admin-text-muted">Призёров в группе</span>
+        <input name="award.Places" value="@(a?.Places ?? 1)" type="number" min="1" class="admin-input" required />
+    </label>
+    <label class="flex flex-col gap-1">
+        <span class="text-[11px] text-admin-text-muted">Группы (сезонный возраст)</span>
+        <input name="award.Bands" value="@(a is null ? "" : SeriesAwardText.FormatBands(a.Bands))" class="admin-input font-mono"
+               placeholder="F 10-11; M 10-12; F 12-13; M 13-14" spellcheck="false" />
+        <span class="text-[11px] text-admin-text-muted">F/M — пол, «16+» — и старше. Пусто — все возраста вместе.</span>
+    </label>
+    <label class="flex flex-col gap-1">
+        <span class="text-[11px] text-admin-text-muted">Призы (построчно «место: текст»)</span>
+        <textarea name="award.Prizes" rows="3" class="admin-input font-mono" spellcheck="false"
+                  placeholder="1: 1,000 ₪ + Cup&#10;2: 500 ₪&#10;3: 250 ₪">@(a is null ? "" : SeriesAwardText.FormatPrizes(a.Prizes))</textarea>
+    </label>
+    <label class="flex flex-col gap-1">
+        <span class="text-[11px] text-admin-text-muted">Порядок на карточке</span>
+        <input name="award.SortOrder" value="@(a?.SortOrder ?? 0)" type="number" class="admin-input" />
+    </label>
+    <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none self-end pb-2">
+        <input type="checkbox" name="award.SplitByGender" value="true" class="w-4 h-4 cursor-pointer" checked="@(a?.SplitByGender ?? true)" />
+        <input type="hidden" name="award.SplitByGender" value="false" />
+        <span class="text-admin-text">Девушки и юноши раздельно</span>
+    </label>
+</div>

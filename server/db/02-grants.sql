@@ -38,6 +38,8 @@ GRANT SELECT ON
     "CompetitionNoteTexts",
     "CompetitionNotes",
     "CompetitionResultUrls",
+    "CompetitionSeries",
+    "CompetitionSeriesParts",
     "CompetitionSources",
     "CompetitionWarmUps",
     "Competitions",
@@ -56,6 +58,10 @@ GRANT SELECT ON
     "RelayMembers",
     "Relays",
     "Results",
+    "SeriesAwardBands",
+    "SeriesAwardPrizes",
+    "SeriesAwards",
+    "SeriesRegulations",
     "Styles",
     "Swimmers"
 TO swimm_ro;
@@ -97,7 +103,7 @@ END $$;
 
 -- ── Проверка ────────────────────────────────────────────────────────────────
 \echo ''
-\echo 'Гранты применены. Таблиц, доступных swimm_ro на чтение (ожидается 31):'
+\echo 'Гранты применены. Таблиц, доступных swimm_ro на чтение (ожидается 37):'
 SELECT count(DISTINCT table_name) AS ro_tables
   FROM information_schema.table_privileges
  WHERE grantee = 'swimm_ro' AND privilege_type = 'SELECT';

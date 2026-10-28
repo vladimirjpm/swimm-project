@@ -621,6 +621,13 @@ else
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td dir="rtl" style="text-align:left">
                                 <a class="text-admin-accent hover:underline" href="https://isr.org.il/comp.asp?compID=@s.OrgCompId" target="_blank" rel="noopener">@s.Name ↗</a>
+                                @* Выпуск серии турнира: при затягивании день привяжется к её части сам (§5.8). *@
+                                @if (Model.SeriesFor(s.Name) is { } series)
+                                {
+                                    <a href="/Admin/Series/Edit?id=@series.Id" dir="ltr"
+                                       class="ml-1 admin-badge border-admin-accent/30 bg-admin-accent/15 text-admin-accent"
+                                       title="Название содержит ключевую фразу серии — при затягивании дни привяжутся к её частям">Series: @series.Name</a>
+                                }
                                 @if (!string.IsNullOrEmpty(s.LastError))
                                 {
                                     <div class="text-[11px] text-[#ef9a9a]" dir="ltr">@s.LastError</div>

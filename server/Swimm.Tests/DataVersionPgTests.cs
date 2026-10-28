@@ -38,7 +38,10 @@ public class DataVersionPgTests
     public void MigrationSnapshot_MatchesSeedTables()
     {
         // Без базы: новая таблица в seed-tables.txt требует новой миграции с её триггером.
-        Assert.Equal(SeedTables(), DataVersionForSync.Tables.Order(StringComparer.Ordinal).ToList());
+        // Снимок DataVersionForSync не правится — таблицы следующих миграций добавляются сюда.
+        var withTrigger = DataVersionForSync.Tables
+            .Concat(AddCompetitionSeries.SyncTables);
+        Assert.Equal(SeedTables(), withTrigger.Order(StringComparer.Ordinal).ToList());
     }
 
     [Fact]

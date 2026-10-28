@@ -16,19 +16,53 @@ public class EditModel : PageModel
     private readonly IPointRulesAdminRepository _rules;
     private readonly IAdminAuditService _audit;
     private readonly ILogger<EditModel> _logger;
+    private readonly ISeriesAdminRepository _series;
 
     public EditModel(
         ICompetitionAdminRepository repo,
         IImportService import,
         IPointRulesAdminRepository rules,
         IAdminAuditService audit,
-        ILogger<EditModel> logger)
+        ILogger<EditModel> logger,
+        ISeriesAdminRepository series)
     {
         _repo = repo;
         _import = import;
         _rules = rules;
         _audit = audit;
         _logger = logger;
+        _series = series;
+    }
+
+    /// <summary>Части всех серий — выпадающий список «Серия турнира».</summary>
+    public IReadOnlyList<SeriesPartOptionDto> SeriesParts { get; private set; } = [];
+
+    /// <summary>Текущая часть серии этого дня; null — не из серии.</summary>
+    public int? SeriesPartId { get; private set; }
+
+    /// <summary>
+    /// Привязка дня к части серии (официальное награждение, docs/admin-pages/series.md). Своя
+    /// форма, а не поле общей: смена части снимает отметку «регламент подтверждён», и молча
+    /// делать это при любом «Сохранить» нельзя.
+    /// </summary>
+    public async Task<IActionResult> OnPostSetSeriesPartAsync(int? seriesPartId)
+    {
+        if (IsNew) return RedirectToList();
+        var result = await _series.SetCompetitionPartAsync(Id!.Value, seriesPartId);
+        if (!result.Success)
+        {
+            Error = result.Error;
+            await LoadLookupsAsync();
+            Existing = await _repo.GetByIdAsync(Id!.Value);
+            if (Existing == null) return RedirectToList();
+            Input = ToForm(Existing);
+            return Page();
+        }
+
+        await _audit.LogAsync("series.day.bind", "Competition", Id!.Value.ToString(),
+            seriesPartId is int p ? $"День привязан к части серии #{p}" : "День отвязан от серии");
+        TempData["Flash"] = "Привязка к серии сохранена";
+        return RedirectToSelf(Id);
     }
 
     [BindProperty(SupportsGet = true)]
@@ -268,6 +302,8 @@ public class EditModel : PageModel
         AllCategories = await _repo.GetAllCategoriesAsync();
         ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
         SwimmerRules = await _rules.GetAllAsync(PointRuleKind.Swimmers);
+        SeriesParts = await _series.GetPartOptionsAsync();
+        if (!IsNew) SeriesPartId = await _series.GetCompetitionPartIdAsync(Id!.Value);
     }
 
     private static CompetitionForm ToForm(CompetitionEditDto d) => new()

@@ -1,0 +1,342 @@
+@page
+@using Swimm.Application.Validation
+@model Swimm.API.Pages.Admin.Series.EditModel
+@{
+    var s = Model.Series!;
+    ViewData["Title"] = "Series · " + s.Name;
+    ViewData["PageSubtitle"] = $"#{s.Id}" + (string.IsNullOrEmpty(s.NameEn) ? "" : $" · {s.NameEn}");
+
+    var flash = TempData["Flash"] as string;
+    var error = TempData["Error"] as string;
+    var id = s.Id;
+}
+
+<div class="max-w-[960px] mx-auto">
+
+    <div class="mb-4">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку серий</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">@error</div>
+    }
+
+    @* ── Серия ─────────────────────────────────────────────────────────── *@
+    <form method="post" asp-page-handler="SaveSeries" asp-route-id="@id" class="admin-card mb-5">
+        <h2 class="text-sm font-semibold text-admin-text mb-3">Серия</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Имя (иврит) <span class="text-admin-danger">*</span></span>
+                <input name="name" value="@s.Name" class="admin-input" dir="auto" autocomplete="off" required />
+            </label>
+            <label class="flex flex-col gap-1">
+                <span class="text-xs text-admin-text-muted">Имя (EN)</span>
+                <input name="nameEn" value="@s.NameEn" class="admin-input" autocomplete="off" />
+            </label>
+            <label class="flex flex-col gap-1 sm:col-span-2">
+                <span class="text-xs text-admin-text-muted">Ключевые фразы для узнавания выпуска (через «;»)</span>
+                <input id="match-phrases" name="matchPhrases" value="@s.MatchPhrases" class="admin-input" dir="auto" autocomplete="off"
+                       placeholder="רודובסקי ועדן נימרי" />
+                <span class="text-[11px] text-admin-text-muted leading-relaxed">
+                    Выпуск подходит, если его название <strong class="text-admin-text">содержит</strong> фразу (кавычки и регистр не важны).
+                    Берите то, что держится от года к году — имена, в честь которых турнир, — а не начало названия.
+                    Пусто — серия при импорте сама не узнаётся.
+                    @if (!string.IsNullOrEmpty(s.SuggestedPhrase))
+                    {
+                        <br />
+                        <span>Общее у привязанных выпусков:</span>
+                        <button type="button" class="text-admin-accent hover:underline" dir="auto"
+                                onclick="document.getElementById('match-phrases').value = this.textContent.trim()">@s.SuggestedPhrase</button>
+                    }
+                </span>
+            </label>
+        </div>
+        <div class="mt-4">
+            <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
+        </div>
+    </form>
+
+    @* ── Части ─────────────────────────────────────────────────────────── *@
+    <div class="admin-card mb-5">
+        <h2 class="text-sm font-semibold text-admin-text mb-1">Части турнира</h2>
+        <p class="text-[11px] text-admin-text-muted mb-3 leading-relaxed">
+            Часть — смысл дня («נוער ובוגרים», «צעירים»), а не его номер. Возраста «кто плывёт» (сезонные)
+            нужны, чтобы при импорте узнать часть нового дня: день уходит туда, где ≥ 80% его пловцов.
+            Подпись EN видна на витрине.
+        </p>
+
+        @foreach (var p in s.Parts)
+        {
+            <form method="post" asp-page-handler="SavePart" asp-route-id="@id"
+                  class="grid grid-cols-2 sm:grid-cols-[2fr_2fr_70px_70px_70px_auto] gap-2 items-end mb-2">
+                <input type="hidden" name="partId" value="@p.Id" />
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">Имя</span>
+                    <input name="name" value="@p.Name" class="admin-input" dir="auto" required />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">EN</span>
+                    <input name="nameEn" value="@p.NameEn" class="admin-input" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">Порядок</span>
+                    <input name="sortOrder" value="@p.SortOrder" type="number" class="admin-input" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">Возраст с</span>
+                    <input name="minAge" value="@p.MinSeasonAge" type="number" min="0" class="admin-input" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">по</span>
+                    <input name="maxAge" value="@p.MaxSeasonAge" type="number" min="0" class="admin-input" />
+                </label>
+                <div class="flex gap-2">
+                    <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
+                    <button type="submit" asp-page-handler="DeletePart" asp-route-id="@id" class="admin-btn admin-btn-danger"
+                            onclick="return confirm('Удалить часть? Её награды удалятся, дни отвяжутся.')">✕</button>
+                </div>
+            </form>
+        }
+
+        <form method="post" asp-page-handler="AddPart" asp-route-id="@id"
+              class="grid grid-cols-2 sm:grid-cols-[2fr_2fr_70px_70px_70px_auto] gap-2 items-end mt-3 pt-3 border-t border-admin-border">
+            <label class="flex flex-col gap-1">
+                <span class="text-[11px] text-admin-text-muted">Новая часть</span>
+                <input name="name" class="admin-input" dir="auto" placeholder="צעירים" required />
+            </label>
+            <label class="flex flex-col gap-1">
+                <span class="text-[11px] text-admin-text-muted">EN</span>
+                <input name="nameEn" class="admin-input" placeholder="Youth" />
+            </label>
+            <label class="flex flex-col gap-1">
+                <span class="text-[11px] text-admin-text-muted">Порядок</span>
+                <input name="sortOrder" value="@(s.Parts.Count + 1)" type="number" class="admin-input" />
+            </label>
+            <label class="flex flex-col gap-1">
+                <span class="text-[11px] text-admin-text-muted">Возраст с</span>
+                <input name="minAge" type="number" min="0" class="admin-input" />
+            </label>
+            <label class="flex flex-col gap-1">
+                <span class="text-[11px] text-admin-text-muted">по</span>
+                <input name="maxAge" type="number" min="0" class="admin-input" />
+            </label>
+            <div><button type="submit" class="admin-btn">+ Добавить</button></div>
+        </form>
+    </div>
+
+    @* ── Регламент ─────────────────────────────────────────────────────── *@
+    <div class="admin-card mb-5">
+        <h2 class="text-sm font-semibold text-admin-text mb-1">Регламент (версии)</h2>
+        <p class="text-[11px] text-admin-text-muted mb-3 leading-relaxed">
+            Выпуск считается по версии с самой поздней датой «действует с», не позже даты дня. Регламент
+            поменялся — склонируйте версию с новой датой и поправьте награды: прошлые выпуски останутся
+            на старой. Видимый на витрине текст (заголовки, призы) — по-английски.
+        </p>
+
+        @if (s.Parts.Count == 0)
+        {
+            <p class="text-xs text-admin-warning mb-3">Сначала заведите части — награда вручается на части.</p>
+        }
+
+        @foreach (var r in s.Regulations)
+        {
+            <div class="border border-admin-border rounded-lg p-4 mb-4">
+                <form method="post" asp-page-handler="SaveRegulation" asp-route-id="@id"
+                      class="grid grid-cols-1 sm:grid-cols-[150px_1fr_1fr_auto] gap-2 items-end">
+                    <input type="hidden" name="regulationId" value="@r.Id" />
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[11px] text-admin-text-muted">Действует с</span>
+                        <input name="effectiveFrom" type="date" value="@r.EffectiveFrom.ToString("yyyy-MM-dd")" class="admin-input" required />
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[11px] text-admin-text-muted">PDF регламента</span>
+                        <input name="sourceUrl" value="@r.SourceUrl" class="admin-input font-mono text-xs" placeholder="https://loglig.com:2053/LeagueTable/ShowLeagueDoc/…" />
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-[11px] text-admin-text-muted">Описание</span>
+                        <input name="description" value="@r.Description" class="admin-input" />
+                    </label>
+                    <div class="flex gap-2">
+                        <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
+                        <button type="submit" asp-page-handler="DeleteRegulation" asp-route-id="@id" class="admin-btn admin-btn-danger"
+                                onclick="return confirm('Удалить версию регламента вместе с наградами?')">✕</button>
+                    </div>
+                </form>
+
+                @foreach (var a in r.Awards)
+                {
+                    <form method="post" asp-page-handler="SaveAward" asp-route-id="@id" class="mt-4 pt-4 border-t border-admin-border">
+                        <input type="hidden" name="awardId" value="@a.Id" />
+                        <partial name="_AwardFields" model="(s, (Swimm.Application.Dtos.SeriesAwardDto?)a)" />
+                        <div class="mt-3 flex gap-2">
+                            <button type="submit" class="admin-btn admin-btn-primary">Сохранить награду</button>
+                            <button type="submit" asp-page-handler="DeleteAward" asp-route-id="@id" class="admin-btn admin-btn-danger"
+                                    onclick="return confirm('Удалить награду?')">Удалить</button>
+                        </div>
+                    </form>
+                }
+
+                @if (s.Parts.Count > 0)
+                {
+                    <details class="mt-4 pt-4 border-t border-admin-border">
+                        <summary class="text-xs text-admin-accent cursor-pointer select-none">+ Награда в эту версию</summary>
+                        <form method="post" asp-page-handler="AddAward" asp-route-id="@id" class="mt-3">
+                            <input type="hidden" name="regulationId" value="@r.Id" />
+                            <partial name="_AwardFields" model="(s, (Swimm.Application.Dtos.SeriesAwardDto?)null)" />
+                            <div class="mt-3"><button type="submit" class="admin-btn">Добавить награду</button></div>
+                        </form>
+                    </details>
+                }
+
+                <details class="mt-3">
+                    <summary class="text-xs text-admin-accent cursor-pointer select-none">Клонировать в новую версию</summary>
+                    <form method="post" asp-page-handler="CloneRegulation" asp-route-id="@id"
+                          class="grid grid-cols-1 sm:grid-cols-[150px_1fr_auto] gap-2 items-end mt-2">
+                        <input type="hidden" name="regulationId" value="@r.Id" />
+                        <label class="flex flex-col gap-1">
+                            <span class="text-[11px] text-admin-text-muted">Действует с</span>
+                            <input name="effectiveFrom" type="date" class="admin-input" required />
+                        </label>
+                        <label class="flex flex-col gap-1">
+                            <span class="text-[11px] text-admin-text-muted">PDF нового регламента</span>
+                            <input name="sourceUrl" class="admin-input font-mono text-xs" />
+                        </label>
+                        <div><button type="submit" class="admin-btn">Клонировать</button></div>
+                    </form>
+                </details>
+            </div>
+        }
+
+        <details open="@(s.Regulations.Count == 0)">
+            <summary class="text-xs text-admin-accent cursor-pointer select-none">+ Новая версия регламента (пустая)</summary>
+            <form method="post" asp-page-handler="AddRegulation" asp-route-id="@id"
+                  class="grid grid-cols-1 sm:grid-cols-[150px_1fr_1fr_auto] gap-2 items-end mt-2">
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">Действует с</span>
+                    <input name="effectiveFrom" type="date" class="admin-input" required />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">PDF регламента</span>
+                    <input name="sourceUrl" class="admin-input font-mono text-xs" />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">Описание</span>
+                    <input name="description" class="admin-input" />
+                </label>
+                <div><button type="submit" class="admin-btn">Создать</button></div>
+            </form>
+        </details>
+    </div>
+
+    @* ── Выпуски ───────────────────────────────────────────────────────── *@
+    <div class="admin-card mb-5">
+        <h2 class="text-sm font-semibold text-admin-text mb-1">Выпуски</h2>
+        <p class="text-[11px] text-admin-text-muted mb-3 leading-relaxed">
+            Дни соревнований, привязанные к частям. Привязка доказывает, что турнир тот же, но не что
+            регламент не поменялся: сверьте PDF нового выпуска и отметьте «Регламент подтверждён»
+            (отметка ставится всем дням выпуска). Пока отметки нет — Health напоминает.
+        </p>
+
+        @if (s.EditionDays.Count > 0)
+        {
+            <div class="overflow-x-auto mb-3">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th class="text-right">#</th>
+                            <th>Дата</th>
+                            <th>Соревнование</th>
+                            <th>Часть</th>
+                            <th>Регламент</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in s.EditionDays)
+                        {
+                            <tr>
+                                <td class="text-right tabular-nums">
+                                    <a href="/Admin/Competitions/Edit?id=@d.CompetitionId" class="text-admin-accent hover:underline">@d.CompetitionId</a>
+                                </td>
+                                <td class="tabular-nums whitespace-nowrap">
+                                    @d.Date
+                                    @if (d.DayNumber is int n)
+                                    {
+                                        <span class="text-admin-text-muted text-xs">· day @n</span>
+                                    }
+                                </td>
+                                <td class="text-xs" dir="auto">@d.Name</td>
+                                <td class="text-xs" dir="auto">@d.PartName</td>
+                                <td class="text-xs">
+                                    @if (d.RegulationCheckedAt is DateTime at)
+                                    {
+                                        <span class="admin-badge border-admin-success/30 bg-admin-success/15 text-admin-success"
+                                              title="@d.RegulationCheckedBy · @at.ToString("dd.MM.yyyy HH:mm")">подтверждён</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning">не подтверждён</span>
+                                    }
+                                </td>
+                                <td>
+                                    <form method="post" asp-page-handler="ToggleChecked" asp-route-id="@id" class="inline">
+                                        <input type="hidden" name="competitionId" value="@d.CompetitionId" />
+                                        <button type="submit" class="admin-btn admin-btn-ghost text-xs">
+                                            @(d.RegulationCheckedAt is null ? "Регламент подтверждён" : "Снять отметку")
+                                        </button>
+                                    </form>
+                                    <form method="post" asp-page-handler="UnbindDay" asp-route-id="@id" class="inline">
+                                        <input type="hidden" name="competitionId" value="@d.CompetitionId" />
+                                        <button type="submit" class="admin-btn admin-btn-ghost text-xs"
+                                                onclick="return confirm('Отвязать день от серии?')">Отвязать</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (s.Parts.Count > 0)
+        {
+            <form method="post" asp-page-handler="BindDay" asp-route-id="@id"
+                  class="grid grid-cols-1 sm:grid-cols-[140px_1fr_auto] gap-2 items-end">
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">Id дня (Competition)</span>
+                    <input name="competitionId" type="number" min="1" class="admin-input" required />
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span class="text-[11px] text-admin-text-muted">Часть</span>
+                    <select name="partId" class="admin-input">
+                        @foreach (var p in s.Parts)
+                        {
+                            <option value="@p.Id">@p.Name@(string.IsNullOrEmpty(p.NameEn) ? "" : $" · {p.NameEn}")</option>
+                        }
+                    </select>
+                </label>
+                <div><button type="submit" class="admin-btn">Привязать день</button></div>
+            </form>
+        }
+    </div>
+
+    <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">
+        <h2 class="text-sm font-semibold text-admin-danger mb-1">Опасная зона — удаление серии</h2>
+        <p class="text-xs text-admin-text-muted leading-relaxed mb-4">
+            Удалятся части, все версии регламента и награды; дни соревнований останутся, но отвяжутся.
+            <strong class="text-admin-danger">Действие необратимо.</strong>
+        </p>
+        <form method="post" asp-page-handler="DeleteSeries" asp-route-id="@id">
+            <button type="submit" class="admin-btn admin-btn-danger"
+                    onclick="return confirm('Удалить серию целиком?')">Удалить серию</button>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
