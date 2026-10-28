@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { CompetitionOverview, OverviewRecord } from '../types';
-import { isConfirmedRecord } from '../types';
+import { groupRecordsBySwim, isConfirmedRecord } from '../types';
 import { initials } from './module-defs';
 import UI_SwimTime from '../../../../components/mix/swim-time/swim-time';
 
@@ -178,7 +178,8 @@ export default function ModuleCardRecords({ overview, onOpenTab, onOpenSwim }: P
             </span>
           </span>
           <span className="w-full flex flex-col gap-1.5">
-            {leader.records.slice(0, 3).map((rec, i) => (
+            {/* Витрина — заплывы, а не рекорды: open + возрастной одного заплыва — одна плашка. */}
+            {groupRecordsBySwim(leader.records).slice(0, 3).map(({ swim: rec }, i) => (
               <span
                 key={rec.result_id ?? i}
                 role="button"
