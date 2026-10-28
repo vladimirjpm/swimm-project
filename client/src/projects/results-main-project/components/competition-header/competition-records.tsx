@@ -1,10 +1,13 @@
 import React from 'react';
 import type { CompetitionOverview } from './types';
+import { groupRecordsBySwim } from './types';
 import UI_SwimTime, { swimFlaggedRowProps } from '../../../components/mix/swim-time/swim-time';
 
 // Таб Records: рекорды, установленные на соревновании (overview.records; сам таб
 // рендерится только когда список непуст). Строка: бейдж вида + событие+время +
 // пловец·клуб + Day N (НАВ-контракт: диплинк на заплыв — следующий шаг).
+// Один заплыв — одна строка: open + возрастной рекорд того же заплыва — два бейджа рядом,
+// а не две одинаковые строки (28.10.2026). Склейка по result_id — groupRecordsBySwim.
 // Рекорд помеченной строки (suspect_reason) — с чипом «Under review» и лентой помеченной
 // строки (Р76, 25.10.2026): протокол его заявляет, мы не подтверждаем.
 
@@ -15,7 +18,7 @@ export default function CompetitionRecords({
   overview: CompetitionOverview | null;
   onOpenSwim?(swim: { result_id: number | null; style_name: string; distance: string }): void;
 }) {
-  const records = overview?.records ?? [];
+  const swims = groupRecordsBySwim(overview?.records ?? []);
 
   return (
     <div
@@ -28,12 +31,12 @@ export default function CompetitionRecords({
       }}
     >
       <div className="mb-2 text-[14px] font-extrabold">New records at this competition</div>
-      {records.length === 0 ? (
+      {swims.length === 0 ? (
         <div className="py-6 text-center text-[12.5px] font-semibold" style={{ color: 'var(--theme-mode-text-muted)' }}>
           No records were set at this competition.
         </div>
       ) : (
-        records.map((r, i) => {
+        swims.map(({ swim: r, kinds }, i) => {
           const quality = r.suspect_reason ? { kind: 'protocol' as const, reason: r.suspect_reason } : null;
           const flagged = swimFlaggedRowProps(quality);
           return (
@@ -46,14 +49,19 @@ export default function CompetitionRecords({
             style={{ borderColor: 'var(--theme-mode-border)' }}
             onClick={onOpenSwim && r.result_id != null ? () => onOpenSwim(r) : undefined}
           >
-            <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
-              style={{
-                background: 'color-mix(in srgb, var(--theme-primary) 15%, transparent)',
-                color: 'var(--theme-primary)',
-              }}
-            >
-              {r.kind}
+            <span className="flex flex-wrap gap-1">
+              {kinds.map((kind) => (
+                <span
+                  key={kind}
+                  className="rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
+                  style={{
+                    background: 'color-mix(in srgb, var(--theme-primary) 15%, transparent)',
+                    color: 'var(--theme-primary)',
+                  }}
+                >
+                  {kind}
+                </span>
+              ))}
             </span>
             <span className="text-[13px] font-extrabold">
               {r.distance}m {r.style_name} —{' '}

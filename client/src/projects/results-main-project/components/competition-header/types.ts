@@ -170,6 +170,36 @@ export interface OverviewRecord {
 /** Рекорд без пометки качества — только такие идут в счётчики («2 records», таб, плитка). */
 export const isConfirmedRecord = (r: OverviewRecord): boolean => !r.suspect_reason;
 
+/** Заплыв и все рекорды, которые он бьёт (open + возрастной — два рекорда, один заплыв). */
+export interface OverviewRecordSwim {
+  /** Первый рекорд заплыва — источник времени, пловца, дня, пометки. */
+  swim: OverviewRecord;
+  /** Виды рекордов заплыва: Open первым, дальше в порядке сервера. */
+  kinds: string[];
+}
+
+/**
+ * Склейка рекордов по заплыву (result_id) для показа: одна строка на заплыв, бейджи рядом.
+ * Только вид — счётчики («N records», таб, «N rec») считают рекорды, не заплывы.
+ * Без result_id не склеиваем: одинаковое время у разных пловцов — не один заплыв.
+ */
+export function groupRecordsBySwim(records: OverviewRecord[]): OverviewRecordSwim[] {
+  const out: OverviewRecordSwim[] = [];
+  const byResult = new Map<number, OverviewRecordSwim>();
+  for (const r of records) {
+    const same = r.result_id != null ? byResult.get(r.result_id) : undefined;
+    if (same) {
+      if (r.kind === 'Open record') same.kinds.unshift(r.kind);
+      else same.kinds.push(r.kind);
+      continue;
+    }
+    const swim = { swim: r, kinds: [r.kind] };
+    out.push(swim);
+    if (r.result_id != null) byResult.set(r.result_id, swim);
+  }
+  return out;
+}
+
 /** Один источник стартового протокола: compID + подпись подтаба (дата и номер). */
 export interface StartListSource {
   org_comp_id: number;
