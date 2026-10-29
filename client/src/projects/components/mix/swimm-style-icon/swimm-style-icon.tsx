@@ -1,6 +1,22 @@
 import './swimm-style-icon.css';
 import { useAppDispatch } from '../../../../store/store';
+import { useMode } from '../../../../hooks/useMode';
 import React from 'react';
+
+/**
+ * Стили, у которых есть вариант для тёмного фона (`images/swimm-style-icon/on-dark/`):
+ * тот же рисунок, но пловец светло-голубой (#c9e6f8 — чистый белый на тёмном резал глаз),
+ * волна прежняя. У остальных имён (и у `no-swim`) такого
+ * варианта нет — для них всегда обычная картинка, лишнего 404 не будет.
+ */
+const ON_DARK_STYLES = new Set([
+  'freestyle',
+  'backstroke',
+  'breaststroke',
+  'butterfly',
+  'individual_medley',
+  'medley',
+]);
 
 /**
  * Готовые пары «размер картинки → кегль дистанции». Одно число вместо двух: подобранные
@@ -100,6 +116,19 @@ interface UI_SwimmStyleIconProps {
    * Плотность — токен `--swim-len-plate` на вызывающем.
    */
   lenPlate?: boolean;
+  /**
+   * На каком фоне лежит иконка (29.10.2026):
+   *
+   * - `auto` — **по умолчанию**: в тёмной теме (`data-mode="dark"`) берётся вариант со
+   *   светлым пловцом, в светлой — обычный с тёмно-синим. Подходит всем, кто кладёт иконку
+   *   прямо на поверхность темы.
+   * - `light` — иконка лежит на светлой плите в ОБЕИХ темах (`swim-row__plate`,
+   *   `rk-event-plate`, `--t-plate`): всегда тёмно-синий пловец, иначе светлый пропал бы на
+   *   белом.
+   * - `dark` — фон тёмный или насыщенный в ОБЕИХ темах (выбранная кнопка фильтра на
+   *   `--theme-bg-active`): всегда светлый пловец, тёмно-синий на синем не читается.
+   */
+  surface?: 'auto' | 'light' | 'dark';
   className?: string; // ✅ Добавлен className
 }
 
@@ -116,9 +145,11 @@ const UI_SwimmStyleIcon: React.FC<UI_SwimmStyleIconProps> = ({
   iconSize,
   lenSize,
   lenPlate,
+  surface = 'auto',
   className = '', // ✅ Значение по умолчанию
 }) => {
   const dispatch = useAppDispatch();
+  const { mode } = useMode();
 
   // Формируем путь к изображению
  let imageSrc;
@@ -127,7 +158,11 @@ try {
   if (typeof styleName !== 'string') {
     throw new TypeError(`styleName должен быть string, а сейчас ${typeof styleName}`);
   }
-  imageSrc = `${base}images/swimm-style-icon/${styleName.replaceAll(' ', '-')}.png`;
+  const fileName = styleName.replaceAll(' ', '-');
+  // Тёмно-синий пловец на тёмной поверхности пропадает — там берём вариант со светлым.
+  const darkBg = surface === 'dark' || (surface === 'auto' && mode === 'dark');
+  const onDark = darkBg && ON_DARK_STYLES.has(fileName);
+  imageSrc = `${base}images/swimm-style-icon/${onDark ? 'on-dark/' : ''}${fileName}.png`;
 } catch (err) {
   console.error('Ошибка при формировании imageSrc:', err);
   // Запасной вариант, чтобы компонент не совсем упал
@@ -213,8 +248,10 @@ try {
     );
   }
 
+  // Без `shadow` (29.10.2026): картинки прозрачные, и тень рисовала вокруг иконки пустой
+  // прямоугольник — на кнопках фильтра стилей это читалось как лишняя рамка.
   return (
-    <div className={`${rootClass} flex items-center justify-center shadow text-gray-900`} style={sizeVars}>
+    <div className={`${rootClass} flex items-center justify-center text-gray-900`} style={sizeVars}>
       {img}
     </div>
   );

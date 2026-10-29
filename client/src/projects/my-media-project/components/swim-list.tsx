@@ -545,6 +545,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
           styleType="icon-len"
           lenPlacement="below"
           size={64}
+          surface="light"
           className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
         />
         {/* Средняя колонка тянется. Показан один пловец — имени в строке нет (оно в шапке
@@ -654,6 +655,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
           styleType="icon-len"
           lenPlacement="below"
           size={64}
+          surface="light"
           className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
         />
         <span className="min-w-0">

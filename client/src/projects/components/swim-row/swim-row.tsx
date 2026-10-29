@@ -296,13 +296,14 @@ function SwimRow({
           className="swim-row__event"
           title={`${distance} ${swimRowStrokeLabel(stroke)}${poolType ? ` · ${poolType}` : ''}`}
         >
-          {/* Белая подложка иконки — статусная, не зависит от темы: PNG нарисованы под
-              светлый фон и в тёмной теме без плиты пропадают. */}
+          {/* Белая подложка иконки — статусная, не зависит от темы, поэтому пловец на ней
+              всегда тёмный (`surface="light"`): белый вариант тёмной темы пропал бы на белом. */}
           <div className="swim-row__plate">
             <UI_SwimmStyleIcon
               styleName={stroke}
               styleLen={distance}
               styleType="icon-len"
+              surface="light"
               className="src-swim-row swim-row__plate-icon"
             />
           </div>
