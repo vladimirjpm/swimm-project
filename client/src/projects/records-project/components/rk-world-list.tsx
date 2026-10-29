@@ -117,6 +117,7 @@ const RkWorldList: React.FC<Props> = ({ records, filters, world = null }) => {
                     lenPlacement="right"
                     size={48}
                     lenSize={16}
+                    surface="light"
                   />
                 </span>
               </a>

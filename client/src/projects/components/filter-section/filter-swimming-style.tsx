@@ -19,9 +19,17 @@ import FilterDistance from './filter-distance';
 interface Props {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /**
+   * Фон ВЫБРАННОЙ кнопки стиля для иконки (`surface` у `UI_SwimmStyleIcon`, 29.10.2026).
+   * `dark` — выбранная кнопка залита насыщенным `--theme-bg-active` в обеих темах (общий
+   * `FilterSection` на /results): там нужен светлый пловец. `auto` (по умолчанию) — для
+   * страниц, где выбранная кнопка бледная в светлой теме (`--deep-accent-chip` на /my-media,
+   * /season-best): светлый пловец на ней пропал бы.
+   */
+  activeSurface?: 'auto' | 'dark';
 }
 
-const FilterSwimmingStyle: React.FC<Props> = ({ open, onOpenChange }) => {
+const FilterSwimmingStyle: React.FC<Props> = ({ open, onOpenChange, activeSurface = 'auto' }) => {
   const { values, set, options, isAvailable } = useFilterHost();
   const styleName = values.style_name ?? '';
   const styleLen = values.style_len;
@@ -70,6 +78,7 @@ const FilterSwimmingStyle: React.FC<Props> = ({ open, onOpenChange }) => {
                 <UI_SwimmStyleIcon
                   className="src-filter-swimming-style w-20"
                   styleName={style.style_name}
+                  surface={styleName === style.style_name ? activeSurface : 'auto'}
                 />
               </button>
             );

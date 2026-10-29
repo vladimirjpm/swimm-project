@@ -283,6 +283,7 @@ function MyMediaContent({ deep }: { deep: string }) {
             styleName={styleFilter}
             styleLen={distanceFilter === 'all' ? '' : distanceFilter}
             styleType="icon-len"
+            surface="light"
             className="src-my-media"
           />
         </span>

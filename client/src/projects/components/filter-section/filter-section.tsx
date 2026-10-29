@@ -60,7 +60,8 @@ const FilterSection: React.FC = () => {
 
         <FilterActivity />
         <FilterResetButton />
-        <FilterSwimmingStyle />
+        {/* Выбранная кнопка здесь на насыщенном `--theme-bg-active` в обеих темах — пловец светлый. */}
+        <FilterSwimmingStyle activeSurface="dark" />
         <FilterEventDate />
         <FilterEventCategory />
         {/* Combine All Results в фильтрах больше нет: он стал полосой под табами шапки
