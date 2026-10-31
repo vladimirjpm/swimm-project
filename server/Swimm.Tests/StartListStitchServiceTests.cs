@@ -179,6 +179,38 @@ public class StartListStitchServiceTests
     }
 
     [Fact]
+    public async Task Stitch_RelayTeamRow_LinksEveryLegThroughMembers()
+    {
+        // Протокол печатает эстафету ОДНОЙ строкой на команду (SwimmerId — первая нога), остальные
+        // ноги — только в составе. Без него три ноги из четырёх были неявками (И-56, Вейсгаль 30.10).
+        // Заявленный, но замененный в день старта (12) — честная неявка; заменивший (13) заявки не имел.
+        await using var db = await SeedAsync(nameof(Stitch_RelayTeamRow_LinksEveryLegThroughMembers));
+        db.AddRange(
+            new Swimmer { Id = 12, LastName = "Третий", FirstName = "Т", BirthYear = 2016 },
+            new Swimmer { Id = 13, LastName = "Замена", FirstName = "З", BirthYear = 2016 },
+            new Relay { Id = 1, TeamName = "Клуб" });
+        db.RelayMembers.AddRange(
+            new RelayMember { RelayId = 1, SwimmerId = 10, LegOrder = 1 },
+            new RelayMember { RelayId = 1, SwimmerId = 11, LegOrder = 2 },
+            new RelayMember { RelayId = 1, SwimmerId = 13, LegOrder = 3 });
+        var team = Result(500, swimmer: 10, heat: 1, lane: 3, dist: "4x50");
+        team.RelayId = 1;
+        db.Results.Add(team);
+        db.CompetitionEntries.AddRange(
+            Entry(1, swimmer: 10, heat: 1, lane: 3, dist: "4X50"),
+            Entry(2, swimmer: 11, heat: 1, lane: 3, dist: "4X50"),
+            Entry(3, swimmer: 12, heat: 1, lane: 3, dist: "4X50"));
+        await db.SaveChangesAsync();
+
+        var report = await Service(db).StitchAsync(OrgCompId);
+
+        Assert.Equal(2, report.Swum);
+        Assert.Equal(1, report.NoShow);
+        var ids = await db.CompetitionEntries.OrderBy(e => e.Id).Select(e => e.ResultId).ToListAsync();
+        Assert.Equal([500L, 500L, null], ids);
+    }
+
+    [Fact]
     public async Task Stitch_BeforeImport_LeavesEntriesAlone()
     {
         // Протокола ещё нет — заявки остаются «entered». Объявить их неявками значило бы
