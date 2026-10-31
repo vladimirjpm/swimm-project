@@ -93,6 +93,77 @@ public class ImportSwimmerResolverTests
     }
 
     [Fact]
+    public async Task StartListBoundary_SameSwimmer()
+    {
+        // И-56: стартовый протокол завёл «עליא אבו | עסב» (последнее слово — фамилия), протокол
+        // результатов режет верно — «עליא | אבו עסב». Живой случай 16858, 30.10.2026.
+        var (db, club, _) = await SeedClubsAsync();
+        var card = new Swimmer { LastName = "עסב", FirstName = "עליא אבו", BirthYear = 2018 };
+        db.Add(card);
+        await db.SaveChangesAsync();
+
+        var log = new List<string>();
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, log);
+        var (found, _) = await resolver.ResolveAsync(Row("אבו עסב", "עליא", 2018), club, 1);
+
+        Assert.Same(card, found);
+        Assert.Equal(1, await db.Swimmers.CountAsync());
+        Assert.Contains(log, l => l.StartsWith("Другая граница имени:"));
+    }
+
+    [Fact]
+    public async Task StartListBoundary_TwoCandidates_NewCard()
+    {
+        // Двое под одним ключом «имя+фамилия» — гадать нельзя, лучше тень, чем чужие результаты.
+        var (db, club, _) = await SeedClubsAsync();
+        db.AddRange(
+            new Swimmer { LastName = "ד", FirstName = "א ב ג", BirthYear = 2015 },
+            new Swimmer { LastName = "ב ג ד", FirstName = "א", BirthYear = 2015 });
+        await db.SaveChangesAsync();
+
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, []);
+        var (found, _) = await resolver.ResolveAsync(Row("ג ד", "א ב", 2015), club, 1);
+
+        Assert.Equal(("ג ד", "א ב"), (found.LastName, found.FirstName));
+        Assert.Equal(3, await db.Swimmers.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartListBoundary_GroupSwimmer_NotMatched()
+    {
+        // Пловец группы (Р71) — его заводил тренер, чужой протокол в его карточку не идёт.
+        var (db, club, _) = await SeedClubsAsync();
+        var group = new HubGroup { Name = "Test", Slug = "test" };
+        db.Add(group);
+        await db.SaveChangesAsync();
+        db.Add(new Swimmer { LastName = "עסב", FirstName = "עליא אבו", BirthYear = 2018, PrivateHubGroupId = group.Id });
+        await db.SaveChangesAsync();
+
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, []);
+        var (found, _) = await resolver.ResolveAsync(Row("אבו עסב", "עליא", 2018), club, 1);
+
+        Assert.Null(found.PrivateHubGroupId);
+        Assert.Equal(2, await db.Swimmers.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartListBoundary_RelayLeg_SameSwimmer()
+    {
+        // Нога эстафеты из PDF — «אריאלי מזוז | אופיר», стартовый протокол завёл «אופיר אריאלי | מזוז».
+        var (db, club, _) = await SeedClubsAsync();
+        var card = new Swimmer { LastName = "מזוז", FirstName = "אופיר אריאלי", BirthYear = 2019 };
+        db.Add(card);
+        await db.SaveChangesAsync();
+
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, []);
+        var members = await resolver.ResolveRelayMembersAsync(
+            [new RelaySwimmerJson { Order = 1, LastName = "אריאלי מזוז", FirstName = "אופיר", BirthYear = 2019 }], club);
+
+        Assert.Equal(card.Id, Assert.Single(members).SwimmerId);
+        Assert.Equal(1, await db.Swimmers.CountAsync());
+    }
+
+    [Fact]
     public async Task SwappedNameAndSurname_IsAnotherPerson()
     {
         // «שני עידו» и «עידו שני» — разные дети (Import_NameSurnameSwap_NotMerged).

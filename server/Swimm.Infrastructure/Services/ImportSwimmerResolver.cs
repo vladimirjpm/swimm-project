@@ -18,6 +18,7 @@ namespace Swimm.Infrastructure.Services;
 ///   <item>английское имя строки — среди EN-полей и среди карточек, заведённых латиницей
 ///     (такие канонизируются: иврит в основные поля, латиница в *En);</item>
 ///   <item>то же имя с другой границей фамилии (<see cref="SwimmerFullNameKey"/>, И-28);</item>
+///   <item>то же со сдвигом границы на шве «имя→фамилия» (<see cref="SwimmerFirstLastKey"/>, И-56);</item>
 ///   <item>имя латиницей в ивритском протоколе — по английским именам карточек;</item>
 ///   <item>точное совпадение в базе (карточка вне кэша);</item>
 ///   <item>другое написание при том же клубе (<see cref="SwimmerSpellingKey"/>, Р79);</item>
@@ -37,6 +38,8 @@ internal sealed class ImportSwimmerResolver
     private readonly Dictionary<string, Swimmer> _byKeyEn = new();
     // Фоллбек «то же имя, другая граница фамилии» — см. SwimmerFullNameKey.
     private readonly Dictionary<string, Swimmer> _byFullName = new();
+    // То же в порядке «имя+фамилия» — см. SwimmerFirstLastKey. null = двое под одним ключом.
+    private readonly Dictionary<string, Swimmer?> _byFirstLast = new();
     // Фоллбек «то же имя другим написанием» (כתיב מלא/חסר) — см. SwimmerSpellingKey.
     private readonly Dictionary<string, List<Swimmer>> _bySpelling = new();
 
@@ -66,6 +69,7 @@ internal sealed class ImportSwimmerResolver
         {
             resolver._byKey.TryAdd(SwimmerMatchKey(s.LastName, s.FirstName, s.BirthYear), s);
             resolver._byFullName.TryAdd(SwimmerFullNameKey(s.LastName, s.FirstName, s.BirthYear), s);
+            AddByFirstLast(resolver._byFirstLast, s);
             AddBySpelling(resolver._bySpelling, s);
             if (!string.IsNullOrWhiteSpace(s.LastNameEn))
                 resolver._byKeyEn.TryAdd(SwimmerMatchKey(s.LastNameEn, s.FirstNameEn, s.BirthYear), s);
@@ -133,6 +137,14 @@ internal sealed class ImportSwimmerResolver
             {
                 // Тот же человек, разрезанный на имя и фамилию иначе, — не новый пловец.
             }
+            else if (FindByFirstLast(_byFirstLast, item.LastName, item.FirstName, item.BirthYear) is { } byFirstLast)
+            {
+                // Граница сдвинута на шве «имя→фамилия» — так режет стартовый протокол (И-56).
+                swimmer = byFirstLast;
+                _diagnosticLog.Add(
+                    $"Другая граница имени: '{item.LastName} {item.FirstName}' ({item.BirthYear}) узнан как "
+                    + $"#{swimmer.Id} '{swimmer.LastName} {swimmer.FirstName}'");
+            }
             else
             {
                 // Ивритский протокол напечатал имя ЛАТИНИЦЕЙ в основных полях, а EN-полей
@@ -167,6 +179,7 @@ internal sealed class ImportSwimmerResolver
                 _db.Swimmers.Add(swimmer);
                 await _db.SaveChangesAsync();
                 AddBySpelling(_bySpelling, swimmer);
+                AddByFirstLast(_byFirstLast, swimmer);
             }
 
             _byKey[swimmerKey] = swimmer;
@@ -301,6 +314,7 @@ internal sealed class ImportSwimmerResolver
                     _db.Swimmers.Add(swimmer);
                     await _db.SaveChangesAsync();
                     AddBySpelling(_bySpelling, swimmer);
+                    AddByFirstLast(_byFirstLast, swimmer);
                 }
                 _byKey[key] = swimmer;
             }
@@ -318,8 +332,10 @@ internal sealed class ImportSwimmerResolver
 
     /// <summary>
     /// Нога, записанная с ДРУГОЙ границей между именем и фамилией: ищем по всем словам
-    /// полного имени и году рождения (<see cref="SwimmerFullNameKey"/>). Неоднозначность
-    /// (двое под одним ключом) — не матчим: лучше тень, чем чужие результаты в профиле.
+    /// полного имени и году рождения — в порядке «фамилия+имя» (<see cref="SwimmerFullNameKey"/>),
+    /// затем «имя+фамилия» (<see cref="SwimmerFirstLastKey"/>: ноги, заведённые стартовым
+    /// протоколом). Неоднозначность (двое под одним ключом) — не матчим: лучше тень, чем чужие
+    /// результаты в профиле.
     /// </summary>
     private async Task<Swimmer?> FindLegByFullNameAsync(RelaySwimmerJson leg)
     {
@@ -330,6 +346,15 @@ internal sealed class ImportSwimmerResolver
         var sameYear = await _db.Swimmers.Where(s => s.BirthYear == year).ToListAsync();
         var hits = sameYear
             .Where(s => SwimmerFullNameKey(s.LastName, s.FirstName, s.BirthYear) == key)
+            .ToList();
+        if (hits.Count == 1) return hits[0];
+        if (hits.Count > 1) return null;
+
+        var firstLast = SwimmerFirstLastKey(leg.LastName, leg.FirstName, year);
+        if (firstLast is null) return null;
+        hits = sameYear
+            .Where(s => s.PrivateHubGroupId == null
+                        && SwimmerFirstLastKey(s.LastName, s.FirstName, s.BirthYear) == firstLast)
             .ToList();
         return hits.Count == 1 ? hits[0] : null;
     }
@@ -495,4 +520,40 @@ internal sealed class ImportSwimmerResolver
             .Replace(" ", string.Empty);
         return $"{glued}|{year ?? 0}";
     }
+
+    /// <summary>
+    /// Зеркало <see cref="SwimmerFullNameKey"/> в порядке «имя+фамилия»: ловит сдвиг границы на
+    /// ДРУГОМ шве. Стартовый протокол loglig печатает имя одной строкой «имя фамилия», и новичка
+    /// режет эвристикой «последнее слово — фамилия»: «עליא אבו | עסב». Протокол результатов
+    /// разрезан верно — «עליא | אבו עסב». Склейка «фамилия+имя» у них разная («עסבעליאאבו» против
+    /// «אבועסבעליא»), и импорт заводил тень рядом с карточкой стартового протокола: заявка
+    /// оставалась без результата, а ребёнок в старт-листе выглядел неявившимся (И-56, 31.10.2026,
+    /// 8 пар за два старта). Склейка «имя+фамилия» у обоих — «עליאאבועסב».
+    ///
+    /// Порядок слов значим и здесь: «שני | עידו» и «עידו | שני» дают разные склейки. Ключ сравнивается
+    /// только с таким же ключом — с «фамилия+имя» его не смешивать, иначе перестановка склеится.
+    /// null — нет года (как у ног без года: гадать не с чем).
+    /// </summary>
+    internal static string? SwimmerFirstLastKey(string? last, string? first, int? year)
+    {
+        if (year is not > 0) return null;
+        var glued = $"{SwimmerDedupService.Normalize(first ?? "")}{SwimmerDedupService.Normalize(last ?? "")}"
+            .Replace(" ", string.Empty);
+        return glued.Length == 0 ? null : $"{glued}|{year}";
+    }
+
+    private static void AddByFirstLast(Dictionary<string, Swimmer?> index, Swimmer swimmer)
+    {
+        // Пловец группы (Р71) — не кандидат, как в AddBySpelling.
+        if (swimmer.PrivateHubGroupId != null) return;
+        if (SwimmerFirstLastKey(swimmer.LastName, swimmer.FirstName, swimmer.BirthYear) is not { } key) return;
+        if (!index.TryGetValue(key, out var existing))
+            index[key] = swimmer;
+        else if (existing != null && existing != swimmer)
+            index[key] = null;   // второй под тем же ключом — неоднозначен, по нему больше не матчим
+    }
+
+    private static Swimmer? FindByFirstLast(
+        Dictionary<string, Swimmer?> index, string? last, string? first, int? year) =>
+        SwimmerFirstLastKey(last, first, year) is { } key && index.TryGetValue(key, out var found) ? found : null;
 }
