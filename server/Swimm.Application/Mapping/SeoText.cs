@@ -76,9 +76,17 @@ public static class SeoText
             NoIndex: c.IsPseudo || c.MergedIntoId != null);
     }
 
+    /// <summary>
+    /// Название с подзаголовком. Подзаголовок, который уже есть в названии («Х - 23/10/2026» и «Х»
+    /// у дней многодневки), не повторяем.
+    /// </summary>
+    public static string CompetitionName(string name, string? subName) =>
+        string.IsNullOrWhiteSpace(subName) || name.Contains(subName.Trim(), StringComparison.Ordinal)
+            ? name.Trim() : $"{name.Trim()} — {subName.Trim()}";
+
     public static SeoHead Competition(SeoCompetitionFacts c)
     {
-        var name = string.IsNullOrWhiteSpace(c.SubName) ? c.Name.Trim() : $"{c.Name.Trim()} — {c.SubName.Trim()}";
+        var name = CompetitionName(c.Name, c.SubName);
         var when = string.IsNullOrWhiteSpace(c.Date) ? "" : $", {c.Date.Trim()}";
         var pool = string.IsNullOrWhiteSpace(c.PoolType) ? "" : $" ({c.PoolType.Trim()} pool)";
         var description = c.Swims > 0
@@ -91,6 +99,78 @@ public static class SeoText
             CanonicalPath: $"/competitions/{c.Id}",
             NoIndex: false);
     }
+
+    // ── Тело страницы в голом HTML (Search Console 01.11.2026) ───────────────────────────
+    // Зачем: ссылки между страницами были только в скрипте, краулер знал адреса лишь по
+    // sitemap и откладывал их («обнаружена, не проиндексирована»). Тело собирается только для
+    // индексируемых страниц; пловцы в ссылках — только индексируемые (их отбирает репозиторий),
+    // поэтому имён детей в серверном HTML нет. Заголовки разделов — английские, как интерфейс.
+
+    /// <summary>Пределы списков: страница остаётся страницей, а не дампом базы.</summary>
+    public const int MaxSwimmerLinks = 300;
+    public const int MaxCompetitionLinks = 100;
+    public const int HomeLatestCompetitions = 12;
+
+    public static SeoBody SwimmerBody(SeoSwimmerFacts s, SeoHead head, SeoSwimmerLinks links)
+    {
+        var sections = new List<SeoSection>();
+        if (links.Club is { } club)
+            sections.Add(new SeoSection("Club", [ClubLink(club)]));
+        sections.Add(Section("Competitions", NewestFirst(links.Competitions).Select(CompetitionLink), MaxCompetitionLinks));
+        return new SeoBody(SwimmerName(s), head.Description, sections);
+    }
+
+    public static SeoBody ClubBody(SeoClubFacts c, SeoHead head, SeoClubLinks links) =>
+        new(ClubName(c.Name, c.NameEn), head.Description,
+        [
+            Section("Swimmers", ByText(links.Swimmers.Select(SwimmerLink)), MaxSwimmerLinks),
+            Section("Recent competitions", NewestFirst(links.Competitions).Select(CompetitionLink), MaxCompetitionLinks),
+        ]);
+
+    public static SeoBody CompetitionBody(SeoCompetitionFacts c, SeoHead head, SeoCompetitionLinks links) =>
+        new(CompetitionName(c.Name, c.SubName), head.Description,
+        [
+            Section("Clubs", ByText(links.Clubs.Select(ClubLink)), int.MaxValue),
+            Section("Swimmers", ByText(links.Swimmers.Select(SwimmerLink)), MaxSwimmerLinks),
+        ]);
+
+    /// <summary><c>/competitions</c> — все соревнования, новые сверху.</summary>
+    public static SeoBody CompetitionsBody(IReadOnlyList<SeoCompetitionRef> competitions) =>
+        new("Swimming competitions", "Competition results: times, places, medals and club points.",
+            [Section("Competitions", NewestFirst(competitions).Select(CompetitionLink), int.MaxValue)]);
+
+    /// <summary>Главная — последние соревнования; остальные — по ссылке на <c>/competitions</c>.</summary>
+    public static SeoBody HomeBody(IReadOnlyList<SeoCompetitionRef> competitions) =>
+        new(SiteName, "Swimming results, personal bests, records and season bests.",
+            [new SeoSection("Latest competitions",
+                NewestFirst(competitions).Take(HomeLatestCompetitions).Select(CompetitionLink).ToList())]);
+
+    /// <summary>Дата соревнования из базы (dd/MM/yyyy); null — не разобрать.</summary>
+    public static DateOnly? ParseCompetitionDate(string? date) =>
+        DateOnly.TryParseExact(date?.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
+            ? d : null;
+
+    private static IEnumerable<SeoCompetitionRef> NewestFirst(IEnumerable<SeoCompetitionRef> competitions) =>
+        competitions.OrderByDescending(c => ParseCompetitionDate(c.Date) ?? DateOnly.MinValue).ThenByDescending(c => c.Id);
+
+    private static IEnumerable<SeoLink> ByText(IEnumerable<SeoLink> links) =>
+        links.OrderBy(l => l.Text, StringComparer.Ordinal).ThenBy(l => l.Path, StringComparer.Ordinal);
+
+    private static SeoSection Section(string title, IEnumerable<SeoLink> links, int max)
+    {
+        var all = links.ToList();
+        return all.Count <= max ? new SeoSection(title, all) : new SeoSection(title, all.Take(max).ToList(), all.Count - max);
+    }
+
+    private static SeoLink CompetitionLink(SeoCompetitionRef c) =>
+        new($"/competitions/{c.Id}", CompetitionName(c.Name, c.SubName),
+            string.IsNullOrWhiteSpace(c.Date) ? null : c.Date.Trim());
+
+    private static SeoLink SwimmerLink(SeoSwimmerRef s) =>
+        new($"/swimmers/{s.Id}",
+            Join(s.FirstName, s.LastName) is { Length: > 0 } he ? he : Join(s.FirstNameEn, s.LastNameEn));
+
+    private static SeoLink ClubLink(SeoClubRef c) => new($"/clubs/{c.Id}", ClubName(c.Name, c.NameEn));
 
     private static string Join(string first, string last) => $"{first?.Trim()} {last?.Trim()}".Trim();
 

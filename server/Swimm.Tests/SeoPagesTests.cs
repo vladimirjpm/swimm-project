@@ -105,6 +105,15 @@ public class SeoPagesTests
         Assert.Contains("(25m pool)", head.Description);
     }
 
+    [Theory]
+    [InlineData("גביע - 23/10/2026", "גביע", "גביע - 23/10/2026")]          // подзаголовок уже в названии
+    [InlineData("אליפות קיץ", "יום ב", "אליפות קיץ — יום ב")]
+    [InlineData(" אליפות ", null, "אליפות")]
+    public void CompetitionName_SubNameNotRepeated(string name, string? subName, string expected)
+    {
+        Assert.Equal(expected, SeoText.CompetitionName(name, subName));
+    }
+
     [Fact]
     public void Description_IsClippedForSnippets()
     {
@@ -123,13 +132,16 @@ public class SeoPagesTests
     [InlineData("/competitions/upcoming/555", SeoPages.Kind.NoIndexOnly, 0)]
     [InlineData("/groups/dolphins", SeoPages.Kind.NoIndexOnly, 0)]
     [InlineData("/groups/dolphins/results", SeoPages.Kind.NoIndexOnly, 0)]
+    [InlineData("/", SeoPages.Kind.Home, 0)]
+    [InlineData("/competitions", SeoPages.Kind.CompetitionsIndex, 0)]
+    [InlineData("/competitions/", SeoPages.Kind.CompetitionsIndex, 0)]
     public void Match_KnownPages(string path, SeoPages.Kind kind, int id)
     {
         Assert.Equal(new SeoPages.Target(kind, id), SeoPages.Match(path));
     }
 
     [Theory]
-    [InlineData("/")]
+    [InlineData("/records")]
     [InlineData("/results")]
     [InlineData("/swimmers")]
     [InlineData("/swimmers/abc")]
@@ -209,14 +221,121 @@ public class SeoPagesTests
         Assert.Equal(expected, SeoPages.CanonicalRedirect(host, path, pathAndQuery, "https://swimhub.co.il"));
     }
 
-    [Fact]
-    public void BuildSitemap_AbsoluteUrlsOnCanonicalHost()
-    {
-        var xml = SeoPages.BuildSitemap(["/", "/swimmers/5"], "https://swimhub.co.il/");
+    private static readonly DateOnly Today = new(2026, 11, 1);
 
-        Assert.Contains("<loc>https://swimhub.co.il/</loc>", xml);
-        Assert.Contains("<loc>https://swimhub.co.il/swimmers/5</loc>", xml);
+    [Fact]
+    public void BuildSitemap_AbsoluteUrlsOnCanonicalHost_WithLastmod()
+    {
+        var xml = SeoPages.BuildSitemap(
+            [new("/", null), new("/swimmers/5", new DateOnly(2026, 10, 9))], "https://swimhub.co.il/", Today);
+
+        Assert.Contains("<url><loc>https://swimhub.co.il/</loc></url>", xml);
+        Assert.Contains("<loc>https://swimhub.co.il/swimmers/5</loc><lastmod>2026-10-09</lastmod>", xml);
         Assert.StartsWith("<?xml", xml);
+    }
+
+    [Fact]
+    public void BuildSitemap_FutureDate_NoLastmod()
+    {
+        var xml = SeoPages.BuildSitemap([new("/competitions/9", Today.AddDays(1))], "https://swimhub.co.il", Today);
+        Assert.DoesNotContain("<lastmod>", xml);
+    }
+
+    [Fact]
+    public void SitemapEntries_HomeAndCompetitionsGetLatestDate_OtherStaticNone()
+    {
+        var entries = SeoPages.SitemapEntries(
+        [
+            new("/competitions/1", new DateOnly(2026, 9, 1)),
+            new("/clubs/2", new DateOnly(2026, 10, 9)),
+            new("/swimmers/3", null),
+        ]).ToList();
+
+        Assert.Equal(new DateOnly(2026, 10, 9), entries.Single(e => e.Path == "/").LastModified);
+        Assert.Equal(new DateOnly(2026, 10, 9), entries.Single(e => e.Path == "/competitions").LastModified);
+        Assert.Null(entries.Single(e => e.Path == "/about").LastModified);
+        Assert.Contains(entries, e => e.Path == "/swimmers/3");
+    }
+
+    // ── Тело страницы в голом HTML (Search Console 01.11.2026) ──────────────
+
+    private static SeoCompetitionRef Comp(int id, string date, string name = "ליגה") => new(id, name, null, date);
+    private static SeoSwimmerRef SwimmerRef(int id, string he, string en = "En") => new(id, he, "", en, "");
+
+    [Fact]
+    public void CompetitionsBody_NewestFirstByDate_NotByDateString()
+    {
+        // Строкой «09/10/2026» < «30/09/2026», датой — наоборот.
+        var body = SeoText.CompetitionsBody([Comp(1, "30/09/2026"), Comp(2, "09/10/2026"), Comp(3, "01/01/2025")]);
+
+        Assert.Equal(["/competitions/2", "/competitions/1", "/competitions/3"],
+            body.Sections.Single().Links.Select(l => l.Path));
+        Assert.Equal("09/10/2026", body.Sections.Single().Links[0].Note);
+    }
+
+    [Fact]
+    public void HomeBody_OnlyLatestCompetitions()
+    {
+        var comps = Enumerable.Range(1, 30).Select(i => Comp(i, $"{i:00}/10/2026")).ToList();
+        var links = SeoText.HomeBody(comps).Sections.Single().Links;
+
+        Assert.Equal(SeoText.HomeLatestCompetitions, links.Count);
+        Assert.Equal("/competitions/30", links[0].Path);
+    }
+
+    [Fact]
+    public void ClubBody_SwimmersByName_CappedWithMoreCount_EnglishFallback()
+    {
+        var swimmers = Enumerable.Range(1, SeoText.MaxSwimmerLinks + 5).Select(i => SwimmerRef(i, $"שם {i:0000}")).ToList();
+        swimmers.Add(SwimmerRef(9999, " ", "Noa Cohen"));
+        var facts = new SeoClubFacts(7, "מכבי חיפה", "Maccabi Haifa", false, null, 400);
+
+        var body = SeoText.ClubBody(facts, SeoText.Club(facts), new SeoClubLinks(swimmers, []));
+        var section = body.Sections.Single(s => s.Title == "Swimmers");
+
+        Assert.Equal("מכבי חיפה", body.Heading);
+        Assert.Equal(SeoText.MaxSwimmerLinks, section.Links.Count);
+        Assert.Equal(6, section.More);
+        Assert.Equal("Noa Cohen", section.Links[0].Text); // латиница раньше иврита при Ordinal
+    }
+
+    private static readonly SeoBody SampleBody = new("נועה <כהן>", "lead",
+    [
+        new SeoSection("Competitions", [new SeoLink("/competitions/5", "A & B", "09/10/2026")], More: 1234),
+        new SeoSection("Empty", []),
+    ]);
+
+    [Fact]
+    public void RenderBody_LinksEncodedMoreCountNav_EmptySectionsSkipped()
+    {
+        var html = SeoPages.RenderBody(SampleBody);
+
+        Assert.Contains("<h1 dir=\"auto\">נועה &lt;כהן&gt;</h1>", html);
+        Assert.Contains("<li><a href=\"/competitions/5\" dir=\"auto\">A &amp; B</a> · 09/10/2026</li>", html);
+        Assert.Contains("and 1,234 more", html);
+        Assert.Contains("<a href=\"/competitions\">Competitions</a>", html);
+        Assert.DoesNotContain("<h2>Empty</h2>", html);
+        Assert.StartsWith("\n<div class=\"seo-static\">", html);
+    }
+
+    [Fact]
+    public void Inject_Body_GoesIntoEmptyRoot_StyleHidesItWhileScriptRuns()
+    {
+        var html = SeoPages.Inject(Html, head: null, noIndex: false, "https://swimhub.co.il", SampleBody);
+
+        Assert.Contains("<div id=\"root\">\n<div class=\"seo-static\">", html);
+        Assert.Contains(SeoPages.BodyStyle, html);
+        Assert.True(html.IndexOf(SeoPages.BodyStyle, StringComparison.Ordinal) < html.IndexOf("</head>", StringComparison.Ordinal));
+        Assert.Contains("<title>Swimmer</title>", html);
+    }
+
+    [Fact]
+    public void Inject_NoEmptyRoot_NoBodyNoStyle()
+    {
+        var html = SeoPages.Inject(Html.Replace("<div id=\"root\"></div>", "<main></main>"),
+            head: null, noIndex: false, "https://swimhub.co.il", SampleBody);
+
+        Assert.DoesNotContain("seo-static", html);
     }
 
     // ── SeoRepository: состав sitemap и факты пловца ─────────────────────────
@@ -272,8 +391,11 @@ public class SeoPagesTests
             Result(comp.Id, unknownYear.Id, style.Id));
         await db.SaveChangesAsync();
 
-        var paths = await new SeoRepository(db, new NullCacheService()).GetSitemapPathsAsync();
+        var entries = await new SeoRepository(db, new NullCacheService()).GetSitemapAsync();
+        var paths = entries.Select(e => e.Path).ToList();
 
+        Assert.Equal(new DateOnly(2026, 10, 9), entries.Single(e => e.Path == $"/swimmers/{open.Id}").LastModified);
+        Assert.Equal(new DateOnly(2026, 10, 9), entries.Single(e => e.Path == $"/competitions/{comp.Id}").LastModified);
         Assert.Contains($"/competitions/{comp.Id}", paths);
         Assert.Contains($"/clubs/{live.Id}", paths);
         Assert.DoesNotContain($"/clubs/{pseudo.Id}", paths);
@@ -315,5 +437,76 @@ public class SeoPagesTests
         Assert.NotNull(facts);
         Assert.Equal(3, facts!.Swims);
         Assert.Equal(2, facts.Competitions);
+    }
+
+    /// <summary>
+    /// Ссылки тела: те же пловцы, что в sitemap (дети, скрытые, пловцы групп в HTML не попадают),
+    /// клубы — только живые.
+    /// </summary>
+    [Fact]
+    public async Task Links_OnlyIndexableSwimmersAndLiveClubs()
+    {
+        await using var db = CreateDb(nameof(Links_OnlyIndexableSwimmersAndLiveClubs));
+        var style = new Style { Name = "freestyle" };
+        var live = new Club { Name = "מכבי", NameEn = "Maccabi" };
+        var pseudo = new Club { Name = "MIX", NameEn = "MIX", IsPseudo = true };
+        var comp = new Competition { Name = "ליגה", Date = "09/10/2026", PoolType = "25m" };
+        var other = new Competition { Name = "אחר", Date = "01/10/2026", PoolType = "25m" };
+        db.AddRange(style, live, pseudo, comp, other);
+        await db.SaveChangesAsync();
+        var adult = NewSwimmer("adult");
+        var minor = NewSwimmer("minor", birthYear: DateTime.UtcNow.Year - 12);
+        var hidden = NewSwimmer("hidden", hidden: true);
+        var groupOnly = NewSwimmer("group", privateGroup: 1);
+        foreach (var s in new[] { adult, minor, hidden, groupOnly }) s.ClubId = live.Id;
+        db.AddRange(adult, minor, hidden, groupOnly);
+        await db.SaveChangesAsync();
+        ResultRecord R(Competition c, Swimmer s, Club club) { var r = Result(c.Id, s.Id, style.Id); r.ClubId = club.Id; return r; }
+        db.Results.AddRange(R(comp, adult, live), R(comp, minor, live), R(comp, hidden, live),
+            R(comp, groupOnly, live), R(comp, adult, pseudo), R(other, adult, live));
+        await db.SaveChangesAsync();
+        var repo = new SeoRepository(db, new NullCacheService());
+
+        var compLinks = await repo.GetCompetitionLinksAsync(comp.Id);
+        Assert.Equal([adult.Id], compLinks.Swimmers.Select(s => s.Id));
+        Assert.Equal([live.Id], compLinks.Clubs.Select(c => c.Id));
+
+        var clubLinks = await repo.GetClubLinksAsync(live.Id);
+        Assert.Equal([adult.Id], clubLinks.Swimmers.Select(s => s.Id));
+        Assert.Equal(new[] { comp.Id, other.Id }.Order(), clubLinks.Competitions.Select(c => c.Id).Order());
+
+        var swimmerLinks = await repo.GetSwimmerLinksAsync(adult.Id);
+        Assert.Equal(live.Id, swimmerLinks.Club?.Id);
+        Assert.Equal(2, swimmerLinks.Competitions.Count);
+    }
+
+    [Fact]
+    public async Task BuildPage_MinorSwimmer_NoIndexAndNoBody_AdultGetsBody()
+    {
+        await using var db = CreateDb(nameof(BuildPage_MinorSwimmer_NoIndexAndNoBody_AdultGetsBody));
+        var style = new Style { Name = "freestyle" };
+        var comp = new Competition { Name = "ליגה", Date = "09/10/2026", PoolType = "25m" };
+        var adult = NewSwimmer("adult");
+        var minor = NewSwimmer("minor", birthYear: DateTime.UtcNow.Year - 12);
+        db.AddRange(style, comp, adult, minor);
+        await db.SaveChangesAsync();
+        db.Results.AddRange(Result(comp.Id, adult.Id, style.Id), Result(comp.Id, minor.Id, style.Id));
+        await db.SaveChangesAsync();
+        var repo = new SeoRepository(db, new NullCacheService());
+
+        var minorPage = await SeoPages.BuildPageAsync(new(SeoPages.Kind.Swimmer, minor.Id), repo, default);
+        Assert.True(minorPage.NoIndex);
+        Assert.Null(minorPage.Body);
+
+        var adultPage = await SeoPages.BuildPageAsync(new(SeoPages.Kind.Swimmer, adult.Id), repo, default);
+        Assert.False(adultPage.NoIndex);
+        Assert.Contains(adultPage.Body!.Sections, s => s.Links.Any(l => l.Path == $"/competitions/{comp.Id}"));
+
+        // Соревнование индексируется, но имя ребёнка в его теле не появляется.
+        var compPage = await SeoPages.BuildPageAsync(new(SeoPages.Kind.Competition, comp.Id), repo, default);
+        var html = SeoPages.RenderBody(compPage.Body!);
+        Assert.Contains($"/swimmers/{adult.Id}", html);
+        Assert.DoesNotContain($"/swimmers/{minor.Id}\"", html);
+        Assert.DoesNotContain("minor", html);
     }
 }

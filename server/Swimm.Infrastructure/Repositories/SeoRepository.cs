@@ -3,12 +3,14 @@ using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Repositories;
 
 /// <summary>
-/// Факты для серверных заголовков страниц и sitemap.xml (A10). Read-only контекст (swimm_ro):
+/// Факты для серверных заголовков страниц, ссылки для их тела в голом HTML и sitemap.xml (A10;
+/// тело и lastmod — после отчёта Search Console 01.11.2026). Read-only контекст (swimm_ro):
 /// всё здесь публично. Кэш — как у остальных ответов витрины: метки таблиц собираются сами
 /// (К3), правка пловца/клуба/соревнования сбрасывает свою запись.
 /// </summary>
@@ -80,31 +82,98 @@ public class SeoRepository : ISeoRepository
             return new SeoCompetitionFacts(c.Id, c.Name, c.SubName, c.Date, c.PoolType, swims, swimmers);
         }, CacheTtl);
 
-    public Task<IReadOnlyList<string>> GetSitemapPathsAsync(CancellationToken ct = default) =>
-        _cache.GetOrCreateAsync<IReadOnlyList<string>>("seo:sitemap", async () =>
+    public Task<IReadOnlyList<SeoSitemapEntry>> GetSitemapAsync(CancellationToken ct = default) =>
+        _cache.GetOrCreateAsync<IReadOnlyList<SeoSitemapEntry>>("seo:sitemap", async () =>
         {
+            // lastmod — дата последнего старта на странице (Results.CompetitionDate): новое
+            // соревнование меняет страницы своих пловцов и клубов, и краулер видит это по дате.
+
             // Соревнования — все: у каждого есть страница результатов.
             var competitions = await _db.Competitions.AsNoTracking()
-                .OrderBy(x => x.Id).Select(x => x.Id).ToListAsync(ct);
+                .OrderBy(x => x.Id)
+                .Select(x => new { x.Id, Last = _db.Results.Where(r => r.CompetitionId == x.Id).Max(r => (DateTime?)r.CompetitionDate) })
+                .ToListAsync(ct);
 
             // Клубы — живые: без псевдоклубов и без склеенных (их canonical — у того, в кого склеены).
-            var clubs = await _db.Clubs.AsNoTracking()
-                .Where(x => !x.IsPseudo && x.MergedIntoId == null)
-                .OrderBy(x => x.Id).Select(x => x.Id).ToListAsync(ct);
+            var clubs = await LiveClubs()
+                .OrderBy(x => x.Id)
+                .Select(x => new { x.Id, Last = _db.Results.Where(r => r.ClubId == x.Id).Max(r => (DateTime?)r.CompetitionDate) })
+                .ToListAsync(ct);
 
-            // Пловцы — с результатами, наверняка взрослые (страницы детей не индексируются —
-            // SeoText.IsCertainlyAdult), не скрытые из поиска, не пловцы закрытых групп.
-            var latestAdultBirthYear = SeoText.LatestAdultBirthYear(IsraelTime.ToLocal(DateTime.UtcNow).Year);
-            var swimmers = await _db.Swimmers.AsNoTracking()
-                .Where(x => !x.HideFromSearch && x.PrivateHubGroupId == null
-                            && x.BirthYear > 0 && x.BirthYear <= latestAdultBirthYear
-                            && _db.Results.Any(r => r.SwimmerId == x.Id))
-                .OrderBy(x => x.Id).Select(x => x.Id).ToListAsync(ct);
+            var swimmers = await IndexableSwimmers()
+                .OrderBy(x => x.Id)
+                .Select(x => new { x.Id, Last = _db.Results.Where(r => r.SwimmerId == x.Id).Max(r => (DateTime?)r.CompetitionDate) })
+                .ToListAsync(ct);
 
-            var paths = new List<string>(competitions.Count + clubs.Count + swimmers.Count);
-            paths.AddRange(competitions.Select(id => $"/competitions/{id}"));
-            paths.AddRange(clubs.Select(id => $"/clubs/{id}"));
-            paths.AddRange(swimmers.Select(id => $"/swimmers/{id}"));
-            return paths;
+            static DateOnly? Day(DateTime? d) => d is { } v ? DateOnly.FromDateTime(v) : null;
+            var entries = new List<SeoSitemapEntry>(competitions.Count + clubs.Count + swimmers.Count);
+            entries.AddRange(competitions.Select(x => new SeoSitemapEntry($"/competitions/{x.Id}", Day(x.Last))));
+            entries.AddRange(clubs.Select(x => new SeoSitemapEntry($"/clubs/{x.Id}", Day(x.Last))));
+            entries.AddRange(swimmers.Select(x => new SeoSitemapEntry($"/swimmers/{x.Id}", Day(x.Last))));
+            return entries;
         }, CacheTtl);
+
+    public Task<IReadOnlyList<SeoCompetitionRef>> GetCompetitionsAsync(CancellationToken ct = default) =>
+        _cache.GetOrCreateAsync<IReadOnlyList<SeoCompetitionRef>>("seo:competitions", async () =>
+            await CompetitionRefs(_db.Competitions.AsNoTracking()).ToListAsync(ct), CacheTtl);
+
+    public Task<SeoSwimmerLinks> GetSwimmerLinksAsync(int swimmerId, CancellationToken ct = default) =>
+        _cache.GetOrCreateAsync($"seo:links:swimmer:{swimmerId}", async () =>
+        {
+            var club = await LiveClubs()
+                .Where(c => _db.Swimmers.Any(s => s.Id == swimmerId && s.ClubId == c.Id))
+                .Select(c => new SeoClubRef(c.Id, c.Name, c.NameEn))
+                .FirstOrDefaultAsync(ct);
+            var competitions = await CompetitionRefs(_db.Competitions.AsNoTracking()
+                    .Where(c => _db.Results.Any(r => r.SwimmerId == swimmerId && r.CompetitionId == c.Id)))
+                .ToListAsync(ct);
+            return new SeoSwimmerLinks(club, competitions);
+        }, CacheTtl);
+
+    public Task<SeoClubLinks> GetClubLinksAsync(int clubId, CancellationToken ct = default) =>
+        _cache.GetOrCreateAsync($"seo:links:club:{clubId}", async () =>
+        {
+            var swimmers = await SwimmerRefs(IndexableSwimmers().Where(s => s.ClubId == clubId)).ToListAsync(ct);
+            var competitions = await CompetitionRefs(_db.Competitions.AsNoTracking()
+                    .Where(c => _db.Results.Any(r => r.ClubId == clubId && r.CompetitionId == c.Id)))
+                .ToListAsync(ct);
+            return new SeoClubLinks(swimmers, competitions);
+        }, CacheTtl);
+
+    public Task<SeoCompetitionLinks> GetCompetitionLinksAsync(int competitionId, CancellationToken ct = default) =>
+        _cache.GetOrCreateAsync($"seo:links:competition:{competitionId}", async () =>
+        {
+            var clubs = await LiveClubs()
+                .Where(c => _db.Results.Any(r => r.CompetitionId == competitionId && r.ClubId == c.Id))
+                .Select(c => new SeoClubRef(c.Id, c.Name, c.NameEn))
+                .ToListAsync(ct);
+            var swimmers = await SwimmerRefs(IndexableSwimmers()
+                    .Where(s => _db.Results.Any(r => r.CompetitionId == competitionId && r.SwimmerId == s.Id)))
+                .ToListAsync(ct);
+            return new SeoCompetitionLinks(clubs, swimmers);
+        }, CacheTtl);
+
+    /// <summary>Клубы с собственной страницей в выдаче: не псевдо и не склеенные.</summary>
+    private IQueryable<Club> LiveClubs() =>
+        _db.Clubs.AsNoTracking().Where(x => !x.IsPseudo && x.MergedIntoId == null);
+
+    /// <summary>
+    /// Пловцы, чьи страницы индексируются: с результатами, наверняка взрослые (страницы детей не
+    /// индексируются — SeoText.IsCertainlyAdult), не скрытые из поиска, не пловцы закрытых групп.
+    /// Один фильтр и для sitemap, и для ссылок в теле страниц: имя ребёнка в серверный HTML не попадёт.
+    /// </summary>
+    private IQueryable<Swimmer> IndexableSwimmers()
+    {
+        var latestAdultBirthYear = SeoText.LatestAdultBirthYear(IsraelTime.ToLocal(DateTime.UtcNow).Year);
+        return _db.Swimmers.AsNoTracking()
+            .Where(x => !x.HideFromSearch && x.PrivateHubGroupId == null
+                        && x.BirthYear > 0 && x.BirthYear <= latestAdultBirthYear
+                        && _db.Results.Any(r => r.SwimmerId == x.Id));
+    }
+
+    private static IQueryable<SeoCompetitionRef> CompetitionRefs(IQueryable<Competition> q) =>
+        q.Select(c => new SeoCompetitionRef(c.Id, c.Name, c.SubName, c.Date));
+
+    private static IQueryable<SeoSwimmerRef> SwimmerRefs(IQueryable<Swimmer> q) =>
+        q.Select(s => new SeoSwimmerRef(s.Id, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn));
 }
