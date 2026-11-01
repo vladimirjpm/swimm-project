@@ -18,10 +18,26 @@ public interface ISeoRepository
     Task<SeoCompetitionFacts?> GetCompetitionAsync(int id, CancellationToken ct = default);
 
     /// <summary>
-    /// Пути для sitemap.xml (от корня): соревнования, клубы (без псевдо и склеенных), взрослые пловцы
-    /// с результатами — без скрытых из поиска и без пловцов закрытых групп.
+    /// Адреса для sitemap.xml (пути от корня) с датой последнего старта: соревнования, клубы (без
+    /// псевдо и склеенных), взрослые пловцы с результатами — без скрытых из поиска и без пловцов
+    /// закрытых групп.
     /// </summary>
-    Task<IReadOnlyList<string>> GetSitemapPathsAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<SeoSitemapEntry>> GetSitemapAsync(CancellationToken ct = default);
+
+    // Ссылки для тела страницы в голом HTML. Пловцы в них — только те, что есть в sitemap
+    // (индексируемые), клубы — только живые.
+
+    /// <summary>Все соревнования — для главной и <c>/competitions</c>.</summary>
+    Task<IReadOnlyList<SeoCompetitionRef>> GetCompetitionsAsync(CancellationToken ct = default);
+
+    /// <summary>Клуб пловца и соревнования, где у него есть результаты.</summary>
+    Task<SeoSwimmerLinks> GetSwimmerLinksAsync(int swimmerId, CancellationToken ct = default);
+
+    /// <summary>Индексируемые пловцы клуба и соревнования, где у клуба есть результаты.</summary>
+    Task<SeoClubLinks> GetClubLinksAsync(int clubId, CancellationToken ct = default);
+
+    /// <summary>Живые клубы и индексируемые пловцы с результатами в соревновании.</summary>
+    Task<SeoCompetitionLinks> GetCompetitionLinksAsync(int competitionId, CancellationToken ct = default);
 }
 
 /// <summary>Флаг «скрыть пловца из поиска» (A10 шаг 1) — правка из админки.</summary>

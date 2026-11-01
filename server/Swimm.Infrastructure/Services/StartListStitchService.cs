@@ -89,6 +89,17 @@ public sealed class StartListStitchService : IStartListStitchService
             .Select(r => new ResultKeyRow(r.Id, r.CompetitionId, r.SwimmerId, r.StyleId, r.Distance, r.Heat, r.Lane))
             .ToListAsync(ct);
 
+        // Эстафета в протоколе — ОДНА строка на команду, её SwimmerId — первая нога; остальные
+        // ноги видны только в составе. Разворачиваем состав в строки «нога → результат команды»,
+        // иначе три ноги из четырёх выглядели неявками (Вейсгаль 30.10: 143 из 174, И-56).
+        results.AddRange(await (
+                from r in _db.Results.AsNoTracking()
+                where dayIds.Contains(r.CompetitionId) && r.RelayId != null
+                join m in _db.RelayMembers.AsNoTracking() on r.RelayId equals m.RelayId
+                where m.SwimmerId != r.SwimmerId
+                select new ResultKeyRow(r.Id, r.CompetitionId, m.SwimmerId, r.StyleId, r.Distance, r.Heat, r.Lane))
+            .ToListAsync(ct));
+
         var linked = 0;
         var unlinked = 0;
         foreach (var entry in entries)
@@ -143,7 +154,8 @@ public sealed class StartListStitchService : IStartListStitchService
         List<CompetitionEntry> entries, List<ResultKeyRow> results)
     {
         var matched = new Dictionary<long, long>();
-        var usedResults = new HashSet<long>();
+        // Занят не результат, а пара «результат + пловец»: строку эстафеты делят четыре ноги.
+        var usedResults = new HashSet<(long Id, int SwimmerId)>();
 
         var byLane = results
             .GroupBy(r => (r.CompetitionId, r.SwimmerId, r.StyleId, Distance: Norm(r.Distance), r.Heat, r.Lane))
@@ -154,19 +166,19 @@ public sealed class StartListStitchService : IStartListStitchService
         {
             var key = (e.CompetitionId!.Value, e.SwimmerId, e.StyleId, Norm(e.Distance), e.Heat, e.Lane);
             var hit = byLane.TryGetValue(key, out var list)
-                ? list.FirstOrDefault(r => !usedResults.Contains(r.Id))
+                ? list.FirstOrDefault(r => !usedResults.Contains((r.Id, r.SwimmerId)))
                 : null;
 
             if (hit is null) { leftovers.Add(e); continue; }
 
             matched[e.Id] = hit.Id;
-            usedResults.Add(hit.Id);
+            usedResults.Add((hit.Id, hit.SwimmerId));
         }
 
         // Проход 2: пловца пересадили на другую дорожку уже в день старта.
         var byDiscipline = 0;
         var freeResults = results
-            .Where(r => !usedResults.Contains(r.Id))
+            .Where(r => !usedResults.Contains((r.Id, r.SwimmerId)))
             .GroupBy(r => (r.CompetitionId, r.SwimmerId, r.StyleId, Distance: Norm(r.Distance)))
             .ToDictionary(g => g.Key, g => g.ToList());
 
@@ -180,7 +192,7 @@ public sealed class StartListStitchService : IStartListStitchService
             if (!freeResults.TryGetValue(key, out var free) || free.Count != 1) continue;
 
             matched[candidates[0].Id] = free[0].Id;
-            usedResults.Add(free[0].Id);
+            usedResults.Add((free[0].Id, free[0].SwimmerId));
             byDiscipline++;
         }
 

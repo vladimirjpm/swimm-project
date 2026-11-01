@@ -477,6 +477,10 @@ app.Use(async (context, next) =>
                 return;
             context.Request.Path = rewrite;
         }
+        // Корень: файл выбирает UseDefaultFiles ниже, а тело со ссылками на соревнования (SeoPages)
+        // вставляется здесь. Локально home.html в wwwroot нет — уходим в UseDefaultFiles как раньше.
+        else if (path == "/" && await SeoPages.TryServeAsync(context, path, "/home.html"))
+            return;
     }
 
     await next();
@@ -569,13 +573,15 @@ app.MapGet("/api/antiforgery/token", (IAntiforgery af, HttpContext ctx) =>
     return Results.Ok(new { token = tokens.RequestToken });
 }).RequireAuthorization();
 
-// sitemap.xml (A10 шаг 3): соревнования, клубы, пловцы — без скрытых из поиска и пловцов групп.
+// sitemap.xml (A10 шаг 3): соревнования, клубы, пловцы — без скрытых из поиска и пловцов групп;
+// lastmod — дата последнего старта на странице (Search Console 01.11.2026).
 // Ссылка на него — в robots.txt. Кэш списка — в репозитории, ответ браузеру — на час.
 app.MapGet("/sitemap.xml", async (ISeoRepository seo, IConfiguration config, HttpContext ctx) =>
 {
-    var paths = SeoPages.StaticSitemapPaths.Concat(await seo.GetSitemapPathsAsync(ctx.RequestAborted));
+    var entries = SeoPages.SitemapEntries(await seo.GetSitemapAsync(ctx.RequestAborted));
     ctx.Response.Headers.CacheControl = "public, max-age=3600";
-    return Results.Text(SeoPages.BuildSitemap(paths, config[SeoPages.BaseUrlKey] ?? SeoPages.DefaultBaseUrl),
+    return Results.Text(SeoPages.BuildSitemap(entries, config[SeoPages.BaseUrlKey] ?? SeoPages.DefaultBaseUrl,
+            DateOnly.FromDateTime(Swimm.Application.Constants.IsraelTime.ToLocal(DateTime.UtcNow))),
         "application/xml; charset=utf-8");
 }).AllowAnonymous();
 
