@@ -59,6 +59,8 @@ public sealed class CalendarDiscoveredRow
     public bool Missing { get; init; }
     /// <summary>new | imported | ignored; ignored (скрыт админом) в календарь не идёт.</summary>
     public string Status { get; init; } = DiscoveredCompetitionStatus.New;
+    /// <summary>Протокол на loglig; общий у частей одного протокола («חלק א'/ב'») — для матча по имени (И-57).</summary>
+    public int? LogligId { get; init; }
 }
 
 /// <summary>Возрастная полоса категории (<c>Categories.MinAge/MaxAge</c>).</summary>
@@ -197,11 +199,16 @@ public static class CompetitionCalendarBuilder
         // становится источником этого старта: площадка и промежуток дат — от неё.
         var claimed = meets.SelectMany(m => m.OrgCompIds).ToHashSet();
         var dated = inputs.Competitions.Where(c => c.Date is not null).ToList();
+        var logligByOrgCompId = discovered.Values
+            .Where(d => d.LogligId is not null)
+            .ToDictionary(d => d.OrgCompId, d => d.LogligId!.Value);
         foreach (var dc in discovered.Values.OrderBy(d => d.OrgCompId))
         {
             if (claimed.Contains(dc.OrgCompId)) continue;
 
-            var day = dated.FirstOrDefault(c => DiscoveryNameMatch.Matches(dc.Name, dc.Start, dc.End, c.Name, c.Date!.Value));
+            var sameProtocol = DiscoveryNameMatch.SameProtocol(dc.LogligId, logligByOrgCompId);
+            var day = dated.FirstOrDefault(c => DiscoveryNameMatch.Matches(dc.Name, dc.Start, dc.End, c.Name, c.Date!.Value,
+                DiscoveryNameMatch.IsStampedByOther(dc.OrgCompId, c.OrgCompId, c.EventOrgCompId, sameProtocol)));
             if (day is not null && meetByCompetitionId.TryGetValue(day.Id, out var byName))
             {
                 byName.OrgCompIds.Add(dc.OrgCompId);

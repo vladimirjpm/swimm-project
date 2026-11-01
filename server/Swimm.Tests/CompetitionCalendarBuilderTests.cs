@@ -332,7 +332,7 @@ public class CompetitionCalendarBuilderTests
 
     private static CalendarDiscoveredRow Disc(int id, string name, string start, string? end = null,
         string? venue = null, string? prevStart = null, string? prevEnd = null, bool missing = false,
-        string status = "new", string discipline = Disciplines.Swimming) => new()
+        string status = "new", string discipline = Disciplines.Swimming, int? loglig = null) => new()
     {
         OrgCompId = id,
         Name = name,
@@ -344,6 +344,7 @@ public class CompetitionCalendarBuilderTests
         Missing = missing,
         Status = status,
         Discipline = discipline,
+        LogligId = loglig,
     };
 
     [Fact]
@@ -560,4 +561,72 @@ public class CompetitionCalendarBuilderTests
     [Fact]
     public void NameMatch_needs_date_inside_span() =>
         Assert.False(DiscoveryNameMatch.Matches("ליגה", new(2026, 7, 3), new(2026, 7, 4), "ליגה", new(2026, 7, 5)));
+
+    // ── И-57: суффикс района не берёт день, проштампованный другим стартом ──────
+
+    [Theory]
+    [InlineData(16827, null, null, false)]    // PDF-импорт без штампа — не чужой
+    [InlineData(16827, 16827, null, false)]   // свой штамп дня
+    [InlineData(16827, null, 16827, false)]   // свой штамп события
+    [InlineData(16827, 16828, null, true)]    // день Севера
+    [InlineData(16827, null, 16828, true)]    // второй день события Севера (штамп только у события)
+    public void IsStampedByOther_rules(int discovered, int? dayStamp, int? eventStamp, bool expected) =>
+        Assert.Equal(expected, DiscoveryNameMatch.IsStampedByOther(discovered, dayStamp, eventStamp));
+
+    [Fact]
+    public void IsStampedByOther_part_of_same_loglig_protocol_is_own()
+    {
+        // «חלק א'» 6621 и «חלק ב'» 6622 — один протокол loglig 11792, событие проштамповано 6622.
+        var loglig = new Dictionary<int, int> { [6621] = 11792, [6622] = 11792, [16828] = 14864 };
+        Assert.False(DiscoveryNameMatch.IsStampedByOther(6621, 6622, 6622, DiscoveryNameMatch.SameProtocol(11792, loglig)));
+        Assert.True(DiscoveryNameMatch.IsStampedByOther(16827, 16828, 16828, DiscoveryNameMatch.SameProtocol(14791, loglig)));
+        Assert.True(DiscoveryNameMatch.IsStampedByOther(6621, 6622, 6622, DiscoveryNameMatch.SameProtocol(null, loglig)));
+    }
+
+    [Theory]
+    [InlineData("מוקדמות קיץ 2026 דרום", "מוקדמות קיץ 2026", false)] // округ к чужому дню — нет
+    [InlineData("ליגה מס 2- הפועל ירושלים", "ליגה מס 2- הפועל ירושלים", true)] // дубль сайта — да
+    public void NameMatch_stamped_by_other_only_exact_name(string discovered, string competition, bool expected) =>
+        Assert.Equal(expected, DiscoveryNameMatch.Matches(discovered, new(2026, 6, 19), new(2026, 6, 20),
+            competition, new(2026, 6, 20), stampedByOther: true));
+
+    [Fact]
+    public void District_row_is_not_claimed_by_other_district_day()
+    {
+        // Север затянут (событие с compID 16828), Юг — нет: Юг остаётся отдельным стартом календаря.
+        var cal = Build(
+            comps: [Day(1, "2026-06-20", name: "מוקדמות קיץ 2026", eventId: 21, eventOrgCompId: 16828, orgCompId: 16828)],
+            discovered:
+            [
+                Disc(16828, "מוקדמות קיץ 2026- צפון", "2026-06-20"),
+                Disc(16827, "מוקדמות קיץ 2026 דרום", "2026-06-19", "2026-06-20"),
+            ],
+            season: 2025); // календарный сезон зовётся годом начала: июнь 2026 — это 2025/26
+
+        Assert.Equal(2, cal.Meets.Count);
+        Assert.Single(cal.Meets, m => m.Kind != CalendarMeetKinds.Upcoming);
+        Assert.Contains(cal.Meets, m => m.Kind == CalendarMeetKinds.Upcoming && m.Id == 16827);
+    }
+
+    [Fact]
+    public void Part_of_same_protocol_is_claimed_by_its_event_not_a_ghost()
+    {
+        // Сайт режет протокол loglig 11792 на «חלק א'» (6621) и «חלק ב'» (6622); в базе одно событие,
+        // проштампованное 6622. «חלק א'» — затянут, а не призрак «No results».
+        var cal = Build(
+            comps:
+            [
+                Day(1526, "2025-01-24", name: "מוקדמות אליפות צעירים", eventId: 17, eventOrgCompId: 6622, orgCompId: 6622),
+                Day(1527, "2025-02-01", name: "מוקדמות אליפות צעירים", eventId: 17, eventOrgCompId: 6622),
+            ],
+            discovered:
+            [
+                Disc(6621, "מוקדמות אליפות צעירים חלק א'", "2025-01-24", "2025-01-25", loglig: 11792),
+                Disc(6622, "מוקדמות אליפות צעירים חלק ב'", "2025-01-31", "2025-02-01", loglig: 11792),
+            ],
+            season: 2024);
+
+        Assert.DoesNotContain(cal.Meets, m => m.Kind == CalendarMeetKinds.Upcoming);
+        Assert.Single(cal.Meets);
+    }
 }

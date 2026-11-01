@@ -16,7 +16,8 @@ namespace Swimm.Infrastructure.Repositories;
 /// <see cref="SwimmReadDbContext"/> (swimm_ro), а площадка (решение В5) лежит только во «Входящих»
 /// (<c>Sys_DiscoveredCompetitions</c>, гранта swimm_ro нет) — её читает <see cref="SwimmDbContext"/>,
 /// и только безопасные поля: compID, имя, площадка, даты (и первая объявленная — перенос), вид
-/// спорта, статус, «пропал ли из списка». С части В (решение В9) — ещё и весь сезон «Входящих»:
+/// спорта, статус, «пропал ли из списка», id протокола на loglig (матч частей одного протокола,
+/// И-57). С части В (решение В9) — ещё и весь сезон «Входящих»:
 /// будущие старты, которых нет в справочнике, тоже идут в календарь.
 ///
 /// Кэш — в контроллере (<c>CachedJson</c>); метки таблиц запись получает сама (К3), включая
@@ -140,7 +141,7 @@ public class CompetitionCalendarRepository : ICompetitionCalendarRepository
             .Select(d => new
             {
                 d.OrgCompId, d.Name, d.Venue, d.DateStart, d.DateEnd, d.Discipline, d.Status,
-                d.PreviousDateStart, d.PreviousDateEnd, Missing = d.MissingSince != null,
+                d.PreviousDateStart, d.PreviousDateEnd, Missing = d.MissingSince != null, d.LogligId,
             })
             .ToListAsync(ct);
 
@@ -190,6 +191,7 @@ public class CompetitionCalendarRepository : ICompetitionCalendarRepository
                 PreviousEnd = d.PreviousDateEnd is DateTime pe ? DateOnly.FromDateTime(pe) : null,
                 Missing = d.Missing,
                 Status = d.Status,
+                LogligId = d.LogligId,
             }).ToList(),
             MeetInfoChampionship = meetInfos
                 .GroupBy(m => m.OrgCompId)

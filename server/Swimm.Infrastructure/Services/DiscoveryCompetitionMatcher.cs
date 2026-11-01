@@ -24,26 +24,34 @@ internal class DiscoveryCompetitionMatcher(SwimmDbContext db)
         IReadOnlyList<DiscoveredCompetition> rows, CancellationToken ct = default)
     {
         // Правило — DiscoveryNameMatch: дата дня в [DateStart..DateEnd] и имя совпадает после
-        // нормализации ЛИБО имя Discovery начинается с имени соревнования (суффикс района).
-        // Дни в Competitions.Date — строка dd/MM/yyyy.
+        // нормализации ЛИБО имя Discovery начинается с имени соревнования (суффикс района) — но
+        // не у дня, проштампованного другим compID (И-57). Дни в Competitions.Date — строка dd/MM/yyyy.
         var competitions = await db.Competitions
             .AsNoTracking()
-            .Select(c => new { c.Id, c.Name, c.Date })
+            .Select(c => new { c.Id, c.Name, c.Date, c.OrgCompId, EventOrgCompId = c.Event != null ? c.Event.OrgCompId : null })
             .ToListAsync(ct);
         var candidates = competitions
-            .Select(c => new { c.Id, Key = Normalize(c.Name), c.Name, Date = ParseDdMmYyyy(c.Date) })
+            .Select(c => new { c.Id, Key = Normalize(c.Name), c.Name, Date = ParseDdMmYyyy(c.Date), c.OrgCompId, c.EventOrgCompId })
             .Where(c => c.Date != null && c.Key.Length > 0)
             .ToList();
+        // compID → протокол loglig: штамп части того же протокола — не чужой (6621/6622).
+        var logligByOrgCompId = await db.DiscoveredCompetitions
+            .AsNoTracking()
+            .Where(x => x.LogligId != null)
+            .Select(x => new { x.OrgCompId, LogligId = x.LogligId!.Value })
+            .ToDictionaryAsync(x => x.OrgCompId, x => x.LogligId, ct);
 
         var result = new Dictionary<int, CompetitionMatch?>();
         foreach (var d in rows)
         {
             var dKey = Normalize(d.Name);
+            var sameProtocol = DiscoveryNameMatch.SameProtocol(d.LogligId, logligByOrgCompId);
             CompetitionMatch? matched = null;
             foreach (var c in candidates)
             {
                 if (c.Date < d.DateStart || c.Date > d.DateEnd) continue;
-                if (DiscoveryNameMatch.KeysMatch(dKey, c.Key))
+                if (DiscoveryNameMatch.KeysMatch(dKey, c.Key,
+                        DiscoveryNameMatch.IsStampedByOther(d.OrgCompId, c.OrgCompId, c.EventOrgCompId, sameProtocol)))
                 {
                     matched = new CompetitionMatch(c.Id, c.Name);
                     break;
