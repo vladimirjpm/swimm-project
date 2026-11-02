@@ -14,6 +14,7 @@ import {
   type SbFilters,
 } from './sb-filters-model';
 import type { SeasonBestModules } from './season-best-modules';
+import { birthYearForAgeInSeason } from '../../utils/helpers/season-helper';
 
 /**
  * `QueryFilterHost` страницы `/season-best` (Ф4 плана `docs/plans/filters-reusable-panel-plan.md`).
@@ -156,6 +157,9 @@ export function useSeasonBestFilterHost(params: {
         values: ['all', ...SB_AGES.map(String), SB_AGE_ADULT],
         // Подпись «сколько лет на стартах» здесь не нужна: возраст и так сезонный.
         compYears: [],
+        // Под возрастом — год рождения ВЫБРАННОГО сезона: «10 (2016)» в 2025/26. Хвост
+        // взрослых — «18+ (≤2008)». Сезон ещё не пришёл с сервера — подписей нет.
+        notes: filters.season != null ? birthYearNotes(filters.season) : undefined,
         // Вторая шкала — мастерские группы. Выбор группы меняет и выборку (мастерские
         // старты вместо обычных), и смысл места: оно считается внутри пятилетки.
         extra: ageGroups.length > 0
@@ -175,10 +179,18 @@ export function useSeasonBestFilterHost(params: {
           }
         : undefined,
     }),
-    [events, clubs, ageGroups, modules.filterClub, modules.latinNames],
+    [events, clubs, ageGroups, modules.filterClub, modules.latinNames, filters.season],
   );
 
   return useMemo(() => ({ values, set, options, reset }), [values, set, options, reset]);
+}
+
+/** Подписи чипов возраста: значение кнопки → год рождения в сезоне `season`. */
+function birthYearNotes(season: number): Record<string, string> {
+  const notes: Record<string, string> = {};
+  for (const age of SB_AGES) notes[String(age)] = String(birthYearForAgeInSeason(season, age));
+  notes[SB_AGE_ADULT] = `≤${birthYearForAgeInSeason(season, SB_ADULT_FROM)}`;
+  return notes;
 }
 
 export default useSeasonBestFilterHost;

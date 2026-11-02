@@ -60,8 +60,9 @@ const FilterAge: React.FC = () => {
 
           // Подпись под годом рождения: сколько лет человеку на стартах этой выборки.
           // Осенние и весенние старты одного сезона дают разный возраст — отсюда вилка.
-          let ageLabel = '';
-          if (by !== 'all' && ages.compYears.length > 0) {
+          // Подпись от хоста (год рождения под возрастом в сезоне) важнее вычисленной.
+          let ageLabel = ages.notes?.[by] ?? '';
+          if (!ages.notes && by !== 'all' && ages.compYears.length > 0) {
             const list = ages.compYears.map((cy) => cy - Number(by));
             const minAge = Math.min(...list);
             const maxAge = Math.max(...list);

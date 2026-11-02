@@ -137,7 +137,7 @@ function SeasonBestProject() {
 
   return (
     <div className={themeClass} style={{ background: 'var(--deep-page-bg)', minHeight: '100vh' }}>
-      {MODULES.topbar && <AppTopbar />}
+      {MODULES.topbar && <AppTopbar active="season-best" />}
 
       <main className="sb-page">
         <div className="sb-topline">
