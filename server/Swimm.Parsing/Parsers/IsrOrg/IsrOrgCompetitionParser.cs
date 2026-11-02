@@ -78,6 +78,15 @@ public static class IsrOrgCompetitionParser
         @"^מאסטרס\s+(?<gender>[א-ת])\s+(?<age>\d+(?:-\d+)?)$",
         RegexOptions.Compiled);
 
+    // Мастерс-категория В САМОМ заголовке, одной строкой: «50 גב - מאסטרס נ 21-99» (loglig 12499,
+    // «מאסטר פאסטר 2025»). Обычно категория «מאסטרס <пол> <возраст>» печатается отдельной
+    // строкой под «50 גב»; здесь её склеили с заголовком, и ни один шаблон строку не брал —
+    // файл разбирался в ноль событий (02.11.2026).
+    private static Regex? _headerRxHEMastersInline;
+    private static Regex HeaderRxHEMastersInline => _headerRxHEMastersInline ??= new Regex(
+        @"^(?<len>\d+)\s+(?<style>[֐-׿\s]+?)\s*-\s*מאסטרס\s+(?<gender>[א-ת])\s+(?<age>\d+(?:-\d+)?)$",
+        RegexOptions.Compiled);
+
     private static Regex? _mastersRelayAgeLineRxHE;
     private static Regex MastersRelayAgeLineRxHE => _mastersRelayAgeLineRxHE ??= new Regex(
         @"^מאסטרס\s+שליח(?:ות|ים)?\s+(?<age>\d+(?:-\d+)?)$",
@@ -193,6 +202,7 @@ public static class IsrOrgCompetitionParser
         || RelayHeaderRxHECategory.IsMatch(line)
         || RelayHeaderNoCategoryRxHE.IsMatch(line)
         || HeaderRxHE.IsMatch(line) || HeaderRxHECategory.IsMatch(line)
+        || HeaderRxHEMastersInline.IsMatch(line)
         || HeaderRxHESimple.IsMatch(line);
 
     private static string? HeCategoryToken(string cat) =>
@@ -974,6 +984,7 @@ public static class IsrOrgCompetitionParser
             if (TryHebrewHeaders()) return;
             if (TryEnglishHeaders()) return;
             if (TryHeaderFormat1()) return;
+            if (TryHebrewMastersInlineHeader()) return;
             if (TryHebrewTextCategoryHeader()) return;
             if (TryMaccabiRelayWithoutCategory()) return;
             if (TryHebrewRelayTeam()) return;
@@ -1817,6 +1828,55 @@ public static class IsrOrgCompetitionParser
                 return true;
             }
             return false;
+        }
+
+        // Личный мастерс-заплыв с категорией в заголовке («50 גב - מאסטרס נ 21-99»). Событие то же,
+        // что дают «50 גב» + строка «מאסטרס נ 21-99» (TryPendingEventGenderAge). Только для
+        // известного стиля — как у текстовой категории.
+        private bool TryHebrewMastersInlineHeader()
+        {
+            if (!isHE) return false;
+
+            var m = HeaderRxHEMastersInline.Match(line);
+            if (!m.Success) return false;
+
+            var styleHeRaw = m.Groups["style"].Value.Trim();
+            if (!HebrewTextHelper.StyleMapHE.TryGetValue(styleHeRaw, out var styleMapped))
+            {
+                Log($"  -> MastersInline REJECTED (неизвестный стиль '{styleHeRaw}')");
+                return false;
+            }
+
+            var genderRaw = m.Groups["gender"].Value;
+            var age = m.Groups["age"].Value;
+            Log($"  -> MATCH MastersInline: len={m.Groups["len"].Value}, style={styleHeRaw}, gender={genderRaw}, age={age}");
+
+            pendingEventLen = null;
+            pendingEventStyle = null;
+            pendingEventLine = null;
+            currentIsRelay = false;
+            currentRelayLegs = 0;
+            if (current != null) Emit(current);
+
+            // Строка под заголовком — «16:00 30/05/2025» (визуальный порядок): дату ищем по форме.
+            var next = i + 1 < lines.Count ? lines[i + 1].Trim() : string.Empty;
+            var date = next.Split(' ').FirstOrDefault(p => Regex.IsMatch(p, @"^\d{2}/\d{2}/\d{4}$"))
+                       ?? dat_relay;
+
+            current = new IsrOrgCompetitionResult(
+                Competition: HebrewTextHelper.NormalizeHebrewLine(lines[0].Trim()),
+                AgeGroup: age,
+                Date: date,
+                Event: line,
+                EventStyleName: HebrewTextHelper.NormalizeStyleName(styleMapped),
+                EventStyleLen: NormalizeHeaderLen(m.Groups["len"].Value),
+                EventStyleGender: HebrewTextHelper.NormalizeGenderHE(genderRaw),
+                EventStyleAge: age,
+                PoolType: "25m",
+                Results: new List<IsrOrgResult>()
+            );
+            Log($"  -> NEW EVENT (мастерс в заголовке): {current.Event}");
+            return true;
         }
 
         // Личный заплыв с текстовой категорией («200 חופשי - שומרי שבת מוקדמות צעירים»).
