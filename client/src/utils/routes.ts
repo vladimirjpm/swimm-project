@@ -84,10 +84,12 @@ export const routes = {
    * Единственный генератор, принимающий query: у списка нет идентичности в пути — адресом
    * его делает как раз набор фильтров, и держать их порознь значит завести второй контракт.
    * Пустые поля не пишем: `/season-best?season=2025` — законный адрес «весь сезон».
+   * Голый `/season-best` (пункт топбара) тоже законен: сезон без параметра страница берёт
+   * витринный с сервера.
    */
   seasonBest: (q: {
     /** Год НАЧАЛА сезона, как везде на публичной стороне (2025 → «2025/26»). */
-    season: number;
+    season?: number | null;
     /** Возраст В СЕЗОНЕ (SeasonMath.AgeInSeason), а не на дату заплыва. */
     age?: number | null;
     gender?: string | null;
@@ -108,9 +110,9 @@ export const routes = {
     bestPerSwimmer?: boolean;
     /** Кого подсветить в списке; на выбор самого списка не влияет. */
     swimmerId?: number | null;
-  }) => {
+  } = {}) => {
     const params = new URLSearchParams();
-    params.set('season', String(q.season));
+    if (q.season != null) params.set('season', String(q.season));
     if (q.age != null) params.set('age', String(q.age));
     if (q.ageTo != null) params.set('age_to', String(q.ageTo));
     if (q.ageGroup) params.set('age_group', q.ageGroup);
@@ -121,7 +123,8 @@ export const routes = {
     if (q.clubId != null) params.set('club', String(q.clubId));
     if (q.bestPerSwimmer) params.set('best', 'true');
     if (q.swimmerId != null) params.set('swimmer', String(q.swimmerId));
-    return `/season-best?${params.toString()}`;
+    const query = params.toString();
+    return query ? `/season-best?${query}` : '/season-best';
   },
 
   /**

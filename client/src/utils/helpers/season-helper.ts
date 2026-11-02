@@ -35,6 +35,15 @@ export function ageInSeason(birthYear: number | string, date: Date = new Date())
 }
 
 /**
+ * Обратная к `ageInSeason`: год рождения пловца, которому в сезоне `startYear` исполняется
+ * `age` (год ОКОНЧАНИЯ сезона − возраст). Сезон 2025/26, возраст 10 → 2016. Подпись чипов
+ * фильтра «Age in season» на `/season-best`.
+ */
+export function birthYearForAgeInSeason(startYear: number, age: number): number {
+  return startYear + 1 - age;
+}
+
+/**
  * Возраст для СТУПЕНИ В СПРАВОЧНИКЕ РЕКОРДОВ — «год заплыва минус год рождения»
  * (для витрины — текущий календарный год).
  *

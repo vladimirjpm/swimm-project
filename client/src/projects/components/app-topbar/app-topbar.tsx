@@ -16,7 +16,7 @@ import { PAGE_CONTAINER } from '../../../utils/layout';
  * когда страница хочет управлять auth снаружи. Хендофф писался до useAuth-синглтона.
  */
 
-export type TopbarActivePage = 'home' | 'competitions' | 'groups' | 'h2h' | 'normatives' | 'records' | 'about';
+export type TopbarActivePage = 'home' | 'competitions' | 'groups' | 'h2h' | 'season-best' | 'normatives' | 'records' | 'about';
 
 export interface AppTopbarProps {
   /** Активный пункт. Не передан (results_main) — ни один пункт не подсвечен. */
@@ -35,6 +35,8 @@ const NAV_LINKS: { label: string; href?: string; key?: TopbarActivePage }[] = [
   // Пустой `/h2h` — законный адрес: обе стороны выбираются прямо на экране, поэтому пункт
   // ведёт именно туда, а не требует сперва найти пловца (решение Влада 03.09.2026).
   { label: 'Head to head', href: routes.h2h(), key: 'h2h' },
+  // Без параметров: сезон страница берёт витринный с сервера, срез выбирается на экране.
+  { label: 'Season best', href: routes.seasonBest(), key: 'season-best' },
   { label: 'Normatives' },
   // Пустой `/records` — законный адрес: дисциплина выбирается на самом экране, и без
   // параметров страница открывает 50 вольным (11.2.2).
@@ -376,7 +378,9 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
       <div className={`${PAGE_CONTAINER} flex h-[46px] items-center justify-between gap-4`}>
         <TopbarLogo />
 
-        <nav className="hidden items-center gap-6 md:flex" aria-label="Main">
+        {/* Восемь пунктов на 768px в gap-6 не влезают: пункты из двух слов переносились, и
+            Login вылезал за край. Поэтому на md зазор теснее, а подписи — в одну строку. */}
+        <nav className="hidden items-center gap-2.5 whitespace-nowrap md:flex lg:gap-6" aria-label="Main">
           {NAV_LINKS.map((link) => (
             <TopbarNavItem key={link.label} link={link} active={active} />
           ))}
