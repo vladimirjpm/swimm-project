@@ -10,7 +10,11 @@ namespace Swimm.Parsing.Parsers.IsrOrg;
 /// <summary>Одна эстафетная дисциплина из PDF промежуточных: стиль и дистанция в форме парсера.</summary>
 /// <param name="Style">«freestyle» / «individual_medley».</param>
 /// <param name="Len">«4X50», «4X100» — как <c>event_style_len</c> основного разбора.</param>
-public sealed record RelaySplitEvent(string Style, string Len, IReadOnlyList<SplitRelayTeam> Teams);
+/// <param name="Gender">Пол дисциплины по сетке loglig (male / female / mixed; none — неизвестен).</param>
+/// <param name="Day">День дисциплины по сетке loglig.</param>
+public sealed record RelaySplitEvent(
+    string Style, string Len, IReadOnlyList<SplitRelayTeam> Teams,
+    string? Gender = null, DateOnly? Day = null);
 
 /// <summary>Что сделала доклейка — для лога импорта и сообщения в админке.</summary>
 public sealed record RelaySplitReport(
@@ -40,6 +44,7 @@ public sealed record RelaySplitReport(
 /// </summary>
 public static class RelaySplitEnricher
 {
+
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -71,7 +76,7 @@ public static class RelaySplitEnricher
             // тоже (DQ микс-эстафеты Эйлата-2026: «במירושניקו», «ברנדוייסלר» вместо
             // «מירושניקוב», «וייסלר ברנד» — две тени при импорте). Вместо времени её ключ —
             // статус: заплыв + дорожка + «DQ» с обеих сторон. Нет ни времени, ни статуса — пропуск.
-            if (team.Legs.Count != 4 || (team.Time is null && team.Status is null)) { noLegs++; continue; }
+            if (team.Time is null && team.Status is null) { noLegs++; continue; }
 
             var candidates = relayRows.Where(o =>
                     string.Equals(Str(o, "event_style_name"), ev.Style, StringComparison.OrdinalIgnoreCase)
@@ -88,6 +93,19 @@ public static class RelaySplitEnricher
             if (candidates.Count > 1) { ambiguous++; continue; }
 
             var row = candidates[0];
+
+            // Пол и день — из дисциплины, к которой команда нашлась. Протоколы чемпионатов 24/25
+            // (6594, 6623) печатают заголовок эстафеты без категории («4X50 מעורב שליחים»): мальчики,
+            // девочки, взрослые и микст разбираются одним заплывом без пола, а плывут в разные дни.
+            // Пол протокола, если он есть, не переписываем.
+            if (ev.Gender is "male" or "female" or "mixed"
+                && Str(row, "event_style_gender") is null or "" or "none")
+                row["event_style_gender"] = ev.Gender;
+            if (ev.Day is { } day)
+                row[Swimm.Application.Mapping.CollapsedDaysRewriter.DisciplineDateField] = day.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+
+            if (team.Legs.Count != 4) { noLegs++; continue; }
+
             if (row["relay_swimmers"] is JsonArray existing && existing.Count > 0)
             {
                 var had = existing.OfType<JsonObject>().Select(l => Int(l, "birth_year") ?? 0).OrderBy(y => y);

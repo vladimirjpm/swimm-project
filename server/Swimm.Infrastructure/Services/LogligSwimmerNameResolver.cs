@@ -25,6 +25,8 @@ public sealed record ResolvedSwimmerName(string LastName, string FirstName, bool
 /// <item>токены базы ⊆ токенов источника (или наоборот) при том же годе — у сайта имя бывает
 /// полнее, чем в PDF: «אבינעם יצחק גבאי» против «אבינעם גבאי». Берётся только если такой
 /// кандидат ОДИН; при нескольких — дополнительно по клубу;</item>
+/// <item>то же без «י/ו» внутри слов (полное/дефектное написание: «יוקליס» / «יוקלס») —
+/// только единственный кандидат того же года;</item>
 /// <item>не нашлось — режем эвристикой (последний токен = фамилия) и честно помечаем
 /// <c>Matched = false</c>.</item>
 /// </list>
@@ -74,6 +76,16 @@ public sealed class LogligSwimmerNameResolver
                 var sameClub = candidates.Where(c => Normalize(c.Club) == Normalize(club)).ToList();
                 if (sameClub.Count == 1) return Take(sameClub[0]);
             }
+
+            // Полное и дефектное написание: «יוקליס» на сайте, «יוקלס» в PDF того же чемпионата
+            // (6594). Только единственный кандидат того же года — без тайбрейка по клубу.
+            if (candidates.Count == 0)
+            {
+                var plene = PleneKey(tokens, year);
+                var spelled = _all.Where(x => x.Swimmer.BirthYear == year && PleneKey(x.Tokens, year) == plene)
+                    .Select(x => x.Swimmer).ToList();
+                if (spelled.Count == 1) return Take(spelled[0]);
+            }
         }
 
         // Пары нет: последний токен — фамилия (порядок источника «имя … фамилия»).
@@ -88,6 +100,10 @@ public sealed class LogligSwimmerNameResolver
 
     private static string ExactKey(IEnumerable<string> tokens, int birthYear) =>
         $"{string.Join(' ', tokens.OrderBy(t => t, StringComparer.Ordinal))}|{birthYear}";
+
+    /// <summary>Ключ без «י/ו» внутри слова (первую букву не трогаем: «יעל» ≠ «על»).</summary>
+    private static string PleneKey(IEnumerable<string> tokens, int birthYear) =>
+        ExactKey(tokens.Select(t => t[..1] + t[1..].Replace("י", "").Replace("ו", "")), birthYear);
 
     private static HashSet<string> Tokenize(string name) =>
         [.. Tokenize(name, keepOrder: true)];

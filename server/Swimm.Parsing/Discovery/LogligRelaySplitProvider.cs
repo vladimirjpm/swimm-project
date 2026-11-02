@@ -44,6 +44,7 @@ public sealed class LogligRelaySplitProvider : IRelaySplitProvider
                 return new RelaySplitOutcome(resultsJson, 0, "эстафет в программе нет");
 
             var events = new List<RelayBuildEvent>();
+            var splitEvents = new List<RelaySplitEvent>();
             var fromResultsPage = new List<int>();
             foreach (var d in relays)
             {
@@ -69,6 +70,10 @@ public sealed class LogligRelaySplitProvider : IRelaySplitProvider
                 events.Add(new RelayBuildEvent(
                     ParserStyle(d.StyleName), d.Distance, RelayGender(d.Category, d.Gender), d.DisciplineRaw,
                     teams));
+                // Пол и день дисциплины — доклейке: заголовок эстафеты без категории их не даёт.
+                splitEvents.Add(new RelaySplitEvent(
+                    ParserStyle(d.StyleName), d.Distance, teams, RelayGender(d.Category, d.Gender),
+                    d.StartAtLocal is { } start ? DateOnly.FromDateTime(start) : null));
             }
 
             var fallbackNote = fromResultsPage.Count == 0
@@ -94,7 +99,7 @@ public sealed class LogligRelaySplitProvider : IRelaySplitProvider
             // порванной переносом фамилии, а после импорта это уже не починить. ВРЕМЕНА
             // ЭТАПОВ здесь не пишем — их пишет --attach-splits по строкам базы (Д7).
             var (json, report) = RelaySplitEnricher.Apply(resultsJson,
-                events.Select(e => new RelaySplitEvent(e.Style, e.Len, e.Teams)).ToList(),
+                splitEvents,
                 writeSplitTimes: false);
             return new RelaySplitOutcome(json, report.Enriched,
                 $"состав эстафет из loglig: команд {report.Teams}, уточнено {report.Enriched}; "

@@ -12,12 +12,17 @@ namespace Swimm.Application.Abstractions;
 /// событий значило бы расщепить соревнование на несколько и оборвать ссылки, зачёты и медиа.
 /// Разбиение на дни — отдельное решение, не побочный эффект смены источника.
 /// </param>
+/// <param name="EventDays">
+/// Соревнование УЖЕ разложено по дням (событие-многодневка, чемпионаты 6594/6623): тогда
+/// строка берёт день своего события loglig, а <paramref name="Date"/> — только запасной.
+/// </param>
 public sealed record LogligImportContext(
     string Country,
     string CompetitionName,
     string Date,
     string PoolType,
-    bool IsAward);
+    bool IsAward,
+    bool EventDays = false);
 
 /// <summary>
 /// Сборка JSON импорта (легаси-контракт <c>IImportService</c>) из результатов пособытийного

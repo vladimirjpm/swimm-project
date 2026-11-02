@@ -16,6 +16,8 @@
 --      превратил бы его в чужого), и его тренировки/членства вместе с ним.
 --      Ушедшая и та строка, что занимает второй уникальный ключ (не PK) прод-строки
 --      с другим Id: одно и то же затянуто и локально, и на проде (26.10.2026).
+--      И строка листовой таблицы, у которой тот же Id на проде с другим уникальным
+--      ключом: Id сдвинуты, перевешивать её по колонке нельзя (01.11.2026).
 --   2. Локальные строки вне переноса, которые держат ушедших через RESTRICT /
 --      NO ACTION, — удаляются (иначе удаление ушедших упадёт). CASCADE и
 --      SET NULL сделает сама база.
@@ -67,6 +69,8 @@ DECLARE
     cmp_r    text;
     gone_sql text;
     clash    text;
+    moved    text;
+    is_leaf  boolean;
     ux       record;
     n        bigint;
     n_clash  bigint;
@@ -150,6 +154,16 @@ BEGIN
         -- Такая строка — тоже ушедшая: дальше обычный путь (перевесить, удалить, upsert вставит
         -- прод-строку). Индексы-выражения пропускаем; у частичных (LogligId WHERE NOT NULL)
         -- равенство само не совпадает на NULL.
+        -- Сдвинутая строка листовой таблицы (на неё не ссылается никто): тот же Id есть на проде,
+        -- но уникальный ключ у него другой. Перевешивание меняет по колонке за раз, и
+        -- промежуточная строка налетает на уникальный индекс соседки, которую ещё не обновили
+        -- (поймано 01.11.2026 на RelayMembers: локальная репетиция сдвинула Id эстафет на 3,
+        -- «duplicate key IX_RelayMembers_RelayId_SwimmerId»). Листовую строку безопасно удалить
+        -- и вставить заново — держать за неё нечему.
+        moved := NULL;
+        is_leaf := NOT EXISTS (SELECT 1 FROM pg_constraint con
+                                WHERE con.contype = 'f'
+                                  AND con.confrelid = format('public.%I', t.tbl)::regclass);
         clash := NULL;
         FOR ux IN
             SELECT array_agg(a.attname ORDER BY array_position(x.indkey::int2[], a.attnum)) AS ucols
@@ -165,7 +179,22 @@ BEGIN
                 (SELECT string_agg(format('s.%1$I = l.%1$I', c), ' AND ') FROM unnest(ux.ucols) c),
                 (SELECT string_agg(format('s.%I', c), ', ') FROM unnest(pk_cols) c),
                 (SELECT string_agg(format('l.%I', c), ', ') FROM unnest(pk_cols) c)));
+            IF is_leaf THEN
+                moved := concat_ws(' OR ', moved, format(
+                    'EXISTS (SELECT 1 FROM _sync.%I s WHERE %s AND ROW(%s) IS DISTINCT FROM ROW(%s))',
+                    t.tbl, pk_match,
+                    (SELECT string_agg(format('s.%I', c), ', ') FROM unnest(ux.ucols) c),
+                    (SELECT string_agg(format('l.%I', c), ', ') FROM unnest(ux.ucols) c)));
+            END IF;
         END LOOP;
+        IF moved IS NOT NULL THEN
+            EXECUTE format('SELECT count(*) FROM public.%I l WHERE %s', t.tbl, moved) INTO n_clash;
+            IF n_clash > 0 THEN
+                gone_sql := gone_sql || ' OR (' || moved || ')';
+                RAISE NOTICE 'строка сдвинута на проде: % — % (уйдут, прод-строки встанут на место)',
+                             t.tbl, n_clash;
+            END IF;
+        END IF;
         IF clash IS NOT NULL THEN
             EXECUTE format('SELECT count(*) FROM public.%I l WHERE %s', t.tbl, clash) INTO n_clash;
             IF n_clash > 0 THEN
@@ -196,10 +225,14 @@ BEGIN
           FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
          WHERE i.indrelid = format('public.%I', fk.child)::regclass AND i.indisprimary;
         pk_match := (SELECT string_agg(format('s.%1$I = c.%1$I', c), ' AND ') FROM unnest(pk_cols) c);
+        -- Сама уходящая строка не перевешивается: её всё равно удалят, а перевешенная она
+        -- может занять чужой уникальный ключ.
         EXECUTE format(
             'UPDATE public.%1$I c SET %2$I = s.%2$I FROM _sync.%1$I s '
-            'WHERE %3$s AND c.%2$I IS DISTINCT FROM s.%2$I AND c.%2$I IN (SELECT g.%4$I FROM %5$I g)',
-            fk.child, fk.fk_col, pk_match, fk.ref_col, '_gone_' || fk.parent);
+            'WHERE %3$s AND c.%2$I IS DISTINCT FROM s.%2$I AND c.%2$I IN (SELECT g.%4$I FROM %5$I g) '
+            'AND NOT EXISTS (SELECT 1 FROM %6$I x WHERE %7$s)',
+            fk.child, fk.fk_col, pk_match, fk.ref_col, '_gone_' || fk.parent, '_gone_' || fk.child,
+            (SELECT string_agg(format('x.%1$I = c.%1$I', c), ' AND ') FROM unnest(pk_cols) c));
         GET DIAGNOSTICS n = ROW_COUNT;
         IF n > 0 THEN RAISE NOTICE 'перевешено: %.% — %', fk.child, fk.fk_col, n; END IF;
     END LOOP;

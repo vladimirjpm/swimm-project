@@ -32,7 +32,7 @@ public sealed class LogligEventPullService(
     public async Task<(LogligPullReport Report, string ImportSummary)> ImportAsync(
         int discoveredId, CancellationToken ct = default)
     {
-        var (report, events, resolver, competition, orgCompId) = await FetchAsync(discoveredId, ct);
+        var (report, events, resolver, competition, orgCompId, eventId) = await FetchAsync(discoveredId, ct);
 
         if (report.UnresolvedNames.Count > 0)
             throw new InvalidOperationException(
@@ -42,7 +42,8 @@ public sealed class LogligEventPullService(
 
         var json = builder.BuildResultsJson(
             events,
-            new LogligImportContext("IL", competition.Name, competition.Date, competition.PoolType, competition.IsAward),
+            new LogligImportContext("IL", competition.Name, competition.Date, competition.PoolType, competition.IsAward,
+                EventDays: eventId is not null),
             row =>
             {
                 var resolved = resolver.Resolve(row.FullName, row.BirthYear, row.Club);
@@ -52,12 +53,14 @@ public sealed class LogligEventPullService(
         // DeleteMissing обязателен: у строк сменился ключ upsert (в нём теперь Round), и без
         // удаления старые безраундовые строки остались бы рядом дублями. PreserveRelays —
         // потому что эстафет источник не несёт, а «удалить лишнее» иначе снесло бы их.
+        // Многодневка, уже разложенная по дням, импортируется в своё событие: строки садятся
+        // в день по дате события loglig.
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
         var result = await importer.ImportAsync(
             stream,
             $"loglig-events-{orgCompId}.json",
             null,
-            new ImportEventOptions(null, null,
+            new ImportEventOptions(eventId, null,
                 OverwriteExisting: true, DeleteMissing: true, PreserveRelays: true),
             orgCompId);
 
@@ -73,7 +76,8 @@ public sealed class LogligEventPullService(
                         List<LogligEventResultsDto> Events,
                         LogligSwimmerNameResolver Resolver,
                         (string Name, string Date, string PoolType, bool IsAward) Competition,
-                        int? OrgCompId)>
+                        int? OrgCompId,
+                        int? EventId)>
         FetchAsync(int discoveredId, CancellationToken ct)
     {
         var row = await db.DiscoveredCompetitions.AsNoTracking()
@@ -87,7 +91,7 @@ public sealed class LogligEventPullService(
         var competition = await db.Competitions.AsNoTracking()
             .Where(c => c.OrgCompId == row.OrgCompId)
             .OrderBy(c => c.Id)
-            .Select(c => new { c.Name, c.Date, c.PoolType })
+            .Select(c => new { c.Name, c.Date, c.PoolType, c.EventId })
             .FirstOrDefaultAsync(ct)
             ?? throw new InvalidOperationException(
                 $"Соревнование с OrgCompId {row.OrgCompId} ещё не импортировано — " +
@@ -101,7 +105,7 @@ public sealed class LogligEventPullService(
         var eventIds = await provider.FetchEventIdsAsync(logligId, ct);
         logger.LogInformation("loglig {LogligId}: событий {Count}", logligId, eventIds.Count);
 
-        var resolver = new LogligSwimmerNameResolver(await KnownSwimmersAsync(row.OrgCompId, ct));
+        var resolver = new LogligSwimmerNameResolver(await KnownSwimmersAsync(row.OrgCompId, competition.EventId, ct));
 
         var events = new List<LogligEventResultsDto>(eventIds.Count);
         var competitionName = string.Empty;
@@ -141,17 +145,19 @@ public sealed class LogligEventPullService(
             clubPoints);
 
         return (report, events, resolver,
-                (competition.Name, competition.Date, competition.PoolType, isAward), row.OrgCompId);
+                (competition.Name, competition.Date, competition.PoolType, isAward), row.OrgCompId,
+                competition.EventId);
     }
 
     /// <summary>
     /// Пловцы, уже импортированные по этому соревнованию (по всем его дням) — кандидаты
-    /// сопоставления для <see cref="LogligSwimmerNameResolver"/>.
+    /// сопоставления для <see cref="LogligSwimmerNameResolver"/>. У разложенной многодневки
+    /// OrgCompId стоит только на одном дне, поэтому дни ищутся по событию.
     /// </summary>
-    private async Task<List<KnownSwimmerName>> KnownSwimmersAsync(int? orgCompId, CancellationToken ct)
+    private async Task<List<KnownSwimmerName>> KnownSwimmersAsync(int? orgCompId, int? eventId, CancellationToken ct)
     {
         var rows = await db.Results.AsNoTracking()
-            .Where(r => r.Competition!.OrgCompId == orgCompId)
+            .Where(r => eventId != null ? r.Competition!.EventId == eventId : r.Competition!.OrgCompId == orgCompId)
             .Select(r => new
             {
                 r.Swimmer!.LastName,

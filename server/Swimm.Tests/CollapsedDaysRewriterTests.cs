@@ -66,8 +66,10 @@ public class CollapsedDaysRewriterTests
 
         Assert.True(outcome.Rewritten);
         Assert.True(outcome.Warn);
-        var dates = JsonNode.Parse(outcome.Parsed.ResultsJson)!.AsArray().Select(r => (string?)r!["date"]).ToList();
-        Assert.Equal(["03/01/2025", "03/01/2025", "04/01/2025", "03/01/2025"], dates);
+        // Строки переупорядочены по дням (устойчиво): импорт нумерует дни по первому появлению даты.
+        var rows = JsonNode.Parse(outcome.Parsed.ResultsJson)!.AsArray();
+        Assert.Equal(["03/01/2025", "03/01/2025", "03/01/2025", "04/01/2025"], rows.Select(r => (string?)r!["date"]));
+        Assert.Equal(["א", "ב", "ד", "ג"], rows.Select(r => (string?)r!["last_name"]));
         Assert.Equal([("03/01/2025", 3), ("04/01/2025", 1)],
             outcome.Parsed.Competitions.Select(c => (c.Date, c.ResultCount)));
         Assert.Contains("אליפות", outcome.Parsed.ResultsJson); // иврит не экранирован
@@ -98,6 +100,27 @@ public class CollapsedDaysRewriterTests
         Assert.True(outcome.Warn);
         Assert.Contains("freestyle 1500 male", outcome.Message);
         Assert.Same(parsed, outcome.Parsed);
+    }
+
+    /// <summary>
+    /// День, который доклейка эстафет уже взяла из сопоставленной дисциплины, сильнее поиска по
+    /// ключу: «freestyle 4X50 none» по сетке неоднозначен (микст 03/01, женщины и мужчины 04/01),
+    /// а с известным днём строка встаёт на место. Служебное поле в итоговый JSON не уходит.
+    /// </summary>
+    [Fact]
+    public void KnownDisciplineDay_WinsOverKeyLookup_AndIsStripped()
+    {
+        var relay = Row("freestyle", "4X50", "none", "ב", 2);
+        relay[CollapsedDaysRewriter.DisciplineDateField] = "03/01/2025";
+        var parsed = Parsed(Row("butterfly", "200", "male", "א", 1), relay); // 200 батт. м — 04/01
+
+        var outcome = CollapsedDaysRewriter.Rewrite(parsed, Grid11586());
+
+        Assert.True(outcome.Rewritten);
+        var rows = JsonNode.Parse(outcome.Parsed.ResultsJson)!.AsArray();
+        Assert.Equal(["03/01/2025", "04/01/2025"], rows.Select(r => (string?)r!["date"]));
+        Assert.Equal("ב", (string?)rows[0]!["last_name"]); // эстафета — первым днём
+        Assert.Null(rows[0]![CollapsedDaysRewriter.DisciplineDateField]);
     }
 
     private sealed class NullCache : ICacheService
