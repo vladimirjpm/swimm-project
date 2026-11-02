@@ -22,6 +22,14 @@ public static class CollapsedDaysRewriter
 {
     private const string DateFormat = "dd/MM/yyyy";
 
+    /// <summary>
+    /// Поле строки JSON: день её эстафетной дисциплины, уже известный из сопоставления с сеткой
+    /// loglig (ставит доклейка эстафет, RelaySplitEnricher). Сильнее поиска по ключу: заголовок
+    /// эстафеты без категории не даёт ни пола, ни возраста, а возрастные полосы одного пола
+    /// плывут в разные дни. Поле служебное — после раскладки убирается.
+    /// </summary>
+    public const string DisciplineDateField = "discipline_date";
+
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -47,8 +55,11 @@ public static class CollapsedDaysRewriter
         var plan = DisciplineDayPlanner.Plan(
             rows.Select((r, i) => new DayPlanRow(
                 i, (string?)r["event_style_name"] ?? "", (string?)r["event_style_len"] ?? "",
-                (string?)r["event_style_gender"] ?? "")),
+                (string?)r["event_style_gender"] ?? "",
+                DateOnly.TryParseExact((string?)r[DisciplineDateField], DateFormat, CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var known) ? known : null)),
             dates);
+        foreach (var r in rows) r.Remove(DisciplineDateField);
         if (!plan.CanApply)
             return new Outcome(parsed, false,
                 $"даты дисциплин НЕ переписаны: у {plan.Unresolved.Values.Sum()} строк нет однозначного дня "
@@ -59,6 +70,13 @@ public static class CollapsedDaysRewriter
             var text = day.ToString(DateFormat, CultureInfo.InvariantCulture);
             foreach (var i in indexes) rows[(int)i]["date"] = text;
         }
+
+        // Строки — в порядке дней (сортировка устойчивая): импорт нумерует дни события по
+        // первому появлению даты, и эстафеты последнего дня в середине файла делали 28/12
+        // «третьим днём» чемпионата 6594.
+        var byDay = rows.OrderBy(r => DateOnly.ParseExact((string)r["date"]!, DateFormat, CultureInfo.InvariantCulture)).ToList();
+        root.Clear();
+        foreach (var r in byDay) root.Add(r);
 
         var summaries = rows
             .GroupBy(r => ((string?)r["competition"] ?? "", (string?)r["date"] ?? "", (string?)r["pool_type"]))

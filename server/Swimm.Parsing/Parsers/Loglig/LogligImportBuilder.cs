@@ -30,6 +30,7 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
         // Возраст — по сезону (год окончания), одинаково с PDF-импортом (IsrOrgParser).
         var eventYear = AgeGroupHelper.SeasonEndYearFromDateString(context.Date);
         var withFinal = DisciplinesWithFinal(events);
+        var withEveningFinal = DisciplinesWithFinal(events, LogligRounds.Final);
         var rows = new List<Result>();
 
         foreach (var ev in events)
@@ -62,7 +63,7 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
                     IsMasters: "false",
                     IsAward: context.IsAward,
                     AgeGroup: age > 0 ? AgeGroupHelper.GetAgeGroup(age) : string.Empty,
-                    Date: context.Date,
+                    Date: context.EventDays && ev.Date.Length > 0 ? ev.Date : context.Date,
                     Event: $"{ev.Distance} {ev.StyleName} - {r.Category}".Trim(),
                     EventStyleName: ev.StyleName,
                     EventStyleLen: ev.Distance,
@@ -89,7 +90,13 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
                     RelaySwimmersName: null,
                     RelaySwimmers: null,
                     EventCategory: null,
-                    HeatType: HeatTypeOf(r.Round, withFinal.Contains(DisciplineKey(ev, r.Category))),
+                    // «כללי» в утреннем прямом финале при вечернем финале той же секции — отбор
+                    // взрослых (6594: 400 вольным все возрасты утром, лучшие «כללי» — вечером).
+                    // Иначе обе строки — «final-open/final», и проверка качества видит повтор.
+                    HeatType: isOpenSection && r.Round == LogligRounds.TimedFinal
+                              && withEveningFinal.Contains(DisciplineKey(ev, r.Category))
+                        ? "prelim"
+                        : HeatTypeOf(r.Round, withFinal.Contains(DisciplineKey(ev, r.Category))),
                     Round: round,
                     // Пустая ячейка «ניקוד קבוצתי» у пособытийного источника означает
                     // «организатор за этот заплыв не заплатил», а НЕ «данных нет»: колонка
@@ -107,17 +114,17 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
     /// от «утра, ставшего результатом»: регламент отменяет финал, если в нём осталось
     /// ≤ 2 участника («הגמר יבוטל»), и тогда мокдамот — единственный заплыв дисциплины.
     /// </summary>
-    private static HashSet<string> DisciplinesWithFinal(IReadOnlyList<LogligEventResultsDto> events) =>
+    private static HashSet<string> DisciplinesWithFinal(IReadOnlyList<LogligEventResultsDto> events, string? onlyRound = null) =>
     [
         .. events
             .Where(ev => !ev.IsRelay)
             .SelectMany(ev => ev.Rows
-                .Where(r => r.Round is LogligRounds.Final or LogligRounds.TimedFinal)
+                .Where(r => onlyRound != null ? r.Round == onlyRound : r.Round is LogligRounds.Final or LogligRounds.TimedFinal)
                 .Select(r => DisciplineKey(ev, r.Category)))
     ];
 
     private static string DisciplineKey(LogligEventResultsDto ev, string category) =>
-        $"{ev.StyleName}|{ev.Distance}|{category}";
+        $"{ev.StyleName}|{ev.Distance}|{ev.Gender}|{category}"; // пол — для «כללי», где его нет в секции
 
     /// <summary>
     /// Наш ВЫВОД об отборе, который читает правило Р34 «место в предварительном — не награда»

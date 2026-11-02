@@ -89,6 +89,26 @@ public class LogligSwimmerNameResolverTests
     }
 
     /// <summary>
+    /// Полное и дефектное написание (чемпионат 6594): сайт «יוקליס», PDF «יוקלס». Пара — только
+    /// единственный кандидат того же года; двое таких — не угадываем.
+    /// </summary>
+    [Fact]
+    public void PleneSpelling_MatchesOnlyUniqueCandidate()
+    {
+        var one = Resolver(new KnownSwimmerName("יוקלס", "עמליה", 2011, "SWIM TLV"));
+        var r = one.Resolve("עמליה יוקליס", 2011, "TLV SWIM");
+        Assert.True(r.Matched);
+        Assert.Equal("יוקלס", r.LastName);
+
+        Assert.False(one.Resolve("עמליה יוקליס", 2012, "TLV SWIM").Matched);
+
+        var two = Resolver(
+            new KnownSwimmerName("יוקלס", "עמליה", 2011, "SWIM TLV"),
+            new KnownSwimmerName("יקלס", "עמליה", 2011, "מכבי חיפה"));
+        Assert.False(two.Resolve("עמליה יוקליס", 2011, "TLV SWIM").Matched);
+    }
+
+    /// <summary>
     /// Пары нет — режем эвристикой (последний токен фамилия) и ЧЕСТНО помечаем Matched=false:
     /// импорт такой строки заведёт нового пловца, и это должно быть видно в отчёте.
     /// </summary>

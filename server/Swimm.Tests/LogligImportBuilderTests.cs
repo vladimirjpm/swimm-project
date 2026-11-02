@@ -92,6 +92,40 @@ public class LogligImportBuilderTests
         Assert.Equal("14", row["event_style_age"].GetString());
     }
 
+    /// <summary>
+    /// «כללי» (взрослые, 6594): утром 400 вольным все возрасты прямым финалом, вечером — финал
+    /// секции «כללי». Утренняя строка — отбор, иначе две «final-open/final» в один день и
+    /// проверка качества видит повтор. Без вечернего финала утро остаётся финалом.
+    /// </summary>
+    [Fact]
+    public void OpenSectionMorning_IsPrelim_OnlyWhenOpenEveningFinalExists()
+    {
+        var morning = Event("13-99", Row(LogligRounds.TimedFinal, "כללי", 1, "עומר שורץ", 2006));
+        var evening = Event("13-99", Row(LogligRounds.Final, "כללי", 2, "עומר שורץ", 2006));
+
+        var rows = Parse(Build(morning, evening));
+        Assert.Equal(["prelim", "final"], rows.Select(r => r["heat_type"].GetString()));
+        Assert.All(rows, r => Assert.Equal("final-open", r["round"].GetString()));
+
+        Assert.Equal("final", Assert.Single(Parse(Build(morning)))["heat_type"].GetString());
+    }
+
+    /// <summary>
+    /// Дата строки: у соревнования одной записью (1581) — дата из базы, иначе оно расщепилось
+    /// бы; у уже разложенной по дням многодневки (6594/6623) — день своего события loglig.
+    /// </summary>
+    [Fact]
+    public void RowDate_IsEventDay_OnlyForCompetitionSplitIntoDays()
+    {
+        var events = new[] { Event("14", Row(LogligRounds.Final, "בנות 14", 1)) };
+        static string Date(string json) => Assert.Single(Parse(json))["date"].GetString()!;
+        (string, string) Name(LogligResultRowDto r) => ("אוגינץ", "מיכל");
+
+        Assert.Equal("21/07/2026", Date(new LogligImportBuilder().BuildResultsJson(events, Context(), Name)));
+        Assert.Equal("19/07/2026", Date(new LogligImportBuilder().BuildResultsJson(
+            events, Context() with { EventDays = true }, Name)));
+    }
+
     /// <summary>Эстафетные события источник несёт без состава — в импорт они не идут.</summary>
     [Fact]
     public void RelayEvents_AreSkipped()

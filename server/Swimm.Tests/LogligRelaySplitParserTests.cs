@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Swimm.Application.Mapping;
 using Swimm.Parsing.Parsers.IsrOrg;
 using Xunit;
 
@@ -205,6 +206,31 @@ public class LogligRelaySplitParserTests
         Assert.Equal("גוסטמלסקי", (string?)legs[0]!["last_name"]);
         Assert.Null((string?)legs[0]!["split_time"]);
         Assert.Equal("גוסטמלסקי", (string?)rows[0]!["last_name"]);
+    }
+
+    /// <summary>
+    /// Чемпионаты 24/25 (6594, 6623): заголовок эстафеты без категории — строка приходит без пола.
+    /// Сопоставленная команда берёт пол и день своей дисциплины из сетки; пол, напечатанный в
+    /// протоколе, не переписывается. Даже когда состав не сошёлся по годам: день от состава не зависит.
+    /// </summary>
+    [Fact]
+    public void Enricher_TakesGenderAndDayFromMatchedDiscipline()
+    {
+        var noGender = Row("02:24.29", 2, 4, (1990, "a", "b"), (1976, "a", "b"), (1998, "a", "b"), (1999, "a", "b"));
+        noGender["event_style_gender"] = "none";
+        var printed = Row("02:34.67", 2, 8, (1981, "קיגוסטמלס", "אניה"), (1990, "נוסם", "שירי"), (1981, "ברילר", "דגנית"), (1974, "קמר", "פלר"));
+        printed["event_style_gender"] = "male";
+        var json = new JsonArray(noGender, printed).ToJsonString();
+
+        var (outJson, _) = RelaySplitEnricher.Apply(json,
+            new[] { new RelaySplitEvent("individual_medley", "4X50", Women, "female", new DateOnly(2024, 12, 26)) },
+            writeSplitTimes: false);
+
+        var rows = JsonNode.Parse(outJson)!.AsArray();
+        Assert.Equal("female", (string?)rows[0]!["event_style_gender"]);
+        Assert.Equal("26/12/2024", (string?)rows[0]![CollapsedDaysRewriter.DisciplineDateField]);
+        Assert.Equal("male", (string?)rows[1]!["event_style_gender"]);
+        Assert.Equal("26/12/2024", (string?)rows[1]![CollapsedDaysRewriter.DisciplineDateField]);
     }
 
     [Fact]

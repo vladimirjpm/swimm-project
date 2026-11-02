@@ -72,7 +72,9 @@ public sealed class DisciplineDates
 }
 
 /// <summary>Строка соревнования для раскладки по дням.</summary>
-public sealed record DayPlanRow(long ResultId, string Style, string Distance, string Gender);
+/// <param name="Day">День, уже известный из другого источника (эстафета, сопоставленная с дисциплиной сетки) —
+/// сильнее поиска по ключу.</param>
+public sealed record DayPlanRow(long ResultId, string Style, string Distance, string Gender, DateOnly? Day = null);
 
 /// <summary>
 /// Раскладка строк по дням. Всё или ничего: <see cref="CanApply"/> только когда день есть у
@@ -97,7 +99,7 @@ public static class DisciplineDayPlanner
         foreach (var row in rows)
         {
             var key = new DisciplineDayKey(row.Style, row.Distance, row.Gender);
-            if (dates.DateOf(key) is not { } day)
+            if ((row.Day ?? dates.DateOf(key)) is not { } day)
             {
                 unresolved[key] = unresolved.GetValueOrDefault(key) + 1;
                 continue;
