@@ -50,6 +50,15 @@ export default class HelperResults {
   }
 
   /**
+   * Короткая метка строки без времени: DNS — не вышел на старт (см. `isNoStart`), DNF — сошёл,
+   * иначе DSQ — снят. Раньше /my-media писал «DSQ» на любую, и неявка выглядела дисквалификацией.
+   */
+  static failLabel(res: { time_fail?: boolean | null; time_fail_note?: string | null }): string {
+    if (HelperResults.isNoStart(res)) return 'DNS';
+    return (res.time_fail_note ?? '').trim().toUpperCase().startsWith('DNF') ? 'DNF' : 'DSQ';
+  }
+
+  /**
    * Счётчик заплывов: «2/3», когда часть заявленных не проплыта (неявки), иначе просто «3».
    * `swum` — без неявок, `entered` — все строки протокола.
    */

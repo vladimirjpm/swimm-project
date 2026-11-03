@@ -56,6 +56,8 @@ export interface MySwimDto {
   /** Ошибка протокола (И11). null — заплыв в порядке. */
   suspect_reason?: string | null;
   time_fail: boolean;
+  /** Пометка протокола у строки без времени: NS/DNS, DQ…, DNF. */
+  time_fail_note?: string | null;
   is_pb: boolean;
   /** Лучшее время сезона; сервер не ставит его там, где уже is_pb. */
   is_sb: boolean;

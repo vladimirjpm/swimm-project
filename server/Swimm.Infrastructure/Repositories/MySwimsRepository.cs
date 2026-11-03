@@ -143,6 +143,7 @@ public class MySwimsRepository : IMySwimsRepository
                 EventStyleAge = r.EventStyleAge,
                 SuspectReason = r.SuspectReason,
                 TimeFail = r.TimeFail,
+                TimeFailNote = r.TimeFailNote,
             })
             .ToListAsync();
         response.Swims = swims;

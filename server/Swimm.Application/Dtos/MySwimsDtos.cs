@@ -157,6 +157,11 @@ public class MySwimDto
     [JsonPropertyName("time_fail")]
     public bool TimeFail { get; set; }
 
+    /// <summary>Пометка протокола у строки без времени: NS/DNS (не стартовал), DQ…, DNF. Без неё
+    /// витрина писала «DSQ» и неявке (Сабина ברנצב, 100 вольным 24.10.2026).</summary>
+    [JsonPropertyName("time_fail_note")]
+    public string? TimeFailNote { get; set; }
+
     /// <summary>Личный рекорд: лучшее время пловца за всё время на (стиль, дистанция), индивидуальные заплывы.</summary>
     [JsonPropertyName("is_pb")]
     public bool IsPb { get; set; }

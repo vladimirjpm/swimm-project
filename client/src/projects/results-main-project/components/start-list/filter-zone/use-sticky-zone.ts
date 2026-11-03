@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import type React from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { setStickyBarSuppressed } from '../../competition-header/sticky-chrome';
 
 /**
@@ -15,10 +16,15 @@ import { setStickyBarSuppressed } from '../../competition-header/sticky-chrome';
  * отлипла бы. Порог — высота топбара, а не `--comp-sticky-chrome-h`: переменная зависит от
  * того, виден ли бар, а бар мы этим же флагом и гасим — вышли бы качели на каждом кадре.
  */
-export function useStickyZone() {
+export function useStickyZone(zoneRef: React.RefObject<HTMLElement>) {
   const [stuck, setStuck] = useState(false);
   const [topbarH, setTopbarH] = useState(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const stuckRef = useRef(false);
+
+  // Высота зоны РАЗВЁРНУТОЙ (снята в момент прилипания) и СВЁРНУТОЙ (снята после).
+  const [expandedH, setExpandedH] = useState(0);
+  const [collapsedH, setCollapsedH] = useState<number | null>(null);
 
   useEffect(() => {
     const onScroll = () => {
@@ -28,7 +34,13 @@ export function useStickyZone() {
       const sentinel = sentinelRef.current;
       if (!sentinel) return;
       // +1px — запас на дробные пиксели зума: ровно на границе рект даёт 45.99.
-      setStuck(sentinel.getBoundingClientRect().top <= h + 1);
+      const next = sentinel.getBoundingClientRect().top <= h + 1;
+      // Мерить развёрнутую можно только ДО свёртки — в том же батче, что и `stuck`.
+      if (next && !stuckRef.current && zoneRef.current) {
+        setExpandedH(zoneRef.current.getBoundingClientRect().height);
+      }
+      stuckRef.current = next;
+      setStuck(next);
     };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -52,5 +64,29 @@ export function useStickyZone() {
   // (замечание Влада 22.10.2026). Запасной отступ — высота топбара.
   const top = `var(--comp-sticky-chrome-h, ${topbarH}px)`;
 
-  return { stuck, sentinelRef, top };
+  // Свёрнутую меряем сразу после коммита, до отрисовки; дальше — если она поменяется
+  // (поиск, ширина окна). Отлипли — сбрасываем.
+  useLayoutEffect(() => {
+    const zone = zoneRef.current;
+    if (!stuck || !zone) {
+      setCollapsedH(null);
+      return;
+    }
+    const measure = () => setCollapsedH(zone.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(zone);
+    return () => ro.disconnect();
+  }, [stuck, zoneRef]);
+
+  // РАСПОРКА под прилипшей зоной: свёрнутая зона ниже развёрнутой, и без распорки на
+  // столько же укорачивается страница. На коротком плане (1–2 заплыва) это петля
+  // (замечание Влада 03.11.2026): прилипла → свернулась → документ короче → браузер
+  // обрезал scrollY → сентинел ниже порога → отлипла → развернулась → … каждые два кадра.
+  // С распоркой высота документа от `stuck` не зависит, а протокол под зоной не прыгает.
+  // Пока свёрнутая не измерена (кадр коммита), резервируем ВСЮ развёрнутую высоту:
+  // перебор только удлиняет документ, а недобор успел бы обрезать скролл.
+  const reserve = stuck ? Math.max(0, expandedH - (collapsedH ?? 0)) : 0;
+
+  return { stuck, sentinelRef, top, reserve };
 }
