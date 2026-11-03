@@ -5,7 +5,6 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import AppTopbar from '../components/app-topbar/app-topbar';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import ConfirmDialog from '../components/confirm-dialog/confirm-dialog';
 import { routes } from '../../utils/routes';
 import {
@@ -146,7 +145,6 @@ function Reminders() {
     <div className={`${deep} relative min-h-screen overflow-x-clip pb-24 text-[var(--t-text)]`} style={{ background: 'var(--deep-hero-grad)' }}>
       <AppTopbar />
       {children}
-      <UI_ModeToggle />
     </div>
   );
 

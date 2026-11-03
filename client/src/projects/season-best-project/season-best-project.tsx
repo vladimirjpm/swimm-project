@@ -5,7 +5,6 @@ import './season-best-page.css';
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import DeepSeasonCarousel from '../components/deep/season-carousel';
 import { parseSeasonBestQuery } from '../../utils/routes';
 import { peerGroupLabel, seasonLabel } from '../../utils/helpers/season-helper';
@@ -155,7 +154,6 @@ function SeasonBestProject() {
               ].join(' · ')}
             </div>
           </div>
-          <UI_ModeToggle />
         </div>
 
         {MODULES.seasonCarousel && options.data && options.data.seasons.length > 0 && (

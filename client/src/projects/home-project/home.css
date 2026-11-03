@@ -22,12 +22,6 @@
 	--hp-ticker-h: 50px;
 }
 
-/* Кнопка режима поднимается над лентой, только когда лента есть: в прод-сборке её нет
-   (данные выдуманные, см. record-ticker.tsx), и кнопка стоит на своих 16px. */
-.home-page:has(.hp-ticker) {
-	--mode-toggle-bottom: calc(var(--hp-ticker-h) + 12px);
-}
-
 @media (min-width: 1024px) {
 	.home-page { --hp-ticker-h: 54px; }
 }

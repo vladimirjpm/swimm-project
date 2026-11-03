@@ -5,7 +5,6 @@ import './records-page.css';
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { parseRecordsCompareQuery, routes, type RecordGender } from '../../utils/routes';
 import { useRecordCountries, useRecordsCompare } from '../../hooks/useRecordsCompare';
 import RcH2HHeader from './components/rc-h2h-header';
@@ -218,7 +217,6 @@ function RecordsCompareProject() {
                 экран выглядит одинаково свежим и через день, и через полгода. */}
             <UI_RecordsChecked sources={checkedSources} className="rk-head__checked" />
           </div>
-          <UI_ModeToggle />
         </div>
 
         {/* Разрез (бассейн и пол) — общий на весь экран, поэтому стоит НАД сторонами:

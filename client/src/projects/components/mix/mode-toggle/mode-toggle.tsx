@@ -2,30 +2,41 @@ import React from 'react';
 import { useMode } from '../../../../hooks/useMode';
 
 /**
- * Минимальный переключатель Light/Dark (☀/🌙). Fixed внизу-справа.
- * Состояние берёт из useMode (localStorage + prefers-color-scheme), без Redux.
+ * Переключатель Light/Dark — switch ☀/🌙 без текста, живёт в ШАПКЕ (решение Влада 03.11.2026),
+ * а не плавающим кружком внизу справа: тот перекрывал оверлеи (шторку, модалки, лайтбокс), и
+ * каждая страница с оверлеем обязана была прятать его сама.
  *
- * ⚠ Отступ снизу — переменная `--mode-toggle-bottom` (умолчание 16px), а не класс:
- * у витрины низ экрана занят прибитой лентой рекордов, и кнопка ложилась прямо на неё.
- * Поднимает кнопку СТРАНИЦА, объявив переменную на своём корне (см. `home.css`), —
- * так значение живёт рядом с тем, что кнопка обходит, а не константой в JSX.
- * Инлайн-стиль, а не утилита: у Tailwind обе `bottom-*` одной специфичности, и кто
- * победит, решает порядок в бандле, а не порядок в строке класса.
+ * Где стоит: у гостя — рядом с Login, у вошедшего — строкой в меню аккаунта. Компонент один,
+ * место выбирает шапка.
+ *
+ * Цвета задаёт ШАПКА: `className` — дорожка (рамка, фон), `knobClassName` — бегунок. У AppTopbar
+ * это `--theme-topbar-*`, у шапки главной — роли `--t-*`. Бегунок несёт значок ТЕКУЩЕГО режима,
+ * на дорожке бледно виден второй. Состояние — из useMode (localStorage + prefers-color-scheme).
  */
-const UI_ModeToggle: React.FC = () => {
+const UI_ModeToggle: React.FC<{ className?: string; knobClassName?: string }> = ({ className = '', knobClassName = '' }) => {
   const { mode, toggleMode } = useMode();
   const isDark = mode === 'dark';
 
   return (
     <button
       type="button"
-      onClick={toggleMode}
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      role="switch"
+      aria-checked={isDark}
+      aria-label="Dark theme"
       title={isDark ? 'Light theme' : 'Dark theme'}
-      className="mode-toggle fixed right-4 z-[120] flex h-10 w-10 items-center justify-center rounded-full border text-lg shadow-lg backdrop-blur transition-colors bg-[var(--theme-mode-surface)] border-[var(--theme-mode-border)] text-[var(--theme-mode-text)] hover:brightness-95"
-      style={{ bottom: 'var(--mode-toggle-bottom, 16px)' }}
+      onClick={toggleMode}
+      className={`relative flex h-[26px] w-[50px] shrink-0 items-center justify-between rounded-full border px-[6px] text-[11px] leading-none transition-colors ${className}`}
     >
-      {isDark ? '☀️' : '🌙'}
+      <span aria-hidden="true" className={isDark ? 'opacity-50' : 'invisible'}>☀️</span>
+      <span aria-hidden="true" className={isDark ? 'invisible' : 'opacity-50'}>🌙</span>
+      <span
+        aria-hidden="true"
+        className={`absolute left-[2px] top-1/2 flex h-[20px] w-[20px] -translate-y-1/2 items-center justify-center rounded-full text-[11px] shadow transition-transform duration-200 ${
+          isDark ? 'translate-x-[24px]' : 'translate-x-0'
+        } ${knobClassName}`}
+      >
+        {isDark ? '🌙' : '☀️'}
+      </span>
     </button>
   );
 };

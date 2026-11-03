@@ -3,6 +3,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useProfileSetup, profileSubtitle, STEP_TITLES, type ProfileSetup } from '../../../hooks/useProfileSetup';
 import LoginModal from '../../components/login-modal/login-modal';
 import UI_BrandMark from '../../components/mix/brand-mark/brand-mark';
+import UI_ModeToggle from '../../components/mix/mode-toggle/mode-toggle';
 import { routes } from '../../../utils/routes';
 
 type ActivePage = 'home' | 'competitions' | 'groups';
@@ -221,6 +222,11 @@ function HomeHeader({ active }: { active: ActivePage }) {
   const dropdownItemClass =
     'block w-full rounded-[10px] px-4 py-[10px] text-left text-[13px] font-bold text-[var(--t-text)] no-underline transition-colors hover:bg-[var(--t-accent-soft)]';
 
+  // Switch темы — тот же, что в AppTopbar, на ролях `--t-*` (дорожка как у «Sign in»).
+  const modeSwitch = (
+    <UI_ModeToggle className="border-[var(--t-accent-border)] bg-[var(--t-accent-soft)]" knobClassName="bg-[var(--t-accent)]" />
+  );
+
   return (
     <header className="relative z-30 flex items-center justify-between px-5 py-[18px] lg:px-16 lg:py-[34px]">
       <SwimHubLogo />
@@ -248,9 +254,12 @@ function HomeHeader({ active }: { active: ActivePage }) {
 
         {/* User-меню (desktop). Пока /auth/me грузится — ничего, чтобы не мигало Войти→аватар. */}
         {!auth.loading && !auth.isAuthenticated && (
-          <button type="button" className={signInButtonClass} onClick={() => setLoginOpen(true)}>
-            Sign in
-          </button>
+          <div className="flex items-center gap-3">
+            {modeSwitch}
+            <button type="button" className={signInButtonClass} onClick={() => setLoginOpen(true)}>
+              Sign in
+            </button>
+          </div>
         )}
         {!auth.loading && auth.isAuthenticated && (
           <div className="relative" ref={userMenuRef}>
@@ -277,6 +286,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
                 <a href={routes.reminders()} className={dropdownItemClass}>
                   Reminders
                 </a>
+                <div className="px-4 py-2">{modeSwitch}</div>
                 <a href={logoutHref} className={dropdownItemClass}>
                   Sign out
                 </a>
@@ -289,29 +299,33 @@ function HomeHeader({ active }: { active: ActivePage }) {
         )}
       </div>
 
-      {/* На телефоне аватара в шапке главной нет — точка «профиль не настроен» на бургере. */}
-      <button
-        type="button"
-        className="relative flex h-11 w-11 flex-col items-end justify-center gap-[5px] lg:hidden"
-        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen((open) => !open)}
-      >
-        {menuOpen ? (
-          <span className="w-full text-center text-[20px] font-bold leading-none text-[var(--t-text-2)]">✕</span>
-        ) : (
-          <>
-            <span className="h-[2.5px] w-[22px] rounded-[2px] bg-[var(--t-text-2)]" />
-            <span className="h-[2.5px] w-[15px] rounded-[2px] bg-[var(--t-text-2)]" />
-            {showSetup && (
-              <span
-                aria-hidden="true"
-                className={`absolute right-[0px] top-[9px] h-[9px] w-[9px] rounded-full shadow-[0_0_0_2px_var(--t-surface-strong)] ${warnSetup ? 'bg-[var(--t-warn)]' : 'bg-[var(--t-text)]'}`}
-              />
-            )}
-          </>
-        )}
-      </button>
+      {/* На телефоне аватара в шапке главной нет — точка «профиль не настроен» на бургере.
+          «Sign in» гостя живёт в бургере, поэтому кнопка темы — рядом с бургером. */}
+      <div className="flex items-center gap-2 lg:hidden">
+        {!auth.loading && !auth.isAuthenticated && modeSwitch}
+        <button
+          type="button"
+          className="relative flex h-11 w-11 flex-col items-end justify-center gap-[5px]"
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? (
+            <span className="w-full text-center text-[20px] font-bold leading-none text-[var(--t-text-2)]">✕</span>
+          ) : (
+            <>
+              <span className="h-[2.5px] w-[22px] rounded-[2px] bg-[var(--t-text-2)]" />
+              <span className="h-[2.5px] w-[15px] rounded-[2px] bg-[var(--t-text-2)]" />
+              {showSetup && (
+                <span
+                  aria-hidden="true"
+                  className={`absolute right-[0px] top-[9px] h-[9px] w-[9px] rounded-full shadow-[0_0_0_2px_var(--t-surface-strong)] ${warnSetup ? 'bg-[var(--t-warn)]' : 'bg-[var(--t-text)]'}`}
+                />
+              )}
+            </>
+          )}
+        </button>
+      </div>
 
       {menuOpen && (
         <div className="hp-menu-panel absolute left-3 right-3 top-[66px] z-40 rounded-[20px] border border-[var(--t-accent-border)] bg-[var(--t-surface-strong)] p-[10px] shadow-[var(--t-shadow)] backdrop-blur-[18px] lg:hidden">
@@ -373,6 +387,7 @@ function HomeHeader({ active }: { active: ActivePage }) {
                   >
                     Reminders
                   </a>
+                  <div className="px-4 py-[10px]">{modeSwitch}</div>
                   <a
                     href={logoutHref}
                     className="block rounded-[13px] px-4 py-[12px] text-[15px] font-extrabold text-[var(--t-text)] no-underline transition-colors hover:bg-[var(--t-accent-soft)]"

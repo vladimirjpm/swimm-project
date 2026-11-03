@@ -381,6 +381,7 @@ public sealed class StartListPullService : IStartListPullService
     {
         var drafts = new List<EntryDraft>(raw.Count);
         var seen = new HashSet<StartListKey>();
+        var heatShifts = HeatShiftsBehindProgramme(raw, discovered);
 
         foreach (var (ev, row) in raw)
         {
@@ -411,7 +412,7 @@ public sealed class StartListPullService : IStartListPullService
                 ev.DisciplineId, ev.EventNumber, row.Heat, row.Lane,
                 swimmer.Id, club.Id, style.Id,
                 ev.Distance, ev.Gender, ev.Category, ev.AgeBand,
-                ToUtc(eventStart, row.HeatStartAt), row.Round,
+                ToUtc(eventStart, row.HeatStartAt, heatShifts.GetValueOrDefault(ev.DisciplineId)), row.Round,
                 ParseSeedMs(row.SeedTime), row.SeedTime ?? string.Empty));
         }
 
@@ -486,13 +487,52 @@ public sealed class StartListPullService : IStartListPullService
     /// <summary>Сколько дней после <c>DateEnd</c> «Входящих» ещё считаем днями соревнования (Р86).</summary>
     private const int ExtraDaysAfterEnd = 3;
 
-    private static DateTime? ToUtc(DateTime? eventStartLocal, string? heatStartHhmm)
+    /// <summary>
+    /// Сдвиг времён заплывов события, чей стартовый протокол ОПЕРЕЖАЕТ программу дня (Р89, И-57).
+    /// У compID 16891 (06.11.2026) событие №28 в программе стоит на 18:48, а в его Start list
+    /// у заплывов «שעת הזנקה» 00:26…00:53 — родитель видел «плывёт ночью». Программа тут права:
+    /// заплывы события не начинаются раньше самого события. Поэтому первый заплыв ставим на
+    /// время программы, остальные сдвигаем на ту же величину — шаг между ними из протокола.
+    ///
+    /// Допуск <see cref="HeatAheadTolerance"/>: программа печатает секунды («15:23:30»), а
+    /// заплыв — только минуты («15:23»), это не расхождение. Событие, у которого ночное время
+    /// стоит и в программе (№9 там же, 00:13), правило не трогает — сверять не с чем.
+    /// </summary>
+    private static Dictionary<int, TimeSpan> HeatShiftsBehindProgramme(
+        List<(LogligDisciplineGridRowDto Event, LogligStartListRowDto Row)> raw,
+        DiscoveredCompetition discovered)
+    {
+        var shifts = new Dictionary<int, TimeSpan>();
+        foreach (var group in raw.GroupBy(r => r.Event.DisciplineId))
+        {
+            if (TrustedEventStart(group.First().Event.StartAtLocal, discovered) is not DateTime eventStart)
+                continue;
+
+            var firstHeat = group
+                .Select(r => ParseHeatTime(r.Row.HeatStartAt))
+                .Where(t => t is not null)
+                .Min();
+            if (firstHeat is not TimeOnly first) continue;
+
+            var lag = eventStart.TimeOfDay - first.ToTimeSpan();
+            if (lag > HeatAheadTolerance) shifts[group.Key] = lag;
+        }
+        return shifts;
+    }
+
+    /// <summary>На сколько заплыв может стоять раньше программы, не считаясь опечаткой (Р89).</summary>
+    private static readonly TimeSpan HeatAheadTolerance = TimeSpan.FromMinutes(2);
+
+    private static TimeOnly? ParseHeatTime(string? hhmm) =>
+        hhmm is { Length: > 0 } && TimeOnly.TryParse(hhmm, out var t) ? t : null;
+
+    private static DateTime? ToUtc(DateTime? eventStartLocal, string? heatStartHhmm, TimeSpan heatShift = default)
     {
         if (eventStartLocal is not DateTime eventStart) return null;
 
         var local = eventStart;
-        if (heatStartHhmm is { Length: > 0 } && TimeOnly.TryParse(heatStartHhmm, out var heatTime))
-            local = eventStart.Date + heatTime.ToTimeSpan();
+        if (ParseHeatTime(heatStartHhmm) is TimeOnly heatTime)
+            local = eventStart.Date + heatTime.ToTimeSpan() + heatShift;
 
         // Пояс и перевод — общие с ручным вводом разминки (Т1), см. IsraelTime.
         return IsraelTime.ToUtc(local);

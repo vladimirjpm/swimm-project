@@ -121,15 +121,13 @@ function ProfileEditPopup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, kind, request]);
 
-  // Esc закрывает; плавающая кнопка темы прячется, пока окно открыто (как у окна H2H).
+  // Esc закрывает.
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
-    document.body.classList.add('h2h-modal-open');
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.classList.remove('h2h-modal-open');
     };
   }, [open, onClose]);
 

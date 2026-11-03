@@ -3,7 +3,6 @@ import '../home-project/home.css';
 import '../components/deep/deep-theme.css';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import RecordTicker from '../home-project/components/record-ticker';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import MyGroupsPanel from './my-groups-panel';
 import UI_ClubIcon from '../components/mix/club-icon/club-icon';
 import UI_FlagEmoji from '../components/mix/flag-icon/flag-icon';
@@ -185,10 +184,6 @@ function GroupsShowcase() {
       )}
 
       <RecordTicker />
-      {/* Переключатель тем. На витрине он единственный способ сменить режим: топбар его
-          не носит, а внутренние экраны (results, клуб, пловец) — уже другая дверь.
-          Отступ снизу считает `home.css` от высоты ленты рекордов. */}
-      <UI_ModeToggle />
     </div>
   );
 }

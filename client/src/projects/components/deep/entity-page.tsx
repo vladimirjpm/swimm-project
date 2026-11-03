@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import './deep-theme.css';
 import AppTopbar from '../app-topbar/app-topbar';
-import UI_ModeToggle from '../mix/mode-toggle/mode-toggle';
 import DeepTabs from './tabs';
 import DeepStickyBar, { useEntitySticky } from './sticky-bar';
 import { useDeepThemeClass } from './use-deep-theme-class';
@@ -91,13 +90,9 @@ function DeepEntityPage<T extends string>({
 
       {/* На телефоне отступов у края нет — ни по бокам, ни сверху: шапка встаёт вплотную
           к топбару, блоки от края до края (`.deep-entity-main` в deep-theme.css). Места и так
-          мало, а своих паддингов у карточек хватает. Строка кнопки темы пустая (кнопка
-          `fixed`), поэтому и её отступ на телефоне снят. */}
-      <main className={`deep-entity-main${hasTools ? ' deep-entity-main--dock' : ''} mx-auto max-w-[1180px] px-0 pt-0 pb-6 sm:px-4 sm:pt-6`} style={{ color: 'var(--deep-text)' }}>
-        <div className="flex justify-end sm:mb-4">
-          <UI_ModeToggle />
-        </div>
-
+          мало, а своих паддингов у карточек хватает. Сверху на десктопе — 40px: 24 своих и 16
+          от бывшей строки кнопки темы (кнопка переехала в топбар 03.11.2026, зазор сохранён). */}
+      <main className={`deep-entity-main${hasTools ? ' deep-entity-main--dock' : ''} mx-auto max-w-[1180px] px-0 pt-0 pb-6 sm:px-4 sm:pt-10`} style={{ color: 'var(--deep-text)' }}>
         {status === 'loading' && (
           <DeepEntityNotice className={noticeClassName}>{messages?.loading ?? 'Loading…'}</DeepEntityNotice>
         )}

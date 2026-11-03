@@ -14,7 +14,6 @@ import FiltersFab from '../components/filter-section/filters-fab';
 import DataSourceDDL from '../components/filter-data-source-ddl/filter-data-source-ddl';
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import UI_ThemeDevTool from '../components/mix/theme-dev-tool/theme-dev-tool';
 import GroupHeader from './components/group-header/group-header';
 import CompetitionHeader from './components/competition-header/competition-header';
@@ -491,8 +490,6 @@ function ResultsMain() {
       <div className="sticky top-0 z-50 md:-mt-4">
         <AppTopbar />
       </div>
-      {/* Переключатель Light/Dark (fixed внизу-справа) */}
-      <UI_ModeToggle />
       {/* Dev-инструмент тем (виден только при ?themes в URL) */}
       <UI_ThemeDevTool />
 
