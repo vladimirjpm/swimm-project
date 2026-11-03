@@ -10,7 +10,8 @@ function About() {
   const testP2 = useAppSelector((store: { testP2: any; }) => store.testP2);
   return (
     <>
-      <AppTopbar active="about" />
+      {/* Тёмной темы у About нет — переключатель режима ей не нужен. */}
+      <AppTopbar active="about" modeToggle={false} />
       <div className="app abc text-4xl text-red">
          ABOUT 11 : {testP2} / {testP1}
       </div>

@@ -4,7 +4,6 @@ import '../components/deep/deep-theme.css';
 import HomeHeader from './components/home-header';
 import DestinationCards from './components/destination-cards';
 import RecordTicker from './components/record-ticker';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { HOME_REGION_LABEL } from '../../utils/constants/home-region';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import { routes } from '../../utils/routes';
@@ -48,10 +47,6 @@ function Home() {
       </nav>
 
       <RecordTicker />
-      {/* Переключатель тем. На витрине он единственный способ сменить режим: топбар его
-          не носит, а внутренние экраны (results, клуб, пловец) — уже другая дверь.
-          Отступ снизу считает `home.css` от высоты ленты рекордов. */}
-      <UI_ModeToggle />
     </div>
   );
 }

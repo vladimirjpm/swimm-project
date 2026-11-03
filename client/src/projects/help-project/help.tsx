@@ -3,7 +3,6 @@ import '../home-project/home.css';
 import '../components/deep/deep-theme.css';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import AppTopbar from '../components/app-topbar/app-topbar';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { UI_LangTabs, useInfoLang } from '../components/info-popup/info-popup';
 import UI_Markdown, { splitTitle } from '../components/markdown/markdown';
 import { contentLanguages, useContent } from '../../content/content';
@@ -71,7 +70,6 @@ function Help() {
           </article>
         )}
       </main>
-      <UI_ModeToggle />
     </div>
   );
 }

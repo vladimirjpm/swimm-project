@@ -3,6 +3,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useProfileSetup, profileSubtitle, STEP_TITLES, type ProfileSetup } from '../../../hooks/useProfileSetup';
 import LoginModal from '../login-modal/login-modal';
 import UI_BrandMark from '../mix/brand-mark/brand-mark';
+import UI_ModeToggle from '../mix/mode-toggle/mode-toggle';
 import { routes } from '../../../utils/routes';
 import { PAGE_CONTAINER } from '../../../utils/layout';
 
@@ -25,6 +26,11 @@ export interface AppTopbarProps {
   user?: { name: string; avatarUrl?: string } | null;
   onLogin?: () => void;
   onLogout?: () => void;
+  /**
+   * Переключатель Light/Dark (у гостя — кнопка рядом с Login, у вошедшего — пункт меню).
+   * `false` — у страницы без тёмной темы (About): кнопка там ничего бы не меняла.
+   */
+  modeToggle?: boolean;
 }
 
 /** Пункты навигации. Normatives — страницы НЕ существует, рендерим span. */
@@ -253,7 +259,7 @@ function TopbarNavItem({
   );
 }
 
-function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
+function AppTopbar({ active, user, onLogin, onLogout, modeToggle = true }: AppTopbarProps) {
   const auth = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -303,6 +309,15 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
   const dropdownItemClass =
     'block w-full rounded-[8px] px-3 py-[9px] text-left text-[13px] font-bold text-[var(--theme-topbar-text)] no-underline transition-colors hover:bg-[color-mix(in_srgb,var(--theme-topbar-accent)_16%,transparent)]';
 
+  // Switch темы: дорожка — рамкой полосы, бегунок — её акцентом. Один на три места: рядом с
+  // Login у гостя, строкой в меню аккаунта и в бургере у вошедшего.
+  const modeSwitch = modeToggle ? (
+    <UI_ModeToggle
+      className="border-[color-mix(in_srgb,var(--theme-topbar-text)_18%,transparent)]"
+      knobClassName="bg-[var(--theme-topbar-accent)]"
+    />
+  ) : null;
+
   const authBlock = authLoading ? null : !isAuthenticated ? (
     <button
       type="button"
@@ -348,6 +363,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
           <a href={routes.reminders()} className={dropdownItemClass}>
             Reminders
           </a>
+          {modeSwitch && <div className="px-3 py-[7px]">{modeSwitch}</div>}
           <MenuDivider />
           {onLogout ? (
             <button type="button" className={dropdownItemClass} onClick={() => { setUserMenuOpen(false); onLogout(); }}>
@@ -387,6 +403,8 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* Гостю — кнопка темы рядом с Login; вошедшему она в меню аккаунта. */}
+          {!authLoading && !isAuthenticated && modeSwitch}
           {authBlock}
           {/* Бургер (мобильный): nav сворачивается, лого + auth остаются */}
           <button
@@ -449,6 +467,7 @@ function AppTopbar({ active, user, onLogin, onLogout }: AppTopbarProps) {
               >
                 Reminders
               </a>
+              {modeSwitch && <div className="px-4 py-[8px]">{modeSwitch}</div>}
               <MenuDivider />
               {onLogout ? (
                 <button

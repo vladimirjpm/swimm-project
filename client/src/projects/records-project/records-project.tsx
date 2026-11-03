@@ -5,7 +5,6 @@ import './records-page.css';
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { parseRecordsQuery, routes, type RecordsTab } from '../../utils/routes';
 import { useRecordsRanking } from '../../hooks/useRecordsRanking';
 import { useRegionRecords } from '../../hooks/useRegionRecords';
@@ -247,7 +246,6 @@ function RecordsProject() {
             </div>
             <UI_RecordsChecked sources={tabSources(tab, region)} className="rk-head__checked" />
           </div>
-          <UI_ModeToggle />
         </div>
 
         {/* «Папка» (шаблон DeepTabs): плитки и панель — один корпус, между ними ничего

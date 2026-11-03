@@ -5,7 +5,6 @@ import './h2h-page.css';
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import DeepSeasonCarousel from '../components/deep/season-carousel';
 import UI_H2HCompare, { h2hScopeLabel } from '../components/mix/h2h/h2h-compare';
 import UI_H2HRivalPicker from '../components/mix/h2h/h2h-rival-picker';
@@ -288,11 +287,7 @@ function H2HProject() {
           карточки и центр, остальное на широком мониторе было пустотой. Ширина ровно
           на пороге `@container h2h (max-width: 780px)`, то есть на десктопе экран
           сознательно живёт в КОМПАКТНОЙ раскладке — той же, что на телефоне. */}
-      <main className={`${PAGE_CONTAINER} py-6`} style={{ color: 'var(--deep-text)' }}>
-        <div className="mb-4 flex justify-end">
-          <UI_ModeToggle />
-        </div>
-
+      <main className={`${PAGE_CONTAINER} pb-6 pt-10`} style={{ color: 'var(--deep-text)' }}>
         <div className="h2h-page content-box-xs">
           <div className="h2h-page__head">
             <h1 className="h2h-page__title">Head to head</h1>

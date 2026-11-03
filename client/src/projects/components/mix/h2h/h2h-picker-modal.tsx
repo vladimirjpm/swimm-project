@@ -38,22 +38,12 @@ const UI_H2HPickerModal: React.FC<Props> = ({ open, title, onClose, children }) 
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
 
-    /**
-     * Пока окно открыто, плавающий переключатель темы прячется. У него `z-index: 120` —
-     * сознательно выше всех оверлеев продукта, и прятать его обязана страница
-     * (`docs/ui-components.md`). Страниц с этим окном три, и одна из них — таб внутри
-     * общего каркаса, который своей кнопкой не распоряжается; поэтому флаг ставит само
-     * окно, а не каждый вызывающий по отдельности.
-     */
-    document.body.classList.add('h2h-modal-open');
-
     // Фокус в поиск: окно открыли, чтобы печатать, а не чтобы смотреть на него.
     const input = boxRef.current?.querySelector('input');
     input?.focus();
 
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.classList.remove('h2h-modal-open');
     };
   }, [open, onClose]);
 

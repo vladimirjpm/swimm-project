@@ -154,8 +154,8 @@ export default function FilterZone({
     </div>
 
     {/* Кнопка «наверх» — пока шапка погашена, это короткий путь обратно к табам. Портал в
-        body: внутри липкой зоны кнопка ездила бы вместе с ней. Место — левее переключателя
-        темы (`UI_ModeToggle`, bottom-4 right-4, 40px). Токены СТРАНИЧНЫЕ, а не `--deep-*`:
+        body: внутри липкой зоны кнопка ездила бы вместе с ней. Угол свободен: переключатель
+        темы, стоявший тут, с 03.11.2026 живёт в топбаре. Токены СТРАНИЧНЫЕ, а не `--deep-*`:
         из портала токены темы таба не видны. */}
     {stuck && createPortal(
       <button
@@ -163,7 +163,7 @@ export default function FilterZone({
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         aria-label="Back to top"
         title="Back to top"
-        className="fixed bottom-4 right-[68px] z-[110] flex h-11 w-11 items-center justify-center rounded-full shadow-lg"
+        className="fixed bottom-4 right-4 z-[110] flex h-11 w-11 items-center justify-center rounded-full shadow-lg"
         style={{ background: 'var(--theme-primary)', color: 'var(--theme-mode-accent-text)' }}
       >
         <svg

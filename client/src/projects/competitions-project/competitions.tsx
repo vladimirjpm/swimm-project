@@ -3,7 +3,6 @@ import '../home-project/home.css';
 import '../components/deep/deep-theme.css';
 import AppTopbar from '../components/app-topbar/app-topbar';
 import RecordTicker from '../home-project/components/record-ticker';
-import UI_ModeToggle from '../components/mix/mode-toggle/mode-toggle';
 import { useDeepThemeClass } from '../components/deep/use-deep-theme-class';
 import CompetitionCalendar from './calendar/competition-calendar';
 import CompetitionsHero from './components/competitions-hero';
@@ -42,10 +41,6 @@ function Competitions() {
       </div>
 
       <RecordTicker />
-      {/* Переключатель тем. На витрине он единственный способ сменить режим: топбар его
-          не носит, а внутренние экраны (results, клуб, пловец) — уже другая дверь.
-          Отступ снизу считает `home.css` от высоты ленты рекордов. */}
-      <UI_ModeToggle />
     </div>
   );
 }
