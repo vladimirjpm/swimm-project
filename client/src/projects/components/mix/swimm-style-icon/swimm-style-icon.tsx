@@ -58,13 +58,12 @@ interface UI_SwimmStyleIconProps {
   /**
    * Где стоит дистанция в режиме `icon-len` (добавлено 31.08.2026):
    *
-   * - `overlay` — **по умолчанию**, как было всегда: числом поверх иконки в правом верхнем
-   *   углу. Плотно, но число ложится на рисунок и на узкой плитке спорит с ним.
-   * - `below` — строкой ПОД иконкой. Число не перекрывает рисунок и читается как подпись.
+   * - `below` — **по умолчанию** (с 03.11.2026, решение Влада): строкой ПОД иконкой. Число
+   *   не перекрывает рисунок и читается как подпись.
+   * - `overlay` — числом поверх иконки в правом верхнем углу. Было умолчанием до 03.11.2026
+   *   и стояло на дюжине экранов, но число наезжало на рисунок — умолчание сменили сразу
+   *   везде. Явно его сейчас не ставит никто.
    * - `right` — столбиком справа от иконки, когда по высоте места нет, а по ширине есть.
-   *
-   * Дефолт менять нельзя: `overlay` стоит на дюжине экранов (таблица результатов, My media,
-   * карточки), и смена умолчания переставила бы число сразу везде.
    */
   lenPlacement?: 'overlay' | 'below' | 'right';
   /**
@@ -140,7 +139,7 @@ const UI_SwimmStyleIcon: React.FC<UI_SwimmStyleIconProps> = ({
   styleName,
   styleLen = '',
   styleType = 'icon-notext',
-  lenPlacement = 'overlay',
+  lenPlacement = 'below',
   size,
   iconSize,
   lenSize,
@@ -154,13 +153,13 @@ const UI_SwimmStyleIcon: React.FC<UI_SwimmStyleIconProps> = ({
   // Формируем путь к изображению
  let imageSrc;
  const base = import.meta.env.BASE_URL;
+  // Тёмно-синий пловец на тёмной поверхности пропадает — там берём вариант со светлым.
+  const darkBg = surface === 'dark' || (surface === 'auto' && mode === 'dark');
 try {
   if (typeof styleName !== 'string') {
     throw new TypeError(`styleName должен быть string, а сейчас ${typeof styleName}`);
   }
   const fileName = styleName.replaceAll(' ', '-');
-  // Тёмно-синий пловец на тёмной поверхности пропадает — там берём вариант со светлым.
-  const darkBg = surface === 'dark' || (surface === 'auto' && mode === 'dark');
   const onDark = darkBg && ON_DARK_STYLES.has(fileName);
   imageSrc = `${base}images/swimm-style-icon/${onDark ? 'on-dark/' : ''}${fileName}.png`;
 } catch (err) {
@@ -236,14 +235,23 @@ try {
       ? 'flex flex-row items-center gap-1.5'
       : 'relative flex flex-col items-center space-y-1';
 
+    // Тёмно-красное число держится только на светлом: на белой подложке `overlay` или на
+    // светлой плите вызывающего (`surface="light"`). Под иконкой на тёмной поверхности
+    // (умолчание `below` с 03.11.2026) оно сливалось с фоном — там красный светлее.
+    const lenColor = darkBg && !plateOn ? 'text-red-400' : 'text-red-700';
+
     return (
       <div className={`${rootClass} ${box} text-gray-800`} style={sizeVars}>
         {img}
-        <div
-          className={`style-len style-len--${lenPlacement} text-red-700 ${len.length >= 5 ? 'style-len--xl' : ''}`}
-        >
-          {len}
-        </div>
+        {/* Пустой дистанции (выбран стиль без дистанции) — нет и блока: в потоке `below` он
+            оставлял под картинкой зазор `space-y-1`. */}
+        {len && (
+          <div
+            className={`style-len style-len--${lenPlacement} ${lenColor} ${len.length >= 5 ? 'style-len--xl' : ''}`}
+          >
+            {len}
+          </div>
+        )}
       </div>
     );
   }
