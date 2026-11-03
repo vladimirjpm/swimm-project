@@ -23,12 +23,14 @@ export default function RefreshBar({ updatedAt, onRefresh }: {
   onRefresh: () => void;
 }) {
   return (
-    <div className="mb-3 flex items-center justify-between gap-2 text-[11px] font-semibold opacity-70">
-      <span>{updatedLabel(updatedAt)}</span>
+    <div className="mb-3 flex items-center justify-between gap-2 text-[11px] font-semibold">
+      {/* Свежесть данных должна бросаться в глаза: организатор правит программу до
+          последнего дня. Роль «акцент мелким текстом» темы Deep, а не хекс. */}
+      <span className="font-bold" style={{ color: 'var(--t-accent-text)' }}>{updatedLabel(updatedAt)}</span>
       <button
         type="button"
         onClick={onRefresh}
-        className="rounded-full border px-2.5 py-1 text-[11px] font-bold"
+        className="rounded-full border px-2.5 py-1 text-[11px] font-bold opacity-70"
         // Токен поверхности Deep, а не страницы: полоса стоит и на карточке плана, где
         // вокруг карточки темы Deep, и в зумах — обе живут внутри одного контейнера темы.
         style={{ borderColor: 'var(--deep-card-border)' }}
