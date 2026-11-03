@@ -192,6 +192,45 @@ public class StartListPullServiceTests
     }
 
     [Fact]
+    public async Task Pull_HeatsAheadOfProgramme_ShiftedToProgrammeKeepingSpacing()
+    {
+        // Р89, И-57: compID 16891 — событие №28 в программе на 18:48, а в Start list у заплывов
+        // 00:26 и 00:28. Первый заплыв встаёт на время программы, шаг между заплывами — свой.
+        await using var db = await SeedAsync(nameof(Pull_HeatsAheadOfProgramme_ShiftedToProgrammeKeepingSpacing));
+        var provider = new FakeProvider(
+            [Event(85713, startAt: new DateTime(2026, 2, 19, 18, 48, 0))],
+            new() { [85713] = StartList(
+                Row(1, 3, 1, "Первый", heatStart: "00:26"),
+                Row(2, 3, 2, "Второй", heatStart: "00:28")) });
+
+        await Service(db, provider).PullAsync(OrgCompId);
+
+        // Февраль, UTC+2: 18:48 и 18:50 местного.
+        var times = await db.CompetitionEntries.OrderBy(e => e.Heat).Select(e => e.HeatStartAt).ToListAsync();
+        Assert.Equal(
+            [new DateTime(2026, 2, 19, 16, 48, 0, DateTimeKind.Utc), new DateTime(2026, 2, 19, 16, 50, 0, DateTimeKind.Utc)],
+            times);
+    }
+
+    [Theory]
+    [InlineData(15, 23, 30, "15:23")]   // программа с секундами, заплыв — минуты: не расхождение
+    [InlineData(0, 13, 0, "00:13")]     // ночное время и в программе (№9 у 16891) — сверять не с чем
+    [InlineData(10, 0, 0, "10:09")]     // заплыв позже программы — обычное дело
+    public async Task Pull_HeatsNotAheadOfProgramme_KeptAsPrinted(int hour, int minute, int second, string heat)
+    {
+        await using var db = await SeedAsync($"{nameof(Pull_HeatsNotAheadOfProgramme_KeptAsPrinted)}_{heat}");
+        var provider = new FakeProvider(
+            [Event(76321, startAt: new DateTime(2026, 2, 19, hour, minute, second))],
+            new() { [76321] = StartList(Row(1, 3, 1, "Пловец", heatStart: heat)) });
+
+        await Service(db, provider).PullAsync(OrgCompId);
+
+        var printed = TimeOnly.Parse(heat);
+        var entry = await db.CompetitionEntries.SingleAsync();
+        Assert.Equal(new DateTime(2026, 2, 19).Add(printed.ToTimeSpan()).AddHours(-2), entry.HeatStartAt);
+    }
+
+    [Fact]
     public async Task Pull_TakesDayFromEventStart_NotFromEventRange()
     {
         // У многодневки день заплыва зашит в его собственное время старта — это точнее,
