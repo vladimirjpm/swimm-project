@@ -575,7 +575,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
             прежняя. */}
         <span className="hp-mono flex flex-col items-start gap-[3px] text-[15px] font-extrabold text-[var(--t-accent)]">
           <span>
-            {swim.time_fail ? 'DSQ' : (
+            {swim.time_fail ? HelperResults.failLabel(swim) : (
               <UI_SwimTime time={swim.time} quality={quality} />
             )}
           </span>
@@ -660,7 +660,7 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
         />
         <span className="min-w-0">
           <span className="hp-mono block text-[13.5px] font-extrabold text-[var(--t-accent)]">
-            {swim.time_fail ? 'DSQ' : (
+            {swim.time_fail ? HelperResults.failLabel(swim) : (
               <UI_SwimTime time={swim.time} quality={quality} />
             )}
           </span>
