@@ -57,7 +57,7 @@ export default function FilterZone({
 }) {
   const plan = mode === 'plan';
   const rootRef = useRef<HTMLDivElement>(null);
-  const { stuck, sentinelRef, top } = useStickyZone();
+  const { stuck, sentinelRef, top, reserve } = useStickyZone(rootRef);
 
   // Открыть пловца — из выдачи поиска или чипа избранного. Карточка рисуется НИЖЕ зоны,
   // поэтому подтягиваем зону к верху: иначе на телефоне тап выглядит несработавшим.
@@ -152,6 +152,9 @@ export default function FilterZone({
         )}
       </div>
     </div>
+    {/* Распорка на разницу развёрнутой и свёрнутой зоны — без неё петля на коротком плане
+        (см. `useStickyZone`). Невидимая: фон страницы, протокол уезжает под зону. */}
+    {reserve > 0 && <div aria-hidden style={{ height: reserve }} />}
 
     {/* Кнопка «наверх» — пока шапка погашена, это короткий путь обратно к табам. Портал в
         body: внутри липкой зоны кнопка ездила бы вместе с ней. Угол свободен: переключатель
