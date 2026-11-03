@@ -94,8 +94,8 @@
 .sb-chip__event { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .sb-chip__event-icon { width: 118px; flex: none; }
 .sb-chip__event-icon img { display: block; width: 100%; height: 46px; object-fit: contain; }
-/* Число дистанции у `icon-len` печатается поверх картинки — на крупной иконке ему нужен
-   свой кегль, иначе оно остаётся мелким пятном в углу. */
+/* Число дистанции у `icon-len` (с 03.11.2026 — под картинкой, а не поверх) — на крупной
+   иконке ему нужен свой кегль, иначе оно остаётся мелким пятном. */
 .sb-chip__event-icon .style-len { font-size: 17px; line-height: 17px; font-weight: 900; }
 
 /* ── Шапка списка ──────────────────────────────────────────────────────────── */

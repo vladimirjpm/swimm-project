@@ -288,16 +288,21 @@
 }
 
 /* Чип Event в полосе: иконка стиля на плашке, как в панели и в строках заплыва.
-   Бокс фиксирован по высоте — исходники разной пропорции, при `height:auto` колонка скачет. */
+   Бокс фиксирован по высоте — исходники разной пропорции, при `height:auto` колонка скачет.
+   Плашка — на всём значке, а не на картинке (03.11.2026): дистанция теперь стоит ПОД
+   иконкой, и тёмно-красное число вне светлой плашки пропадало на тёмном чипе. */
 .mmb-event { display: inline-flex; align-items: center; justify-content: center; }
+.mmb-event .dv-swimm-icon {
+  background: var(--t-plate);
+  border-radius: 8px;
+  padding-bottom: 2px;
+}
 .mmb-event img {
   display: block;
   height: 40px;
   width: auto;
   max-width: 120px;
   object-fit: contain;
-  background: var(--t-plate);
-  border-radius: 8px;
   padding: 2px 6px;
 }
 
