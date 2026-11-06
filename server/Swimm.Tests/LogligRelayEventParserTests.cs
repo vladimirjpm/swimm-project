@@ -23,6 +23,37 @@ public class LogligRelayEventParserTests
     private static LogligEventResults RelayEvent() =>
         LogligEventResultsParser.Parse(Fixture("event-82438-relay-girls14-15.html"));
 
+    /// <summary>
+    /// Эстафета соревнования БЕЗ клубного зачёта — 7 колонок (только FINA-очки). Живая
+    /// страница «4X50 חופשי שליחים - בנות 9-10» Эйлата-2026 (16891, loglig 15896, событие 85617).
+    /// До 05.11.2026 парсер ждал 8–10 колонок и отдавал ноль строк — --pull-relays не находил
+    /// у источника ни одной команды. Секции здесь по году («בנות 10», «בנות 9»): награждение по
+    /// возрасту, места внутри года.
+    /// </summary>
+    [Fact]
+    public void RelayWithoutClubStanding_SevenColumns_RowsParsedPerAgeSection()
+    {
+        var ev = LogligEventResultsParser.Parse(Fixture("event-85617-relay-girls9-10-nopoints.html"));
+
+        Assert.True(ev.IsRelay);
+        Assert.Equal("freestyle", ev.StyleName);
+        Assert.Equal("4X50", ev.Distance);
+        Assert.Equal("female", ev.Gender);
+        Assert.Equal("9-10", ev.AgeBand);
+
+        Assert.Equal(4, ev.Rows.Count);
+        var winner = ev.Rows[0];
+        Assert.Equal(1, winner.Position);
+        Assert.Equal("מכבי קרית ביאליק", winner.Club);
+        Assert.Equal("02:50.21", winner.Time);
+        Assert.Equal(160, winner.InternationalPoints);
+        Assert.Null(winner.PersonalPoints);
+        Assert.Null(winner.ClubPoints);
+
+        Assert.Equal(new[] { "בנות 10", "בנות 10", "בנות 10", "בנות 9" }, ev.Rows.Select(r => r.Category));
+        Assert.Equal(new int?[] { 1, 2, 3, 1 }, ev.Rows.Select(r => r.Position));
+    }
+
     [Fact]
     public void RelayEvent_BandComesFromHeader_NotFromSectionCaption()
     {

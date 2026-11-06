@@ -86,11 +86,14 @@ public static partial class LogligEventResultsParser
 
             // Данные: 10 колонок у личных (есть год рождения), 9 у эстафет, 8 у мастерских
             // эстафет — там нет «ניקוד אישי» (6595, loglig 11586: иначе ни одной строки).
-            if (cells.Count is not (8 or 9 or 10)) continue;
+            // 7 — эстафета соревнования без клубного зачёта: нет ни личных, ни клубных очков,
+            // только FINA (16891, loglig 15896, 05.11.2026: иначе ни одной строки, --pull-relays
+            // видел у источника 0). Только у эстафет: у личной строки 7 колонок не бывает.
+            if (cells.Count is not (8 or 9 or 10) && !(isRelay && cells.Count == 7)) continue;
             if (cells[0] == "מיקום") continue;   // строка заголовков таблицы
 
             var row = ParseRow(cells, round, category,
-                hasBirthYear: cells.Count == 10, hasPersonalPoints: cells.Count != 8);
+                hasBirthYear: cells.Count == 10, hasPersonalPoints: cells.Count is 9 or 10);
             if (row is not null) rows.Add(row);
         }
 
@@ -112,7 +115,8 @@ public static partial class LogligEventResultsParser
         var (time, failNote) = ParseTime(cells[i++]);
         var fina = ParseInt(cells[i++]) ?? 0;
         var personal = hasPersonalPoints ? ParseInt(cells[i++]) : null;
-        var clubPoints = ParseInt(cells[i]);
+        // Колонки «ניקוד קבוצתי» нет у эстафеты без клубного зачёта (7 колонок).
+        var clubPoints = i < cells.Count ? ParseInt(cells[i]) : null;
 
         return new LogligResultRow(
             position, round, category, name, birthYear, club, heat, lane,

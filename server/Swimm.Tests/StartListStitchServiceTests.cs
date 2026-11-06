@@ -47,14 +47,14 @@ public class StartListStitchServiceTests
 
     private static CompetitionEntry Entry(
         long id, int swimmer, int heat, int lane, string dist = "50",
-        DateTime? day = null) =>
+        DateTime? day = null, int discipline = 76321) =>
         new()
         {
             Id = id,
             OrgCompId = OrgCompId,
             CompDate = day ?? new DateTime(2026, 2, 19),
             CompName = "Чемпионат",
-            OrgDisciplineId = 76321,
+            OrgDisciplineId = discipline,
             SwimmerId = swimmer,
             ClubId = 1,
             StyleId = 1,
@@ -121,6 +121,76 @@ public class StartListStitchServiceTests
         var noShow = await db.CompetitionEntries.SingleAsync(e => e.SwimmerId == 11);
         Assert.Equal(CompetitionEntryStatus.NoShow, noShow.Status);
         Assert.Null(noShow.ResultId);
+    }
+
+    /// <summary>
+    /// Соревнование затягивают по ходу дня (И-60, 16891): событие, которое ещё не плыли, —
+    /// результатов нет ни у одного его пловца. Это не неявки, заявки ждут.
+    /// </summary>
+    [Fact]
+    public async Task Stitch_EventNotSwumYet_StaysEntered()
+    {
+        await using var db = await SeedAsync(nameof(Stitch_EventNotSwumYet_StaysEntered));
+        db.CompetitionEntries.AddRange(
+            Entry(1, swimmer: 10, heat: 1, lane: 3, discipline: 1),
+            Entry(2, swimmer: 11, heat: 1, lane: 4, dist: "200", discipline: 2));   // вечером
+        db.Results.Add(Result(500, swimmer: 10, heat: 1, lane: 3));
+        await db.SaveChangesAsync();
+
+        var report = await Service(db).StitchAsync(OrgCompId);
+
+        Assert.Equal(1, report.Swum);
+        Assert.Equal(0, report.NoShow);
+        Assert.Equal(1, report.NotSwumYet);
+        var later = await db.CompetitionEntries.SingleAsync(e => e.Id == 2);
+        Assert.Equal(CompetitionEntryStatus.Entered, later.Status);
+        Assert.Equal(100, later.CompetitionId);   // день есть — заявка к нему привязана
+    }
+
+    /// <summary>
+    /// Эстафеты 9-10 и 11-13 — одна дисциплина (4×50 вольным), но разные события и пловцы.
+    /// Проплыта только первая: заявки второй — не неявки.
+    /// </summary>
+    [Fact]
+    public async Task Stitch_SameDisciplineOtherEvent_NotSwumYet_StaysEntered()
+    {
+        await using var db = await SeedAsync(nameof(Stitch_SameDisciplineOtherEvent_NotSwumYet_StaysEntered));
+        db.CompetitionEntries.AddRange(
+            Entry(1, swimmer: 10, heat: 1, lane: 3, dist: "4X50", discipline: 85617),
+            Entry(2, swimmer: 11, heat: 1, lane: 3, dist: "4X50", discipline: 87302));
+        db.Results.Add(Result(500, swimmer: 10, heat: 1, lane: 3, dist: "4X50"));
+        await db.SaveChangesAsync();
+
+        var report = await Service(db).StitchAsync(OrgCompId);
+
+        Assert.Equal(1, report.Swum);
+        Assert.Equal(0, report.NoShow);
+        Assert.Equal(1, report.NotSwumYet);
+    }
+
+    /// <summary>
+    /// Многодневка, затянутая пока первым днём: заявки второго дня к нему не цепляются (раньше
+    /// фоллбек «единственный день» делал их неявками первого) и сбрасываются, если прошлый
+    /// прогон уже успел так сделать.
+    /// </summary>
+    [Fact]
+    public async Task Stitch_OnlyFirstDayInDb_SecondDayEntriesWait()
+    {
+        await using var db = await SeedAsync(nameof(Stitch_OnlyFirstDayInDb_SecondDayEntriesWait));
+        var tomorrow = Entry(2, swimmer: 11, heat: 1, lane: 4, day: new DateTime(2026, 2, 20), discipline: 2);
+        tomorrow.CompetitionId = 100;
+        tomorrow.Status = CompetitionEntryStatus.NoShow;   // след старого прогона
+        db.CompetitionEntries.AddRange(Entry(1, swimmer: 10, heat: 1, lane: 3), tomorrow);
+        db.Results.Add(Result(500, swimmer: 10, heat: 1, lane: 3));
+        await db.SaveChangesAsync();
+
+        var report = await Service(db).StitchAsync(OrgCompId);
+
+        Assert.Equal(1, report.Linked);
+        Assert.Equal(1, report.Unlinked);
+        var waiting = await db.CompetitionEntries.SingleAsync(e => e.Id == 2);
+        Assert.Null(waiting.CompetitionId);
+        Assert.Equal(CompetitionEntryStatus.Entered, waiting.Status);
     }
 
     [Fact]

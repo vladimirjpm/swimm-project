@@ -39,6 +39,10 @@ public interface ILogligRelayBandService
 /// События, которые loglig не отдал (HTTP-ошибка). Эстафета ли это, до чтения неизвестно;
 /// если да — наши строки останутся без пары, и план станет неприменимым сам.
 /// </param>
+/// <param name="NotSwumEvents">
+/// Эстафетные события без единого времени — ещё не проплыты (соревнование идёт). Пропущены:
+/// их команды без времени дали бы дубли ключа «клуб + no-time» и сорвали весь план.
+/// </param>
 public sealed record LogligRelayBandReport(
     string CompetitionName,
     int RelayEvents,
@@ -49,4 +53,5 @@ public sealed record LogligRelayBandReport(
     int PointsAfter,
     int Applied,
     RelayBandPlan Plan,
-    IReadOnlyList<int>? UnreadableEvents = null);
+    IReadOnlyList<int>? UnreadableEvents = null,
+    IReadOnlyList<int>? NotSwumEvents = null);

@@ -129,4 +129,29 @@ public class LogligRelayBandMatcherTests
         Assert.True(plan.CanApply);
         Assert.False(Assert.Single(plan.Changes).HasChanges);
     }
+
+    /// <summary>
+    /// Идущее соревнование (16891, 05.11.2026): у loglig уже есть страницы эстафет, которые ещё
+    /// не плыли, — команды без времени, по две у клуба. Такое событие пропускается целиком;
+    /// событие, где время есть хоть у одной команды, — нет (его DQ/NS матчатся как обычно).
+    /// </summary>
+    [Fact]
+    public void EventWithoutAnyTime_IsNotSwumYet_EventWithOneTime_IsSwum()
+    {
+        Assert.True(LogligRelayBandMatcher.IsNotSwumYet([null, null, null]));
+        Assert.True(LogligRelayBandMatcher.IsNotSwumYet([]));
+        Assert.False(LogligRelayBandMatcher.IsNotSwumYet([null, 170_210, null]));
+    }
+
+    /// <summary>Латинское имя клуба: «Eilat Swimming» на странице, «Swimming Eilat» в PDF (16891).</summary>
+    [Fact]
+    public void ClubWordOrder_DoesNotMatter()
+    {
+        var plan = LogligRelayBandMatcher.Build(
+            [Src("Eilat Swimming", 204_590, 1, gender: "female", band: "9-10", style: "freestyle")],
+            [Ours(1, "Swimming Eilat", 204_590, 7, style: "freestyle")]);
+
+        Assert.True(plan.CanApply);
+        Assert.Equal(1, Assert.Single(plan.Changes).PositionAfter);
+    }
 }

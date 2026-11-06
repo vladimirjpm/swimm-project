@@ -534,7 +534,6 @@ public partial class ResultRepository
                 ClubId = r.ClubId,
                 Gender = r.Gender,
                 BirthYear = r.Swimmer.BirthYear,
-                Year = r.CompetitionDate.Year,
                 AgeGroup = r.AgeGroup,
                 IsMasters = r.Competition.IsMasters,
                 // Пара-очки в сумму FINA не идут (Р67); очки за место правило считает по месту.
@@ -572,8 +571,22 @@ public partial class ResultRepository
         public int ClubId { get; init; }
         public string Gender { get; init; } = "";
         public int BirthYear { get; init; }
-        public int Year { get; init; }
         public string AgeGroup { get; init; } = "";
+
+        /// <summary>
+        /// Номинация «по возрасту» — возраст В СЕЗОНЕ (год окончания сезона − год рождения),
+        /// как секции «בנות 10» у loglig и возраст на всех экранах сайта. Год старта − год
+        /// рождения давал осенью (сен–дек) подпись на год меньше: Сабина 2017 г.р. на старте
+        /// 06.11.2026 — «9» вместо «10» (06.11.2026). 0 — возраст не определён.
+        /// </summary>
+        public int SeasonAge =>
+            SeasonMath.AgeInSeason(SeasonMath.StartYearOf(CompetitionDate), BirthYear) ?? 0;
+
+        /// <summary>
+        /// Ступень справочника рекордов для бонуса — КАЛЕНДАРНАЯ: так справочник ведёт
+        /// федерация (дефолт RecordAgeAxis, docs/data-integrity.md §13). Не путать с SeasonAge.
+        /// </summary>
+        public int RecordStepAge => CompetitionDate.Year - BirthYear;
         public bool IsMasters { get; init; }
         public int InternationalPoints { get; init; }
         public int? Place { get; init; }
@@ -590,7 +603,8 @@ public partial class ResultRepository
     /// Legacy-ветка (правило не привязано): та же логика, что была до Э2.5, включая
     /// условие InternationalPoints > 0 — оно перенесено сюда из SQL-запроса.
     /// Masters: корзина — возрастная ГРУППА ("25-29", как в фильтрах), топ-5 по очкам на пол.
-    /// Не-masters: корзина — отдельный возраст (год − год рождения), все возрасты по порядку.
+    /// Не-masters: корзина — отдельный возраст в сезоне (<see cref="HighPointSourceRow.SeasonAge"/>),
+    /// все возрасты по порядку.
     /// Группировка по возрастным ГРУППАМ — только для masters (Competition.IsMasters).
     /// Молодёжные категории (8-11, 11-14) тоже имеют AgeGroup в данных, но там HPA
     /// должен идти по отдельным возрастам, поэтому детектим строго по флагу masters.
@@ -602,10 +616,10 @@ public partial class ResultRepository
         // Сумма очков пловца в (корзина × пол), затем max по корзине; ничья по сумме → все.
         var perSwimmer = hpRows
             .Where(r => r.InternationalPoints > 0)
-            .Where(r => isMastersOverview ? !string.IsNullOrEmpty(r.AgeGroup) : (r.Year - r.BirthYear) > 0)
+            .Where(r => isMastersOverview ? !string.IsNullOrEmpty(r.AgeGroup) : r.SeasonAge > 0)
             .GroupBy(r => new
             {
-                Bucket = isMastersOverview ? r.AgeGroup : (r.Year - r.BirthYear).ToString(),
+                Bucket = isMastersOverview ? r.AgeGroup : r.SeasonAge.ToString(),
                 r.Gender,
                 r.SwimmerId,
             })
@@ -620,7 +634,7 @@ public partial class ResultRepository
                 g.First().LastNameEn,
                 g.First().Club,
                 g.First().ClubId,
-                Age = g.First().Year - g.First().BirthYear,
+                Age = g.First().SeasonAge,
                 g.First().AgeGroup,
                 Points = g.Sum(r => r.InternationalPoints)
             })
@@ -671,13 +685,13 @@ public partial class ResultRepository
             .Select(r => new SwimmerHighPointRow(
                 SwimmerId: r.SwimmerId,
                 Gender: r.Gender,
-                Age: r.Year - r.BirthYear,
+                Age: r.SeasonAge,
                 AgeGroup: r.AgeGroup,
                 Place: r.Place,
                 InternationalPoints: r.InternationalPoints,
                 IsRelay: false,
                 TimeFail: false,
-                Record: RecordStatusOf(recordIndex, r.Year - r.BirthYear, r.Gender, r.PoolType, r.StyleName,
+                Record: RecordStatusOf(recordIndex, r.RecordStepAge, r.Gender, r.PoolType, r.StyleName,
                     r.Distance, r.AgeGroup, r.IsMasters, r.TimeMillisecond),
                 HeatType: r.HeatType))
             .ToList());

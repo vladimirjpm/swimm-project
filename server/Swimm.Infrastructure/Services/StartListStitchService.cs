@@ -100,17 +100,30 @@ public sealed class StartListStitchService : IStartListStitchService
                 select new ResultKeyRow(r.Id, r.CompetitionId, m.SwimmerId, r.StyleId, r.Distance, r.Heat, r.Lane))
             .ToListAsync(ct));
 
+        // Единственный день — дате спорить не о чем: у однодневного старта расхождение на сутки
+        // бывает от того, что источник и протокол печатают разные календарные дни. Но только
+        // если и заявки ОДНОЙ даты: у многодневки, затянутой пока первым днём (16891, И-60),
+        // фоллбек цеплял к нему заявки всех дней, и завтрашние заплывы становились неявками.
+        var singleDayFallback = days.Count == 1
+                                && entries.Select(e => e.CompDate.Date).Distinct().Count() == 1;
+
         var linked = 0;
         var unlinked = 0;
         foreach (var entry in entries)
         {
             var day = dayByDate.GetValueOrDefault(entry.CompDate.Date)
-                      // Единственный день — дата спорить не о чем: у однодневного старта
-                      // расхождение на сутки бывает от того, что источник и протокол
-                      // печатают разные календарные дни одного соревнования.
-                      ?? (days.Count == 1 ? days[0] : null);
+                      ?? (singleDayFallback ? days[0] : null);
 
-            if (day is null) { unlinked++; continue; }
+            if (day is null)
+            {
+                // Дня этой заявки в базе нет (ещё не затянут) — заявка ждёт, как до импорта.
+                // Сброс, а не «не трогать»: прежний прогон мог прицепить её не к тому дню.
+                entry.CompetitionId = null;
+                entry.ResultId = null;
+                entry.Status = CompetitionEntryStatus.Entered;
+                unlinked++;
+                continue;
+            }
 
             entry.CompetitionId = day.Id;
             linked++;
@@ -118,9 +131,11 @@ public sealed class StartListStitchService : IStartListStitchService
 
         var scoped = entries.Where(e => e.CompetitionId is not null).ToList();
         var (matched, byDiscipline) = MatchToResults(scoped, results);
+        var swumEvents = SwumEvents(scoped, matched, results);
 
         var swum = 0;
         var noShow = 0;
+        var notSwumYet = 0;
         foreach (var entry in scoped)
         {
             if (matched.TryGetValue(entry.Id, out var resultId))
@@ -129,18 +144,24 @@ public sealed class StartListStitchService : IStartListStitchService
                 entry.Status = CompetitionEntryStatus.Swum;
                 swum++;
             }
-            else
+            else if (swumEvents.Contains(EventKey(entry)))
             {
                 entry.ResultId = null;
                 entry.Status = CompetitionEntryStatus.NoShow;
                 noShow++;
+            }
+            else
+            {
+                entry.ResultId = null;
+                entry.Status = CompetitionEntryStatus.Entered;
+                notSwumYet++;
             }
         }
 
         await _db.SaveChangesAsync(ct);
 
         return new StartListStitchReport(
-            orgCompId, days.Count, entries.Count, linked, swum, noShow, byDiscipline, unlinked);
+            orgCompId, days.Count, entries.Count, linked, swum, noShow, byDiscipline, unlinked, notSwumYet);
     }
 
     private sealed record ResultKeyRow(
@@ -197,6 +218,33 @@ public sealed class StartListStitchService : IStartListStitchService
         }
 
         return (matched, byDiscipline);
+    }
+
+    /// <summary>Событие стартового протокола в своём дне: дисциплина loglig (у эстафет 9-10 и
+    /// 11-13 стиль и дистанция общие, а события разные).</summary>
+    private static (int CompetitionId, int OrgDisciplineId) EventKey(CompetitionEntry e) =>
+        (e.CompetitionId!.Value, e.OrgDisciplineId);
+
+    /// <summary>
+    /// События, которые уже плыли: хоть у одного заявленного пловца события в этот день есть
+    /// результат той же дисциплины — сшитый или нет (предварительные + финал не сшиваются, но
+    /// событие явно состоялось). У остальных результатов нет ни у кого: событие ещё впереди,
+    /// его заявки — не неявки (И-60: 16891 затягивали по ходу дня, и сшивка объявляла неявкой
+    /// всё непроплытое). Именно «по пловцу», а не «есть ли результаты дисциплины в дне»: у
+    /// проплытой эстафеты 9-10 и будущей 11-13 дисциплина одна, а пловцы разные.
+    /// </summary>
+    private static HashSet<(int, int)> SwumEvents(
+        List<CompetitionEntry> entries, Dictionary<long, long> matched, List<ResultKeyRow> results)
+    {
+        var hasResult = results
+            .Select(r => (r.CompetitionId, r.SwimmerId, r.StyleId, Norm(r.Distance)))
+            .ToHashSet();
+
+        return entries
+            .Where(e => matched.ContainsKey(e.Id)
+                        || hasResult.Contains((e.CompetitionId!.Value, e.SwimmerId, e.StyleId, Norm(e.Distance))))
+            .Select(EventKey)
+            .ToHashSet();
     }
 
     /// <summary>Дистанция сравнивается без регистра: источник печатает «4X50», протокол — «4x50».</summary>

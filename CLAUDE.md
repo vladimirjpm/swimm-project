@@ -46,7 +46,9 @@ plus repo-specific footguns.
 
 **Skills for recurring multi-step ops:** `/db-migrate` (EF migrations with the two-context flag),
 `/smoke-test-api` (build → run → poll → curl → stop, handles the build-lock),
-`/db-sync-from-prod` (локальная копия бизнес-данных с прода, слиянием).
+`/db-sync-from-prod` (локальная копия бизнес-данных с прода, слиянием),
+`/pull-to-prod` (затянуть соревнование в прод через ProdAdmin, в том числе идущее — по дням;
+инструкция [`docs/pull-to-prod.md`](docs/pull-to-prod.md)).
 
 ---
 

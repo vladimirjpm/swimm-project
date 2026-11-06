@@ -17,6 +17,11 @@ namespace Swimm.Application.Dtos;
 /// доверять.
 /// </param>
 /// <param name="Unlinked">Заявок не удалось отнести ни к одному дню (дата не совпала).</param>
+/// <param name="NotSwumYet">
+/// Заявок в событиях, которые ещё не плыли: ни у одного заявленного пловца события нет
+/// результата этой дисциплины в этот день. Остаются «entered», а не неявками — соревнование
+/// затягивают частями, пока оно идёт (И-60, 16891).
+/// </param>
 public sealed record StartListStitchReport(
     int OrgCompId,
     int Days,
@@ -25,4 +30,5 @@ public sealed record StartListStitchReport(
     int Swum,
     int NoShow,
     int MatchedByDiscipline,
-    int Unlinked);
+    int Unlinked,
+    int NotSwumYet = 0);
