@@ -57,6 +57,8 @@ internal static class StartListCli
         Console.WriteLine(
             $"Сшивка {report.OrgCompId}: дней {report.Days}, заявок {report.Entries}, " +
             $"привязано к дню {report.Linked}, проплыли {report.Swum}, без результата {report.NoShow}");
+        if (report.NotSwumYet > 0)
+            Console.WriteLine($"  в событиях, которые ещё не плыли (остались «заявлен»): {report.NotSwumYet}");
         if (report.MatchedByDiscipline > 0)
             Console.WriteLine($"  сматчено по дисциплине, а не по дорожке: {report.MatchedByDiscipline}");
         if (report.Unlinked > 0)

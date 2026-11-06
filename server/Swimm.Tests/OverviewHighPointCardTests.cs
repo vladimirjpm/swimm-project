@@ -209,6 +209,68 @@ public class OverviewHighPointCardTests
         Assert.Equal(once.Id, combined.SwimmerId);    // 800 против 500 — повтор не в счёт
     }
 
+    /// <summary>
+    /// Осенний старт: номинация — возраст В СЕЗОНЕ (год окончания сезона − год рождения), как у
+    /// loglig («בנות 10») и на всех экранах. Случай 06.11.2026: Сабина 2017 г.р. — 10, не 9.
+    /// </summary>
+    [Fact]
+    public async Task Legacy_AutumnMeet_AgeIsSeasonAge()
+    {
+        await using var kit = await OverviewTestKit.CreateAsync(nameof(Legacy_AutumnMeet_AgeIsSeasonAge));
+        var comp = await kit.AddCompetitionAsync();
+        var s = await kit.AddSwimmerAsync("Autumn", birthYear: 2017);
+        var row = kit.Row(comp, s, points: 187, gender: "female");
+        row.CompetitionDate = new DateTime(2026, 11, 6, 0, 0, 0, DateTimeKind.Utc);
+        await kit.AddRowsAsync(row);
+
+        var award = Assert.Single((await kit.OverviewAsync(comp)).HighPointAwards);
+
+        Assert.Equal(10, award.Age);   // 2027 − 2017; календарно было бы 9
+    }
+
+    /// <summary>То же для привязанного правила (GroupBy=age): корзина и подпись — сезонный возраст.</summary>
+    [Fact]
+    public async Task Rule_AutumnMeet_AgeIsSeasonAge()
+    {
+        await using var kit = await OverviewTestKit.CreateAsync(nameof(Rule_AutumnMeet_AgeIsSeasonAge));
+        var comp = await CompetitionWithRuleAsync(kit, PlacementRule());
+        var s = await kit.AddSwimmerAsync("Autumn", birthYear: 2017);
+        var row = kit.Row(comp, s, position: 1, gender: "female");
+        row.CompetitionDate = new DateTime(2026, 11, 6, 0, 0, 0, DateTimeKind.Utc);
+        await kit.AddRowsAsync(row);
+
+        var award = Assert.Single((await kit.OverviewAsync(comp)).HighPointAwards);
+
+        Assert.Equal(10, award.Age);
+        Assert.Equal(5, award.Points);
+    }
+
+    /// <summary>
+    /// Рекордный бонус ищет ступень справочника КАЛЕНДАРНО (ось справочника федерации), даже
+    /// когда номинация уже сезонная: осенью 2024 пловец 2012 г.р. — Age 12 по справочнику
+    /// и 13 в номинации.
+    /// </summary>
+    [Fact]
+    public async Task Rule_AutumnMeet_RecordStepStaysCalendar()
+    {
+        await using var kit = await OverviewTestKit.CreateAsync(nameof(Rule_AutumnMeet_RecordStepStaysCalendar));
+        kit.Db.Add(new Record
+        {
+            RegionType = "country", RegionCode = "ISR", Category = "age", AgeKey = "12",
+            Gender = "male", PoolType = "50m", Style = "freestyle", Distance = "100m", Time = "1:00.00"
+        });
+        var comp = await CompetitionWithRuleAsync(kit, PlacementRule(r => { r.RecordPoints = 13; r.RecordTiePoints = 8; }));
+        var s = await kit.AddSwimmerAsync("Equal", birthYear: 2012);
+        var row = kit.Row(comp, s, position: 2, timeMs: 60_000);
+        row.CompetitionDate = new DateTime(2024, 10, 20, 0, 0, 0, DateTimeKind.Utc);
+        await kit.AddRowsAsync(row);
+
+        var award = Assert.Single((await kit.OverviewAsync(comp)).HighPointAwards);
+
+        Assert.Equal(13, award.Age);     // номинация — сезон 2024/25
+        Assert.Equal(8, award.Points);   // повторён рекорд Age 12 — ступень календарная
+    }
+
     /// <summary>Пол строки неизвестен («none») — в номинации ♂/♀ она не попадает.</summary>
     [Fact]
     public async Task UnknownGenderRow_IsExcluded()

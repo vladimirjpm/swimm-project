@@ -181,6 +181,8 @@ internal static class LogligCli
                           $"станет {relayReport.PointsAfter}, официально {relayReport.OfficialPoints}");
         if (relayReport.UnreadableEvents is { Count: > 0 } unreadableEvents)
             Console.WriteLine($"  loglig не отдал события (пропущены): {string.Join(", ", unreadableEvents)}");
+        if (relayReport.NotSwumEvents is { Count: > 0 } notSwumEvents)
+            Console.WriteLine($"  ещё не проплыты, ни одного времени (пропущены): {string.Join(", ", notSwumEvents)}");
 
         if (relayReport.Plan.Problems.Count > 0)
         {

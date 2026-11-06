@@ -84,6 +84,17 @@ public sealed record RelayBandPlan(
 /// </summary>
 public static class LogligRelayBandMatcher
 {
+    /// <summary>
+    /// Эстафетное событие ещё не проплыто: у источника нет ни одной команды с временем.
+    /// Бывает у идущего соревнования (16891, 05.11.2026): страница уже есть, а в ней только
+    /// заявленные команды без результата, по две у клуба — ключ «клуб + no-time» дублируется,
+    /// и весь план становился неприменимым из-за событий, которых ещё не было. Чинить в таком
+    /// событии нечего, у нас его строк тоже нет — пропускаем целиком. Событие, где время есть
+    /// хоть у одной команды, идёт в матчинг как обычно, вместе со своими DQ/NS.
+    /// </summary>
+    public static bool IsNotSwumYet(IEnumerable<int?> teamTimesMs) =>
+        !teamTimesMs.Any(t => t is not null);
+
     public static RelayBandPlan Build(
         IReadOnlyList<RelayRowFromSource> source,
         IReadOnlyList<RelayRowInDb> db)
@@ -156,9 +167,13 @@ public static class LogligRelayBandMatcher
     /// Имя клуба у источника и в базе пишется одинаково, но апострофы бывают разными
     /// символами («מוניר אבו ח'ליס») — приводим к ивритскому гершу, как это уже делает
     /// сопоставление имён пловцов. Пробелы схлопываются: в HTML их печатает вёрстка.
+    /// Порядок слов не важен: латинское имя клуба страница и PDF пишут по-разному
+    /// («Eilat Swimming» против «Swimming Eilat», 16891, 05.11.2026) — тот же набор слов.
     /// </summary>
     private static string NormalizeClub(string club) =>
         string.Join(' ', club
             .Replace('\'', '׳').Replace('’', '׳').Replace('‘', '׳').Replace('`', '׳')
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(w => w.ToLowerInvariant())
+            .Order(StringComparer.Ordinal));
 }

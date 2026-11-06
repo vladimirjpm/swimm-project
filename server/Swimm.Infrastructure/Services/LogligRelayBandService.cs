@@ -28,10 +28,11 @@ public sealed class LogligRelayBandService(
 
         // Соревнование ищем по OrgCompId и по всем дням: эстафеты многодневки могут лежать
         // в разных днях, а идентичность события — это OrgCompId (Д2), не название.
-        var competitions = await db.Competitions.AsNoTracking()
-            .Where(c => c.OrgCompId == discovered.OrgCompId)
+        // Через общий шов: OrgCompId уникален и стоит только на одном дне, остальные дни
+        // приходят через событие (И-60 — день 06.11 у 16891 был не виден).
+        var competitions = (await CompetitionIdentity.ResolveDaysAsync(db, discovered.OrgCompId, ct))
             .Select(c => new { c.Id, c.Date, c.IsMasters, c.PointRuleClubsId })
-            .ToListAsync(ct);
+            .ToList();
         if (competitions.Count == 0)
             throw new InvalidOperationException(
                 $"Соревнование с OrgCompId {discovered.OrgCompId} ещё не импортировано — " +
@@ -46,6 +47,7 @@ public sealed class LogligRelayBandService(
         var source = new List<RelayRowFromSource>();
         var relayEvents = 0;
         var unreadable = new List<int>();
+        var notSwum = new List<int>();
 
         foreach (var eventId in eventIds)
         {
@@ -68,6 +70,11 @@ public sealed class LogligRelayBandService(
             if (!ev.IsRelay) continue;
 
             relayEvents++;
+            if (LogligRelayBandMatcher.IsNotSwumYet(ev.Rows.Select(r => SwimTime.ParseToMs(r.Time))))
+            {
+                notSwum.Add(eventId);
+                continue;
+            }
             foreach (var r in ev.Rows)
                 source.Add(new RelayRowFromSource(
                     ev.StyleName, ev.Distance, r.Club, SwimTime.ParseToMs(r.Time), r.Position,
@@ -107,7 +114,7 @@ public sealed class LogligRelayBandService(
 
         return new LogligRelayBandReport(
             competitionName, relayEvents, source.Count, ours.Count,
-            source.Sum(r => r.OfficialClubPoints), pointsBefore, pointsAfter, applied, plan, unreadable);
+            source.Sum(r => r.OfficialClubPoints), pointsBefore, pointsAfter, applied, plan, unreadable, notSwum);
     }
 
     /// <summary>
