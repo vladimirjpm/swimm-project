@@ -28,7 +28,9 @@ public class SuspectResultService(SwimmDbContext db) : ISuspectResultService
                 r.Id, r.SwimmerId, r.Style.Name, r.Distance, r.Gender,
                 r.TimeMillisecond, r.CompetitionDate, r.RelayId != null, r.TimeFail, r.AgeGroup,
                 r.IsParaPoints ? 0 : r.InternationalPoints, r.HeatType, r.Round, r.Heat, r.Swimmer.Gender,
-                r.Competition.PoolType))
+                // SeedTimeMs и EntryHeatKey дописываются ниже, по заявкам (null здесь — позиционно,
+                // дерево выражений не принимает именованные аргументы не по порядку).
+                r.Competition.PoolType, null, null, r.Position, r.TimeFailNote))
             .ToListAsync(ct);
 
         var seeds = await LoadSeedsAsync(db, scope, ct);

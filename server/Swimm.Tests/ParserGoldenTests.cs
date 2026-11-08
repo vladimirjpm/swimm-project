@@ -33,6 +33,7 @@ public class ParserGoldenTests
         ("Maccabiah-2026_IL_HE.pdf", "HE"),
         ("MastersWinter2025_6595_relay_then_individual_HE.pdf", "HE"),
         ("MastersWinter2026_13805_relay_mix_bands_EN.pdf", "EN"),
+        ("League3BeitShemesh2025_16753_one_digit_minutes_HE.pdf", "HE"),
         ("OpenLeague2Haifa2025_1658_doubled_rows_HE.pdf", "HE"),
         ("OpenWaterEilat2025_6601_K_headers_EN.pdf", "EN"),
         ("OpenWaterEilat2025_6601_K_headers_HE.pdf", "HE"),

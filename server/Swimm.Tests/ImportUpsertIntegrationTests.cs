@@ -212,6 +212,34 @@ public class ImportUpsertIntegrationTests
         Assert.Equal(1, (await db.Results.SingleAsync(r => !r.TimeFail)).Position);
     }
 
+    /// <summary>
+    /// Р90: место без времени и БЕЗ статуса — время не записали (16891, 50 вольным мальчики 13:
+    /// двое «00:00.00» на 1-м месте). Место остаётся, как напечатано, строка — проплытая
+    /// (TimeFail=false, времени нет). Со статусом (NS/DQ) — по-прежнему без места (И-18).
+    /// </summary>
+    [Fact]
+    public async Task PlacedWithoutTime_NoStatus_KeepsPrintedPlace()
+    {
+        await using var db = CreateDb(nameof(PlacedWithoutTime_NoStatus_KeepsPrintedPlace));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        var noTime = new
+        {
+            country = "ISR", competition = "Comp", date = "05/11/2026",
+            event_style_name = "Freestyle", event_style_len = "50", event_style_gender = "male",
+            pool_type = "25m", position = 1, heat = 11, lane = 1,
+            last_name = "Alhazov", first_name = "Uriel", birth_year = 2014, club = "Club",
+            time = (string?)null, time_fail = true, time_fail_note = (string?)null,
+        };
+
+        var result = await svc.ImportAsync(ToStream(new object[] { noTime, Item("Levi", "Dan", 2014, lane: 5) }));
+
+        Assert.Empty(result.ErrorMessages);
+        var stored = await db.Results.SingleAsync(r => r.TimeMillisecond == null);
+        Assert.Equal(1, stored.Position);
+        Assert.False(stored.TimeFail);
+    }
+
     [Fact]
     public async Task MediaSurvivesReimport()
     {

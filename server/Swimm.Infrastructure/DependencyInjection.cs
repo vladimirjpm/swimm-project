@@ -237,6 +237,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, PlaceWithoutTimeCheck>();
         services.AddScoped<ILogligEventPullService, LogligEventPullService>();
         services.AddScoped<ILogligRelayBandService, LogligRelayBandService>();
+        services.AddScoped<ILogligPlaceRepairService, LogligPlaceRepairService>();
         services.AddScoped<IDataCheck, SwimmerDedupCheck>();
         services.AddScoped<IDataCheck, ClubDedupCheck>();
         services.AddScoped<IDataCheck, SwimmerOrphanCheck>();

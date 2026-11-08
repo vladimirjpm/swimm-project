@@ -39,6 +39,13 @@ public static class SuspectReasons
     /// </summary>
     public const string SeedTimeJump = "seed_time_jump";
 
+    /// <summary>
+    /// Протокол напечатал МЕСТО у строки без времени и без статуса (DQ/NS/DNF) — время не
+    /// записали. Место оставляем, как напечатано, строка с чипом «Under review» (Р90,
+    /// решение Влада 07.11.2026). 16891, 50 вольным мальчики 13: двое «00:00.00» на 1-м месте.
+    /// </summary>
+    public const string PlacedWithoutTime = "placed_without_time";
+
     /// <summary>Поставлено человеком. Переживает переимпорт (в отличие от автоматических).</summary>
     public const string Manual = "manual";
 
@@ -46,6 +53,14 @@ public static class SuspectReasons
     public static readonly string[] Automatic =
     [
         TimeOutlier, TimeVsDistance, RelayTimeInIndividual, GenderMismatch, DuplicateSwim,
-        PersonalOutlier, SeedTimeJump
+        PersonalOutlier, SeedTimeJump, PlacedWithoutTime
     ];
+
+    /// <summary>
+    /// Строка «место без времени» (Р90): личная, без времени, без статуса снятия, но с местом
+    /// в протоколе. Единственное определение — его зовут импорт, проверка качества и сверка
+    /// мест с loglig. DQ/NS/DNS/DNF несут статус, и их номер в протоколе местом не является (И-18).
+    /// </summary>
+    public static bool IsPlacedWithoutTime(bool isRelay, int? timeMs, string? failNote, int? position) =>
+        !isRelay && timeMs is null or <= 0 && string.IsNullOrWhiteSpace(failNote) && position is > 0;
 }

@@ -83,6 +83,61 @@ public class LogligEventResultsParserTests
     /// полос видел «у источника 0» при 132 наших. Настоящая полоса суммы возрастов — только в
     /// подзаголовке секции («מאסטרס שליחות 100-119»), в шапке события — общая «21-99».
     /// </summary>
+    /// <summary>
+    /// Личное событие без клубного зачёта (16891, loglig 15896, 06.11.2026): 8 колонок — место,
+    /// имя, ГОД, клуб, заплыв, дорожка, время, FINA. По одному числу колонок это мастерская
+    /// эстафета, и строка съезжала на колонку: год пустой, клуб «2015», заплыв 0, время не
+    /// читалось (И-62, сверка мест не нашла ни одной пары).
+    /// </summary>
+    [Fact]
+    public void IndividualWithoutClubStanding_EightColumns_BirthYearRead()
+    {
+        var ev = LogligEventResultsParser.Parse(Fixture("event-85705-200im-girls-noclubpoints.html"));
+
+        Assert.False(ev.IsRelay);
+        Assert.Equal("individual_medley", ev.StyleName);
+        Assert.Equal("200", ev.Distance);
+        Assert.Equal("female", ev.Gender);
+        Assert.NotEmpty(ev.Rows);
+        Assert.All(ev.Rows, r =>
+        {
+            Assert.True(r.BirthYear is >= 2000 and <= 2020, $"{r.FullName}: год {r.BirthYear}");
+            Assert.True(r.Heat > 0, $"{r.FullName}: заплыв {r.Heat}");
+            Assert.Null(r.ClubPoints);
+            Assert.Null(r.PersonalPoints);
+        });
+
+        var yarden = Assert.Single(ev.Rows, r => r.FullName.Contains("שייכט"));
+        Assert.Equal(2015, yarden.BirthYear);
+        Assert.Contains("דולפין", yarden.Club);
+        Assert.Equal(5, yarden.Heat);
+        Assert.Equal(6, yarden.Lane);
+        Assert.Equal("03:13.32", yarden.Time);
+        Assert.Equal(249, yarden.InternationalPoints);
+        Assert.Contains("כללי", yarden.Category);
+    }
+
+    /// <summary>
+    /// Время с часами «00:00:00.00» (16891, 50 вольным мальчики, 05.11.2026): у двоих с местом 1
+    /// время не записали. Раньше шаблон брал «00:00.00», а «00:» уходил в статус — строка
+    /// выглядела снятой. Теперь: времени нет, статуса нет, место 1 (Р90). Обычное время с той
+    /// же страницы читается как раньше.
+    /// </summary>
+    [Fact]
+    public void ZeroTimeWithHours_IsNoTimeWithoutStatus()
+    {
+        var ev = LogligEventResultsParser.Parse(Fixture("event-85623-50free-boys-zero-time.html"));
+
+        var zero = ev.Rows.Single(r => r.FullName.Contains("אלחזוב"));
+        Assert.Null(zero.Time);
+        Assert.Null(zero.FailNote);
+        Assert.Equal(1, zero.Position);
+
+        var markus = ev.Rows.Single(r => r.FullName.Contains("יעקובוביץ"));
+        Assert.Equal("00:29.62", markus.Time);
+        Assert.Equal(3, markus.Position);
+    }
+
     [Fact]
     public void MastersRelay_EightColumns_RowsAreRead()
     {

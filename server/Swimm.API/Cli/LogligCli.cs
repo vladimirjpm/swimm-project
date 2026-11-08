@@ -156,6 +156,76 @@ internal static class LogligCli
         return;
     }
 
+    // Сверка ЛИЧНЫХ строк с пособытийным источником и ремонт мест (И-62):
+    //   dotnet run -- --pull-places <discoveredId> [--apply] [--report <file.tsv>]
+    // PDF сводит секцию «כללי» обоих полов в один список со сквозными местами; страница события
+    // у loglig одного пола. Сверяет место, время, год по паре «день+дисциплина+пол+заплыв+дорожка»,
+    // пишет только МЕСТО и только у пар с тем же временем и годом. Без --apply — dry-run.
+    internal static async Task PullPlacesAsync(WebApplication app, string[] args)
+    {
+        var index = Array.IndexOf(args, "--pull-places") + 1;
+        if (index >= args.Length || !int.TryParse(args[index], out var discoveredId))
+        {
+            Console.Error.WriteLine("Usage: dotnet run -- --pull-places <discoveredId> [--apply] [--report <file.tsv>]");
+            Environment.ExitCode = 1;
+            return;
+        }
+        var reportIndex = Array.IndexOf(args, "--report") + 1;
+        var reportPath = reportIndex > 0 && reportIndex < args.Length ? args[reportIndex] : null;
+
+        using var scope = app.Services.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<ILogligPlaceRepairService>();
+        var report = await svc.RepairAsync(discoveredId, args.Contains("--apply"));
+        var plan = report.Plan;
+
+        Console.WriteLine($"«{report.CompetitionName}»: личных событий {report.Events}, " +
+                          $"строк у источника {report.SourceRows}, у нас {report.DbRows}, сопоставлено {plan.Changes.Count}");
+        if (report.UnreadableEvents.Count > 0)
+            Console.WriteLine($"  loglig не отдал события (пропущены): {string.Join(", ", report.UnreadableEvents)}");
+
+        var changes = plan.Changes.Where(c => c.WillApply).ToList();
+        Console.WriteLine($"  «כללי» — место к правке: {changes.Count}, из них медаль меняется у " +
+                          $"{changes.Count(c => (c.PositionBefore is >= 1 and <= 3) != (c.PositionAfter is >= 1 and <= 3))}");
+        foreach (var g in changes.GroupBy(c => $"{c.Date} {c.Distance} {c.StyleName} · {c.Gender}"))
+            Console.WriteLine($"      {g.Key}: {g.Count()}");
+        foreach (var c in changes.Take(8))
+            Console.WriteLine($"      #{c.ResultId} {c.FullName}: место {c.PositionBefore} → {c.PositionAfter}");
+
+        // Возрастные секции не пишем: там расхождение — напечатанное в протоколе (Р76).
+        var ageSections = plan.Changes.Where(c => c.HasChanges && !c.IsOpenSection).ToList();
+        Console.WriteLine($"  возрастные секции — место расходится, НЕ пишем (решает человек): {ageSections.Count}");
+        foreach (var c in ageSections.Take(30))
+            Console.WriteLine($"      {c.Date} {c.Distance} {c.StyleName} · {c.Category} · #{c.ResultId} {c.FullName}: " +
+                              $"у нас {c.PositionBefore}, по секции источника {c.PositionAfter}");
+
+        Console.WriteLine($"  время или год не совпали (место не трогаем): {plan.Mismatches.Count}");
+        foreach (var m in plan.Mismatches.Take(30)) Console.WriteLine($"      {m}");
+        Console.WriteLine($"  без пары: {plan.Unmatched.Count}");
+        foreach (var u in plan.Unmatched.Take(30)) Console.WriteLine($"      {u}");
+
+        if (reportPath != null)
+        {
+            await File.WriteAllLinesAsync(reportPath, plan.Changes
+                .Select(c => string.Join('\t', c.ResultId, c.Date, c.Distance, c.StyleName, c.Gender, c.Category,
+                    c.FullName, c.PositionBefore, c.PositionAfter, c.HasChanges ? "change" : ""))
+                .Prepend("result_id\tdate\tdistance\tstyle\tgender\tcategory\tname\tplace_before\tplace_after\tstatus")
+                .Concat(plan.Mismatches.Select(m => "mismatch\t" + m))
+                .Concat(plan.Unmatched.Select(u => "unmatched\t" + u)));
+            Console.WriteLine($"Отчёт: {reportPath}");
+        }
+
+        if (!plan.CanApply)
+        {
+            Console.WriteLine($"  НЕПРИМЕНИМО — общий ключ, пары не доказаны ({plan.Problems.Count}):");
+            foreach (var p in plan.Problems.Take(20)) Console.WriteLine($"      {p}");
+            return;
+        }
+
+        Console.WriteLine(report.Applied > 0
+            ? $"ПРИМЕНЕНО: обновлено мест {report.Applied}, дни события пересчитаны"
+            : "Ничего не записано (dry-run). Повторите с --apply.");
+    }
+
     // Ремонт зачётных полос эстафет по пособытийному источнику (data-integrity §10):
     //   dotnet run -- --pull-relays <discoveredId> [--apply]
     // PDF печатает эстафеты сквозной дисциплиной (пол «none», места через все полосы), а сайт

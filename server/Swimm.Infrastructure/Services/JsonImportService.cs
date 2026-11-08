@@ -841,6 +841,8 @@ public class JsonImportService : IImportService
         // 8. ResultRecord — added to batch; Relay and Gallery inserted via navigation on batch save
         private void AddRecord(ResultJsonItem item)
         {
+            var placedWithoutTime = item.TimeFail && SuspectReasons.IsPlacedWithoutTime(
+                item.IsRelay == true, ParseTimeToMs(item.Time), item.TimeFailNote, item.Position);
             var record = new ResultRecord
             {
                 CompetitionId = competition.Id,
@@ -871,14 +873,16 @@ public class JsonImportService : IImportService
                 // витрины как «#2 🥈» рядом со словом DSQ (инцидент И-18,
                 // docs/data-integrity.md). Режем на ЗАПИСИ: иначе про это правило
                 // обязан помнить каждый читающий репозиторий, а их полдюжины.
-                Position = item.TimeFail ? null : item.Position,
-                PositionAgeGroup = item.TimeFail ? null : item.PositionAgeGroup,
+                // Исключение — Р90: место без времени и без статуса (время не записали) остаётся,
+                // как напечатано; строка считается проплытой, её пометит проверка качества.
+                Position = item.TimeFail && !placedWithoutTime ? null : item.Position,
+                PositionAgeGroup = item.TimeFail && !placedWithoutTime ? null : item.PositionAgeGroup,
                 Heat = item.Heat ?? 0,
                 Lane = item.Lane ?? 0,
                 TimeMillisecond = ParseTimeToMs(item.Time),
                 TimeOriginal = item.Time ?? string.Empty,
                 TimeSplit = item.TimeSplit ?? string.Empty,
-                TimeFail = item.TimeFail,
+                TimeFail = item.TimeFail && !placedWithoutTime,
                 TimeFailNote = item.TimeFailNote,
                 InternationalPoints = item.InternationalPoints ?? 0,
                 Note = item.Note,
@@ -943,12 +947,21 @@ public class JsonImportService : IImportService
                     ResultMatcher.KeyOfPersisted, ResultMatcher.KeyOfTransient,
                     ResultMatcher.DiscriminatorOfPersisted, ResultMatcher.DiscriminatorOfTransient);
 
+                // Тот же пловец под другим полом (И-63): пол в базе выровнял человек — не откатываем.
+                var crossGender = match.CrossGender.Select(p => p.Old).ToHashSet();
+
                 foreach (var (old, incoming) in match.Matched)
                 {
                     if (old.SwimmerId != incoming.SwimmerId)
                         orphanCandidateSwimmerIds.Add(old.SwimmerId); // может осиротеть анонимная заглушка (Р5, Маккабиада-кейс)
 
+                    var storedGender = old.Gender;
                     ApplyPayloadUpdate(old, incoming);
+                    if (crossGender.Contains(old))
+                    {
+                        old.Gender = storedGender;
+                        diagnosticLog.Add($"Upsert: result {old.Id} — пол в файле {incoming.Gender}, в базе {storedGender}; оставлен хранимый (И-63)");
+                    }
                     ApplyRelayUpdate(_db, old, incoming);
                     ApplyGalleryUpdate(_db, old, incoming);
 
