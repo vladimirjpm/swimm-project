@@ -360,9 +360,12 @@ export function actionLabel(meet: CalendarMeet): string | null {
   return link.external ? 'Details ↗' : 'Details →';
 }
 
-/** Многодневка в процессе (частично загружена) — куб на 2 колонки с полосой дней. */
+/**
+ * Многодневка с протоколами — куб на 2 колонки с полосой дней: в процессе (часть дней) и
+ * затянутая целиком (все ✓; решение Влада 08.11.2026 — иначе двухдневный старт выглядит однодневным).
+ */
 export function isWideCube(meet: CalendarMeet): boolean {
-  return meet.status === 'in_progress';
+  return meet.days_total > 1 && (meet.status === 'in_progress' || meet.status === 'complete');
 }
 
 /** Индекс недели сетки месяца (`monthGrid`), в которой лежит дата; -1 — нет. */
