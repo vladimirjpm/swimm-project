@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -92,13 +93,23 @@ public static partial class LogligEventResultsParser
             if (cells.Count is not (8 or 9 or 10) && !(isRelay && cells.Count == 7)) continue;
             if (cells[0] == "מיקום") continue;   // строка заголовков таблицы
 
+            // Год рождения узнаём по содержимому, а не по числу колонок: у личного события
+            // без клубного зачёта 8 колонок — место, имя, ГОД, клуб, заплыв, дорожка, время,
+            // FINA (16891, И-62), а у мастерской эстафеты тоже 8, но без года и с клубными
+            // очками. Колонки очков — то, что осталось после FINA: обе (личные + клубные),
+            // одна (клубные) или ни одной.
+            var hasBirthYear = cells.Count == 10 || (!isRelay && IsBirthYear(cells[2]));
+            var pointColumns = cells.Count - (hasBirthYear ? 8 : 7);
             var row = ParseRow(cells, round, category,
-                hasBirthYear: cells.Count == 10, hasPersonalPoints: cells.Count is 9 or 10);
+                hasBirthYear: hasBirthYear, hasPersonalPoints: pointColumns >= 2);
             if (row is not null) rows.Add(row);
         }
 
         return new LogligEventResults(competition, date, style, distance, gender, ageBand, isRelay, rows);
     }
+
+    private static bool IsBirthYear(string cell) =>
+        cell.Length == 4 && int.TryParse(cell, out var year) && year is >= 1900 and <= 2100;
 
     private static LogligResultRow? ParseRow(
         List<string> cells, string round, string category, bool hasBirthYear, bool hasPersonalPoints)
@@ -115,7 +126,8 @@ public static partial class LogligEventResultsParser
         var (time, failNote) = ParseTime(cells[i++]);
         var fina = ParseInt(cells[i++]) ?? 0;
         var personal = hasPersonalPoints ? ParseInt(cells[i++]) : null;
-        // Колонки «ניקוד קבוצתי» нет у эстафеты без клубного зачёта (7 колонок).
+        // Колонки «ניקוד קבוצתי» нет у соревнования без клубного зачёта (эстафета — 7 колонок,
+        // личное — 8 с годом).
         var clubPoints = i < cells.Count ? ParseInt(cells[i]) : null;
 
         return new LogligResultRow(
@@ -212,7 +224,17 @@ public static partial class LogligEventResultsParser
         if (!m.Success) return (null, string.IsNullOrWhiteSpace(cell) ? null : cell);
 
         var note = cell.Remove(m.Index, m.Length).Trim();
-        return (m.Value, string.IsNullOrWhiteSpace(note) ? null : note);
+        var failNote = string.IsNullOrWhiteSpace(note) ? null : note;
+
+        // Время бывает и с часами: «00:00:00.00» (16891, И-62). Раньше шаблон брал из него
+        // «00:00.00», а «00:» уходил в статус — и строка «время не записали» читалась как снятая.
+        var minutes = int.Parse(m.Groups["m"].Value, CultureInfo.InvariantCulture)
+                      + (m.Groups["h"].Success ? int.Parse(m.Groups["h"].Value, CultureInfo.InvariantCulture) * 60 : 0);
+        var rest = m.Groups["s"].Value;
+
+        // Нулевое время — «времени нет», а не результат (Р90: место без времени).
+        if (minutes == 0 && rest == "00.00") return (null, failNote);
+        return ($"{minutes:00}:{rest}", failNote);
     }
 
     /// <summary>
@@ -256,6 +278,6 @@ public static partial class LogligEventResultsParser
     [GeneratedRegex("""^\d+[xX]\d+|^\d+""")]
     private static partial Regex DistanceRx();
 
-    [GeneratedRegex("""\d{1,2}:\d{2}\.\d{2}""")]
+    [GeneratedRegex("""(?:(?<h>\d{1,2}):)?(?<m>\d{1,2}):(?<s>\d{2}\.\d{2})""")]
     private static partial Regex TimeRx();
 }

@@ -532,4 +532,26 @@ public class SuspectResultDetectorTests
         var all = Detect(rows).Where(v => v.ResultId == 1).ToList();
         Assert.Single(all);
     }
+
+    /// <summary>
+    /// Р90: место без времени и без статуса — пометка «placed_without_time», место не трогаем.
+    /// Снятый со статусом (NS) и строка без места — не метятся. Правило работает, даже когда
+    /// во всём наборе нет ни одного времени (раньше проверка выходила сразу).
+    /// </summary>
+    [Fact]
+    public void PlacedWithoutTime_Flagged_StatusOrNoPlace_NotFlagged()
+    {
+        var rows = new List<SuspectCandidateRow>
+        {
+            new(1, 1, "freestyle", "50", "male", null, Day1, false, false, "13-14", Position: 1),
+            new(2, 2, "freestyle", "50", "male", null, Day1, false, true, "13-14", Position: 2, TimeFailNote: "NS"),
+            new(3, 3, "freestyle", "50", "male", null, Day1, false, false, "13-14"),
+        };
+
+        var v = Assert.Single(Detect(rows));
+
+        Assert.Equal(1, v.ResultId);
+        Assert.Equal(SuspectReasons.PlacedWithoutTime, v.Reason);
+        Assert.Contains("место 1", v.Note);
+    }
 }

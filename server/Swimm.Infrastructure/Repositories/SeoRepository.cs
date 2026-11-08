@@ -88,11 +88,30 @@ public class SeoRepository : ISeoRepository
             // lastmod — дата последнего старта на странице (Results.CompetitionDate): новое
             // соревнование меняет страницы своих пловцов и клубов, и краулер видит это по дате.
 
-            // Соревнования — все: у каждого есть страница результатов.
-            var competitions = await _db.Competitions.AsNoTracking()
-                .OrderBy(x => x.Id)
-                .Select(x => new { x.Id, Last = _db.Results.Where(r => r.CompetitionId == x.Id).Max(r => (DateTime?)r.CompetitionDate) })
+            // Соревнования: однодневные — все; многодневка — ОДНИМ адресом (первый день), lastmod —
+            // по всему событию. Адрес любого дня открывает на витрине всё событие
+            // (findSourceForCompetitionId на клиенте), так что дни 2…N — дубли одной страницы;
+            // раньше sitemap отдавал каждый день, и человек из поиска попадал на день 1
+            // чемпионата 6594 — 43 строки из 3968 (08.11.2026).
+            var rows = await _db.Competitions.AsNoTracking()
+                .Select(x => new
+                {
+                    x.Id,
+                    x.EventId,
+                    x.DayNumber,
+                    x.Date,
+                    Last = _db.Results.Where(r => r.CompetitionId == x.Id).Max(r => (DateTime?)r.CompetitionDate),
+                })
                 .ToListAsync(ct);
+            var competitions = rows
+                .GroupBy(x => x.EventId is { } e ? -e : x.Id) // одиночные — сами по себе, дни — по событию
+                .Select(g => new
+                {
+                    Id = CompetitionDays.FirstId(g.Select(x => new CompetitionDays.Day(x.Id, x.DayNumber, x.Date))),
+                    Last = g.Max(x => x.Last),
+                })
+                .OrderBy(x => x.Id)
+                .ToList();
 
             // Клубы — живые: без псевдоклубов и без склеенных (их canonical — у того, в кого склеены).
             var clubs = await LiveClubs()

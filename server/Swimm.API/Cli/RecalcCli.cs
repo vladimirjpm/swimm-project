@@ -18,6 +18,25 @@ internal static class RecalcCli
         return;
     }
 
+    // Пересчёт производных одного соревнования (объединённые места, пара-очки, клубный зачёт —
+    // всё событие), как после импорта или правки результата:
+    //   dotnet run -- --recalc-competition <competitionId>
+    // Нужен после правки строк SQL-файлом (prod-sql.mjs): та идёт мимо сервиса и пересчёт не
+    // вызывает (И-63, 07.11.2026: удалены дубли comp 1580).
+    internal static async Task RecalcCompetitionAsync(WebApplication app, string[] args)
+    {
+        var i = Array.IndexOf(args, "--recalc-competition");
+        if (i + 1 >= args.Length || !int.TryParse(args[i + 1], out var competitionId))
+        {
+            Console.Error.WriteLine("Usage: dotnet run -- --recalc-competition <competitionId>");
+            return;
+        }
+        using var scope = app.Services.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<ICompetitionRecalculationService>();
+        var updated = await svc.RecalculateCompetitionAsync(competitionId);
+        Console.WriteLine($"Соревнование {competitionId}: пересчитано строк — {updated}, клубный зачёт пересобран");
+    }
+
     // Флаг пара-очков (Р67) во всех соревнованиях:
     //   dotnet run -- --para-points-scan
     // Разово после миграции AddResultIsParaPoints; штатно флаг ставит пересчёт соревнования.

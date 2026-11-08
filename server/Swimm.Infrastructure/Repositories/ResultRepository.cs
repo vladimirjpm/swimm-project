@@ -467,6 +467,8 @@ public partial class ResultRepository : IResultRepository
                 ShowCombine = !_db.Competitions.Any(c => c.EventId == e.Id && !c.ShowCombineAllResults),
                 ResultCount = _db.Results.Count(r => r.Competition.EventId == e.Id),
                 DayDates = _db.Competitions.Where(c => c.EventId == e.Id).Select(c => c.Date).ToList(),
+                Days = _db.Competitions.Where(c => c.EventId == e.Id)
+                    .Select(c => new { c.Id, c.DayNumber, c.Date }).ToList(),
                 // Страны всех дней (alpha-3 коды) — фильтр по country применяем ниже, в памяти (Any).
                 DayCountries = _db.Competitions.Where(c => c.EventId == e.Id)
                     .Select(c => c.Country != null ? c.Country.CountryCode : "").ToList()
@@ -582,7 +584,9 @@ public partial class ResultRepository : IResultRepository
                 Status = StatusFor(e.StartDate, e.EndDate, today),
                 DayCount = e.DayCount,
                 ResultCount = e.ResultCount,
-                DayDates = SortDayDates(e.DayDates)
+                DayDates = SortDayDates(e.DayDates),
+                // Порядок дней — общий с sitemap (CompetitionDays): дата, DayNumber, Id.
+                DayIds = CompetitionDays.OrderedIds(e.Days.Select(d => new CompetitionDays.Day(d.Id, d.DayNumber, d.Date)))
             }));
         }
 
@@ -605,7 +609,8 @@ public partial class ResultRepository : IResultRepository
                 Status = StatusFor(d == default ? null : d, null, today),
                 DayCount = 1,
                 ResultCount = c.ResultCount,
-                DayDates = string.IsNullOrWhiteSpace(c.Date) ? [] : [c.Date]
+                DayDates = string.IsNullOrWhiteSpace(c.Date) ? [] : [c.Date],
+                DayIds = [c.Id]
             }));
         }
 

@@ -408,6 +408,56 @@ public class SeoPagesTests
         Assert.DoesNotContain($"/swimmers/{unknownYear.Id}", paths);
     }
 
+    /// <summary>
+    /// Многодневка — ОДНИМ адресом (первый день по дате), lastmod — по всему событию. Адрес
+    /// любого дня открывает на витрине всё событие; раньше sitemap отдавал каждый день, и из
+    /// поиска приходили на день 1 чемпионата 6594 — 43 строки из 3968 (08.11.2026).
+    /// </summary>
+    [Fact]
+    public async Task Sitemap_MultiDayEvent_OneEntry_FirstDay_LastmodOfWholeEvent()
+    {
+        await using var db = CreateDb(nameof(Sitemap_MultiDayEvent_OneEntry_FirstDay_LastmodOfWholeEvent));
+        var style = new Style { Name = "freestyle" };
+        var ev = new CompetitionEvent { Name = "אליפות" };
+        var single = new Competition { Name = "ליגה", Date = "01/10/2026", PoolType = "25m" };
+        db.AddRange(style, ev, single);
+        await db.SaveChangesAsync();
+        // Id дня 2 меньше, чем у дня 1 (день доимпортирован раньше) — первым всё равно день по дате.
+        var day2 = new Competition { Name = "אליפות", Date = "25/12/2024", PoolType = "25m", EventId = ev.Id, DayNumber = 2 };
+        var day1 = new Competition { Name = "אליפות", Date = "24/12/2024", PoolType = "25m", EventId = ev.Id, DayNumber = 1 };
+        var s = NewSwimmer("x");
+        db.AddRange(day2, day1, s);
+        await db.SaveChangesAsync();
+        var late = Result(day2.Id, s.Id, style.Id);
+        late.CompetitionDate = new DateTime(2024, 12, 25);
+        var early = Result(day1.Id, s.Id, style.Id);
+        early.CompetitionDate = new DateTime(2024, 12, 24);
+        db.Results.AddRange(late, early, Result(single.Id, s.Id, style.Id));
+        await db.SaveChangesAsync();
+
+        var entries = await new SeoRepository(db, new NullCacheService()).GetSitemapAsync();
+        var comps = entries.Where(e => e.Path.StartsWith("/competitions/")).ToList();
+
+        Assert.Equal(2, comps.Count);
+        Assert.Contains(comps, e => e.Path == $"/competitions/{single.Id}");
+        var evEntry = Assert.Single(comps, e => e.Path == $"/competitions/{day1.Id}");
+        Assert.Equal(new DateOnly(2024, 12, 25), evEntry.LastModified);
+    }
+
+    [Fact]
+    public void CompetitionDays_OrderByDateThenDayNumberThenId_UnparsableLast()
+    {
+        var ids = CompetitionDays.OrderedIds([
+            new(10, 3, "26/12/2024"),
+            new(5, null, ""),
+            new(30, 1, "24/12/2024"),
+            new(20, 2, "24/12/2024"),
+            new(1, 2, "25/12/2024"),
+        ]);
+
+        Assert.Equal([30, 20, 1, 10, 5], ids);
+    }
+
     [Fact]
     public async Task SwimmerFacts_PrivateGroupSwimmer_IsNull_NameNeverReachesHtml()
     {

@@ -54,6 +54,13 @@ public sealed class ResultMatch<TOld, TNew>
     public List<(TOld Old, TNew New)> Matched { get; } = [];
     public List<TNew> Inserted { get; } = [];
     public List<TOld> Deleted { get; } = [];
+
+    /// <summary>
+    /// Подмножество <see cref="Matched"/>: тот же пловец, тот же заплыв и дорожка, но пол строки
+    /// в базе другой (И-63). Пол у таких пар хранимый — его выровнял человек, перезабор его не
+    /// откатывает (см. <c>ResultMatcher.SamePerson.cs</c>).
+    /// </summary>
+    public List<(TOld Old, TNew New)> CrossGender { get; } = [];
 }
 
 /// <summary>
@@ -98,7 +105,7 @@ public sealed class ResultMatch<TOld, TNew>
 /// случай); частичная замена внутри группы теперь не путает уже опознанные ноги друг с другом.
 /// </para>
 /// </remarks>
-public static class ResultMatcher
+public static partial class ResultMatcher
 {
     public static ResultMatch<TOld, TNew> Match<TOld, TNew>(
         IReadOnlyList<TOld> oldRows,
@@ -110,11 +117,19 @@ public static class ResultMatcher
     {
         var result = new ResultMatch<TOld, TNew>();
 
+        // Предпроход (И-63): тот же пловец под другим полом — до ключевого матча, иначе строка
+        // ушла бы в чужой ключ. Сматченные исключаются из всего, что ниже.
+        var (takenOld, takenNew) = PairSamePersonAcrossGender(result, oldRows, newRows,
+            oldKeySelector, newKeySelector, oldDiscriminatorSelector, newDiscriminatorSelector);
+        var claimed = SwimmersClaimingKeys(newRows, takenNew, newKeySelector, newDiscriminatorSelector);
+
         // Старые строки, сгруппированные по ключу, в порядке следования — плюс параллельный
         // массив "занята ли позиция i уже матчем" на группу (для FIFO-доматча после SwimmerId-прохода).
         var oldByKey = new Dictionary<ResultMatchKey, List<TOld>>();
-        foreach (var old in oldRows)
+        for (var oi = 0; oi < oldRows.Count; oi++)
         {
+            if (takenOld.Contains(oi)) continue;
+            var old = oldRows[oi];
             var key = oldKeySelector(old);
             if (!oldByKey.TryGetValue(key, out var list))
             {
@@ -127,8 +142,10 @@ public static class ResultMatcher
         foreach (var (key, list) in oldByKey)
             consumed[key] = new bool[list.Count];
 
-        foreach (var @new in newRows)
+        for (var ni = 0; ni < newRows.Count; ni++)
         {
+            if (takenNew.Contains(ni)) continue;
+            var @new = newRows[ni];
             var key = newKeySelector(@new);
             var matched = false;
 
@@ -159,9 +176,13 @@ public static class ResultMatcher
                 // по SwimmerId (анонимные ноги, либо обычный единственный кандидат в группе).
                 if (!matched)
                 {
+                    var newSwimmer = newDiscriminatorSelector(@new).SwimmerId;
                     for (var i = 0; i < bucket.Count; i++)
                     {
-                        if (!flags[i])
+                        // Строку другого пловца не забираем, если он сам есть в файле под этим
+                        // ключом (И-63): она — его, а не «свободная позиция».
+                        if (!flags[i] && !IsClaimedByAnother(claimed, key,
+                                oldDiscriminatorSelector(bucket[i]).SwimmerId, newSwimmer))
                         {
                             result.Matched.Add((bucket[i], @new));
                             flags[i] = true;

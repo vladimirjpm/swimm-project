@@ -44,7 +44,11 @@ public sealed record SuspectCandidateRow(
     /// <summary>Заплыв по заявке: «OrgDisciplineId/Heat». Номер заплыва сам по себе не
     /// ключ — «заплыв 1» в одном дне бывает у нескольких событий одной дисциплины (на
     /// comp 1772 у 200 вольным девушек их два).</summary>
-    string? EntryHeatKey = null);
+    string? EntryHeatKey = null,
+    /// <summary>Место из протокола. Нужно правилу «место без времени» (Р90).</summary>
+    int? Position = null,
+    /// <summary>Статус вместо времени (DQ/NS/DNF). Есть статус — номер в протоколе не место (И-18).</summary>
+    string? TimeFailNote = null);
 
 /// <summary>
 /// Заплыв пловца из его личной истории (для правила «выброс относительно себя»).
@@ -200,18 +204,25 @@ public static class SuspectResultDetector
     {
         var verdicts = new Dictionary<long, SuspectVerdict>();
 
-        // Эстафеты вне скоупа: у них время команды, а состав и ноги считаются иначе.
-        var timed = rows
-            .Where(r => !r.IsRelay && !r.TimeFail && r.TimeMilliseconds is > 0)
-            .ToList();
-        if (timed.Count == 0) return [];
-
         void Flag(SuspectCandidateRow row, string reason, string note)
         {
             // Первое сработавшее правило побеждает — порядок вызовов ниже и есть приоритет.
             if (!verdicts.ContainsKey(row.ResultId))
                 verdicts[row.ResultId] = new SuspectVerdict(row.ResultId, reason, note);
         }
+
+        // 0. Место без времени (Р90): протокол напечатал место, а время не записали. Место
+        //    остаётся как есть — это напечатанное (Р76), строка получает чип «Under review».
+        foreach (var row in rows.Where(r => !r.TimeFail
+                     && SuspectReasons.IsPlacedWithoutTime(r.IsRelay, r.TimeMilliseconds, r.TimeFailNote, r.Position)))
+            Flag(row, SuspectReasons.PlacedWithoutTime,
+                $"В протоколе место {row.Position} без времени — время не записали; место оставлено, как напечатано");
+
+        // Эстафеты вне скоупа: у них время команды, а состав и ноги считаются иначе.
+        var timed = rows
+            .Where(r => !r.IsRelay && !r.TimeFail && r.TimeMilliseconds is > 0)
+            .ToList();
+        if (timed.Count == 0) return verdicts.Values.OrderBy(v => v.ResultId).ToList();
 
         var wr = worldBests ?? WorldBestReference.Empty;
 

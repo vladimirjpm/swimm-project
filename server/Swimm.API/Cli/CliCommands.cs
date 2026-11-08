@@ -17,6 +17,7 @@ internal static class CliCommands
         (args => args.Contains("--grant-admin"), DatabaseCli.GrantAdminAsync),
         (args => args.Contains("--generate-vapid-keys"), PushCli.GenerateVapidKeysAsync),
         (args => args.Contains("--recalc-combined"), RecalcCli.RecalcCombinedAsync),
+        (args => args.Contains("--recalc-competition"), RecalcCli.RecalcCompetitionAsync),
         (args => args.Contains("--para-points-scan"), RecalcCli.ParaPointsScanAsync),
         (args => args.Contains("--rebuild-club-standings"), RecalcCli.RebuildClubStandingsAsync),
         (args => args.Contains("--hubgroup-club-sync"), RecalcCli.HubgroupClubSyncAsync),
@@ -45,6 +46,7 @@ internal static class CliCommands
         (args => args.Contains("--quality-scan"), RecalcCli.QualityScanAsync),
         (args => args.Contains("--pull-events"), LogligCli.PullEventsAsync),
         (args => args.Contains("--pull-relays"), LogligCli.PullRelaysAsync),
+        (args => args.Contains("--pull-places"), LogligCli.PullPlacesAsync),
         (args => args.Contains("--points-diff"), LogligCli.PointsDiffAsync),
         // Псевдоним --check-data (была вторая копия с другим выводом); место в списке прежнее.
         (args => args.Contains("--data-checks"), DataChecksCli.CheckDataAsync),

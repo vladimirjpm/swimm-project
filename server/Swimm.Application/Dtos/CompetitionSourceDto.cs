@@ -70,6 +70,14 @@ public sealed class CompetitionSourceDto
     [JsonPropertyName("day_dates")]
     public IReadOnlyList<string> DayDates { get; init; } = [];
 
+    /// <summary>Id соревнований-дней (Competitions.Id) по порядку дней: для события — все дни,
+    /// для однодневного — он сам. Нужен клиенту, чтобы адрес ДНЯ (<c>/competitions/{dayId}</c> —
+    /// из поиска, sitemap, по номеру isr.org.il) открывал всё событие, а не один день:
+    /// день 1 чемпионата 6594 — это 43 строки из 3968, и это читалось как «не хватает
+    /// заплывов» (08.11.2026).</summary>
+    [JsonPropertyName("day_ids")]
+    public IReadOnlyList<int> DayIds { get; init; } = [];
+
     [JsonPropertyName("result_count")]
     public int ResultCount { get; init; }
 }

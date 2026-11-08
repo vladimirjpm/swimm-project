@@ -1,10 +1,13 @@
 import React from 'react';
-import { parseRoute } from '../../../utils/routes';
+import { parseRoute, routes } from '../../../utils/routes';
 import {
   resolveCategoryKey,
   ResultsCategory,
 } from '../../../utils/constants/results-categories';
-import { CompetitionSource } from '../../../utils/helpers/competition-source';
+import {
+  CompetitionSource,
+  findSourceForCompetitionId,
+} from '../../../utils/helpers/competition-source';
 
 // Компонент может монтироваться несколько раз — грузить данные
 // по URL-параметрам должен только один инстанс.
@@ -66,7 +69,14 @@ export const useUrlInit = ({
     } else if (eventId) {
       target = sources.find((s) => s.kind === 'event' && String(s.id) === eventId);
     } else if (competitionId) {
-      target = sources.find((s) => s.kind === 'competition' && String(s.id) === competitionId);
+      target = findSourceForCompetitionId(sources, competitionId);
+      // Адрес дня многодневки → адрес события: дальше страница живёт как выбранное событие
+      // (обновление, «поделиться», Change), прочие параметры (tab, swim, swimmerId) — как были.
+      if (target?.kind === 'event') {
+        params.delete('competitionId');
+        params.set('eventId', String(target.id));
+        window.history.replaceState(null, '', `${routes.results()}?${params.toString()}`);
+      }
     }
 
     if (target) {
@@ -79,7 +89,8 @@ export const useUrlInit = ({
       }
       return;
     }
-    // Конкретный id вне списка (например, день события) — грузим напрямую, таб не трогаем.
+    // Конкретный id вне списка (день события теперь находится по day_ids выше; сюда — id,
+    // которого в списке нет совсем) — грузим напрямую, таб не трогаем.
     if (competitionId || eventId) {
       if (!urlLoadTriggered) {
         urlLoadTriggered = true;

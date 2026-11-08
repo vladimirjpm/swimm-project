@@ -207,6 +207,28 @@ BEGIN
         END IF;
 
         EXECUTE format('CREATE TEMP TABLE %I ON COMMIT DROP AS %s', '_gone_' || t.tbl, gone_sql);
+
+        -- Переставленные Id (08.11.2026: сезон 24/25 затянут пакетом и тут, и на проде, но в
+        -- разном порядке — локальный 1779 = прод-1780 и наоборот, 40 соревнований). Строку-не-лист,
+        -- чей Id ЕСТЬ на проде, а уникальный ключ на проде у другой строки, удалять нельзя: на тот же
+        -- Id на проде ссылаются дети через RESTRICT (Results → Competitions), а RESTRICT Postgres не
+        -- откладывает — удаление падает, хотя upsert тут же вернул бы строку. Такая строка
+        -- переписывается на месте: шаг 4-бис гасит её уникальные колонки, upsert кладёт прод-строку
+        -- поверх, детей-переносимых перевесит их собственный upsert. Пловец группы (Р71) — не сюда:
+        -- его Id на проде занят другим человеком, и он уходит вместе со своими тренировками.
+        EXECUTE format(
+            'CREATE TEMP TABLE %I ON COMMIT DROP AS SELECT g.* FROM %I g WHERE %s AND EXISTS (SELECT 1 FROM _sync.%I s WHERE %s)',
+            '_inplace_' || t.tbl, '_gone_' || t.tbl,
+            CASE WHEN is_leaf THEN 'false'
+                 WHEN t.tbl = 'Swimmers' THEN 'g."PrivateHubGroupId" IS NULL'
+                 ELSE 'true' END,
+            t.tbl,
+            (SELECT string_agg(format('s.%1$I = g.%1$I', c), ' AND ') FROM unnest(pk_cols) c));
+        EXECUTE format('DELETE FROM %I WHERE (%s) IN (SELECT %s FROM %I)',
+                       '_gone_' || t.tbl, pk_list, pk_list, '_inplace_' || t.tbl);
+        GET DIAGNOSTICS n = ROW_COUNT;
+        IF n > 0 THEN RAISE NOTICE 'Id переставлен на проде: % — % (перепишутся на месте)', t.tbl, n; END IF;
+
         EXECUTE format('SELECT count(*) FROM %I', '_gone_' || t.tbl) INTO n;
         IF n > 0 THEN RAISE NOTICE 'уходит: % — %', t.tbl, n; END IF;
     END LOOP;
@@ -245,6 +267,59 @@ BEGIN
         pk_list := (SELECT string_agg(format('%I', c), ', ') FROM unnest(pk_cols) c);
         EXECUTE format('DELETE FROM public.%I WHERE (%s) IN (SELECT %s FROM %I)',
                        t.tbl, pk_list, pk_list, '_gone_' || t.tbl);
+    END LOOP;
+
+    -- ── 4-бис. Переставленные Id: погасить уникальные колонки до upsert ──────
+    -- Иначе прод-строка с Id 1779 упрётся в уникальный ключ, который пока держит локальная 1780.
+    -- Уникальные индексы не отложены. Колонка индекса — первая NULL-допустимая (NULL не равен
+    -- ничему), иначе первая текстовая ('~sync:' || ключ — таких значений на проде нет).
+    -- Upsert ниже перезапишет всё прод-значениями.
+    FOR t IN SELECT tbl FROM _sync_tables LOOP
+        EXECUTE format('SELECT count(*) FROM %I', '_inplace_' || t.tbl) INTO n;
+        CONTINUE WHEN n = 0;
+
+        SELECT array_agg(a.attname) INTO pk_cols
+          FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+         WHERE i.indrelid = format('public.%I', t.tbl)::regclass AND i.indisprimary;
+        pk_list := (SELECT string_agg(format('%I', c), ', ') FROM unnest(pk_cols) c);
+
+        set_list := NULL;
+        cols := ARRAY[]::text[];
+        FOR ux IN
+            SELECT array_agg(a.attname ORDER BY array_position(x.indkey::int2[], a.attnum)) AS ucols
+              FROM pg_index x
+              JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = ANY(x.indkey)
+             WHERE x.indrelid = format('public.%I', t.tbl)::regclass
+               AND x.indisunique AND NOT x.indisprimary AND x.indexprs IS NULL
+             GROUP BY x.indexrelid
+        LOOP
+            CONTINUE WHEN ux.ucols::text[] && cols;   -- индекс уже погашен общей колонкой
+            cmp_l := NULL;
+            SELECT a.attname INTO cmp_l
+              FROM unnest(ux.ucols) WITH ORDINALITY u(c, o)
+              JOIN pg_attribute a ON a.attrelid = format('public.%I', t.tbl)::regclass AND a.attname = u.c
+             WHERE NOT a.attnotnull ORDER BY u.o LIMIT 1;
+            IF cmp_l IS NOT NULL THEN
+                set_list := concat_ws(', ', set_list, format('%I = NULL', cmp_l));
+            ELSE
+                SELECT a.attname INTO cmp_l
+                  FROM unnest(ux.ucols) WITH ORDINALITY u(c, o)
+                  JOIN pg_attribute a ON a.attrelid = format('public.%I', t.tbl)::regclass AND a.attname = u.c
+                 WHERE a.atttypid IN ('text'::regtype, 'varchar'::regtype) ORDER BY u.o LIMIT 1;
+                IF cmp_l IS NULL THEN
+                    RAISE EXCEPTION 'Переставленный Id в %: уникальный ключ % не погасить (нет NULL-допустимой и текстовой колонки)',
+                                    t.tbl, ux.ucols;
+                END IF;
+                set_list := concat_ws(', ', set_list, format('%I = %L || concat_ws(%L, %s)', cmp_l, '~sync:', ':',
+                    (SELECT string_agg(format('%I', c), ', ') FROM unnest(pk_cols) c)));
+            END IF;
+            cols := cols || cmp_l;
+        END LOOP;
+
+        IF set_list IS NOT NULL THEN
+            EXECUTE format('UPDATE public.%I SET %s WHERE (%s) IN (SELECT %s FROM %I)',
+                           t.tbl, set_list, pk_list, pk_list, '_inplace_' || t.tbl);
+        END IF;
     END LOOP;
 
     -- ── 5. Upsert: родители раньше детей (проверки FK всё равно отложены) ────
