@@ -748,6 +748,44 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
 
 /* ── Competition group ───────────────────────────────────────────────────── */
 
+/** Заплывы карточки по дням (`date`, yyyy-MM-dd) в порядке появления — сортировку списка наследуем. */
+function swimsByDay(swims: MySwimDto[]): { date: string; swims: MySwimDto[] }[] {
+  const byDay = new Map<string, MySwimDto[]>();
+  for (const s of swims) {
+    const list = byDay.get(s.date) ?? [];
+    list.push(s);
+    byDay.set(s.date, list);
+  }
+  return Array.from(byDay, ([date, list]) => ({ date, swims: list }));
+}
+
+/** yyyy-MM-dd → dd/MM/yyyy — формат даты в шапке карточки (`competition_date`). */
+function isoToDmy(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return d ? `${d}/${m}/${y}` : iso;
+}
+
+/** Полоса дня внутри карточки многодневки: день недели · дата · сколько заплывов. */
+function DayDivider({ date, count }: { date: string; count: number }) {
+  const [y, m, d] = date.split('-').map(Number);
+  const weekday = new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' });
+  return (
+    <div className="flex items-center gap-2 bg-[var(--t-nested)] px-4 py-1.5 sm:px-5">
+      <span className="hp-mono text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent)]">
+        {weekday}
+      </span>
+      <UI_DateIcon
+        styleType="row-style-1"
+        date={date}
+        fontClassName="hp-mono text-[10.5px] font-extrabold text-[var(--t-text)]"
+      />
+      <span className="hp-mono text-[10px] text-[var(--t-text-2)]">
+        · {count} {count === 1 ? 'swim' : 'swims'}
+      </span>
+    </div>
+  );
+}
+
 function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, preferredSwimmerId, cb }: {
   swims: MySwimDto[];
   compMedia: SwimMediaDto[];
@@ -762,8 +800,18 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
   const anyPodium = swims.some((s) => s.place != null && s.place <= 3);
   const anyPb = swims.some((s) => s.is_pb);
   const anySb = swims.some((s) => s.is_sb);
-  // Дата в шапке группы одна на всех — колонку DATE держим только там, где дни разные.
-  const showDate = swims.some((s) => !sameDay(first.competition_date, s.date));
+  // Дни карточки (многодневка — одна карточка на событие): разные дни — полосы-разделители.
+  const days = useMemo(() => swimsByDay(swims), [swims]);
+  const multiDay = days.length > 1;
+  // Разделители уже несут дату, колонка DATE — только у однодневной карточки, где день
+  // заплыва всё же разошёлся с датой в шапке.
+  const showDate = !multiDay && swims.some((s) => !sameDay(first.competition_date, s.date));
+  // Самый ранний день карточки: к нему «+ Photo/Video» цепляет медиа события — как кнопка в
+  // шапке соревнования (первый день).
+  const earliest = days[days.length - 1].swims[0];
+  const headerDate = multiDay
+    ? `${isoToDmy(days[days.length - 1].date)} – ${isoToDmy(days[0].date)}`
+    : first.competition_date;
   const selectedName = preferredSwimmerId != null ? swimmerNames.get(preferredSwimmerId) ?? null : null;
   // Подписи колонок — ровно по сетке строки (`.mms-row`), поэтому ширины здесь больше нет:
   // и шапка, и строка тянут её из одного grid-шаблона в `my-media.css`.
@@ -816,7 +864,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
             isChampionship={first.is_championship}
           />
         </div>
-        <span className="hp-mono text-[11px] font-extrabold text-[var(--t-accent)]">{first.competition_date}</span>
+        <span className="hp-mono text-[11px] font-extrabold text-[var(--t-accent)]">{headerDate}</span>
         <span className="text-[11.5px] text-[var(--t-text-2)]">{first.pool_type}</span>
         {anyPodium && <span title="Podium finish">🏅</span>}
         <BestMark pb={anyPb} sb={anySb} />
@@ -835,7 +883,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
           )}
           <button
             type="button"
-            onClick={() => cb.onAddCompMedia(first.competition_id, first.competition_name)}
+            onClick={() => cb.onAddCompMedia(earliest.competition_id, earliest.competition_name)}
             className="hp-mono rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
           >
             + Photo/Video
@@ -870,16 +918,21 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
       </div>
 
       <div className="divide-y divide-[var(--t-accent-soft)]">
-        {swims.map((s) => (
-          <MySwimRow
-            key={s.result_id}
-            swim={s}
-            showSwimmerName={showSwimmerName}
-            showDate={showDate}
-            showCheers={showCheers}
-            swimmerName={rowSwimmerName(s, swimmerNames, preferredSwimmerId)}
-            cb={cb}
-          />
+        {days.map((day) => (
+          <React.Fragment key={day.date}>
+            {multiDay && <DayDivider date={day.date} count={day.swims.length} />}
+            {day.swims.map((s) => (
+              <MySwimRow
+                key={s.result_id}
+                swim={s}
+                showSwimmerName={showSwimmerName}
+                showDate={showDate}
+                showCheers={showCheers}
+                swimmerName={rowSwimmerName(s, swimmerNames, preferredSwimmerId)}
+                cb={cb}
+              />
+            ))}
+          </React.Fragment>
         ))}
       </div>
     </div>
@@ -888,48 +941,48 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
 
 /* ── Root ────────────────────────────────────────────────────────────────── */
 
+/**
+ * Ключ карточки: многодневка — ОДНА карточка на событие (решение Влада 08.11.2026; на сайте
+ * событие и так открывается целиком, И-64), однодневное — по дню.
+ */
+function cardKey(competitionId: number, eventId: number | null): string {
+  return eventId != null ? `e${eventId}` : `c${competitionId}`;
+}
+
 function SwimList({ swims, competitionMedia, showSwimmerName, swimmerNames, preferredSwimmerId = null, ...cb }: Props) {
   const groups = useMemo(() => {
-    const byComp = new Map<number, MySwimDto[]>();
+    const byCard = new Map<string, MySwimDto[]>();
     for (const s of swims) {
-      const list = byComp.get(s.competition_id) ?? [];
+      const key = cardKey(s.competition_id, s.event_id);
+      const list = byCard.get(key) ?? [];
       list.push(s);
-      byComp.set(s.competition_id, list);
+      byCard.set(key, list);
     }
     // swims приходят отсортированными по дате DESC — порядок групп наследуем.
-    return Array.from(byComp.values());
+    return Array.from(byCard.entries());
   }, [swims]);
 
   // Медиа «ко всему соревнованию» привязано к ДНЮ (кнопка в шапке соревнования цепляет к
-  // первому), а карточка собрана по дню заплывов. Медиа дня без своей карточки отдаём
-  // карточке другого дня того же события — иначе на /my-media его не видно нигде (30.09.2026).
-  const compMediaByComp = useMemo(() => {
-    const cardDays = new Set(groups.map((g) => g[0].competition_id));
-    const cardByEvent = new Map<number, number>();
-    for (const g of groups) {
-      const ev = g[0].event_id;
-      if (ev != null && !cardByEvent.has(ev)) cardByEvent.set(ev, g[0].competition_id);
-    }
-    const map = new Map<number, SwimMediaDto[]>();
+  // первому). Карточка многодневки — на всё событие, поэтому медиа любого её дня — её.
+  const compMediaByCard = useMemo(() => {
+    const map = new Map<string, SwimMediaDto[]>();
     for (const m of competitionMedia) {
       if (m.competition_id == null) continue;
-      const key = !cardDays.has(m.competition_id) && m.event_id != null
-        ? cardByEvent.get(m.event_id) ?? m.competition_id
-        : m.competition_id;
+      const key = cardKey(m.competition_id, m.event_id ?? null);
       const list = map.get(key) ?? [];
       list.push(m);
       map.set(key, list);
     }
     return map;
-  }, [groups, competitionMedia]);
+  }, [competitionMedia]);
 
   return (
     <div className="flex flex-col gap-4">
-      {groups.map((g) => (
+      {groups.map(([key, g]) => (
         <CompetitionGroup
-          key={g[0].competition_id}
+          key={key}
           swims={g}
-          compMedia={compMediaByComp.get(g[0].competition_id) ?? []}
+          compMedia={compMediaByCard.get(key) ?? []}
           showSwimmerName={showSwimmerName}
           swimmerNames={swimmerNames}
           preferredSwimmerId={preferredSwimmerId}
