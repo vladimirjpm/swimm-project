@@ -81,7 +81,8 @@ function DeepDisplaySettingsCard({
 }: Props) {
   // Выбирать можно только КАРТИНКИ: ссылка на видео ушла бы в <img src> битой. Превью с
   // YouTube клиент считать умеет, но сервер — нет, а решает указатель именно он.
-  const photos = media.filter((m) => m.media_type === 'image');
+  // Папка Drive (альбом) тоже бывает image, но картинкой шапки быть не может.
+  const photos = media.filter((m) => m.media_type === 'image' && !HelperMedia.isAlbumUrl(m.url));
   const [show, setShow] = useState(showHeroImage);
   const [url, setUrl] = useState(coverImageUrl ?? '');
   const [mediaId, setMediaId] = useState<number | null>(heroMediaId ?? null);

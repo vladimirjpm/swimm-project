@@ -38,11 +38,14 @@ interface Props {
   contextLabel?: React.ReactNode;
 }
 
-type Detected = 'YOUTUBE' | 'VIMEO' | 'PHOTO' | 'OTHER';
+type Detected = 'YOUTUBE' | 'VIMEO' | 'PHOTO' | 'ALBUM' | 'OTHER';
 
 function detectType(url: string): Detected {
   if (/youtu\.?be/i.test(url)) return 'YOUTUBE';
   if (/vimeo/i.test(url)) return 'VIMEO';
+  // Папка Drive хранится как image/other (новой формы на сервере не заводим), а узнаётся
+  // при показе по самой ссылке — HelperMedia.isAlbumUrl.
+  if (HelperMedia.isAlbumUrl(url)) return 'ALBUM';
   if (/\.(jpe?g|png|webp|gif|heic)(\?|#|$)/i.test(url) || /imgur|googleusercontent|photos\.app/i.test(url)) return 'PHOTO';
   return 'OTHER';
 }
@@ -72,7 +75,8 @@ function AddLinkModal({
 
   const detected = detectType(url.trim());
   const isOther = detected === 'OTHER';
-  const kind: 'video' | 'photo' = detected === 'PHOTO' ? 'photo' : isOther ? otherKind : 'video';
+  const isAlbum = detected === 'ALBUM';
+  const kind: 'video' | 'photo' = detected === 'PHOTO' || isAlbum ? 'photo' : isOther ? otherKind : 'video';
 
   useEffect(() => {
     if (step !== 3 || swimmerId == null) return;
@@ -173,7 +177,12 @@ function AddLinkModal({
                   )}
                 </div>
                 <div className="flex aspect-video items-center justify-center rounded-[12px] border border-[var(--t-border)] bg-[var(--t-surface2)]">
-                  {kind === 'photo' && /^https?:\/\//i.test(url) ? (
+                  {isAlbum ? (
+                    <span className="flex flex-col items-center gap-1 px-4 text-center text-[12.5px] text-[var(--t-text-2)]">
+                      <span className="text-[28px]">📁</span>
+                      Google Drive folder — opens as an album. Keep it shared: Anyone with the link → Viewer.
+                    </span>
+                  ) : kind === 'photo' && /^https?:\/\//i.test(url) ? (
                     <img src={HelperMedia.directImageUrl(url)} referrerPolicy="no-referrer" alt="" className="h-full w-full rounded-[12px] object-cover" />
                   ) : (
                     <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--t-accent-border)] bg-[var(--t-scrim)] text-[16px] text-[var(--t-accent)]">

@@ -25,8 +25,9 @@ function MediaCard({ item, publications, onOpenLightbox, onDelete, onWithdraw, o
 
   const isEmbeddable = item.media_type === 'video' && (item.source_type === 'youtube' || item.source_type === 'vimeo');
   const thumb = HelperMedia.resolveThumbUrl(item.media_type, item.source_type, item.url);
-  const srcLabel = item.media_type === 'image' ? 'PHOTO' : item.source_type.toUpperCase();
-  const playGlyph = item.media_type === 'image' ? '🖼' : '▶';
+  const isAlbum = HelperMedia.isAlbumUrl(item.url);
+  const srcLabel = isAlbum ? 'ALBUM' : item.media_type === 'image' ? 'PHOTO' : item.source_type.toUpperCase();
+  const playGlyph = isAlbum ? '📁' : item.media_type === 'image' ? '🖼' : '▶';
 
   const chips: { label: string; status: CardStatus }[] =
     publications.length === 0
