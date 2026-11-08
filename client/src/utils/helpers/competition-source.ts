@@ -20,6 +20,9 @@ export type CompetitionSource = {
   result_count: number;
   /** даты дней (dd/MM/yyyy, по возрастанию) — опции фильтра по дню в paged-режиме */
   day_dates: string[];
+  /** id соревнований-дней по порядку (у однодневного — он сам). По нему адрес дня
+   *  `/competitions/{dayId}` узнаёт своё событие — см. `findSourceForCompetitionId`. */
+  day_ids?: number[];
   /** Чемпионат Израиля — ручной флаг из админки (Competition.IsChampionship). */
   is_championship?: boolean;
 };
@@ -145,3 +148,17 @@ export function competitionTileData(src: CompetitionTileSource | undefined | nul
 
 export const sourceUrlParam = (src: CompetitionSource): [string, string] =>
   src.kind === 'event' ? ['eventId', String(src.id)] : ['competitionId', String(src.id)];
+
+/**
+ * Источник для адреса `/competitions/{id}`. Однодневное — оно само. День многодневки в списке
+ * отдельной записью не живёт (событие свёрнуто), поэтому его ищем по `day_ids` события и
+ * открываем ВСЁ событие: адрес дня приходит из поиска, sitemap и по номеру isr.org.il
+ * (OrgCompId лежит на одном дне), а один день читался как «не хватает заплывов» —
+ * чемпионат 6594: день 1 = 43 строки из 3968 (08.11.2026).
+ */
+export const findSourceForCompetitionId = (
+  sources: CompetitionSource[],
+  competitionId: string,
+): CompetitionSource | undefined =>
+  sources.find((s) => s.kind === 'competition' && String(s.id) === competitionId)
+  ?? sources.find((s) => s.kind === 'event' && (s.day_ids ?? []).some((d) => String(d) === competitionId));
