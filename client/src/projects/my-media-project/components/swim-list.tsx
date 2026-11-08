@@ -13,6 +13,7 @@ import UI_DateIcon from '../../components/mix/date-icon/date-icon';
 import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-best-badge';
 import HelperSwimmer from '../../../utils/helpers/helper-swimmer';
 import HelperResults from '../../../utils/helpers/helper-results';
+import HelperMedia from '../../../utils/helpers/helper-media';
 import Helper from '../../../utils/helpers/data-helper';
 import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
 import CompetitionTile from '../../results-main-project/components/competition-header/competition-tile';
@@ -220,7 +221,8 @@ function StatusPill({ status, isPublic, pubs }: { status: CardStatus; isPublic: 
  * в кнопке невалидна и отдаёт клик по сердечку в воспроизведение.
  */
 function SourceChip({ m, onPlay, onToggleLike }: { m: SwimMediaDto; onPlay: () => void; onToggleLike: () => void }) {
-  const label = m.media_type === 'image' ? '🖼 PHOTO' : `▶ ${m.source_type.toUpperCase()}`;
+  const isAlbum = HelperMedia.isAlbumUrl(m.url);
+  const label = isAlbum ? '📁 ALBUM' : m.media_type === 'image' ? '🖼 PHOTO' : `▶ ${m.source_type.toUpperCase()}`;
   const like = likeVisual(m);
   return (
     <span className="hp-mono inline-flex w-[142px] shrink-0 items-stretch overflow-hidden rounded-[7px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] text-[10.5px] font-extrabold text-[var(--t-accent)]">
@@ -228,7 +230,7 @@ function SourceChip({ m, onPlay, onToggleLike }: { m: SwimMediaDto; onPlay: () =
         type="button"
         onClick={onPlay}
         className="min-w-0 flex-1 truncate px-2 py-[4px] text-left"
-        title={m.media_type === 'image' ? 'Open photo' : 'Play'}
+        title={isAlbum ? 'Open album' : m.media_type === 'image' ? 'Open photo' : 'Play'}
       >
         {label}
       </button>

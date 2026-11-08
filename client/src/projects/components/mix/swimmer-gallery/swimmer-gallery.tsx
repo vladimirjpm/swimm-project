@@ -17,7 +17,48 @@ interface UI_SwimmerGalleryProps {
   onClose?: () => void;
 }
 
+/**
+ * Папка Google Drive (альбом) — встроенная сетка превью папки. Клик по файлу Google открывает
+ * в новой вкладке — отсюда allow-popups-to-escape-sandbox. Google отдаёт папку 3–6 с (замер
+ * 08.11.2026), фрейм всё это время пустой, поэтому до `load` поверх — подпись «Loading».
+ * Убирать её по `load` обязательно: фон у страницы папки прозрачный, подпись просвечивала бы.
+ */
+const DriveFolderView: React.FC<{ embedUrl: string; url: string }> = ({ embedUrl, url }) => {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <div className="relative h-[70vh] w-full">
+        {!loaded && (
+          <span className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">
+            Loading album from Google Drive…
+          </span>
+        )}
+        <iframe
+          src={embedUrl}
+          title="Photo album"
+          onLoad={() => setLoaded(true)}
+          className="relative h-full w-full rounded border-0"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="self-end text-sm font-semibold text-blue-700 hover:underline"
+      >
+        Open in Google Drive ↗
+      </a>
+    </div>
+  );
+};
+
 const GalleryItemView: React.FC<{ item: GalleryItem }> = ({ item }) => {
+  // Папка Drive (альбом) — сетка превью папки во фрейме; в <img> она была бы пустой.
+  const folderEmbed = HelperMedia.driveFolderEmbedUrl(item.url);
+  if (folderEmbed) return <DriveFolderView key={folderEmbed} embedUrl={folderEmbed} url={item.url!} />;
+
   if (item.type === 'image') {
     return (
       <img

@@ -585,6 +585,18 @@ yours», «Added by you» и право удалить считаются по �
   «глазами посетителя» делает таб Admin (`DeepDisplaySettingsCard`): картинку Google грузит
   с `crossOrigin="anonymous"`, то есть без кук. Серверной проверки ссылок для этой формы нет
   сознательно (SSRF).
+- **Папка Google Drive = альбом, узнаётся по ссылке при показе** (08.11.2026). Влад добавил
+  папку фото Эйлата (`drive.google.com/drive/folders/{id}`) как медиа соревнования, она
+  сохранилась `image/other`, и лайтбокс был белым: папка — страница, а не картинка. Новой
+  формы в базе не заводили — `HelperMedia.isAlbumUrl` / `driveFolderEmbedUrl` узнают папку по
+  ссылке: плитка без превью (`resolveThumbUrl` → null), плашка `📁 ALBUM`, лайтбокс
+  `UI_SwimmerGallery` показывает встроенный вид папки (`embeddedfolderview?id=…#grid`, сетка
+  превью, клик открывает файл в Drive) + «Open in Google Drive ↗»; Add link пишет
+  `detected · ALBUM`; картинкой шапки папку выбрать нельзя. ⚠ Google отдаёт папку 3–6 с,
+  у страницы папки прозрачный фон — подпись «Loading» убирается по `load` фрейма.
+  ⚠ Папка — «Anyone with the link → Viewer», иначе посетитель увидит отказ. Чего НЕ
+  сделано: фото-хайлайт группы (`HubGroupHighlightsBuilder`, сервер) берёт первую `image`
+  галереи и для папки дал бы пустое превью; лайтбокс тренировок — свой (`training-lightbox`).
 - **`DevAdminBypass` ломает модерацию из curl.** Синтетический админ имеет
   `NameIdentifier = "0"`, а `DecidedByUserId` ссылается на `Sys_AppUsers` — решение по заявке
   падает 500 на FK. Это свойство обхода, а не ручки: под реальным логином id настоящий.

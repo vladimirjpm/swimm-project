@@ -33,6 +33,33 @@ export default class HelperMedia {
     return match ? match[1] : null;
   }
 
+  /**
+   * Id ПАПКИ Google Drive (`drive.google.com/drive/folders/{id}`, в т.ч. `/drive/u/0/folders/`).
+   * Папка — не картинка: в `<img>` она пустая (08.11.2026, папка фото Эйлата сохранилась как
+   * PHOTO, и лайтбокс показывал белый прямоугольник). Показываем её встроенным видом папки —
+   * см. `driveFolderEmbedUrl`.
+   */
+  static extractGoogleDriveFolderId(url?: string | null): string | null {
+    if (!url) return null;
+    const match = url.trim().match(/^https?:\/\/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([\w-]+)/i);
+    return match ? match[1] : null;
+  }
+
+  /** Ссылка — папка-альбом (Drive), а не один файл: плитка без превью, лайтбокс — сетка папки. */
+  static isAlbumUrl(url?: string | null): boolean {
+    return HelperMedia.extractGoogleDriveFolderId(url) != null;
+  }
+
+  /**
+   * Встроенный вид папки Drive — сетка превью всех файлов, клик открывает файл в Drive.
+   * Адрес неофициальный (как и `lh3` у картинок): сменит его Google — чинить здесь.
+   * ⚠ Папка должна быть открыта «Anyone with the link», иначе посетитель увидит отказ.
+   */
+  static driveFolderEmbedUrl(url?: string | null): string | null {
+    const id = HelperMedia.extractGoogleDriveFolderId(url);
+    return id ? `https://drive.google.com/embeddedfolderview?id=${id}#grid` : null;
+  }
+
   /** Любая ссылка на Google Drive — для подсказки «откройте доступ по ссылке». */
   static isGoogleDriveUrl(url?: string | null): boolean {
     return !!url && /^https?:\/\/(?:drive|docs|drive\.usercontent)\.google\.com\//i.test(url.trim());
@@ -78,10 +105,11 @@ export default class HelperMedia {
 
   /**
    * URL превью-картинки для тайла галереи: image — сам URL (Drive-ссылка → прямой адрес),
-   * youtube — статичный кадр с img.youtube.com; для vimeo/other/album превью нет
-   * (null → иконка-заглушка).
+   * youtube — статичный кадр с img.youtube.com; для vimeo/other/album (в т.ч. папки Drive,
+   * сохранённой как image) превью нет (null → иконка-заглушка).
    */
   static resolveThumbUrl(mediaType: string, sourceType: string, url: string): string | null {
+    if (HelperMedia.isAlbumUrl(url)) return null;
     if (mediaType === 'image') return HelperMedia.directImageUrl(url);
     if (mediaType === 'video' && sourceType === 'youtube') {
       const id = HelperMedia.extractYoutubeId(url);
