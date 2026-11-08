@@ -158,7 +158,8 @@ K/Y/J/A/M, низ светлый с возрастом `--t-badge-ink`); у че
 `Details →`). Чемпионат — фон `--t-champ-bg`, рамка `--t-champ-border`. Многодневный частично
 загруженный — куб на 2 колонки, полоса дней (сегменты 4px: загружено — accent, нет — border;
 подписи `Day 1 · 16 Oct ✓`), статус `In progress`, действие `Day 1 results →`; загружен целиком —
-1 колонка, `Complete`, `Full results →` (В8). Cancelled — opacity .5, тег, без ссылки; Postponed —
+`Complete`, `Full results →` (В8); с 08.11.2026 тоже 2 колонки с полосой (все дни ✓) — решение
+Влада: иначе двухдневный старт выглядит однодневным (Эйлат 16891). Cancelled — opacity .5, тег, без ссылки; Postponed —
 тег `Postponed → 21 Nov` + Details (В4: данных пока нет).
 
 **Телефон (375):** сегмент Year · Month · Meet + кнопка Type (funnel) — раскрывает 4 кнопки типов
