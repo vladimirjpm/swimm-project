@@ -96,7 +96,8 @@ public sealed class CalendarInputs
 ///   kind=upcoming получает <c>cancelled</c>. Затянутые отменёнными не бывают.</item>
 /// <item>Многодневка: дни справочника с результатами «загружены», дни программы (заявки) и
 ///   промежуток дат из «Входящих» — нет. Так событие, у которого затянут один день из трёх,
-///   получает <c>in_progress</c> (решение В8: загружено всё — <c>complete</c>).</item>
+///   получает <c>in_progress</c> (решение В8: загружено всё — <c>complete</c>). Если программа
+///   есть, прошедший день из одного лишь промежутка «Входящих» отбрасывается (16891, 08.11.2026).</item>
 /// </list>
 /// Однодневный (kind=competition) промежутком из «Входящих» НЕ растягивается: его протокол уже
 /// целиком у нас, а многодневка, сложенная в один день (memory: multiday-split), иначе вечно
@@ -298,11 +299,17 @@ public static class CompetitionCalendarBuilder
 
             if (m.SpanFromDiscovered)
             {
+                // Программа (заявки) знает дни точнее сайта федерации: Эйлат 16891 объявлен 5–7.11,
+                // а плыли 5 и 6 (три сессии). Прошедший день, которого нет ни в программе, ни в
+                // протоколах, при известной программе — не день старта. Будущие дни промежутка
+                // остаются: программа бывает затянута не на все дни.
+                var programmeKnown = m.EntryDates.Count > 0;
                 foreach (var oc in m.OrgCompIds)
                 {
                     if (!discovered.TryGetValue(oc, out var dc)) continue;
                     if (dc.End < dc.Start || dc.End.DayNumber - dc.Start.DayNumber >= MaxSpanDays) continue;
-                    for (var d = dc.Start; d <= dc.End; d = d.AddDays(1)) days.TryAdd(d, false);
+                    for (var d = dc.Start; d <= dc.End; d = d.AddDays(1))
+                        if (!(programmeKnown && d < today)) days.TryAdd(d, false);
                 }
             }
 

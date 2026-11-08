@@ -200,6 +200,41 @@ public class CompetitionCalendarBuilderTests
     }
 
     [Fact]
+    public void Past_discovered_day_outside_programme_is_dropped()
+    {
+        // 16891 Эйлат: федерация объявила 3 дня (16–18), программа и протоколы — 16 и 17.
+        // 18-е прошло (сегодня 19-е) и ни в программе, ни в протоколах его нет — не день старта.
+        var cal = Build(
+            comps:
+            [
+                Day(10, "2026-10-16", eventId: 5, eventName: "אליפות אילת", orgCompId: 777),
+                Day(11, "2026-10-17", eventId: 5, eventName: "אליפות אילת"),
+            ],
+            entries:
+            [
+                new CalendarEntryRow { OrgCompId = 777, CompetitionId = 10, Date = new(2026, 10, 16), CompName = "x" },
+                new CalendarEntryRow { OrgCompId = 777, CompetitionId = 11, Date = new(2026, 10, 17), CompName = "x" },
+            ],
+            discovered: [new CalendarDiscoveredRow { OrgCompId = 777, Start = new(2026, 10, 16), End = new(2026, 10, 18) }]);
+
+        var m = Assert.Single(cal.Meets);
+        Assert.Equal(["2026-10-16", "2026-10-17"], m.Days.Select(d => d.Date));
+        Assert.Equal("2026-10-17", m.End);
+        Assert.Equal(CalendarMeetStatuses.Complete, m.Status);
+    }
+
+    [Fact]
+    public void Future_discovered_day_stays_even_with_programme()
+    {
+        // Программа затянута только на первый день — будущие дни промежутка остаются.
+        var cal = Build(
+            entries: [new CalendarEntryRow { OrgCompId = 778, Date = new(2026, 10, 19), CompName = "גביע" }],
+            discovered: [new CalendarDiscoveredRow { OrgCompId = 778, Name = "גביע", Start = new(2026, 10, 19), End = new(2026, 10, 21) }]);
+
+        Assert.Equal(3, Assert.Single(cal.Meets).DaysTotal);
+    }
+
+    [Fact]
     public void Single_competition_is_not_stretched_by_discovered_span()
     {
         // Однодневный в справочнике = протокол целиком у нас; растянуть его — значит вечно «в процессе».
