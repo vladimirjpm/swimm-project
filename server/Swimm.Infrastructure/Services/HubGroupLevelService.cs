@@ -40,6 +40,9 @@ public class HubGroupLevelService : IHubGroupLevelService
                 SwimmerId = m.SwimmerId,
                 Name = (m.Swimmer!.LastName + " " + m.Swimmer.FirstName).Trim(),
                 NameEn = (m.Swimmer.LastNameEn + " " + m.Swimmer.FirstNameEn).Trim(),
+                // Пара берётся целиком с одного языка: иврит, а без ивритского имени — английская.
+                FirstName = m.Swimmer.FirstName != "" ? m.Swimmer.FirstName : m.Swimmer.FirstNameEn,
+                LastName = m.Swimmer.FirstName != "" ? m.Swimmer.LastName : m.Swimmer.LastNameEn,
                 BirthYear = m.Swimmer.BirthYear,
                 Gender = m.Swimmer.Gender,
                 ClubName = m.Swimmer.Club != null ? m.Swimmer.Club.Name : null,

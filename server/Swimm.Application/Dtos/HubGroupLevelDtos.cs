@@ -58,6 +58,14 @@ public sealed class HubGroupLevelSwimmerDto
     /// <summary>Имя на иврите (правило имён: иврит по умолчанию), EN — фоллбек.</summary>
     public string Name { get; set; } = "";
     public string NameEn { get; set; } = "";
+
+    /// <summary>
+    /// Имя и фамилия порознь (иврит, нет ивритского имени — английские) — короткая подпись плашки
+    /// в редакторе дорожек: только имя, при тёзках — плюс первая буква фамилии (решение Влада 09.11.2026).
+    /// </summary>
+    public string FirstName { get; set; } = "";
+    public string LastName { get; set; } = "";
+
     public int BirthYear { get; set; }
     public string? Gender { get; set; }
     public string? ClubName { get; set; }

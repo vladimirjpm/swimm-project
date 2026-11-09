@@ -532,6 +532,9 @@ export interface HubGroupLevelSwimmer {
   /** Иврит по умолчанию, EN — фоллбек. */
   name: string;
   nameEn: string;
+  /** Имя и фамилия порознь (иврит, без ивритского — английские) — короткая подпись в редакторе дорожек. */
+  firstName?: string;
+  lastName?: string;
   birthYear: number;
   gender?: string | null;
   clubName?: string | null;
