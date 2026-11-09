@@ -240,6 +240,7 @@ public class HubGroupPublicRepository : IHubGroupPublicRepository
             WhoIsComing = schedule.EffectiveWhoIsComing,
             RsvpTop = schedule.RsvpTop == true,
             TrainingMedia = schedule.EffectiveTrainingMedia,
+            LanePresence = schedule.EffectiveLanePresence,
         };
 
         // Ответ кэшируется (К4, TTL страницы) — «ближайшие» живут по тому же правилу, что и

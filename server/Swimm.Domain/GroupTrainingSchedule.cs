@@ -86,6 +86,18 @@ public sealed class GroupTrainingSchedule
     [JsonPropertyName("training_media")]
     public string? TrainingMedia { get; set; }
 
+    /// <summary>
+    /// Кого новый план дорожек считает пришедшим (<see cref="GroupLanePresence"/>, решение Влада
+    /// 09.11.2026): everyone — весь состав, кроме «Can't come» и перерывов; answered — раз на дату
+    /// есть «Going», не ответившие в «Not today». null — everyone.
+    /// </summary>
+    [JsonPropertyName("lane_presence")]
+    public string? LanePresence { get; set; }
+
+    [JsonIgnore]
+    public string EffectiveLanePresence =>
+        LanePresence == GroupLanePresence.Answered ? GroupLanePresence.Answered : GroupLanePresence.Everyone;
+
     [JsonIgnore]
     public string EffectiveTrainingMedia =>
         TrainingMedia == GroupTrainingMedia.Coach ? GroupTrainingMedia.Coach : GroupTrainingMedia.Members;
@@ -187,6 +199,25 @@ public static class GroupLaneView
     public const string Off = "off";
 
     public static readonly string[] All = [Auto, Plan, Off];
+}
+
+/// <summary>
+/// Кого новый план дорожек считает пришедшим (<see cref="GroupTrainingSchedule.LanePresence"/>).
+/// Решает только «Not today» стартового черновика (<c>GET …/lane-plans/{date}/away</c>); сохранённый
+/// план не трогает. Список открытый — на клиенте это выпадающий список, вариантов может стать больше.
+/// </summary>
+public static class GroupLanePresence
+{
+    /// <summary>Весь состав, кроме «Can't come», On break и Doesn't train. Молчащие — в воде.</summary>
+    public const string Everyone = "everyone";
+
+    /// <summary>
+    /// Только ответившие: если на дату есть хоть одно «Going», кто не ответил вовсе — в «Not today».
+    /// «Going» нет ни одного — как <see cref="Everyone"/> (переклички не было).
+    /// </summary>
+    public const string Answered = "answered";
+
+    public static readonly string[] All = [Everyone, Answered];
 }
 
 /// <summary>Кто видит имена «кто идёт» (<see cref="GroupTrainingSchedule.WhoIsComing"/>).</summary>

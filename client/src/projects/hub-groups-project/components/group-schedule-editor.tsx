@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import type { GroupTrainingSchedule, GroupTrainingSlot, LaneViewMode, TrainingMediaPolicy, WhoIsComing } from '../types';
+import type {
+  GroupTrainingSchedule, GroupTrainingSlot, LanePresence, LaneViewMode, TrainingMediaPolicy, WhoIsComing,
+} from '../types';
 import { DAY_SHORT } from './group-training-slots';
 
 /**
@@ -14,6 +16,8 @@ import { DAY_SHORT } from './group-training-slots';
  *
  * Блок «Lanes» (Ш3.3): сколько дорожек обычно, режим вида по дорожкам и кто видит имена
  * «кто идёт» — всё в том же JSON расписания (`usual_lanes`, `lane_view`, `who_is_coming`).
+ * Там же «с кого начинается план дорожек» (`lane_presence`, 09.11.2026) — выпадающим списком,
+ * а не тумблером: вариантов может стать больше.
  * Там же «кто добавляет видео к тренировкам» (`training_media`, Е3 group-events-media-plan).
  */
 
@@ -66,6 +70,7 @@ function GroupScheduleEditor({
   const [usualLanes, setUsualLanes] = useState(schedule?.usual_lanes != null ? String(schedule.usual_lanes) : '');
   const [laneView, setLaneView] = useState<LaneViewMode>(schedule?.lane_view ?? 'auto');
   const [whoIsComing, setWhoIsComing] = useState<WhoIsComing>(schedule?.who_is_coming ?? 'members');
+  const [lanePresence, setLanePresence] = useState<LanePresence>(schedule?.lane_presence ?? 'everyone');
   const [rsvpTop, setRsvpTop] = useState(!!schedule?.rsvp_top);
   const [trainingMedia, setTrainingMedia] = useState<TrainingMediaPolicy>(schedule?.training_media ?? 'members');
   const [saving, setSaving] = useState(false);
@@ -103,6 +108,7 @@ function GroupScheduleEditor({
       usual_lanes: usualLanes === '' ? null : Number(usualLanes),
       lane_view: laneView,
       who_is_coming: whoIsComing,
+      lane_presence: lanePresence,
       rsvp_top: rsvpTop,
       training_media: trainingMedia,
     });
@@ -225,6 +231,22 @@ function GroupScheduleEditor({
               <option value="members">Members see names</option>
               <option value="coach">Only coaches see names</option>
             </select>
+          </label>
+          <label className="flex flex-wrap items-center gap-2">
+            <span className="w-[120px]">Lane plan starts with</span>
+            <select
+              value={lanePresence}
+              onChange={(e) => { setLanePresence(e.target.value as LanePresence); setSaved(false); }}
+              className={`${inputCls} cursor-pointer`}
+            >
+              <option value="everyone">Everyone, except Can&apos;t come</option>
+              <option value="answered">Only who answered</option>
+            </select>
+            <span className="block w-full pl-[128px] text-[11px] text-[var(--t-text-3)]">
+              {lanePresence === 'answered'
+                ? 'once someone taps Going for the day, those who didn’t answer start in Not today'
+                : 'those who didn’t answer are on the lanes too; Can’t come and breaks start in Not today'}
+            </span>
           </label>
           <label className="flex items-start gap-2">
             <input
