@@ -4,6 +4,7 @@ using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
+using Swimm.Domain;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Services;
@@ -65,9 +66,26 @@ public class LanePlanService : ILanePlanService
         var going = bySwimmer.Where(g => g.Contains(TrainingRsvpAnswer.Yes)).Select(g => g.Key).ToHashSet();
 
         var away = onBreak.SwimmerIds.Where(id => !going.Contains(id)).Concat(cantCome).ToHashSet();
-        if (away.Count == 0) return new LanePlanAwayDto();
+
+        // Настройка расписания «answered» (решение Влада 09.11.2026): раз на дату кто-то ответил «Going»,
+        // перекличка идёт — кто из состава не ответил вовсе, тоже не в воде. «Going» аккаунта без
+        // пловца состава перекличку тоже открывает. Ответов «Going» нет — молчащие в воде, как при everyone.
+        var scheduleJson = await _db.HubGroups.AsNoTracking()
+            .Where(g => g.Id == hubGroupId)
+            .Select(g => g.TrainingSchedule)
+            .FirstOrDefaultAsync();
+        var silentAreAway = GroupTrainingSchedule.Parse(scheduleJson).EffectiveLanePresence == GroupLanePresence.Answered
+                            && answers.Any(a => a.Answer == TrainingRsvpAnswer.Yes);
+        if (away.Count == 0 && !silentAreAway) return new LanePlanAwayDto();
 
         var roster = await LoadRosterAsync(hubGroupId);
+        if (silentAreAway)
+        {
+            var answered = bySwimmer.Select(g => g.Key).ToHashSet();
+            away.UnionWith(roster.Select(r => r.SwimmerId).Where(id => !answered.Contains(id)));
+        }
+        if (away.Count == 0) return new LanePlanAwayDto();
+
         return new LanePlanAwayDto
         {
             SwimmerIds = roster.Select(r => r.SwimmerId).Where(away.Contains).ToList(),

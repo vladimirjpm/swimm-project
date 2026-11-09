@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
+using Swimm.Domain;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
 using Xunit;
@@ -451,6 +452,35 @@ public class LanePlanTests
 
         Assert.Equal([s.A], (await service.GetAwayAsync(s.GroupId, Day)).SwimmerIds);
         Assert.Equal([s.B, s.C], (await service.GetAwayAsync(s.GroupId, Day.AddDays(1))).SwimmerIds);
+    }
+
+    [Fact]
+    public async Task Away_AnsweredPresence_SilentAreAwayOnceSomeoneIsGoing()
+    {
+        await using var db = CreateDb(nameof(Away_AnsweredPresence_SilentAreAwayOnceSomeoneIsGoing));
+        var s = await SeedAsync(db);
+        HubGroupTrainingRsvp Answer(DateOnly day, string answer, int swimmerId) =>
+            new() { HubGroupId = s.GroupId, SessionDate = day, SessionStart = "20:00", SwimmerId = swimmerId, Answer = answer };
+        db.HubGroupTrainingRsvps.AddRange(
+            // Day: A «Going», B «Not sure», C молчит.
+            Answer(Day, TrainingRsvpAnswer.Yes, s.A),
+            Answer(Day, TrainingRsvpAnswer.Maybe, s.B),
+            // Day+1: только «Not sure» — переклички «Going» нет, молчащие в воде.
+            Answer(Day.AddDays(1), TrainingRsvpAnswer.Maybe, s.A));
+        await db.SaveChangesAsync();
+        var service = new LanePlanService(db);
+
+        // По умолчанию (everyone) молчащий C в воде.
+        Assert.Empty((await service.GetAwayAsync(s.GroupId, Day)).SwimmerIds);
+
+        (await db.HubGroups.SingleAsync(g => g.Id == s.GroupId)).TrainingSchedule =
+            new GroupTrainingSchedule { LanePresence = GroupLanePresence.Answered }.ToJson();
+        await db.SaveChangesAsync();
+
+        // answered: C не ответил — в Not today; «Not sure» B остаётся в воде. Скрытый из состава не в списке.
+        Assert.Equal([s.C], (await service.GetAwayAsync(s.GroupId, Day)).SwimmerIds);
+        Assert.Empty((await service.GetAwayAsync(s.GroupId, Day.AddDays(1))).SwimmerIds);
+        Assert.Empty((await service.GetAwayAsync(s.GroupId, Day.AddDays(2))).SwimmerIds);
     }
 
     [Fact]

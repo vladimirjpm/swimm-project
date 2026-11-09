@@ -185,9 +185,15 @@ export interface GroupTrainingSchedule {
   rsvp_top?: boolean | null;
   /** Кто добавляет видео к тренировкам (Е2): members — все участники; coach — только управляющие. */
   training_media?: TrainingMediaPolicy | null;
+  /**
+   * Кого новый план дорожек считает пришедшим (09.11.2026): everyone — весь состав, кроме
+   * «Can't come» и перерывов; answered — раз на дату есть «Going», не ответившие в «Not today».
+   */
+  lane_presence?: LanePresence | null;
 }
 
 export type LaneViewMode = 'auto' | 'plan' | 'off';
+export type LanePresence = 'everyone' | 'answered';
 export type WhoIsComing = 'members' | 'coach';
 export type TrainingMediaPolicy = 'members' | 'coach';
 

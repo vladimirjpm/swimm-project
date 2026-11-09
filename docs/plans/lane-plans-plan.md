@@ -464,6 +464,14 @@ Intermediate». Подуровень — это порядок перелива,
   `Away_CantComeOnPlanDay_GoingBringsDoesntTrainBack`. Проверено вживую
   на `dolphin-netanya-masters` (локально): Аня «Doesn't train» → Create plan → «Not today · 1» →
   Auto lanes — она там же, не на дорожке.
+- **Настройка «Lane plan starts with»** (решение Влада 09.11.2026, после 10.11 у Дельфина: в
+  черновик встали трое, кто не отвечал). Выпадающий список в карточке расписания таба Admin, ключ
+  `lane_presence` в JSON расписания (`GroupLanePresence`, без миграции): `everyone` — по умолчанию,
+  как выше (молчащие в воде); `answered` — раз на дату есть хоть одно «Going» (в том числе аккаунта
+  без пловца состава), кто не ответил вовсе — в «Not today». «Not sure» — ответ, человек в воде.
+  «Going» на дату нет ни одного — переклички не было, все в воде, как при `everyone`. Сохранённый
+  план настройка не трогает. Список, а не тумблер: Влад ждёт ещё вариантов. Тест
+  `LanePlanTests.Away_AnsweredPresence_SilentAreAwayOnceSomeoneIsGoing`.
 - Там же (20.10): «✎ Edit lanes» / «Lanes ›» / сегмент Lanes тренера открывают редактор на дату
   выбранного занятия (`openLanes(date)` в контексте таба), а не на сегодня.
 

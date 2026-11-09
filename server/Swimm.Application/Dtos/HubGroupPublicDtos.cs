@@ -582,6 +582,10 @@ public sealed class GroupTrainingScheduleDto
     /// <summary>members | coach — кто добавляет видео к тренировкам (<c>GroupTrainingMedia</c>); null — members.</summary>
     [JsonPropertyName("training_media")]
     public string? TrainingMedia { get; set; }
+
+    /// <summary>everyone | answered — кого новый план дорожек считает пришедшим (<c>GroupLanePresence</c>); null — everyone.</summary>
+    [JsonPropertyName("lane_presence")]
+    public string? LanePresence { get; set; }
 }
 
 /// <summary>Занятие недели: день ISO (1 = Mon … 7 = Sun) и часы по стенным часам бассейна.</summary>
