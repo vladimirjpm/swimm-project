@@ -111,18 +111,25 @@ function GroupLanes({
     return () => { cancelled = true; };
   }, [groupId, manages]);
 
-  // Кто в этот день «не в воде» (On break / Doesn't train / «Can't come») — редактор кладёт их в «Not today»
-  // нового плана и копии. Ошибка — пустой список: раскладку из-за неё не блокируем.
-  const [away, setAway] = useState<{ date: string; ids: ReadonlySet<number> } | null>(null);
+  // Кто в этот день «не в воде» (On break / Doesn't train / «Can't come», а при настройке «Only who
+  // answered» — и молчащие) — редактор кладёт их в «Not today» нового плана и копии. Ошибка — пустой
+  // список: раскладку из-за неё не блокируем.
+  // Перечитывается при КАЖДОМ «Create plan» / «Copy from …» (`awayNonce`), а не раз на дату: пока
+  // страница открыта, люди отвечают «Going», а тренер меняет настройку — старый список ставил на
+  // дорожки тех, кто уже не придёт или так и не ответил (найдено Владом 09.11.2026).
+  const [awayNonce, setAwayNonce] = useState(0);
+  const [away, setAway] = useState<{ date: string; nonce: number; ids: ReadonlySet<number> } | null>(null);
   useEffect(() => {
     if (!manages || !date) return undefined;
     let cancelled = false;
     lanePlansApi.away(groupId, date).then((result) => {
-      if (!cancelled) setAway({ date, ids: new Set(result.ok ? result.data?.swimmer_ids ?? [] : []) });
+      if (!cancelled) {
+        setAway({ date, nonce: awayNonce, ids: new Set(result.ok ? result.data?.swimmer_ids ?? [] : []) });
+      }
     });
     return () => { cancelled = true; };
-  }, [groupId, date, manages]);
-  const awayIds = away?.date === date ? away.ids : null;
+  }, [groupId, date, manages, awayNonce]);
+  const awayIds = away?.date === date && away.nonce === awayNonce ? away.ids : null;
 
   // Смена даты — план на неё.
   useEffect(() => {
@@ -190,6 +197,7 @@ function GroupLanes({
     if (!result.ok || !result.data) return 'Could not load that plan. Try again.';
     setTemplate(result.data);
     setCreating(true);
+    setAwayNonce((n) => n + 1);
     setEditorNonce((n) => n + 1);
     return null;
   };
@@ -326,7 +334,7 @@ function GroupLanes({
                 type="button"
                 className="h-[40px] cursor-pointer rounded-[10px] border-0 px-4 text-[12px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ background: 'var(--deep-ow)', color: 'var(--deep-accent-ink)' }}
-                onClick={() => setCreating(true)}
+                onClick={() => { setAwayNonce((n) => n + 1); setCreating(true); }}
                 disabled={busy}
               >
                 Create plan
@@ -347,7 +355,7 @@ function GroupLanes({
         )}
 
         {editable && (state.kind === 'ready' || (state.kind === 'none' && creating)) && (
-          // Новый план и копия ждут ещё и `away`: редактор читает его один раз при монтировании.
+          // Новый план и копия ждут СВЕЖИЙ `away` (этого нажатия): редактор читает его один раз при монтировании.
           levels && (awayIds || (plan && !template)) ? (
             <GroupLaneEditor
               key={`${date}:${editorNonce}`}
