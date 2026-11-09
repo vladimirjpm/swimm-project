@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
 import type { HubGroupLevel, HubGroupLevels, LanePlan, LanePlanInput, LanePlanSwimmer } from '../types';
@@ -8,6 +8,7 @@ import LaneSaveBar, { type SaveBarState } from './group-lane-savebar';
 import LaneToolbar, { shortDay } from './group-lane-toolbar';
 import { lanePlansApi } from './lane-plans-api';
 import { levelColor } from './level-color';
+import { laneShortNames } from './lane-short-names';
 
 /**
  * Редактор плана дорожек — тренер (docs/plans/lane-plans-plan.md, L3; доведён в Т7 по решению
@@ -43,14 +44,12 @@ import { levelColor } from './level-color';
 const MAX_LANES = 12;
 
 /**
- * Десктоп: дорожки колонками (Р6 п.5 — при ≤ 6), пока колонке достаётся хотя бы MIN_COLUMN px,
- * иначе сетка. Редактор не шире 1118px, и 6 колонок там — по 137px: имя в плашке уже не видно
- * (на 960px — по 100px). Поэтому порог — по ширине, а «≤ 6» — только потолок.
+ * Десктоп: ВСЕ дорожки одной строкой, сколько бы их ни было (решение Влада 09.11.2026: «6 или 8
+ * в одну линию» — бассейн виден целиком, как с бортика). Плашки — пилюли с одним именем, поэтому
+ * колонке хватает MIN_COLUMN; не влезли — строка прокручивается вбок, а не ломается в сетку.
+ * Unassigned — под дорожками во всю ширину.
  */
-const MAX_COLUMNS = 6;
-const MIN_COLUMN = 150;
-const UNASSIGNED_COLUMN = 220;
-const COLUMN_GAP = 12;
+const MIN_COLUMN = 112;
 
 type Target = number | 'unassigned' | 'out';
 
@@ -228,21 +227,19 @@ function GroupLaneEditor({
   /** Выбранный для переноса пловец — один на весь редактор. */
   const [selected, setSelected] = useState<number | null>(null);
   const [outOpen, setOutOpen] = useState(false);
-  /** Ширина редактора — выбор «колонки или сетка» на десктопе. */
-  const [root, setRoot] = useState<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
-
-  useLayoutEffect(() => {
-    if (!root) return undefined;
-    setWidth(root.clientWidth);
-    const ro = new ResizeObserver(() => setWidth(root.clientWidth));
-    ro.observe(root);
-    return () => ro.disconnect();
-  }, [root]);
 
   const info = useMemo(() => new Map([...base.info, ...init.info]), [base, init]);
   const levelById = useMemo(() => new Map(levels.levels.map((l) => [l.id, l])), [levels]);
   const laneNos = Array.from({ length: laneCount }, (_, i) => i + 1);
+
+  // Подпись плашки: только имя, тёзкам — с буквой фамилии (тёзки — по всему составу и плану).
+  const shortName = useMemo(() => {
+    const roster = new Map(levels.swimmers.map((s) => [s.swimmerId, s]));
+    return laneShortNames([...info.values()].map((s) => {
+      const r = roster.get(s.swimmer_id);
+      return { id: s.swimmer_id, first: r?.firstName ?? '', last: r?.lastName ?? '', full: s.name || s.name_en };
+    }));
+  }, [info, levels]);
 
   const circleColor = (swimmerId: number): string | null => {
     const levelId = info.get(swimmerId)?.level_id;
@@ -436,8 +433,8 @@ function GroupLaneEditor({
     return (
       <LaneChip
         key={swimmerId}
-        name={s.name}
-        nameEn={s.name_en}
+        label={shortName.get(swimmerId) || s.name || s.name_en}
+        fullName={s.name || s.name_en}
         color={circleColor(swimmerId)}
         subLevel={s.sub_level ?? null}
         leftGroup={!!s.left_group}
@@ -471,12 +468,9 @@ function GroupLaneEditor({
     );
   };
 
-  /** Столбик плашек (десктоп) или ряд с переносом (телефон). `wide` — Unassigned отдельной строкой. */
-  const chipList = (ids: number[], wide = false) => (
-    <div
-      className={desktop && !wide ? 'flex flex-col gap-1.5' : desktop ? 'grid gap-1.5' : 'flex flex-wrap gap-1.5'}
-      style={desktop && wide ? { gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' } : undefined}
-    >
+  /** Пилюли с переносом строки — и в дорожке, и в Unassigned, и в Not today. */
+  const chipList = (ids: number[]) => (
+    <div className="flex flex-wrap gap-1.5">
       {ids.map((id) => chip(id))}
     </div>
   );
@@ -484,14 +478,14 @@ function GroupLaneEditor({
   const dropHere = desktop && (
     <div
       aria-hidden="true"
-      className="flex h-[36px] items-center justify-center rounded-[10px] text-[11px] font-bold"
+      className="flex h-[30px] items-center justify-center rounded-[10px] text-[11px] font-bold"
       style={{ border: '1px dashed var(--deep-pool-border)', color: 'var(--deep-pool-label)' }}
     >
       Drop here
     </div>
   );
 
-  const laneCard = (no: number, columns: boolean) => {
+  const laneCard = (no: number) => {
     const lane = lanes[no - 1];
     const prev = no > 1 ? lanes[no - 2] : null;
     const ids = buckets.lanes[no - 1];
@@ -500,7 +494,7 @@ function GroupLaneEditor({
       <section
         key={no}
         {...dropProps(no)}
-        className={`flex min-w-0 flex-col rounded-[16px] border ${desktop ? 'gap-2.5 p-3' : 'gap-2 px-3 py-2.5'} ${desktop && columns ? 'min-h-[300px]' : ''}`}
+        className={`flex min-w-0 flex-col rounded-[16px] border ${desktop ? 'min-h-[220px] gap-2 p-2.5' : 'gap-2 px-3 py-2.5'}`}
         style={{ borderColor: 'var(--deep-pool-border)', background: 'var(--deep-pool-water)', ...dropOutline(no) }}
         aria-label={`Lane ${no}`}
       >
@@ -512,7 +506,10 @@ function GroupLaneEditor({
             value={lane.levelId ?? ''}
             onChange={(e) => patchLane(no, { levelId: e.target.value === '' ? null : Number(e.target.value) })}
             aria-label={`Level of lane ${no}`}
-            className={`min-w-0 flex-1 basis-[120px] cursor-pointer rounded-[8px] border px-2 text-[12px] font-extrabold ${desktop ? 'h-[32px]' : 'h-[34px]'}`}
+            // Десктоп: колонка узкая (8 дорожек в строку) — уровень второй строкой во всю ширину,
+            // номер и счётчик над ним.
+            className={`min-w-0 cursor-pointer rounded-[8px] border px-2 text-[12px] font-extrabold ${
+              desktop ? 'order-last h-[32px] basis-full' : 'h-[34px] flex-1 basis-[120px]'}`}
             style={field}
           >
             <option value="">No level</option>
@@ -524,9 +521,7 @@ function GroupLaneEditor({
             style={{ color: over ? 'var(--t-danger)' : 'var(--t-text-3)', fontWeight: over ? 800 : undefined }}
             title={over ? `More than  in this lane` : undefined}
           >
-            {maxPerLane != null
-              ? `${ids.length} / ${maxPerLane}`
-              : desktop ? `${ids.length} ${ids.length === 1 ? 'swimmer' : 'swimmers'}` : ids.length}
+            {maxPerLane != null ? `${ids.length} / ${maxPerLane}` : ids.length}
           </span>
         </header>
         <textarea
@@ -558,7 +553,7 @@ function GroupLaneEditor({
     );
   };
 
-  const unassignedCard = (wide: boolean) => (
+  const unassignedCard = (
     <section
       {...dropProps('unassigned')}
       className="flex min-w-0 flex-col gap-2 rounded-[16px] p-3"
@@ -572,7 +567,7 @@ function GroupLaneEditor({
       <div className="text-[11px] font-bold" style={{ color: 'var(--t-text-3)' }}>
         In today’s plan, no lane yet. Distribute places them by level.
       </div>
-      {unassigned.length > 0 && chipList(unassigned, wide)}
+      {unassigned.length > 0 && chipList(unassigned)}
       {moveRow('unassigned')}
       {dropHere}
     </section>
@@ -599,7 +594,7 @@ function GroupLaneEditor({
           <div className="text-[11px] font-bold" style={{ color: 'var(--t-text-3)' }}>
             not in this plan · members don’t see this list
           </div>
-          {buckets.out.length > 0 && chipList(buckets.out, desktop)}
+          {buckets.out.length > 0 && chipList(buckets.out)}
           {moveRow('out')}
         </div>
       )}
@@ -626,12 +621,10 @@ function GroupLaneEditor({
     />
   );
 
-  const columnWidth = (width - UNASSIGNED_COLUMN - COLUMN_GAP * laneCount) / laneCount;
-  const wide = desktop && (laneCount > MAX_COLUMNS || columnWidth < MIN_COLUMN);
   const saveState: SaveBarState = needsSave ? 'unsaved' : (plan?.status ?? 'draft');
 
   return (
-    <div ref={setRoot}>
+    <div>
       {/* Тулбар: телефон — здесь, десктоп — в шапке вида (портал; пока узла нет — не рисуем). */}
       {desktop ? (toolbarHost ? createPortal(toolbar, toolbarHost) : null) : toolbar}
 
@@ -646,28 +639,24 @@ function GroupLaneEditor({
         style={field}
       />
 
-      {/* Дорожки (Р6 п.5): телефон — столбиком; десктоп — колонки + Unassigned 220, пока влезают (MIN_COLUMN), иначе сетка. */}
+      {/* Дорожки: телефон — столбиком; десктоп — все одной строкой (MIN_COLUMN, иначе прокрутка вбок), Unassigned — под ними. */}
       {!desktop && (
         <div className="mt-3 flex flex-col gap-3">
-          {laneNos.map((no) => laneCard(no, false))}
-          {unassignedCard(false)}
+          {laneNos.map((no) => laneCard(no))}
+          {unassignedCard}
         </div>
       )}
-      {desktop && !wide && (
-        <div
-          className="mt-3 grid items-start gap-3"
-          style={{ gridTemplateColumns: `repeat(${laneCount}, minmax(0, 1fr)) 220px` }}
-        >
-          {laneNos.map((no) => laneCard(no, true))}
-          {unassignedCard(false)}
-        </div>
-      )}
-      {desktop && wide && (
+      {desktop && (
         <>
-          <div className="mt-3 grid items-start gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
-            {laneNos.map((no) => laneCard(no, false))}
+          <div className="mt-3 overflow-x-auto pb-1">
+            <div
+              className="grid items-start gap-2"
+              style={{ gridTemplateColumns: `repeat(${laneCount}, minmax(${MIN_COLUMN}px, 1fr))` }}
+            >
+              {laneNos.map((no) => laneCard(no))}
+            </div>
           </div>
-          <div className="mt-3">{unassignedCard(true)}</div>
+          <div className="mt-3">{unassignedCard}</div>
         </>
       )}
 
