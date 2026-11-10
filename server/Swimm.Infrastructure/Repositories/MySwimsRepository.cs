@@ -190,17 +190,21 @@ public class MySwimsRepository : IMySwimsRepository
                 flags.IsMasters, categoryKeysByComp.GetValueOrDefault(s.CompetitionId));
         }
 
-        // 4. PB — личный рекорд: лучшее время пловца за всё время на (стиль, дистанция),
-        //    индивидуальные заплывы. Правило продукта, менять его тут нельзя.
+        // 4. PB — личный рекорд: лучшее время пловца за всё время на (стиль, дистанция, БАССЕЙН),
+        //    индивидуальные заплывы. Бассейн входит в ключ, как в общем `SeasonAggregator.DisciplineKey`:
+        //    50 вольным в 25-метровом и в 50-метровом — разные дисциплины, и короткая вода
+        //    отнимала PB у длинной (найдено 10.11.2026). Помеченные строки (SuspectReason, Р76)
+        //    в эталон не входят и PB не получают — как `SeasonAggregator.IsCountable`.
         //    Индекс (SwimmerId, TimeMillisecond) держит выборку дешёвой.
         var bests = await _db.Results
             .AsNoTracking()
             .Where(r => swimmerIds.Contains(r.SwimmerId)
-                        && r.RelayId == null && !r.TimeFail && r.TimeMillisecond != null)
-            .GroupBy(r => new { r.SwimmerId, r.StyleId, r.Distance })
-            .Select(g => new { g.Key.SwimmerId, g.Key.StyleId, g.Key.Distance, Best = g.Min(r => r.TimeMillisecond) })
+                        && r.RelayId == null && !r.TimeFail && r.TimeMillisecond != null
+                        && r.SuspectReason == null)
+            .GroupBy(r => new { r.SwimmerId, r.StyleId, r.Distance, r.Competition.PoolType })
+            .Select(g => new { g.Key.SwimmerId, g.Key.StyleId, g.Key.Distance, g.Key.PoolType, Best = g.Min(r => r.TimeMillisecond) })
             .ToListAsync();
-        var bestByKey = bests.ToDictionary(b => (b.SwimmerId, b.StyleId, b.Distance), b => b.Best);
+        var bestByKey = bests.ToDictionary(b => (b.SwimmerId, b.StyleId, b.Distance, b.PoolType), b => b.Best);
 
         // Времена сезонных заплывов + поля ступени SB (пол ПЛОВЦА, год рождения, отбраковки
         // сезонной таблицы) — в DTO их нет, добираем одним запросом.
@@ -225,8 +229,9 @@ public class MySwimsRepository : IMySwimsRepository
         foreach (var s in swims)
         {
             if (s.IsRelay || s.TimeFail) continue;
+            if (s.SuspectReason != null) continue;
             if (!timeById.TryGetValue(s.ResultId, out var ms) || ms == null) continue;
-            if (bestByKey.TryGetValue((s.SwimmerId, s.StyleId, s.Distance), out var best) && best == ms)
+            if (bestByKey.TryGetValue((s.SwimmerId, s.StyleId, s.Distance, s.PoolType), out var best) && best == ms)
                 s.IsPb = true;
         }
 

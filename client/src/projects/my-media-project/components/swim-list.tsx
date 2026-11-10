@@ -19,6 +19,7 @@ import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-bad
 import CompetitionTile from '../../results-main-project/components/competition-header/competition-tile';
 import { competitionTileData } from '../../../utils/helpers/competition-source';
 import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
+import { routes } from '../../../utils/routes';
 
 // Список заплывов, сгруппированный по соревнованиям — ядро My media.
 // Строка узкая на обеих ширинах, а всё управление медиа (share, withdraw, delete, ❤)
@@ -66,8 +67,10 @@ function sameDay(competitionDate: string, swimDate: string): boolean {
  *  • `PB` — личный рекорд пловца за всё время на дистанции;
  *  • одна строка носит ОДИН чип, SB замещает PB — тот же приоритет, что у `SwimRowBadge`
  *    в `components/swim-row` («SB сильнее BEST и ЗАМЕЩАЕТ его»).
- * Рекордов (WR/NR/REC·AGE/REC·M, `UI_RecordBadge`) в этом агрегате пока нет; когда появятся —
- * они старше SB, вставлять их надо сюда же, а не рядом.
+ *  • рекорд (`UI_RecordBadge`) старше обоих и замещает их.
+ * Метка — свойство ЗАПЛЫВА, поэтому живёт только в строке; сводной метки «PB есть хоть где-то»
+ * в шапке карточки больше нет (решение Влада 10.11.2026): она не говорила, какой заплыв.
+ * Помеченной строке (`SuspectReason`, Р76) метки не рисуются — это наш вывод из времени.
  */
 const PB_CHIP =
   'inline-flex items-center rounded-full border border-[var(--t-accent-dim)] '
@@ -96,16 +99,31 @@ function BestMark({ record = null, pb, sb, stacked = false }: {
  * заводить нельзя), поэтому имя ищем среди избранных: сперва выбранный чипом пловец,
  * иначе первый подходящий (карта идёт в порядке избранного, primary первым).
  */
-function rowSwimmerName(
+function rowSwimmer(
   swim: MySwimDto, names: Map<number, string>, preferredId: number | null,
-): string {
+): { id: number | null; name: string } {
   if (preferredId != null && HelperSwimmer.resultBelongsToSwimmer(swim, preferredId)) {
-    return names.get(preferredId) ?? '?';
+    return { id: preferredId, name: names.get(preferredId) ?? '?' };
   }
   for (const [id, name] of names) {
-    if (HelperSwimmer.resultBelongsToSwimmer(swim, id)) return name;
+    if (HelperSwimmer.resultBelongsToSwimmer(swim, id)) return { id, name };
   }
-  return '?';
+  return { id: null, name: '?' };
+}
+
+/**
+ * Ссылки карточки (просьба Влада 10.11.2026): имя → страница пловца, название → соревнование,
+ * дисциплина заплыва → ЭТОТ заплыв в протоколе. Цвет у ссылки — текста вокруг, подчёркивание
+ * только под курсором: иначе карточка превратилась бы в синий частокол.
+ */
+const LINK_CLS = 'no-underline [color:inherit] hover:underline hover:underline-offset-2';
+
+/**
+ * Заплыв в протоколе: таб Swims, отфильтрованный на пловца, строка подсвечена (`?swim=`).
+ * Адрес — ДНЯ, даже у многодневки: заплыв лежит в конкретном дне (`routes.competitionSwims`).
+ */
+function swimHref(swim: MySwimDto, swimmerId: number | null): string {
+  return routes.competitionSwims(swim.competition_id, { swimmerId, resultId: swim.result_id });
 }
 
 /**
@@ -452,6 +470,33 @@ function MediaLine({
   );
 }
 
+/* ── Ссылки строки ───────────────────────────────────────────────────────────── */
+
+/**
+ * Иконка дисциплины — ссылка на заплыв в протоколе. Ссылка именно она, а не время: у
+ * помеченного времени `UI_SwimTime` рисует КНОПКУ-объяснялку, а кнопка внутри `<a>`
+ * невалидна и отдавала бы клик по «⚠» в переход.
+ */
+function SwimLink({ href, discipline, children }: { href: string; discipline: string; children: React.ReactNode }) {
+  const label = `${discipline} — open this swim in the results`;
+  return (
+    <a
+      href={href}
+      title={label}
+      aria-label={label}
+      className="block w-fit rounded-[8px] transition-shadow hover:shadow-[0_0_0_2px_var(--t-accent-border)] focus-visible:shadow-[0_0_0_2px_var(--t-accent)] focus-visible:outline-none"
+    >
+      {children}
+    </a>
+  );
+}
+
+/** Имя пловца — ссылка на его страницу; без id (не нашли среди избранных) — просто текст. */
+function SwimmerLink({ id, children }: { id: number | null; children: React.ReactNode }) {
+  if (id == null) return <>{children}</>;
+  return <a href={routes.swimmer(id)} className={LINK_CLS}>{children}</a>;
+}
+
 /* ── Строка заплыва My media ──────────────────────────────────────────────────── */
 
 /**
@@ -473,7 +518,7 @@ function MediaLine({
  * Общее берётся ячейками: `UI_SwimmStyleIcon`, `UI_SwimTime` вместе с
  * `swimFlaggedRowProps` (носитель спорного времени) и `UI_DateIcon` (формат даты один на продукт).
  */
-function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, cb }: {
+function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, swimmerId, cb }: {
   swim: MySwimDto;
   showSwimmerName: boolean;
   /** Колонка DATE — только у многодневок (см. `sameDay`). */
@@ -481,9 +526,13 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
   /** Колонка 🎉 — только если в карточке кого-то уже поздравили (см. `CompetitionGroup`). */
   showCheers: boolean;
   swimmerName: string;
+  /** Чей это заплыв среди избранных (у эстафеты — нога из избранного); null — не нашли. */
+  swimmerId: number | null;
   cb: SwimListCallbacks;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const href = swimHref(swim, swimmerId);
+  const discipline = `${swim.distance}m ${styleLabel(swim.style)}`;
   const videos = swim.media.filter((m) => m.media_type === 'video');
   const photos = swim.media.filter((m) => m.media_type === 'image');
   const hasMedia = swim.media.length > 0;
@@ -500,6 +549,10 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
   // обвязки не несла — ровно тот случай, ради которого хелпер и заводили.
   const quality = swim.suspect_reason ? { kind: 'protocol' as const, reason: swim.suspect_reason } : null;
   const flagged = swimFlaggedRowProps(quality);
+  // Р76: PB/SB — наши выводы из времени, у помеченной строки их нет. SB сервер уже не ставит,
+  // PB ставит — гасим здесь, у самой метки.
+  const pb = swim.is_pb && !swim.suspect_reason;
+  const sb = swim.is_sb && !swim.suspect_reason;
 
   // Бейдж рекорда — тем же способом, что в протоколе: справочник рекордов + ось возраста из
   // админ-настройки (`Helper.recordStepAge`), своего поиска по справочнику тут нет.
@@ -541,15 +594,17 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
           <UI_PrelimLabel heatType={swim.heat_type} className="mt-0.5 block text-[8px]" />
         </span>
         <span className="text-center text-[15px] leading-none">{medal(swim)}</span>
-        <UI_SwimmStyleIcon
-          styleName={swim.style}
-          styleLen={swim.distance}
-          styleType="icon-len"
-          lenPlacement="below"
-          size={64}
-          surface="light"
-          className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
-        />
+        <SwimLink href={href} discipline={discipline}>
+          <UI_SwimmStyleIcon
+            styleName={swim.style}
+            styleLen={swim.distance}
+            styleType="icon-len"
+            lenPlacement="below"
+            size={64}
+            surface="light"
+            className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
+          />
+        </SwimLink>
         {/* Средняя колонка тянется. Показан один пловец — имени в строке нет (оно в шапке
             карточки), и колонку занимает название дисциплины: пустая тянущаяся колонка
             разрывала бы строку пополам. */}
@@ -558,18 +613,18 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
             // text-left обязателен: dir="auto" у ивритского имени тянет выравнивание вправо,
             // и имена прыгали бы между краями колонки от пловца к пловцу.
             <span dir="auto" className="min-w-0 flex-1 truncate text-left text-[19px] font-black text-[var(--t-text)]">
-              {swimmerName}
+              <SwimmerLink id={swimmerId}>{swimmerName}</SwimmerLink>
             </span>
           ) : (
-            <span className="min-w-0 flex-1 truncate text-left text-[13.5px] font-extrabold text-[var(--t-text-2)]">
-              {swim.distance}m {styleLabel(swim.style)}
-            </span>
+            <a href={href} title="Open this swim in the results" className={`min-w-0 flex-1 truncate text-left text-[13.5px] font-extrabold text-[var(--t-text-2)] ${LINK_CLS}`}>
+              {discipline}
+            </a>
           )}
         </span>
         {/* Метка достижения — своей колонкой, а не под медалью: рекорд и PB это про ВРЕМЯ,
             и стоять им положено рядом с ним. */}
         <span className="flex items-center justify-end">
-          <BestMark record={recordMark} pb={swim.is_pb} sb={swim.is_sb} />
+          <BestMark record={recordMark} pb={pb} sb={sb} />
         </span>
         {/* RELAY стоит ПОД временем, а не у имени (решение Влада 08.09.2026): это признак
             самого заплыва, и в тянущейся колонке он уезжал от времени тем дальше, чем
@@ -649,17 +704,19 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
             {swim.place != null ? `#${swim.place}` : '—'}
           </span>
           {medal(swim) && <span className="mt-[2px] block text-[13px]">{medal(swim)}</span>}
-          <BestMark record={recordMark} pb={swim.is_pb} sb={swim.is_sb} stacked />
+          <BestMark record={recordMark} pb={pb} sb={sb} stacked />
         </span>
-        <UI_SwimmStyleIcon
-          styleName={swim.style}
-          styleLen={swim.distance}
-          styleType="icon-len"
-          lenPlacement="below"
-          size={64}
-          surface="light"
-          className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
-        />
+        <SwimLink href={href} discipline={discipline}>
+          <UI_SwimmStyleIcon
+            styleName={swim.style}
+            styleLen={swim.distance}
+            styleType="icon-len"
+            lenPlacement="below"
+            size={64}
+            surface="light"
+            className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
+          />
+        </SwimLink>
         <span className="min-w-0">
           <span className="hp-mono block text-[13.5px] font-extrabold text-[var(--t-accent)]">
             {swim.time_fail ? HelperResults.failLabel(swim) : (
@@ -682,16 +739,15 @@ function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, c
           </span>
           {/* Имя целиком, без многоточия: ивритское имя, укороченное посередине, читается
               как чужое. Показан один пловец — вместо имени дисциплина. */}
-          <span
-            dir={showSwimmerName ? 'auto' : undefined}
-            className={`mt-1 block break-words text-left leading-tight ${
-              showSwimmerName
-                ? 'text-[15px] font-black text-[var(--t-text)]'
-                : 'text-[12px] font-extrabold text-[var(--t-text-2)]'
-            }`}
-          >
-            {showSwimmerName ? swimmerName : `${swim.distance}m ${styleLabel(swim.style)}`}
-          </span>
+          {showSwimmerName ? (
+            <span dir="auto" className="mt-1 block break-words text-left text-[15px] font-black leading-tight text-[var(--t-text)]">
+              <SwimmerLink id={swimmerId}>{swimmerName}</SwimmerLink>
+            </span>
+          ) : (
+            <a href={href} title="Open this swim in the results" className={`mt-1 block text-left text-[12px] font-extrabold leading-tight text-[var(--t-text-2)] ${LINK_CLS}`}>
+              {discipline}
+            </a>
+          )}
         </span>
         {/* Цель нажатия 44px, поздравления — ПОД кнопкой, а не сбоку: справа их выдавливало
             имя. Кнопка раскрывает ТУ ЖЕ панель, что на десктопе (решение Влада 08.09.2026):
@@ -800,8 +856,6 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
   const first = swims[0];
   const videoCount = swims.reduce((n, s) => n + s.media.filter((m) => m.media_type === 'video').length, 0);
   const anyPodium = swims.some((s) => s.place != null && s.place <= 3);
-  const anyPb = swims.some((s) => s.is_pb);
-  const anySb = swims.some((s) => s.is_sb);
   // Дни карточки (многодневка — одна карточка на событие): разные дни — полосы-разделители.
   const days = useMemo(() => swimsByDay(swims), [swims]);
   const multiDay = days.length > 1;
@@ -838,11 +892,13 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         {/* Плитка соревнования — общая CompetitionTile (сезон/кубок · буква категории ·
             возрастная лента). Данные считает общий competitionTileData, своей эвристики по
             названию тут нет: категория и флаг чемпионата приходят с сервера. */}
-        {/* Плитка, имя пловца и название — ОДНОЙ строкой: на мобильной этот блок занимает
-            всю ширину, поэтому дата, бассейн, метки и кнопки переносятся на вторую строку.
-            Ширина блока обязательна: без неё название сжималось флексом почти в ноль и
-            ломалось по одной букве в строку. */}
-        <div className="flex w-full min-w-0 items-center gap-2.5 sm:w-auto">
+        {/* Плитка + столбик «имя пловца / название» — ДВЕ строки (просьба Влада 10.11.2026:
+            в одну линию ивритские имя и название читались одной фразой). На мобильной блок
+            занимает всю ширину, дата, бассейн и кнопки переносятся ниже; на десктопе он
+            тянется, а название обрезается многоточием. База 280px обязательна: с нулевой
+            (`flex-1`) соседи забирали всю строку и название сжималось в ноль, а так узкой
+            шапке проще перенести дату и кнопки на вторую строку. */}
+        <div className="flex w-full min-w-0 items-center gap-2.5 sm:w-auto sm:flex-[1_1_280px]">
           <CompetitionTile
             {...competitionTileData({
               name: first.competition_name,
@@ -855,21 +911,26 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
           {/* Имя выбранного пловца — крупно и первым: карточка соревнования должна сама
               отвечать «чьи это заплывы». В режиме All имени нет: в карточке лежат заплывы
               разных избранных, и одно имя над ними было бы враньём. */}
-          {selectedName && (
-            <span dir="auto" className="shrink-0 text-[18px] font-black leading-tight text-[var(--t-accent)]">
-              {selectedName}
-            </span>
-          )}
-          <UI_CompetitionName
-            className="min-w-0 flex-1 text-[15px] font-black leading-tight text-[var(--t-text)] sm:flex-none sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap"
-            name={first.competition_name}
-            isChampionship={first.is_championship}
-          />
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+            {selectedName && (
+              <span dir="auto" className="max-w-full text-[18px] font-black leading-tight text-[var(--t-accent)]">
+                <SwimmerLink id={preferredSwimmerId}>{selectedName}</SwimmerLink>
+              </span>
+            )}
+            {/* Адрес ДНЯ открывает всё событие (И-64), поэтому у многодневки — ранний день. */}
+            <a href={routes.competition(earliest.competition_id)} className={`block max-w-full ${LINK_CLS}`}>
+              <UI_CompetitionName
+                as="div"
+                className="text-[15px] font-black leading-tight text-[var(--t-text)] sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap"
+                name={first.competition_name}
+                isChampionship={first.is_championship}
+              />
+            </a>
+          </div>
         </div>
         <span className="hp-mono text-[11px] font-extrabold text-[var(--t-accent)]">{headerDate}</span>
         <span className="text-[11.5px] text-[var(--t-text-2)]">{first.pool_type}</span>
         {anyPodium && <span title="Podium finish">🏅</span>}
-        <BestMark pb={anyPb} sb={anySb} />
         <span className="ml-auto flex items-center gap-2">
           <span className="hidden text-[11px] font-bold text-[var(--t-text-2)] sm:inline">
             {swims.length} {swims.length === 1 ? 'swim' : 'swims'} · {videoCount} {videoCount === 1 ? 'video' : 'videos'}
@@ -923,17 +984,21 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         {days.map((day) => (
           <React.Fragment key={day.date}>
             {multiDay && <DayDivider date={day.date} count={day.swims.length} />}
-            {day.swims.map((s) => (
-              <MySwimRow
-                key={s.result_id}
-                swim={s}
-                showSwimmerName={showSwimmerName}
-                showDate={showDate}
-                showCheers={showCheers}
-                swimmerName={rowSwimmerName(s, swimmerNames, preferredSwimmerId)}
-                cb={cb}
-              />
-            ))}
+            {day.swims.map((s) => {
+              const owner = rowSwimmer(s, swimmerNames, preferredSwimmerId);
+              return (
+                <MySwimRow
+                  key={s.result_id}
+                  swim={s}
+                  showSwimmerName={showSwimmerName}
+                  showDate={showDate}
+                  showCheers={showCheers}
+                  swimmerName={owner.name}
+                  swimmerId={owner.id}
+                  cb={cb}
+                />
+              );
+            })}
           </React.Fragment>
         ))}
       </div>

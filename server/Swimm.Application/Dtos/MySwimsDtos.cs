@@ -162,11 +162,13 @@ public class MySwimDto
     [JsonPropertyName("time_fail_note")]
     public string? TimeFailNote { get; set; }
 
-    /// <summary>Личный рекорд: лучшее время пловца за всё время на (стиль, дистанция), индивидуальные заплывы.</summary>
+    /// <summary>Личный рекорд: лучшее время пловца за всё время на (стиль, дистанция, бассейн), индивидуальные
+    /// заплывы; помеченные SuspectReason (Р76) его не получают и в эталон не входят.</summary>
     [JsonPropertyName("is_pb")]
     public bool IsPb { get; set; }
 
-    /// <summary>Лучшее время СЕЗОНА на (стиль, дистанция). Не ставится там, где уже IsPb — личный рекорд и так лучший в сезоне.</summary>
+    /// <summary>SB по общему правилу продукта: быстрейший в стране в сезоне на своей ступени (peers &gt;= 2),
+    /// тот же эталон, что /api/season-best/table. Может стоять вместе с IsPb — чип выбирает клиент (SB сильнее).</summary>
     [JsonPropertyName("is_sb")]
     public bool IsSb { get; set; }
 
