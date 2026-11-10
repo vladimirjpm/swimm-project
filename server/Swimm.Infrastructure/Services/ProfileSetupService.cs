@@ -21,7 +21,15 @@ public sealed class ProfileSetupService(
     IUserFavoriteRepository favorites,
     IHubGroupUserService groups) : IProfileSetupService
 {
-    public async Task<ProfileSetupDto?> GetAsync(int userId)
+    public Task<ProfileSetupDto?> GetAsync(int userId) => BuildAsync(userId, recordSeen: true);
+
+    /// <summary>
+    /// То же состояние для карточки пользователя в админке — БЕЗ записи «какие шаги видел»: иначе
+    /// просмотр админом съел бы у человека пометку «New: …» о появившемся шаге.
+    /// </summary>
+    public Task<ProfileSetupDto?> GetForAdminAsync(int userId) => BuildAsync(userId, recordSeen: false);
+
+    private async Task<ProfileSetupDto?> BuildAsync(int userId, bool recordSeen)
     {
         var user = await db.AppUsers.AsNoTracking()
             .Where(u => u.Id == userId)
@@ -63,7 +71,7 @@ public sealed class ProfileSetupService(
         // Всё заполнено — запомнить, какие шаги человек видел: появится новый шаг — он придёт как
         // «New: …» (хендофф ex2, 3b). Пишем, только когда снимок устарел, — обычно ни разу.
         var snapshot = ProfileSetupRules.SeenSnapshot();
-        if (status.Complete && user.ProfileStepsSeen != snapshot)
+        if (recordSeen && status.Complete && user.ProfileStepsSeen != snapshot)
             await db.AppUsers.Where(u => u.Id == userId)
                 .ExecuteUpdateAsync(s => s.SetProperty(u => u.ProfileStepsSeen, snapshot));
 

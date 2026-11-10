@@ -310,6 +310,14 @@ public class ProfileSetupPgTests
             await svc.GetAsync(done.Id);
             Assert.Null(await db.AppUsers.Where(u => u.Id == done.Id).Select(u => u.ProfileStepsSeen).SingleAsync());
             foreach (var key in ProfileSetupRules.StepKeys) await svc.SetStepSkippedAsync(done.Id, key, true);
+
+            // Карточка в админке видит «готово», но снимок НЕ пишет: иначе съела бы у человека «New: …».
+            var forAdmin = await svc.GetForAdminAsync(done.Id);
+            Assert.True(forAdmin!.Complete);
+            Assert.Equal((forAdmin.Total, forAdmin.Total), (forAdmin.Done, forAdmin.Total));
+            Assert.Null(await db.AppUsers.Where(u => u.Id == done.Id).Select(u => u.ProfileStepsSeen).SingleAsync());
+            Assert.Null(await svc.GetForAdminAsync(-1));
+
             var status = await svc.GetAsync(done.Id);
             Assert.True(status!.Complete);
             Assert.Empty(status.NewSteps);

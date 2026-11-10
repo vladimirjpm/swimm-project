@@ -130,6 +130,17 @@ public class AdminController : ControllerBase
         return Ok(detail);
     }
 
+    /// <summary>
+    /// «My profile» пользователя для его карточки в админке: шаги (Me, клуб, группа, семья), сколько
+    /// заполнено, анкета ролей, Dismiss. Только чтение — сервис ничего не пишет.
+    /// </summary>
+    [HttpGet("users/{userId}/profile-setup")]
+    public async Task<IActionResult> GetUserProfileSetup(int userId, [FromServices] IProfileSetupService profile)
+    {
+        var dto = await profile.GetForAdminAsync(userId);
+        return dto == null ? NotFound(new { error = "User not found" }) : Ok(dto);
+    }
+
     // ── Dashboard ────────────────────────────────────────────────────────────
 
     [HttpGet("stats")]

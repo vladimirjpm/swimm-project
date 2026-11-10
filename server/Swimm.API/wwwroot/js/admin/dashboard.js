@@ -875,8 +875,12 @@
         panel.innerHTML = `<div class="bg-white/[.05] rounded-lg p-6 text-center text-[#90a4ae] text-sm">Загрузка…</div>`;
 
         try {
-            const d = await api(`${API}/users/${userId}/details`);
-            renderDetail(d);
+            // «My profile» — отдельной ручкой и необязательно: не загрузился — карточка без блока.
+            const [d, profile] = await Promise.all([
+                api(`${API}/users/${userId}/details`),
+                api(`${API}/users/${userId}/profile-setup`).catch(() => null),
+            ]);
+            renderDetail(d, profile);
         } catch (e) {
             panel.innerHTML = `<div class="bg-white/[.05] rounded-lg p-4 text-[#ef5350] text-sm">Ошибка: ${esc(e.message)}</div>`;
         }
@@ -888,7 +892,52 @@
         applyFilters(); // re-render to remove highlight
     };
 
-    function renderDetail(d) {
+    /**
+     * Блок «Профиль»: насколько человек заполнил My profile (/setup-profile) — шаги Me / клуб /
+     * группа / семья (семья — только у отметивших «родитель»), анкета ролей и Dismiss. Данные —
+     * GET /api/admin/users/{id}/profile-setup (только чтение). Уровень = сделанные/всего, как в меню.
+     */
+    function renderProfileSetup(p) {
+        if (!p) return '';
+        const pct = p.total > 0 ? Math.round(100 * p.done / p.total) : 0;
+        const levelColor = p.complete ? '#66bb6a' : p.done > 0 ? '#ffa726' : '#ef5350';
+        const STEP = { me: 'Это я', club: 'Клуб', group: 'Группа', family: 'Семья' };
+        const rows = (p.steps || []).map(s => {
+            const value = s.done
+                ? esc(s.targetName || '—') + (s.status === 'pending' ? ' <span class="text-[#ffa726]">(заявка)</span>' : '')
+                : s.skipped ? '<span class="text-[#546e7a]">пропущен</span>' : '<span class="text-[#546e7a]">—</span>';
+            const mark = s.done
+                ? '<span class="text-[#66bb6a] ml-1">✓</span>'
+                : s.skipped ? '<span class="text-[#546e7a] ml-1">–</span>' : '<span class="text-[#ef5350] ml-1">✗</span>';
+            return `<div class="flex items-center gap-2 text-xs py-1 border-b border-white/5">
+                <span class="text-[#90a4ae] w-14 flex-shrink-0">${STEP[s.key] || esc(s.key)}</span>
+                <span class="flex-1 truncate">${value}</span>${mark}
+            </div>`;
+        }).join('');
+        const sv = p.survey || {};
+        const picked = [sv.swimmer && 'пловец', sv.parent && 'родитель', sv.coach && 'тренер', sv.watcher && 'смотрит']
+            .filter(Boolean).join(', ');
+        const survey = sv.answeredAt
+            ? `${esc(picked || 'ничего не выбрал')} <span class="text-[#546e7a]">· ${fmtDate(sv.answeredAt)}</span>`
+            : '<span class="text-[#546e7a]">не отвечал</span>';
+        return `
+            <div class="mb-4">
+                <div class="text-xs uppercase text-[#546e7a] font-semibold mb-1.5 tracking-wide">
+                    Профиль <span class="normal-case font-normal" style="color:${levelColor}">${p.done} / ${p.total}</span>
+                    ${p.dismissed ? '<span class="text-[#546e7a] normal-case font-normal">· скрыл пункт</span>' : ''}
+                </div>
+                <div class="mb-1.5" style="height:4px;border-radius:2px;background:rgba(255,255,255,.1)">
+                    <div style="height:4px;border-radius:2px;width:${pct}%;background:${levelColor}"></div>
+                </div>
+                ${rows}
+                <div class="flex items-center gap-2 text-xs py-1">
+                    <span class="text-[#90a4ae] w-14 flex-shrink-0">Анкета</span>
+                    <span class="flex-1 truncate">${survey}</span>
+                </div>
+            </div>`;
+    }
+
+    function renderDetail(d, profile) {
         const missingRoles = allRoles.filter(r => !d.roles.includes(r.name));
         const addBtns = missingRoles.map(r =>
             `<button class="py-0.5 px-2 rounded text-xs text-white bg-[#66bb6a] hover:opacity-80 transition-opacity"
@@ -980,6 +1029,8 @@
                 </div>
                 <div class="flex gap-1 flex-wrap">${addBtns}${removeBtns}</div>
             </div>
+
+            ${renderProfileSetup(profile)}
 
             <!-- Auth -->
             <div class="mb-4">

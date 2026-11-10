@@ -11,6 +11,12 @@ public interface IProfileSetupService
     /// <summary>Состояние для меню и страницы. null — пользователя нет.</summary>
     Task<ProfileSetupDto?> GetAsync(int userId);
 
+    /// <summary>
+    /// Состояние профиля пользователя для админки (карточка в /Admin) — только чтение, ничего не
+    /// пишет. null — пользователя нет.
+    /// </summary>
+    Task<ProfileSetupDto?> GetForAdminAsync(int userId);
+
     /// <summary>Сохранить ответ опроса (замена целиком) и время ответа. false — пользователя нет.</summary>
     Task<bool> SaveSurveyAsync(int userId, ProfileSurveyRequest answer);
 
