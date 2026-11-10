@@ -1968,6 +1968,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("AddedByUserId")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("CoachRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("HubGroupId")
                         .HasColumnType("integer");
 

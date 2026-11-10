@@ -78,6 +78,28 @@ public interface IHubGroupUserService
     /// <summary>Самовыход из группы.</summary>
     Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId);
 
+    // ── Заявка тренера (docs/plans/coach-access-request-plan.md) ─────────────
+
+    /// <summary>
+    /// «Request access» тренера: вступить в группу (если ещё не участник — по тем же правилам,
+    /// что <see cref="JoinAsync"/>) с пометкой «просит права тренера». Уже владелец/админ —
+    /// отказ <see cref="HubGroupCoachRequestResult.AlreadyCoach"/>; повтор висящей заявки — успех
+    /// без <see cref="HubGroupCoachRequestResult.Created"/> (второго push не будет).
+    /// </summary>
+    Task<HubGroupCoachRequestResult> RequestCoachAccessAsync(int hubGroupId, int userId);
+
+    /// <summary>Висящие заявки тренеров группы, старые первыми. Авторизация (CanManageAdmins) — в контроллере.</summary>
+    Task<IReadOnlyList<HubGroupCoachRequestDto>> GetCoachRequestsAsync(int hubGroupId);
+
+    /// <summary>
+    /// Одобрить (Т1): админ группы + членство active + метка на его «Me»-пловца, если тот в видимом
+    /// составе и метки ещё нет; заявка снимается. Одна запись. Авторизация — в контроллере.
+    /// </summary>
+    Task<HubGroupMemberSaveResult> ApproveCoachRequestAsync(int hubGroupId, int userId, int grantedByUserId);
+
+    /// <summary>Отклонить: заявка снимается, членство не трогаем. Авторизация — в контроллере.</summary>
+    Task<HubGroupMemberSaveResult> DeclineCoachRequestAsync(int hubGroupId, int userId);
+
     /// <summary>Группы, в которые пользователь вступил как участник-аккаунт (список «участвую»).</summary>
     Task<IReadOnlyList<JoinedHubGroupDto>> GetJoinedAsync(int userId);
 

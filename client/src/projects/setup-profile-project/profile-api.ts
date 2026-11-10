@@ -82,6 +82,13 @@ export const joinGroup = async (groupId: number) =>
   errorOf(await call('POST', `/api/me/hub-groups/${groupId}/join`));
 
 /**
+ * Заявка тренера (docs/plans/coach-access-request-plan.md): вступить, если ещё нет, с пометкой
+ * «просит права тренера»; владелец одобряет в табе Admin группы. Уже админ — 409 с текстом.
+ */
+export const requestCoachAccess = async (groupId: number) =>
+  errorOf(await call('POST', `/api/me/hub-groups/${groupId}/coach-request`));
+
+/**
  * Выйти из группы (заявка в ожидании отменяется). `keepalive` — для ухода, отложенного под Undo
  * (Р9): если вкладку закрыли раньше, запрос всё равно должен дойти.
  */

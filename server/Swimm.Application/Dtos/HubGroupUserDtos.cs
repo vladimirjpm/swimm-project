@@ -62,4 +62,42 @@ public sealed class JoinedHubGroupDto
     /// <summary>active | pending.</summary>
     public string Status { get; set; } = "";
     public DateTime JoinedAt { get; set; }
+    /// <summary>Заявка тренера висит (docs/plans/coach-access-request-plan.md).</summary>
+    public bool CoachRequested { get; set; }
+}
+
+/// <summary>
+/// Заявка тренера на группу — строка карточки «Coach requests» в табе Admin
+/// (docs/plans/coach-access-request-plan.md, Т2). Видит только тот, у кого CanManageAdmins.
+/// </summary>
+public sealed class HubGroupCoachRequestDto
+{
+    public int UserId { get; set; }
+    public string DisplayName { get; set; } = "";
+    public string Email { get; set; } = "";
+    public DateTime RequestedAt { get; set; }
+    /// <summary>Членство заявителя: active | pending (группа с одобрением — одобрение заявки его активирует).</summary>
+    public string MembershipStatus { get; set; } = "";
+    /// <summary>Его пловец «Me» (Sys_UserFavorites.IsPrimary); null — не отмечен.</summary>
+    public int? MeSwimmerId { get; set; }
+    /// <summary>Имя «Me»-пловца — на иврите, английское только фоллбеком.</summary>
+    public string? MeSwimmerName { get; set; }
+    /// <summary>«Me»-пловец стоит в видимом составе группы — одобрение поставит метку на него.</summary>
+    public bool MeSwimmerInGroup { get; set; }
+}
+
+/// <summary>Итог заявки тренера: <see cref="Created"/> — заявка новая (повод для push владельцу).</summary>
+public sealed record HubGroupCoachRequestResult(bool Success, string? Error, bool Created, bool AlreadyCoach)
+{
+    public static HubGroupCoachRequestResult New() => new(true, null, Created: true, AlreadyCoach: false);
+    public static HubGroupCoachRequestResult Repeat() => new(true, null, Created: false, AlreadyCoach: false);
+    public static HubGroupCoachRequestResult Coach() => new(false, CoachAccessRules.AlreadyCoachError, Created: false, AlreadyCoach: true);
+    public static HubGroupCoachRequestResult Fail(string error) => new(false, error, Created: false, AlreadyCoach: false);
+}
+
+/// <summary>Тексты заявки тренера — показываются в UI как есть, поэтому по-английски.</summary>
+public static class CoachAccessRules
+{
+    public const string AlreadyCoachError = "You already manage this group.";
+    public const string NoRequestError = "No coach request from this member.";
 }

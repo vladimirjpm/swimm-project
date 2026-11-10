@@ -425,6 +425,156 @@ public class HubGroupUserService : IHubGroupUserService
     public async Task<HubGroupMemberSaveResult> LeaveAsync(int hubGroupId, int userId) =>
         await RemoveUserMemberAsync(hubGroupId, userId);
 
+    // ── Заявка тренера (docs/plans/coach-access-request-plan.md) ─────────────
+    // Тексты ошибок — по-английски: страница профиля и таб Admin показывают их как есть.
+
+    public async Task<HubGroupCoachRequestResult> RequestCoachAccessAsync(int hubGroupId, int userId)
+    {
+        var group = await _db.HubGroups.AsNoTracking()
+            .Where(g => g.Id == hubGroupId)
+            .Select(g => new { g.OwnerUserId, g.IsTest })
+            .FirstOrDefaultAsync();
+        if (group == null
+            || (group.IsTest && !await TestGroupAccess.CanSeeAsync(_db, userId, isSiteAdmin: false)))
+            return HubGroupCoachRequestResult.Fail("Group not found.");
+
+        if (group.OwnerUserId == userId
+            || await _db.HubGroupAdmins.AnyAsync(a => a.HubGroupId == hubGroupId && a.UserId == userId))
+            return HubGroupCoachRequestResult.Coach();
+
+        var member = await _db.HubGroupUserMembers
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
+        if (member != null)
+        {
+            if (member.CoachRequestedAt != null) return HubGroupCoachRequestResult.Repeat();
+            member.CoachRequestedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return HubGroupCoachRequestResult.New();
+        }
+
+        // Ещё не участник — вступаем ровно как самозаписью (политика, приватность, потолки), а
+        // пометку ставим следом: вторая запись дешевле, чем дублировать правила JoinAsync.
+        var joined = await JoinAsync(hubGroupId, userId);
+        if (!joined.Success) return HubGroupCoachRequestResult.Fail(joined.Error ?? "Could not send the request.");
+
+        var fresh = await _db.HubGroupUserMembers
+            .FirstAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
+        fresh.CoachRequestedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return HubGroupCoachRequestResult.New();
+    }
+
+    public async Task<IReadOnlyList<HubGroupCoachRequestDto>> GetCoachRequestsAsync(int hubGroupId)
+    {
+        var rows = await _db.HubGroupUserMembers.AsNoTracking()
+            .Where(m => m.HubGroupId == hubGroupId && m.CoachRequestedAt != null)
+            .OrderBy(m => m.CoachRequestedAt)
+            .Select(m => new HubGroupCoachRequestDto
+            {
+                UserId = m.UserId,
+                DisplayName = m.User!.DisplayName,
+                Email = m.User.Email,
+                RequestedAt = m.CoachRequestedAt!.Value,
+                MembershipStatus = m.Status,
+            })
+            .ToListAsync();
+        if (rows.Count == 0) return rows;
+
+        var userIds = rows.Select(r => r.UserId).ToList();
+        var me = await MeSwimmersAsync(userIds);
+        var meIds = me.Values.Select(x => x.Id).ToList();
+        var inRoster = (await _db.HubGroupMembers.AsNoTracking()
+                .Where(m => m.HubGroupId == hubGroupId && !m.IsExcluded && meIds.Contains(m.SwimmerId))
+                .Select(m => m.SwimmerId)
+                .ToListAsync())
+            .ToHashSet();
+
+        foreach (var row in rows)
+        {
+            if (!me.TryGetValue(row.UserId, out var swimmer)) continue;
+            row.MeSwimmerId = swimmer.Id;
+            row.MeSwimmerName = swimmer.Name;
+            row.MeSwimmerInGroup = inRoster.Contains(swimmer.Id);
+        }
+        return rows;
+    }
+
+    /// <summary>«Me» аккаунтов (избранное IsPrimary) с именем: иврит, английское — фоллбек.</summary>
+    private async Task<Dictionary<int, (int Id, string Name)>> MeSwimmersAsync(IReadOnlyCollection<int> userIds)
+    {
+        var rows = await _db.UserFavorites.AsNoTracking()
+            .Where(f => f.IsPrimary && f.SwimmerId != null && userIds.Contains(f.UserId))
+            .Select(f => new
+            {
+                f.UserId,
+                SwimmerId = f.SwimmerId!.Value,
+                He = (f.Swimmer!.LastName + " " + f.Swimmer.FirstName).Trim(),
+                En = (f.Swimmer.LastNameEn + " " + f.Swimmer.FirstNameEn).Trim(),
+            })
+            .ToListAsync();
+        // Звезда «Me» одна на аккаунт (её снимает с прежнего сервер), но словарь не должен падать.
+        return rows
+            .GroupBy(r => r.UserId)
+            .ToDictionary(g => g.Key, g =>
+            {
+                var r = g.First();
+                return (r.SwimmerId, r.He.Length > 0 ? r.He : r.En);
+            });
+    }
+
+    public async Task<HubGroupMemberSaveResult> ApproveCoachRequestAsync(int hubGroupId, int userId, int grantedByUserId)
+    {
+        var member = await _db.HubGroupUserMembers
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
+        if (member?.CoachRequestedAt == null) return HubGroupMemberSaveResult.Fail(CoachAccessRules.NoRequestError);
+
+        var ownerId = await _db.HubGroups.Where(g => g.Id == hubGroupId).Select(g => g.OwnerUserId).FirstOrDefaultAsync();
+        var isAdminAlready = ownerId == userId
+            || await _db.HubGroupAdmins.AnyAsync(a => a.HubGroupId == hubGroupId && a.UserId == userId);
+        if (!isAdminAlready)
+            _db.HubGroupAdmins.Add(new HubGroupAdmin { HubGroupId = hubGroupId, UserId = userId, GrantedByUserId = grantedByUserId });
+
+        // Группа с одобрением / приватная: одобрение тренера заодно впускает его (§2 плана).
+        member.Status = HubGroupUserMemberStatus.Active;
+
+        // Метка тренера — на его «Me», если тот в видимом составе. Метку, поставленную руками
+        // (напр. «родитель X»), не перебиваем: её ставил владелец, и она главнее заявления «Me».
+        if (member.SwimmerId == null
+            && (await MeSwimmersAsync([userId])).TryGetValue(userId, out var me)
+            && await _db.HubGroupMembers.AnyAsync(m => m.HubGroupId == hubGroupId && !m.IsExcluded && m.SwimmerId == me.Id))
+            member.SwimmerId = me.Id;
+
+        member.CoachRequestedAt = null;
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            // Гонка двух Approve (или «+ Admin» руками в ту же секунду): админ уже есть — довести
+            // остальное второй записью, без строки админа.
+            foreach (var entry in _db.ChangeTracker.Entries<HubGroupAdmin>().ToList()) entry.State = EntityState.Detached;
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return HubGroupMemberSaveResult.Fail("Could not approve the request.");
+        }
+        return HubGroupMemberSaveResult.Ok();
+    }
+
+    public async Task<HubGroupMemberSaveResult> DeclineCoachRequestAsync(int hubGroupId, int userId)
+    {
+        var member = await _db.HubGroupUserMembers
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
+        if (member?.CoachRequestedAt == null) return HubGroupMemberSaveResult.Fail(CoachAccessRules.NoRequestError);
+
+        member.CoachRequestedAt = null;
+        await _db.SaveChangesAsync();
+        return HubGroupMemberSaveResult.Ok();
+    }
+
     public async Task<IReadOnlyList<JoinedHubGroupDto>> GetJoinedAsync(int userId)
     {
         return await _db.HubGroupUserMembers.AsNoTracking()
@@ -437,7 +587,8 @@ public class HubGroupUserService : IHubGroupUserService
                 Slug = m.HubGroup.Slug,
                 IconUrl = m.HubGroup.IconUrl,
                 Status = m.Status,
-                JoinedAt = m.JoinedAt
+                JoinedAt = m.JoinedAt,
+                CoachRequested = m.CoachRequestedAt != null
             })
             .ToListAsync();
     }

@@ -18,7 +18,8 @@ import type { ProfileSetupTarget } from '../../../hooks/useProfileSetup';
  * остальных окон deep: снаружи корня страницы роли `--t-*` пусты.
  */
 
-export type EditKind = 'me' | 'family' | 'club' | 'group';
+/** `coach` — «Request access» тренера: тот же выбор группы, но шлёт заявку тренера (docs/plans/coach-access-request-plan.md К3). */
+export type EditKind = 'me' | 'family' | 'club' | 'group' | 'coach';
 
 export interface EditRequest {
   kind: EditKind;
@@ -57,6 +58,7 @@ const TITLES: Record<EditKind, { add: string; change: string; noun: string }> = 
   family: { add: 'Add children', change: 'Edit family', noun: 'family' },
   club: { add: 'Add club', change: 'Change club', noun: 'club' },
   group: { add: 'Add group', change: 'Change group', noun: 'group' },
+  coach: { add: 'Request coach access', change: 'Request coach access', noun: 'group' },
 };
 
 const PLACEHOLDERS: Record<EditKind, string> = {
@@ -64,6 +66,7 @@ const PLACEHOLDERS: Record<EditKind, string> = {
   family: "Search your child's name…",
   club: 'Search a club…',
   group: 'Search a group…',
+  coach: 'Search the group you coach…',
 };
 
 interface Props {
@@ -114,7 +117,7 @@ function ProfileEditPopup({
     setError(null);
     setLoadError(false);
     if (kind === 'club') loadClubs().then(setClubs).catch(() => setLoadError(true));
-    if (kind === 'group') loadGroups().then(setGroups).catch(() => setLoadError(true));
+    if (kind === 'group' || kind === 'coach') loadGroups().then(setGroups).catch(() => setLoadError(true));
     // autofocus поиска: окно открыли, чтобы печатать.
     const t = setTimeout(() => inputRef.current?.focus(), 0);
     return () => clearTimeout(t);
@@ -151,6 +154,15 @@ function ProfileEditPopup({
           sub: c.swimmerCount ? `${c.swimmerCount} swimmers` : undefined,
           taken: c.id !== request?.current?.id && takenClubIds.has(c.id) ? 'Added' : undefined,
         }));
+    }
+    if (kind === 'coach') {
+      if (!groups) return null;
+      // Группа, где уже состоишь, — годится: заявка ставится на это же членство. Уже админ —
+      // сервер ответит 409 текстом, отдельной пометки в списке нет.
+      return groups
+        .filter((g) => !q || g.name.toLowerCase().includes(q) || (g.club_name ?? '').toLowerCase().includes(q))
+        .slice(0, 40)
+        .map((g) => ({ id: g.id, name: g.name, sub: g.club_name ?? undefined }));
     }
     if (kind === 'group') {
       if (!groups) return null;
@@ -300,6 +312,12 @@ function ProfileEditPopup({
               <span>The coach will confirm. Until then it shows as Pending.</span>
             </div>
           )}
+          {kind === 'coach' && picked.length > 0 && (
+            <div className="flex items-start gap-2 rounded-[8px] bg-[var(--t-accent-soft)] px-3 py-2 text-[12px] text-[var(--t-text)]">
+              <span aria-hidden="true" className="text-[var(--t-accent)]">ⓘ</span>
+              <span>The group owner will review your request. Once approved, you manage the group as its coach.</span>
+            </div>
+          )}
           {error && <p className="m-0 text-[13px] text-[var(--t-danger)]">{error}</p>}
         </div>
 
@@ -345,7 +363,7 @@ function ProfileEditPopup({
                 onClick={() => { void run(() => onSave(picked)); }}
                 className="h-8 rounded-[8px] bg-[var(--t-accent)] px-4 text-[13px] font-bold text-[var(--t-accent-ink)] disabled:opacity-40"
               >
-                Save
+                {kind === 'coach' ? 'Send request' : 'Save'}
               </button>
             </>
           )}

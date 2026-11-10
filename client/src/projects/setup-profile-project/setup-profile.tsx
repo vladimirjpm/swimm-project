@@ -191,7 +191,8 @@ const TOAST_MS = 5000;
  */
 interface Toast {
   text: string;
-  undo: () => Promise<void>;
+  /** Нет — тост без кнопки Undo (заявку тренера отзывать нечем: её снимает владелец). */
+  undo?: () => Promise<void>;
   commit?: () => Promise<void>;
 }
 
@@ -255,7 +256,7 @@ function SetupProfile() {
     setToast(null);
     setBusy(true);
     try {
-      await t.undo();
+      await t.undo?.();
       await refresh();
     } finally {
       setBusy(false);
@@ -338,6 +339,16 @@ function SetupProfile() {
   const saveEdit = async (req: EditRequest, ids: number[]): Promise<string | null> => {
     const prev = req.current ?? null;
     const id = ids[0];
+
+    // Заявка тренера: вступает с пометкой, решает владелец группы в её табе Admin. Undo нет —
+    // отозвать заявку нечем, а уход из группы был бы уже другим действием.
+    if (req.kind === 'coach') {
+      const err = await api.requestCoachAccess(id);
+      if (err) return err;
+      await refresh();
+      showToast({ text: 'Request sent to the group owner' });
+      return null;
+    }
 
     if (req.kind === 'me') {
       const fav = await api.ensureFavorite('swimmer', id);
@@ -449,6 +460,17 @@ function SetupProfile() {
 
   const openEdit = (kind: EditKind, current?: ProfileSetupTarget | null) =>
     setEdit({ kind, mode: kind === 'family' ? (familyTargets.length > 0 ? 'change' : 'add') : current ? 'change' : 'add', current });
+
+  // Роль тренера уже отмечена — подсказки «Also» с «Request access» больше нет, а заявка нужна
+  // и ему (и не одна: тренер может вести несколько групп). Своего шага у тренера нет (Р7).
+  const coachLink = s.survey.coach ? (
+    <div className="mt-2 text-[13px] text-[var(--t-text-2)]">
+      Coaching a group?{' '}
+      <button type="button" onClick={() => openEdit('coach')} className="font-semibold text-[var(--t-accent)] hover:underline">
+        Request coach access
+      </button>
+    </div>
+  ) : null;
 
   /** Подсказка шага: у семьи — число из лимита сервера; клуб тренера — «Club you coach at» (ex3). */
   const hintFor = (step: ProfileSetupStep): string => {
@@ -604,7 +626,7 @@ function SetupProfile() {
         family={familyTargets}
         meSwimmerId={meTarget?.id ?? null}
         familyMax={familyLimit?.max ?? null}
-        icon={edit ? STEP_META[edit.kind].icon : null}
+        icon={edit ? (edit.kind === 'coach' ? COACH_ICON : STEP_META[edit.kind].icon) : null}
         onClose={() => setEdit(null)}
         onSave={(ids) => saveEdit(edit!, ids)}
         onRemove={() => removeEdit(edit!)}
@@ -615,9 +637,11 @@ function SetupProfile() {
           className={`${deep} fixed bottom-6 left-1/2 z-[110] flex -translate-x-1/2 items-center gap-3 rounded-[10px] border border-[var(--t-border)] bg-[var(--t-card)] px-4 py-2.5 text-[13px] text-[var(--t-text)] shadow-[var(--t-shadow)]`}
         >
           <span>{toast.text}</span>
-          <button type="button" disabled={busy} onClick={() => { void undoToast(); }} className="font-bold text-[var(--t-accent)] hover:underline disabled:opacity-50">
-            Undo
-          </button>
+          {toast.undo && (
+            <button type="button" disabled={busy} onClick={() => { void undoToast(); }} className="font-bold text-[var(--t-accent)] hover:underline disabled:opacity-50">
+              Undo
+            </button>
+          )}
         </div>
       )}
     </>
@@ -734,7 +758,7 @@ function SetupProfile() {
         if (!(await toggleRole(role))) { setError('Could not save — please try again.'); return; }
         if (role === 'parent') openEdit('family');
         else if (role === 'swimmer') openEdit('me', meTarget);
-        else if (role === 'coach') window.location.href = routes.groupsList();
+        else if (role === 'coach') openEdit('coach');
         else window.location.href = routes.results();
       } finally {
         setBusy(false);
@@ -774,6 +798,7 @@ function SetupProfile() {
             {' or '}
             <button type="button" onClick={() => openEdit('group')} className="font-semibold text-[var(--t-accent)] hover:underline">group</button>
           </div>
+          {coachLink}
 
           {/* 4b «Also»: невыбранные роли — вопрос, что даёт, кнопка сразу к делу. */}
           {also.length > 0 && (
@@ -839,6 +864,8 @@ function SetupProfile() {
         {surveyBlock}
 
         <ul className="m-0 list-none p-0">{s.steps.map(stepRow)}</ul>
+
+        {coachLink}
 
         {error && <p className="m-0 mt-3 text-[13px] text-[var(--t-danger)]">{error}</p>}
       </section>

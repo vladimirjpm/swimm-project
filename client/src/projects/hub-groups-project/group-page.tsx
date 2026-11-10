@@ -28,6 +28,7 @@ import {
 } from './components/group-media';
 import PublicationsInbox, { GroupTrustCard } from './components/group-admin';
 import GroupJoinPolicyCard from './components/group-join-policy';
+import GroupCoachRequestsCard, { loadCoachRequests } from './components/group-coach-requests';
 import GroupScheduleEditor from './components/group-schedule-editor';
 import GroupLevelsCard from './components/group-levels';
 import DeepDisplaySettingsCard from '../components/deep/display-settings-card';
@@ -80,6 +81,8 @@ function GroupPage({ slug }: { slug: string }) {
 
   // Решение в инбоксе меняет оба published-списка — форсируем их рефетч ремаунтом по ключу.
   const [publicationsReloadKey, setPublicationsReloadKey] = useState(0);
+  // Решение по заявке тренера — перечитать карточку и счётчик на табе Admin.
+  const [coachReloadKey, setCoachReloadKey] = useState(0);
 
   // Вид таба Results живёт здесь, а не в табе: дайджест Overview уводит сразу на чип
   // Records («All 20 records →»).
@@ -220,6 +223,17 @@ function GroupPage({ slug }: { slug: string }) {
     return () => { cancelled = true; };
   }, [real, manages, groupId, publicationsReloadKey]);
 
+  // Заявки тренеров (docs/plans/coach-access-request-plan.md, Т2) — в тот же бейдж. Админ группы
+  // их не видит (сервер 403 → 0): назначать админов может только владелец / админ сайта.
+  const [pendingCoachRequests, setPendingCoachRequests] = useState(0);
+  useEffect(() => {
+    if (!real || !manages) { setPendingCoachRequests(0); return undefined; }
+    let cancelled = false;
+    void loadCoachRequests(groupId).then((rows) => { if (!cancelled) setPendingCoachRequests(rows.length); });
+    return () => { cancelled = true; };
+  }, [real, manages, groupId, coachReloadKey]);
+  const adminBadgeCount = pendingPublications + pendingCoachRequests;
+
   const tabs: EntityTabSpec<GroupTab>[] = group == null || membersOnly ? [] : ([
     {
       // Дайджест — витрина соседних табов, а не шестой набор данных: те же `bests` и
@@ -359,7 +373,7 @@ function GroupPage({ slug }: { slug: string }) {
       label: 'Admin',
       sub: 'display · schedule · levels · joining',
       pinned: true,
-      badge: pendingPublications > 0 ? `${pendingPublications} new` : undefined,
+      badge: adminBadgeCount > 0 ? `${adminBadgeCount} new` : undefined,
       cards: () => [
         {
           id: 'display-settings',
@@ -407,6 +421,17 @@ function GroupPage({ slug }: { slug: string }) {
           // Сообщение Р58: без «Trusted» public-медиа группы видны всем только здесь.
           id: 'trust',
           render: () => <GroupTrustCard group={group} />,
+        },
+        {
+          // Рядом с инбоксом публикаций и ВЫШЕ него: заявка тренера — решение о правах, не о медиа.
+          id: 'coach-requests',
+          render: () => (
+            <GroupCoachRequestsCard
+              groupId={group.id}
+              reloadKey={coachReloadKey}
+              onDecided={() => setCoachReloadKey((k) => k + 1)}
+            />
+          ),
         },
         {
           id: 'publications-inbox',

@@ -301,6 +301,7 @@ public static class DependencyInjection
         services.AddHttpClient<IPushSender, WebPushSender>(c => c.Timeout = TimeSpan.FromSeconds(15));
         services.AddScoped<IPushSubscriptionService, PushSubscriptionService>();
         services.AddScoped<ITrainingReminderService, TrainingReminderService>();
+        services.AddScoped<ICoachRequestNotifier, CoachRequestNotifier>();
 
         // DB migrator
         services.AddScoped<IDbMigrator, DbMigrator>();
