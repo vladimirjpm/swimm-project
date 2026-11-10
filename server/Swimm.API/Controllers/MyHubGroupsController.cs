@@ -27,15 +27,17 @@ public class MyHubGroupsController : ControllerBase
     private readonly IHubGroupUserService _mine;
     private readonly IHubGroupPermissionService _permissions;
     private readonly IHubGroupClubSubscriptionService _clubSubscriptions;
+    private readonly ICoachRequestNotifier _coachNotifier;
 
     public MyHubGroupsController(
         IHubGroupAdminService admin, IHubGroupUserService mine, IHubGroupPermissionService permissions,
-        IHubGroupClubSubscriptionService clubSubscriptions)
+        IHubGroupClubSubscriptionService clubSubscriptions, ICoachRequestNotifier coachNotifier)
     {
         _admin = admin;
         _mine = mine;
         _permissions = permissions;
         _clubSubscriptions = clubSubscriptions;
+        _coachNotifier = coachNotifier;
     }
 
     private int? CurrentUserId()
@@ -354,6 +356,67 @@ public class MyHubGroupsController : ControllerBase
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
         var result = await _mine.JoinAsync(id, userId.Value);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
+    // ── Заявка тренера (docs/plans/coach-access-request-plan.md) ─────────────
+
+    /// <summary>
+    /// «Request access» тренера: вступить (если ещё нет) с пометкой «просит права тренера» и
+    /// сообщить владельцу push'ем. Уже владелец/админ группы — 409. Повтор висящей заявки —
+    /// 200 без второго push.
+    /// </summary>
+    [HttpPost("{id:int}/coach-request")]
+    public async Task<IActionResult> RequestCoachAccess(int id)
+    {
+        var userId = CurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var result = await _mine.RequestCoachAccessAsync(id, userId.Value);
+        if (result.AlreadyCoach) return Conflict(new { error = result.Error });
+        if (!result.Success) return BadRequest(new { error = result.Error });
+
+        // Push — после записи и не в счёт её успеха: сбой доставки заявку не отменяет.
+        if (result.Created) await _coachNotifier.NotifyOwnerAsync(id, userId.Value, HttpContext.RequestAborted);
+        return Ok(new { created = result.Created });
+    }
+
+    /// <summary>Висящие заявки тренеров — карточка «Coach requests» таба Admin. Только CanManageAdmins.</summary>
+    [HttpGet("{id:int}/coach-requests")]
+    public async Task<IActionResult> GetCoachRequests(int id)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        // Админ группы админов не назначает — значит и заявку на админство не видит (§2 плана).
+        if (!perms.CanManageAdmins) return Forbid();
+
+        return Ok(await _mine.GetCoachRequestsAsync(id));
+    }
+
+    /// <summary>Одобрить заявку тренера: админ группы + членство active + метка на его «Me».</summary>
+    [HttpPost("{id:int}/coach-requests/{userId:int}/approve")]
+    public async Task<IActionResult> ApproveCoachRequest(int id, int userId)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanManageAdmins) return Forbid();
+
+        var result = await _mine.ApproveCoachRequestAsync(id, userId, CurrentUserId()!.Value);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Отклонить заявку тренера: заявка снимается, участником он остаётся.</summary>
+    [HttpPost("{id:int}/coach-requests/{userId:int}/decline")]
+    public async Task<IActionResult> DeclineCoachRequest(int id, int userId)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanManageAdmins) return Forbid();
+
+        var result = await _mine.DeclineCoachRequestAsync(id, userId);
         return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 

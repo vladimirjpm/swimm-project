@@ -49,6 +49,10 @@ Why: a group can add any swimmer, so anything that reaches someone else’s page
 
 Anyone who’s signed in can create groups and own up to **3** (official ones count too). Need more? Ask the site admin to raise your limit. You can be an admin in any number of other people’s groups.
 
+## You coach a group someone else created
+
+Go to [your profile](route:setupProfile), pick **I’m a coach** and press **Request access** (or **Request coach access**), then choose the group. You join it with a coach request; the group’s owner approves it on the group’s **Admin** tab. Once approved, you’re a group admin: you edit the roster, schedule, levels and lane plans. The owner can also add you directly in **My groups** → **Group admins**.
+
 ## Your club’s official group
 
 1. Create a group.

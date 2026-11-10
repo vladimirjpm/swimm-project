@@ -59,4 +59,11 @@ public class HubGroupUserMember
     /// <summary>Произвольная подпись к ярлыку («родитель», «бабушка», …), опционально.</summary>
     [MaxLength(100)]
     public string? Note { get; set; }
+
+    /// <summary>
+    /// Заявка тренера (docs/plans/coach-access-request-plan.md): когда участник попросил права
+    /// тренера группы. null — заявки нет. Одобрение (владелец / админ сайта) делает его админом
+    /// группы и обнуляет поле; отказ — только обнуляет, членство остаётся. Само поле прав НЕ даёт.
+    /// </summary>
+    public DateTime? CoachRequestedAt { get; set; }
 }
