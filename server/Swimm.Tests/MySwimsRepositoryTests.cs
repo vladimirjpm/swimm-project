@@ -270,6 +270,63 @@ public class MySwimsRepositoryTests
         Assert.False(response.Swims.Single(s => s.ResultId == failed.Id).IsPb);
     }
 
+    // ── PB: бассейн — часть дисциплины (как SeasonAggregator.DisciplineKey) ──────────
+    //    Быстрая короткая вода не отнимает PB у длинной (найдено 10.11.2026).
+
+    [Fact]
+    public async Task GetMySwims_ShortAndLongPool_EachHasOwnPb()
+    {
+        await using var db = CreateDb(nameof(GetMySwims_ShortAndLongPool_EachHasOwnPb));
+        var user = NewUser("u5b@example.com");
+        var swimmer = NewSwimmer("Иванов", "Иван");
+        db.AppUsers.Add(user);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        var (style, club) = await SeedRefsAsync(db);
+        var longPool = await SeedCompetitionAsync(db, "Long");
+        var shortPool = new Competition { Name = "Short", Date = "02/10/2025", PoolType = "25m" };
+        db.Competitions.Add(shortPool);
+        await db.SaveChangesAsync();
+        await AddFavoriteAsync(db, user, swimmer);
+
+        var lcm = NewResult(swimmer, longPool, style, club, new DateTime(2025, 10, 1), timeMs: 30000);
+        var scm = NewResult(swimmer, shortPool, style, club, new DateTime(2025, 10, 2), timeMs: 29000);
+        db.Results.AddRange(lcm, scm);
+        await db.SaveChangesAsync();
+
+        var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
+
+        Assert.True(response.Swims.Single(s => s.ResultId == lcm.Id).IsPb);
+        Assert.True(response.Swims.Single(s => s.ResultId == scm.Id).IsPb);
+    }
+
+    // ── PB и Р76: помеченная строка PB не получает и у чистой его не отнимает ─────────
+
+    [Fact]
+    public async Task GetMySwims_SuspectFasterSwim_NoPbAndCleanKeepsPb()
+    {
+        await using var db = CreateDb(nameof(GetMySwims_SuspectFasterSwim_NoPbAndCleanKeepsPb));
+        var user = NewUser("u5c@example.com");
+        var swimmer = NewSwimmer("Иванов", "Иван");
+        db.AppUsers.Add(user);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        var (style, club) = await SeedRefsAsync(db);
+        var comp = await SeedCompetitionAsync(db);
+        await AddFavoriteAsync(db, user, swimmer);
+
+        var clean = NewResult(swimmer, comp, style, club, new DateTime(2025, 10, 1), timeMs: 30000);
+        var suspect = NewResult(swimmer, comp, style, club, new DateTime(2025, 10, 2), timeMs: 20000);
+        suspect.SuspectReason = "time-too-fast";
+        db.Results.AddRange(clean, suspect);
+        await db.SaveChangesAsync();
+
+        var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
+
+        Assert.False(response.Swims.Single(s => s.ResultId == suspect.Id).IsPb);
+        Assert.True(response.Swims.Single(s => s.ResultId == clean.Id).IsPb);
+    }
+
     // ── Медиа: level=result → Media, level=competition → CompetitionMedia, level=swimmer → UnlinkedMedia ──
 
     [Fact]
