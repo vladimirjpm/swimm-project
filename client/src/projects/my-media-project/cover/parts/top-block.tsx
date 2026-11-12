@@ -1,9 +1,9 @@
 import React from 'react';
-import CompetitionTile from '../../../results-main-project/components/competition-header/competition-tile';
 import type { CoverData } from '../cover-data';
 import { PRINT_FONT } from '../../print/print-fonts';
 import { COVER_COLOR } from '../cover-theme';
 import FitText from '../../print/parts/fit-text';
+import PrintTile from '../../print/parts/print-tile';
 
 const TOP = {
   gap: 22,
@@ -33,7 +33,8 @@ function DatePlate({ day, year }: { day: string; year: string }) {
 export default function TopBlock({ data }: { data: CoverData }) {
   return (
     <div style={{ flex: 'none', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'start', gap: TOP.gap }}>
-      <CompetitionTile {...data.tile} size="cover" />
+      {/* Почти пустой плитки нет (`PrintTile`); колонка остаётся, название — по центру. */}
+      <span><PrintTile tile={data.tile} size="cover" /></span>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, maxWidth: TOP.nameWidth }}>
         <FitText
           text={data.competitionName}

@@ -3,6 +3,9 @@
 
 import CategoryHelper from './category-helper';
 
+// Правило «плитка содержательна» живёт в модуле без исполняемых импортов (ради юнит-теста).
+export { hasTileContent } from './competition-tile-content';
+
 // Элемент /api/competitions: событие (свёрнуто в одну запись) или однодневное соревнование.
 export type CompetitionSource = {
   kind: 'event' | 'competition';

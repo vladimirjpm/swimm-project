@@ -1,9 +1,9 @@
 import React from 'react';
 import UI_ClubLogo from '../../../components/mix/club-logo/club-logo';
-import CompetitionTile from '../../../results-main-project/components/competition-header/competition-tile';
 import type { PhotoOptions } from '../../print/dialog/photo-controls';
 import Background from '../../print/parts/background';
 import PhotoSlot from '../../print/parts/photo';
+import PrintTile from '../../print/parts/print-tile';
 import type { PosterData } from '../poster-data';
 import { fitGrid, type GridFit } from '../poster-fit';
 import { POSTER_BG_FOCUS, POSTER_CLASS, POSTER_COLOR, POSTER_H, POSTER_INNER_W, POSTER_MARGIN, POSTER_ROOT, POSTER_W } from '../poster-theme';
@@ -69,7 +69,7 @@ function CompetitionStrip({ data }: { data: PosterData }) {
         padding: `0 ${STRIP.side}px`, borderRadius: STRIP.radius, background: POSTER_COLOR.panel, display: 'flex', alignItems: 'center', gap: STRIP.gap,
       }}
     >
-      <CompetitionTile {...data.tile} size="poster" />
+      <PrintTile tile={data.tile} size="poster" />
       <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: STRIP.textGap }}>
         <CompetitionName name={data.competitionName} size={STRIP.name} />
         <SeasonLine data={data} size={STRIP.season} />
