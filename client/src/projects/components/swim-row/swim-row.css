@@ -82,8 +82,8 @@ a.swim-row:hover {
 /* Первое место в рейтинге — золото: это и есть носитель бейджа SB. */
 .swim-row__rank--first { color: var(--sr-gold, #d99e0b); }
 
-/* Плитка дисциплины. Белая подложка и красная дистанция одинаковы в обеих темах: это знак,
-   а не поверхность темы (правило хендоффа). */
+/* Плитка дисциплины. В светлой теме подложка белая, в тёмной — тёмная (`--swim-plate` из
+   index.css) со светлым пловцом: с 11.11.2026 тёмная тема действует и на иконку. */
 .swim-row__event {
   width: 86px;
   flex: none;
@@ -97,7 +97,7 @@ a.swim-row:hover {
   width: 86px;
   height: 52px;
   border-radius: 10px;
-  background: #fff;
+  background: var(--swim-plate, #fff);
   display: flex;
   align-items: center;
   justify-content: center;

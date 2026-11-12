@@ -149,8 +149,8 @@
   border-radius: 8px; padding: 2px 8px;
 }
 .tbs-recipe .chip.strong { color: var(--theme-mode-text); font-weight: 700; gap: 6px; padding: 3px 8px; }
-/* Значок стиля в «рецепте» сета — на светлой подложке, как в строке (силуэт чёрный) */
-.tbs-recipe .dv-swimm-icon { background: #fff; border-radius: 6px; padding: 2px 3px; }
+/* Значок стиля в «рецепте» сета — на подложке, как в строке (`--swim-plate`, идёт за темой) */
+.tbs-recipe .dv-swimm-icon { background: var(--swim-plate, #fff); border-radius: 6px; padding: 2px 3px; }
 .tbs-recipe .chip.v { padding: 1px 4px; }
 .tbs-setmeta {
   margin-left: auto; font-size: 11px; color: var(--theme-mode-text-muted);
@@ -171,8 +171,8 @@
    Отдельная колонка, а не .tbs-gear — та на мобиле скрыта, а стиль нужен везде. */
 .tbs-row--styled { grid-template-columns: 42px 120px minmax(96px, 1.4fr) 40px minmax(84px, 1fr) 44px auto; }
 .tbs-style { display: flex; align-items: center; justify-content: center; }
-/* Светлая подложка в ОБЕИХ темах: силуэты стилей нарисованы чёрным (как .swim-row__plate) */
-.tbs-style .dv-swimm-icon { background: #fff; border-radius: 7px; padding: 3px 2px; }
+/* Подложка идёт за темой (`--swim-plate`, как .swim-row__plate): в тёмной — тёмная */
+.tbs-style .dv-swimm-icon { background: var(--swim-plate, #fff); border-radius: 7px; padding: 3px 2px; }
 .tbs-row.m { background: var(--theme-mode-row-male); }
 .tbs-row.f { background: var(--theme-mode-row-female); }
 
