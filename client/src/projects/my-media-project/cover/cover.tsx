@@ -4,7 +4,7 @@ import { COVER_H, COVER_W } from './cover-theme';
 import CoverA from './layouts/cover-a';
 import CoverB from './layouts/cover-b';
 import CoverC from './layouts/cover-c';
-import './cover.css';
+import '../print/print.css';
 
 // Обложка YouTube выбранной раскладки (хендофф `!design_handoff/my-media-handoff-nov2026`,
 // задача 2). Рисуется в ФИКСИРОВАННОМ размере 1280×720: предпросмотр уменьшает её transform-ом

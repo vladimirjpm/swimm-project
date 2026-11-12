@@ -1,7 +1,6 @@
 import React from 'react';
 import UI_SwimmStyleIcon from '../../../components/mix/swimm-style-icon/swimm-style-icon';
-import type { CoverData } from '../cover-data';
-import { COVER_COLOR } from '../cover-theme';
+import { PRINT_COLOR } from '../print-theme';
 
 /** Размеры плиты в раскладке: ширина плиты, сторона иконки, кегль дистанции. */
 export interface StylePlateSpec {
@@ -13,17 +12,17 @@ export interface StylePlateSpec {
 }
 
 /** Светлая плита со стилем и дистанцией: на тёмной панели тёмная иконка без неё не видна. */
-export default function StylePlate({ data, spec }: { data: CoverData; spec: StylePlateSpec }) {
+export default function StylePlate({ styleName, distanceLabel, spec }: { styleName: string; distanceLabel: string; spec: StylePlateSpec }) {
   return (
     <div
       style={{
         width: spec.width, flex: 'none', boxSizing: 'border-box', padding: spec.padding, borderRadius: spec.radius,
-        background: COVER_COLOR.plate, display: 'flex', flexDirection: 'column', alignItems: 'center',
+        background: PRINT_COLOR.plate, display: 'flex', flexDirection: 'column', alignItems: 'center',
       }}
     >
       <UI_SwimmStyleIcon
-        styleName={data.styleName}
-        styleLen={data.distanceLabel}
+        styleName={styleName}
+        styleLen={distanceLabel}
         styleType="icon-len"
         lenPlacement="below"
         iconSize={spec.icon}

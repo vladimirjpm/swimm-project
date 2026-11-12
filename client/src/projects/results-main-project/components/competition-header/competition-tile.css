@@ -91,6 +91,22 @@
 .comp-tile--cover-lg .comp-tile__letter { font-size: 46px; }
 .comp-tile--cover-lg .comp-tile__age    { height: 32px; font-size: 19px; }
 
+/* Плакат в My media (тот же хендофф, макеты PosterA/C): 132×160 в полосе раскладки C,
+   150×182 в углу раскладки A. Плакат рисуется 1414×2000. Пропорции слотов — из макета. */
+.comp-tile--poster { width: 132px; height: 160px; border-radius: 30px; border-width: 3px; }
+.comp-tile--poster .comp-tile__icons  { height: 52px; gap: 8px; }
+.comp-tile--poster .comp-tile__season { font-size: 24px; }
+.comp-tile--poster .comp-tile__cup    { font-size: 36px; }
+.comp-tile--poster .comp-tile__letter { font-size: 56px; }
+.comp-tile--poster .comp-tile__age    { height: 38px; font-size: 23px; }
+
+.comp-tile--poster-lg { width: 150px; height: 182px; border-radius: 34px; border-width: 3px; }
+.comp-tile--poster-lg .comp-tile__icons  { height: 58px; gap: 10px; }
+.comp-tile--poster-lg .comp-tile__season { font-size: 28px; }
+.comp-tile--poster-lg .comp-tile__cup    { font-size: 40px; }
+.comp-tile--poster-lg .comp-tile__letter { font-size: 64px; }
+.comp-tile--poster-lg .comp-tile__age    { height: 44px; font-size: 26px; }
+
 /* Без возрастной группы (masters, открытый старт) — ленты нет, плитка ниже */
 .comp-tile--no-age { height: 64px; }
 .comp-tile--no-age.comp-tile--sm { height: 56px; }
@@ -98,6 +114,8 @@
 .comp-tile--no-age.comp-tile--mini { height: 34px; }
 .comp-tile--no-age.comp-tile--cover { height: 78px; }
 .comp-tile--no-age.comp-tile--cover-lg { height: 102px; }
+.comp-tile--no-age.comp-tile--poster { height: 122px; }
+.comp-tile--no-age.comp-tile--poster-lg { height: 138px; }
 
 /* Без кубка (не чемпионат) — в полосе только сезон, выравнивание по центру сохраняется */
 

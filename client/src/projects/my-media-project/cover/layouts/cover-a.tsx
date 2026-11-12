@@ -1,12 +1,12 @@
 import React from 'react';
 import type { CoverData } from '../cover-data';
 import { COVER_CLASS, COVER_COLOR, COVER_ROOT } from '../cover-theme';
-import Background from '../parts/background';
+import Background from '../parts/cover-background';
 import { EmblemCorner } from '../parts/emblem';
-import NameRow, { type NameSpec } from '../parts/name-row';
-import { PlaceCircle } from '../parts/place';
-import { Badge, TimeText, type BadgeSpec, type TimeSpec } from '../parts/result-text';
-import StylePlate, { type StylePlateSpec } from '../parts/style-plate';
+import NameRow, { type NameSpec } from '../../print/parts/name-row';
+import { PlaceCircle } from '../../print/parts/place';
+import { Badge, TimeText, type BadgeSpec, type TimeSpec } from '../../print/parts/result-text';
+import StylePlate, { type StylePlateSpec } from '../../print/parts/style-plate';
 import TopBlock from '../parts/top-block';
 
 // Раскладка A (макет `CoverB.dc.html`): результат одной крупной строкой, имя с логотипом
@@ -32,13 +32,13 @@ export default function CoverA({ data }: { data: CoverData }) {
         }}
       >
         <PlaceCircle place={data.place} size="medal-116" />
-        <StylePlate data={data} spec={PLATE} />
+        <StylePlate styleName={data.styleName} distanceLabel={data.distanceLabel} spec={PLATE} />
         <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: PANEL.textGap }}>
           <TimeText text={data.timeText} spec={TIME} />
           <Badge text={data.badge} spec={BADGE} />
         </div>
       </div>
-      <NameRow data={data} spec={NAME} />
+      <NameRow swimmerName={data.swimmerName} clubName={data.clubName} spec={NAME} />
     </div>
   );
 }

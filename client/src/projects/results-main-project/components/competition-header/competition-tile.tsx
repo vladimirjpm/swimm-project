@@ -9,8 +9,9 @@ import './competition-tile.css';
 interface Props extends CompetitionTileData {
   /** 'responsive' — полный габарит, ниже 640px сам ужимается до xs (шапка соревнования).
    *  'mini' — 34×42 для стики-компакт-бара мобайла (16b).
-   *  'cover' (86×104) и 'cover-lg' (110×134) — обложка YouTube в My media. */
-  size?: 'responsive' | 'md' | 'sm' | 'xs' | 'mini' | 'cover' | 'cover-lg';
+   *  'cover' (86×104) и 'cover-lg' (110×134) — обложка YouTube в My media;
+   *  'poster' (132×160) и 'poster-lg' (150×182) — плакат там же. */
+  size?: 'responsive' | 'md' | 'sm' | 'xs' | 'mini' | 'cover' | 'cover-lg' | 'poster' | 'poster-lg';
 }
 
 const SIZE_CLASS: Record<NonNullable<Props['size']>, string> = {
@@ -21,6 +22,8 @@ const SIZE_CLASS: Record<NonNullable<Props['size']>, string> = {
   mini: 'comp-tile--mini',
   cover: 'comp-tile--cover',
   'cover-lg': 'comp-tile--cover-lg',
+  poster: 'comp-tile--poster',
+  'poster-lg': 'comp-tile--poster-lg',
 };
 
 export default function CompetitionTile({

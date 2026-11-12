@@ -1,9 +1,9 @@
 import React from 'react';
 import CompetitionTile from '../../../results-main-project/components/competition-header/competition-tile';
 import type { CoverData } from '../cover-data';
-import { COVER_FONT } from '../cover-fonts';
+import { PRINT_FONT } from '../../print/print-fonts';
 import { COVER_COLOR } from '../cover-theme';
-import FitText from './fit-text';
+import FitText from '../../print/parts/fit-text';
 
 const TOP = {
   gap: 22,
@@ -22,7 +22,7 @@ function DatePlate({ day, year }: { day: string; year: string }) {
       <span style={{ padding: '12px 40px 10px', background: COVER_COLOR.dateStrip, fontSize: TOP.day, fontWeight: 800, letterSpacing: '0.08em', lineHeight: 1, color: COVER_COLOR.ink, whiteSpace: 'nowrap' }}>
         {day}
       </span>
-      <span style={{ padding: '10px 40px 14px', fontFamily: COVER_FONT.digits, fontSize: TOP.year, fontWeight: 900, lineHeight: 1, color: COVER_COLOR.ink }}>
+      <span style={{ padding: '10px 40px 14px', fontFamily: PRINT_FONT.digits, fontSize: TOP.year, fontWeight: 900, lineHeight: 1, color: COVER_COLOR.ink }}>
         {year}
       </span>
     </div>
@@ -40,7 +40,7 @@ export default function TopBlock({ data }: { data: CoverData }) {
           dir="rtl"
           size={TOP.name}
           wrap
-          style={{ textAlign: 'center', fontFamily: COVER_FONT.hebrew, fontWeight: 900, lineHeight: 1.1 }}
+          style={{ textAlign: 'center', fontFamily: PRINT_FONT.hebrew, fontWeight: 900, lineHeight: 1.1 }}
         />
         <DatePlate day={data.dayLabel} year={data.year} />
       </div>

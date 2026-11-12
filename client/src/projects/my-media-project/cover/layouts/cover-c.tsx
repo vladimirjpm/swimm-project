@@ -1,15 +1,15 @@
 import React from 'react';
 import CompetitionTile from '../../../results-main-project/components/competition-header/competition-tile';
 import type { CoverData, CoverOptions } from '../cover-data';
-import { COVER_FONT } from '../cover-fonts';
+import { PRINT_FONT } from '../../print/print-fonts';
 import { COVER_CLASS, COVER_COLOR, COVER_ROOT } from '../cover-theme';
-import Background from '../parts/background';
-import { EmblemMark } from '../parts/emblem';
-import FitText from '../parts/fit-text';
+import Background from '../parts/cover-background';
+import EmblemMark from '../../print/parts/emblem-mark';
+import FitText from '../../print/parts/fit-text';
 import PhotoAndName from '../parts/photo-and-name';
-import { PlaceRibbon } from '../parts/place';
-import { Badge, TimeText, type BadgeSpec, type TimeSpec } from '../parts/result-text';
-import StylePlate, { type StylePlateSpec } from '../parts/style-plate';
+import { PlaceCircle, RibbonMedal } from '../../print/parts/place';
+import { Badge, TimeText, type BadgeSpec, type TimeSpec } from '../../print/parts/result-text';
+import StylePlate, { type StylePlateSpec } from '../../print/parts/style-plate';
 
 // Раскладка C (макет `CoverG.dc.html`): слева тёмная колонка — дни соревнования и год, значок,
 // плитка; справа название, результат столбиком, необязательное фото и имя под ним.
@@ -20,6 +20,8 @@ const PANEL = { width: 400, padding: '14px 20px', radius: 36, gap: 12 } as const
 const PLATE: StylePlateSpec = { width: 330, icon: 280, len: 50, radius: 22, padding: '10px 0 8px' };
 const TIME: TimeSpec = { max: 92, min: 56, stroke: 3 };
 const BADGE: BadgeSpec = { max: 44, min: 26, padding: '9px 20px', radius: 14 };
+/** Ширина медали с лентой; без медали — номер места кружком без заливки, как в строке списка. */
+const RIBBON_WIDTH = 40;
 
 /** Левая колонка: дни и год сверху, значок посередине, плитка внизу. */
 function CompetitionColumn({ data }: { data: CoverData }) {
@@ -32,7 +34,7 @@ function CompetitionColumn({ data }: { data: CoverData }) {
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, maxWidth: '100%' }}>
         <FitText text={data.rangeLabel} size={COLUMN.range} style={{ fontWeight: 800, letterSpacing: '0.06em', lineHeight: 1 }} />
-        <span style={{ fontFamily: COVER_FONT.digits, fontStyle: 'italic', fontSize: COLUMN.year, fontWeight: 900, lineHeight: 1, color: COVER_COLOR.yearGold }}>
+        <span style={{ fontFamily: PRINT_FONT.digits, fontStyle: 'italic', fontSize: COLUMN.year, fontWeight: 900, lineHeight: 1, color: COVER_COLOR.yearGold }}>
           {data.year}
         </span>
       </div>
@@ -55,8 +57,8 @@ function ResultColumn({ data }: { data: CoverData }) {
         justifyContent: 'center', gap: PANEL.gap,
       }}
     >
-      <PlaceRibbon place={data.place} />
-      <StylePlate data={data} spec={PLATE} />
+      {data.place?.medal ? <RibbonMedal place={data.place} width={RIBBON_WIDTH} /> : <PlaceCircle place={data.place} size="medal-80" />}
+      <StylePlate styleName={data.styleName} distanceLabel={data.distanceLabel} spec={PLATE} />
       <TimeText text={data.timeText} spec={TIME} />
       <Badge text={data.badge} spec={BADGE} />
     </div>
@@ -74,7 +76,7 @@ export default function CoverC({ data, options }: { data: CoverData; options: Co
           dir="rtl"
           size={MAIN.title}
           wrap
-          style={{ flex: 'none', alignSelf: 'center', textAlign: 'center', fontFamily: COVER_FONT.hebrew, fontWeight: 900, lineHeight: 1.1 }}
+          style={{ flex: 'none', alignSelf: 'center', textAlign: 'center', fontFamily: PRINT_FONT.hebrew, fontWeight: 900, lineHeight: 1.1 }}
         />
         <div style={{ flex: '1 1 0', minHeight: 0, display: 'flex', alignItems: 'stretch', gap: MAIN.columnsGap }}>
           <ResultColumn data={data} />

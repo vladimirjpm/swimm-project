@@ -1,15 +1,15 @@
-// Фото пловца для обложки: файл с устройства → data-URL. Файл остаётся в браузере и на сервер
+// Фото пловца для обложки и плаката: файл с устройства → data-URL. Файл остаётся в браузере и на сервер
 // не уходит (решение Влада 12.11.2026).
 
-/** Сторона, до которой уменьшается фото: больше обложке не нужно (слот около 500px). */
+/** Сторона, до которой уменьшается фото: больше картинке не нужно (самый большой слот — 1242px на плакате). */
 const PHOTO_MAX_SIDE = 1600;
 const PHOTO_JPEG_QUALITY = 0.9;
 
 /**
- * Уменьшаем сразу: снимок с телефона — это 4000px и 5 МБ, а в обложку он вшивается целиком и
+ * Уменьшаем сразу: снимок с телефона — это 4000px и 5 МБ, а в картинку он вшивается целиком и
  * раздул бы каждый рендер. Бросает ошибку, если браузер не смог прочитать файл как картинку.
  */
-export async function readCoverPhoto(file: File): Promise<string> {
+export async function readPrintPhoto(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
