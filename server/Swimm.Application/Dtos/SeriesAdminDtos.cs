@@ -22,6 +22,9 @@ public sealed class SeriesEditDto
     /// </summary>
     public string? SuggestedPhrase { get; init; }
 
+    /// <summary>Значок серии; null — не загружен (docs/plans/series-emblem-plan.md).</summary>
+    public SeriesEmblemDto? Emblem { get; init; }
+
     public IReadOnlyList<SeriesPartDto> Parts { get; init; } = [];
     public IReadOnlyList<SeriesRegulationDto> Regulations { get; init; } = [];
     public IReadOnlyList<SeriesEditionDayDto> EditionDays { get; init; } = [];
@@ -94,6 +97,22 @@ public sealed record SeriesBindingDto(
     double Share, double? CurrentPartShare, string Reason,
     bool HasRegulation, DateTime? RegulationCheckedAt,
     bool BoundNow = false);
+
+/// <summary>Сведения о значке серии — без самих байтов.</summary>
+public sealed record SeriesEmblemDto(
+    int Id, string Sha256, string ContentType, int Width, int Height, int Bytes, DateTime UploadedAt)
+{
+    /// <summary>
+    /// Публичный адрес картинки. Хэш содержимого в пути: замена значка даёт новый адрес, поэтому
+    /// ответ кэшируется браузером навсегда (immutable). Единственное место, где адрес собирается.
+    /// </summary>
+    public string Url => PublicUrl(Id, Sha256);
+
+    public static string PublicUrl(int id, string sha256) => $"/api/series-emblems/{id}/{sha256}";
+}
+
+/// <summary>Картинка значка для публичной выдачи.</summary>
+public sealed record SeriesEmblemFileDto(byte[] Data, string ContentType);
 
 /// <summary>Итог мутации: Id созданной/изменённой строки или текст ошибки.</summary>
 public sealed record SeriesSaveResult(bool Success, int Id, string? Error)

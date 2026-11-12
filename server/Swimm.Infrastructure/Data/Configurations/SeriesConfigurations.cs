@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Swimm.Application.Validation;
 using Swimm.Domain.Entities;
 
 namespace Swimm.Infrastructure.Data.Configurations;
@@ -15,6 +16,12 @@ internal sealed class CompetitionSeriesConfiguration : IEntityTypeConfiguration<
         entity.ToTable("CompetitionSeries");
         entity.HasIndex(e => e.Name).IsUnique();
 
+        // SET NULL: удалить значок — не значит сломать серию, она просто остаётся без значка.
+        entity.HasOne(e => e.Emblem)
+            .WithMany()
+            .HasForeignKey(e => e.EmblemId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         entity.HasMany(e => e.Parts)
             .WithOne(p => p.Series)
             .HasForeignKey(p => p.SeriesId)
@@ -24,6 +31,32 @@ internal sealed class CompetitionSeriesConfiguration : IEntityTypeConfiguration<
             .WithOne(r => r.Series)
             .HasForeignKey(r => r.SeriesId)
             .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+/// <summary>
+/// Значок серии (docs/plans/series-emblem-plan.md). Публичная таблица: картинку отдаёт анонимный
+/// read-путь. CHECK-ограничения повторяют <see cref="SeriesEmblemImage"/> — в таблицу пишет не
+/// только репозиторий (синхронизация, ручной SQL), и мусор не должен попасть на публичный адрес.
+/// </summary>
+internal sealed class SeriesEmblemConfiguration : IEntityTypeConfiguration<SeriesEmblem>
+{
+    public void Configure(EntityTypeBuilder<SeriesEmblem> entity)
+    {
+        entity.ToTable("SeriesEmblems");
+
+        entity.HasCheckConstraint(
+            "CK_SeriesEmblems_ContentType",
+            $@"""ContentType"" IN ('{SeriesEmblemImage.Png}', '{SeriesEmblemImage.Webp}')");
+        entity.HasCheckConstraint(
+            "CK_SeriesEmblems_DataSize",
+            $@"octet_length(""Data"") BETWEEN 1 AND {SeriesEmblemImage.MaxBytes}");
+        entity.HasCheckConstraint(
+            "CK_SeriesEmblems_Dimensions",
+            $@"""Width"" BETWEEN 1 AND {SeriesEmblemImage.MaxSide} AND ""Height"" BETWEEN 1 AND {SeriesEmblemImage.MaxSide}");
+        entity.HasCheckConstraint(
+            "CK_SeriesEmblems_Sha256",
+            @"""Sha256"" ~ '^[0-9a-f]{64}$'");
     }
 }
 

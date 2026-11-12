@@ -163,6 +163,7 @@ public static class DependencyInjection
         services.AddScoped<IPointRulesAdminRepository, PointRulesAdminRepository>();
         services.AddScoped<ISeriesAdminRepository, SeriesAdminRepository>();
         services.AddScoped<ISeriesBinder, SeriesBinder>();
+        services.AddScoped<ISeriesEmblemReader, SeriesEmblemReader>();
         services.AddScoped<IResultAdminRepository, ResultAdminRepository>();
         services.AddScoped<IResultTransferService, ResultTransferService>();
         // Деление схлопнутой многодневки по дням без переимпорта (multiday-split-plan, М2).

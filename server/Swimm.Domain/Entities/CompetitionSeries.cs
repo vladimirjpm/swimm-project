@@ -32,12 +32,51 @@ public class CompetitionSeries
     [MaxLength(500)]
     public string? MatchPhrases { get; set; }
 
+    /// <summary>
+    /// Значок (эмблема) серии; null — значка нет, это обычное состояние. Висит на серии, а не на
+    /// соревновании: новый выпуск узнаётся по <see cref="MatchPhrases"/> и получает значок сам
+    /// (docs/plans/series-emblem-plan.md).
+    /// </summary>
+    public int? EmblemId { get; set; }
+
+    [ForeignKey(nameof(EmblemId))]
+    public SeriesEmblem? Emblem { get; set; }
+
     public ICollection<CompetitionSeriesPart> Parts { get; set; } = [];
     public ICollection<SeriesRegulation> Regulations { get; set; } = [];
 
     /// <summary>Фразы <see cref="MatchPhrases"/> списком, без пустых.</summary>
     public IReadOnlyList<string> MatchPhraseList() =>
         (MatchPhrases ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+
+/// <summary>
+/// Значок серии — картинка байтами в базе (решение Влада 12.11.2026: не файл на диске, не
+/// репозиторий, не Azure Blob). Отдельная таблица, а не колонка серии: серию читают часто, и
+/// тянуть вместе с ней десятки килобайт незачем. Оригинал не хранится — браузер админки уменьшает
+/// картинку до отправки. Строка неизменяема: замена значка — новая строка с новым Id и хэшем,
+/// поэтому публичный адрес (Id + <see cref="Sha256"/>) можно кэшировать навсегда.
+/// </summary>
+public class SeriesEmblem
+{
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public int Id { get; set; }
+
+    public byte[] Data { get; set; } = [];
+
+    /// <summary>"image/png" | "image/webp" — определён по сигнатуре файла, не по заголовку запроса.</summary>
+    [MaxLength(20)]
+    public string ContentType { get; set; } = string.Empty;
+
+    public int Width { get; set; }
+    public int Height { get; set; }
+
+    /// <summary>SHA-256 содержимого, 64 hex-символа в нижнем регистре — часть публичного адреса.</summary>
+    [MaxLength(64)]
+    public string Sha256 { get; set; } = string.Empty;
+
+    public DateTime UploadedAt { get; set; }
 }
 
 /// <summary>

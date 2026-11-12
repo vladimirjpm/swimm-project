@@ -46,6 +46,7 @@ public class SwimmDbContext : DbContext
 
     /* === Серии турниров и официальное награждение (docs/plans/official-awards-plan.md) === */
     public DbSet<CompetitionSeries> CompetitionSeries => Set<CompetitionSeries>();
+    public DbSet<SeriesEmblem> SeriesEmblems => Set<SeriesEmblem>();
     public DbSet<CompetitionSeriesPart> CompetitionSeriesParts => Set<CompetitionSeriesPart>();
     public DbSet<SeriesRegulation> SeriesRegulations => Set<SeriesRegulation>();
     public DbSet<SeriesAward> SeriesAwards => Set<SeriesAward>();

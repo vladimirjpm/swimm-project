@@ -868,6 +868,9 @@ namespace Swimm.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("EmblemId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("MatchPhrases")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -882,6 +885,8 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("character varying(300)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EmblemId");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -3523,6 +3528,51 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("SeriesAwardPrizes", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.SeriesEmblem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SeriesEmblems", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SeriesEmblems_ContentType", "\"ContentType\" IN ('image/png', 'image/webp')");
+
+                            t.HasCheckConstraint("CK_SeriesEmblems_DataSize", "octet_length(\"Data\") BETWEEN 1 AND 307200");
+
+                            t.HasCheckConstraint("CK_SeriesEmblems_Dimensions", "\"Width\" BETWEEN 1 AND 1024 AND \"Height\" BETWEEN 1 AND 1024");
+
+                            t.HasCheckConstraint("CK_SeriesEmblems_Sha256", "\"Sha256\" ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.SeriesRegulation", b =>
                 {
                     b.Property<int>("Id")
@@ -4598,6 +4648,16 @@ namespace Swimm.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Note");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.CompetitionSeries", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.SeriesEmblem", "Emblem")
+                        .WithMany()
+                        .HasForeignKey("EmblemId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Emblem");
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.CompetitionSeriesPart", b =>
