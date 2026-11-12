@@ -6,7 +6,8 @@ namespace Swimm.Application.Dtos;
 /// <summary>Строка списка серий.</summary>
 public sealed record SeriesRowDto(
     int Id, string Name, string? NameEn, string? MatchPhrases,
-    int PartCount, int RegulationCount, int EditionDayCount);
+    int PartCount, int RegulationCount, int EditionDayCount,
+    SeriesEmblemDto? Emblem = null);
 
 /// <summary>Серия целиком — для страницы правки.</summary>
 public sealed class SeriesEditDto
