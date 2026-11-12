@@ -135,13 +135,15 @@ export interface DeepSheetProps {
   footer?: React.ReactNode;
   /** Кому отдать фокус при открытии; иначе — первое поле ввода, иначе ✕. */
   initialFocusRef?: React.RefObject<HTMLElement>;
+  /** Ширина модала на десктопе, px (по умолчанию 480). Шире — когда в теле предпросмотр картинки. */
+  width?: number;
   children: React.ReactNode;
 }
 
 const FOCUSABLE_FIELD = 'input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])';
 
 export function DeepSheet({
-  title, sub, tone = 'accent', variant = 'sheet', busy = false, onClose, onSubmit, footer, initialFocusRef, children,
+  title, sub, tone = 'accent', variant = 'sheet', busy = false, onClose, onSubmit, footer, initialFocusRef, width = 480, children,
 }: DeepSheetProps) {
   const themeClass = useDeepThemeClass();
   const isDesktop = useMediaQuery(DEEP_DESKTOP_QUERY);
@@ -188,7 +190,7 @@ export function DeepSheet({
     boxShadow: 'var(--deep-card-shadow)',
     maxHeight: '90dvh',
     ...(modal
-      ? { width: 480, maxWidth: 'calc(100vw - 32px)', borderRadius: 18, padding: 20 }
+      ? { width, maxWidth: 'calc(100vw - 32px)', borderRadius: 18, padding: 20 }
       : {
         width: '100%',
         borderRadius: '22px 22px 0 0',

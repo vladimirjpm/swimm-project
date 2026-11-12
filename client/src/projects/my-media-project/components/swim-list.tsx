@@ -25,6 +25,11 @@ import UI_ClubLogo from '../../components/mix/club-logo/club-logo';
 import MobileFiltersDrawer from '../../components/filter-section/mobile-filters-drawer';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useDeepThemeClass } from '../../components/deep/use-deep-theme-class';
+import type { CoverData } from '../cover/cover-layouts';
+
+// Диалог обложки — ленивый чанк: шрифты обложки и `html-to-image` страница грузит только по
+// нажатию `YouTube cover`, а не при каждом открытии /my-media.
+const CoverDialog = React.lazy(() => import('./cover-dialog'));
 
 // Список заплывов, сгруппированный по соревнованиям — ядро My media. Карточка соревнования —
 // вариант 3A хендоффа `!design_handoff/my-media-handoff-nov2026` (12.11.2026): слева список
@@ -273,6 +278,70 @@ function swimMarks(swim: MySwimDto) {
     pb: swim.is_pb && !swim.suspect_reason,
     sb: swim.is_sb && !swim.suspect_reason,
   };
+}
+
+/* ── Обложка YouTube ─────────────────────────────────────────────────────────── */
+
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+/** yyyy-MM-dd → `5 NOV` (подписи обложки — на английском). */
+function coverDay(iso: string): string {
+  const [, m, d] = iso.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1] ?? ''}`.trim();
+}
+
+/** Дни соревнования: `5–6 NOV`, через границу месяца — `30 OCT–1 NOV`. */
+function coverRange(fromIso: string, toIso: string): string {
+  if (fromIso === toIso) return coverDay(fromIso);
+  const [, fm, fd] = fromIso.split('-').map(Number);
+  const [, tm] = toIso.split('-').map(Number);
+  return fm === tm ? `${fd}–${coverDay(toIso)}` : `${coverDay(fromIso)}–${coverDay(toIso)}`;
+}
+
+/** Метка достижения на обложке — словами: в сетке YouTube сокращение `REC·AGE` не читается. */
+const COVER_RECORD_LABEL: Record<RecordKind, string> = {
+  world: 'WORLD RECORD',
+  national: 'NATIONAL RECORD',
+  age: 'AGE RECORD',
+  masters: 'MASTERS RECORD',
+};
+
+/**
+ * Данные обложки одного результата. Ничего своего: медаль — `isMedal`, метка — `swimMarks`
+ * (рекорд > SB > PB; у строки `Under review` меток нет, Р76 — время и место при этом как в
+ * протоколе), плитка — `competitionTileData`, время — та же строка, что печатает `UI_SwimTime`.
+ */
+function coverDataOf(
+  swim: MySwimDto, swimmerName: string, firstDay: string, lastDay: string,
+): CoverData {
+  const { record, pb, sb } = swimMarks(swim);
+  return {
+    competitionName: swim.competition_name,
+    tile: competitionTileData({
+      name: swim.competition_name,
+      date: swim.competition_date,
+      category: swim.category,
+      is_championship: swim.is_championship,
+    }),
+    emblemUrl: swim.emblem_url ?? null,
+    isChampionship: swim.is_championship,
+    dayLabel: coverDay(swim.date),
+    rangeLabel: coverRange(firstDay, lastDay),
+    year: swim.date.slice(0, 4),
+    place: swim.place,
+    medal: isMedal(swim),
+    styleName: swim.style,
+    distanceLabel: /^\d+$/.test(swim.distance) ? `${swim.distance}m` : swim.distance,
+    timeText: swim.time_fail ? String(HelperResults.failLabel(swim)) : swim.time,
+    badge: record ? COVER_RECORD_LABEL[record.kind] : sb ? 'SEASON BEST' : pb ? 'PERSONAL BEST' : null,
+    swimmerName,
+    clubName: swim.club_name || null,
+  };
+}
+
+/** Имя файла обложки без расширения: дата и дисциплина — чтобы файлы разных заплывов не слиплись. */
+function coverFileName(swim: MySwimDto): string {
+  return `swimhub-cover-${swim.date}-${swim.distance}${styleLabel(swim.style)}`.replace(/[^\w-]+/g, '-');
 }
 
 /** Время заплыва: `UI_SwimTime` (единственный вывод времени) или пометка протокола DNS / DQ. */
@@ -811,10 +880,11 @@ function MediaStage({ m, onPlay }: { m: SwimMediaDto; onPlay: () => void }) {
  * `MediaLine`, что был в раскрывающейся панели под строкой (источник и ❤, статус публикации,
  * пометка модерации, Share / Update, Withdraw, Delete).
  *
- * Кнопок `YouTube cover` и `Poster` из макета здесь нет: логики у них нет до задачи 2
- * хендоффа (обложки и плакаты), а кнопка «в никуда» на проде нежелательна.
+ * `actions` — кнопки результата под управлением медиа: `YouTube cover` (задача 2 хендоффа).
+ * `Poster` и `Share` из макета здесь нет: у плаката пока нет логики, а Share живёт в
+ * `MediaLine`.
  */
-function MediaPane({ head, media, addLabel, onAdd, onClose, cb }: {
+function MediaPane({ head, media, addLabel, onAdd, onClose, actions, cb }: {
   head: React.ReactNode;
   /** Видео первыми, затем фото. */
   media: SwimMediaDto[];
@@ -822,6 +892,8 @@ function MediaPane({ head, media, addLabel, onAdd, onClose, cb }: {
   onAdd: () => void;
   /** Есть только у выезжающей панели и шторки; рядом со списком закрывать нечего. */
   onClose?: () => void;
+  /** Кнопки открытого результата (обложка YouTube); у медиа соревнования их нет. */
+  actions?: React.ReactNode;
   cb: SwimListCallbacks;
 }) {
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -866,6 +938,7 @@ function MediaPane({ head, media, addLabel, onAdd, onClose, cb }: {
       {/* `key` — у `MediaLine` своё состояние селектов публикации: при смене медиа оно обязано
           начаться заново, а не унаследовать выбор соседа. */}
       {active && <MediaLine key={active.id} m={active} pubs={cb.publicationsByMedia.get(active.id) ?? []} cb={cb} />}
+      {actions && <div className="flex flex-wrap items-center gap-2 border-t border-[var(--t-border-2)] pt-2.5">{actions}</div>}
     </div>
   );
 }
@@ -1048,6 +1121,9 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
   if (sel != null) lastSel.current = sel;
   const drawerSel = sel ?? (isOpenable(lastSel.current) ? lastSel.current : null);
 
+  // Обложка YouTube: для какого результата открыт диалог.
+  const [coverSwim, setCoverSwim] = useState<MySwimDto | null>(null);
+
   const renderPane = (target: PaneSel, onClose?: () => void) => {
     if (target === 'comp') {
       return (
@@ -1078,6 +1154,17 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         addLabel="Add photo or video"
         onAdd={() => cb.onAddVideo(swim)}
         onClose={onClose}
+        actions={(
+          <button
+            type="button"
+            onClick={() => setCoverSwim(swim)}
+            title="Make a 1280 × 720 thumbnail for this result"
+            className="hp-mono inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[var(--t-accent-border)] bg-transparent px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
+          >
+            <IconVideo size={9} />
+            YouTube cover
+          </button>
+        )}
         cb={cb}
       />
     );
@@ -1195,6 +1282,21 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         >
           {drawerSel != null && renderPane(drawerSel, () => setPicked(null))}
         </MobileFiltersDrawer>
+      )}
+
+      {coverSwim && (
+        <React.Suspense fallback={null}>
+          <CoverDialog
+            data={coverDataOf(
+              coverSwim,
+              rowSwimmer(coverSwim, swimmerNames, preferredSwimmerId).name,
+              days[days.length - 1].date,
+              days[0].date,
+            )}
+            fileName={coverFileName(coverSwim)}
+            onClose={() => setCoverSwim(null)}
+          />
+        </React.Suspense>
       )}
     </div>
   );

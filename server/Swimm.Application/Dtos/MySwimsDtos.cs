@@ -93,6 +93,14 @@ public class MySwimDto
     [JsonPropertyName("is_championship")]
     public bool IsChampionship { get; set; }
 
+    /// <summary>
+    /// Публичный адрес значка серии турнира (серия дня — Competition.SeriesPart.Series), собран
+    /// через <see cref="SeriesEmblemDto.PublicUrl"/>. null — день не привязан к серии или у серии
+    /// нет значка (обычное состояние). Нужен обложке YouTube в My media.
+    /// </summary>
+    [JsonPropertyName("emblem_url")]
+    public string? EmblemUrl { get; set; }
+
     /// <summary>Пол ПЛОВЦА (Results.Gender — фоллбек): ключ ступени рекорда и season best.</summary>
     [JsonPropertyName("gender")]
     public string Gender { get; set; } = string.Empty;
