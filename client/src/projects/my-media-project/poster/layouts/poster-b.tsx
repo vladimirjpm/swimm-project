@@ -1,7 +1,7 @@
 import React from 'react';
+import CompetitionTile from '../../../results-main-project/components/competition-header/competition-tile';
 import UI_ClubLogo from '../../../components/mix/club-logo/club-logo';
 import Background from '../../print/parts/background';
-import PrintTile from '../../print/parts/print-tile';
 import type { PosterData } from '../poster-data';
 import { fitGrid } from '../poster-fit';
 import { POSTER_BG_FOCUS, POSTER_CLASS, POSTER_COLOR, POSTER_H, POSTER_ROOT, POSTER_W } from '../poster-theme';
@@ -33,7 +33,7 @@ function Head({ data }: { data: PosterData }) {
     <div style={{ flex: 'none', height: HEAD.height, display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: HEAD.gap }}>
       <span style={{ justifySelf: 'start' }}>{data.clubName && <UI_ClubLogo clubName={data.clubName} size={HEAD.logo} />}</span>
       <SeasonLine data={data} size={HEAD.season} />
-      <span style={{ justifySelf: 'end', display: 'flex' }}><PrintTile tile={data.tile} size="cover-lg" /></span>
+      <span style={{ justifySelf: 'end', display: 'flex' }}><CompetitionTile {...data.tile} size="cover-lg" /></span>
     </div>
   );
 }

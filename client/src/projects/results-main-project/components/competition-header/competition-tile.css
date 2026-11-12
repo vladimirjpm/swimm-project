@@ -130,3 +130,27 @@
   .comp-tile--responsive .comp-tile__age    { height: 17px; font-size: 10px; }
   .comp-tile--responsive.comp-tile--no-age  { height: 48px; }
 }
+
+/* Несодержательная плитка (нет ни буквы категории, ни возрастной группы): рамки и подложки
+   нет, на месте плитки — в её габарите — значок сезона, у чемпионата под ним кубок
+   (решение Влада 13.11.2026). Цвет — роль буквы плитки; картинки My media (обложка, плакат)
+   задают сезону и кубку свои цвета токенами --theme-comp-tile-winter / -summer / -cup. */
+.comp-tile--bare {
+  border-color: transparent;
+  background: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6%;
+  color: var(--theme-comp-tile-letter);
+}
+.comp-tile--bare.comp-tile--winter { color: var(--theme-comp-tile-winter, var(--theme-comp-tile-letter)); }
+.comp-tile--bare.comp-tile--summer { color: var(--theme-comp-tile-summer, var(--theme-comp-tile-letter)); }
+.comp-tile--bare .comp-tile__mark { width: 78%; height: auto; flex: none; }
+.comp-tile--bare .comp-tile__mark-cup {
+  width: 42%;
+  height: auto;
+  flex: none;
+  color: var(--theme-comp-tile-cup, var(--theme-comp-tile-letter));
+}
+/* С кубком значок сезона меньше — оба помещаются в габарит плитки. */
+.comp-tile--bare .comp-tile__mark:not(:last-child) { width: 56%; }

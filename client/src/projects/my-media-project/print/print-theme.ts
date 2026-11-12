@@ -37,6 +37,10 @@ const ROOT_TOKENS = {
   '--theme-comp-tile-strip-bg': '#ffffff',
   '--theme-comp-tile-age-bg': '#ffffff',
   '--theme-comp-tile-age-text': '#00265e',
+  // Значок сезона на месте несодержательной плитки и кубок под ним.
+  '--theme-comp-tile-winter': PRINT_COLOR.sky,
+  '--theme-comp-tile-summer': PRINT_COLOR.gold,
+  '--theme-comp-tile-cup': '#f2b632',
   // `UI_MedalIcon` без медали печатает номер цветом текста поверхности — здесь она тёмная.
   '--theme-mode-text': '#ffffff',
   // `UI_ClubLogo`: белый круг под логотипом, инициалы тёмным.

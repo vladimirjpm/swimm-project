@@ -1,10 +1,16 @@
 import React from 'react';
-import type { CompetitionTileData } from '../../../../utils/helpers/competition-source';
+import { hasTileContent, type CompetitionTileData } from '../../../../utils/helpers/competition-source';
+import { IconSnowflake, IconSun, IconTrophy } from '../../../competitions-project/calendar/calendar-icons';
 import './competition-tile.css';
 
 // Плитка соревнования (design_handoff_competition_overview3, вариант 11c):
 // полоса значков (сезон + кубок) · буква группы (K/M) · лента возрастной группы.
 // Каждый слот скрывается отдельно, если данных нет; без возраста — модификатор --no-age.
+//
+// Несодержательная плитка — без буквы категории и без возрастной группы (`hasTileContent`) —
+// рамкой не рисуется: на её месте, в том же габарите, стоит значок сезона (решение Влада
+// 13.11.2026: «вместо него поставь иконку зимы или лета»). Так бывает у соревнования без
+// канонической категории. Значки — рисунки календаря (`calendar-icons`), не эмодзи.
 
 interface Props extends CompetitionTileData {
   /** 'responsive' — полный габарит, ниже 640px сам ужимается до xs (шапка соревнования).
@@ -26,6 +32,27 @@ const SIZE_CLASS: Record<NonNullable<Props['size']>, string> = {
   'poster-lg': 'comp-tile--poster-lg',
 };
 
+/**
+ * Значок сезона на месте несодержательной плитки, в её габарите — раскладки вокруг не прыгают.
+ * У чемпионата под ним кубок (в плитке он стоял бы в полосе значков — пропасть он не должен);
+ * сезон неизвестен — только кубок; нет ни сезона, ни чемпионата — ничего.
+ */
+function SeasonMark({ season, isChampionship, sizeClass }: {
+  season: CompetitionTileData['season'];
+  isChampionship: boolean;
+  sizeClass: string;
+}) {
+  if (!season && !isChampionship) return null;
+  const Season = season === '❄️' ? IconSnowflake : IconSun;
+  const tone = season === '❄️' ? 'comp-tile--winter' : season ? 'comp-tile--summer' : '';
+  return (
+    <span className={['comp-tile', 'comp-tile--bare', sizeClass, tone].filter(Boolean).join(' ')} aria-hidden="true">
+      {season && <Season className="comp-tile__mark" />}
+      {isChampionship && <IconTrophy className="comp-tile__mark-cup" />}
+    </span>
+  );
+}
+
 export default function CompetitionTile({
   letter, ageGroup, season, isChampionship, size = 'responsive',
 }: Props) {
@@ -34,6 +61,10 @@ export default function CompetitionTile({
     SIZE_CLASS[size],
     ageGroup ? '' : 'comp-tile--no-age',
   ].filter(Boolean).join(' ');
+
+  if (!hasTileContent({ letter, ageGroup })) {
+    return <SeasonMark season={season} isChampionship={isChampionship} sizeClass={SIZE_CLASS[size]} />;
+  }
 
   return (
     <span className={classes} aria-hidden="true">

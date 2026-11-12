@@ -1,5 +1,5 @@
 import React from 'react';
-import { hasTileContent } from '../../../../utils/helpers/competition-source';
+import CompetitionTile from '../../../results-main-project/components/competition-header/competition-tile';
 import type { CoverData, CoverOptions } from '../cover-data';
 import { PRINT_FONT } from '../../print/print-fonts';
 import { COVER_CLASS, COVER_COLOR, COVER_ROOT } from '../cover-theme';
@@ -9,7 +9,6 @@ import FitText from '../../print/parts/fit-text';
 import PhotoAndName from '../parts/photo-and-name';
 import { PlaceCircle, RibbonMedal } from '../../print/parts/place';
 import { Badge, TimeText, type BadgeSpec, type TimeSpec } from '../../print/parts/result-text';
-import PrintTile from '../../print/parts/print-tile';
 import StylePlate, { type StylePlateSpec } from '../../print/parts/style-plate';
 
 // Раскладка C (макет `CoverG.dc.html`): слева тёмная колонка — дни соревнования и год, значок,
@@ -40,11 +39,10 @@ function CompetitionColumn({ data }: { data: CoverData }) {
         </span>
       </div>
       {/* Место значка держит размер и без значка — колонка не перестраивается. */}
-      <div style={{ width: COLUMN.emblem, height: COLUMN.emblem, flex: 'none', margin: hasTileContent(data.tile) ? undefined : 'auto 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: COLUMN.emblem, height: COLUMN.emblem, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <EmblemMark emblem={data.emblem} size={COLUMN.emblem} cup={COLUMN.cup} />
       </div>
-      {/* Почти пустой плитки нет (`PrintTile`): значок тогда стоит по центру оставшейся высоты. */}
-      <PrintTile tile={data.tile} size="cover-lg" />
+      <CompetitionTile {...data.tile} size="cover-lg" />
     </div>
   );
 }

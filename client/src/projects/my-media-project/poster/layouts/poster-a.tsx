@@ -1,9 +1,9 @@
 import React from 'react';
+import CompetitionTile from '../../../results-main-project/components/competition-header/competition-tile';
 import UI_ClubLogo from '../../../components/mix/club-logo/club-logo';
 import type { PhotoOptions } from '../../print/dialog/photo-controls';
 import Background from '../../print/parts/background';
 import PhotoSlot from '../../print/parts/photo';
-import PrintTile from '../../print/parts/print-tile';
 import type { PosterData } from '../poster-data';
 import { fitGrid } from '../poster-fit';
 import { POSTER_BG_FOCUS, POSTER_CLASS, POSTER_COLOR, POSTER_H, POSTER_INNER_W, POSTER_MARGIN, POSTER_ROOT, POSTER_W } from '../poster-theme';
@@ -62,7 +62,7 @@ export default function PosterA({ data, options }: { data: PosterData; options: 
         </div>
       )}
       <div style={{ position: 'absolute', right: HEAD.tile.right, top: HEAD.tile.top }}>
-        <PrintTile tile={data.tile} size="poster-lg" />
+        <CompetitionTile {...data.tile} size="poster-lg" />
       </div>
       <div style={{ position: 'absolute', left: NAME.side, top: NAME.top, width: POSTER_W - 2 * NAME.side }}>
         <SwimmerName name={data.swimmerName} size={NAME.size} />

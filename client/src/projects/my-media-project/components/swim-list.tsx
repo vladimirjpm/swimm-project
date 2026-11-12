@@ -16,7 +16,7 @@ import HelperResults from '../../../utils/helpers/helper-results';
 import HelperMedia from '../../../utils/helpers/helper-media';
 import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
 import CompetitionTile from '../../results-main-project/components/competition-header/competition-tile';
-import { competitionTileData, hasTileContent } from '../../../utils/helpers/competition-source';
+import { competitionTileData } from '../../../utils/helpers/competition-source';
 import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 import { routes } from '../../../utils/routes';
 import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
@@ -1048,9 +1048,9 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         <div className="mmc-head__id">
           {/* Плитка соревнования — общая CompetitionTile (сезон/кубок · буква категории ·
               возрастная лента). Данные считает общий competitionTileData, своей эвристики по
-              названию тут нет: категория и флаг чемпионата приходят с сервера. Почти пустую
-              плитку (без буквы и без возраста) не рисуем — текст шапки начинается от края. */}
-          {hasTileContent(tile) && <CompetitionTile {...tile} size="sm" />}
+              названию тут нет: категория и флаг чемпионата приходят с сервера. Плитку без
+              буквы и возраста компонент сам заменяет значком сезона. */}
+          <CompetitionTile {...tile} size="sm" />
           {/* Столбик «имя пловца / название / даты». `items-start` обязателен: ивритский
               текст с dir="auto" в блоке на всю ширину уезжает вправо, а имя должно стоять
               слева (хендофф §1.4). */}
