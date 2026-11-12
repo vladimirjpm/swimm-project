@@ -145,7 +145,6 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
                           styleName={style}
                           styleLen={distance}
                           styleType="icon-len"
-                          surface="light"
                           className="src-training-by-session w-16"
                         />
                       )}
@@ -183,7 +182,6 @@ function TrainingBySession({ results, selectedSource, filters, updateFilter }: P
                               styleName={r.event_style_name}
                               styleLen={r.event_style_len}
                               styleType="icon-len"
-                              surface="light"
                               className="src-training-by-session w-20"
                             />
                           </span>

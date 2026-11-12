@@ -107,8 +107,8 @@ const RkWorldList: React.FC<Props> = ({ records, filters, world = null }) => {
                 aria-label={`${strokeLabel(r.style)} ${distanceLabel(r.distance)}`}
               >
                 {/* Дисциплина — общим значком стиля с дистанцией справа, как в строке заплыва и
-                    карточках рекордов; текст — в подсказке и aria-label. Белая плита под
-                    иконкой обязательна: PNG стилей нарисованы под светлый фон. */}
+                    карточках рекордов; текст — в подсказке и aria-label. Плита под
+                    иконкой идёт за темой (`--swim-plate`), пловец — `surface="auto"`. */}
                 <span className="rk-event-plate">
                   <UI_SwimmStyleIcon
                     styleName={r.style}
@@ -117,7 +117,6 @@ const RkWorldList: React.FC<Props> = ({ records, filters, world = null }) => {
                     lenPlacement="right"
                     size={48}
                     lenSize={16}
-                    surface="light"
                   />
                 </span>
               </a>

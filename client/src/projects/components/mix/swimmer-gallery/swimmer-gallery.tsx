@@ -196,8 +196,10 @@ const UI_SwimmerGallery: React.FC<UI_SwimmerGalleryProps> = ({
       )}
 
       {showPopup && (
+        // z-[110]: просмотр открывают и ИЗ панелей-оверлеев (панель медиа My media — z-85),
+        // и он обязан лечь поверх них. При прежних z-50 лайтбокс уходил под панель (12.11.2026).
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70"
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black bg-opacity-70"
           onClick={handleClose}
         >
           <div

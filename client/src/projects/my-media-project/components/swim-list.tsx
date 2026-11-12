@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { UserMediaPublicationDto } from '../../../hooks/useUserMedia';
 import { fetchPublishTargets, PublishTargetDto } from '../use-all-my-media';
 import {
@@ -20,11 +20,18 @@ import CompetitionTile from '../../results-main-project/components/competition-h
 import { competitionTileData } from '../../../utils/helpers/competition-source';
 import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
 import { routes } from '../../../utils/routes';
+import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
+import UI_ClubLogo from '../../components/mix/club-logo/club-logo';
+import MobileFiltersDrawer from '../../components/filter-section/mobile-filters-drawer';
+import { useMediaQuery } from '../../../hooks/useMediaQuery';
+import { useDeepThemeClass } from '../../components/deep/use-deep-theme-class';
 
-// Список заплывов, сгруппированный по соревнованиям — ядро My media.
-// Строка узкая на обеих ширинах, а всё управление медиа (share, withdraw, delete, ❤)
-// живёт в ОДНОЙ разворачиваемой панели под строкой — и на десктопе, и на телефоне
-// (решение Влада 08.09.2026; своей мобильной шторки действий у строки больше нет).
+// Список заплывов, сгруппированный по соревнованиям — ядро My media. Карточка соревнования —
+// вариант 3A хендоффа `!design_handoff/my-media-handoff-nov2026` (12.11.2026): слева список
+// результатов, всё управление медиа (кому видно, share, withdraw, delete, ❤) — в ПАНЕЛИ МЕДИА
+// открытого результата. Панель одна, мест у неё три, и выбирает их ширина КАРТОЧКИ: рядом со
+// списком (широкая карточка), выезжает справа (десктоп, карточка уже), нижняя шторка (телефон).
+// План и решения — `docs/plans/my-media-card-3a-plan.md`.
 
 export interface SwimListCallbacks {
   publicationsByMedia: Map<number, UserMediaPublicationDto[]>;
@@ -126,19 +133,58 @@ function swimHref(swim: MySwimDto, swimmerId: number | null): string {
   return routes.competitionSwims(swim.competition_id, { swimmerId, resultId: swim.result_id });
 }
 
+/* ── Линейные иконки карточки ─────────────────────────────────────────────── */
+
 /**
- * Шеврон кнопки «развернуть медиа». Инлайновый SVG, а не `UI_*`: готовой иконки-стрелки в
- * реестре нет (docs/ui-components.md §6, тот же случай, что у кнопки «наверх» в стартовом
- * протоколе). Раньше тут стоял глиф ▾ в 11px — его было почти не видно.
+ * Инлайновые SVG с `currentColor`, а не `UI_*`: готовых линейных иконок (видео, фото, плюс,
+ * стрелка, крестик) в реестре нет (docs/ui-components.md §6), а отдельных вариантов под тему
+ * им не нужно — цвет приходит от текста. Рисунки — из хендоффа карточки 3A.
  */
-function Chevron({ open }: { open: boolean }) {
+const IconVideo = ({ size = 8 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 12 12" aria-hidden="true">
+    <path d="M3 1.5v9l7.5-4.5z" fill="currentColor" />
+  </svg>
+);
+const IconPhoto = ({ size = 12 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+    <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
+    <path d="M2 11l3.5-3.5 3 3 2-2 3.5 3.5" />
+  </svg>
+);
+const IconPlus = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <path d="M8 3v10M3 8h10" />
+  </svg>
+);
+/** Стрелка кнопки «открыть медиа»: вправо — панель рядом или выезжает справа, вверх — шторка. */
+const IconChevron = ({ dir }: { dir: 'right' | 'up' }) => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <path d={dir === 'right' ? 'M6 4l4 4-4 4' : 'M4 10l4-4 4 4'} />
+  </svg>
+);
+const IconClose = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <path d="M4 4l8 8M12 4l-8 8" />
+  </svg>
+);
+
+/**
+ * Счётчик видео или фото. Есть — число на акценте; нет — серый значок без числа (ноль в
+ * каждой строке читался бы как оценка, а не как «ещё не добавили»).
+ */
+function Counter({ kind, count, large = false }: { kind: 'video' | 'photo'; count: number; large?: boolean }) {
+  const noun = kind === 'video' ? 'video' : 'photo';
+  const label = count === 0 ? `No ${noun}s` : `${count} ${noun}${count === 1 ? '' : 's'}`;
   return (
-    <svg
-      width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"
-      style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 120ms' }}
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={`mmc-count${count > 0 ? ' mmc-count--on' : ''}${large ? ' mmc-count--lg' : ''}`}
     >
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+      {kind === 'video' ? <IconVideo size={large ? 10 : 8} /> : <IconPhoto size={large ? 13 : count > 0 ? 11 : 12} />}
+      {count > 0 && count}
+    </span>
   );
 }
 
@@ -147,17 +193,101 @@ function Chevron({ open }: { open: boolean }) {
  * а медалей за них не дают. Правило одно на продукт — `HelperResults.isMedalPlace`, тот же,
  * что у таблицы результатов и страницы пловца.
  */
-function medal(swim: MySwimDto): string | null {
-  const isMedal = HelperResults.isMedalPlace({
+function isMedal(swim: MySwimDto): boolean {
+  return HelperResults.isMedalPlace({
     place: swim.place,
     heatType: swim.heat_type,
     round: swim.round,
     timeFail: swim.time_fail,
     competitionIsAward: swim.is_award,
   });
-  if (!isMedal) return null;
-  return swim.place === 1 ? '🥇' : swim.place === 2 ? '🥈' : '🥉';
 }
+
+/**
+ * Место — кружок `UI_MedalIcon`. Медальная заливка только там, где медаль вручали
+ * (`isMedal`); иначе `icon-noplace` — номер без кружка: место 1 в предварительном или в
+ * «כללי» золотым кружком показало бы медаль, которой не было. Места нет (DNS / DQ, снятые) —
+ * прочерк.
+ */
+function PlaceMark({ swim, size }: { swim: MySwimDto; size: 'medal-32' | 'medal-40' }) {
+  if (swim.place == null) {
+    return <span className="text-[15px] font-black leading-none text-[var(--t-text-3)]" title="No place">—</span>;
+  }
+  const medalPlace = isMedal(swim);
+  return (
+    <UI_MedalIcon
+      place={String(swim.place)}
+      styleType={medalPlace ? 'icon-place' : 'icon-noplace'}
+      styleSize={size}
+      title={medalPlace ? `Place ${swim.place} · medal` : `Place ${swim.place}`}
+    />
+  );
+}
+
+/** Иконка стиля с дистанцией на плите 52px (картинка 46 + поля) — одна на строку и панель. */
+function StylePlate({ swim }: { swim: MySwimDto }) {
+  return (
+    <UI_SwimmStyleIcon
+      styleName={swim.style}
+      styleLen={swim.distance}
+      styleType="icon-len"
+      lenPlacement="below"
+      iconSize={46}
+      lenSize={11}
+      className="src-swim-list mmc-plate"
+    />
+  );
+}
+
+/**
+ * Выводы из времени заплыва — общие для строки и панели, чтобы метка в них не разошлась.
+ *
+ * Спорное время (И11): чип рисует `UI_SwimTime`, а НОСИТЕЛЬ — сама строка
+ * (`swimFlaggedRowProps`: caution-лента слева плюс полный текст в title/aria-label).
+ * Р76: PB/SB/рекорд — наши выводы из времени, у помеченной строки их нет. SB сервер уже не
+ * ставит, PB ставит — гасим здесь. Бейдж рекорда — тем же способом, что в протоколе:
+ * справочник рекордов + ось возраста из админ-настройки (`Helper.recordStepAge`). Эстафеты,
+ * DSQ и помеченные ошибки протокола рекордов не носят — как в таблице результатов.
+ */
+function swimMarks(swim: MySwimDto) {
+  const quality = swim.suspect_reason ? { kind: 'protocol' as const, reason: swim.suspect_reason } : null;
+  const isMastersResult = Helper.isResultMasters(swim.category === 'masters', swim.event_style_age);
+  const record = swim.is_relay || swim.time_fail || swim.suspect_reason || !swim.gender
+    ? null
+    : Helper.recordMarkForTime({
+      time: swim.time,
+      gender: swim.gender,
+      poolType: swim.pool_type,
+      styleName: swim.style,
+      distance: `${swim.distance}m`,
+      age: Helper.recordStepAge({
+        date: swim.competition_date,
+        birth_year: swim.birth_year,
+        event_style_age: swim.event_style_age,
+      }),
+      isMasters: isMastersResult,
+    });
+  return {
+    quality,
+    record,
+    pb: swim.is_pb && !swim.suspect_reason,
+    sb: swim.is_sb && !swim.suspect_reason,
+  };
+}
+
+/** Время заплыва: `UI_SwimTime` (единственный вывод времени) или пометка протокола DNS / DQ. */
+function SwimTimeText({ swim, quality }: { swim: MySwimDto; quality: ReturnType<typeof swimMarks>['quality'] }) {
+  return swim.time_fail
+    ? <>{HelperResults.failLabel(swim)}</>
+    : <UI_SwimTime time={swim.time} quality={quality} />;
+}
+
+/** RELAY — признак самого заплыва, стоит под временем (решение Влада 08.09.2026). */
+const RELAY_CHIP = (
+  <span className="hp-mono rounded-[5px] border border-[var(--t-text-2)] px-[5px] text-[9px] font-extrabold leading-[1.5] tracking-[0.08em] text-[var(--t-text-2)]">
+    RELAY
+  </span>
+);
 
 /** Style.Name из БД сырой (freestyle / individual_medley) — короткие лейблы дизайна. */
 const STYLE_LABELS: Record<string, string> = {
@@ -497,310 +627,289 @@ function SwimmerLink({ id, children }: { id: number | null; children: React.Reac
   return <a href={routes.swimmer(id)} className={LINK_CLS}>{children}</a>;
 }
 
-/* ── Строка заплыва My media ──────────────────────────────────────────────────── */
+/* ── Строка результата (карточка 3A) ──────────────────────────────────────────── */
 
 /**
- * Это НЕ общая строка заплыва `SwimRow` (`components/swim-row/`). Раньше она звалась
- * так же и читалась как шестая копия той же строки — поэтому переименована.
+ * Это НЕ общая строка заплыва `SwimRow` (`components/swim-row/`): та — двухлинейная КАРТОЧКА
+ * результата, а здесь — плотная строка управления медиа (вариант 3A хендоффа
+ * `!design_handoff/my-media-handoff-nov2026`, 12.11.2026).
  *
- * Почему не сведена в общую: общая строка — двухлинейная КАРТОЧКА результата, а здесь —
- * ПЛОТНАЯ ТАБЛИЦА управления медиа: сетка `48 28 66 1fr 72 110 120` под своей шапкой
- * (PLACE / SWIM / TIME / MEDIA) и разворачиваемая панель медиа под строкой. Карточка втрое
- * выше и ломает выравнивание по колонкам, а чтобы вместить медиа-кнопки, RELAY, метку PB и
- * тап-по-строке, в общий компонент пришлось бы добавить слот на каждый угол — ровно то, от
- * чего план общей строки отказался (§3.1 `docs/plans/swim-row-shared-component-plan.md`).
+ * Слева направо: место (`UI_MedalIcon`) → иконка стиля с дистанцией (ссылка на заплыв в
+ * протоколе) → время и одна метка → счётчики видео и фото → кнопка. Текстовой подписи
+ * «50m breast» в строке нет: стиль и дистанцию показывает иконка (подпись осталась в панели).
  *
- * В строке — только короткое и главное (решение Влада 07.09.2026): бейдж «кому это видно»,
- * поздравления соседей и управление публикациями живут в раскрывающейся панели, а на
- * мобильной — в нижней шторке действий. Сетка задана в `my-media.css` (`.mms-row`,
- * `.mms-mrow`), и шапка колонок берёт её же — разъехаться они не могут.
+ * Всё управление медиа (кому видно, Share / Withdraw / Delete, ❤) живёт в панели медиа
+ * открытого результата. У заплыва без медиа открывать нечего — на месте кнопки стоит «+»,
+ * который сразу зовёт Add video: добавить ролик к свежему заплыву — главный сценарий
+ * страницы, и лишний шаг через пустую панель ему ни к чему.
  *
- * Общее берётся ячейками: `UI_SwimmStyleIcon`, `UI_SwimTime` вместе с
- * `swimFlaggedRowProps` (носитель спорного времени) и `UI_DateIcon` (формат даты один на продукт).
+ * Сетка — в `my-media.css` (`.mmc-row`), от ШИРИНЫ КАРТОЧКИ (container query): на
+ * телефонной счётчики встают столбиком, цели касания 44px.
  */
-function MySwimRow({ swim, showSwimmerName, showDate, showCheers, swimmerName, swimmerId, cb }: {
+function MySwimRow({ swim, first, showSwimmerName, showDate, swimmerName, swimmerId, selected, sheet, onOpen, cb }: {
   swim: MySwimDto;
+  /** Первая строка списка или дня — без верхнего разделителя. */
+  first: boolean;
   showSwimmerName: boolean;
-  /** Колонка DATE — только у многодневок (см. `sameDay`). */
+  /** День заплыва в строке — только у однодневной карточки, где он разошёлся с шапкой (`sameDay`). */
   showDate: boolean;
-  /** Колонка 🎉 — только если в карточке кого-то уже поздравили (см. `CompetitionGroup`). */
-  showCheers: boolean;
   swimmerName: string;
   /** Чей это заплыв среди избранных (у эстафеты — нога из избранного); null — не нашли. */
   swimmerId: number | null;
+  /** Панель медиа открыта на этом результате. */
+  selected: boolean;
+  /** Панель открывается нижней шторкой (телефон) — стрелка кнопки смотрит вверх. */
+  sheet: boolean;
+  onOpen: () => void;
   cb: SwimListCallbacks;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const href = swimHref(swim, swimmerId);
   const discipline = `${swim.distance}m ${styleLabel(swim.style)}`;
-  const videos = swim.media.filter((m) => m.media_type === 'video');
-  const photos = swim.media.filter((m) => m.media_type === 'image');
-  const hasMedia = swim.media.length > 0;
-  const noVideo = videos.length === 0;
+  const videos = swim.media.filter((m) => m.media_type === 'video').length;
+  const photos = swim.media.length - videos;
   // ❤ в строке — сводка: самое залайканное медиа заплыва. Ноль не показываем: пустое
   // сердечко в каждой строке читается как «никому не понравилось», а не как «ещё нет оценок».
   const topLiked = swim.media.reduce<SwimMediaDto | null>(
     (best, m) => (m.likes_count > 0 && (!best || m.likes_count > best.likes_count) ? m : best),
     null,
   );
-
-  // Спорное время (И11): чип рисует `UI_SwimTime`, а НОСИТЕЛЬ — сама строка:
-  // caution-лента слева плюс полный текст в title/aria-label. До этого строка My media
-  // обвязки не несла — ровно тот случай, ради которого хелпер и заводили.
-  const quality = swim.suspect_reason ? { kind: 'protocol' as const, reason: swim.suspect_reason } : null;
+  const { quality, record, pb, sb } = swimMarks(swim);
   const flagged = swimFlaggedRowProps(quality);
-  // Р76: PB/SB — наши выводы из времени, у помеченной строки их нет. SB сервер уже не ставит,
-  // PB ставит — гасим здесь, у самой метки.
-  const pb = swim.is_pb && !swim.suspect_reason;
-  const sb = swim.is_sb && !swim.suspect_reason;
-
-  // Бейдж рекорда — тем же способом, что в протоколе: справочник рекордов + ось возраста из
-  // админ-настройки (`Helper.recordStepAge`), своего поиска по справочнику тут нет.
-  // Эстафеты, DSQ и помеченные ошибки протокола рекордов не носят — как в таблице результатов.
-  const isMastersResult = Helper.isResultMasters(swim.category === 'masters', swim.event_style_age);
-  const recordMark = swim.is_relay || swim.time_fail || swim.suspect_reason || !swim.gender
-    ? null
-    : Helper.recordMarkForTime({
-      time: swim.time,
-      gender: swim.gender,
-      poolType: swim.pool_type,
-      styleName: swim.style,
-      distance: `${swim.distance}m`,
-      age: Helper.recordStepAge({
-        date: swim.competition_date,
-        birth_year: swim.birth_year,
-        event_style_age: swim.event_style_age,
-      }),
-      isMasters: isMastersResult,
-    });
 
   return (
-    <>
-      {/* Desktop row — сетка хендоффа `48 28 66 1fr 72 110 120` (Ф6). В строке только
-          короткое и главное (решение Влада 07.09.2026): место, медаль, дисциплина, кто,
-          метка, время и ОДИН чип медиа. Бейдж «кому это видно» и управление публикациями
-          уехали в раскрывающуюся панель — она и есть кнопка «открыть/закрыть». */}
-      <div
-        {...flagged}
-        className={`mms-row${showDate ? ' mms-row--dated' : ''}${showCheers ? ' mms-row--cheers' : ''} hidden px-5 py-[10px] sm:grid${flagged.className ? ` ${flagged.className}` : ''}`}
-        style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
-      >
-        <span className="text-center leading-none">
-          <span className="block text-[17px] font-black">
-            {swim.place != null ? `#${swim.place}` : '—'}
+    <div
+      {...flagged}
+      className={`mmc-row${first ? ' mmc-row--first' : ''}${selected ? ' mmc-row--on' : ''}${flagged.className ? ` ${flagged.className}` : ''}`}
+    >
+      <span className="mmc-row__place">
+        <PlaceMark swim={swim} size="medal-32" />
+        {/* Место предварительного заплыва — не медальное, и молчать об этом нельзя:
+            иначе «1» утром и «1» вечером читаются как два золота. */}
+        <UI_PrelimLabel heatType={swim.heat_type} className="text-[8px] leading-none" />
+      </span>
+      <SwimLink href={href} discipline={discipline}>
+        <StylePlate swim={swim} />
+      </SwimLink>
+      <div className="flex min-w-0 flex-col items-start gap-[2px]">
+        {/* Режим All: имя — первой строкой ячейки времени, целиком, без многоточия (ивритское
+            имя, укороченное посередине, читается как чужое). `w-fit` + text-left: dir="auto"
+            в блоке на всю ширину увёл бы имя вправо. */}
+        {showSwimmerName && (
+          <span dir="auto" className="w-fit max-w-full break-words text-left text-[14px] font-black leading-tight text-[var(--t-text)]">
+            <SwimmerLink id={swimmerId}>{swimmerName}</SwimmerLink>
           </span>
-          {/* Место предварительного заплыва — не медальное, и молчать об этом нельзя:
-              иначе «#1» утром и «#1» вечером читаются как два золота. */}
-          <UI_PrelimLabel heatType={swim.heat_type} className="mt-0.5 block text-[8px]" />
-        </span>
-        <span className="text-center text-[15px] leading-none">{medal(swim)}</span>
-        <SwimLink href={href} discipline={discipline}>
-          <UI_SwimmStyleIcon
-            styleName={swim.style}
-            styleLen={swim.distance}
-            styleType="icon-len"
-            lenPlacement="below"
-            size={64}
-            surface="light"
-            className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
-          />
-        </SwimLink>
-        {/* Средняя колонка тянется. Показан один пловец — имени в строке нет (оно в шапке
-            карточки), и колонку занимает название дисциплины: пустая тянущаяся колонка
-            разрывала бы строку пополам. */}
-        <span className="flex min-w-0 items-center gap-2 overflow-hidden">
-          {showSwimmerName ? (
-            // text-left обязателен: dir="auto" у ивритского имени тянет выравнивание вправо,
-            // и имена прыгали бы между краями колонки от пловца к пловцу.
-            <span dir="auto" className="min-w-0 flex-1 truncate text-left text-[19px] font-black text-[var(--t-text)]">
-              <SwimmerLink id={swimmerId}>{swimmerName}</SwimmerLink>
-            </span>
-          ) : (
-            <a href={href} title="Open this swim in the results" className={`min-w-0 flex-1 truncate text-left text-[13.5px] font-extrabold text-[var(--t-text-2)] ${LINK_CLS}`}>
-              {discipline}
-            </a>
-          )}
-        </span>
-        {/* Метка достижения — своей колонкой, а не под медалью: рекорд и PB это про ВРЕМЯ,
-            и стоять им положено рядом с ним. */}
-        <span className="flex items-center justify-end">
-          <BestMark record={recordMark} pb={pb} sb={sb} />
-        </span>
-        {/* RELAY стоит ПОД временем, а не у имени (решение Влада 08.09.2026): это признак
-            самого заплыва, и в тянущейся колонке он уезжал от времени тем дальше, чем
-            длиннее имя. Растёт по высоте только строка эстафеты — у остальных ячейка
-            прежняя. */}
-        <span className="hp-mono flex flex-col items-start gap-[3px] text-[15px] font-extrabold text-[var(--t-accent)]">
-          <span>
-            {swim.time_fail ? HelperResults.failLabel(swim) : (
-              <UI_SwimTime time={swim.time} quality={quality} />
-            )}
-          </span>
-          {swim.is_relay && (
-            <span className="rounded-[5px] border border-[var(--t-accent-border)] px-1.5 py-[1px] text-[9px] font-extrabold leading-none">RELAY</span>
-          )}
-        </span>
-        {/* Дата — общим `UI_DateIcon`, а не сырой ISO-строкой из API: формат даты живёт
-            в одном месте, а «2026-07-30» здесь спорило с «30 JUL 2026» на всех остальных
-            экранах. Колонка есть только у многодневок (см. `sameDay`). */}
-        {showDate && (
-          <span>
+        )}
+        <span className="mmc-time"><SwimTimeText swim={swim} quality={quality} /></span>
+        {/* Под временем — одна метка достижения (рекорд > SB > PB) либо RELAY, и то, что есть
+            не у каждой строки: день заплыва, 🎉 и ❤. `empty:hidden` — пустой контейнер не
+            должен раздвигать строку. */}
+        <span className="flex flex-wrap items-center gap-1 empty:hidden">
+          <BestMark record={record} pb={pb} sb={sb} />
+          {swim.is_relay && RELAY_CHIP}
+          {/* Дата — общим `UI_DateIcon`: формат даты живёт в одном месте. */}
+          {showDate && (
             <UI_DateIcon
               styleType="row-style-1"
               date={swim.date}
-              fontClassName="hp-mono text-[10.5px] text-[var(--t-text-3)]"
+              fontClassName="hp-mono text-[10px] text-[var(--t-text-3)]"
             />
-          </span>
-        )}
-        {/* Поздравления — СВОЯ колонка: 🎉 про заплыв, а не про медиа, и в медиа-ячейке
-            читалось как оценка ролика. Колонка есть только там, где кого-то поздравили. */}
-        {showCheers && (
-          <span className="flex items-center justify-end">
-            {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}
-          </span>
-        )}
-        {/* MEDIA — один чип. У заплыва с медиа он же и раскрывает панель, поэтому отдельной
-            кнопки «Manage» больше нет: две кнопки об одном занимали треть строки. */}
-        <span className="flex flex-col items-end justify-center gap-1">
-          {hasMedia ? (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-expanded={expanded}
-              title={expanded ? 'Hide media panel' : 'Share, withdraw, delete this media'}
-              className="hp-mono inline-flex h-[26px] shrink-0 items-center gap-1 rounded-[8px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-2 text-[10.5px] font-extrabold text-[var(--t-accent)]"
-            >
-              {videos.length > 0 ? `▶ ${videos.length}` : `🖼 ${photos.length}`}
-              <Chevron open={expanded} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => cb.onAddVideo(swim)}
-              className="hp-mono shrink-0 rounded-[8px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2 py-[4px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
-            >
-              + Add video
-            </button>
           )}
-          {/* Слот под ❤ держится всегда, даже пустой: иначе строки скачут по высоте
-              от того, есть у медиа оценки или нет. */}
-          <span className="flex h-[20px] items-center">
-            {topLiked && <LikeChip m={topLiked} />}
-          </span>
+          {/* 🎉 про заплыв, ❤ про его медиа — оба только ПОКАЗЫВАЮТ (решение Влада 08.09.2026). */}
+          {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}
+          {topLiked && <LikeChip m={topLiked} />}
         </span>
       </div>
-
-      {/* Mobile row — сетка хендоффа `34 58 1fr auto` (Ф6). Тап по строке открывает
-          нижнюю шторку действий: бейдж «кому видно», поздравления и управление медиа живут
-          там, а в строке остаётся только короткое. */}
-      <div
-        {...flagged}
-        className={`mms-mrow grid px-4 py-[10px] sm:hidden${flagged.className ? ` ${flagged.className}` : ''}`}
-        style={{ background: noVideo ? 'var(--t-input-bg)' : 'transparent' }}
-      >
-        {/* Место, медаль и метка — ОДНИМ столбиком: на узком экране трёх колонок под них нет. */}
-        <span className="text-center leading-tight">
-          <span className="block text-[13.5px] font-black leading-none">
-            {swim.place != null ? `#${swim.place}` : '—'}
-          </span>
-          {medal(swim) && <span className="mt-[2px] block text-[13px]">{medal(swim)}</span>}
-          <BestMark record={recordMark} pb={pb} sb={sb} stacked />
-        </span>
-        <SwimLink href={href} discipline={discipline}>
-          <UI_SwimmStyleIcon
-            styleName={swim.style}
-            styleLen={swim.distance}
-            styleType="icon-len"
-            lenPlacement="below"
-            size={64}
-            surface="light"
-            className="src-swim-list rounded-[8px] bg-[var(--t-plate)] px-1 py-0.5"
-          />
-        </SwimLink>
-        <span className="min-w-0">
-          <span className="hp-mono block text-[13.5px] font-extrabold text-[var(--t-accent)]">
-            {swim.time_fail ? HelperResults.failLabel(swim) : (
-              <UI_SwimTime time={swim.time} quality={quality} />
-            )}
-          </span>
-          {/* Метки заплыва — сразу ПОД временем, имя уходит вниз (решение Влада 08.09.2026):
-              RELAY относится к заплыву, а не к пловцу, и от времени его отделять незачем.
-              `empty:hidden` — на строках без единой метки контейнер не должен разрывать
-              время и имя своим отступом. */}
-          <span className="mt-1 flex items-center gap-1.5 empty:hidden">
-            {swim.is_relay && (
-              <span className="hp-mono inline-block rounded-[5px] border border-[var(--t-accent-border)] px-1 py-[1px] text-[8.5px] font-extrabold text-[var(--t-accent)]">RELAY</span>
-            )}
-            {/* На телефоне колонка места 34px — пометка стоит у времени. */}
-            <UI_PrelimLabel heatType={swim.heat_type} className="text-[8.5px]" />
-            {/* Колонок на телефоне нет, поэтому 🎉 стоит у времени — рядом с заплывом,
-                к которому относится, а не у медиа. */}
-            {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}
-          </span>
-          {/* Имя целиком, без многоточия: ивритское имя, укороченное посередине, читается
-              как чужое. Показан один пловец — вместо имени дисциплина. */}
-          {showSwimmerName ? (
-            <span dir="auto" className="mt-1 block break-words text-left text-[15px] font-black leading-tight text-[var(--t-text)]">
-              <SwimmerLink id={swimmerId}>{swimmerName}</SwimmerLink>
-            </span>
-          ) : (
-            <a href={href} title="Open this swim in the results" className={`mt-1 block text-left text-[12px] font-extrabold leading-tight text-[var(--t-text-2)] ${LINK_CLS}`}>
-              {discipline}
-            </a>
-          )}
-        </span>
-        {/* Цель нажатия 44px, поздравления — ПОД кнопкой, а не сбоку: справа их выдавливало
-            имя. Кнопка раскрывает ТУ ЖЕ панель, что на десктопе (решение Влада 08.09.2026):
-            своей мобильной шторки действий у строки больше нет. */}
-        <span className="flex flex-col items-end gap-1.5">
-          {hasMedia ? (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-expanded={expanded}
-              aria-label="Open media"
-              className="hp-mono inline-flex h-[44px] items-center gap-1 rounded-[10px] border border-[var(--t-accent-border)] bg-[var(--t-accent-soft)] px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
-            >
-              {videos.length > 0 ? `▶ ${videos.length}` : `🖼 ${photos.length}`}
-              <Chevron open={expanded} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => cb.onAddVideo(swim)}
-              className="hp-mono inline-flex h-[44px] items-center rounded-[10px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
-            >
-              + Video
-            </button>
-          )}
-          <span className="flex h-[20px] items-center">
-            {topLiked && <LikeChip m={topLiked} />}
-          </span>
-        </span>
+      <div className="mmc-row__counts">
+        <Counter kind="video" count={videos} />
+        <Counter kind="photo" count={photos} />
       </div>
-
-      {/* Раскрытая панель медиа — ОДНА на обе ширины: на узком экране она просто идёт
-          во всю ширину строки, без отступа под колонки. */}
-      {expanded && hasMedia && (
-        <div className="bg-[var(--t-nested)] px-4 py-2 sm:px-5 sm:pl-[116px]">
-          {/* «Кому это видно» — первым: раньше бейдж стоял в строке и занимал 124px у каждой,
-              хотя отвечает на вопрос, который задают, только открыв панель. */}
-          <div className="mb-1">
-            <RowVisibility swim={swim} publicationsByMedia={cb.publicationsByMedia} />
-          </div>
-          {[...videos, ...photos].map((m) => (
-            <MediaLine key={m.id} m={m} pubs={cb.publicationsByMedia.get(m.id) ?? []} cb={cb} />
-          ))}
-          <button
-            type="button"
-            onClick={() => cb.onAddVideo(swim)}
-            className="hp-mono my-1.5 rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2.5 py-[4px] text-[10.5px] font-extrabold text-[var(--t-accent-dim)]"
-          >
-            + Add media
-          </button>
-        </div>
+      {swim.media.length > 0 ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-pressed={selected}
+          aria-label={selected ? 'Media of this result is open' : 'Open photos and videos of this result'}
+          title="Photos and videos: play, share, withdraw, delete"
+          className={`mmc-btn${selected ? ' mmc-btn--on' : ''}`}
+        >
+          <IconChevron dir={sheet ? 'up' : 'right'} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => cb.onAddVideo(swim)}
+          aria-label="Add video to this result"
+          title="+ Add video"
+          className="mmc-btn mmc-btn--add"
+        >
+          <IconPlus />
+        </button>
       )}
-    </>
+    </div>
+  );
+}
+
+/**
+ * Строка «медиа ко всему соревнованию» — первая в списке, только когда такое медиа есть.
+ * В макете 3A его нет вовсе (хендофф §1.7): счётчики в шапке считают всё медиа карточки, а
+ * управлять роликом «не к заплыву» было бы негде. Строка открывает ту же панель, что и
+ * результат.
+ */
+function CompMediaRow({ media, selected, sheet, onOpen }: {
+  media: SwimMediaDto[];
+  selected: boolean;
+  sheet: boolean;
+  onOpen: () => void;
+}) {
+  const videos = media.filter((m) => m.media_type === 'video').length;
+  return (
+    <div className={`mmc-row mmc-row--first${selected ? ' mmc-row--on' : ''}`}>
+      <span className="mmc-row__place text-[17px] leading-none" aria-hidden="true">📎</span>
+      <span className="col-span-2 min-w-0">
+        <span className="block text-[13px] font-black leading-tight text-[var(--t-text)]">Competition media</span>
+        <span className="block text-[11px] font-bold leading-tight text-[var(--t-text-2)]">not tied to a swim</span>
+      </span>
+      <div className="mmc-row__counts">
+        <Counter kind="video" count={videos} />
+        <Counter kind="photo" count={media.length - videos} />
+      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-pressed={selected}
+        aria-label={selected ? 'Competition media is open' : 'Open competition photos and videos'}
+        className={`mmc-btn${selected ? ' mmc-btn--on' : ''}`}
+      >
+        <IconChevron dir={sheet ? 'up' : 'right'} />
+      </button>
+    </div>
+  );
+}
+
+/* ── Панель медиа открытого результата ────────────────────────────────────────── */
+
+/** Крупное превью выбранного медиа: кадр ролика с кнопкой Play, фото, значок альбома. */
+function MediaStage({ m, onPlay }: { m: SwimMediaDto; onPlay: () => void }) {
+  const isAlbum = HelperMedia.isAlbumUrl(m.url);
+  const thumb = HelperMedia.resolveThumbUrl(m.media_type, m.source_type, m.url);
+  const label = isAlbum ? 'Open album' : m.media_type === 'image' ? 'Open photo' : 'Play video';
+  return (
+    <button type="button" className="mmc-stage" onClick={onPlay} aria-label={label} title={label}>
+      {/* `no-referrer` — правило для картинок по ссылке (Drive отвечает 429 с Referer). */}
+      {thumb && <img src={thumb} alt="" referrerPolicy="no-referrer" loading="lazy" />}
+      {m.media_type === 'video'
+        ? <span className="mmc-stage__play"><IconVideo size={20} /></span>
+        : !thumb && <span className="text-[13px] font-extrabold">{isAlbum ? '📁 Album' : 'Photo'}</span>}
+    </button>
+  );
+}
+
+/**
+ * Панель медиа — ОДНА вёрстка на три места: рядом со списком (широкая карточка), выезжающая
+ * справа и нижняя шторка. Сверху заголовок (что открыто), крупное превью выбранного медиа,
+ * лента превью всех видео и фото с «добавить», под ней — управление ВЫБРАННЫМ медиа: тот же
+ * `MediaLine`, что был в раскрывающейся панели под строкой (источник и ❤, статус публикации,
+ * пометка модерации, Share / Update, Withdraw, Delete).
+ *
+ * Кнопок `YouTube cover` и `Poster` из макета здесь нет: логики у них нет до задачи 2
+ * хендоффа (обложки и плакаты), а кнопка «в никуда» на проде нежелательна.
+ */
+function MediaPane({ head, media, addLabel, onAdd, onClose, cb }: {
+  head: React.ReactNode;
+  /** Видео первыми, затем фото. */
+  media: SwimMediaDto[];
+  addLabel: string;
+  onAdd: () => void;
+  /** Есть только у выезжающей панели и шторки; рядом со списком закрывать нечего. */
+  onClose?: () => void;
+  cb: SwimListCallbacks;
+}) {
+  const [activeId, setActiveId] = useState<number | null>(null);
+  // Выбранное могли удалить — тогда снова первое.
+  const active = media.find((m) => m.id === activeId) ?? media[0] ?? null;
+
+  return (
+    <div className="mmc-media">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">{head}</div>
+        {onClose && (
+          <button type="button" onClick={onClose} aria-label="Close" className="mmc-btn mmc-btn--lg text-[var(--t-text-2)]">
+            <IconClose />
+          </button>
+        )}
+      </div>
+      {active && <MediaStage m={active} onPlay={() => cb.onPlay(active)} />}
+      <div className="mmc-thumbs">
+        {media.map((m, i) => {
+          const thumb = HelperMedia.resolveThumbUrl(m.media_type, m.source_type, m.url);
+          const isVideo = m.media_type === 'video';
+          const on = m.id === active?.id;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setActiveId(m.id)}
+              aria-pressed={on}
+              aria-label={`${isVideo ? 'Video' : 'Photo'} ${i + 1}${on ? ', selected' : ''}`}
+              className={`mmc-thumb${isVideo ? ' mmc-thumb--video' : ''}${on ? ' mmc-thumb--on' : ''}`}
+            >
+              {thumb
+                ? <img src={thumb} alt="" referrerPolicy="no-referrer" loading="lazy" />
+                : isVideo ? <IconVideo size={14} /> : <IconPhoto size={18} />}
+            </button>
+          );
+        })}
+        <button type="button" onClick={onAdd} aria-label={addLabel} title={`+ ${addLabel}`} className="mmc-thumb mmc-thumb--add">
+          <IconPlus />
+        </button>
+      </div>
+      {/* `key` — у `MediaLine` своё состояние селектов публикации: при смене медиа оно обязано
+          начаться заново, а не унаследовать выбор соседа. */}
+      {active && <MediaLine key={active.id} m={active} pubs={cb.publicationsByMedia.get(active.id) ?? []} cb={cb} />}
+    </div>
+  );
+}
+
+/** Заголовок панели результата: место, иконка, время, метка, «кому видно»; ниже — подписи. */
+function SwimPaneHead({ swim, showSwimmerName, swimmerName, swimmerId, cb }: {
+  swim: MySwimDto;
+  showSwimmerName: boolean;
+  swimmerName: string;
+  swimmerId: number | null;
+  cb: SwimListCallbacks;
+}) {
+  const href = swimHref(swim, swimmerId);
+  const discipline = `${swim.distance}m ${styleLabel(swim.style)}`;
+  const { quality, record, pb, sb } = swimMarks(swim);
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Режим All: имя стоит заголовком панели — в шапке карточки его нет. */}
+      {showSwimmerName && (
+        <span dir="auto" className="w-fit max-w-full text-left text-[16px] font-black leading-tight text-[var(--t-accent)]">
+          <SwimmerLink id={swimmerId}>{swimmerName}</SwimmerLink>
+        </span>
+      )}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+        <PlaceMark swim={swim} size="medal-40" />
+        <SwimLink href={href} discipline={discipline}>
+          <StylePlate swim={swim} />
+        </SwimLink>
+        <span className="mmc-media__time"><SwimTimeText swim={swim} quality={quality} /></span>
+        <BestMark record={record} pb={pb} sb={sb} />
+        {/* «Кому это видно» — по ВСЕМ медиа заплыва; подробности по каждому — ниже, в строке
+            выбранного медиа. */}
+        <span className="ml-auto"><RowVisibility swim={swim} publicationsByMedia={cb.publicationsByMedia} /></span>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {/* Текстовая подпись дисциплины — здесь, а не в строке: в строке её заменила иконка. */}
+        <a href={href} title="Open this swim in the results" className={`text-[12.5px] font-extrabold text-[var(--t-text-2)] ${LINK_CLS}`}>
+          {discipline}
+        </a>
+        {swim.is_relay && RELAY_CHIP}
+        <UI_PrelimLabel heatType={swim.heat_type} className="text-[9px]" />
+        {swim.congrats_count > 0 && <CheerChip swim={swim} emphasized={swim.is_pb} />}
+      </div>
+    </div>
   );
 }
 
@@ -828,8 +937,8 @@ function DayDivider({ date, count }: { date: string; count: number }) {
   const [y, m, d] = date.split('-').map(Number);
   const weekday = new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' });
   return (
-    <div className="flex items-center gap-2 bg-[var(--t-nested)] px-4 py-1.5 sm:px-5">
-      <span className="hp-mono text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-accent)]">
+    <div className="mmc-day">
+      <span className="hp-mono text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-[var(--t-text-2)]">
         {weekday}
       </span>
       <UI_DateIcon
@@ -837,68 +946,150 @@ function DayDivider({ date, count }: { date: string; count: number }) {
         date={date}
         fontClassName="hp-mono text-[10.5px] font-extrabold text-[var(--t-text)]"
       />
-      <span className="hp-mono text-[10px] text-[var(--t-text-2)]">
+      <span className="hp-mono text-[10.5px] font-extrabold text-[var(--t-text-2)]">
         · {count} {count === 1 ? 'swim' : 'swims'}
       </span>
     </div>
   );
 }
 
-function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, preferredSwimmerId, cb }: {
+/** Что открыто в панели медиа: заплыв (`result_id`) или медиа ко всему соревнованию. */
+type PaneSel = number | 'comp';
+
+/**
+ * Включена ли раскладка «две панели». Решает CSS — container query на карточке
+ * (`@container mmc (min-width: …)` в `my-media.css`), а не число в коде: здесь только
+ * ЧИТАЕМ, показан ли слот панели. Так порог живёт в одном месте, и вёрстка с логикой
+ * («панель рядом» против «панель в портале») разойтись не могут.
+ */
+function useTwoPane(
+  cardRef: React.RefObject<HTMLElement>, paneRef: React.RefObject<HTMLElement>, hasMedia: boolean,
+): boolean {
+  const [wide, setWide] = useState(false);
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    const pane = paneRef.current;
+    if (!card || !pane) return undefined;
+    const check = () => setWide(getComputedStyle(pane).display !== 'none');
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(card);
+    return () => observer.disconnect();
+    // `hasMedia` меняет класс карточки, а с ним и видимость слота — перечитываем.
+  }, [cardRef, paneRef, hasMedia]);
+  return wide;
+}
+
+function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, preferredSwimmerId, isDesktop, deep, cb }: {
   swims: MySwimDto[];
   compMedia: SwimMediaDto[];
   showSwimmerName: boolean;
   swimmerNames: Map<number, string>;
   preferredSwimmerId: number | null;
+  /** Окно от 1024px: панель медиа выезжает справа; уже — нижняя шторка. */
+  isDesktop: boolean;
+  /** Класс темы deep — порталу панели он нужен свой. */
+  deep: string;
   cb: SwimListCallbacks;
 }) {
-  const [mediaOpen, setMediaOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<HTMLDivElement>(null);
   const first = swims[0];
-  const videoCount = swims.reduce((n, s) => n + s.media.filter((m) => m.media_type === 'video').length, 0);
+  const videoCount = [...swims.flatMap((s) => s.media), ...compMedia].filter((m) => m.media_type === 'video').length;
+  const photoCount = swims.reduce((n, s) => n + s.media.length, 0) + compMedia.length - videoCount;
+  const hasMedia = videoCount + photoCount > 0;
   const anyPodium = swims.some((s) => s.place != null && s.place <= 3);
   // Дни карточки (многодневка — одна карточка на событие): разные дни — полосы-разделители.
   const days = useMemo(() => swimsByDay(swims), [swims]);
   const multiDay = days.length > 1;
-  // Разделители уже несут дату, колонка DATE — только у однодневной карточки, где день
+  // Разделители уже несут дату; день в строке — только у однодневной карточки, где день
   // заплыва всё же разошёлся с датой в шапке.
   const showDate = !multiDay && swims.some((s) => !sameDay(first.competition_date, s.date));
-  // Самый ранний день карточки: к нему «+ Photo/Video» цепляет медиа события — как кнопка в
-  // шапке соревнования (первый день).
+  // Самый ранний день карточки: к нему «+» цепляет медиа события — как кнопка в шапке
+  // соревнования (первый день).
   const earliest = days[days.length - 1].swims[0];
   const headerDate = multiDay
     ? `${isoToDmy(days[days.length - 1].date)} – ${isoToDmy(days[0].date)}`
     : first.competition_date;
   const selectedName = preferredSwimmerId != null ? swimmerNames.get(preferredSwimmerId) ?? null : null;
-  // Подписи колонок — ровно по сетке строки (`.mms-row`), поэтому ширины здесь больше нет:
-  // и шапка, и строка тянут её из одного grid-шаблона в `my-media.css`.
-  // Колонка 🎉 появляется, только если в этой карточке кого-то уже поздравили: пустой
-  // столбец нулей в каждой строке — шум, а не информация.
-  const showCheers = swims.some((s) => s.congrats_count > 0);
-  const columns: { label: string; align?: 'center' | 'right' }[] = [
-    { label: 'PLACE', align: 'center' },
-    { label: '' },
-    { label: 'SWIM', align: 'center' },
-    { label: '' },
-    { label: '' },
-    { label: 'TIME' },
-    ...(showDate ? [{ label: 'DATE' as const }] : []),
-    ...(showCheers ? [{ label: '🎉', align: 'right' as const }] : []),
-    { label: 'MEDIA', align: 'right' as const },
-  ];
+  // Логотип клуба рядом с именем — клуб строки результата (на момент заплыва). Сперва личный
+  // заплыв выбранного пловца; эстафета годится запасной — у неё клуб команды, тот же.
+  const ownerClub = preferredSwimmerId == null ? null : (
+    swims.find((s) => !s.is_relay && HelperSwimmer.resultBelongsToSwimmer(s, preferredSwimmerId))
+    ?? swims.find((s) => HelperSwimmer.resultBelongsToSwimmer(s, preferredSwimmerId))
+  )?.club_name || null;
+
+  // ── Панель медиа: что открыто и где оно показано ──────────────────────────────
+  const wide = useTwoPane(cardRef, paneRef, hasMedia);
+  const [picked, setPicked] = useState<PaneSel | null>(null);
+  const isOpenable = (sel: PaneSel | null): sel is PaneSel =>
+    sel === 'comp' ? compMedia.length > 0 : sel != null && swims.some((s) => s.result_id === sel && s.media.length > 0);
+  // Рядом со списком панель не бывает пустой: пока ничего не выбрано — первый результат с
+  // медиа (или медиа соревнования). В портале по умолчанию закрыто.
+  const defaultSel: PaneSel | null = swims.find((s) => s.media.length > 0)?.result_id ?? (compMedia.length > 0 ? 'comp' : null);
+  const sel: PaneSel | null = isOpenable(picked) ? picked : wide ? defaultSel : null;
+
+  // Карточка сузилась (окно, сайдбар) — выбор «рядом» не должен выскочить выезжающей панелью.
+  const wasWide = useRef(wide);
+  useEffect(() => {
+    if (wasWide.current && !wide) setPicked(null);
+    wasWide.current = wide;
+  }, [wide]);
+
+  const drawerOpen = !wide && sel != null;
+  useEffect(() => {
+    if (!drawerOpen) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPicked(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
+  // Пока панель уезжает, в ней остаётся последнее открытое — иначе она схлопывалась бы на ходу.
+  const lastSel = useRef<PaneSel | null>(null);
+  if (sel != null) lastSel.current = sel;
+  const drawerSel = sel ?? (isOpenable(lastSel.current) ? lastSel.current : null);
+
+  const renderPane = (target: PaneSel, onClose?: () => void) => {
+    if (target === 'comp') {
+      return (
+        <MediaPane
+          key="comp"
+          head={(
+            <div>
+              <div className="text-[15px] font-black leading-tight text-[var(--t-text)]">📎 Competition media</div>
+              <div className="mt-0.5 text-[11.5px] font-bold text-[var(--t-text-2)]">Not tied to a swim</div>
+            </div>
+          )}
+          media={compMedia}
+          addLabel="Add photo or video to the competition"
+          onAdd={() => cb.onAddCompMedia(earliest.competition_id, earliest.competition_name)}
+          onClose={onClose}
+          cb={cb}
+        />
+      );
+    }
+    const swim = swims.find((s) => s.result_id === target);
+    if (!swim) return null;
+    const owner = rowSwimmer(swim, swimmerNames, preferredSwimmerId);
+    return (
+      <MediaPane
+        key={swim.result_id}
+        head={<SwimPaneHead swim={swim} showSwimmerName={showSwimmerName} swimmerName={owner.name} swimmerId={owner.id} cb={cb} />}
+        media={[...swim.media.filter((m) => m.media_type === 'video'), ...swim.media.filter((m) => m.media_type !== 'video')]}
+        addLabel="Add photo or video"
+        onAdd={() => cb.onAddVideo(swim)}
+        onClose={onClose}
+        cb={cb}
+      />
+    );
+  };
 
   return (
-    <div className={`${hpCardCls} overflow-hidden`}>
-      <div className="flex flex-wrap items-center gap-2.5 border-b border-[var(--t-accent-soft)] bg-[var(--t-list-head)] px-4 py-3 sm:px-5">
-        {/* Плитка соревнования — общая CompetitionTile (сезон/кубок · буква категории ·
-            возрастная лента). Данные считает общий competitionTileData, своей эвристики по
-            названию тут нет: категория и флаг чемпионата приходят с сервера. */}
-        {/* Плитка + столбик «имя пловца / название» — ДВЕ строки (просьба Влада 10.11.2026:
-            в одну линию ивритские имя и название читались одной фразой). На мобильной блок
-            занимает всю ширину, дата, бассейн и кнопки переносятся ниже; на десктопе он
-            тянется, а название обрезается многоточием. База 280px обязательна: с нулевой
-            (`flex-1`) соседи забирали всю строку и название сжималось в ноль, а так узкой
-            шапке проще перенести дату и кнопки на вторую строку. */}
-        <div className="flex w-full min-w-0 items-center gap-2.5 sm:w-auto sm:flex-[1_1_280px]">
+    <div ref={cardRef} className={`${hpCardCls} mmc${hasMedia ? '' : ' mmc--nomedia'}`}>
+      <div className="mmc-head">
+        <div className="mmc-head__id">
+          {/* Плитка соревнования — общая CompetitionTile (сезон/кубок · буква категории ·
+              возрастная лента). Данные считает общий competitionTileData, своей эвристики по
+              названию тут нет: категория и флаг чемпионата приходят с сервера. */}
           <CompetitionTile
             {...competitionTileData({
               name: first.competition_name,
@@ -908,100 +1099,103 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
             })}
             size="sm"
           />
-          {/* Имя выбранного пловца — крупно и первым: карточка соревнования должна сама
-              отвечать «чьи это заплывы». В режиме All имени нет: в карточке лежат заплывы
-              разных избранных, и одно имя над ними было бы враньём. */}
+          {/* Столбик «имя пловца / название / даты». `items-start` обязателен: ивритский
+              текст с dir="auto" в блоке на всю ширину уезжает вправо, а имя должно стоять
+              слева (хендофф §1.4). */}
           <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+            {/* Имя выбранного пловца — крупно и первым: карточка сама отвечает «чьи это
+                заплывы». В режиме All имени нет: в карточке заплывы разных избранных, и одно
+                имя (и один логотип) над ними было бы враньём. */}
             {selectedName && (
-              <span dir="auto" className="max-w-full text-[18px] font-black leading-tight text-[var(--t-accent)]">
-                <SwimmerLink id={preferredSwimmerId}>{selectedName}</SwimmerLink>
+              <span className="flex max-w-full items-center gap-2">
+                <span dir="auto" className="min-w-0 text-left text-[18px] font-black leading-tight text-[var(--t-accent)]">
+                  <SwimmerLink id={preferredSwimmerId}>{selectedName}</SwimmerLink>
+                </span>
+                {ownerClub && <UI_ClubLogo clubName={ownerClub} size={isDesktop ? 28 : 26} />}
               </span>
             )}
-            {/* Адрес ДНЯ открывает всё событие (И-64), поэтому у многодневки — ранний день. */}
-            <a href={routes.competition(earliest.competition_id)} className={`block max-w-full ${LINK_CLS}`}>
-              <UI_CompetitionName
-                as="div"
-                className="text-[15px] font-black leading-tight text-[var(--t-text)] sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap"
-                name={first.competition_name}
-                isChampionship={first.is_championship}
-              />
-            </a>
+            <span className="flex max-w-full items-center gap-2">
+              {/* Адрес ДНЯ открывает всё событие (И-64), поэтому у многодневки — ранний день. */}
+              <a href={routes.competition(earliest.competition_id)} className={`block min-w-0 ${LINK_CLS}`}>
+                <UI_CompetitionName
+                  as="div"
+                  className="text-left text-[15px] font-black leading-tight text-[var(--t-text)]"
+                  name={first.competition_name}
+                  isChampionship={first.is_championship}
+                />
+              </a>
+              {anyPodium && <span className="flex-none" title="Podium finish" role="img" aria-label="Podium finish">🏅</span>}
+            </span>
+            <span className="mmc-head__meta">
+              {headerDate} · {first.pool_type} · {swims.length} {swims.length === 1 ? 'swim' : 'swims'}
+            </span>
           </div>
         </div>
-        <span className="hp-mono text-[11px] font-extrabold text-[var(--t-accent)]">{headerDate}</span>
-        <span className="text-[11.5px] text-[var(--t-text-2)]">{first.pool_type}</span>
-        {anyPodium && <span title="Podium finish">🏅</span>}
-        <span className="ml-auto flex items-center gap-2">
-          <span className="hidden text-[11px] font-bold text-[var(--t-text-2)] sm:inline">
-            {swims.length} {swims.length === 1 ? 'swim' : 'swims'} · {videoCount} {videoCount === 1 ? 'video' : 'videos'}
-          </span>
-          {compMedia.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setMediaOpen((v) => !v)}
-              className="hp-mono rounded-[7px] border border-[var(--t-accent-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
-            >
-              📎 {compMedia.length} {mediaOpen ? '▴' : '▾'}
-            </button>
-          )}
+        <div className="mmc-head__actions">
+          {/* Счётчики — по ВСЕМУ медиа карточки: заплывов и «ко всему соревнованию». */}
+          <Counter kind="video" count={videoCount} large />
+          <Counter kind="photo" count={photoCount} large />
           <button
             type="button"
             onClick={() => cb.onAddCompMedia(earliest.competition_id, earliest.competition_name)}
-            className="hp-mono rounded-[7px] border border-dashed border-[var(--t-accent-border)] bg-transparent px-2 py-[3px] text-[10.5px] font-extrabold text-[var(--t-accent)]"
+            aria-label="Add photo or video to the competition"
+            title="+ Photo or video to the whole competition"
+            className="mmc-btn mmc-btn--accent mmc-btn--lg"
           >
-            + Photo/Video
+            <IconPlus />
           </button>
-        </span>
+        </div>
       </div>
 
-      {mediaOpen && compMedia.length > 0 && (
-        <div className="border-b border-[var(--t-accent-soft)] bg-[var(--t-nested)] px-4 py-2 sm:px-5">
-          <p className="hp-mono m-0 mb-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-col-label)]">
-            Competition media · not tied to a swim
-          </p>
-          {compMedia.map((m) => (
-            <MediaLine key={m.id} m={m} pubs={cb.publicationsByMedia.get(m.id) ?? []} cb={cb} />
+      <div className="mmc-body">
+        <div className="mmc-list">
+          {compMedia.length > 0 && (
+            <CompMediaRow media={compMedia} selected={sel === 'comp'} sheet={!isDesktop} onOpen={() => setPicked('comp')} />
+          )}
+          {days.map((day, dayIdx) => (
+            <React.Fragment key={day.date}>
+              {multiDay && <DayDivider date={day.date} count={day.swims.length} />}
+              {day.swims.map((s, i) => {
+                const owner = rowSwimmer(s, swimmerNames, preferredSwimmerId);
+                return (
+                  <MySwimRow
+                    key={s.result_id}
+                    swim={s}
+                    first={i === 0 && (multiDay || (dayIdx === 0 && compMedia.length === 0))}
+                    showSwimmerName={showSwimmerName}
+                    showDate={showDate}
+                    swimmerName={owner.name}
+                    swimmerId={owner.id}
+                    selected={sel === s.result_id}
+                    sheet={!isDesktop}
+                    onOpen={() => setPicked(s.result_id)}
+                    cb={cb}
+                  />
+                );
+              })}
+            </React.Fragment>
           ))}
         </div>
+        {/* Слот панели «рядом со списком». Показан он или нет — решает container query
+            (`.mmc-pane` в my-media.css); `useTwoPane` это только читает. */}
+        <div ref={paneRef} className="mmc-pane">
+          {wide && sel != null && <div className="mmc-pane__stick">{renderPane(sel)}</div>}
+        </div>
+      </div>
+
+      {/* Карточка уже порога двух панелей: та же панель в общем `MobileFiltersDrawer` —
+          выезжает справа на десктопе, нижняя шторка на телефоне. Портал в `body`, поэтому
+          класс темы у него свой. */}
+      {!wide && hasMedia && (
+        <MobileFiltersDrawer
+          variant={isDesktop ? 'side' : 'sheet'}
+          className={`mmc-drawer ${deep}`}
+          open={drawerOpen}
+          onClose={() => setPicked(null)}
+        >
+          {drawerSel != null && renderPane(drawerSel, () => setPicked(null))}
+        </MobileFiltersDrawer>
       )}
-
-      {/* Column header (desktop) — та же сетка, что у строки: подписи не могут разъехаться
-          со столбцами, потому что ширины у них общие (`.mms-row` в my-media.css). */}
-      <div className={`mms-row${showDate ? ' mms-row--dated' : ''}${showCheers ? ' mms-row--cheers' : ''} hidden px-5 py-1.5 sm:grid`}>
-        {columns.map((c, i) => (
-          <span
-            key={i}
-            className={`hp-mono text-[9px] font-extrabold uppercase tracking-[0.14em] text-[var(--t-col-label)]${
-              c.align === 'center' ? ' text-center' : c.align === 'right' ? ' text-right' : ''
-            }`}
-          >
-            {c.label}
-          </span>
-        ))}
-      </div>
-
-      <div className="divide-y divide-[var(--t-accent-soft)]">
-        {days.map((day) => (
-          <React.Fragment key={day.date}>
-            {multiDay && <DayDivider date={day.date} count={day.swims.length} />}
-            {day.swims.map((s) => {
-              const owner = rowSwimmer(s, swimmerNames, preferredSwimmerId);
-              return (
-                <MySwimRow
-                  key={s.result_id}
-                  swim={s}
-                  showSwimmerName={showSwimmerName}
-                  showDate={showDate}
-                  showCheers={showCheers}
-                  swimmerName={owner.name}
-                  swimmerId={owner.id}
-                  cb={cb}
-                />
-              );
-            })}
-          </React.Fragment>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1017,6 +1211,10 @@ function cardKey(competitionId: number, eventId: number | null): string {
 }
 
 function SwimList({ swims, competitionMedia, showSwimmerName, swimmerNames, preferredSwimmerId = null, ...cb }: Props) {
+  // Граница «телефон / десктоп» — та же, что у сайдбара и шторки фильтров страницы (lg).
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const deep = useDeepThemeClass();
+
   const groups = useMemo(() => {
     const byCard = new Map<string, MySwimDto[]>();
     for (const s of swims) {
@@ -1053,6 +1251,8 @@ function SwimList({ swims, competitionMedia, showSwimmerName, swimmerNames, pref
           showSwimmerName={showSwimmerName}
           swimmerNames={swimmerNames}
           preferredSwimmerId={preferredSwimmerId}
+          isDesktop={isDesktop}
+          deep={deep}
           cb={cb}
         />
       ))}

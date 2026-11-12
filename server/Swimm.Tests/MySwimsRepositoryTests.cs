@@ -241,6 +241,39 @@ public class MySwimsRepositoryTests
         Assert.True(individualSwim.IsPb);
     }
 
+    // ── Клуб строки: id и ИВРИТСКОЕ название клуба на момент заплыва (логотип в шапке карточки) ──
+
+    [Fact]
+    public async Task GetMySwims_CarriesClubOfTheResultRow_HebrewName_NotSwimmersCurrentClub()
+    {
+        await using var db = CreateDb(nameof(GetMySwims_CarriesClubOfTheResultRow_HebrewName_NotSwimmersCurrentClub));
+        var user = NewUser("u-club@example.com");
+        var style = new Style { Name = "freestyle" };
+        var oldClub = new Club { Name = "הפועל דולפין נתניה", NameEn = "Hapoel Dolphin Netanya" };
+        var newClub = new Club { Name = "מכבי חיפה", NameEn = "Maccabi Haifa" };
+        db.AppUsers.Add(user);
+        db.Styles.Add(style);
+        db.Clubs.AddRange(oldClub, newClub);
+        await db.SaveChangesAsync();
+        // Пловец уже перешёл в новый клуб, а заплыв был за старый.
+        var swimmer = NewSwimmer("Иванов", "Иван");
+        swimmer.ClubId = newClub.Id;
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        var comp = await SeedCompetitionAsync(db);
+        await AddFavoriteAsync(db, user, swimmer);
+
+        var result = NewResult(swimmer, comp, style, oldClub, new DateTime(2025, 10, 1));
+        db.Results.Add(result);
+        await db.SaveChangesAsync();
+
+        var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
+
+        var swim = Assert.Single(response.Swims);
+        Assert.Equal(oldClub.Id, swim.ClubId);
+        Assert.Equal("הפועל דולפין נתניה", swim.ClubName);
+    }
+
     // ── PB: лучший по TimeMillisecond получает IsPb=true, худший — false; TimeFail не PB ──
 
     [Fact]

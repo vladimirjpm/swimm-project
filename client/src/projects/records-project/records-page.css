@@ -456,14 +456,14 @@
 /* ═══ /records/compare — сравнение двух стран ═══════════════════════════════ */
 
 .rc-picker { display: flex; flex-direction: column; gap: 5px; min-width: 190px; }
-/* Дисциплина в списке WR/NR — значок стиля с дистанцией справа на белой плите: PNG стилей
-   нарисованы под светлый фон и в тёмной теме без плиты пропадают (как swim-row__plate). */
+/* Дисциплина в списке WR/NR — значок стиля с дистанцией справа на плите. Плита идёт за темой
+   (`--swim-plate`, как swim-row__plate): в тёмной она тёмная, пловец светлый. */
 .rk-event-plate {
   display: inline-flex;
   align-items: center;
   padding: 2px 10px 2px 4px;
   border-radius: 8px;
-  background: #fff;
+  background: var(--swim-plate, #fff);
 }
 .rk-event-plate .style-len { font-weight: 700; }
 

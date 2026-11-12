@@ -25,8 +25,9 @@ interface Props {
   /**
    * `fullscreen` — шторка во весь экран (results: фильтров много, и они длинные).
    * `sheet` — нижняя шторка по содержимому, с ручкой и подвалом.
+   * `side` — панель 420px, выезжает справа (десктоп; панель медиа карточки My media).
    */
-  variant?: 'fullscreen' | 'sheet';
+  variant?: 'fullscreen' | 'sheet' | 'side';
   /** Прилипший к низу подвал варианта `sheet` — обычно кнопка «Show N swims». */
   footer?: React.ReactNode;
   /** Класс панели: переопределение токенов `--fdrawer-*` и прочая палитра страницы. */

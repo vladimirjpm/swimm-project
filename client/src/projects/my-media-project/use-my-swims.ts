@@ -18,6 +18,10 @@ export interface MySwimmerDto {
 export interface MySwimDto {
   result_id: number;
   swimmer_id: number;
+  /** Клуб строки результата — на момент заплыва (у эстафеты — клуб команды). */
+  club_id: number;
+  /** Ивритское название клуба — для `UI_ClubLogo` в шапке карточки. */
+  club_name: string;
   competition_id: number;
   /** Событие многодневки (дни — разные competition_id); null — однодневное. */
   event_id: number | null;
