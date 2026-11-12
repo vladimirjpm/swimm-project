@@ -177,7 +177,8 @@
 
   /* Затемнение под <dialog> подтверждения (::backdrop нельзя выразить утилитой в разметке). */
   #admin-confirm::backdrop,
-  #quality-modal::backdrop {
+  #quality-modal::backdrop,
+  #emblem-zoom::backdrop {
     background: rgb(0 0 0 / 0.65);
   }
 

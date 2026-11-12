@@ -25,11 +25,18 @@ public class SeriesAdminRepository(SwimmDbContext db) : ISeriesAdminRepository
 
         var rows = await db.CompetitionSeries.AsNoTracking()
             .OrderBy(s => s.Name)
-            .Select(s => new { s.Id, s.Name, s.NameEn, s.MatchPhrases, Parts = s.Parts.Count, Regs = s.Regulations.Count })
+            .Select(s => new
+            {
+                s.Id, s.Name, s.NameEn, s.MatchPhrases, Parts = s.Parts.Count, Regs = s.Regulations.Count,
+                // Сведения о значке без байтов: в списке нужна только миниатюра по публичному адресу.
+                Emblem = s.Emblem == null ? null : new SeriesEmblemDto(
+                    s.Emblem.Id, s.Emblem.Sha256, s.Emblem.ContentType, s.Emblem.Width, s.Emblem.Height,
+                    s.Emblem.Data.Length, s.Emblem.UploadedAt)
+            })
             .ToListAsync();
 
         return rows.Select(s => new SeriesRowDto(s.Id, s.Name, s.NameEn, s.MatchPhrases, s.Parts, s.Regs,
-            days.GetValueOrDefault(s.Id))).ToList();
+            days.GetValueOrDefault(s.Id), s.Emblem)).ToList();
     }
 
     public async Task<SeriesEditDto?> GetByIdAsync(int id)

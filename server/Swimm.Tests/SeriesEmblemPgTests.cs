@@ -69,6 +69,7 @@ public class SeriesEmblemPgTests
             // Значок необязателен: серия без него — обычное состояние.
             var bare = await With(r => r.GetByIdAsync(created.Id));
             Assert.Null(bare!.Emblem);
+            Assert.Null((await With(r => r.GetAllAsync())).Single(s => s.Id == created.Id).Emblem);
             Assert.False((await With(r => r.DeleteEmblemAsync(created.Id))).Success);
 
             // Не картинка — отказ, в базе ничего.
@@ -82,6 +83,11 @@ public class SeriesEmblemPgTests
             emblemIds.Add(one.Id);
             Assert.Equal(("image/png", 512, 384, first.Length), (one.ContentType, one.Width, one.Height, one.Bytes));
             Assert.Equal(Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(first)), one.Sha256);
+
+            // Список серий (/Admin/Series) несёт те же сведения для миниатюры; у серии без значка — null.
+            var listed = (await With(r => r.GetAllAsync())).Single(s => s.Id == created.Id);
+            Assert.Equal(one, listed.Emblem);
+            Assert.Equal(one.Url, listed.Emblem!.Url);
 
             // Публичная выдача — под ролью swimm_ro (грант из миграции), bytea без искажений.
             await using (var read = NewReadContext())

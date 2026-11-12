@@ -1,5 +1,6 @@
 @page
 @model Swimm.API.Pages.Admin.Series.IndexModel
+@using Swimm.Application.Validation
 @{
     ViewData["Title"] = "Series";
     ViewData["PageSubtitle"] = "Серии турниров и официальное награждение по регламенту";
@@ -26,6 +27,7 @@
         <thead>
             <tr>
                 <th class="w-16 text-right">#</th>
+                <th class="w-14">Значок</th>
                 <th>Серия</th>
                 <th>Ключевые фразы</th>
                 <th class="text-right">Частей</th>
@@ -37,7 +39,7 @@
             @if (Model.Series.Count == 0)
             {
                 <tr>
-                    <td colspan="6" class="text-admin-text-muted py-6 text-center text-sm">
+                    <td colspan="7" class="text-admin-text-muted py-6 text-center text-sm">
                         Серий пока нет — официальных наград на витрине нет.
                     </td>
                 </tr>
@@ -46,6 +48,19 @@
             {
                 <tr>
                     <td class="text-right tabular-nums text-admin-text-muted">@s.Id</td>
+                    <td>
+                        @* Серия без значка — пустая ячейка, заглушки нет (значок необязателен). *@
+                        @if (s.Emblem is { } em)
+                        {
+                            <button type="button" class="emblem-thumb block cursor-zoom-in rounded border border-admin-border bg-black hover:border-admin-accent"
+                                    title="Увеличить значок" aria-label="Увеличить значок серии"
+                                    data-src="@em.Url" data-name="@s.Name"
+                                    data-info="@em.Width×@em.Height · @(em.ContentType == SeriesEmblemImage.Webp ? "WebP" : "PNG") · @((em.Bytes / 1024.0).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)) КБ">
+                                <img src="@em.Url" alt="" width="@em.Width" height="@em.Height" loading="lazy"
+                                     class="w-10 h-10 object-contain" />
+                            </button>
+                        }
+                    </td>
                     <td>
                         <a href="@Url.Page("Edit", new { id = s.Id })" class="text-admin-accent hover:underline font-medium" dir="auto">@s.Name</a>
                         @if (!string.IsNullOrEmpty(s.NameEn))
@@ -80,6 +95,47 @@
         <button type="submit" class="admin-btn admin-btn-primary">Создать</button>
     </div>
 </form>
+
+@* Значок крупно — поверх страницы, без перехода. Закрытие: крестик, клик мимо, Esc. *@
+<dialog id="emblem-zoom"
+        class="m-auto max-w-[calc(100vw-2rem)] rounded-lg border border-admin-border bg-admin-surface p-0 text-admin-text shadow-xl shadow-black/50">
+    <div class="p-4">
+        <div class="flex items-start justify-between gap-4 mb-3">
+            <div class="min-w-0">
+                <h2 id="emblem-zoom-name" class="text-sm font-semibold text-admin-text" dir="auto"></h2>
+                <div id="emblem-zoom-info" class="text-[11px] text-admin-text-muted tabular-nums"></div>
+            </div>
+            <button type="button" id="emblem-zoom-close" class="admin-btn admin-btn-ghost" aria-label="Закрыть">✕</button>
+        </div>
+        <div class="flex flex-wrap gap-3 justify-center">
+            <img id="emblem-zoom-dark" alt="Значок серии на тёмном фоне"
+                 class="w-72 h-72 max-w-full object-contain rounded-lg border border-admin-border bg-black" />
+            <img id="emblem-zoom-light" alt="Значок серии на светлом фоне"
+                 class="w-72 h-72 max-w-full object-contain rounded-lg border border-admin-border bg-white" />
+        </div>
+    </div>
+</dialog>
+
+<script>
+(() => {
+    const dlg = document.getElementById('emblem-zoom');
+    const close = () => { if (dlg.open) dlg.close(); };
+
+    document.querySelectorAll('.emblem-thumb').forEach(btn => btn.addEventListener('click', () => {
+        document.getElementById('emblem-zoom-dark').src = btn.dataset.src;
+        document.getElementById('emblem-zoom-light').src = btn.dataset.src;
+        document.getElementById('emblem-zoom-name').textContent = btn.dataset.name;
+        document.getElementById('emblem-zoom-info').textContent = btn.dataset.info;
+        dlg.showModal();
+    }));
+
+    document.getElementById('emblem-zoom-close').addEventListener('click', close);
+    // Клик мимо: у <dialog> нет отступов, поэтому цель «сам dialog» — это затемнение вокруг.
+    dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
+    // Esc закрывает showModal() сам; дубль — для движков, где событие cancel не приходит.
+    dlg.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+})();
+</script>
 
 @if (!string.IsNullOrEmpty(flash))
 {
