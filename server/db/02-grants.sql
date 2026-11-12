@@ -61,6 +61,7 @@ GRANT SELECT ON
     "SeriesAwardBands",
     "SeriesAwardPrizes",
     "SeriesAwards",
+    "SeriesEmblems",
     "SeriesRegulations",
     "Styles",
     "Swimmers"
@@ -103,7 +104,7 @@ END $$;
 
 -- ── Проверка ────────────────────────────────────────────────────────────────
 \echo ''
-\echo 'Гранты применены. Таблиц, доступных swimm_ro на чтение (ожидается 37):'
+\echo 'Гранты применены. Таблиц, доступных swimm_ro на чтение (ожидается 38):'
 SELECT count(DISTINCT table_name) AS ro_tables
   FROM information_schema.table_privileges
  WHERE grantee = 'swimm_ro' AND privilege_type = 'SELECT';

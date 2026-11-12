@@ -19,6 +19,15 @@ public interface ISeriesAdminRepository
     /// <summary>Удалить серию целиком (части, регламенты, награды); дни отвязываются.</summary>
     Task<SeriesSaveResult> DeleteSeriesAsync(int id);
 
+    /// <summary>
+    /// Загрузить или заменить значок серии. Файл проверяется здесь же (сигнатура PNG/WebP, лимиты —
+    /// <see cref="Validation.SeriesEmblemImage"/>); прежний значок удаляется. В Id результата — серия.
+    /// </summary>
+    Task<SeriesSaveResult> SetEmblemAsync(int seriesId, byte[] data);
+
+    /// <summary>Убрать значок; серия остаётся.</summary>
+    Task<SeriesSaveResult> DeleteEmblemAsync(int seriesId);
+
     Task<SeriesSaveResult> AddPartAsync(int seriesId, SeriesPartInputDto input);
     Task<SeriesSaveResult> UpdatePartAsync(int partId, SeriesPartInputDto input);
 

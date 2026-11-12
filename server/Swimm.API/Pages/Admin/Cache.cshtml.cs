@@ -106,6 +106,7 @@ public static class CachePolicyCatalog
         ["RecordsController"] = "справочник рекордов, попап нормативов; дуги уровня и метки рекордов на всех страницах",
         ["ResultsController"] = "/results, /competitions, /competitions/{id} — результаты, список и обзор соревнования",
         ["SeasonBestController"] = "/season-best, бейдж SB в протоколе, Season best у клуба и пловца",
+        ["SeriesEmblemsController"] = "значок серии турнира — на витрину пока не встроен (предпросмотр в /Admin/Series). Кэш вечный, но замена значка меняет адрес — видна сразу",
         ["StartListController"] = "таб Start list соревнования, предстоящие старты",
         ["SwimmersPublicController"] = "/swimmers/{id} — страница пловца, head-to-head",
     };

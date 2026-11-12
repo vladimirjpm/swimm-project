@@ -49,6 +49,40 @@ public class EditModel(ISeriesAdminRepository repo, IAdminAuditService audit) : 
         return RedirectToPage("Index");
     }
 
+    // ── Значок ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Загрузить или заменить значок (docs/plans/series-emblem-plan.md). Картинку уменьшает
+    /// браузер; здесь — только проверка. Заголовку Content-Type и имени файла не верим: тип и
+    /// размеры репозиторий берёт из самих байтов (<see cref="SeriesEmblemImage"/>).
+    /// </summary>
+    public async Task<IActionResult> OnPostUploadEmblemAsync(IFormFile? emblem)
+    {
+        if (emblem is null || emblem.Length == 0)
+            return Fail("Файл значка не выбран");
+        // До чтения в память: лимит — по заявленной длине, чтобы не тянуть заведомо большой файл.
+        if (emblem.Length > SeriesEmblemImage.MaxBytes)
+            return Fail($"Файл больше {SeriesEmblemImage.MaxBytes / 1024} КБ ({emblem.Length / 1024} КБ)");
+
+        var data = new byte[emblem.Length];
+        await using (var stream = emblem.OpenReadStream())
+            await stream.ReadExactlyAsync(data);
+
+        var summary = SeriesEmblemImage.TryRead(data, out var info, out _)
+            ? $"Загружен значок серии: {info.Width}×{info.Height}, {info.ContentType}, {data.Length / 1024} КБ"
+            : "Загружен значок серии";
+        return await Done(repo.SetEmblemAsync(Id, data), "series.emblem.set", "CompetitionSeries", summary);
+    }
+
+    public Task<IActionResult> OnPostDeleteEmblemAsync() =>
+        Done(repo.DeleteEmblemAsync(Id), "series.emblem.delete", "CompetitionSeries", "Удалён значок серии");
+
+    private IActionResult Fail(string error)
+    {
+        TempData["Error"] = error;
+        return RedirectToPage("Edit", new { id = Id });
+    }
+
     // ── Части ─────────────────────────────────────────────────────────────────
 
     public Task<IActionResult> OnPostAddPartAsync(string name, string? nameEn, int sortOrder, int? minAge, int? maxAge) =>

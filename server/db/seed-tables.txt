@@ -38,6 +38,7 @@ Results
 SeriesAwardBands
 SeriesAwardPrizes
 SeriesAwards
+SeriesEmblems
 SeriesRegulations
 Styles
 Swimmers

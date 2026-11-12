@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
+using Swimm.Application.Validation;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -51,9 +52,18 @@ public class SeriesAdminRepository(SwimmDbContext db) : ISeriesAdminRepository
             })
             .ToListAsync();
 
+        // Отдельным запросом и проекцией: байты картинки странице правки не нужны.
+        var emblem = series.EmblemId is int emblemId
+            ? await db.SeriesEmblems.AsNoTracking()
+                .Where(e => e.Id == emblemId)
+                .Select(e => new SeriesEmblemDto(e.Id, e.Sha256, e.ContentType, e.Width, e.Height, e.Data.Length, e.UploadedAt))
+                .FirstOrDefaultAsync()
+            : null;
+
         var partName = series.Parts.ToDictionary(p => p.Id, p => p.Name);
         return new SeriesEditDto
         {
+            Emblem = emblem,
             Id = series.Id,
             Name = series.Name,
             NameEn = series.NameEn,
@@ -128,6 +138,7 @@ public class SeriesAdminRepository(SwimmDbContext db) : ISeriesAdminRepository
         if (series is null) return SeriesSaveResult.Fail($"Серия #{id} не найдена");
         // Дни отвязывает FK SET NULL, но трекер его не видит — снимаем явно, чтобы сбросить и кэш.
         await UnbindDaysAsync(db.Competitions.Where(c => c.SeriesPart!.SeriesId == id));
+        RemoveEmblem(series); // иначе строка значка осталась бы сиротой: каскада от серии к нему нет
         db.CompetitionSeries.Remove(series);
         await db.SaveChangesAsync();
         return SeriesSaveResult.Ok(id);
@@ -150,6 +161,52 @@ public class SeriesAdminRepository(SwimmDbContext db) : ISeriesAdminRepository
         var phrases = (input.MatchPhrases ?? "").Split([';', '\n', '\r'],
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         s.MatchPhrases = phrases.Length == 0 ? null : string.Join("; ", phrases);
+    }
+
+    // ── Значок ────────────────────────────────────────────────────────────────
+
+    public async Task<SeriesSaveResult> SetEmblemAsync(int seriesId, byte[] data)
+    {
+        var series = await db.CompetitionSeries.FindAsync(seriesId);
+        if (series is null) return SeriesSaveResult.Fail($"Серия #{seriesId} не найдена");
+        if (!SeriesEmblemImage.TryRead(data, out var info, out var error)) return SeriesSaveResult.Fail(error);
+
+        var sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(data));
+        if (series.EmblemId is int current
+            && await db.SeriesEmblems.AnyAsync(e => e.Id == current && e.Sha256 == sha256))
+            return SeriesSaveResult.Ok(seriesId); // тот же файл — не плодим строку и новый адрес
+
+        // Замена — новая строка, а не правка старой: адрес с прежним хэшем закэширован навсегда.
+        RemoveEmblem(series);
+        series.Emblem = new SeriesEmblem
+        {
+            Data = data,
+            ContentType = info.ContentType,
+            Width = info.Width,
+            Height = info.Height,
+            Sha256 = sha256,
+            UploadedAt = DateTime.UtcNow
+        };
+        await db.SaveChangesAsync();
+        return SeriesSaveResult.Ok(seriesId);
+    }
+
+    public async Task<SeriesSaveResult> DeleteEmblemAsync(int seriesId)
+    {
+        var series = await db.CompetitionSeries.FindAsync(seriesId);
+        if (series is null) return SeriesSaveResult.Fail($"Серия #{seriesId} не найдена");
+        if (series.EmblemId is null) return SeriesSaveResult.Fail("У серии нет значка");
+        RemoveEmblem(series);
+        await db.SaveChangesAsync();
+        return SeriesSaveResult.Ok(seriesId);
+    }
+
+    /// <summary>Отвязать и удалить значок серии, не загружая его байты (заглушка по ключу).</summary>
+    private void RemoveEmblem(CompetitionSeries series)
+    {
+        if (series.EmblemId is not int emblemId) return;
+        series.EmblemId = null;
+        db.SeriesEmblems.Remove(new SeriesEmblem { Id = emblemId });
     }
 
     // ── Части ─────────────────────────────────────────────────────────────────

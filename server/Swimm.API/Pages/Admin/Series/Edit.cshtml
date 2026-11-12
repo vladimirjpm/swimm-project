@@ -57,6 +57,64 @@
         </div>
     </form>
 
+    @* ── Значок ────────────────────────────────────────────────────────── *@
+    <div class="admin-card mb-5">
+        <h2 class="text-sm font-semibold text-admin-text mb-1">Значок серии</h2>
+        <p class="text-[11px] text-admin-text-muted mb-3 leading-relaxed">
+            Эмблема турнира — одна на все выпуски серии; необязательна. Хранится в базе. Перед отправкой
+            браузер уменьшает картинку до @SeriesEmblemImage.TargetSide px по большей стороне (оригинал не
+            сохраняется); сервер принимает PNG или WebP до @(SeriesEmblemImage.MaxBytes / 1024) КБ.
+            На сайте значок пока не показывается.
+        </p>
+
+        <div class="flex flex-wrap gap-5 items-start">
+            <div class="flex flex-col gap-2 items-start">
+                <span class="text-[11px] text-admin-text-muted">Сейчас</span>
+                @if (s.Emblem is { } em)
+                {
+                    <div class="flex gap-2">
+                        <img src="@em.Url" alt="Значок серии" width="@em.Width" height="@em.Height"
+                             class="w-32 h-32 object-contain rounded-lg border border-admin-border bg-black" />
+                        <img src="@em.Url" alt="" width="@em.Width" height="@em.Height"
+                             class="w-32 h-32 object-contain rounded-lg border border-admin-border bg-white" />
+                    </div>
+                    <span class="text-[11px] text-admin-text-muted tabular-nums">
+                        @em.Width×@em.Height · @(em.ContentType == SeriesEmblemImage.Webp ? "WebP" : "PNG") ·
+                        @((em.Bytes / 1024.0).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)) КБ ·
+                        @em.UploadedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    </span>
+                    <a href="@em.Url" target="_blank" rel="noopener" class="text-[11px] text-admin-accent hover:underline font-mono break-all">@em.Url</a>
+                    <form method="post" asp-page-handler="DeleteEmblem" asp-route-id="@id">
+                        <button type="submit" class="admin-btn admin-btn-danger"
+                                onclick="return confirm('Удалить значок серии?')">Удалить значок</button>
+                    </form>
+                }
+                else
+                {
+                    <span class="text-xs text-admin-text-muted">Значка нет.</span>
+                }
+            </div>
+
+            <form id="emblem-form" method="post" enctype="multipart/form-data" asp-page-handler="UploadEmblem" asp-route-id="@id"
+                  class="flex flex-col gap-2 items-start"
+                  data-target-side="@SeriesEmblemImage.TargetSide" data-max-bytes="@SeriesEmblemImage.MaxBytes">
+                <span class="text-[11px] text-admin-text-muted">@(s.Emblem is null ? "Загрузить" : "Заменить")</span>
+                @* Выбранный файл на сервер не уходит: у поля нет name. Уходит уменьшенная копия в поле emblem. *@
+                <input id="emblem-pick" type="file" accept="image/png,image/webp,image/jpeg" class="admin-input" />
+                <input id="emblem-file" type="file" name="emblem" class="hidden" />
+                <div id="emblem-preview" class="hidden flex-col gap-2 items-start">
+                    <div class="flex gap-2">
+                        <img id="emblem-preview-dark" alt="Предпросмотр" class="w-32 h-32 object-contain rounded-lg border border-admin-border bg-black" />
+                        <img id="emblem-preview-light" alt="" class="w-32 h-32 object-contain rounded-lg border border-admin-border bg-white" />
+                    </div>
+                    <span id="emblem-preview-info" class="text-[11px] text-admin-text-muted tabular-nums"></span>
+                </div>
+                <span id="emblem-error" class="hidden text-xs text-admin-danger"></span>
+                <button id="emblem-submit" type="submit" class="admin-btn admin-btn-primary" disabled>Загрузить значок</button>
+            </form>
+        </div>
+    </div>
+
     @* ── Части ─────────────────────────────────────────────────────────── *@
     <div class="admin-card mb-5">
         <h2 class="text-sm font-semibold text-admin-text mb-1">Части турнира</h2>
@@ -333,6 +391,84 @@
         </form>
     </div>
 </div>
+
+@* Значок: уменьшение в браузере (canvas) — серверной библиотеки обработки изображений нет.
+   Результат кладётся в скрытое поле emblem и уходит обычной отправкой формы (antiforgery, PRG). *@
+<script>
+    (() => {
+        const form = document.getElementById('emblem-form');
+        const pick = document.getElementById('emblem-pick');
+        const out = document.getElementById('emblem-file');
+        const preview = document.getElementById('emblem-preview');
+        const info = document.getElementById('emblem-preview-info');
+        const errorBox = document.getElementById('emblem-error');
+        const submit = document.getElementById('emblem-submit');
+        const targetSide = Number(form.dataset.targetSide);
+        const maxBytes = Number(form.dataset.maxBytes);
+        let previewUrl = null;
+
+        const toBlob = (canvas, type, quality) =>
+            new Promise(resolve => canvas.toBlob(resolve, type, quality));
+
+        function fail(message) {
+            errorBox.textContent = message;
+            errorBox.classList.remove('hidden');
+            preview.classList.add('hidden');
+            preview.classList.remove('flex');
+            submit.disabled = true;
+            out.value = '';
+        }
+
+        pick.addEventListener('change', async () => {
+            errorBox.classList.add('hidden');
+            submit.disabled = true;
+            const file = pick.files[0];
+            if (!file) return;
+
+            let bitmap;
+            try { bitmap = await createImageBitmap(file); }
+            catch { return fail('Не удалось прочитать картинку'); }
+
+            // Только уменьшаем: маленькую картинку растягивать незачем.
+            const scale = Math.min(1, targetSide / Math.max(bitmap.width, bitmap.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            bitmap.close();
+
+            // WebP заметно меньше PNG при той же прозрачности. Браузер, не умеющий кодировать
+            // WebP, молча вернёт PNG — сервер принимает оба, тип определит по содержимому.
+            let blob = await toBlob(canvas, 'image/webp', 0.9);
+            if (!blob || (blob.type !== 'image/webp' && blob.type !== 'image/png'))
+                blob = await toBlob(canvas, 'image/png');
+            if (!blob) return fail('Браузер не смог сохранить картинку');
+            if (blob.size > maxBytes)
+                return fail(`После уменьшения файл всё ещё ${Math.round(blob.size / 1024)} КБ — больше ${Math.round(maxBytes / 1024)} КБ`);
+
+            const ext = blob.type === 'image/webp' ? 'webp' : 'png';
+            const transfer = new DataTransfer();
+            transfer.items.add(new File([blob], `emblem.${ext}`, { type: blob.type }));
+            out.files = transfer.files;
+
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = URL.createObjectURL(blob);
+            document.getElementById('emblem-preview-dark').src = previewUrl;
+            document.getElementById('emblem-preview-light').src = previewUrl;
+            info.textContent = `${canvas.width}×${canvas.height} · ${ext === 'webp' ? 'WebP' : 'PNG'} · `
+                + `${(blob.size / 1024).toFixed(1)} КБ (исходник ${Math.round(file.size / 1024)} КБ)`;
+            preview.classList.remove('hidden');
+            preview.classList.add('flex');
+            submit.disabled = false;
+        });
+
+        form.addEventListener('submit', e => {
+            if (!out.files.length) { e.preventDefault(); fail('Сначала выберите картинку'); }
+        });
+    })();
+</script>
 
 @if (!string.IsNullOrEmpty(flash))
 {
