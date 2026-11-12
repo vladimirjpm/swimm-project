@@ -6,7 +6,7 @@ interface UI_MedalIconProps {
   place: string; // '1', '2', '3'
   placeReplace?: string | undefined;
   styleType?: 'icon-noplace' | 'icon-place';
-  styleSize?: 'medal-16' |'medal-24' | 'medal-40';
+  styleSize?: 'medal-16' | 'medal-24' | 'medal-32' | 'medal-40';
   title? :string | undefined;
 }
 

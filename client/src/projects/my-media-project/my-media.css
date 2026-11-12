@@ -293,7 +293,7 @@
    иконкой, и тёмно-красное число вне светлой плашки пропадало на тёмном чипе. */
 .mmb-event { display: inline-flex; align-items: center; justify-content: center; }
 .mmb-event .dv-swimm-icon {
-  background: var(--t-plate);
+  background: var(--swim-plate, var(--t-plate));
   border-radius: 8px;
   padding-bottom: 2px;
 }
@@ -306,48 +306,211 @@
   padding: 2px 6px;
 }
 
-/* ── Строка заплыва (Ф6, сетка хендоффа) ──────────────────────────────────────── */
+/* ── Карточка соревнования, вариант 3A (12.11.2026) ───────────────────────────── */
 
-/* Одна сетка на шапку колонок и на строку: разъехаться они не могут по построению.
-   Порядок: место · медаль · плитка стиля · кто/что (тянется) · метка · время · медиа. */
-.mms-row {
-  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 120px;
-  gap: 14px;
+/* Хендофф `!design_handoff/my-media-handoff-nov2026`, план `docs/plans/my-media-card-3a-plan.md`.
+   Раскладку решает ШИРИНА КАРТОЧКИ (container query), а не окна: ширину карточки задают ещё
+   и сайдбар фильтров, и поля панели, и медиазапрос по окну разошёлся бы с ней при первой же
+   правке сайдбара.
+
+   ⚠ `overflow: clip`, а не `hidden`: правая панель липкая (`position: sticky`), а `hidden`
+   делает карточку контейнером прокрутки, и липнуть становится не к чему.
+   ⚠ Контейнер запросов — ещё и containing block для `position: fixed`, поэтому выезжающая
+   панель и шторка живут в портале (`MobileFiltersDrawer`), а не внутри карточки. */
+.mmc {
+  container: mmc / inline-size;
+  overflow: clip;
+}
+
+/* Шапка: плитка · имя пловца с логотипом клуба / название / даты · счётчики и «+». */
+.mmc-head {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 10px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--t-border-2);
+  background: var(--t-list-head);
 }
-/* Две колонки необязательные: дата (только у многодневок) и 🎉 (только там, где кого-то
-   поздравили). Комбинации перечислены явно — нулевая колонка не годится, у неё всё равно
-   остаётся зазор, и строка расходится с шапкой. */
-.mms-row--dated {
-  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 72px 120px;
-}
-.mms-row--cheers {
-  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 56px 120px;
-}
-.mms-row--dated.mms-row--cheers {
-  grid-template-columns: 48px 28px 66px minmax(0, 1fr) 72px 110px 72px 56px 120px;
-}
-
-/* Плотный вариант: на 1280 рядом с сайдбаром 320 полной сетке уже тесно. Ужимается
-   ровно то, что просил дизайнер, и в его порядке: медиа, метка, плитка. */
-@media (max-width: 1400px) {
-  .mms-row { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 110px; gap: 10px; }
-  .mms-row--dated { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 64px 110px; }
-  .mms-row--cheers { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 52px 110px; }
-  .mms-row--dated.mms-row--cheers { grid-template-columns: 40px 24px 60px minmax(0, 1fr) 64px 96px 64px 52px 110px; }
+.mmc-head__id { display: flex; flex: 1 1 280px; min-width: 0; align-items: center; gap: 12px; }
+.mmc-head__actions { display: flex; align-items: center; gap: 8px; }
+.mmc-head__meta {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px; font-weight: 800;
+  color: var(--t-text-2);
 }
 
-/* Плитка стиля тянется по своей колонке: ширину задаёт сетка, а не размер картинки. */
-.mms-row .src-swim-list { width: 100%; }
-.mms-row .src-swim-list img { width: 100%; height: auto; }
+/* Счётчик видео / фото. Есть медиа — на акценте; нет — серый значок без числа. Своей роли
+   «пустой счётчик» в теме нет (хендофф §1.2), берём ближайшие: фон поля и третий текст. */
+.mmc-count {
+  display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 3px;
+  width: 32px; height: 22px;
+  border-radius: 6px;
+  background: var(--t-input-bg);
+  color: var(--t-text-3);
+  font-size: 11px; font-weight: 800; line-height: 1;
+}
+.mmc-count--on { background: var(--t-accent); color: var(--t-accent-ink); }
+.mmc-count--lg {
+  width: auto; min-width: 36px; height: 28px; padding: 0 9px; gap: 4px;
+  border-radius: 7px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+}
 
-/* Мобильная строка: место+медаль · плитка · время и кто/что · одна кнопка медиа. */
-/* `display` НЕ задаём: строка прячется утилитой `sm:hidden`, а правило той же
-   специфичности из этого файла подключается позже и перебило бы её. */
-.mms-mrow {
-  grid-template-columns: 34px 58px minmax(0, 1fr) auto;
-  gap: 10px;
+/* Круглые кнопки карточки. Контур — существующими токенами (решение Влада 12.11.2026):
+   акцентная кнопка — `--t-accent-border`, обычная — `--t-border`; значений макета не берём. */
+.mmc-btn {
+  display: inline-flex; flex: none; align-items: center; justify-content: center;
+  width: 40px; height: 40px; padding: 0;
+  border: 1.5px solid var(--t-border);
+  border-radius: 999px;
+  background: var(--t-card);
+  color: var(--t-accent);
+  cursor: pointer;
+}
+.mmc-btn:hover { border-color: var(--t-accent-border); }
+.mmc-btn--accent { border-color: var(--t-accent-border); }
+.mmc-btn--on, .mmc-btn--on:hover { border-color: transparent; background: var(--t-accent); color: var(--t-accent-ink); }
+.mmc-btn--add { border-style: dashed; border-color: var(--t-accent-border); background: transparent; }
+.mmc-btn--lg { width: 44px; height: 44px; }
+
+/* Тело: список и (на широкой карточке) панель медиа рядом. */
+.mmc-body { display: flex; align-items: stretch; }
+.mmc-list { flex: 1 1 auto; min-width: 0; }
+.mmc-pane { display: none; }
+
+/* Строка результата: место · иконка стиля · время и метка · счётчики · кнопка. */
+.mmc-row {
+  display: grid;
+  grid-template-columns: 54px 52px minmax(0, 1fr) auto 40px;
   align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--t-border-2);
 }
-.mms-mrow .src-swim-list { width: 100%; }
-.mms-mrow .src-swim-list img { width: 100%; height: auto; }
+.mmc-row--first { border-top: 0; }
+.mmc-row--on { background: var(--t-accent-soft); }
+.mmc-row__place { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.mmc-row__counts { display: flex; gap: 4px; }
+.mmc-time {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 15px; font-weight: 800; line-height: 1.2;
+  color: var(--t-accent);
+}
+
+/* Плита под иконкой стиля — 52px: картинка 46 + поля по 3. Идёт за темой (`--swim-plate`,
+   в тёмной 7% белого — решение Влада 12.11.2026, хотя в макете плиты в тёмной нет). */
+.mmc-plate {
+  box-sizing: content-box;
+  padding: 3px 3px 2px;
+  border-radius: 8px;
+  background: var(--swim-plate, var(--t-plate));
+}
+.mmc-plate.dv-swimm-icon > .style-len { margin-top: 1px; font-weight: 800; }
+
+.mmc-day {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px;
+  background: var(--t-nested);
+}
+
+/* Телефонная ширина карточки: счётчики столбиком, цели касания 44px. */
+@container mmc (max-width: 519px) {
+  .mmc-head { padding: 12px; }
+  .mmc-head__id { flex-basis: 100%; gap: 10px; }
+  .mmc-head__actions { width: 100%; }
+  .mmc-head__actions .mmc-btn { margin-left: auto; }
+  .mmc-row { grid-template-columns: 48px 52px minmax(0, 1fr) 36px 44px; padding: 8px 12px; }
+  .mmc-row__counts { flex-direction: column; gap: 3px; }
+  .mmc-row .mmc-count { width: 36px; height: 20px; border-radius: 5px; }
+  .mmc-row .mmc-btn { width: 44px; height: 44px; }
+  .mmc-time { font-size: 16px; }
+  .mmc-day { padding: 6px 12px; }
+}
+
+/* Две панели: карточка шириной с окно 1280 при сайдбаре 320 (808px по расчёту хендоффа).
+   Порог 780, а не 808: расчёт не учитывал полосу прокрутки окна (~15px в Windows), и ровно
+   на 1280 карточка выходит 793px — раскладка не включалась бы на подтверждённом пороге.
+   Карточке без единого медиа панель не нужна — список остаётся во всю ширину. */
+@container mmc (min-width: 780px) {
+  .mmc:not(.mmc--nomedia) .mmc-list { flex: none; width: 400px; border-right: 1px solid var(--t-border-2); }
+  .mmc:not(.mmc--nomedia) .mmc-pane {
+    display: block; flex: 1 1 0; min-width: 0;
+    background: var(--t-surface2);
+  }
+  /* Панель короче длинного списка — пусть едет за прокруткой, а не остаётся наверху. */
+  .mmc-pane__stick { position: sticky; top: 64px; padding: 16px; }
+}
+
+/* Панель медиа открытого результата — одна вёрстка на три места: рядом со списком,
+   выезжающая справа и нижняя шторка. */
+.mmc-media { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.mmc-media__time {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 22px; font-weight: 800; line-height: 1.1;
+  color: var(--t-accent);
+}
+.mmc-stage {
+  position: relative;
+  display: flex; flex: none; align-items: center; justify-content: center;
+  width: 100%; height: 200px; padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--t-border-2);
+  border-radius: 12px;
+  background: var(--t-input-bg);
+  color: var(--t-text-2);
+  cursor: pointer;
+}
+.mmc-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mmc-stage__play {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px;
+  border-radius: 999px;
+  background: var(--t-accent); color: var(--t-accent-ink);
+}
+.mmc-thumbs { display: flex; flex: none; align-items: center; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.mmc-thumb {
+  position: relative;
+  display: flex; flex: none; align-items: center; justify-content: center;
+  width: 72px; height: 54px; padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--t-border);
+  border-radius: 8px;
+  background: var(--t-input-bg);
+  color: var(--t-text-2);
+  cursor: pointer;
+}
+.mmc-thumb--video { width: 96px; }
+.mmc-thumb--on { border: 3px solid var(--t-accent); }
+.mmc-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mmc-thumb svg { position: relative; }
+.mmc-thumb--add {
+  width: 54px;
+  border: 1.5px dashed var(--t-accent-border);
+  background: transparent;
+  color: var(--t-accent);
+}
+
+/* Оболочка выезжающей панели и шторки — общий `MobileFiltersDrawer`; здесь только палитра. */
+.mmc-drawer {
+  --fdrawer-bg: var(--t-surface-strong);
+  --fdrawer-text: var(--t-text);
+  --fdrawer-border: var(--t-border);
+  --fdrawer-handle: var(--t-border);
+  --fdrawer-scrim: var(--t-scrim);
+  --fdrawer-shadow: var(--t-shadow-lg);
+}
+/* Панель медиа — НИЖЕ модалок и лайтбокса (у них z-100): из неё открывают Add link и
+   просмотр, и они обязаны лечь поверх неё, а не под неё. Шторке фильтров (общие 90/100)
+   это не нужно — из неё ничего не открывают. */
+.fdrawer:has(> .mmc-drawer) > .fdrawer__scrim { z-index: 80; }
+.fdrawer__panel.mmc-drawer { z-index: 85; }
+.fdrawer--sheet .mmc-drawer .fdrawer__handle { margin: 8px auto 10px; }
+.fdrawer--sheet .mmc-drawer .fdrawer__body { padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+.fdrawer--sheet .mmc-drawer .mmc-stage { height: 180px; }
+
+/* Пилюля «Filters» (z-110) висит над низом экрана и легла бы на кнопки открытой панели
+   медиа — пока панель открыта, пилюли нет (у шторки фильтров то же делает `hideWhenOpen`). */
+body:has(.mmc-drawer.fdrawer__panel--open) .my-media-fab { display: none; }
