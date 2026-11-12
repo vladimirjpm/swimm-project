@@ -39,18 +39,49 @@
 
 ## 2. Как сделано
 
-Код — `client/src/projects/my-media-project/cover/` и `components/cover-dialog.tsx`.
+Весь код обложки — в папке `client/src/projects/my-media-project/cover/`; `swim-list.tsx`
+знает о ней только кнопку и хост диалога (`cover-entry.tsx`). Требование Влада (12.11.2026):
+«чистый код, разделённый, чтобы не было больших кусков» — один файл, одна ответственность.
 
-- **Раскладки** (`cover-layouts.tsx`) — три компонента в фиксированном размере 1280×720,
-  размеры и кегли из inline-стилей макетов (`CoverB`, `CoverB2`, `CoverG`). Цвета — хексы
-  макета, не роли `--t-*`: обложка — картинка и обязана выйти одинаковой в обеих темах.
+```
+my-media-project/
+  swim-marks.ts            медаль, метки рекорд/SB/PB, подпись стиля — общие для списка и обложки
+  components/swim-list.tsx только <CoverButton> и <CoverDialogHost>
+  cover/
+    cover-entry.tsx        кнопка YouTube cover + ленивый хост диалога
+    cover-dialog.tsx       диалог: состояние и сборка частей
+    cover-data.ts          ЧТО печатать — чистые функции (метка, место/медаль, значок/кубок, даты)
+    cover-data.test.mjs    юнит-тест чистых функций (npm --prefix client test)
+    cover-source.ts        мост MySwimDto → данные обложки (общие isMedal / swimMarks)
+    cover.tsx              обложка выбранной раскладки, узел для экспорта
+    cover-theme.ts         размер 1280×720, цвета макета, корень раскладки
+    cover-fonts.ts         шрифты: регистрация и @font-face с data-URL
+    cover-export.ts        DOM → PNG и скачивание, без React
+    cover-photo.ts         фото с устройства → data-URL
+    cover.css              обводка времени, подгонка готовых компонентов
+    layouts/               cover-a.tsx, cover-b.tsx, cover-c.tsx — по раскладке на файл
+    parts/                 общие части: background, emblem (угол, значок, кубок), top-block,
+                           place (кружок, медаль с лентой), style-plate, result-text (время,
+                           метка), name-row, photo-and-name, fit-text
+    dialog/                layout-picker, cover-preview, cover-toggles, use-cover-download
+```
+
+- **Раскладки** (`layouts/`) — три компонента в фиксированном размере 1280×720, размеры и
+  кегли из inline-стилей макетов (`CoverB`, `CoverB2`, `CoverG`) — именованными константами
+  в начале файла раскладки (`PANEL`, `PLATE`, `TIME`, `BADGE`, `NAME`). Цвета — хексы макета
+  (`COVER_COLOR`), не роли `--t-*`: обложка — картинка и обязана выйти одинаковой в обеих темах.
 - **Готовые компоненты, не своя вёрстка:** `CompetitionTile` (новые размеры `cover` 86×104 и
   `cover-lg` 110×134), `UI_SwimmStyleIcon` (`surface="light"` на плите `#e6f2fb`),
   `UI_ClubLogo`, `UI_MedalIcon` (новые ступени `medal-80`, `medal-116`). Их токены темы заданы
   на корне обложки постоянными значениями (`ROOT_TOKENS`).
-- **Данные** собирает `coverDataOf` в `swim-list.tsx` теми же хелперами, что строку: медаль —
-  `isMedal` (`HelperResults.isMedalPlace`, место ≠ медаль), метка — `swimMarks` (рекорд > SB >
-  PB), время — та же строка, что печатает `UI_SwimTime`.
+- **Данные** собирает `coverDataForSwim` (`cover-source.ts`) теми же хелперами, что строку
+  списка: медаль — `isMedal` (`HelperResults.isMedalPlace`, место ≠ медаль), метка —
+  `swimMarks` (оба вынесены из `swim-list.tsx` в общий `swim-marks.ts`), время — та же строка,
+  что печатает `UI_SwimTime`. Что из этого печатать (одна метка рекорд > SB > PB, значок или
+  кубок, подписи дат) — чистая `buildCoverData` (`cover-data.ts`) с юнит-тестом.
+- **Тесты клиента:** у клиента не было ни одного теста и раннера. Заведён скрипт
+  `npm --prefix client test` на встроенном раннере Node (`node --test`, без новых
+  зависимостей); тесты — файлы `*.test.mjs` рядом с кодом. В CI скрипт не подключён.
 - **Р76:** у строки с `suspect_reason` `swimMarks` меток не даёт — на обложке их нет; время и
   место — как в протоколе.
 - **Подгонка длинного текста** (`FitText`): в макетах короткие образцы, а настоящие названия,

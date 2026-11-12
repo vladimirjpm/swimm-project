@@ -1,6 +1,6 @@
 import { toBlob } from 'html-to-image';
 import { coverFontEmbedCss } from './cover-fonts';
-import { COVER_H, COVER_W } from './cover-layouts';
+import { COVER_H, COVER_W } from './cover-theme';
 
 // Экспорт обложки: DOM → canvas → PNG 1280×720, целиком в браузере (решение Влада
 // 12.11.2026) — на сервер ничего не уходит и там ничего не хранится.

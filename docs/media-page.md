@@ -398,19 +398,27 @@ PLACE / SWIM / TIME / MEDIA и «разворачиваемую панель п�
 непроверенного — `docs/plans/my-media-youtube-cover-plan.md`.
 
 Кнопка `YouTube cover` стоит в панели медиа РЕЗУЛЬТАТА (под `MediaLine`; у медиа ко всему
-соревнованию её нет) и открывает диалог `components/cover-dialog.tsx` на оболочке `DeepSheet`:
+соревнованию её нет) и открывает диалог `cover/cover-dialog.tsx` на оболочке `DeepSheet`:
 выбор раскладки A / B / C, у B и C чекбоксы `Show swimmer name` и `Add photo`, предпросмотр,
 `Download PNG`. Обложка — про один результат.
 
+Весь код обложки — в папке `my-media-project/cover/`, по файлу на ответственность (карта
+файлов — в плане, §2). `swim-list.tsx` знает о ней только `CoverButton` и `CoverDialogHost`
+(`cover/cover-entry.tsx`) — новое про обложку туда не дописывать.
+
 - **Файл делается в браузере и скачивается** — PNG 1280×720. На сервер не уходит ни обложка,
   ни фото пловца (файл с устройства читается в data-URL и уменьшается до 1600px).
-- **Раскладки** — `cover/cover-layouts.tsx`, фиксированный размер 1280×720; предпросмотр — та
+- **Раскладки** — `cover/layouts/` (по файлу на A, B, C) из общих частей `cover/parts/`,
+  размеры — именованными константами в начале файла; фиксированный размер 1280×720; предпросмотр — та
   же вёрстка, уменьшенная `transform`. Цвета — хексы макета, а не роли `--t-*`: обложка
   обязана выйти одинаковой в обеих темах. Готовым компонентам (`CompetitionTile` размеров
   `cover` / `cover-lg`, `UI_MedalIcon` ступеней `medal-80` / `medal-116`, `UI_ClubLogo`,
   `UI_SwimmStyleIcon`) токены темы заданы на корне обложки постоянными значениями.
-- **Данные** — `coverDataOf` в `swim-list.tsx`, теми же хелперами, что строка: место ≠ медаль
-  (`isMedal`), одна метка рекорд > SB > PB (`swimMarks`; словами — `AGE RECORD`,
+- **Данные** — `coverDataForSwim` (`cover/cover-source.ts`) теми же хелперами, что строка
+  списка; с 12.11.2026 `isMedal`, `swimMarks` и `styleLabel` живут в общем
+  `my-media-project/swim-marks.ts`, а не в `swim-list.tsx`. Что печатать — чистая
+  `buildCoverData` (`cover/cover-data.ts`, юнит-тест `npm --prefix client test`): место ≠ медаль,
+  одна метка рекорд > SB > PB (словами — `AGE RECORD`,
   `SEASON BEST`, `PERSONAL BEST`), у строки `Under review` (Р76) меток нет, время и место — как
   в протоколе. Дата на A и B — день заплыва, на C — дни соревнования (`5–6 NOV`).
 - **Значок соревнования** — `MySwimDto.emblem_url`: значок серии дня

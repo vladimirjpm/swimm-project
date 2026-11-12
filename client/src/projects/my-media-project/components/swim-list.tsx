@@ -14,7 +14,6 @@ import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-be
 import HelperSwimmer from '../../../utils/helpers/helper-swimmer';
 import HelperResults from '../../../utils/helpers/helper-results';
 import HelperMedia from '../../../utils/helpers/helper-media';
-import Helper from '../../../utils/helpers/data-helper';
 import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
 import CompetitionTile from '../../results-main-project/components/competition-header/competition-tile';
 import { competitionTileData } from '../../../utils/helpers/competition-source';
@@ -25,11 +24,8 @@ import UI_ClubLogo from '../../components/mix/club-logo/club-logo';
 import MobileFiltersDrawer from '../../components/filter-section/mobile-filters-drawer';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useDeepThemeClass } from '../../components/deep/use-deep-theme-class';
-import type { CoverData } from '../cover/cover-layouts';
-
-// Диалог обложки — ленивый чанк: шрифты обложки и `html-to-image` страница грузит только по
-// нажатию `YouTube cover`, а не при каждом открытии /my-media.
-const CoverDialog = React.lazy(() => import('./cover-dialog'));
+import { isMedal, styleLabel, swimMarks } from '../swim-marks';
+import { CoverButton, CoverDialogHost } from '../cover/cover-entry';
 
 // Список заплывов, сгруппированный по соревнованиям — ядро My media. Карточка соревнования —
 // вариант 3A хендоффа `!design_handoff/my-media-handoff-nov2026` (12.11.2026): слева список
@@ -194,21 +190,6 @@ function Counter({ kind, count, large = false }: { kind: 'video' | 'photo'; coun
 }
 
 /**
- * Медаль рисуется НЕ из места: место есть и у предварительного заплыва, и у секции «כללי»,
- * а медалей за них не дают. Правило одно на продукт — `HelperResults.isMedalPlace`, тот же,
- * что у таблицы результатов и страницы пловца.
- */
-function isMedal(swim: MySwimDto): boolean {
-  return HelperResults.isMedalPlace({
-    place: swim.place,
-    heatType: swim.heat_type,
-    round: swim.round,
-    timeFail: swim.time_fail,
-    competitionIsAward: swim.is_award,
-  });
-}
-
-/**
  * Место — кружок `UI_MedalIcon`. Медальная заливка только там, где медаль вручали
  * (`isMedal`); иначе `icon-noplace` — номер без кружка: место 1 в предварительном или в
  * «כללי» золотым кружком показало бы медаль, которой не было. Места нет (DNS / DQ, снятые) —
@@ -244,106 +225,6 @@ function StylePlate({ swim }: { swim: MySwimDto }) {
   );
 }
 
-/**
- * Выводы из времени заплыва — общие для строки и панели, чтобы метка в них не разошлась.
- *
- * Спорное время (И11): чип рисует `UI_SwimTime`, а НОСИТЕЛЬ — сама строка
- * (`swimFlaggedRowProps`: caution-лента слева плюс полный текст в title/aria-label).
- * Р76: PB/SB/рекорд — наши выводы из времени, у помеченной строки их нет. SB сервер уже не
- * ставит, PB ставит — гасим здесь. Бейдж рекорда — тем же способом, что в протоколе:
- * справочник рекордов + ось возраста из админ-настройки (`Helper.recordStepAge`). Эстафеты,
- * DSQ и помеченные ошибки протокола рекордов не носят — как в таблице результатов.
- */
-function swimMarks(swim: MySwimDto) {
-  const quality = swim.suspect_reason ? { kind: 'protocol' as const, reason: swim.suspect_reason } : null;
-  const isMastersResult = Helper.isResultMasters(swim.category === 'masters', swim.event_style_age);
-  const record = swim.is_relay || swim.time_fail || swim.suspect_reason || !swim.gender
-    ? null
-    : Helper.recordMarkForTime({
-      time: swim.time,
-      gender: swim.gender,
-      poolType: swim.pool_type,
-      styleName: swim.style,
-      distance: `${swim.distance}m`,
-      age: Helper.recordStepAge({
-        date: swim.competition_date,
-        birth_year: swim.birth_year,
-        event_style_age: swim.event_style_age,
-      }),
-      isMasters: isMastersResult,
-    });
-  return {
-    quality,
-    record,
-    pb: swim.is_pb && !swim.suspect_reason,
-    sb: swim.is_sb && !swim.suspect_reason,
-  };
-}
-
-/* ── Обложка YouTube ─────────────────────────────────────────────────────────── */
-
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-
-/** yyyy-MM-dd → `5 NOV` (подписи обложки — на английском). */
-function coverDay(iso: string): string {
-  const [, m, d] = iso.split('-').map(Number);
-  return `${d} ${MONTHS[m - 1] ?? ''}`.trim();
-}
-
-/** Дни соревнования: `5–6 NOV`, через границу месяца — `30 OCT–1 NOV`. */
-function coverRange(fromIso: string, toIso: string): string {
-  if (fromIso === toIso) return coverDay(fromIso);
-  const [, fm, fd] = fromIso.split('-').map(Number);
-  const [, tm] = toIso.split('-').map(Number);
-  return fm === tm ? `${fd}–${coverDay(toIso)}` : `${coverDay(fromIso)}–${coverDay(toIso)}`;
-}
-
-/** Метка достижения на обложке — словами: в сетке YouTube сокращение `REC·AGE` не читается. */
-const COVER_RECORD_LABEL: Record<RecordKind, string> = {
-  world: 'WORLD RECORD',
-  national: 'NATIONAL RECORD',
-  age: 'AGE RECORD',
-  masters: 'MASTERS RECORD',
-};
-
-/**
- * Данные обложки одного результата. Ничего своего: медаль — `isMedal`, метка — `swimMarks`
- * (рекорд > SB > PB; у строки `Under review` меток нет, Р76 — время и место при этом как в
- * протоколе), плитка — `competitionTileData`, время — та же строка, что печатает `UI_SwimTime`.
- */
-function coverDataOf(
-  swim: MySwimDto, swimmerName: string, firstDay: string, lastDay: string,
-): CoverData {
-  const { record, pb, sb } = swimMarks(swim);
-  return {
-    competitionName: swim.competition_name,
-    tile: competitionTileData({
-      name: swim.competition_name,
-      date: swim.competition_date,
-      category: swim.category,
-      is_championship: swim.is_championship,
-    }),
-    emblemUrl: swim.emblem_url ?? null,
-    isChampionship: swim.is_championship,
-    dayLabel: coverDay(swim.date),
-    rangeLabel: coverRange(firstDay, lastDay),
-    year: swim.date.slice(0, 4),
-    place: swim.place,
-    medal: isMedal(swim),
-    styleName: swim.style,
-    distanceLabel: /^\d+$/.test(swim.distance) ? `${swim.distance}m` : swim.distance,
-    timeText: swim.time_fail ? String(HelperResults.failLabel(swim)) : swim.time,
-    badge: record ? COVER_RECORD_LABEL[record.kind] : sb ? 'SEASON BEST' : pb ? 'PERSONAL BEST' : null,
-    swimmerName,
-    clubName: swim.club_name || null,
-  };
-}
-
-/** Имя файла обложки без расширения: дата и дисциплина — чтобы файлы разных заплывов не слиплись. */
-function coverFileName(swim: MySwimDto): string {
-  return `swimhub-cover-${swim.date}-${swim.distance}${styleLabel(swim.style)}`.replace(/[^\w-]+/g, '-');
-}
-
 /** Время заплыва: `UI_SwimTime` (единственный вывод времени) или пометка протокола DNS / DQ. */
 function SwimTimeText({ swim, quality }: { swim: MySwimDto; quality: ReturnType<typeof swimMarks>['quality'] }) {
   return swim.time_fail
@@ -357,15 +238,6 @@ const RELAY_CHIP = (
     RELAY
   </span>
 );
-
-/** Style.Name из БД сырой (freestyle / individual_medley) — короткие лейблы дизайна. */
-const STYLE_LABELS: Record<string, string> = {
-  freestyle: 'free', backstroke: 'back', breaststroke: 'breast',
-  butterfly: 'fly', individual_medley: 'IM', medley: 'IM',
-};
-export function styleLabel(style: string): string {
-  return STYLE_LABELS[style.toLowerCase()] ?? style.replace(/_/g, ' ');
-}
 
 function mediaStatus(m: SwimMediaDto, pubs: UserMediaPublicationDto[]): { status: CardStatus; isPublic: boolean } {
   const status = derivedCardStatus(pubs);
@@ -1154,17 +1026,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         addLabel="Add photo or video"
         onAdd={() => cb.onAddVideo(swim)}
         onClose={onClose}
-        actions={(
-          <button
-            type="button"
-            onClick={() => setCoverSwim(swim)}
-            title="Make a 1280 × 720 thumbnail for this result"
-            className="hp-mono inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[8px] border border-[var(--t-accent-border)] bg-transparent px-3 text-[11px] font-extrabold text-[var(--t-accent)]"
-          >
-            <IconVideo size={9} />
-            YouTube cover
-          </button>
-        )}
+        actions={<CoverButton onClick={() => setCoverSwim(swim)} />}
         cb={cb}
       />
     );
@@ -1285,18 +1147,13 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
       )}
 
       {coverSwim && (
-        <React.Suspense fallback={null}>
-          <CoverDialog
-            data={coverDataOf(
-              coverSwim,
-              rowSwimmer(coverSwim, swimmerNames, preferredSwimmerId).name,
-              days[days.length - 1].date,
-              days[0].date,
-            )}
-            fileName={coverFileName(coverSwim)}
-            onClose={() => setCoverSwim(null)}
-          />
-        </React.Suspense>
+        <CoverDialogHost
+          swim={coverSwim}
+          swimmerName={rowSwimmer(coverSwim, swimmerNames, preferredSwimmerId).name}
+          firstDay={days[days.length - 1].date}
+          lastDay={days[0].date}
+          onClose={() => setCoverSwim(null)}
+        />
       )}
     </div>
   );
