@@ -181,7 +181,15 @@ public class MySwimsRepository : IMySwimsRepository
             .ToDictionary(g => g.Key, g => g.Select(x => x.Key).ToHashSet());
         var compFlags = await _db.Competitions.AsNoTracking()
             .Where(c => competitionIds.Contains(c.Id))
-            .Select(c => new { c.Id, c.IsMasters, c.IsChampionship })
+            .Select(c => new
+            {
+                c.Id, c.IsMasters, c.IsChampionship,
+                // Значок серии дня (обложка YouTube): проекция без байтов картинки — только то,
+                // из чего собирается публичный адрес. У дня без серии и у серии без значка — null.
+                EmblemId = c.SeriesPart != null ? c.SeriesPart.Series.EmblemId : null,
+                EmblemSha = c.SeriesPart != null && c.SeriesPart.Series.Emblem != null
+                    ? c.SeriesPart.Series.Emblem.Sha256 : null,
+            })
             .ToListAsync();
         var flagsById = compFlags.ToDictionary(c => c.Id);
 
@@ -189,6 +197,8 @@ public class MySwimsRepository : IMySwimsRepository
         {
             if (!flagsById.TryGetValue(s.CompetitionId, out var flags)) continue;
             s.IsChampionship = flags.IsChampionship;
+            s.EmblemUrl = flags.EmblemId is int emblemId && !string.IsNullOrEmpty(flags.EmblemSha)
+                ? SeriesEmblemDto.PublicUrl(emblemId, flags.EmblemSha) : null;
             s.Category = CompetitionCategories.Canonical(
                 flags.IsMasters, categoryKeysByComp.GetValueOrDefault(s.CompetitionId));
         }

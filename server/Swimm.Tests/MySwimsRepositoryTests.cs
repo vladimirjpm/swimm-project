@@ -274,6 +274,48 @@ public class MySwimsRepositoryTests
         Assert.Equal("הפועל דולפין נתניה", swim.ClubName);
     }
 
+    // ── Значок серии: адрес приходит у дня, привязанного к серии со значком; иначе null ──
+
+    [Fact]
+    public async Task GetMySwims_CarriesSeriesEmblemUrl_OnlyForDayBoundToSeriesWithEmblem()
+    {
+        await using var db = CreateDb(nameof(GetMySwims_CarriesSeriesEmblemUrl_OnlyForDayBoundToSeriesWithEmblem));
+        var user = NewUser("u-emblem@example.com");
+        var swimmer = NewSwimmer("Иванов", "Иван");
+        db.AppUsers.Add(user);
+        db.Swimmers.Add(swimmer);
+        await db.SaveChangesAsync();
+        var (style, club) = await SeedRefsAsync(db);
+        await AddFavoriteAsync(db, user, swimmer);
+
+        var sha = new string('a', 64);
+        var emblem = new SeriesEmblem { Data = [1, 2, 3], ContentType = "image/png", Width = 8, Height = 8, Sha256 = sha };
+        var withEmblem = new CompetitionSeries { Name = "אליפות אילת", Emblem = emblem };
+        var noEmblem = new CompetitionSeries { Name = "גביע" };
+        var partWith = new CompetitionSeriesPart { Series = withEmblem, Name = "day" };
+        var partWithout = new CompetitionSeriesPart { Series = noEmblem, Name = "day" };
+        db.AddRange(partWith, partWithout);
+        await db.SaveChangesAsync();
+
+        var bound = await SeedCompetitionAsync(db, "Eilat");
+        bound.SeriesPartId = partWith.Id;
+        var boundNoEmblem = await SeedCompetitionAsync(db, "Cup");
+        boundNoEmblem.SeriesPartId = partWithout.Id;
+        var unbound = await SeedCompetitionAsync(db, "League");
+        db.Results.AddRange(
+            NewResult(swimmer, bound, style, club, new DateTime(2025, 10, 1)),
+            NewResult(swimmer, boundNoEmblem, style, club, new DateTime(2025, 10, 2)),
+            NewResult(swimmer, unbound, style, club, new DateTime(2025, 10, 3)));
+        await db.SaveChangesAsync();
+
+        var response = await NewRepo(db).GetMySwimsAsync(user.Id, season: 2025);
+
+        var byComp = response.Swims.ToDictionary(s => s.CompetitionId, s => s.EmblemUrl);
+        Assert.Equal(SeriesEmblemDto.PublicUrl(emblem.Id, sha), byComp[bound.Id]);
+        Assert.Null(byComp[boundNoEmblem.Id]);
+        Assert.Null(byComp[unbound.Id]);
+    }
+
     // ── PB: лучший по TimeMillisecond получает IsPb=true, худший — false; TimeFail не PB ──
 
     [Fact]

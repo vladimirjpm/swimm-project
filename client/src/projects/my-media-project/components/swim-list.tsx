@@ -14,7 +14,6 @@ import UI_SeasonBestBadge from '../../components/mix/season-best-badge/season-be
 import HelperSwimmer from '../../../utils/helpers/helper-swimmer';
 import HelperResults from '../../../utils/helpers/helper-results';
 import HelperMedia from '../../../utils/helpers/helper-media';
-import Helper from '../../../utils/helpers/data-helper';
 import UI_RecordBadge, { type RecordKind } from '../../components/mix/record-badge/record-badge';
 import CompetitionTile from '../../results-main-project/components/competition-header/competition-tile';
 import { competitionTileData } from '../../../utils/helpers/competition-source';
@@ -25,6 +24,8 @@ import UI_ClubLogo from '../../components/mix/club-logo/club-logo';
 import MobileFiltersDrawer from '../../components/filter-section/mobile-filters-drawer';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useDeepThemeClass } from '../../components/deep/use-deep-theme-class';
+import { isMedal, styleLabel, swimMarks } from '../swim-marks';
+import { CoverButton, CoverDialogHost } from '../cover/cover-entry';
 
 // Список заплывов, сгруппированный по соревнованиям — ядро My media. Карточка соревнования —
 // вариант 3A хендоффа `!design_handoff/my-media-handoff-nov2026` (12.11.2026): слева список
@@ -189,21 +190,6 @@ function Counter({ kind, count, large = false }: { kind: 'video' | 'photo'; coun
 }
 
 /**
- * Медаль рисуется НЕ из места: место есть и у предварительного заплыва, и у секции «כללי»,
- * а медалей за них не дают. Правило одно на продукт — `HelperResults.isMedalPlace`, тот же,
- * что у таблицы результатов и страницы пловца.
- */
-function isMedal(swim: MySwimDto): boolean {
-  return HelperResults.isMedalPlace({
-    place: swim.place,
-    heatType: swim.heat_type,
-    round: swim.round,
-    timeFail: swim.time_fail,
-    competitionIsAward: swim.is_award,
-  });
-}
-
-/**
  * Место — кружок `UI_MedalIcon`. Медальная заливка только там, где медаль вручали
  * (`isMedal`); иначе `icon-noplace` — номер без кружка: место 1 в предварительном или в
  * «כללי» золотым кружком показало бы медаль, которой не было. Места нет (DNS / DQ, снятые) —
@@ -239,42 +225,6 @@ function StylePlate({ swim }: { swim: MySwimDto }) {
   );
 }
 
-/**
- * Выводы из времени заплыва — общие для строки и панели, чтобы метка в них не разошлась.
- *
- * Спорное время (И11): чип рисует `UI_SwimTime`, а НОСИТЕЛЬ — сама строка
- * (`swimFlaggedRowProps`: caution-лента слева плюс полный текст в title/aria-label).
- * Р76: PB/SB/рекорд — наши выводы из времени, у помеченной строки их нет. SB сервер уже не
- * ставит, PB ставит — гасим здесь. Бейдж рекорда — тем же способом, что в протоколе:
- * справочник рекордов + ось возраста из админ-настройки (`Helper.recordStepAge`). Эстафеты,
- * DSQ и помеченные ошибки протокола рекордов не носят — как в таблице результатов.
- */
-function swimMarks(swim: MySwimDto) {
-  const quality = swim.suspect_reason ? { kind: 'protocol' as const, reason: swim.suspect_reason } : null;
-  const isMastersResult = Helper.isResultMasters(swim.category === 'masters', swim.event_style_age);
-  const record = swim.is_relay || swim.time_fail || swim.suspect_reason || !swim.gender
-    ? null
-    : Helper.recordMarkForTime({
-      time: swim.time,
-      gender: swim.gender,
-      poolType: swim.pool_type,
-      styleName: swim.style,
-      distance: `${swim.distance}m`,
-      age: Helper.recordStepAge({
-        date: swim.competition_date,
-        birth_year: swim.birth_year,
-        event_style_age: swim.event_style_age,
-      }),
-      isMasters: isMastersResult,
-    });
-  return {
-    quality,
-    record,
-    pb: swim.is_pb && !swim.suspect_reason,
-    sb: swim.is_sb && !swim.suspect_reason,
-  };
-}
-
 /** Время заплыва: `UI_SwimTime` (единственный вывод времени) или пометка протокола DNS / DQ. */
 function SwimTimeText({ swim, quality }: { swim: MySwimDto; quality: ReturnType<typeof swimMarks>['quality'] }) {
   return swim.time_fail
@@ -288,15 +238,6 @@ const RELAY_CHIP = (
     RELAY
   </span>
 );
-
-/** Style.Name из БД сырой (freestyle / individual_medley) — короткие лейблы дизайна. */
-const STYLE_LABELS: Record<string, string> = {
-  freestyle: 'free', backstroke: 'back', breaststroke: 'breast',
-  butterfly: 'fly', individual_medley: 'IM', medley: 'IM',
-};
-export function styleLabel(style: string): string {
-  return STYLE_LABELS[style.toLowerCase()] ?? style.replace(/_/g, ' ');
-}
 
 function mediaStatus(m: SwimMediaDto, pubs: UserMediaPublicationDto[]): { status: CardStatus; isPublic: boolean } {
   const status = derivedCardStatus(pubs);
@@ -811,10 +752,11 @@ function MediaStage({ m, onPlay }: { m: SwimMediaDto; onPlay: () => void }) {
  * `MediaLine`, что был в раскрывающейся панели под строкой (источник и ❤, статус публикации,
  * пометка модерации, Share / Update, Withdraw, Delete).
  *
- * Кнопок `YouTube cover` и `Poster` из макета здесь нет: логики у них нет до задачи 2
- * хендоффа (обложки и плакаты), а кнопка «в никуда» на проде нежелательна.
+ * `actions` — кнопки результата под управлением медиа: `YouTube cover` (задача 2 хендоффа).
+ * `Poster` и `Share` из макета здесь нет: у плаката пока нет логики, а Share живёт в
+ * `MediaLine`.
  */
-function MediaPane({ head, media, addLabel, onAdd, onClose, cb }: {
+function MediaPane({ head, media, addLabel, onAdd, onClose, actions, cb }: {
   head: React.ReactNode;
   /** Видео первыми, затем фото. */
   media: SwimMediaDto[];
@@ -822,6 +764,8 @@ function MediaPane({ head, media, addLabel, onAdd, onClose, cb }: {
   onAdd: () => void;
   /** Есть только у выезжающей панели и шторки; рядом со списком закрывать нечего. */
   onClose?: () => void;
+  /** Кнопки открытого результата (обложка YouTube); у медиа соревнования их нет. */
+  actions?: React.ReactNode;
   cb: SwimListCallbacks;
 }) {
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -866,6 +810,7 @@ function MediaPane({ head, media, addLabel, onAdd, onClose, cb }: {
       {/* `key` — у `MediaLine` своё состояние селектов публикации: при смене медиа оно обязано
           начаться заново, а не унаследовать выбор соседа. */}
       {active && <MediaLine key={active.id} m={active} pubs={cb.publicationsByMedia.get(active.id) ?? []} cb={cb} />}
+      {actions && <div className="flex flex-wrap items-center gap-2 border-t border-[var(--t-border-2)] pt-2.5">{actions}</div>}
     </div>
   );
 }
@@ -1048,6 +993,9 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
   if (sel != null) lastSel.current = sel;
   const drawerSel = sel ?? (isOpenable(lastSel.current) ? lastSel.current : null);
 
+  // Обложка YouTube: для какого результата открыт диалог.
+  const [coverSwim, setCoverSwim] = useState<MySwimDto | null>(null);
+
   const renderPane = (target: PaneSel, onClose?: () => void) => {
     if (target === 'comp') {
       return (
@@ -1078,6 +1026,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         addLabel="Add photo or video"
         onAdd={() => cb.onAddVideo(swim)}
         onClose={onClose}
+        actions={<CoverButton onClick={() => setCoverSwim(swim)} />}
         cb={cb}
       />
     );
@@ -1195,6 +1144,16 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         >
           {drawerSel != null && renderPane(drawerSel, () => setPicked(null))}
         </MobileFiltersDrawer>
+      )}
+
+      {coverSwim && (
+        <CoverDialogHost
+          swim={coverSwim}
+          swimmerName={rowSwimmer(coverSwim, swimmerNames, preferredSwimmerId).name}
+          firstDay={days[days.length - 1].date}
+          lastDay={days[0].date}
+          onClose={() => setCoverSwim(null)}
+        />
       )}
     </div>
   );

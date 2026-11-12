@@ -33,6 +33,8 @@ export interface MySwimDto {
   category: 'kids8_11' | 'young11_14' | 'juniors' | 'adults' | 'masters' | null;
   /** Чемпионат Израиля (флаг админки) — кубок в плитке. */
   is_championship: boolean;
+  /** Публичный адрес значка серии турнира (`/api/series-emblems/…`); null — значка нет. */
+  emblem_url?: string | null;
   /** Пол пловца — ключ ступени рекорда. */
   gender: string;
   /** Год рождения — ось возраста ступени рекорда. */

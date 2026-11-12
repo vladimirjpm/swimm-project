@@ -1,0 +1,28 @@
+/* Обложка YouTube (`cover-layouts.tsx`). Раскладка — inline-стилями, как в макетах хендоффа;
+   здесь только то, что inline не выразить: порядок отрисовки обводки и подгонка готовых
+   компонентов под макет. Всё заперто под `.ytc`, наружу ничего не течёт. */
+
+/* Обводка времени рисуется ПОД заливкой: иначе 4px съедают сам знак. */
+.ytc .ytc-time {
+  paint-order: stroke fill;
+}
+
+/* Дистанция под иконкой стиля — жирная, как в макете (у компонента вес обычный). */
+.ytc .dv-swimm-icon .style-len {
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Номер места — шрифтом цифр обложки. На медальной заливке — тёмным без тени (макет):
+   белый с тенью, как на сайте, в сетке YouTube (обложка ~320px) не читается. */
+.ytc .dv-medal-icon .medal {
+  font-family: 'Cover Montserrat', sans-serif;
+  font-weight: 900;
+  box-shadow: none;
+}
+.ytc .dv-medal-icon .medal.gold,
+.ytc .dv-medal-icon .medal.silver,
+.ytc .dv-medal-icon .medal.bronze {
+  color: #12305a;
+  text-shadow: none;
+}

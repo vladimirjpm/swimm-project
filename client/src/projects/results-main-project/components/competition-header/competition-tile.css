@@ -74,11 +74,30 @@
 .comp-tile--mini .comp-tile__letter { font-size: 14px; }
 .comp-tile--mini .comp-tile__age    { height: 11px; font-size: 7px; }
 
+/* Обложка YouTube в My media (хендофф `my-media-handoff-nov2026`, задача 2): 86×104 в
+   раскладках A и B, 110×134 в колонке раскладки C. Крупнее экранных — обложка рисуется
+   1280×720. Пропорции слотов — из макета. */
+.comp-tile--cover { width: 86px; height: 104px; border-radius: 20px; border-width: 2px; }
+.comp-tile--cover .comp-tile__icons  { height: 34px; gap: 6px; }
+.comp-tile--cover .comp-tile__season { font-size: 16px; }
+.comp-tile--cover .comp-tile__cup    { font-size: 24px; }
+.comp-tile--cover .comp-tile__letter { font-size: 36px; }
+.comp-tile--cover .comp-tile__age    { height: 26px; font-size: 15px; }
+
+.comp-tile--cover-lg { width: 110px; height: 134px; border-radius: 24px; border-width: 2px; }
+.comp-tile--cover-lg .comp-tile__icons  { height: 44px; gap: 6px; }
+.comp-tile--cover-lg .comp-tile__season { font-size: 20px; }
+.comp-tile--cover-lg .comp-tile__cup    { font-size: 30px; }
+.comp-tile--cover-lg .comp-tile__letter { font-size: 46px; }
+.comp-tile--cover-lg .comp-tile__age    { height: 32px; font-size: 19px; }
+
 /* Без возрастной группы (masters, открытый старт) — ленты нет, плитка ниже */
 .comp-tile--no-age { height: 64px; }
 .comp-tile--no-age.comp-tile--sm { height: 56px; }
 .comp-tile--no-age.comp-tile--xs { height: 48px; }
 .comp-tile--no-age.comp-tile--mini { height: 34px; }
+.comp-tile--no-age.comp-tile--cover { height: 78px; }
+.comp-tile--no-age.comp-tile--cover-lg { height: 102px; }
 
 /* Без кубка (не чемпионат) — в полосе только сезон, выравнивание по центру сохраняется */
 
