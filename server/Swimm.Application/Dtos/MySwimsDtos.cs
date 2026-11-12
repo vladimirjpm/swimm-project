@@ -56,6 +56,18 @@ public class MySwimDto
     [JsonPropertyName("swimmer_id")]
     public int SwimmerId { get; set; }
 
+    /// <summary>
+    /// Клуб строки результата (Results.ClubId) — клуб пловца НА МОМЕНТ ЗАПЛЫВА, а не нынешний
+    /// из карточки пловца: после перехода логотип в шапке старой карточки остаётся прежним.
+    /// У эстафеты это клуб команды. Нужен для логотипа рядом с именем в шапке карточки My media.
+    /// </summary>
+    [JsonPropertyName("club_id")]
+    public int ClubId { get; set; }
+
+    /// <summary>Название клуба — ивритское (Club.Name): названия на витрине по умолчанию на иврите.</summary>
+    [JsonPropertyName("club_name")]
+    public string ClubName { get; set; } = string.Empty;
+
     [JsonPropertyName("competition_id")]
     public int CompetitionId { get; set; }
 

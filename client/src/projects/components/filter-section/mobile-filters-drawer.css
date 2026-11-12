@@ -137,3 +137,28 @@
 }
 
 .fpill__caret { font-size: 10px; opacity: 0.8; }
+
+/* ── Вариант `side` (My media, 12.11.2026): панель выезжает СПРАВА ─────────────── */
+
+/* Десктоп, где рядом со списком панели не хватает места (карточка соревнования My media
+   уже порога двух панелей): та же оболочка — портал, scrim, прокрутка, — только едет по
+   горизонтали. Ширина 420px из хендоффа карточки 3A; на узком окне — не шире экрана. */
+.fdrawer--side .fdrawer__panel {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 100vw);
+  border-left: 1px solid var(--fdrawer-border, var(--theme-mode-border));
+  box-shadow: var(--fdrawer-shadow, 0 25px 50px -12px rgb(0 0 0 / 0.25));
+  transform: translateX(100%);
+}
+.fdrawer--side .fdrawer__panel--open { transform: translateX(0); }
+
+.fdrawer--side .fdrawer__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}

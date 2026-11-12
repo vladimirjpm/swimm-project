@@ -104,6 +104,9 @@ public class MySwimsRepository : IMySwimsRepository
             {
                 ResultId = r.Id,
                 SwimmerId = r.SwimmerId,
+                // Клуб строки — на момент заплыва (логотип в шапке карточки); название ивритское.
+                ClubId = r.ClubId,
+                ClubName = r.Club.Name,
                 RelayId = r.RelayId,
                 CompetitionId = r.CompetitionId,
                 EventId = r.Competition.EventId,
