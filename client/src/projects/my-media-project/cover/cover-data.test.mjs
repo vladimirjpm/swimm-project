@@ -6,26 +6,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildCoverData, coverBadge, coverDay, coverDistance, coverEmblem, coverFileName, coverRange,
+  buildCoverData, coverBadge, coverDay, coverFileName, coverRange,
 } from './cover-data.ts';
-
-const NO_MARKS = { record: null, sb: false, pb: false };
 
 const source = (over = {}) => ({
   competitionName: 'אליפות אילת הפתוחה',
-  tile: { letter: 'K', ageGroup: '8-11', season: '❄️', isChampionship: false },
-  emblemUrl: null,
-  isChampionship: false,
+  tile: { letter: 'K', ageGroup: '8-11', season: 'winter', isChampionship: false },
+  emblem: { kind: 'empty' },
   date: '2026-11-05',
   firstDay: '2026-11-05',
   lastDay: '2026-11-06',
   place: 1,
   medal: true,
   styleName: 'individual_medley',
-  distance: '100',
+  distanceLabel: '100m',
   time: '01:37.05',
   failLabel: null,
-  marks: NO_MARKS,
+  mark: null,
   swimmerName: 'סבינה ברנצב',
   clubName: 'הפועל דולפין נתניה',
   ...over,
@@ -38,23 +35,12 @@ test('дата: день заплыва и дни соревнования', () 
   assert.equal(coverRange('2026-10-30', '2026-11-01'), '30 OCT–1 NOV');
 });
 
-test('метка одна: рекорд > SB > PB', () => {
-  assert.equal(coverBadge({ record: { kind: 'age' }, sb: true, pb: true }), 'AGE RECORD');
-  assert.equal(coverBadge({ record: { kind: 'national' }, sb: false, pb: false }), 'NATIONAL RECORD');
-  assert.equal(coverBadge({ record: null, sb: true, pb: true }), 'SEASON BEST');
-  assert.equal(coverBadge({ record: null, sb: false, pb: true }), 'PERSONAL BEST');
-  assert.equal(coverBadge(NO_MARKS), null);
-});
-
-test('значок: значок серии важнее кубка, кубок — только у чемпионата', () => {
-  assert.deepEqual(coverEmblem('/api/series-emblems/1/abc', true), { kind: 'image', url: '/api/series-emblems/1/abc' });
-  assert.deepEqual(coverEmblem(null, true), { kind: 'cup' });
-  assert.deepEqual(coverEmblem(null, false), { kind: 'empty' });
-});
-
-test('дистанция: метры дописываются числу, эстафета — как в протоколе', () => {
-  assert.equal(coverDistance('100'), '100m');
-  assert.equal(coverDistance('4X50'), '4X50');
+test('подпись метки: словами, а не сокращением (какая метка одна — topMark в print-data)', () => {
+  assert.equal(coverBadge({ kind: 'record', record: 'age' }), 'AGE RECORD');
+  assert.equal(coverBadge({ kind: 'record', record: 'national' }), 'NATIONAL RECORD');
+  assert.equal(coverBadge({ kind: 'sb' }), 'SEASON BEST');
+  assert.equal(coverBadge({ kind: 'pb' }), 'PERSONAL BEST');
+  assert.equal(coverBadge(null), null);
 });
 
 test('место ≠ медаль: число сохраняется, медаль — отдельным признаком', () => {
@@ -65,7 +51,7 @@ test('место ≠ медаль: число сохраняется, медал
 
 test('Р76: у помеченной строки меток нет, время и место — как в протоколе', () => {
   // `swimMarks` у строки `Under review` отдаёт пустые метки — обложка их не додумывает.
-  const data = buildCoverData(source({ marks: NO_MARKS, place: 2, medal: true, time: '00:40.08' }));
+  const data = buildCoverData(source({ mark: null, place: 2, medal: true, time: '00:40.08' }));
   assert.equal(data.badge, null);
   assert.equal(data.timeText, '00:40.08');
   assert.deepEqual(data.place, { value: 2, medal: true });

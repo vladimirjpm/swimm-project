@@ -1,17 +1,19 @@
 import React from 'react';
+import { UI_SeasonKindIcon } from '../season-icon/season-icon';
 
-/** Роль старта в сезоне (`kind` из API): winter | summer | openwater. */
-const KIND_ICON: Record<string, { icon: string; label: string }> = {
-  winter: { icon: '❄', label: 'Winter championship' },
-  summer: { icon: '☀', label: 'Summer championship' },
-  openwater: { icon: '🌊', label: 'Open water' },
+/** Роль старта в сезоне (`kind` из API): winter | summer | openwater — подпись для подсказки.
+ *  Сам значок рисует общий `UI_SeasonKindIcon` (зима и лето — рисунок, открытая вода — 🌊). */
+const KIND_LABEL: Record<string, string> = {
+  winter: 'Winter championship',
+  summer: 'Summer championship',
+  openwater: 'Open water',
 };
 
 export interface UI_CompetitionNameProps {
   name?: string | null;
   /** Чемпионат — 🏆 перед названием. Источник — ручной флаг `Competition.IsChampionship` из API. */
   isChampionship?: boolean | null;
-  /** Роль в сезоне (winter | summer | openwater) — значок ❄/☀/🌊 после 🏆. Не задано — без значка. */
+  /** Роль в сезоне (winter | summer | openwater) — значок сезона или 🌊 после 🏆. Не задано — без значка. */
   kind?: string | null;
   /** Классы на само название (кегль, цвет, обрезка) — типографика за вызывающим экраном. */
   className?: string;
@@ -43,14 +45,14 @@ const UI_CompetitionName: React.FC<UI_CompetitionNameProps> = ({
   as = 'span',
 }) => {
   if (!name) return null;
-  const kindIcon = kind ? KIND_ICON[kind] : undefined;
+  const kindLabel = kind ? KIND_LABEL[kind] : undefined;
   const Tag = as;
-  const title = [isChampionship ? 'Championship' : null, kindIcon?.label, name].filter(Boolean).join(' · ');
+  const title = [isChampionship ? 'Championship' : null, kindLabel, name].filter(Boolean).join(' · ');
 
   return (
     <Tag dir="auto" className={className} title={title}>
       {isChampionship && <span aria-label="Championship" role="img">🏆 </span>}
-      {kindIcon && <span aria-label={kindIcon.label} role="img">{kindIcon.icon} </span>}
+      {kindLabel && <span aria-label={kindLabel} role="img"><UI_SeasonKindIcon kind={kind} /> </span>}
       {name}
     </Tag>
   );

@@ -26,6 +26,7 @@ import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useDeepThemeClass } from '../../components/deep/use-deep-theme-class';
 import { isMedal, styleLabel, swimMarks } from '../swim-marks';
 import { CoverButton, CoverDialogHost } from '../cover/cover-entry';
+import { PosterButton, PosterDialogHost, canMakePoster } from '../poster/poster-entry';
 
 // Список заплывов, сгруппированный по соревнованиям — ядро My media. Карточка соревнования —
 // вариант 3A хендоффа `!design_handoff/my-media-handoff-nov2026` (12.11.2026): слева список
@@ -753,7 +754,8 @@ function MediaStage({ m, onPlay }: { m: SwimMediaDto; onPlay: () => void }) {
  * пометка модерации, Share / Update, Withdraw, Delete).
  *
  * `actions` — кнопки результата под управлением медиа: `YouTube cover` (задача 2 хендоффа).
- * `Poster` и `Share` из макета здесь нет: у плаката пока нет логики, а Share живёт в
+ * `Poster` и `Share` из макета здесь нет: плакат — про все заплывы пловца, его кнопка стоит в
+ * шапке карточки (решение Влада 12.11.2026), а Share живёт в
  * `MediaLine`.
  */
 function MediaPane({ head, media, addLabel, onAdd, onClose, actions, cb }: {
@@ -957,6 +959,12 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
     ? `${isoToDmy(days[days.length - 1].date)} – ${isoToDmy(days[0].date)}`
     : first.competition_date;
   const selectedName = preferredSwimmerId != null ? swimmerNames.get(preferredSwimmerId) ?? null : null;
+  const tile = competitionTileData({
+    name: first.competition_name,
+    date: first.competition_date,
+    category: first.category,
+    is_championship: first.is_championship,
+  });
   // Логотип клуба рядом с именем — клуб строки результата (на момент заплыва). Сперва личный
   // заплыв выбранного пловца; эстафета годится запасной — у неё клуб команды, тот же.
   const ownerClub = preferredSwimmerId == null ? null : (
@@ -995,6 +1003,8 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
 
   // Обложка YouTube: для какого результата открыт диалог.
   const [coverSwim, setCoverSwim] = useState<MySwimDto | null>(null);
+  // Плакат — про все заплывы ОДНОГО пловца, поэтому кнопка есть только при выбранном пловце.
+  const [posterOpen, setPosterOpen] = useState(false);
 
   const renderPane = (target: PaneSel, onClose?: () => void) => {
     if (target === 'comp') {
@@ -1038,16 +1048,9 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         <div className="mmc-head__id">
           {/* Плитка соревнования — общая CompetitionTile (сезон/кубок · буква категории ·
               возрастная лента). Данные считает общий competitionTileData, своей эвристики по
-              названию тут нет: категория и флаг чемпионата приходят с сервера. */}
-          <CompetitionTile
-            {...competitionTileData({
-              name: first.competition_name,
-              date: first.competition_date,
-              category: first.category,
-              is_championship: first.is_championship,
-            })}
-            size="sm"
-          />
+              названию тут нет: категория и флаг чемпионата приходят с сервера. Плитку без
+              буквы и возраста компонент сам заменяет значком сезона. */}
+          <CompetitionTile {...tile} size="sm" />
           {/* Столбик «имя пловца / название / даты». `items-start` обязателен: ивритский
               текст с dir="auto" в блоке на всю ширину уезжает вправо, а имя должно стоять
               слева (хендофф §1.4). */}
@@ -1084,6 +1087,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
           {/* Счётчики — по ВСЕМУ медиа карточки: заплывов и «ко всему соревнованию». */}
           <Counter kind="video" count={videoCount} large />
           <Counter kind="photo" count={photoCount} large />
+          {preferredSwimmerId != null && canMakePoster(swims) && <PosterButton onClick={() => setPosterOpen(true)} />}
           <button
             type="button"
             onClick={() => cb.onAddCompMedia(earliest.competition_id, earliest.competition_name)}
@@ -1153,6 +1157,16 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
           firstDay={days[days.length - 1].date}
           lastDay={days[0].date}
           onClose={() => setCoverSwim(null)}
+        />
+      )}
+      {posterOpen && preferredSwimmerId != null && selectedName && (
+        <PosterDialogHost
+          swims={swims}
+          swimmerId={preferredSwimmerId}
+          swimmerName={selectedName}
+          clubName={ownerClub}
+          firstDay={days[days.length - 1].date}
+          onClose={() => setPosterOpen(false)}
         />
       )}
     </div>

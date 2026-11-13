@@ -1,7 +1,6 @@
 import React from 'react';
 import UI_ClubLogo from '../../../components/mix/club-logo/club-logo';
-import type { CoverData } from '../cover-data';
-import { COVER_FONT } from '../cover-fonts';
+import { PRINT_FONT } from '../print-fonts';
 import FitText from './fit-text';
 
 export interface NameSpec {
@@ -15,16 +14,16 @@ export interface NameSpec {
 const MIN_SHARE = 0.6;
 
 /** Логотип клуба и имя пловца (иврит, справа налево). */
-export default function NameRow({ data, spec }: { data: CoverData; spec: NameSpec }) {
+export default function NameRow({ swimmerName, clubName, spec }: { swimmerName: string; clubName: string | null; spec: NameSpec }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, maxWidth: '100%' }}>
-      {data.clubName && <UI_ClubLogo clubName={data.clubName} size={spec.logo} />}
+      {clubName && <UI_ClubLogo clubName={clubName} size={spec.logo} />}
       <span style={{ minWidth: 0 }}>
         <FitText
-          text={data.swimmerName}
+          text={swimmerName}
           dir="rtl"
           size={{ max: spec.size, min: Math.round(spec.size * MIN_SHARE) }}
-          style={{ fontFamily: COVER_FONT.hebrew, fontWeight: 900, lineHeight: 1.1 }}
+          style={{ fontFamily: PRINT_FONT.hebrew, fontWeight: 900, lineHeight: 1.1 }}
         />
       </span>
     </div>

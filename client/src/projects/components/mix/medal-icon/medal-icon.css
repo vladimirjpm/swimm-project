@@ -47,12 +47,19 @@
 
 /* Ступени 80 и 116 (12.11.2026) — место на обложке YouTube в My media (хендофф
    `my-media-handoff-nov2026`, задача 2): обложка рисуется 1280×720 и смотрится в сетке
-   вчетверо мельче, поэтому кружок там крупнее любого экранного. Размеры — из макета. */
+   вчетверо мельче, поэтому кружок там крупнее любого экранного. Размеры — из макета.
+   Ступень 96 — место в таблице плаката B (1414×2000) там же. */
 .dv-medal-icon .medal.medal-80 {
   width: 80px;
   height: 80px;
   font-size: 46px;
   border: 5px solid transparent;
+}
+.dv-medal-icon .medal.medal-96 {
+  width: 96px;
+  height: 96px;
+  font-size: 52px;
+  border: 6px solid transparent;
 }
 .dv-medal-icon .medal.medal-116 {
   width: 116px;

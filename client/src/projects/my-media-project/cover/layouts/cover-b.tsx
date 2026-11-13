@@ -1,12 +1,12 @@
 import React from 'react';
 import type { CoverData, CoverOptions } from '../cover-data';
 import { COVER_CLASS, COVER_COLOR, COVER_ROOT } from '../cover-theme';
-import Background from '../parts/background';
+import Background from '../parts/cover-background';
 import { EmblemCorner } from '../parts/emblem';
 import PhotoAndName from '../parts/photo-and-name';
-import { PlaceCircle } from '../parts/place';
-import { Badge, TimeText, type BadgeSpec, type TimeSpec } from '../parts/result-text';
-import StylePlate, { type StylePlateSpec } from '../parts/style-plate';
+import { PlaceCircle } from '../../print/parts/place';
+import { Badge, TimeText, type BadgeSpec, type TimeSpec } from '../../print/parts/result-text';
+import StylePlate, { type StylePlateSpec } from '../../print/parts/style-plate';
 import TopBlock from '../parts/top-block';
 
 // Раскладка B (макет `CoverB2.dc.html`): верх как у A; панель результата на половину ширины
@@ -32,7 +32,7 @@ export default function CoverB({ data, options }: { data: CoverData; options: Co
           }}
         >
           <PlaceCircle place={data.place} size="medal-80" />
-          <StylePlate data={data} spec={PLATE} />
+          <StylePlate styleName={data.styleName} distanceLabel={data.distanceLabel} spec={PLATE} />
           <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: PANEL.textGap }}>
             <TimeText text={data.timeText} spec={TIME} />
             <Badge text={data.badge} spec={BADGE} />

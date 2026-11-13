@@ -1,20 +1,24 @@
 import React from 'react';
-import type { CoverLayout } from '../cover-data';
 
-const LAYOUTS: { key: CoverLayout; hint: string }[] = [
-  { key: 'A', hint: 'Result as one big line' },
-  { key: 'B', hint: 'Result on the left, photo on the right' },
-  { key: 'C', hint: 'Competition column, result stacked' },
-];
+export interface LayoutChoice<K extends string> {
+  key: K;
+  hint: string;
+}
 
 const ON: React.CSSProperties = { borderColor: 'var(--t-accent)', background: 'var(--t-accent-soft)', color: 'var(--t-accent)' };
 const OFF: React.CSSProperties = { borderColor: 'var(--t-border)', background: 'transparent', color: 'var(--t-text-2)' };
 
-/** Выбор раскладки обложки: три кнопки-переключателя; подпись под буквой — только с 640px. */
-export default function LayoutPicker({ value, onChange }: { value: CoverLayout; onChange: (layout: CoverLayout) => void }) {
+/** Выбор раскладки: кнопки-переключатели; подпись под буквой — только с 640px. */
+export default function LayoutPicker<K extends string>({ label, choices, value, onChange }: {
+  /** Подпись группы для скринридера (`Cover layout`, `Poster layout`). */
+  label: string;
+  choices: LayoutChoice<K>[];
+  value: K;
+  onChange: (layout: K) => void;
+}) {
   return (
-    <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Cover layout">
-      {LAYOUTS.map((l) => (
+    <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={label}>
+      {choices.map((l) => (
         <button
           key={l.key}
           type="button"

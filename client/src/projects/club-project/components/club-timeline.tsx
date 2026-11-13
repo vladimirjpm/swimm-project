@@ -1,4 +1,5 @@
 import React from 'react';
+import { UI_SeasonKindIcon } from '../../components/mix/season-icon/season-icon';
 import type { ClubTimelineItem } from '../../../hooks/useClubOverview';
 import { routes } from '../../../utils/routes';
 import UI_ClubPointsUnofficialChip from '../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
@@ -13,8 +14,6 @@ import UI_CompetitionName from '../../components/mix/competition-name/competitio
 interface Props {
   timeline: ClubTimelineItem[];
 }
-
-const KIND_ICON: Record<string, string> = { winter: '❄', summer: '☀', openwater: '🌊' };
 
 const KIND_STYLE: Record<string, { bg: string; border: string; fg: string }> = {
   winter: { bg: 'var(--deep-accent-chip)', border: 'var(--deep-accent-border)', fg: 'var(--deep-accent)' },
@@ -71,7 +70,7 @@ function ClubTimeline({ timeline }: Props) {
                           color: style?.fg ?? 'var(--deep-text-mute)',
                         }}
                       >
-                        {KIND_ICON[item.kind] ?? ''} {item.group_name ?? ''}
+                        <UI_SeasonKindIcon kind={item.kind} /> {item.group_name ?? ''}
                       </span>
                     )}
                     <a

@@ -13,7 +13,7 @@ export interface FitSize {
  * а настоящие названия, время на 1500 м и `NATIONAL RECORD` длиннее.
  *
  * Кегль ставится в DOM напрямую, а не состоянием: это замер вёрстки, лишний рендер ему не
- * нужен. Обложка появляется только после загрузки шрифтов (`ensureCoverFonts`), поэтому замер
+ * нужен. Картинка появляется только после загрузки шрифтов (`ensurePrintFonts`), поэтому замер
  * идёт настоящим шрифтом.
  */
 export default function FitText({ text, size, wrap = false, dir, className, style }: {

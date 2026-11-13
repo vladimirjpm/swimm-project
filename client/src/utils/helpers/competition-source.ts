@@ -3,6 +3,9 @@
 
 import CategoryHelper from './category-helper';
 
+// Правило «плитка содержательна» живёт в модуле без исполняемых импортов (ради юнит-теста).
+export { hasTileContent } from './competition-tile-content';
+
 // Элемент /api/competitions: событие (свёрнуто в одну запись) или однодневное соревнование.
 export type CompetitionSource = {
   kind: 'event' | 'competition';
@@ -73,8 +76,11 @@ export type CompetitionTileData = {
   letter: string;
   /** Возрастная лента: '8-11' | '11-14'; null — ленты нет. */
   ageGroup: string | null;
-  /** '❄️' зима / '☀️' лето; null — сезон не определён. */
-  season: '❄️' | '☀️' | null;
+  /**
+   * Сезон: зима или лето; null — не определён. Ключ, а не эмодзи: значок рисует плитка
+   * (рисунки календаря), слово для плаката — `posterSeasonLabel`.
+   */
+  season: 'winter' | 'summer' | null;
   /** Тип соревнования = чемпионат → кубок в полосе. */
   isChampionship: boolean;
 };
@@ -128,13 +134,13 @@ export function competitionTileData(src: CompetitionTileSource | undefined | nul
   const category = src?.category ?? null;
 
   let season: CompetitionTileData['season'] = null;
-  if (WINTER_RX.test(name)) season = '❄️';
-  else if (SUMMER_RX.test(name)) season = '☀️';
+  if (WINTER_RX.test(name)) season = 'winter';
+  else if (SUMMER_RX.test(name)) season = 'summer';
   else {
     const d = src ? parseDate(src.date) : null;
     if (d) {
       const m = d.getMonth() + 1; // 1..12
-      season = m >= 11 || m <= 3 ? '❄️' : '☀️';
+      season = m >= 11 || m <= 3 ? 'winter' : 'summer';
     }
   }
 

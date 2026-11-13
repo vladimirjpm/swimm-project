@@ -1,36 +1,26 @@
 // Данные обложки YouTube: ЧТО на ней напечатано. Чистые функции без React и без обращений к
 // приложению (импорты — только типы), поэтому проверяются юнит-тестом `cover-data.test.mjs`.
-// Откуда берутся входы (медаль, метки, плитка) — `cover-source.ts`; как это нарисовано —
-// `layouts/` и `parts/`.
+// Откуда берутся входы (медаль, метка, значок, плитка) — `cover-source.ts`; как это
+// нарисовано — `layouts/` и `parts/`. Общее с плакатом (значок или кубок, одна метка,
+// дистанция) — `print/print-data.ts`.
 
 import type { CompetitionTileData } from '../../../utils/helpers/competition-source';
+import type { PrintEmblem, PrintMark, PrintPlace, PrintRecordKind } from '../print/print-data';
 
 export type CoverLayout = 'A' | 'B' | 'C';
-
-/** Что стоит на месте значка соревнования. */
-export type CoverEmblem =
-  | { kind: 'image'; url: string }
-  | { kind: 'cup' }
-  | { kind: 'empty' };
-
-/** Место на обложке: число как в протоколе и отдельно — вручали ли за него медаль. */
-export interface CoverPlace {
-  value: number;
-  medal: boolean;
-}
 
 /** Всё, что обложка печатает. */
 export interface CoverData {
   competitionName: string;
   tile: CompetitionTileData;
-  emblem: CoverEmblem;
+  emblem: PrintEmblem;
   /** День заплыва: `5 NOV`. */
   dayLabel: string;
   /** Дни соревнования: `5–6 NOV`; у однодневного совпадает с `dayLabel`. */
   rangeLabel: string;
   year: string;
   /** null — места нет (DNS / DQ). */
-  place: CoverPlace | null;
+  place: PrintPlace | null;
   styleName: string;
   /** `100m`; у эстафеты — как в протоколе (`4X50`). */
   distanceLabel: string;
@@ -51,22 +41,12 @@ export interface CoverOptions {
   photo: string | null;
 }
 
-/** Вид рекорда — те же ключи, что у `UI_RecordBadge` (`RecordKind`). */
-export type CoverRecordKind = 'world' | 'national' | 'age' | 'masters';
-
-/** Метки достижений заплыва, уже посчитанные общим `swimMarks` (у `Under review` все пустые, Р76). */
-export interface CoverMarks {
-  record: { kind: CoverRecordKind } | null;
-  sb: boolean;
-  pb: boolean;
-}
-
 /** Входы обложки: поля заплыва и то, что о нём уже решили общие правила продукта. */
 export interface CoverSource {
   competitionName: string;
   tile: CompetitionTileData;
-  emblemUrl: string | null;
-  isChampionship: boolean;
+  /** Значок серии, кубок или пусто — `printEmblem`. */
+  emblem: PrintEmblem;
   /** День заплыва, yyyy-MM-dd. */
   date: string;
   /** Первый и последний день соревнования, yyyy-MM-dd. */
@@ -76,11 +56,13 @@ export interface CoverSource {
   /** Медаль вручали (`isMedal`) — место ≠ медаль. */
   medal: boolean;
   styleName: string;
-  distance: string;
+  /** Дистанция, готовая к печати, — `printDistance`. */
+  distanceLabel: string;
   time: string;
   /** Пометка протокола вместо времени (DNS / DQ); null — время есть. */
   failLabel: string | null;
-  marks: CoverMarks;
+  /** Одна метка заплыва — `topMark` (у `Under review` её нет, Р76). */
+  mark: PrintMark | null;
   swimmerName: string;
   clubName: string | null;
 }
@@ -102,47 +84,33 @@ export function coverRange(fromIso: string, toIso: string): string {
 }
 
 /** Метка словами: в сетке YouTube сокращение `REC·AGE` не читается. */
-const RECORD_LABEL: Record<CoverRecordKind, string> = {
+const RECORD_LABEL: Record<PrintRecordKind, string> = {
   world: 'WORLD RECORD',
   national: 'NATIONAL RECORD',
   age: 'AGE RECORD',
   masters: 'MASTERS RECORD',
 };
 
-/** Одна метка на обложку, приоритет общий для продукта: рекорд > SB > PB. */
-export function coverBadge(marks: CoverMarks): string | null {
-  if (marks.record) return RECORD_LABEL[marks.record.kind];
-  if (marks.sb) return 'SEASON BEST';
-  return marks.pb ? 'PERSONAL BEST' : null;
-}
-
-/**
- * Что на месте значка (решение Влада 12.11.2026): есть значок серии — значок; значка нет, но
- * соревнование — чемпионат — кубок; иначе пусто (место при этом остаётся — это дело вёрстки).
- */
-export function coverEmblem(emblemUrl: string | null, isChampionship: boolean): CoverEmblem {
-  if (emblemUrl) return { kind: 'image', url: emblemUrl };
-  return isChampionship ? { kind: 'cup' } : { kind: 'empty' };
-}
-
-/** `100` → `100m`; дистанцию эстафеты (`4X50`) печатаем как в протоколе. */
-export function coverDistance(distance: string): string {
-  return /^\d+$/.test(distance) ? `${distance}m` : distance;
+/** Подпись метки обложки. */
+export function coverBadge(mark: PrintMark | null): string | null {
+  if (!mark) return null;
+  if (mark.kind === 'record') return RECORD_LABEL[mark.record];
+  return mark.kind === 'sb' ? 'SEASON BEST' : 'PERSONAL BEST';
 }
 
 export function buildCoverData(src: CoverSource): CoverData {
   return {
     competitionName: src.competitionName,
     tile: src.tile,
-    emblem: coverEmblem(src.emblemUrl, src.isChampionship),
+    emblem: src.emblem,
     dayLabel: coverDay(src.date),
     rangeLabel: coverRange(src.firstDay, src.lastDay),
     year: src.date.slice(0, 4),
     place: src.place == null ? null : { value: src.place, medal: src.medal },
     styleName: src.styleName,
-    distanceLabel: coverDistance(src.distance),
+    distanceLabel: src.distanceLabel,
     timeText: src.failLabel ?? src.time,
-    badge: coverBadge(src.marks),
+    badge: coverBadge(src.mark),
     swimmerName: src.swimmerName,
     clubName: src.clubName || null,
   };
