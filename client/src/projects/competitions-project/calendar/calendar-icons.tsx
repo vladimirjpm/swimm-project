@@ -91,25 +91,8 @@ export function IconLotus(props: IconProps) {
   );
 }
 
-/** Зима — снежинка (иконка сезона на бейдже группы). */
-export function IconSnowflake(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9" />
-      <path d="m9.5 4.5 2.5 2 2.5-2M9.5 19.5l2.5-2 2.5 2" />
-    </Svg>
-  );
-}
-
-/** Лето — солнце: круг и восемь лучей. */
-export function IconSun(props: IconProps) {
-  return (
-    <Svg {...props}>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" />
-    </Svg>
-  );
-}
+// Снежинка и солнце сезона — общий `UI_SeasonIcon` (`components/mix/season-icon`), не здесь:
+// один набор на весь проект (решение Влада 13.11.2026).
 
 /**
  * Кубок — ЗАЛИТЫЙ (в 6–9px контур не читается): чаша с ручками, ножка и основание.

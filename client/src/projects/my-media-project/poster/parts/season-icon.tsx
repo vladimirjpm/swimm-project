@@ -1,19 +1,19 @@
 import React from 'react';
-import { IconSnowflake, IconSun } from '../../../competitions-project/calendar/calendar-icons';
+import UI_SeasonIcon, { isSeason } from '../../../components/mix/season-icon/season-icon';
 import { POSTER_COLOR } from '../poster-theme';
 
 /**
- * Крупный значок сезона рядом с годом (раскладка C) — те же рисунки календаря, что стоят на
- * месте несодержательной плитки соревнования (`CompetitionTile`): один набор на все места.
- * Сезон неизвестен — ничего.
+ * Крупный значок сезона рядом с годом (раскладка C): общий `UI_SeasonIcon` в цветах макета —
+ * зима светло-голубым, лето золотом. Сезон неизвестен — ничего.
  */
 export default function SeasonIcon({ season, size, style }: { season: string | null; size: number; style?: React.CSSProperties }) {
-  if (!season) return null;
-  const winter = season === 'winter';
-  const Icon = winter ? IconSnowflake : IconSun;
+  if (!isSeason(season)) return null;
   return (
-    <span role="img" aria-label={winter ? 'Winter season' : 'Summer season'} style={{ display: 'flex', color: winter ? POSTER_COLOR.sky : POSTER_COLOR.gold, ...style }}>
-      <Icon size={size} />
-    </span>
+    <UI_SeasonIcon
+      season={season}
+      size={size}
+      label={season === 'winter' ? 'Winter season' : 'Summer season'}
+      style={{ color: season === 'winter' ? POSTER_COLOR.sky : POSTER_COLOR.gold, ...style }}
+    />
   );
 }

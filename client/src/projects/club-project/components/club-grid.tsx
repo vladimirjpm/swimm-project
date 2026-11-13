@@ -1,4 +1,5 @@
 ﻿import React from 'react';
+import UI_SeasonIcon from '../../components/mix/season-icon/season-icon';
 import type { ClubGridCell, ClubGridYear } from '../../../hooks/useClubOverview';
 import { groupAgeRange } from './club-groups';
 
@@ -89,7 +90,7 @@ function ClubGrid({ grid, currentSeason, onPickStanding, selectedCompetitionId }
                         и ранги ❄/☀ читаются столбиком. */}
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <StandingLine
-                      icon="❄"
+                      icon={<UI_SeasonIcon season="winter" />}
                       kind="winter"
                       cell={row.winter}
                       dim={year.season !== brightest}
@@ -97,7 +98,7 @@ function ClubGrid({ grid, currentSeason, onPickStanding, selectedCompetitionId }
                       onPick={onPickStanding}
                     />
                     <StandingLine
-                      icon="☀"
+                      icon={<UI_SeasonIcon season="summer" />}
                       kind="summer"
                       cell={row.summer}
                       dim={year.season !== brightest}
@@ -132,7 +133,7 @@ function StandingLine({
   selected,
   onPick,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   kind: 'winter' | 'summer' | 'ow';
   cell: ClubGridCell | null;
   dim: boolean;

@@ -1,4 +1,5 @@
 ﻿import React from 'react';
+import { UI_SeasonKindIcon } from '../../components/mix/season-icon/season-icon';
 import type { ClubStandingsTable } from '../../../hooks/useClubOverview';
 import { routes } from '../../../utils/routes';
 import { seasonLabel } from '../../../utils/helpers/season-helper';
@@ -19,8 +20,6 @@ interface Props {
   standings: ClubStandingsTable | null;
 }
 
-const KIND_ICON: Record<string, string> = { winter: '❄', summer: '☀', openwater: '🌊' };
-
 function ClubStandings({ standings }: Props) {
   if (!standings) {
     return (
@@ -32,8 +31,6 @@ function ClubStandings({ standings }: Props) {
       </section>
     );
   }
-
-  const icon = standings.kind ? KIND_ICON[standings.kind] ?? '' : '';
 
   return (
     <section className="deep-card h-full">
@@ -58,7 +55,7 @@ function ClubStandings({ standings }: Props) {
         />
       </a>
       <div className="deep-card-sub mt-0.5">
-        {icon && `${icon} · `}
+        {standings.kind && <><UI_SeasonKindIcon kind={standings.kind} /> · </>}
         {standings.group_name ?? 'All groups'} · {seasonLabel(standings.season)} · {standings.date} ·{' '}
         {standings.club_count} clubs
       </div>

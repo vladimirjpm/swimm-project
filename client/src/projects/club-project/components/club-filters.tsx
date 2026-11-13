@@ -1,4 +1,5 @@
 import React from 'react';
+import UI_SeasonIcon from '../../components/mix/season-icon/season-icon';
 import type { ClubGroupTile } from '../../../hooks/useClubOverview';
 import { groupAgeRange } from './club-groups';
 
@@ -93,8 +94,8 @@ function GroupTile({
       </div>
       {/* Ряд рангов выровнен по тексту, а не по медальону: отступ = ширина медальона (32) + gap (8). */}
       <div className="mt-2 ml-10 flex gap-3 text-[11px] font-bold">
-        <RankHint icon="❄" rank={tile.winter_rank} />
-        <RankHint icon="☀" rank={tile.summer_rank} />
+        <RankHint icon={<UI_SeasonIcon season="winter" />} rank={tile.winter_rank} />
+        <RankHint icon={<UI_SeasonIcon season="summer" />} rank={tile.summer_rank} />
         <RankHint icon="🌊" rank={tile.open_water_rank} />
       </div>
     </button>
@@ -102,7 +103,7 @@ function GroupTile({
 }
 
 /** Ранг подписывается всегда: сравнивать между соревнованиями можно только его, не очки. */
-function RankHint({ icon, rank }: { icon: string; rank: number | null }) {
+function RankHint({ icon, rank }: { icon: React.ReactNode; rank: number | null }) {
   if (rank == null) return null;
   return (
     <span style={{ color: rank === 1 ? 'var(--deep-gold)' : 'var(--deep-text-mute)' }}>

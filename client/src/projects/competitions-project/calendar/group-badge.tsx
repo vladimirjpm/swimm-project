@@ -1,5 +1,6 @@
 import React from 'react';
-import { IconSnowflake, IconSun, IconTrophy } from './calendar-icons';
+import UI_SeasonIcon, { isSeason } from '../../components/mix/season-icon/season-icon';
+import { IconTrophy } from './calendar-icons';
 import type { CalendarGroup } from './calendar-types';
 
 /*
@@ -36,7 +37,6 @@ export function groupBadgeLabel(group: CalendarGroup): string {
 function GroupBadge({ group, size, className }: GroupBadgeProps) {
   const d = DIMS[size];
   const bare = size === 'dot';
-  const SeasonIcon = group.season === 'winter' ? IconSnowflake : group.season === 'summer' ? IconSun : null;
 
   return (
     <span
@@ -49,7 +49,7 @@ function GroupBadge({ group, size, className }: GroupBadgeProps) {
         className="flex items-center justify-between bg-[var(--t-plate)] text-[var(--t-badge-ink)]"
         style={{ height: d.top, padding: `0 ${d.padX}px` }}
       >
-        {!bare && (SeasonIcon ? <SeasonIcon size={d.icon} /> : <span />)}
+        {!bare && (isSeason(group.season) ? <UI_SeasonIcon season={group.season} size={d.icon} /> : <span />)}
         {!bare && <IconTrophy size={d.icon} />}
       </span>
       <span
