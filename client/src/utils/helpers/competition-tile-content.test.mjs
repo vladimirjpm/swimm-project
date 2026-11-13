@@ -14,7 +14,7 @@ test('есть буква категории или возрастная гру�
 
 test('только значок сезона и/или кубок — плитку не показываем', () => {
   assert.equal(hasTileContent(tile()), false);
-  assert.equal(hasTileContent(tile({ season: '❄️' })), false);
+  assert.equal(hasTileContent(tile({ season: 'winter' })), false);
   assert.equal(hasTileContent(tile({ isChampionship: true })), false);
-  assert.equal(hasTileContent(tile({ season: '☀️', isChampionship: true })), false);
+  assert.equal(hasTileContent(tile({ season: 'summer', isChampionship: true })), false);
 });

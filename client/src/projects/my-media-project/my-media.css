@@ -42,6 +42,7 @@
   --theme-comp-tile-border: var(--t-accent-border);
   --theme-comp-tile-letter: var(--t-text);
   --theme-comp-tile-strip-bg: var(--t-surface2);
+  --theme-comp-tile-strip-text: var(--t-accent);
   --theme-comp-tile-age-bg: var(--t-surface2);
   --theme-comp-tile-age-text: var(--t-accent);
 }

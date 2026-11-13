@@ -14,7 +14,7 @@ const swim = (over = {}) => ({
 
 const source = (swims) => ({
   competitionName: 'אליפות אילת הפתוחה',
-  tile: { letter: 'K', ageGroup: '8-11', season: '❄️', isChampionship: false },
+  tile: { letter: 'K', ageGroup: '8-11', season: 'winter', isChampionship: false },
   emblem: { kind: 'empty' },
   firstDay: '2026-11-05',
   swimmerName: 'ברנצב סבינה',
@@ -38,8 +38,8 @@ test('метка: коротко и словами', () => {
 });
 
 test('строка сезона и возраста', () => {
-  assert.equal(posterSeasonLabel('❄️', '2026'), 'חורף 2026');
-  assert.equal(posterSeasonLabel('☀️', '2026'), 'קיץ 2026');
+  assert.equal(posterSeasonLabel('winter', '2026'), 'חורף 2026');
+  assert.equal(posterSeasonLabel('summer', '2026'), 'קיץ 2026');
   assert.equal(posterSeasonLabel(null, '2026'), '2026');
   assert.equal(posterAgeLabel('8-11'), 'גילאי 8-11');
   assert.equal(posterAgeLabel(null), null);

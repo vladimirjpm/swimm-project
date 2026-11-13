@@ -11,7 +11,7 @@ import {
 
 const source = (over = {}) => ({
   competitionName: 'אליפות אילת הפתוחה',
-  tile: { letter: 'K', ageGroup: '8-11', season: '❄️', isChampionship: false },
+  tile: { letter: 'K', ageGroup: '8-11', season: 'winter', isChampionship: false },
   emblem: { kind: 'empty' },
   date: '2026-11-05',
   firstDay: '2026-11-05',

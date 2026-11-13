@@ -24,7 +24,15 @@
   line-height: 1;
   background: var(--theme-comp-tile-strip-bg);
 }
-.comp-tile__season { font-size: 12px; }   /* ❄️ зима / ☀️ лето */
+/* Сезон — рисунок (снежинка / солнце), размером от кегля слота: ступени плитки по-прежнему
+   задают только font-size. Цвет — парный полосе токен --theme-comp-tile-strip-text. */
+.comp-tile__season {
+  display: flex;
+  font-size: 12px;
+  color: var(--theme-comp-tile-strip-text);
+}
+.comp-tile__season--summer { color: var(--theme-comp-tile-strip-summer, var(--theme-comp-tile-strip-text)); }
+.comp-tile__season svg { width: 1.3em; height: 1.3em; }
 .comp-tile__cup    { font-size: 20px; }   /* 🏆 только если чемпионат */
 
 .comp-tile__letter {         /* центр: K (детские ступени) / M (masters) */

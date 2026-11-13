@@ -108,7 +108,7 @@ export function posterBadge(mark: PrintMark | null): PosterBadge | null {
 }
 
 /** Сезон плитки соревнования → слово строки сезона (иврит, как в макете). */
-const SEASON_WORD: Record<string, string> = { '❄️': 'חורף', '☀️': 'קיץ' };
+const SEASON_WORD: Record<string, string> = { winter: 'חורף', summer: 'קיץ' };
 
 /** `חורף 2026`: сезон по тому же правилу, что значок плитки, и год соревнования. */
 export function posterSeasonLabel(season: string | null, year: string): string {

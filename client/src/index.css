@@ -163,6 +163,8 @@
   --theme-comp-tile-border: color-mix(in srgb, var(--theme-mode-accent-text) 35%, transparent);
   --theme-comp-tile-letter: var(--theme-mode-accent-text);
   --theme-comp-tile-strip-bg: color-mix(in srgb, var(--theme-mode-surface) 92%, transparent);
+  /* Рисунок сезона в полосе — пара к strip-bg (светлая полоса → акцент). */
+  --theme-comp-tile-strip-text: var(--theme-primary);
   --theme-comp-tile-age-bg: var(--theme-mode-surface);
   --theme-comp-tile-age-text: var(--theme-primary);
   /* Полоса Combine All Results под табами (design_handoff_competition_overview_combine, 12b):
@@ -256,6 +258,8 @@
   --theme-comp-tile-border: color-mix(in srgb, var(--theme-mode-accent-text) 40%, transparent);
   --theme-comp-tile-letter: var(--theme-mode-accent-text);
   --theme-comp-tile-strip-bg: color-mix(in srgb, var(--theme-mode-accent-text) 14%, transparent);
+  /* В dark полоса — затемнённый primary: рисунок сезона светлый, как буква. */
+  --theme-comp-tile-strip-text: var(--theme-mode-accent-text);
   /* Лента возраста — почти сплошная светлая подложка + primary-текст: полупрозрачная
      заливка поверх primary давала белым по средне-синему всего ~3.4:1. */
   --theme-comp-tile-age-bg: color-mix(in srgb, var(--theme-mode-accent-text) 88%, transparent);
