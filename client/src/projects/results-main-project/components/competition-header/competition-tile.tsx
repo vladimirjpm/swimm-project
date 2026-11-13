@@ -1,19 +1,18 @@
 import React from 'react';
 import { hasTileContent, type CompetitionTileData } from '../../../../utils/helpers/competition-source';
 import UI_SeasonIcon from '../../../components/mix/season-icon/season-icon';
-import { IconTrophy } from '../../../competitions-project/calendar/calendar-icons';
 import './competition-tile.css';
 
 // Плитка соревнования (design_handoff_competition_overview3, вариант 11c):
 // полоса значков (сезон + кубок) · буква группы (K/M) · лента возрастной группы.
-// Сезон в полосе — рисунок, общий `UI_SeasonIcon` («сделай нашу снежинку», Влад 13.11.2026);
-// размер и цвет ему задаёт CSS плитки. Кубок — эмодзи.
+// Сезон в полосе — эмодзи ❄️ / ☀️ через общий `UI_SeasonIcon` (окончательное решение Влада
+// 13.11.2026), кубок — эмодзи 🏆; кегль им задаёт CSS плитки.
 // Каждый слот скрывается отдельно, если данных нет; без возраста — модификатор --no-age.
 //
 // Несодержательная плитка — без буквы категории и без возрастной группы (`hasTileContent`) —
 // рамкой не рисуется: на её месте, в том же габарите, стоит значок сезона (решение Влада
 // 13.11.2026: «вместо него поставь иконку зимы или лета»). Так бывает у соревнования без
-// канонической категории. Значок — общий `UI_SeasonIcon`, не эмодзи.
+// канонической категории. Значок — общий `UI_SeasonIcon` (эмодзи).
 
 interface Props extends CompetitionTileData {
   /** 'responsive' — полный габарит, ниже 640px сам ужимается до xs (шапка соревнования).
@@ -46,11 +45,10 @@ function SeasonMark({ season, isChampionship, sizeClass }: {
   sizeClass: string;
 }) {
   if (!season && !isChampionship) return null;
-  const tone = season ? `comp-tile--${season}` : '';
   return (
-    <span className={['comp-tile', 'comp-tile--bare', sizeClass, tone].filter(Boolean).join(' ')} aria-hidden="true">
+    <span className={['comp-tile', 'comp-tile--bare', sizeClass].filter(Boolean).join(' ')} aria-hidden="true">
       {season && <UI_SeasonIcon season={season} className="comp-tile__mark" />}
-      {isChampionship && <IconTrophy className="comp-tile__mark-cup" />}
+      {isChampionship && <span className="comp-tile__mark-cup">🏆</span>}
     </span>
   );
 }
@@ -73,9 +71,7 @@ export default function CompetitionTile({
       {(season || isChampionship) && (
         <span className="comp-tile__icons">
           {season && (
-            <span className={`comp-tile__season comp-tile__season--${season}`}>
-              <UI_SeasonIcon season={season} />
-            </span>
+            <span className="comp-tile__season"><UI_SeasonIcon season={season} /></span>
           )}
           {isChampionship && <span className="comp-tile__cup">🏆</span>}
         </span>

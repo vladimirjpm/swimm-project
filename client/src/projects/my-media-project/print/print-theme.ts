@@ -35,15 +35,8 @@ const ROOT_TOKENS = {
   '--theme-comp-tile-border': '#8fb4ee',
   '--theme-comp-tile-letter': '#0048b8',
   '--theme-comp-tile-strip-bg': '#ffffff',
-  // Рисунок сезона в белой полосе плитки: снежинка — синим макета, солнце — золотом.
-  '--theme-comp-tile-strip-text': '#3b82c4',
-  '--theme-comp-tile-strip-summer': '#e09a1a',
   '--theme-comp-tile-age-bg': '#ffffff',
   '--theme-comp-tile-age-text': '#00265e',
-  // Значок сезона на месте несодержательной плитки и кубок под ним.
-  '--theme-comp-tile-winter': PRINT_COLOR.sky,
-  '--theme-comp-tile-summer': PRINT_COLOR.gold,
-  '--theme-comp-tile-cup': '#f2b632',
   // `UI_MedalIcon` без медали печатает номер цветом текста поверхности — здесь она тёмная.
   '--theme-mode-text': '#ffffff',
   // `UI_ClubLogo`: белый круг под логотипом, инициалы тёмным.

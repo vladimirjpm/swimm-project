@@ -24,15 +24,7 @@
   line-height: 1;
   background: var(--theme-comp-tile-strip-bg);
 }
-/* Сезон — рисунок (снежинка / солнце), размером от кегля слота: ступени плитки по-прежнему
-   задают только font-size. Цвет — парный полосе токен --theme-comp-tile-strip-text. */
-.comp-tile__season {
-  display: flex;
-  font-size: 12px;
-  color: var(--theme-comp-tile-strip-text);
-}
-.comp-tile__season--summer { color: var(--theme-comp-tile-strip-summer, var(--theme-comp-tile-strip-text)); }
-.comp-tile__season svg { width: 1.3em; height: 1.3em; }
+.comp-tile__season { font-size: 12px; }   /* ❄️ зима / ☀️ лето — эмодзи, общий UI_SeasonIcon */
 .comp-tile__cup    { font-size: 20px; }   /* 🏆 только если чемпионат */
 
 .comp-tile__letter {         /* центр: K (детские ступени) / M (masters) */
@@ -140,25 +132,18 @@
 }
 
 /* Несодержательная плитка (нет ни буквы категории, ни возрастной группы): рамки и подложки
-   нет, на месте плитки — в её габарите — значок сезона, у чемпионата под ним кубок
-   (решение Влада 13.11.2026). Цвет — роль буквы плитки; картинки My media (обложка, плакат)
-   задают сезону и кубку свои цвета токенами --theme-comp-tile-winter / -summer / -cup. */
+   нет, на месте плитки — в её габарите — значок сезона (эмодзи), у чемпионата под ним кубок
+   (решения Влада 13.11.2026). Кегль эмодзи считается от ширины плитки (cqw), поэтому значок
+   сам подстраивается под каждую ступень размера. */
 .comp-tile--bare {
   border-color: transparent;
   background: none;
   align-items: center;
   justify-content: center;
-  gap: 6%;
-  color: var(--theme-comp-tile-letter);
+  gap: 4%;
+  container-type: size;
 }
-.comp-tile--bare.comp-tile--winter { color: var(--theme-comp-tile-winter, var(--theme-comp-tile-letter)); }
-.comp-tile--bare.comp-tile--summer { color: var(--theme-comp-tile-summer, var(--theme-comp-tile-letter)); }
-.comp-tile--bare .comp-tile__mark { width: 78%; height: auto; flex: none; }
-.comp-tile--bare .comp-tile__mark-cup {
-  width: 42%;
-  height: auto;
-  flex: none;
-  color: var(--theme-comp-tile-cup, var(--theme-comp-tile-letter));
-}
+.comp-tile--bare .comp-tile__mark { font-size: 64cqw; }
+.comp-tile--bare .comp-tile__mark-cup { font-size: 34cqw; line-height: 1; }
 /* С кубком значок сезона меньше — оба помещаются в габарит плитки. */
-.comp-tile--bare .comp-tile__mark:not(:last-child) { width: 56%; }
+.comp-tile--bare .comp-tile__mark:not(:last-child) { font-size: 46cqw; }
