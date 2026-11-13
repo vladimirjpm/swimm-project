@@ -19,7 +19,7 @@ import SeasonIcon from '../parts/season-icon';
 // пяти результатов — вторая лента (фото становится ниже). Без фото результаты занимают всё
 // освободившееся место крупной сеткой.
 
-const HEAD = { year: { top: 48, size: 150 }, season: { left: 510, top: 52, size: 140 } } as const;
+const HEAD = { year: { top: 48, size: 150 }, season: { left: 500, top: 26, size: 140 } } as const;
 const NAME = { logo: { left: 32, top: 265, size: 196 }, left: 254, top: 262, size: { max: 196, min: 110 } } as const;
 const STRIP = { top: 492, height: 216, side: 36, gap: 36, radius: 36, textGap: 10, name: { max: 72, min: 46 }, season: 46, emblem: 196 } as const;
 /** Низ плаката под полосой: фото и лента результатов. */

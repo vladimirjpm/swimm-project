@@ -29,6 +29,14 @@ export const PRINT_COLOR = {
   photoFrame: '#9cc3e8',
 } as const;
 
+/**
+ * Во сколько раз значок сезона (❄️ / ☀️) на обложке и плакате крупнее обычного (правка Влада
+ * 13.11.2026: «на всех коверах и постерах увелич снежинку на 50%»). Одно число на оба случая:
+ * значок на месте несодержательной плитки (`--comp-tile-mark-scale`) и отдельный значок сезона
+ * плаката C. На сайте значок не меняется; сезон в полосе содержательной плитки — тоже.
+ */
+export const PRINT_SEASON_SCALE = 1.5;
+
 /** Токены готовых компонентов — постоянные: картинка не зависит от темы страницы. */
 const ROOT_TOKENS = {
   '--theme-comp-tile-bg': '#d3e3ff',
@@ -37,6 +45,7 @@ const ROOT_TOKENS = {
   '--theme-comp-tile-strip-bg': '#ffffff',
   '--theme-comp-tile-age-bg': '#ffffff',
   '--theme-comp-tile-age-text': '#00265e',
+  '--comp-tile-mark-scale': PRINT_SEASON_SCALE,
   // `UI_MedalIcon` без медали печатает номер цветом текста поверхности — здесь она тёмная.
   '--theme-mode-text': '#ffffff',
   // `UI_ClubLogo`: белый круг под логотипом, инициалы тёмным.

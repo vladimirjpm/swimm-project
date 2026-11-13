@@ -134,7 +134,9 @@
 /* Несодержательная плитка (нет ни буквы категории, ни возрастной группы): рамки и подложки
    нет, на месте плитки — в её габарите — значок сезона (эмодзи), у чемпионата под ним кубок
    (решения Влада 13.11.2026). Кегль эмодзи считается от ширины плитки (cqw), поэтому значок
-   сам подстраивается под каждую ступень размера. */
+   сам подстраивается под каждую ступень размера. Множитель --comp-tile-mark-scale (по умолчанию 1)
+   задают картинки My media: на обложке и плакате значок сезона крупнее и может выступать за
+   габарит плитки — поэтому overflow здесь видимый. */
 .comp-tile--bare {
   border-color: transparent;
   background: none;
@@ -142,8 +144,9 @@
   justify-content: center;
   gap: 4%;
   container-type: size;
+  overflow: visible;
 }
-.comp-tile--bare .comp-tile__mark { font-size: 64cqw; }
+.comp-tile--bare .comp-tile__mark { font-size: calc(64cqw * var(--comp-tile-mark-scale, 1)); white-space: nowrap; }
 .comp-tile--bare .comp-tile__mark-cup { font-size: 34cqw; line-height: 1; }
 /* С кубком значок сезона меньше — оба помещаются в габарит плитки. */
-.comp-tile--bare .comp-tile__mark:not(:last-child) { font-size: 46cqw; }
+.comp-tile--bare .comp-tile__mark:not(:last-child) { font-size: calc(46cqw * var(--comp-tile-mark-scale, 1)); }
