@@ -41,8 +41,14 @@ function statusInfo(status: LanePlanStatus | null): { text: string; color: strin
 }
 
 function GroupLanes({
-  groupId, manages, desktop, initialDate = null, onDirtyChange, onPlansChanged, onPlanShown,
+  groupId, manages, desktop, initialDate = null, embedded = false, onDirtyChange, onPlansChanged, onPlanShown,
 }: {
+  /**
+   * План ОДНОГО занятия внутри рабочего стола тренера (docs/plans/trainings-coach-flow-plan.md, CF1):
+   * дата — `initialDate`, своей навигации по датам (стрелки, поле даты) нет — занятие выбирает шапка
+   * стола. Смена занятия — новый `key` у вызывающего.
+   */
+  embedded?: boolean;
   groupId: number;
   manages: boolean;
   /** ≥960px: шапка в одну строку с тулбаром, редактор колонками. */
@@ -274,13 +280,19 @@ function GroupLanes({
    */
   const header = (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <div className="flex items-center gap-1.5">{arrows(36)}</div>
-      {dateButton('flex-none', (
-        <div className="flex items-center gap-1.5 text-[18px]" style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}>
-          <span>Lanes · {dateLabel}</span>
-          {manages && <span aria-hidden="true" className="text-[11px]" style={{ color: 'var(--deep-ow)' }}>▾</span>}
-        </div>
-      ))}
+      {embedded ? (
+        <div className="text-[18px]" style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}>Pool</div>
+      ) : (
+        <>
+          <div className="flex items-center gap-1.5">{arrows(36)}</div>
+          {dateButton('flex-none', (
+            <div className="flex items-center gap-1.5 text-[18px]" style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}>
+              <span>Lanes · {dateLabel}</span>
+              {manages && <span aria-hidden="true" className="text-[11px]" style={{ color: 'var(--deep-ow)' }}>▾</span>}
+            </div>
+          ))}
+        </>
+      )}
       <span
         className="inline-flex flex-none items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-[11px] font-extrabold"
         style={{
@@ -300,7 +312,9 @@ function GroupLanes({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       {/* Порядок кнопок: ‹ › рядом на десктопе, по краям даты на телефоне — как в прототипе. */}
-      {desktop ? header : (
+      {desktop ? header : embedded ? (
+        <div className="text-[10.5px] font-extrabold" style={{ color: status.color }}>{status.text}</div>
+      ) : (
         <div className="flex items-center gap-2">
           <PrevNext side="prev" size={40} disabled={!prevPlan} onClick={() => prevPlan && goTo(prevPlan.date)} />
           {dateButton('min-w-0 flex-1 text-center', (

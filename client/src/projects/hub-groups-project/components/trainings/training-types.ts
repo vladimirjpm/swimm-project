@@ -23,6 +23,17 @@ export const TRAINING_TYPES: TrainingTypeInfo[] = [
   { id: 'other', label: 'Other', glyph: '◦' },
 ];
 
+/**
+ * Типы, которые в форме New training видны, но не выбираются (docs/plans/trainings-coach-flow-plan.md,
+ * решение 11): поток тренера для суши и открытой воды — позже. Уже созданные тренировки этих типов
+ * и фильтр ленты не меняются.
+ */
+const DISABLED_IN_FORM: readonly TrainingType[] = ['dryland', 'open-water'];
+
+export function isTypeDisabled(type: TrainingType): boolean {
+  return DISABLED_IN_FORM.includes(type);
+}
+
 /** Обычная тренировка в воде — по умолчанию; на карточке значка не получает (иначе он на каждой). */
 export const DEFAULT_TRAINING_TYPE: TrainingType = 'swim';
 

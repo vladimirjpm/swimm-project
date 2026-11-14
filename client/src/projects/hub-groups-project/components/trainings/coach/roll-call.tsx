@@ -235,7 +235,12 @@ function RollRow({
   );
 }
 
-function RollCall({ roll, r }: { roll: TrainingRsvpState; r: TrainingRsvp }) {
+function RollCall({ roll, r, narrow = false }: {
+  roll: TrainingRsvpState;
+  r: TrainingRsvp;
+  /** Узкая колонка десктопа (рабочий стол тренера, CF1): строки в один столбец вместо двух. */
+  narrow?: boolean;
+}) {
   const { isDesktop, breaks, openSheet, setRollChangeListener } = useTrainingsTab();
   const [filter, setFilter] = useState<Filter>('all');
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -332,8 +337,8 @@ function RollCall({ roll, r }: { roll: TrainingRsvpState; r: TrainingRsvp }) {
   return (
     <div className={`flex min-w-0 flex-col ${isDesktop ? 'gap-2' : 'gap-3'}`}>
       {isDesktop ? (
-        <div className="flex items-center justify-between gap-2.5">
-          <span className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
+        <div className={`flex items-center justify-between gap-x-2.5 gap-y-1 ${narrow ? 'flex-wrap' : ''}`}>
+          <span className="flex flex-none items-center gap-2 whitespace-nowrap text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
             Roll call
             {counts.none > 0 && (
               <span
@@ -359,7 +364,7 @@ function RollCall({ roll, r }: { roll: TrainingRsvpState; r: TrainingRsvp }) {
 
       {isDesktop ? (
         <>
-          <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>{list}</div>
+          <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${narrow ? 1 : 2}, minmax(0, 1fr))` }}>{list}</div>
           <div className="text-[10.5px] font-bold" style={{ color: 'var(--t-text-3)' }}>
             Click status: — → ✓ → ? → ✕ · ⋮ for status, break, note
           </div>

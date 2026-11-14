@@ -5,7 +5,7 @@ import {
 import type { TrainingSessionInput, TrainingType } from '../../../types';
 import { todayInIsrael } from '../../lane-plans-api';
 import { useTrainingsTab } from '../trainings-context';
-import { DEFAULT_TRAINING_TYPE, TRAINING_TYPES, trainingTypeOf } from '../training-types';
+import { DEFAULT_TRAINING_TYPE, isTypeDisabled, TRAINING_TYPES, trainingTypeOf } from '../training-types';
 import type { TrainingsSheetProps } from '../trainings-sheets';
 
 /**
@@ -109,13 +109,17 @@ function TrainingFormSheet({ sheet, onClose }: {
         >
           {TRAINING_TYPES.map((t) => {
             const on = type === t.id;
+            // Отключённый тип (CF1) выбрать нельзя; у уже созданной тренировки он остаётся отмеченным.
+            const off = isTypeDisabled(t.id) && !on;
             return (
               <button
                 key={t.id}
                 type="button"
                 aria-pressed={on}
+                disabled={off}
+                title={off ? 'Not available yet' : undefined}
                 onClick={() => setType(t.id)}
-                className="inline-flex h-[36px] cursor-pointer items-center justify-center gap-1 border-0 px-1 text-[12px] font-extrabold"
+                className="inline-flex h-[36px] cursor-pointer items-center justify-center gap-1 border-0 px-1 text-[12px] font-extrabold disabled:cursor-not-allowed disabled:opacity-40"
                 style={on
                   ? { background: 'var(--deep-ow)', color: 'var(--deep-accent-ink)', borderRadius: 10 }
                   : { background: 'transparent', color: 'var(--t-text-2)', borderRadius: 10 }}

@@ -16,7 +16,7 @@ import { nextSessions } from '../next/next-format';
  *   (рамка `--deep-live-border`), строка перерыва;
  * - десктоп (3a) — ОДНА карточка: шапка, ответы сеткой, заметки + «Taking a break?», полный бассейн.
  *
- * Управляющему (`manages`) секция не показывается — у него `coach-next` (Т6).
+ * Управляющему (`manages`) секция не показывается — у него список занятий и рабочий стол (`coach-sessions` / `coach-desk`).
  */
 
 const LIVE_BORDER = { borderColor: 'var(--deep-live-border)' } as const;

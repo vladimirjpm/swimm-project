@@ -3,7 +3,7 @@ import { DEEP_DESKTOP_QUERY, useMediaQuery } from '../../../../hooks/useMediaQue
 import { readViewParam, writeViewParam } from '../../../components/deep/view-chips';
 import { useTrainingSessions, type TrainingSessionsState } from '../../use-training-sessions';
 import { useTrainingRsvp, type TrainingRsvpState } from '../../use-training-rsvp';
-import type { HubGroupDetails, LanePlan, LanePlanSummary, RsvpAnswer, RsvpNote, TrainingRsvpPerson } from '../../types';
+import type { HubGroupDetails, LanePlan, LanePlanSummary, NextTraining, RsvpAnswer, RsvpNote, TrainingRsvpPerson } from '../../types';
 import ConfirmDialog from '../../../components/confirm-dialog/confirm-dialog';
 import { lanePlansApi } from '../lane-plans-api';
 import { useGroupBreaks } from '../use-group-breaks';
@@ -46,6 +46,21 @@ export interface RollChange {
 const VIEWS: readonly TrainingsView[] = ['next', 'trainings', 'lanes'];
 const DEFAULT_VIEW: TrainingsView = 'next';
 
+/**
+ * `?session=<id>` — занятие, открытое на рабочем столе тренера (docs/plans/trainings-coach-flow-plan.md,
+ * CF1). Ключ тот же, что у ответов (`NextTraining.id`). Нет параметра — список занятий.
+ */
+const SESSION_PARAM = 'session';
+function readSessionParam(): string | null {
+  return new URLSearchParams(window.location.search).get(SESSION_PARAM) || null;
+}
+function writeSessionParam(id: string | null): void {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set(SESSION_PARAM, id);
+  else url.searchParams.delete(SESSION_PARAM);
+  window.history.replaceState(null, '', url.toString());
+}
+
 export interface TrainingsTabState {
   group: HubGroupDetails;
   /** Управляющий группой (тот же гейт, что у таба Admin). Только прячет кнопки — права у сервера. */
@@ -69,6 +84,15 @@ export interface TrainingsTabState {
   /** В редакторе Lanes есть несохранённые правки; ставит сам редактор (через секцию), Т7. */
   lanesDirty: boolean;
   setLanesDirty: (dirty: boolean) => void;
+  /**
+   * Занятие, открытое на рабочем столе тренера (`?session=<id>`, CF1 плана trainings-coach-flow);
+   * `null` — тренер видит список занятий. У участника всегда `null`.
+   */
+  deskSession: NextTraining | null;
+  /** Открыть рабочий стол занятия (кнопка Open карточки списка). */
+  openDesk: (sessionId: string) => void;
+  /** «← All trainings»: назад к списку. С несохранёнными правками плана — после «Discard?». */
+  closeDesk: () => void;
   rsvp: TrainingRsvpState | null;
   /**
    * Ответы на ближайшие занятия (`nextSessions(group)`: три не отменённых и отменённые между ними,
@@ -77,7 +101,11 @@ export interface TrainingsTabState {
    * свои. Длина всегда `NEXT_ENTRIES_MAX`; `null` — строки нет или ответы не грузятся (гость).
    */
   upcoming: (TrainingRsvpState | null)[];
-  /** Какое из ближайших занятий открыто у тренера (индекс строки `nextSessions`), вид `coach-next` (Т6). */
+  /**
+   * Какое из ближайших занятий открыто у тренера (индекс строки `nextSessions`). На рабочем столе
+   * это индекс `deskSession`; `setRollIndex` (стрелки ‹ › `SessionNav`) переводит стол на другое
+   * занятие и меняет `?session=` — с несохранёнными правками плана после «Discard?».
+   */
   rollIndex: number;
   setRollIndex: (index: number) => void;
   /** Планы дорожек группы: тренеру — все, участнику — опубликованные (`null` — ещё не пришли). */
@@ -169,15 +197,40 @@ export function TrainingsTabProvider({
     dirtyRef.current = dirty;
     setLanesDirtyState(dirty);
   }, []);
-  /** Вид, в который ушли бы, но ждём ответа на «Discard unsaved changes?». */
-  const [pendingView, setPendingView] = useState<TrainingsView | null>(null);
+  /** Переход, который сделали бы, но ждём ответа на «Discard unsaved changes?». */
+  const [pendingLeave, setPendingLeave] = useState<{ run: () => void } | null>(null);
   const setView = useCallback((next: TrainingsView) => {
     if (dirtyRef.current && viewRef.current === 'lanes' && next !== 'lanes') {
-      setPendingView(next);
+      setPendingLeave({ run: () => applyView(next) });
       return;
     }
     applyView(next);
   }, [applyView]);
+
+  // Рабочий стол тренера (CF1): открытое занятие — в адресе. Уход со стола и смена занятия с
+  // несохранёнными правками плана спрашивают «Discard?» (тот же флаг `lanesDirty`).
+  const upcomingIds = nextSessions(group);
+  const [deskId, setDeskId] = useState<string | null>(readSessionParam);
+  const applyDesk = useCallback((id: string | null) => {
+    setDeskId(id);
+    writeSessionParam(id);
+  }, []);
+  const leaveDesk = useCallback((id: string | null) => {
+    if (dirtyRef.current) setPendingLeave({ run: () => applyDesk(id) });
+    else applyDesk(id);
+  }, [applyDesk]);
+  const openDesk = useCallback((id: string) => leaveDesk(id), [leaveDesk]);
+  const closeDesk = useCallback(() => leaveDesk(null), [leaveDesk]);
+  const deskIndex = manages && deskId ? upcomingIds.findIndex((s) => s.id === deskId) : -1;
+  const deskSession = deskIndex >= 0 ? upcomingIds[deskIndex] : null;
+  // Занятия из адреса нет среди ближайших (прошло, удалено, приватный список ещё не пришёл) —
+  // `deskSession` пуст и тренер видит список. Параметр при этом НЕ снимаем: общий ответ страницы
+  // приходит раньше приватного списка с разовыми занятиями, и диплинк на такое занятие стёрся бы
+  // до того, как оно появится (поймано на проверке CF1).
+  // У тренера видов Next / Trainings / Lanes нет: старые `?view=` ведут на список.
+  useEffect(() => {
+    if (manages && view !== DEFAULT_VIEW) applyView(DEFAULT_VIEW);
+  }, [manages, view, applyView]);
   const openLanes = useCallback((date: string) => {
     setLanesDate(date);
     applyView('lanes');
@@ -186,7 +239,7 @@ export function TrainingsTabProvider({
   const [sheet, setSheet] = useState<TrainingsSheet | null>(null);
   const closeSheet = useCallback(() => setSheet(null), []);
 
-  const [rollIndexRaw, setRollIndex] = useState(0);
+  const [rollIndexRaw, setRollIndexRaw] = useState(0);
 
   // Слушатель изменений ответа — в ref: смена слушателя не должна перерисовывать весь таб.
   const rollListener = useRef<((change: RollChange) => void) | null>(null);
@@ -256,7 +309,8 @@ export function TrainingsTabProvider({
 
   // Гашение «нового» — один раз за монтирование таба (флаги в ref), не на каждое переключение видов.
   // Лента на экране: телефон — вид Trainings, десктоп — правая колонка (всё, кроме Lanes).
-  const feedShown = isDesktop ? view !== 'lanes' : view === 'trainings';
+  // Тренеру лента стоит под списком занятий (CF1) — видна, пока не открыт рабочий стол.
+  const feedShown = manages ? deskSession == null : isDesktop ? view !== 'lanes' : view === 'trainings';
   const newMedia = sessions.data?.new_media_count ?? 0;
   const feedSeenSent = useRef(false);
   const { markSeen: markFeedSeen } = sessions;
@@ -286,9 +340,15 @@ export function TrainingsTabProvider({
   // занятия). Строк до `NEXT_ENTRIES_MAX`: три не отменённых и отменённые между ними (Р9), поэтому
   // первое НЕ отменённое занятие (`group.next_training`) — не обязательно строка 0. Его ответы уже
   // грузит страница группы (`rsvp`) — своему слоту хука id не даём, чтобы не читать дважды.
-  const upcomingIds = nextSessions(group);
   // Занятий стало меньше, чем выбранный индекс (прошло ближайшее) — не выходим за край.
-  const rollIndex = Math.min(rollIndexRaw, Math.max(0, upcomingIds.length - 1));
+  const rollIndex = deskIndex >= 0 ? deskIndex : Math.min(rollIndexRaw, Math.max(0, upcomingIds.length - 1));
+  const idsKey = upcomingIds.map((s) => s.id ?? '').join(',');
+  const deskOpen = deskSession != null;
+  const setRollIndex = useCallback((index: number) => {
+    const id = idsKey.split(',')[index];
+    if (deskOpen && id) leaveDesk(id);
+    else setRollIndexRaw(index);
+  }, [idsKey, deskOpen, leaveDesk]);
   const answersEnabled = rsvp?.rsvp != null;
   const sharedId = group.next_training?.id;
   const slotId = (i: number) => (upcomingIds[i]?.id && upcomingIds[i].id !== sharedId ? upcomingIds[i].id : undefined);
@@ -310,28 +370,29 @@ export function TrainingsTabProvider({
 
   const value = useMemo<TrainingsTabState>(() => ({
     group, manages, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
+    deskSession, openDesk, closeDesk,
     rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown,
     onRollChange, setRollChangeListener, sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
-    group, manages, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, lanePlans, reloadLanePlans,
-    lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sessions,
+    group, manages, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, setRollIndex,
+    deskSession, openDesk, closeDesk, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sessions,
     breaks, marks, closeSheet, sheet,
   ]);
 
   return (
     <TrainingsTabContext.Provider value={value}>
       {children}
-      {pendingView && (
+      {pendingLeave && (
         <ConfirmDialog
           title="Discard unsaved changes?"
           confirmLabel="Discard"
           onConfirm={async () => {
             setLanesDirty(false);
-            applyView(pendingView);
-            setPendingView(null);
+            pendingLeave.run();
+            setPendingLeave(null);
             return { success: true };
           }}
-          onClose={() => setPendingView(null)}
+          onClose={() => setPendingLeave(null)}
         >
           <p className="m-0 mt-3 text-[13px] text-[var(--t-text-2)]">
             The lane plan you are editing has changes that are not saved yet.
