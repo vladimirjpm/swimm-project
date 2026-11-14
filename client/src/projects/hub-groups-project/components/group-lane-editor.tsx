@@ -1,14 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
 import type { HubGroupLevel, HubGroupLevels, LanePlan, LanePlanInput, LanePlanSwimmer } from '../types';
 import LaneChip from './group-lane-chip';
 import LaneMoveRow from './group-lane-move-row';
-import LaneSaveBar, { type SaveBarState } from './group-lane-savebar';
-import LaneToolbar, { shortDay } from './group-lane-toolbar';
-import { lanePlansApi } from './lane-plans-api';
+import LanePlanStatus from './lane-plan-status';
+import { lanePlansApi, shortDay } from './lane-plans-api';
 import { levelColor } from './level-color';
 import { laneShortNames } from './lane-short-names';
+import RollToast, { type RollToastData } from './trainings/coach/roll-toast';
+import { useTrainingsTab } from './trainings/trainings-context';
+import { useLaneAutosave } from './use-lane-autosave';
 
 /**
  * Редактор плана дорожек — тренер (docs/plans/lane-plans-plan.md, L3; доведён в Т7 по решению
@@ -21,11 +23,24 @@ import { laneShortNames } from './lane-short-names';
  *   «Move <name> to [1][2][3] [Unassigned] [Not today] [Lead]»;
  * - десктоп — ещё и перетаскивание: бросок на колонку — в конец, бросок НА плашку — вставка ПЕРЕД
  *   ней (так меняется порядок; кнопки «↑» больше нет).
- * Порядок внутри дорожки = кто ведёт. «Distribute» раскладывает пришедших по уровням дорожек на
- * сервере и НЕ сохраняет — сохраняет Save. «Auto lanes» — шаг раньше: тренер задал только число
- * дорожек, сервер сам делит их между уровнями по числу пришедших (соседние уровни при нехватке
- * дорожек — вместе) и раскладывает людей; задания дорожек остаются на своих номерах. «Max per lane»
- * (лимит людей на дорожку, решение Влада 20.10.2026) обе кнопки отдают серверу: дорожка полна —
+ * Порядок внутри дорожки = кто ведёт.
+ *
+ * Над дорожками две кнопки (docs/plans/trainings-coach-flow-plan.md, CF2): «Auto-arrange» и
+ * «Pool setup». «Auto-arrange» (бывшие Distribute + Auto lanes, ручка `auto-lanes`): тренер задал
+ * только число дорожек, сервер сам делит их между уровнями по числу пришедших (соседние уровни при
+ * нехватке дорожек — вместе) и раскладывает людей; «Reserve lanes» (параметр плана, решение Влада
+ * 14.11.2026) — столько последних дорожек всегда остаются пустыми про запас, даже когда остальных
+ * не хватает (уровни тогда сливаются, при лимите дорожки переполняются); задания дорожек остаются на своих номерах. «Pool setup» — шторка `trainings/sheets/pool-setup-sheet.tsx`: число
+ * дорожек, «Reserve lanes», «Max per lane», уровень каждой дорожки, «Copy from …», удаление плана; редактор отдаёт
+ * ей снимок черновика и принимает правки по «Done».
+ *
+ * Закрепление (CF2): пловец, которого тренер перенёс на ДРУГУЮ дорожку руками (строка «Move … to»
+ * или перетаскивание), закреплён — следующий «Auto-arrange» его не двигает (значок 📌 на плашке).
+ * Снять — «Unpin» в строке «Move … to»; перенос в Unassigned / Not today тоже снимает. Смена
+ * порядка внутри дорожки («Lead», вставка перед соседом) закреплением не считается. Хранится в
+ * плане (`pinned` у пловца), в копию («Copy from …») не переносится.
+ *
+ * «Max per lane» (лимит людей на дорожку, решение Влада 20.10.2026) уходит серверу: дорожка полна —
  * нижний подуровень её уровня по одному переходит на дорожку следующего уровня; счётчик дорожки
  * тогда «5 / 6», переполненная — цветом тревоги. Дорожки сверх
  * числа не выбрасываются из черновика: уменьшил и вернул — задания и люди на месте; пока дорожка
@@ -34,11 +49,19 @@ import { laneShortNames } from './lane-short-names';
  *
  * «Copy from …» (L5) — тот же редактор с заготовкой `template`: прошлый план целиком (дорожки,
  * уровни, задания, заметка, расстановка), но только нынешний состав — ушедшие из группы выпадают
- * (в новый план сервер их и не примет), новенькие встают в Unassigned. Ничего не пишется, пока
- * тренер не нажмёт Save (липкая панель `group-lane-savebar.tsx`).
+ * (в новый план сервер их и не примет), новенькие встают в Unassigned. Копия сохраняется сама,
+ * как любая правка, — поэтому замена существующего плана идёт через подтверждение.
  *
- * «Есть несохранённые правки» = нормализованный вход сохранения (`LanePlanInput`) черновика не
- * равен входу сохранённого плана — сравнение по содержимому, не по ссылкам на массивы.
+ * Сохранение (CF3): кнопки Save нет — каждая правка уходит на сервер сама, с паузой после
+ * последнего изменения, в черновике и в опубликованном плане (`use-lane-autosave.ts`; вернуть
+ * явный Save — там же, редактор не переписывать). «Правка есть» = нормализованный вход сохранения
+ * (`LanePlanInput`) не равен последнему сохранённому — сравнение по содержимому, не по ссылкам.
+ * Наверх (`onDirtyChange`) уходит только «запись НЕ УДАЛАСЬ»: тогда уход со стола спрашивает
+ * «Discard unsaved changes?». После переноса человека — тост с Undo (`RollToast`).
+ *
+ * Статус плана и единственная кнопка Publish / Unpublish — строка `LanePlanStatus`: в узле
+ * `statusHost` (шапка рабочего стола или слот нижней панели каркаса), без узла — под дорожками.
+ * Publish досылает правки и открывает диалог `trainings/sheets/publish-sheet.tsx`.
  */
 
 const MAX_LANES = 12;
@@ -78,16 +101,18 @@ const emptyLanes = (): LaneDraft[] => Array.from({ length: MAX_LANES }, () => ({
  * Unassigned). Не разложенный никуда из состава: в своём плане — «Not today» (пришёл в группу
  * после сохранения), в копии — Unassigned (новенький, тренер должен его заметить).
  * Кто в этот день «не в воде» (`away`: On break / Doesn't train / «Can't come») — в новом плане и копии сразу
- * «Not today»: иначе Auto lanes и Distribute ставят их на дорожки. Сохранённый план не трогаем —
+ * «Not today»: иначе Auto-arrange ставит их на дорожки. Сохранённый план не трогаем —
  * там тренер решил сам.
  */
 function initialDraft(
   plan: LanePlan | null, template: LanePlan | null, levels: HubGroupLevels, laneCountHint: number,
-  maxPerLaneHint: number | null, away: ReadonlySet<number>,
+  maxPerLaneHint: number | null, reservedLanesHint: number, away: ReadonlySet<number>,
 ) {
   const lanes = emptyLanes();
   const buckets: Buckets = { lanes: Array.from({ length: MAX_LANES }, () => []), unassigned: [], out: [] };
   const info = new Map<number, LanePlanSwimmer>();
+  // Закрепление — только из своего сохранённого плана: в копию не переносится.
+  const pinned = new Set<number>();
 
   // Текущий уровень — из карточки уровней (свежее снимка).
   const levelOf = new Map(levels.swimmers.map((s) => [s.swimmerId, s]));
@@ -111,7 +136,11 @@ function initialDraft(
   if (source) {
     source.lanes.forEach((l) => {
       lanes[l.lane_no - 1] = { levelId: l.level?.id ?? null, workout: l.workout ?? '' };
-      l.swimmers.filter(keep).forEach((s) => { remember(s); buckets.lanes[l.lane_no - 1].push(s.swimmer_id); });
+      l.swimmers.filter(keep).forEach((s) => {
+        remember(s);
+        buckets.lanes[l.lane_no - 1].push(s.swimmer_id);
+        if (plan && s.pinned) pinned.add(s.swimmer_id);
+      });
     });
     source.unassigned.filter(keep).forEach((s) => { remember(s); buckets.unassigned.push(s.swimmer_id); });
     source.not_today.filter(keep).forEach((s) => { remember(s); buckets.out.push(s.swimmer_id); });
@@ -133,29 +162,33 @@ function initialDraft(
   return {
     laneCount: source?.lane_count ?? laneCountHint,
     maxPerLane: source ? source.max_per_lane ?? null : maxPerLaneHint,
+    reservedLanes: source ? source.reserved_lanes ?? 1 : reservedLanesHint,
     note: source?.note ?? '',
     lanes,
     buckets,
     info,
+    pinned,
   };
 }
 
 /** Вход сохранения из черновика: видимые дорожки; люди убранных дорожек — в Unassigned. */
 function buildInput(
-  laneCount: number, maxPerLane: number | null, note: string, lanes: LaneDraft[], buckets: Buckets,
+  laneCount: number, maxPerLane: number | null, reservedLanes: number, note: string, lanes: LaneDraft[],
+  buckets: Buckets, pinned: ReadonlySet<number>,
 ): LanePlanInput {
   const laneNos = Array.from({ length: laneCount }, (_, i) => i + 1);
   const unassigned = [...buckets.unassigned, ...buckets.lanes.slice(laneCount).flat()];
   return {
     lane_count: laneCount,
     max_per_lane: maxPerLane,
+    reserved_lanes: reservedLanes,
     note: note.trim() || null,
     lanes: laneNos.map((no) => ({
       lane_no: no, level_id: lanes[no - 1].levelId, workout: lanes[no - 1].workout.trim() || null,
     })),
     swimmers: [
-      ...laneNos.flatMap((no) => buckets.lanes[no - 1].map((id) => ({ swimmer_id: id, lane_no: no }))),
-      ...unassigned.map((id) => ({ swimmer_id: id, lane_no: null })),
+      ...laneNos.flatMap((no) => buckets.lanes[no - 1].map((id) => ({ swimmer_id: id, lane_no: no, pinned: pinned.has(id) }))),
+      ...unassigned.map((id) => ({ swimmer_id: id, lane_no: null, pinned: false })),
     ],
   };
 }
@@ -171,8 +204,8 @@ function inputKey(input: LanePlanInput): string {
 }
 
 function GroupLaneEditor({
-  groupId, date, plan, template = null, levels, laneCountHint, maxPerLaneHint = null, away = NO_AWAY, desktop, toolbarHost,
-  copyFrom, onSaved, onSetStatus, onDelete, onCopy, onDirtyChange,
+  groupId, date, plan, template = null, levels, laneCountHint, maxPerLaneHint = null, reservedLanesHint = 1, away = NO_AWAY, desktop, toolbarHost,
+  statusHost, abandon, copyFrom, onSaved, onSetStatus, onDelete, onCopy, onDirtyChange, onFocusPool,
 }: {
   groupId: number;
   date: string;
@@ -185,43 +218,63 @@ function GroupLaneEditor({
   laneCountHint: number;
   /** Лимит людей на дорожку нового плана (как в прошлом плане); null — без лимита. */
   maxPerLaneHint?: number | null;
+  /** Запас дорожек нового плана (как в прошлом плане); по умолчанию одна. */
+  reservedLanesHint?: number;
   /** Кто в этот день «не в воде» — в «Not today» нового плана и копии. Читается при монтировании. */
   away?: ReadonlySet<number>;
   desktop: boolean;
   /** Десктоп: узел шапки вида, куда выносится тулбар (портал); пока его нет — тулбар не рисуем. */
   toolbarHost?: HTMLElement | null;
+  /**
+   * Куда вынести строку статуса и Publish (портал): `undefined` — некуда, строка стоит под
+   * дорожками; `null` — узел ещё не появился, строку пока не рисуем.
+   */
+  statusHost?: HTMLElement | null;
+  /** План удаляют: несохранённые правки при размонтировании не досылать. */
+  abandon?: React.MutableRefObject<boolean>;
   /** Дата плана, с которого можно скопировать; null — копировать не с чего. */
   copyFrom: string | null;
+  /** План сохранился (автосохранение). Редактор при этом НЕ пересобирается. */
   onSaved: (plan: LanePlan) => void;
-  /** Publish / Unpublish в родителе; вернул текст ошибки или null. */
-  onSetStatus: (publish: boolean) => Promise<string | null>;
+  /** Publish / Unpublish в родителе; вернул текст ошибки или null. `notify` — push участникам. */
+  onSetStatus: (publish: boolean, notify?: boolean) => Promise<string | null>;
   /** Запросить удаление плана (подтверждение — в родителе). */
   onDelete: () => void;
   /** Загрузить план-источник и пересоздать редактор с копией; вернул текст ошибки или null. */
   onCopy: (sourceDate: string) => Promise<string | null>;
+  /** Запись не удалась — есть правки, которых нет на сервере. */
   onDirtyChange: (dirty: boolean) => void;
+  /** Показать панель бассейна (телефон: переключатель People / Pool) — «перейти к человеку» из диалога публикации. */
+  onFocusPool?: () => void;
 }) {
   // Исходный вид черновика: копия (если есть) или сохранённый план. Читается только при монтировании.
   const init = useMemo(
-    () => initialDraft(template ? null : plan, template, levels, laneCountHint, maxPerLaneHint, away),
-    [plan, template, levels, laneCountHint, maxPerLaneHint, away],
+    () => initialDraft(template ? null : plan, template, levels, laneCountHint, maxPerLaneHint, reservedLanesHint, away),
+    [plan, template, levels, laneCountHint, maxPerLaneHint, reservedLanesHint, away],
   );
   // С чем сравниваем: сохранённый план (его нет — пустой черновик).
   const base = useMemo(
-    () => initialDraft(plan, null, levels, laneCountHint, maxPerLaneHint, away),
-    [plan, levels, laneCountHint, maxPerLaneHint, away],
+    () => initialDraft(plan, null, levels, laneCountHint, maxPerLaneHint, reservedLanesHint, away),
+    [plan, levels, laneCountHint, maxPerLaneHint, reservedLanesHint, away],
   );
 
   const [laneCount, setLaneCount] = useState(init.laneCount);
   const [maxPerLane, setMaxPerLane] = useState<number | null>(init.maxPerLane);
+  /** Сколько дорожек Auto-arrange оставляет пустыми про запас. */
+  const [reservedLanes, setReservedLanes] = useState(init.reservedLanes);
   const [note, setNote] = useState(init.note);
   const [lanes, setLanes] = useState<LaneDraft[]>(init.lanes);
   const [buckets, setBuckets] = useState<Buckets>(init.buckets);
-  const [saving, setSaving] = useState(false);
+  /** Закреплённые на своей дорожке: Auto-arrange их не двигает. */
+  const [pinned, setPinned] = useState<ReadonlySet<number>>(init.pinned);
+  const { openSheet } = useTrainingsTab();
   const [publishing, setPublishing] = useState(false);
+  /** Тост «<имя> → lane 2 · Undo» после переноса; `restore` — корзины и закрепление до него. */
+  const [toast, setToast] = useState<(RollToastData & { restore: () => void }) | null>(null);
+  const toastId = useRef(0);
   const [distributing, setDistributing] = useState(false);
-  /** Что подтверждаем: повторный Distribute / Auto lanes поверх заданного либо замену копией. */
-  const [confirm, setConfirm] = useState<'distribute' | 'auto' | 'copy' | null>(null);
+  /** Что подтверждаем: повторный Auto-arrange поверх заданного либо замену копией. */
+  const [confirm, setConfirm] = useState<'auto' | 'copy' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   /** Выбранный для переноса пловец — один на весь редактор. */
@@ -247,18 +300,24 @@ function GroupLaneEditor({
     return level ? levelColor(level) : null;
   };
 
-  // ── Несохранённые правки ──────────────────────────────────────────────────
+  // ── Автосохранение ────────────────────────────────────────────────────────
 
-  const draftKey = inputKey(buildInput(laneCount, maxPerLane, note, lanes, buckets));
-  const baseKey = useMemo(
-    () => inputKey(buildInput(base.laneCount, base.maxPerLane, base.note, base.lanes, base.buckets)),
-    [base],
-  );
-  const dirty = draftKey !== baseKey;
-  // Плана ещё нет — сохранять нужно, даже если черновик пуст.
-  const needsSave = dirty || plan == null;
+  const draftInput = buildInput(laneCount, maxPerLane, reservedLanes, note, lanes, buckets, pinned);
+  const draftKey = inputKey(draftInput);
+  // С чем сравнивать при открытии: сохранённый план; плана нет — сохраняем сразу (и пустой).
+  // Читается один раз: дальше «сохранённое» ведёт сам хук.
+  const [openedWith] = useState(() => ({
+    plan,
+    key: plan
+      ? inputKey(buildInput(base.laneCount, base.maxPerLane, base.reservedLanes, base.note, base.lanes, base.buckets, base.pinned))
+      : null,
+  }));
+  const autosave = useLaneAutosave({
+    groupId, date, draftKey, input: draftInput, plan: openedWith.plan, savedKey: openedWith.key, abandon, onSaved,
+  });
+  const saveFailed = autosave.status === 'error';
 
-  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => { onDirtyChange(saveFailed); }, [saveFailed, onDirtyChange]);
   useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
 
   // Esc снимает выбор пловца.
@@ -271,8 +330,44 @@ function GroupLaneEditor({
 
   // ── Перенос ───────────────────────────────────────────────────────────────
 
-  /** В конец корзины; `before` — вставить перед этим пловцом; `first` — поставить первым («Lead»). */
+  /** Где пловец сейчас; люди убранных дорожек считаются Unassigned. */
+  const where = (swimmerId: number): Target => {
+    const lane = buckets.lanes.findIndex((l) => l.includes(swimmerId));
+    if (lane >= 0) return lane < laneCount ? lane + 1 : 'unassigned';
+    return buckets.unassigned.includes(swimmerId) ? 'unassigned' : 'out';
+  };
+
+  const setPin = (swimmerId: number, on: boolean) =>
+    setPinned((p) => {
+      if (p.has(swimmerId) === on) return p;
+      const next = new Set(p);
+      if (on) next.add(swimmerId);
+      else next.delete(swimmerId);
+      return next;
+    });
+
+  /**
+   * В конец корзины; `before` — вставить перед этим пловцом; `first` — поставить первым («Lead»).
+   * Перенос на ДРУГУЮ дорожку закрепляет пловца, в Unassigned / Not today — снимает закрепление;
+   * перестановка внутри дорожки его не меняет.
+   */
   const move = (swimmerId: number, target: Target, opts?: { before?: number; first?: boolean }) => {
+    const from = where(swimmerId);
+    if (typeof target !== 'number') setPin(swimmerId, false);
+    else if (from !== target) setPin(swimmerId, true);
+    // Тост с Undo — когда человек сменил корзину; перестановка внутри дорожки видна и так.
+    if (from !== target) {
+      const before = { buckets, pinned };
+      const s = info.get(swimmerId);
+      toastId.current += 1;
+      setToast({
+        id: toastId.current,
+        name: shortName.get(swimmerId) || s?.name || s?.name_en || '',
+        answer: null,
+        label: target === 'unassigned' ? 'Unassigned' : target === 'out' ? 'Not today' : `lane ${target}`,
+        restore: () => { setBuckets(before.buckets); setPinned(before.pinned); },
+      });
+    }
     setBuckets((b) => {
       const strip = (list: number[]) => list.filter((id) => id !== swimmerId);
       const next: Buckets = { lanes: b.lanes.map(strip), unassigned: strip(b.unassigned), out: strip(b.out) };
@@ -285,37 +380,17 @@ function GroupLaneEditor({
     setSelected(null);
   };
 
-  const changeLaneCount = (delta: number) =>
-    setLaneCount((c) => Math.min(MAX_LANES, Math.max(1, c + delta)));
-
   /** Unassigned на экране и в сохранении = своя корзина + люди убранных дорожек. */
   const unassigned = [...buckets.unassigned, ...buckets.lanes.slice(laneCount).flat()];
 
   const patchLane = (laneNo: number, patch: Partial<LaneDraft>) =>
     setLanes((ls) => ls.map((l, i) => (i === laneNo - 1 ? { ...l, ...patch } : l)));
 
-  // ── Distribute / Auto lanes / Save ────────────────────────────────────────
-
-  const lanesInput = () => buildInput(laneCount, maxPerLane, note, lanes, buckets).lanes;
+  // ── Auto-arrange / Pool setup / Save ──────────────────────────────────────
 
   const present = () => [...buckets.lanes.slice(0, laneCount).flat(), ...unassigned];
 
-  const distribute = async () => {
-    setDistributing(true);
-    setError(null);
-    const result = await lanePlansApi.distribute(groupId, {
-      lane_count: laneCount, max_per_lane: maxPerLane, lanes: lanesInput(), swimmer_ids: present(),
-    });
-    setDistributing(false);
-    setConfirm(null);
-    if (!result.ok || !result.data) {
-      setError(result.error ?? 'Could not distribute. Try again.');
-      return;
-    }
-    place(result.data.swimmers);
-  };
-
-  /** Раскладка с сервера → корзины; «Not today» не трогаем. */
+  /** Раскладка с сервера → корзины; «Not today» не трогаем. Закреплены те, кого сервер оставил на месте. */
   const place = (swimmers: LanePlanInput['swimmers']) => {
     const next: Buckets = { lanes: Array.from({ length: MAX_LANES }, () => []), unassigned: [], out: buckets.out };
     swimmers.forEach((s) => {
@@ -323,19 +398,25 @@ function GroupLaneEditor({
       else next.lanes[s.lane_no - 1].push(s.swimmer_id);
     });
     setBuckets(next);
+    setPinned(new Set(swimmers.filter((s) => s.pinned && s.lane_no != null).map((s) => s.swimmer_id)));
     setSelected(null);
+    // Раскладка заменила расстановку — «Undo» прошлого переноса вернул бы и её.
+    setToast(null);
   };
 
   const autoLanes = async () => {
     setDistributing(true);
     setError(null);
     const result = await lanePlansApi.autoLanes(groupId, {
-      lane_count: laneCount, max_per_lane: maxPerLane, swimmer_ids: present(),
+      lane_count: laneCount, max_per_lane: maxPerLane, reserved_lanes: reservedLanes, swimmer_ids: present(),
+      // Закреплённые на видимых дорожках остаются на месте.
+      pinned: buckets.lanes.slice(0, laneCount).flatMap((ids, i) =>
+        ids.filter((id) => pinned.has(id)).map((id) => ({ swimmer_id: id, lane_no: i + 1 }))),
     });
     setDistributing(false);
     setConfirm(null);
     if (!result.ok || !result.data) {
-      setError(result.error ?? 'Could not set up the lanes. Try again.');
+      setError(result.error ?? 'Could not arrange the lanes. Try again.');
       return;
     }
     const levelOf = new Map(result.data.lanes.map((l) => [l.lane_no, l.level_id]));
@@ -351,16 +432,6 @@ function GroupLaneEditor({
     else void autoLanes();
   };
 
-  const askDistribute = () => {
-    if (!laneNos.some((no) => lanes[no - 1].levelId != null)) {
-      setError('Pick a level for at least one lane first — Distribute places swimmers by level.');
-      return;
-    }
-    // Уже кто-то разложен — предупреждаем, что ручные переносы пропадут.
-    if (buckets.lanes.slice(0, laneCount).some((l) => l.length > 0)) setConfirm('distribute');
-    else void distribute();
-  };
-
   const doCopy = async (): Promise<string | null> => {
     if (!copyFrom) return null;
     setError(null);
@@ -370,24 +441,35 @@ function GroupLaneEditor({
   };
 
   const askCopy = () => {
-    // На дату уже есть план или есть несохранённые правки — заменяем только после подтверждения.
-    if (plan != null || dirty) setConfirm('copy');
+    // На дату уже есть план — копия заменит его (и сохранится сама): только после подтверждения.
+    if (plan != null) setConfirm('copy');
     else void doCopy();
   };
 
-  const save = async () => {
-    setSaving(true);
-    setError(null);
-    const result = await lanePlansApi.save(groupId, date, buildInput(laneCount, maxPerLane, note, lanes, buckets));
-    setSaving(false);
-    if (result.ok && result.data) onSaved(result.data);
-    else setError(result.error ?? 'Could not save. Try again.');
+  /** «Перейти к человеку» из диалога публикации: пловец выбран, его корзина на экране. */
+  const showSwimmer = (swimmerId: number) => {
+    if (where(swimmerId) === 'out') setOutOpen(true);
+    setSelected(swimmerId);
+    onFocusPool?.();
   };
 
-  const setStatus = async (publish: boolean) => {
+  /** Publish: дослать правки, затем диалог с сохранённым планом (его и увидят участники). */
+  const askPublish = async () => {
     setPublishing(true);
     setError(null);
-    const err = await onSetStatus(publish);
+    const saved = await autosave.flush();
+    setPublishing(false);
+    if (!saved) return; // запись не удалась — причина в строке ошибки, Publish ждёт
+    openSheet({
+      kind: 'publish',
+      publish: { groupId, date, plan: saved, onPublish: (notify) => onSetStatus(true, notify), onPerson: showSwimmer },
+    });
+  };
+
+  const unpublish = async () => {
+    setPublishing(true);
+    setError(null);
+    const err = await onSetStatus(false);
     setPublishing(false);
     if (err) setError(err);
   };
@@ -406,12 +488,6 @@ function GroupLaneEditor({
   });
   const dropOutline = (target: Target): React.CSSProperties =>
     (dragOver === String(target) ? { outline: '2px solid var(--deep-accent)' } : {});
-
-  const where = (swimmerId: number): Target => {
-    const lane = buckets.lanes.findIndex((l) => l.includes(swimmerId));
-    if (lane >= 0) return lane < laneCount ? lane + 1 : 'unassigned';
-    return buckets.unassigned.includes(swimmerId) ? 'unassigned' : 'out';
-  };
 
   const chip = (swimmerId: number) => {
     const s = info.get(swimmerId);
@@ -437,6 +513,7 @@ function GroupLaneEditor({
         fullName={s.name || s.name_en}
         color={circleColor(swimmerId)}
         subLevel={s.sub_level ?? null}
+        pinned={pinned.has(swimmerId) && typeof where(swimmerId) === 'number'}
         leftGroup={!!s.left_group}
         selected={selected === swimmerId}
         desktop={desktop}
@@ -460,6 +537,8 @@ function GroupLaneEditor({
         canUnassign={target !== 'unassigned'}
         canOut={target !== 'out'}
         canLead={typeof target === 'number' && index > 0}
+        canUnpin={typeof target === 'number' && pinned.has(selected)}
+        onUnpin={() => { setPin(selected, false); setSelected(null); }}
         onLane={(no) => move(selected, no)}
         onUnassign={() => move(selected, 'unassigned')}
         onOut={() => move(selected, 'out')}
@@ -565,7 +644,7 @@ function GroupLaneEditor({
         Unassigned · {unassigned.length}
       </div>
       <div className="text-[11px] font-bold" style={{ color: 'var(--t-text-3)' }}>
-        In today’s plan, no lane yet. Distribute places them by level.
+        In today’s plan, no lane yet. Auto-arrange places them by level.
       </div>
       {unassigned.length > 0 && chipList(unassigned)}
       {moveRow('unassigned')}
@@ -601,30 +680,86 @@ function GroupLaneEditor({
     </div>
   );
 
+  /** «Pool setup»: шторка получает снимок черновика; правки приходят обратно по «Done». */
+  const openPoolSetup = () => openSheet({
+    kind: 'pool-setup',
+    setup: {
+      laneCount,
+      maxPerLane,
+      reservedLanes,
+      laneLevels: lanes.map((l) => l.levelId),
+      maxLanes: MAX_LANES,
+      levels: levels.levels,
+      copyFrom,
+      canDelete: plan != null,
+      onApply: (next) => {
+        setLaneCount(next.laneCount);
+        setMaxPerLane(next.maxPerLane);
+        setReservedLanes(next.reservedLanes);
+        setLanes((ls) => ls.map((l, i) => ({ ...l, levelId: next.laneLevels[i] ?? null })));
+        setSelected(null);
+        setToast(null);
+      },
+      onCopy: askCopy,
+      onDelete,
+    },
+  });
+
+  // Две кнопки над дорожками (CF2): раскладка и настройка бассейна.
+  const toolBtn = `flex-none cursor-pointer rounded-[10px] border bg-transparent px-3 text-[12px] font-extrabold disabled:cursor-not-allowed disabled:opacity-40 ${desktop ? 'h-[36px]' : 'h-[40px]'}`;
+  const toolStyle = { borderColor: 'var(--deep-ow-border)', color: 'var(--deep-ow)' };
   const toolbar = (
-    <LaneToolbar
-      desktop={desktop}
-      laneCount={laneCount}
-      minLanes={1}
-      maxLanes={MAX_LANES}
-      onLaneCount={changeLaneCount}
-      maxPerLane={maxPerLane}
-      onMaxPerLane={setMaxPerLane}
-      working={distributing}
-      canRun={present().length > 0}
-      onDistribute={askDistribute}
-      onAutoLanes={askAutoLanes}
-      copyFrom={copyFrom}
-      onCopy={askCopy}
-      canDelete={plan != null}
-      onDelete={onDelete}
-    />
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        className={toolBtn}
+        style={toolStyle}
+        onClick={askAutoLanes}
+        disabled={distributing || present().length === 0}
+        title="Split the lanes between levels by how many are coming, then place everyone. Reserved lanes stay empty; pinned swimmers stay."
+      >
+        {distributing ? 'Working…' : 'Auto-arrange'}
+      </button>
+      <button type="button" className={toolBtn} style={toolStyle} onClick={openPoolSetup} disabled={distributing}>
+        Pool setup
+      </button>
+    </div>
   );
 
-  const saveState: SaveBarState = needsSave ? 'unsaved' : (plan?.status ?? 'draft');
+  // Пока первая запись нового плана не дошла, статуса ещё нет — «No lane plan» без кнопки.
+  const statusBar = (
+    <LanePlanStatus
+      status={plan?.status ?? null}
+      unassigned={unassigned.length}
+      save={autosave.status}
+      busy={publishing}
+      onRetry={autosave.retry}
+      onPublish={() => { void askPublish(); }}
+      onUnpublish={() => { void unpublish(); }}
+    />
+  );
+  const writeError = autosave.error ?? error;
 
   return (
     <div>
+      {/* Запись не удалась: правки остались в редакторе, повтор — здесь и в строке статуса. */}
+      {writeError && (
+        <p className="m-0 mb-2 flex flex-wrap items-center gap-x-2 text-[12px] font-bold" style={{ color: 'var(--deep-danger)' }} role="alert">
+          <span>{writeError}</span>
+          {autosave.error && (
+            <button
+              type="button"
+              onClick={autosave.retry}
+              className="cursor-pointer border-0 bg-transparent p-0 text-[12px] font-extrabold underline"
+              style={{ color: 'inherit' }}
+            >
+              Retry
+            </button>
+          )}
+        </p>
+      )}
+      {statusHost && createPortal(statusBar, statusHost)}
+
       {/* Тулбар: телефон — здесь, десктоп — в шапке вида (портал; пока узла нет — не рисуем). */}
       {desktop ? (toolbarHost ? createPortal(toolbar, toolbarHost) : null) : toolbar}
 
@@ -662,35 +797,18 @@ function GroupLaneEditor({
 
       {notToday}
 
-      <LaneSaveBar
-        state={saveState}
-        saving={saving}
-        busy={publishing}
-        error={error}
-        desktop={desktop}
-        onSave={save}
-        onPublish={() => setStatus(true)}
-        onUnpublish={() => setStatus(false)}
+      {statusHost === undefined && <div className="mt-3">{statusBar}</div>}
+
+      <RollToast
+        toast={toast}
+        onUndo={() => { toast?.restore(); setToast(null); setSelected(null); }}
+        onExpire={() => setToast(null)}
       />
 
-      {confirm === 'distribute' && (
-        <ConfirmDialog
-          title="Re-distribute everyone?"
-          confirmLabel="Distribute"
-          busyLabel="Distributing…"
-          onConfirm={async () => { await distribute(); return { success: true }; }}
-          onClose={() => setConfirm(null)}
-        >
-          <p className="m-0 mt-3 text-[13px] text-[var(--t-text-2)]">
-            Everyone coming today is placed again by level. Manual moves will be lost.
-            People in “Not today” stay there.
-          </p>
-        </ConfirmDialog>
-      )}
       {confirm === 'auto' && (
         <ConfirmDialog
-          title="Set up the lanes automatically?"
-          confirmLabel="Auto lanes"
+          title="Arrange the lanes again?"
+          confirmLabel="Auto-arrange"
           busyLabel="Working…"
           onConfirm={async () => { await autoLanes(); return { success: true }; }}
           onClose={() => setConfirm(null)}
@@ -699,6 +817,14 @@ function GroupLaneEditor({
             The level of every lane and who swims where are replaced: lanes are split between levels
             by how many are coming, the strongest on the lowest numbers, neighbouring levels share a
             lane when there are too few. Workouts stay on their lanes; “Not today” stays as is.
+          </p>
+          {reservedLanes > 0 && (
+            <p className="m-0 mt-2 text-[13px] text-[var(--t-text-2)]">
+              {reservedLanes === 1 ? 'The last lane is' : `The last ${reservedLanes} lanes are`} kept empty in reserve.
+            </p>
+          )}
+          <p className="m-0 mt-2 text-[13px] text-[var(--t-text-2)]">
+            Swimmers you moved by hand (📌) stay on their lanes.
           </p>
           {maxPerLane != null && (
             <p className="m-0 mt-2 text-[13px] text-[var(--t-text-2)]">
@@ -721,7 +847,7 @@ function GroupLaneEditor({
         >
           <p className="m-0 mt-3 text-[13px] text-[var(--t-text-2)]">
             Lanes, levels, workouts and who swims where are copied; today’s people who left the group
-            drop out. Nothing is saved until you press Save.
+            drop out. The copy replaces the saved plan straight away.
           </p>
         </ConfirmDialog>
       )}

@@ -716,4 +716,199 @@ public class LanePlanTests
         Assert.False(await db.LanePlanLanes.AnyAsync());
         Assert.False(await db.LanePlanSwimmers.AnyAsync());
     }
+
+    // ── Закрепление (docs/plans/trainings-coach-flow-plan.md, CF2) ───────────
+
+    [Fact]
+    public void AutoLanes_TwoLevelsOnSixLanes_BiggerLevelGetsTheSpareLanes()
+    {
+        // Пример из задачи CF2: 2 Advanced и 9 Intermediate на 6 дорожек, лимита нет.
+        var result = LaneAllocation.AutoLanes(6, FourLevels, Swimmers((2, 1), (9, 2)));
+
+        Assert.Equal([(1, (int?)1), (2, 2), (3, 2), (4, 2), (5, 2), (6, 2)], LanesOf(result));
+    }
+
+    [Fact]
+    public void AutoLanes_Reserve_LeavesTheLastLanesEmpty()
+    {
+        // Пример задачи CF2: 2 Advanced и 9 Intermediate на 6 дорожек, одна про запас.
+        var one = LaneAllocation.AutoLanes(6, FourLevels, Swimmers((2, 1), (9, 2)), reserveLanes: 1);
+        Assert.Equal([(1, (int?)1), (2, 2), (3, 2), (4, 2), (5, 2), (6, null)], LanesOf(one));
+        Assert.DoesNotContain(one.Placements, p => p.LaneNo == 6);
+        Assert.Equal(11, one.Placements.Count(p => p.LaneNo != null));
+
+        // Две про запас — пустыми остаются 5 и 6.
+        var two = LaneAllocation.AutoLanes(6, FourLevels, Swimmers((2, 1), (9, 2)), reserveLanes: 2);
+        Assert.Equal([(1, (int?)1), (2, 2), (3, 2), (4, 2), (5, null), (6, null)], LanesOf(two));
+    }
+
+    [Fact]
+    public void AutoLanes_Reserve_IsKept_EvenWhenLanesAreShort()
+    {
+        // 4 уровня на 4 дорожки: запас остаётся, уровни сливаются на трёх.
+        var tight = LaneAllocation.AutoLanes(4, FourLevels, Swimmers((2, 1), (2, 2), (2, 3), (2, 4)), reserveLanes: 1);
+        Assert.Null(tight.Lanes[3].LevelId);
+        Assert.Equal([1, 2, 3], tight.Placements.Select(p => p.LaneNo!.Value).Distinct());
+        Assert.Equal(8, tight.Placements.Count);
+
+        // Лимит 3, 9 человек, 3 дорожки: в две не помещаются — запас всё равно пустой, дорожки переполнены.
+        var full = LaneAllocation.AutoLanes(3, FourLevels, Swimmers((9, 1)), maxPerLane: 3, reserveLanes: 1);
+        Assert.Equal([(1, (int?)1), (2, 1), (3, null)], LanesOf(full));
+        Assert.DoesNotContain(full.Placements, p => p.LaneNo == 3);
+
+        // Людям остаётся хотя бы одна дорожка, сколько бы ни просили в запас.
+        var single = LaneAllocation.AutoLanes(1, FourLevels, Swimmers((2, 1), (1, 2)), reserveLanes: 1);
+        Assert.All(single.Placements, p => Assert.Equal(1, p.LaneNo));
+        var greedy = LaneAllocation.AutoLanes(3, FourLevels, Swimmers((2, 1), (1, 2)), reserveLanes: 5);
+        Assert.All(greedy.Placements, p => Assert.Equal(1, p.LaneNo));
+    }
+
+    [Fact]
+    public void AutoLanes_Reserve_PinnedSwimmerStaysOnTheReservedLane()
+    {
+        var result = LaneAllocation.AutoLanes(
+            3, FourLevels, Swimmers((2, 1), (2, 2)), pinned: new Dictionary<int, int> { [4] = 3 }, reserveLanes: 1);
+
+        Assert.Equal([(1, (int?)1), (2, 2), (3, null)], LanesOf(result));
+        Assert.Equal([4], result.Placements.Where(p => p.LaneNo == 3).Select(p => p.SwimmerId));
+    }
+
+    [Fact]
+    public async Task ReservedLanes_IsSavedWithThePlan_DefaultsToOne_AndIsValidated()
+    {
+        await using var db = CreateDb(nameof(ReservedLanes_IsSavedWithThePlan_DefaultsToOne_AndIsValidated));
+        var s = await SeedAsync(db);
+        var service = new LanePlanService(db);
+
+        // Клиент поле не прислал — одна дорожка про запас.
+        Assert.True((await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId)).Success);
+        Assert.Equal(1, (await service.GetAsync(s.GroupId, Day, isManager: true))!.ReservedLanes);
+
+        var input = Plan(s);
+        input.ReservedLanes = 0;
+        Assert.True((await service.SaveAsync(s.GroupId, Day, input, s.UserId)).Success);
+        Assert.Equal(0, (await service.GetAsync(s.GroupId, Day, isManager: true))!.ReservedLanes);
+        Assert.Equal(0, (await service.ListAsync(s.GroupId, isManager: true)).Single().ReservedLanes);
+
+        input.ReservedLanes = 12;
+        Assert.False((await service.SaveAsync(s.GroupId, Day, input, s.UserId)).Success);
+
+        // Запас держится и когда уровней больше, чем оставшихся дорожек: оба уровня — на первой.
+        var (auto, error) = await service.AutoLanesAsync(s.GroupId, new LanePlanAutoLanesInputDto { LaneCount = 2, ReservedLanes = 1 });
+        Assert.Null(error);
+        Assert.Equal([(1, (int?)s.Fast), (2, null)], auto!.Lanes.Select(l => (l.LaneNo, l.LevelId)));
+        Assert.Equal([(s.A, (int?)1), (s.B, 1), (s.C, null)], auto.Swimmers.Select(p => (p.SwimmerId, p.LaneNo)));
+    }
+
+    [Fact]
+    public void AutoLanes_Pinned_StaysOnItsLane_AndOthersFillAroundIt()
+    {
+        // Один уровень, 6 человек на 2 дорожки; пловец 1 закреплён на дорожке 2.
+        var result = LaneAllocation.AutoLanes(
+            2, [new(1, 1)], Swimmers((6, 1)), pinned: new Dictionary<int, int> { [1] = 2 });
+
+        // Остальные режутся с учётом занятого места (3 + 3), закреплённый — в конце своей дорожки.
+        Assert.Equal(
+            [(2, (int?)1), (3, 1), (4, 1), (5, 2), (6, 2), (1, 2)],
+            result.Placements.Select(p => (p.SwimmerId, p.LaneNo)));
+    }
+
+    [Fact]
+    public void AutoLanes_Pinned_MayStandOnAnotherLevelsLane_AndStillCountsForItsLevel()
+    {
+        // 3 + 3 на две дорожки; пловец 6 (уровень 2) закреплён на дорожке уровня 1.
+        var result = LaneAllocation.AutoLanes(
+            2, FourLevels, Swimmers((3, 1), (3, 2)), pinned: new Dictionary<int, int> { [6] = 1 });
+
+        Assert.Equal([(1, (int?)1), (2, 2)], LanesOf(result));
+        Assert.Equal(
+            [(1, (int?)1), (2, 1), (3, 1), (6, 1), (4, 2), (5, 2)],
+            result.Placements.Select(p => (p.SwimmerId, p.LaneNo)));
+    }
+
+    [Fact]
+    public void AutoLanes_Pinned_OutsideTheLanesOrNotComing_IsIgnored()
+    {
+        var swimmers = Swimmers((2, 1), (2, 2));
+        var plain = LaneAllocation.AutoLanes(2, FourLevels, swimmers);
+        // Дорожки 5 нет; пловца 99 среди пришедших нет.
+        var pinned = LaneAllocation.AutoLanes(
+            2, FourLevels, swimmers, pinned: new Dictionary<int, int> { [1] = 5, [99] = 1 });
+
+        Assert.Equal(plain.Placements, pinned.Placements);
+    }
+
+    [Fact]
+    public void AutoLanes_Pinned_TakesAPlaceUnderTheLaneLimit()
+    {
+        // Уровень 1 с двумя подуровнями: 3 человека, лимит 2, одна дорожка; на ней уже закреплён
+        // пловец уровня 2 — свободно одно место, двое нижнего подуровня уходят на дорожку ниже.
+        LaneAllocation.Level[] levels = [new(1, 1, 2), new(2, 2)];
+        var swimmers = new List<LaneDistribution.Swimmer>
+        {
+            new(1, 1, 1, 1), new(2, 1, 2, 2), new(3, 1, 3, 2), new(4, 2, 4), new(5, 2, 5),
+        };
+
+        var result = LaneAllocation.AutoLanes(3, levels, swimmers, maxPerLane: 2, pinned: new Dictionary<int, int> { [5] = 1 });
+
+        var lane1 = result.Placements.Where(p => p.LaneNo == 1).Select(p => p.SwimmerId).ToList();
+        Assert.Equal(2, lane1.Count);
+        Assert.Contains(5, lane1);
+    }
+
+    [Fact]
+    public void Normalize_KeepsPinnedOnlyOnALane()
+    {
+        var (plan, error) = LanePlanRules.Normalize(new LanePlanInputDto
+        {
+            LaneCount = 2,
+            Swimmers =
+            [
+                new() { SwimmerId = 1, LaneNo = 2, Pinned = true },
+                new() { SwimmerId = 2, LaneNo = null, Pinned = true },
+                new() { SwimmerId = 3, LaneNo = 1 },
+            ],
+        });
+
+        Assert.Null(error);
+        Assert.Equal([true, false, false], plan!.Swimmers.Select(s => s.Pinned));
+    }
+
+    [Fact]
+    public async Task Pinned_IsSaved_ShownToManagerOnly_AndHeldByAutoLanes()
+    {
+        await using var db = CreateDb(nameof(Pinned_IsSaved_ShownToManagerOnly_AndHeldByAutoLanes));
+        var s = await SeedAsync(db);
+        var service = new LanePlanService(db);
+        var input = Plan(s);
+        // A (Fast) тренер руками поставил на дорожку Slow.
+        input.Swimmers[0] = new() { SwimmerId = s.A, LaneNo = 2, Pinned = true };
+
+        Assert.True((await service.SaveAsync(s.GroupId, Day, input, s.UserId)).Success);
+
+        var board = (await service.GetAsync(s.GroupId, Day, isManager: true))!;
+        Assert.Equal(
+            [(s.A, true), (s.B, false)],
+            board.Lanes[1].Swimmers.Select(w => (w.SwimmerId, w.Pinned)));
+
+        await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published);
+        var member = (await service.GetAsync(s.GroupId, Day, isManager: false))!;
+        Assert.DoesNotContain(member.Lanes.SelectMany(l => l.Swimmers), w => w.Pinned);
+
+        // Auto lanes: дорожки делятся как раньше (Fast — 1, Slow — 2), A остаётся на дорожке 2.
+        var (auto, error) = await service.AutoLanesAsync(s.GroupId, new LanePlanAutoLanesInputDto
+        {
+            LaneCount = 3, Pinned = [new() { SwimmerId = s.A, LaneNo = 2 }],
+        });
+        Assert.Null(error);
+        Assert.Equal([(1, (int?)s.Fast), (2, s.Slow), (3, null)], auto!.Lanes.Select(l => (l.LaneNo, l.LevelId)));
+        Assert.Equal(
+            [(s.B, (int?)2, false), (s.A, 2, true), (s.C, null, false)],
+            auto.Swimmers.Select(p => (p.SwimmerId, p.LaneNo, p.Pinned)));
+
+        // Сняли с дорожки — закрепление пропало.
+        input.Swimmers[0] = new() { SwimmerId = s.A, LaneNo = null, Pinned = true };
+        Assert.True((await service.SaveAsync(s.GroupId, Day, input, s.UserId)).Success);
+        Assert.False(await db.LanePlanSwimmers.AnyAsync(w => w.Pinned));
+    }
 }

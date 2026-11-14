@@ -1,4 +1,6 @@
 import React, { useCallback, useState } from 'react';
+import { useMediaQuery } from '../../../../../hooks/useMediaQuery';
+import { DEEP_DOCK_QUERY, useDockSlot } from '../../../../components/deep/dock-slot';
 import GroupLanes from '../../group-lanes';
 import RollCall from '../coach/roll-call';
 import SessionNav from '../coach/session-nav';
@@ -19,8 +21,13 @@ import { SegmentBar, type SegmentOption } from '../trainings-segments';
  *   панель остаётся смонтированной (`hidden`): несохранённый черновик дорожек переживает
  *   переключение.
  *
- * Смена занятия пересобирает редактор (`key` — id занятия); «Discard unsaved changes?» при уходе
- * со стола и смене занятия спрашивает контекст (`lanesDirty`).
+ * Статус плана и единственный Publish (CF3): строка `LanePlanStatus`, которую редактор кладёт
+ * порталом в узел этой секции — в шапке стола справа; на телефоне, где инструменты каркаса
+ * закреплены панелью у низа экрана, — в слот ЭТОЙ ЖЕ панели (`components/deep/dock-slot.ts`).
+ *
+ * Смена занятия пересобирает редактор (`key` — id занятия). Правки плана сохраняются сами;
+ * «Discard unsaved changes?» при уходе со стола и смене занятия контекст спрашивает, только когда
+ * запись не удалась (`lanesDirty`).
  */
 
 type DeskPanel = 'people' | 'pool';
@@ -36,6 +43,12 @@ function CoachDeskSection() {
   } = useTrainingsTab();
   const [panel, setPanel] = useState<DeskPanel>('people');
   const sessions = nextSessions(group);
+  // Куда встаёт строка статуса плана: слот нижней панели (телефон) или узел в шапке стола.
+  const docked = useMediaQuery(DEEP_DOCK_QUERY);
+  const dockSlot = useDockSlot();
+  const [headerHost, setHeaderHost] = useState<HTMLElement | null>(null);
+  const statusHost = docked ? dockSlot : headerHost;
+  const showPool = useCallback(() => setPanel('pool'), []);
 
   const roll = deskSession ? upcoming[rollIndex] ?? null : null;
   // Ответы пришли именно на выбранное занятие (при переходе ‹ › на секунду там ещё пусто).
@@ -69,6 +82,8 @@ function CoachDeskSection() {
       desktop={isDesktop}
       initialDate={deskSession.date}
       embedded
+      statusHost={statusHost}
+      onFocusPool={showPool}
       onDirtyChange={setLanesDirty}
       onPlansChanged={plansChanged}
     />
@@ -86,7 +101,11 @@ function CoachDeskSection() {
           ← All trainings
         </button>
       </div>
-      <SessionNav sessions={sessions} />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1 basis-[280px]"><SessionNav sessions={sessions} /></div>
+        {/* Сюда редактор дорожек выносит статус плана и Publish (портал); на телефоне — в нижнюю панель. */}
+        {!docked && <div ref={setHeaderHost} className="min-w-0 flex-none" />}
+      </div>
     </div>
   );
 

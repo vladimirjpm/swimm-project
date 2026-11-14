@@ -81,7 +81,10 @@ export interface TrainingsTabState {
   openLanes: (date: string) => void;
   /** Дата, с которой открыт Lanes (`openLanes`); `null` — вход без даты (сегмент участника, `?view=lanes`). */
   lanesDate: string | null;
-  /** В редакторе Lanes есть несохранённые правки; ставит сам редактор (через секцию), Т7. */
+  /**
+   * В редакторе дорожек есть правки, которые НЕ УДАЛОСЬ сохранить (с CF3 редактор сохраняет сам);
+   * ставит сам редактор (через секцию).
+   */
   lanesDirty: boolean;
   setLanesDirty: (dirty: boolean) => void;
   /**
@@ -395,7 +398,7 @@ export function TrainingsTabProvider({
           onClose={() => setPendingLeave(null)}
         >
           <p className="m-0 mt-3 text-[13px] text-[var(--t-text-2)]">
-            The lane plan you are editing has changes that are not saved yet.
+            The last changes to the lane plan could not be saved. Leave without them?
           </p>
         </ConfirmDialog>
       )}

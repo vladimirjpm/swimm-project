@@ -578,6 +578,8 @@
   color: var(--deep-ow);
 }
 .deep-tabs-tools__row { display: flex; gap: 6px; }
+/* Слот строки активного таба (dock-slot.ts) — только в закреплённой панели телефона. */
+.deep-tabs-tools__slot { display: none; }
 .deep-tool-tab {
   flex: 1; min-width: 0;
   height: 48px;
@@ -799,6 +801,16 @@
   .deep-tool-tab__badge--danger::before { content: none; }
   .deep-tool-tab__dot { margin-left: 0; }
   .deep-entity-main--dock { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  /* Строка активного таба над кнопками инструментов: пустой слот места не занимает, с
+     содержимым панель выше на строку (48 + отступ 6) — и отступ страницы тоже. */
+  .deep-tabs-tools__slot:not(:empty) {
+    display: block; min-height: 48px;
+    padding: 0 4px 6px;
+    border-bottom: 1px solid var(--deep-card-border);
+  }
+  .deep-entity-main--dock:has(.deep-tabs-tools__slot:not(:empty)) {
+    padding-bottom: calc(158px + env(safe-area-inset-bottom));
+  }
   /* Открыт инструмент — у верхнего ряда нет активного язычка, и панель отбивает фиолетовая
      линия сверху: видно, откуда пришёл контент. */
   .deep-tabs-panel--tool { border-top: 3px solid var(--deep-ow); }

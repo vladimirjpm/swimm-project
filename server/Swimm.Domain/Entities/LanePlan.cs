@@ -42,6 +42,13 @@ public class LanePlan
     /// </summary>
     public int? MaxPerLane { get; set; }
 
+    /// <summary>
+    /// Сколько дорожек «Auto-arrange» оставляет пустыми про запас (0..11; решение Влада 14.11.2026,
+    /// CF2 плана trainings-coach-flow). Запас держится всегда, и когда дорожек не хватает; людям
+    /// остаётся хотя бы одна дорожка.
+    /// </summary>
+    public int ReservedLanes { get; set; } = 1;
+
     /// <summary><see cref="LanePlanStatus.Draft"/> | <see cref="LanePlanStatus.Published"/>.</summary>
     [Required, MaxLength(10)]
     public string Status { get; set; } = LanePlanStatus.Draft;
@@ -109,4 +116,11 @@ public class LanePlanSwimmer
 
     /// <summary>Когда перенесли (UTC) — сравнивается с <c>HubGroupUserSeen.LanesSeenAt</c> зрителя.</summary>
     public DateTime? MovedAt { get; set; }
+
+    /// <summary>
+    /// Закреплён на своей дорожке (docs/plans/trainings-coach-flow-plan.md, CF2): тренер перенёс
+    /// пловца руками — «Auto-arrange» его не двигает. Только у стоящего на дорожке; в Unassigned
+    /// закрепления нет (сбрасывает <c>LanePlanRules.Normalize</c>).
+    /// </summary>
+    public bool Pinned { get; set; }
 }

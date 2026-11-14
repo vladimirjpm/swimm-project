@@ -34,12 +34,13 @@ public class LanePlanService : ILanePlanService
             .Where(p => p.HubGroupId == hubGroupId && (isManager || p.Status == LanePlanStatus.Published))
             .OrderByDescending(p => p.Date)
             .Take(ListLimit)
-            .Select(p => new { p.Date, p.Status, p.LaneCount, p.MaxPerLane })
+            .Select(p => new { p.Date, p.Status, p.LaneCount, p.MaxPerLane, p.ReservedLanes })
             .ToListAsync();
 
         return rows.Select(p => new LanePlanSummaryDto
         {
             Date = LanePlanRules.FormatDate(p.Date), Status = p.Status, LaneCount = p.LaneCount, MaxPerLane = p.MaxPerLane,
+            ReservedLanes = p.ReservedLanes,
         }).ToList();
     }
 
@@ -47,23 +48,11 @@ public class LanePlanService : ILanePlanService
     {
         var onBreak = await HubGroupBreakQuery.LoadAsync(_db, hubGroupId, date);
 
-        // Ответы на занятия этой даты (их может быть несколько — план один на день). Ответ аккаунта
-        // — его пловцу состава (тот же резолвер, что у вида по дорожкам), за пловца группы — ему.
-        var answers = await _db.HubGroupTrainingRsvps.AsNoTracking()
-            .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date)
-            .Select(r => new { r.UserId, r.SwimmerId, r.Answer })
-            .ToListAsync();
-        var userIds = answers.Where(a => a.UserId != null).Select(a => a.UserId!.Value).Distinct().ToList();
-        var swimmerOf = await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, userIds);
-        var bySwimmer = answers
-            .Select(a => (SwimmerId: a.SwimmerId ?? (a.UserId is int uid ? swimmerOf[uid] : null), a.Answer))
-            .Where(a => a.SwimmerId != null)
-            .GroupBy(a => a.SwimmerId!.Value, a => a.Answer)
-            .ToList();
+        var (bySwimmer, anyGoing) = await LoadAnswersBySwimmerAsync(hubGroupId, date);
         // «Can't come» — только если на эту дату нет другого ответа: «нет» утром и «иду» вечером — в воде.
-        var cantCome = bySwimmer.Where(g => g.All(a => a == TrainingRsvpAnswer.No)).Select(g => g.Key).ToHashSet();
+        var cantCome = bySwimmer.Where(g => g.Value.All(a => a == TrainingRsvpAnswer.No)).Select(g => g.Key).ToHashSet();
         // «Going» на эту дату перебивает «Doesn't train» (Р74: человек посчитан на этот день).
-        var going = bySwimmer.Where(g => g.Contains(TrainingRsvpAnswer.Yes)).Select(g => g.Key).ToHashSet();
+        var going = bySwimmer.Where(g => g.Value.Contains(TrainingRsvpAnswer.Yes)).Select(g => g.Key).ToHashSet();
 
         var away = onBreak.SwimmerIds.Where(id => !going.Contains(id)).Concat(cantCome).ToHashSet();
 
@@ -75,13 +64,13 @@ public class LanePlanService : ILanePlanService
             .Select(g => g.TrainingSchedule)
             .FirstOrDefaultAsync();
         var silentAreAway = GroupTrainingSchedule.Parse(scheduleJson).EffectiveLanePresence == GroupLanePresence.Answered
-                            && answers.Any(a => a.Answer == TrainingRsvpAnswer.Yes);
+                            && anyGoing;
         if (away.Count == 0 && !silentAreAway) return new LanePlanAwayDto();
 
         var roster = await LoadRosterAsync(hubGroupId);
         if (silentAreAway)
         {
-            var answered = bySwimmer.Select(g => g.Key).ToHashSet();
+            var answered = bySwimmer.Keys.ToHashSet();
             away.UnionWith(roster.Select(r => r.SwimmerId).Where(id => !answered.Contains(id)));
         }
         if (away.Count == 0) return new LanePlanAwayDto();
@@ -90,6 +79,28 @@ public class LanePlanService : ILanePlanService
         {
             SwimmerIds = roster.Select(r => r.SwimmerId).Where(away.Contains).ToList(),
         };
+    }
+
+    /// <summary>
+    /// Ответы на занятия даты по пловцам состава (занятий в день может быть несколько — план один на
+    /// день). Ответ аккаунта — его пловцу (тот же резолвер, что у вида по дорожкам), за пловца — ему.
+    /// <c>AnyGoing</c> — «Going» есть хоть у кого-то, в том числе у аккаунта без пловца состава.
+    /// </summary>
+    private async Task<(Dictionary<int, List<string>> BySwimmer, bool AnyGoing)> LoadAnswersBySwimmerAsync(
+        int hubGroupId, DateOnly date)
+    {
+        var answers = await _db.HubGroupTrainingRsvps.AsNoTracking()
+            .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date)
+            .Select(r => new { r.UserId, r.SwimmerId, r.Answer })
+            .ToListAsync();
+        var userIds = answers.Where(a => a.UserId != null).Select(a => a.UserId!.Value).Distinct().ToList();
+        var swimmerOf = await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, userIds);
+        var bySwimmer = answers
+            .Select(a => (SwimmerId: a.SwimmerId ?? (a.UserId is int uid ? swimmerOf[uid] : null), a.Answer))
+            .Where(a => a.SwimmerId != null)
+            .GroupBy(a => a.SwimmerId!.Value, a => a.Answer)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        return (bySwimmer, answers.Any(a => a.Answer == TrainingRsvpAnswer.Yes));
     }
 
     public async Task<LanePlanDto?> GetAsync(int hubGroupId, DateOnly date, bool isManager, int? viewerUserId = null)
@@ -122,6 +133,11 @@ public class LanePlanService : ILanePlanService
                 .ToListAsync())
               .ToDictionary(s => s.Id, s => new RosterRow(s.Id, s.Name, s.NameEn, s.BirthYear, int.MaxValue));
 
+        // Закрепление — рабочая пометка тренера: участнику не отдаём.
+        var pinnedIds = isManager
+            ? plan.Swimmers.Where(s => s.Pinned && s.LaneNo != null).Select(s => s.SwimmerId).ToHashSet()
+            : [];
+
         LanePlanSwimmerDto ToDto(int swimmerId)
         {
             var inRoster = rosterById.TryGetValue(swimmerId, out var row);
@@ -136,6 +152,7 @@ public class LanePlanService : ILanePlanService
                 SubLevel = level?.SubLevel,
                 LeftGroup = !inRoster,
                 OnBreak = onBreak.SwimmerIds.Contains(swimmerId),
+                Pinned = pinnedIds.Contains(swimmerId),
             };
         }
 
@@ -163,6 +180,7 @@ public class LanePlanService : ILanePlanService
             Status = plan.Status,
             LaneCount = plan.LaneCount,
             MaxPerLane = plan.MaxPerLane,
+            ReservedLanes = plan.ReservedLanes,
             Note = plan.Note,
             UpdatedAt = plan.UpdatedAt,
             Lanes = plan.Lanes
@@ -255,6 +273,7 @@ public class LanePlanService : ILanePlanService
 
             plan.LaneCount = normalized.LaneCount;
             plan.MaxPerLane = normalized.MaxPerLane;
+            plan.ReservedLanes = normalized.ReservedLanes;
             plan.Note = normalized.Note;
             plan.UpdatedAt = now;
 
@@ -289,6 +308,7 @@ public class LanePlanService : ILanePlanService
                     RecordMove(row, n.LaneNo, now);
                 row.LaneNo = n.LaneNo;
                 row.OrderNo = n.OrderNo;
+                row.Pinned = n.Pinned;
             }
 
             await _db.SaveChangesAsync();
@@ -355,6 +375,8 @@ public class LanePlanService : ILanePlanService
             return (null, $"Lanes: from {LanePlanRules.MinLanes} to {LanePlanRules.MaxLanes}.");
         var perLaneError = LanePlanRules.CheckMaxPerLane(input.MaxPerLane);
         if (perLaneError != null) return (null, perLaneError);
+        var reservedError = LanePlanRules.CheckReservedLanes(input.ReservedLanes);
+        if (reservedError != null) return (null, reservedError);
 
         var roster = await LoadRosterAsync(hubGroupId);
         var levels = await LoadSwimmerLevelsAsync(hubGroupId);
@@ -370,12 +392,77 @@ public class LanePlanService : ILanePlanService
         if (!swimmers.Any(s => s.LevelId != null))
             return (null, "Nobody coming today has a level yet — set levels in Admin → Levels first.");
 
-        var result = LaneAllocation.AutoLanes(input.LaneCount, groupLevels, swimmers, input.MaxPerLane);
+        // Закреплённые (CF2): последняя запись о пловце побеждает; без дорожки — не закрепление.
+        // Границы (пришедший, дорожка в 1..lane_count) проверяет сама раскладка.
+        var pinned = new Dictionary<int, int>();
+        foreach (var p in input.Pinned ?? [])
+            if (p.LaneNo is int no) pinned[p.SwimmerId] = no;
+
+        // Запасные дорожки — параметр плана (решение Влада 14.11.2026). Вид «по дорожкам» без плана
+        // (TrainingLaneView) считает сам и запаса не держит.
+        var result = LaneAllocation.AutoLanes(
+            input.LaneCount, groupLevels, swimmers, input.MaxPerLane, pinned, input.ReservedLanes);
         return (new LanePlanAutoLanesDto
         {
             Lanes = result.Lanes.Select(l => new LanePlanLaneInputDto { LaneNo = l.LaneNo, LevelId = l.LevelId }).ToList(),
-            Swimmers = result.Placements.Select(p => new LanePlanSwimmerInputDto { SwimmerId = p.SwimmerId, LaneNo = p.LaneNo }).ToList(),
+            Swimmers = result.Placements.Select(p => new LanePlanSwimmerInputDto
+            {
+                SwimmerId = p.SwimmerId,
+                LaneNo = p.LaneNo,
+                Pinned = p.LaneNo is int no && pinned.TryGetValue(p.SwimmerId, out var lane) && lane == no,
+            }).ToList(),
         }, null);
+    }
+
+    public async Task<LanePlanPublishCheckDto?> GetPublishCheckAsync(int hubGroupId, DateOnly date)
+    {
+        var plan = await _db.LanePlans.AsNoTracking()
+            .Include(p => p.Swimmers)
+            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+        return plan == null ? null : new LanePlanPublishCheckDto { Blockers = await LoadBlockersAsync(plan) };
+    }
+
+    /// <summary>
+    /// Решение 10: идущий («Going» хоть на одно занятие даты) пловец видимого состава без уровня,
+    /// который не стоит на дорожке плана (Unassigned, «Not today» или дорожка сверх числа дорожек).
+    /// Порядок — как в составе.
+    /// </summary>
+    private async Task<List<LanePlanBlockerDto>> LoadBlockersAsync(LanePlan plan)
+    {
+        var going = (await LoadAnswersBySwimmerAsync(plan.HubGroupId, plan.Date)).BySwimmer
+            .Where(g => g.Value.Contains(TrainingRsvpAnswer.Yes))
+            .Select(g => g.Key)
+            .ToHashSet();
+        if (going.Count == 0) return [];
+
+        var onLane = plan.Swimmers
+            .Where(s => s.LaneNo is int no && no <= plan.LaneCount)
+            .Select(s => s.SwimmerId)
+            .ToHashSet();
+        var levels = await LoadSwimmerLevelsAsync(plan.HubGroupId);
+        return (await LoadRosterAsync(plan.HubGroupId))
+            .Where(r => going.Contains(r.SwimmerId) && !levels.ContainsKey(r.SwimmerId) && !onLane.Contains(r.SwimmerId))
+            .Select(r => new LanePlanBlockerDto { SwimmerId = r.SwimmerId, Name = r.Name, NameEn = r.NameEn })
+            .ToList();
+    }
+
+    public async Task<LanePlanPublishResult> PublishAsync(int hubGroupId, DateOnly date)
+    {
+        var plan = await _db.LanePlans
+            .Include(p => p.Swimmers)
+            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+        if (plan == null) return new LanePlanPublishResult(false, null, false);
+        if (plan.Status == LanePlanStatus.Published) return new LanePlanPublishResult(true, null, false);
+
+        var blockers = await LoadBlockersAsync(plan);
+        if (blockers.Count > 0)
+            return new LanePlanPublishResult(true, LanePlanRules.PublishBlockedMessage(
+                blockers.Select(b => string.IsNullOrWhiteSpace(b.Name) ? b.NameEn : b.Name).ToList()), false);
+
+        plan.Status = LanePlanStatus.Published;
+        plan.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return new LanePlanPublishResult(true, null, true);
     }
 
     public async Task<bool> SetStatusAsync(int hubGroupId, DateOnly date, string status)

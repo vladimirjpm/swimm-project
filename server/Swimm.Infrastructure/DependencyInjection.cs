@@ -303,6 +303,7 @@ public static class DependencyInjection
         services.AddScoped<IPushSubscriptionService, PushSubscriptionService>();
         services.AddScoped<ITrainingReminderService, TrainingReminderService>();
         services.AddScoped<ICoachRequestNotifier, CoachRequestNotifier>();
+        services.AddScoped<ILanePlanNotifier, LanePlanNotifier>();
 
         // DB migrator
         services.AddScoped<IDbMigrator, DbMigrator>();

@@ -570,6 +570,8 @@ export interface LanePlanSummary {
   lane_count: number;
   /** Лимит людей на дорожку (перелив по подуровням); null — без лимита. */
   max_per_lane?: number | null;
+  /** Сколько дорожек Auto-arrange всегда оставляет пустыми про запас. */
+  reserved_lanes?: number;
 }
 
 export interface LanePlanLevel {
@@ -593,6 +595,8 @@ export interface LanePlanSwimmer {
   left_group?: boolean;
   /** На перерыве в день плана (Ш3.1): в Unassigned новой раскладки не кладётся. */
   on_break?: boolean;
+  /** Закреплён на дорожке (тренер перенёс руками, CF2): Auto-arrange не двигает. Только управляющему. */
+  pinned?: boolean;
 }
 
 export interface LanePlanLane {
@@ -608,6 +612,8 @@ export interface LanePlan {
   status: LanePlanStatus;
   lane_count: number;
   max_per_lane?: number | null;
+  /** Сколько дорожек Auto-arrange всегда оставляет пустыми про запас. */
+  reserved_lanes?: number;
   note?: string | null;
   updated_at: string;
   lanes: LanePlanLane[];
@@ -630,14 +636,21 @@ export interface LanePlan {
   }[];
 }
 
+/** `GET …/lane-plans/{date}/publish-check`: кто мешает опубликовать (решение 10 потока тренера). */
+export interface LanePlanPublishCheck {
+  blockers: { swimmer_id: number; name: string; name_en: string }[];
+}
+
 export interface LanePlanInput {
   lane_count: number;
   /** Лимит людей на дорожку; null — без лимита (перелива по подуровням нет). */
   max_per_lane: number | null;
+  /** Сколько дорожек Auto-arrange всегда оставляет пустыми про запас. */
+  reserved_lanes: number;
   note: string | null;
   lanes: { lane_no: number; level_id: number | null; workout: string | null }[];
   /** Порядок в массиве = порядок внутри дорожки; кого нет — «Not today». */
-  swimmers: { swimmer_id: number; lane_no: number | null }[];
+  swimmers: { swimmer_id: number; lane_no: number | null; pinned?: boolean }[];
 }
 
 // ── Ответы «иду / не приду» (docs/plans/entity-hero-roles-plan.md, Ш2) ──────────

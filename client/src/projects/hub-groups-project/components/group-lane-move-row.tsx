@@ -4,9 +4,11 @@ import React from 'react';
  * Строка переноса «Move <name> to [1][2][3] [Unassigned] [Not today] [Lead]» (Т7, Р6 п.1).
  * Появляется в карточке дорожки / корзины выбранного пловца; кнопки — ДРУГИЕ места, «Lead» —
  * только если он в дорожке не первый. Выбор снимает повторный тап по плашке или Esc (в редакторе).
+ * У закреплённого (CF2 плана trainings-coach-flow) — ещё «📌 Unpin»: следующий Auto-arrange снова
+ * сможет его переставить.
  */
 function LaneMoveRow({
-  name, laneNos, canUnassign, canOut, canLead, onLane, onUnassign, onOut, onLead,
+  name, laneNos, canUnassign, canOut, canLead, canUnpin = false, onLane, onUnassign, onOut, onLead, onUnpin,
 }: {
   name: string;
   /** Номера ДРУГИХ видимых дорожек. */
@@ -14,10 +16,13 @@ function LaneMoveRow({
   canUnassign: boolean;
   canOut: boolean;
   canLead: boolean;
+  /** Пловец закреплён на своей дорожке — можно снять закрепление. */
+  canUnpin?: boolean;
   onLane: (no: number) => void;
   onUnassign: () => void;
   onOut: () => void;
   onLead: () => void;
+  onUnpin?: () => void;
 }) {
   const btn = 'h-[36px] flex-none cursor-pointer rounded-[8px] border bg-transparent text-[12px] font-extrabold';
   const style = { borderColor: 'var(--deep-ow-border)', color: 'var(--deep-ow)' };
@@ -39,6 +44,11 @@ function LaneMoveRow({
       {canUnassign && <button type="button" className={`${btn} px-2.5`} style={style} onClick={onUnassign}>Unassigned</button>}
       {canOut && <button type="button" className={`${btn} px-2.5`} style={style} onClick={onOut}>Not today</button>}
       {canLead && <button type="button" className={`${btn} px-2.5`} style={style} onClick={onLead}>Lead</button>}
+      {canUnpin && (
+        <button type="button" className={`${btn} px-2.5`} style={style} onClick={onUnpin} title="Auto-arrange may move this swimmer again">
+          <span aria-hidden="true">📌 </span>Unpin
+        </button>
+      )}
     </div>
   );
 }

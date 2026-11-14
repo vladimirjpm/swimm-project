@@ -4,6 +4,8 @@ import AddVideoSheet from './sheets/add-video-sheet';
 import BreakSheet from './sheets/break-sheet';
 import DeleteTrainingSheet from './sheets/delete-training-sheet';
 import PersonSheet from './sheets/person-sheet';
+import PoolSetupSheet, { type PoolSetup } from './sheets/pool-setup-sheet';
+import PublishSheet, { type PublishRequest } from './sheets/publish-sheet';
 import TrainingFormSheet from './sheets/training-form-sheet';
 import TrainingLightbox from './sheets/training-lightbox';
 
@@ -16,7 +18,7 @@ import TrainingLightbox from './sheets/training-lightbox';
  * переделка формы не трогает секцию, а секцию можно заменить, не теряя формы.
  *
  * Т3: оболочка — общий `DeepSheet` (`components/deep/deep-sheet.tsx`), формы — в `sheets/`.
- * Т6 добавил `person` (шторка человека переклички тренера). Вид без записи в реестре хост
+ * Т6 добавил `person` (шторка человека переклички тренера), CF2 потока тренера — `pool-setup`, CF3 — `publish`. Вид без записи в реестре хост
  * ничего не рисует — `hasSheet` говорит, есть ли форма.
  */
 
@@ -29,6 +31,10 @@ export type TrainingsSheet =
   | { kind: 'break' }
   /** Человек переклички (⋮ / долгое нажатие у тренера): статус, ответ, заметка. */
   | { kind: 'person'; person: TrainingRsvpPerson }
+  /** Настройка бассейна (CF2): открывает редактор дорожек со снимком своего черновика. */
+  | { kind: 'pool-setup'; setup: PoolSetup }
+  /** Диалог публикации плана (CF3): открывает редактор дорожек с уже сохранённым планом. */
+  | { kind: 'publish'; publish: PublishRequest }
   | { kind: 'lightbox'; sessionId: number; index: number };
 
 export type TrainingsSheetKind = TrainingsSheet['kind'];
@@ -47,6 +53,8 @@ const SHEETS: SheetRegistry = {
   'delete-training': DeleteTrainingSheet,
   break: BreakSheet,
   person: PersonSheet,
+  'pool-setup': PoolSetupSheet,
+  publish: PublishSheet,
   lightbox: TrainingLightbox,
 };
 

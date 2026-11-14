@@ -18,6 +18,14 @@ namespace Swimm.Application.Mapping;
 /// как в <see cref="LaneDistribution"/>; на общей дорожке сперва сильнейший уровень.</item>
 /// <item>Задан лимит людей на дорожку — дорожки делятся так же, а затем нижний подуровень
 /// переполненной группы переливается на дорожки следующей (<see cref="LaneOverflow"/>).</item>
+/// <item>Закреплённые (тренер перенёс руками, CF2 плана trainings-coach-flow) считаются в числе
+/// людей своего уровня — дорожки делятся как без закрепления, — но остаются на своей дорожке:
+/// занимают на ней место (остальные режутся с учётом этого) и стоят в её конце.</item>
+/// <item><c>reserveLanes</c> (параметр плана «Reserve lanes», решение Влада 14.11.2026): столько
+/// последних дорожек остаются пустыми и без уровня — про запас; люди расходятся по остальным.
+/// Запас держится ВСЕГДА, и когда дорожек не хватает: уровни тогда сливаются на оставшихся, а
+/// при лимите дорожки переполняются (тренер видит это в редакторе). Людям остаётся хотя бы одна.
+/// Закреплённый на запасной дорожке на ней остаётся: тренер поставил его туда сам.</item>
 /// </list>
 /// У дорожки в модели один уровень: общей дорожке подписью ставится сильнейший из слитых.
 /// </summary>
@@ -33,9 +41,16 @@ public static class LaneAllocation
     private sealed record Group(List<Level> Levels, int Count, int Lanes);
 
     public static Result AutoLanes(
-        int laneCount, IEnumerable<Level> levels, IEnumerable<LaneDistribution.Swimmer> swimmers, int? maxPerLane = null)
+        int laneCount, IEnumerable<Level> levels, IEnumerable<LaneDistribution.Swimmer> swimmers, int? maxPerLane = null,
+        IReadOnlyDictionary<int, int>? pinned = null, int reserveLanes = 0)
     {
         var people = swimmers.OrderBy(s => s.SortKey).ThenBy(s => s.SwimmerId).ToList();
+
+        // Закрепление — только пришедшего и только на существующей дорожке.
+        var pinnedLane = people
+            .Where(s => pinned != null && pinned.TryGetValue(s.SwimmerId, out var no) && no >= 1 && no <= laneCount)
+            .ToDictionary(s => s.SwimmerId, s => pinned![s.SwimmerId]);
+        var occupied = pinnedLane.Values.GroupBy(no => no).ToDictionary(g => g.Key, g => g.Count());
         var countOf = people.Where(s => s.LevelId != null)
             .GroupBy(s => s.LevelId!.Value)
             .ToDictionary(g => g.Key, g => g.Count());
@@ -46,9 +61,12 @@ public static class LaneAllocation
             .OrderBy(l => l.Rank).ThenBy(l => l.LevelId)
             .ToList();
 
-        var groups = present.Count <= laneCount
-            ? Spread(laneCount, present, countOf)
-            : Merge(laneCount, present, countOf);
+        // Сколько дорожек делится между уровнями: все, кроме запаса; хотя бы одна остаётся людям.
+        var usable = Math.Max(1, laneCount - Math.Max(0, reserveLanes));
+
+        var groups = present.Count <= usable
+            ? Spread(usable, present, countOf)
+            : Merge(usable, present, countOf);
 
         var lanes = new List<LaneDistribution.Lane>(laneCount);
         var blocks = new List<LaneOverflow.Block>(groups.Count);
@@ -65,15 +83,22 @@ public static class LaneAllocation
             // (OrderBy устойчив). Уйти вниз может только нижний подуровень слабейшего уровня группы.
             var ids = g.Levels.Select(l => l.LevelId).ToHashSet();
             var weakest = g.Levels[^1].LevelId;
-            var members = people.Where(s => s.LevelId is int id && ids.Contains(id))
+            var members = people.Where(s => s.LevelId is int id && ids.Contains(id) && !pinnedLane.ContainsKey(s.SwimmerId))
                 .OrderBy(s => rankOf[s.LevelId!.Value]).ThenBy(LaneOverflow.SubLevelOrder).ToList();
             blocks.Add(new LaneOverflow.Block(
                 numbers,
                 members.Select(s => s.SwimmerId).ToList(),
                 members.Where(s => s.LevelId == weakest && LaneOverflow.IsBottom(s, subLevelsOf))
-                    .Select(s => s.SwimmerId).ToHashSet()));
+                    .Select(s => s.SwimmerId).ToHashSet(),
+                occupied));
         }
         var placed = LaneOverflow.Place(blocks, maxPerLane);
+        // Закреплённые — в конец своей дорожки, в порядке состава (OrderBy устойчив).
+        placed = placed
+            .Concat(people.Where(s => pinnedLane.ContainsKey(s.SwimmerId))
+                .Select(s => new LaneDistribution.Placement(s.SwimmerId, pinnedLane[s.SwimmerId])))
+            .OrderBy(p => p.LaneNo)
+            .ToList();
         var onLane = placed.Select(p => p.SwimmerId).ToHashSet();
         for (; next <= laneCount; next++) lanes.Add(new LaneDistribution.Lane(next, null));
 

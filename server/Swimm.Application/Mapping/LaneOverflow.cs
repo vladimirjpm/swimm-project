@@ -23,8 +23,17 @@ public static class LaneOverflow
     /// <summary>
     /// Блок дорожек: номера по возрастанию и люди в порядке «сильнейший первым» (этот порядок —
     /// кто ведёт). <paramref name="Movable"/> — кто из них может уйти вниз (нижний подуровень).
+    /// <paramref name="Occupied"/> — сколько мест на дорожке уже занято закреплёнными (CF2 плана
+    /// trainings-coach-flow): их не двигают, но они занимают место — и в лимите, и при резке кусков.
     /// </summary>
-    public sealed record Block(IReadOnlyList<int> LaneNos, IReadOnlyList<int> SwimmerIds, IReadOnlySet<int> Movable);
+    public sealed record Block(
+        IReadOnlyList<int> LaneNos, IReadOnlyList<int> SwimmerIds, IReadOnlySet<int> Movable,
+        IReadOnlyDictionary<int, int>? Occupied = null)
+    {
+        public int OccupiedOn(int laneNo) => Occupied != null && Occupied.TryGetValue(laneNo, out var n) ? n : 0;
+
+        public int OccupiedTotal => LaneNos.Sum(OccupiedOn);
+    }
 
     /// <summary>
     /// Раскладка: (пловец, дорожка) по номеру дорожки, внутри — итоговый порядок дорожки (кто ведёт).
@@ -43,7 +52,7 @@ public static class LaneOverflow
             {
                 var capacity = max * blocks[k].LaneNos.Count;
                 var canShed = Math.Min(MovableCount(blocks[k]), absorb[k + 1]);
-                absorb[k] = Math.Max(0, capacity - blocks[k].SwimmerIds.Count + canShed);
+                absorb[k] = Math.Max(0, capacity - blocks[k].OccupiedTotal - blocks[k].SwimmerIds.Count + canShed);
             }
 
         var incoming = new List<int>();
@@ -54,7 +63,7 @@ public static class LaneOverflow
             var leaving = new List<int>();
             if (maxPerLane is int cap)
             {
-                var over = incoming.Count + own.Count - cap * block.LaneNos.Count;
+                var over = incoming.Count + own.Count + block.OccupiedTotal - cap * block.LaneNos.Count;
                 var shed = Math.Min(Math.Max(0, over), Math.Min(MovableCount(block), absorb[k + 1]));
                 // С конца порядка: уходят слабейшие из нижнего подуровня.
                 for (var i = own.Count - 1; i >= 0 && leaving.Count < shed; i--)
@@ -63,7 +72,7 @@ public static class LaneOverflow
                 own.RemoveAll(leaving.Contains);
             }
 
-            Cut([.. incoming, .. own], block.LaneNos, placed);
+            Cut([.. incoming, .. own], block, placed);
             incoming = leaving;
         }
         return placed.OrderBy(p => p.LaneNo).ToList();   // OrderBy устойчив — порядок внутри дорожки сохраняется
@@ -71,13 +80,26 @@ public static class LaneOverflow
 
     private static int MovableCount(Block block) => block.SwimmerIds.Count(block.Movable.Contains);
 
-    /// <summary>Подряд идущие куски по дорожкам, размеры отличаются не больше чем на 1, большие — первыми.</summary>
-    private static void Cut(List<int> members, IReadOnlyList<int> laneNos, List<LaneDistribution.Placement> placed)
+    /// <summary>
+    /// Подряд идущие куски по дорожкам: каждый следующий человек добавляет место дорожке, где сейчас
+    /// меньше всего людей (вместе с закреплёнными), при равенстве — меньшему номеру. Без закреплённых
+    /// это прежнее «размеры отличаются не больше чем на 1, большие — первыми».
+    /// </summary>
+    private static void Cut(List<int> members, Block block, List<LaneDistribution.Placement> placed)
     {
+        var laneNos = block.LaneNos;
         if (laneNos.Count == 0) return;
-        int size = members.Count / laneNos.Count, extra = members.Count % laneNos.Count, index = 0;
+        var sizes = new int[laneNos.Count];
+        for (var m = 0; m < members.Count; m++)
+        {
+            var best = 0;
+            for (var i = 1; i < laneNos.Count; i++)
+                if (sizes[i] + block.OccupiedOn(laneNos[i]) < sizes[best] + block.OccupiedOn(laneNos[best])) best = i;
+            sizes[best]++;
+        }
+        var index = 0;
         for (var i = 0; i < laneNos.Count; i++)
-            for (var k = 0; k < size + (i < extra ? 1 : 0); k++) placed.Add(new LaneDistribution.Placement(members[index++], laneNos[i]));
+            for (var k = 0; k < sizes[i]; k++) placed.Add(new LaneDistribution.Placement(members[index++], laneNos[i]));
     }
 
     /// <summary>

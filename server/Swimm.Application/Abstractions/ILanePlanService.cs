@@ -47,7 +47,19 @@ public interface ILanePlanService
     /// </summary>
     Task<(LanePlanAutoLanesDto? Result, string? Error)> AutoLanesAsync(int hubGroupId, LanePlanAutoLanesInputDto input);
 
-    /// <summary>Опубликовать / вернуть в черновик. false — плана нет.</summary>
+    /// <summary>
+    /// Идущие пловцы без уровня, которые не стоят на дорожке (решение 10 плана
+    /// trainings-coach-flow): пока они есть, план не публикуется. null — плана нет.
+    /// </summary>
+    Task<LanePlanPublishCheckDto?> GetPublishCheckAsync(int hubGroupId, DateOnly date);
+
+    /// <summary>Опубликовать с проверкой решения 10 (<see cref="GetPublishCheckAsync"/>).</summary>
+    Task<LanePlanPublishResult> PublishAsync(int hubGroupId, DateOnly date);
+
+    /// <summary>
+    /// Сменить статус без проверок: вернуть в черновик (Unpublish). Публикацию из интерфейса ведёт
+    /// <see cref="PublishAsync"/>. false — плана нет.
+    /// </summary>
     Task<bool> SetStatusAsync(int hubGroupId, DateOnly date, string status);
 
     /// <summary>Удалить план. false — плана нет.</summary>

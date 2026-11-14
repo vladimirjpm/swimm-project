@@ -195,6 +195,7 @@ DELETE /api/hub-groups/{id}/lane-plans/{date}              CanEdit → 204 / 404
 | ✅ **L3** | Таб `Lanes`: редактор управляющего (дорожки, Distribute, перенос, корзины, задания) + доска только для чтения | сделано 26.09.2026 — см. «Сделано» ниже |
 | ✅ **L4** | Таб `Lanes`: доска участника + «Your lane» (`my_swimmers` на сервере); замок не участнику; `utest`-персонажи | сделано 26.09.2026 — см. «Сделано» ниже | `utest-member` видит опубликованный план и не видит черновик; гость — замок; pending — замок |
 | ✅ **L5** | «Copy from previous plan»; footguns: склейка пловцов, delete-impact | сделано 26.09.2026 — см. «Сделано» ниже |
+| ✅ **Закрепление + Pool setup** | Пловец, перенесённый руками, закреплён (`Pinned`, миграция `AddLanePlanSwimmerPinned`): Auto-arrange его не двигает; параметр плана «Reserve lanes» (`ReservedLanes`, миграция `AddLanePlanReservedLanes`) — сколько последних дорожек Auto-arrange всегда оставляет пустыми; в Pool setup — в одном блоке с числом дорожек; тулбар заменён кнопками «Auto-arrange» / «Pool setup», Distribute из интерфейса убран | сделано 14.11.2026 — CF2, `trainings-coach-flow-plan.md` §7 |
 | ✅ **Auto lanes** | Дорожки между уровнями по числу пришедших (`LaneAllocation`), кнопка в редакторе | сделано 27.09.2026 (PR #99) — см. «Сделано» ниже |
 | ✅ **Подуровни** | «Advanced 1 / Advanced 2…», лимит «Max per lane», перелив нижнего подуровня вниз (`LaneOverflow`), миграция `AddLevelSubLevels` | сделано 20.10.2026 — см. «Сделано» ниже |
 

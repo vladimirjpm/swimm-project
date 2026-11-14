@@ -14,6 +14,8 @@ public static class LanePlanRules
     public const int MaxLanes = 12;
     public const int MinPerLane = 1;
     public const int MaxPerLane = 20;
+    /// <summary>Запасных дорожек — не больше, чем «все, кроме одной» при самом большом бассейне.</summary>
+    public const int MaxReservedLanes = MaxLanes - 1;
     public const int NoteMaxLength = 500;
     public const int WorkoutMaxLength = 4000;
     public const string DateFormat = "yyyy-MM-dd";
@@ -25,13 +27,45 @@ public static class LanePlanRules
 
     public static string FormatDate(DateOnly date) => date.ToString(DateFormat, CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// Отказ в публикации (решение 10 плана trainings-coach-flow): «Tom and Niv are going but have
+    /// no level and no lane…». Имён больше трёх — «Tom, Niv, Dan and 2 more».
+    /// </summary>
+    public static string PublishBlockedMessage(IReadOnlyList<string> names)
+    {
+        const int shown = 3;
+        var head = names.Take(shown).ToList();
+        var rest = names.Count - head.Count;
+        var list = rest > 0 ? $"{string.Join(", ", head)} and {rest} more"
+            : head.Count == 1 ? head[0]
+            : $"{string.Join(", ", head.Take(head.Count - 1))} and {head[^1]}";
+        var verb = names.Count == 1 ? "is going but has" : "are going but have";
+        return $"{list} {verb} no level and no lane. Set a level or put them on a lane to publish.";
+    }
+
+    /// <summary>
+    /// Push участникам об опубликованном плане (CF3): заголовок — название группы, текст — «Lanes
+    /// for Sat, Nov 14 are ready». Адрес зеркалит <c>routes.group(slug)</c> клиента + <c>?tab=</c>;
+    /// тег — ключ плана: повторная публикация заменяет уведомление, а не копит.
+    /// </summary>
+    public static (string Title, string Body, string Url, string Tag) PublishedPush(
+        int hubGroupId, string groupName, string slug, DateOnly date) =>
+        (groupName,
+         $"Lanes for {date.ToString("ddd, MMM d", CultureInfo.InvariantCulture)} are ready",
+         $"/groups/{Uri.EscapeDataString(slug)}?tab=trainings",
+         $"lanes-{hubGroupId}-{FormatDate(date)}");
+
     public sealed record NormalizedLane(int LaneNo, int? LevelId, string? Workout);
 
-    /// <summary>Пловец плана: <c>OrderNo</c> — место в своей дорожке (или среди Unassigned).</summary>
-    public sealed record NormalizedSwimmer(int SwimmerId, int? LaneNo, int OrderNo);
+    /// <summary>
+    /// Пловец плана: <c>OrderNo</c> — место в своей дорожке (или среди Unassigned);
+    /// <c>Pinned</c> — закреплён на дорожке («Auto-arrange» не двигает).
+    /// </summary>
+    public sealed record NormalizedSwimmer(int SwimmerId, int? LaneNo, int OrderNo, bool Pinned = false);
 
     public sealed record NormalizedPlan(
-        int LaneCount, int? MaxPerLane, string? Note, IReadOnlyList<NormalizedLane> Lanes, IReadOnlyList<NormalizedSwimmer> Swimmers);
+        int LaneCount, int? MaxPerLane, string? Note, IReadOnlyList<NormalizedLane> Lanes, IReadOnlyList<NormalizedSwimmer> Swimmers,
+        int ReservedLanes = LanePlanDefaults.ReservedLanes);
 
     /// <summary>
     /// Проверить план и привести к полному виду: дорожки 1..LaneCount все (недостающие — пустые),
@@ -46,6 +80,9 @@ public static class LanePlanRules
 
         var perLaneError = CheckMaxPerLane(input.MaxPerLane);
         if (perLaneError != null) return (null, perLaneError);
+
+        var reservedError = CheckReservedLanes(input.ReservedLanes);
+        if (reservedError != null) return (null, reservedError);
 
         var note = input.Note?.Trim();
         if (string.IsNullOrEmpty(note)) note = null;
@@ -66,10 +103,11 @@ public static class LanePlanRules
             var key = s.LaneNo ?? 0;
             var order = orderInLane.GetValueOrDefault(key);
             orderInLane[key] = order + 1;
-            swimmers.Add(new NormalizedSwimmer(s.SwimmerId, s.LaneNo, order));
+            // Закрепление — только на дорожке (CF2).
+            swimmers.Add(new NormalizedSwimmer(s.SwimmerId, s.LaneNo, order, s.Pinned && s.LaneNo != null));
         }
 
-        return (new NormalizedPlan(input.LaneCount, input.MaxPerLane, note, lanes, swimmers), null);
+        return (new NormalizedPlan(input.LaneCount, input.MaxPerLane, note, lanes, swimmers, input.ReservedLanes), null);
     }
 
     /// <summary>Дорожки «Distribute»/плана: номера в 1..LaneCount без повторов, задание ≤ лимита.</summary>
@@ -104,6 +142,13 @@ public static class LanePlanRules
         maxPerLane is < MinPerLane or > MaxPerLane
             ? $"Max per lane: from {MinPerLane} to {MaxPerLane}, or no limit."
             : null;
+
+    /// <summary>
+    /// Запасных дорожек: 0..11. Больше, чем дорожек в плане, — не ошибка: раскладка возьмёт столько,
+    /// сколько можно (число дорожек тренер меняет отдельно).
+    /// </summary>
+    public static string? CheckReservedLanes(int reservedLanes) =>
+        reservedLanes is < 0 or > MaxReservedLanes ? $"Reserve lanes: from 0 to {MaxReservedLanes}." : null;
 
     private static string? CheckLaneCount(int laneCount) =>
         laneCount is < MinLanes or > MaxLanes ? $"Lanes: from {MinLanes} to {MaxLanes}." : null;

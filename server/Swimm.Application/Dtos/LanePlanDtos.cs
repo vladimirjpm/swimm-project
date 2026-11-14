@@ -22,6 +22,13 @@ public sealed class LanePlanSummaryDto
     /// <summary>Лимит людей на дорожку (перелив по подуровням); null — без лимита.</summary>
     [JsonPropertyName("max_per_lane")]
     public int? MaxPerLane { get; set; }
+
+    /// <summary>
+    /// Сколько дорожек «Auto-arrange» оставляет пустыми про запас (0..11). Запас держится всегда,
+    /// и когда дорожек не хватает; людям остаётся хотя бы одна.
+    /// </summary>
+    [JsonPropertyName("reserved_lanes")]
+    public int ReservedLanes { get; set; }
 }
 
 /// <summary>Уровень на дорожке — подпись и цвет (null-цвет клиент красит по рангу).</summary>
@@ -73,6 +80,13 @@ public sealed class LanePlanSwimmerDto
     /// </summary>
     [JsonPropertyName("on_break")]
     public bool OnBreak { get; set; }
+
+    /// <summary>
+    /// Закреплён на дорожке (тренер перенёс руками, CF2): «Auto-arrange» его не двигает.
+    /// Только управляющему — участнику всегда false.
+    /// </summary>
+    [JsonPropertyName("pinned")]
+    public bool Pinned { get; set; }
 }
 
 public sealed class LanePlanLaneDto
@@ -106,6 +120,13 @@ public sealed class LanePlanDto
     /// <summary>Лимит людей на дорожку (перелив по подуровням); null — без лимита.</summary>
     [JsonPropertyName("max_per_lane")]
     public int? MaxPerLane { get; set; }
+
+    /// <summary>
+    /// Сколько дорожек «Auto-arrange» оставляет пустыми про запас (0..11). Запас держится всегда,
+    /// и когда дорожек не хватает; людям остаётся хотя бы одна.
+    /// </summary>
+    [JsonPropertyName("reserved_lanes")]
+    public int ReservedLanes { get; set; }
 
     [JsonPropertyName("note")]
     public string? Note { get; set; }
@@ -152,6 +173,44 @@ public sealed class LanePlanAwayDto
     public List<int> SwimmerIds { get; set; } = [];
 }
 
+/// <summary>
+/// Что мешает опубликовать план (docs/plans/trainings-coach-flow-plan.md, решение 10): идущие
+/// («Going» на занятие этой даты) пловцы без уровня, которые не стоят на дорожке. Пусто — можно.
+/// </summary>
+public sealed class LanePlanPublishCheckDto
+{
+    [JsonPropertyName("blockers")]
+    public List<LanePlanBlockerDto> Blockers { get; set; } = [];
+}
+
+public sealed class LanePlanBlockerDto
+{
+    [JsonPropertyName("swimmer_id")]
+    public int SwimmerId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("name_en")]
+    public string NameEn { get; set; } = "";
+}
+
+/// <summary>Тело «Publish»: <c>notify</c> — разослать участникам push «дорожки готовы» (CF3).</summary>
+public sealed class LanePlanPublishInputDto
+{
+    [JsonPropertyName("notify")]
+    public bool Notify { get; set; }
+}
+
+/// <summary>
+/// Итог «Publish»: плана нет / отказ с текстом (решение 10) / опубликован. <see cref="Changed"/> —
+/// статус действительно сменился (повторный Publish уведомление не шлёт).
+/// </summary>
+public sealed record LanePlanPublishResult(bool Found, string? Error, bool Changed)
+{
+    public bool Success => Found && Error == null;
+}
+
 /// <summary>«Мой» пловец плана: <c>me</c> — сам зритель, <c>family</c> — за кого он смотрит.</summary>
 public sealed class LanePlanMySwimmerDto
 {
@@ -169,6 +228,13 @@ public sealed class LanePlanMySwimmerDto
     /// </summary>
     [JsonPropertyName("moved_from_lane")]
     public int? MovedFromLane { get; set; }
+}
+
+/// <summary>Значения по умолчанию входа плана — когда клиент поле не прислал.</summary>
+public static class LanePlanDefaults
+{
+    /// <summary>Запасных дорожек у нового плана: одна.</summary>
+    public const int ReservedLanes = 1;
 }
 
 // ── Вход ────────────────────────────────────────────────────────────────────
@@ -193,6 +259,13 @@ public sealed class LanePlanSwimmerInputDto
     /// <summary>null — Unassigned. Порядок в массиве = порядок внутри дорожки.</summary>
     [JsonPropertyName("lane_no")]
     public int? LaneNo { get; set; }
+
+    /// <summary>
+    /// Закреплён на этой дорожке (тренер перенёс руками, CF2): «Auto-arrange» его не двигает.
+    /// Без дорожки (Unassigned) не учитывается.
+    /// </summary>
+    [JsonPropertyName("pinned")]
+    public bool Pinned { get; set; }
 }
 
 /// <summary>
@@ -207,6 +280,13 @@ public sealed class LanePlanInputDto
     /// <summary>Лимит людей на дорожку (перелив по подуровням); null — без лимита.</summary>
     [JsonPropertyName("max_per_lane")]
     public int? MaxPerLane { get; set; }
+
+    /// <summary>
+    /// Сколько дорожек «Auto-arrange» оставляет пустыми про запас (0..11). Запас держится всегда,
+    /// и когда дорожек не хватает; людям остаётся хотя бы одна.
+    /// </summary>
+    [JsonPropertyName("reserved_lanes")]
+    public int ReservedLanes { get; set; } = LanePlanDefaults.ReservedLanes;
 
     [JsonPropertyName("note")]
     public string? Note { get; set; }
@@ -240,7 +320,8 @@ public sealed class LanePlanDistributeInputDto
 
 /// <summary>
 /// «Auto lanes»: сколько дорожек и кто сегодня пришёл (<c>swimmer_ids</c> null — весь видимый
-/// состав). Сервер сам делит дорожки между уровнями (<c>LaneAllocation</c>). Ничего не сохраняет.
+/// состав). Сервер сам делит дорожки между уровнями (<c>LaneAllocation</c>); <c>reserved_lanes</c>
+/// последних дорожек оставляет пустыми всегда. Ничего не сохраняет.
 /// </summary>
 public sealed class LanePlanAutoLanesInputDto
 {
@@ -251,8 +332,23 @@ public sealed class LanePlanAutoLanesInputDto
     [JsonPropertyName("max_per_lane")]
     public int? MaxPerLane { get; set; }
 
+    /// <summary>
+    /// Сколько дорожек «Auto-arrange» оставляет пустыми про запас (0..11). Запас держится всегда,
+    /// и когда дорожек не хватает; людям остаётся хотя бы одна.
+    /// </summary>
+    [JsonPropertyName("reserved_lanes")]
+    public int ReservedLanes { get; set; } = LanePlanDefaults.ReservedLanes;
+
     [JsonPropertyName("swimmer_ids")]
     public List<int>? SwimmerIds { get; set; }
+
+    /// <summary>
+    /// Закреплённые (CF2): кто на какой дорожке стоит и не должен сдвинуться. Считаются в числе
+    /// людей своего уровня, но остаются на своей дорожке; в ответе стоят в её конце с
+    /// <c>pinned: true</c>. Не из пришедших или с дорожкой вне 1..lane_count — не закрепление.
+    /// </summary>
+    [JsonPropertyName("pinned")]
+    public List<LanePlanSwimmerInputDto>? Pinned { get; set; }
 }
 
 /// <summary>Итог «Auto lanes»: уровень каждой дорожки (1..lane_count) и раскладка людей.</summary>

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
@@ -26,9 +27,13 @@ public class HubGroupLanePlansController : ControllerBase
     private readonly IHubGroupPermissionService _permissions;
     private readonly IHubGroupTrainingRepository _trainings;
 
+    private readonly ILanePlanNotifier _notifier;
+
     public HubGroupLanePlansController(
-        ILanePlanService plans, IHubGroupPermissionService permissions, IHubGroupTrainingRepository trainings)
+        ILanePlanService plans, IHubGroupPermissionService permissions, IHubGroupTrainingRepository trainings,
+        ILanePlanNotifier notifier)
     {
+        _notifier = notifier;
         _plans = plans;
         _permissions = permissions;
         _trainings = trainings;
@@ -151,8 +156,39 @@ public class HubGroupLanePlansController : ControllerBase
         return result == null ? BadRequest(new { error }) : Ok(result);
     }
 
+    /// <summary>
+    /// Что мешает опубликовать (решение 10 плана trainings-coach-flow): идущие пловцы без уровня не
+    /// на дорожке. Диалог публикации показывает их заранее; сам Publish проверяет то же.
+    /// </summary>
+    [HttpGet("{date}/publish-check")]
+    public async Task<IActionResult> PublishCheck(int id, string date)
+    {
+        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var check = await _plans.GetPublishCheckAsync(id, day);
+        return check == null ? NotFound() : Ok(check);
+    }
+
+    /// <summary>
+    /// Опубликовать. Отказ 400 с текстом — решение 10. Тело необязательно; <c>notify</c> — push
+    /// участникам «дорожки готовы» (только когда статус действительно сменился).
+    /// </summary>
     [HttpPost("{date}/publish")]
-    public Task<IActionResult> Publish(int id, string date) => SetStatusAsync(id, date, LanePlanStatus.Published);
+    public async Task<IActionResult> Publish(
+        int id, string date, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] LanePlanPublishInputDto? input)
+    {
+        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var result = await _plans.PublishAsync(id, day);
+        if (!result.Found) return NotFound();
+        if (result.Error != null) return BadRequest(new { error = result.Error });
+
+        if (result.Changed && input?.Notify == true)
+            await _notifier.NotifyPublishedAsync(id, day, CurrentUserId()!.Value, HttpContext.RequestAborted);
+        return NoContent();
+    }
 
     [HttpPost("{date}/unpublish")]
     public Task<IActionResult> Unpublish(int id, string date) => SetStatusAsync(id, date, LanePlanStatus.Draft);
