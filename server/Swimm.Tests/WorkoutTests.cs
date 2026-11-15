@@ -117,6 +117,20 @@ public class WorkoutTests
     }
 
     [Fact]
+    public void ForLevel_UntitledSet_NumberedLikeCoachSheet()
+    {
+        WorkoutSetDto Plain(List<int>? levels) => new()
+        {
+            Repeat = 1, LevelIds = levels,
+            Lines = [new WorkoutLineDto { Reps = 1, Distance = 100, Text = "x" }],
+        };
+        var workout = new WorkoutDto { Sets = [Plain(null), Plain([Adv]), Plain(null)] };
+
+        Assert.Equal(["Set 1", "Set 3"], WorkoutRules.ForLevel(workout, Int)!.Sets.Select(s => s.Title));
+        Assert.Equal(["Set 1", "Set 2", "Set 3"], WorkoutRules.ForLevel(workout, Adv)!.Sets.Select(s => s.Title));
+    }
+
+    [Fact]
     public void LaneView_LevelWorkout_OnlyOnViewersLane()
     {
         var levels = new TrainingLaneView.LevelInfo[] { new(Adv, 1, "Advanced", null), new(Int, 2, "Intermediate", null) };
@@ -136,6 +150,12 @@ public class WorkoutTests
         var mine = dto.Lanes[1].LevelWorkout!;
         Assert.Single(mine.Sets);
         Assert.Equal("1:50", mine.Sets[0].Lines[0].PerLevel![Int].SendOff);
+
+        // Управляющему — версия уровня на каждой дорожке (режим «View» страницы группы).
+        var coach = TrainingLaneView.Build(GroupLaneView.Plan, plan, null, null, levels, pool, viewerUserId: 99,
+            namesVisible: true, workoutOnEveryLane: true)!;
+        Assert.Equal(2, coach.Lanes[0].LevelWorkout!.Sets.Count);
+        Assert.Equal("1:50", coach.Lanes[1].LevelWorkout!.Sets[0].Lines[0].PerLevel![Int].SendOff);
     }
 
     // ── Сервис ──────────────────────────────────────────────────────────────

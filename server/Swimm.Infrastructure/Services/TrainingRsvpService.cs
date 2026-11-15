@@ -459,7 +459,7 @@ public class TrainingRsvpService : ITrainingRsvpService
 
         var namesVisible = isManager || schedule.EffectiveWhoIsComing == GroupWhoIsComing.Members;
         return TrainingLaneView.Build(mode, planModel, schedule.UsualLanes, lastPlanLanes, levels, pool,
-            viewerUserId, namesVisible);
+            viewerUserId, namesVisible, workoutOnEveryLane: isManager);
     }
 
     /// <summary>Убрать строку ответа за пловца, которым стоит аккаунт, на это занятие.</summary>

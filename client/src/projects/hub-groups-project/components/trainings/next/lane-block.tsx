@@ -11,6 +11,9 @@ import { CancelledPill } from './session-tag';
 import { hasWorkout } from '../workout/workout-for-level';
 import WorkoutLevelView from '../workout/workout-level-view';
 import { formatKm, levelMeters } from '../workout/workout-totals';
+import { ownLaneNo, previewLaneNo } from './lane-preview';
+import { LevelTag } from '../workout/workout-level-tag';
+import { levelColor } from '../../level-color';
 
 /**
  * Ближайшее занятие участника: шапка, «Your lane», бассейн и счётчики (Т5, хендофф Trainings Tab,
@@ -23,9 +26,17 @@ import { formatKm, levelMeters } from '../workout/workout-totals';
  * нет. Нового workout нет — как раньше, старое задание дорожки строкой.
  */
 
-/** Своя дорожка: та, где среди `people` есть `is_me`. */
-function myLane(lanes: TrainingLane[]): TrainingLane | null {
-  return lanes.find((l) => l.people.some((p) => p.is_me)) ?? null;
+/**
+ * Номер «своей» дорожки экрана: участнику — где он стоит (`is_me`); управляющему в режиме «👁 View» —
+ * выбранная в ряду дорожек (`lane-preview-picker.tsx`).
+ */
+function useMyLaneNo(lanes: TrainingLane[]): number | null {
+  const { lanePreview, previewLane } = useTrainingsTab();
+  return lanePreview ? previewLaneNo(lanes, previewLane) : ownLaneNo(lanes);
+}
+
+function laneByNo(lanes: TrainingLane[], no: number | null): TrainingLane | null {
+  return no == null ? null : lanes.find((l) => l.lane_no === no) ?? null;
 }
 
 /** Подпись дорожки: «2 · medium» (уровень в нижнем регистре, если он есть) либо «2». */
@@ -129,10 +140,18 @@ export function YourWorkout({ lane }: { lane: TrainingLane }) {
   const workout = lane.level_workout;
   if (!hasWorkout(workout)) return null;
   const levelId = lane.level?.id ?? null;
+  // Уровень дорожки в шапке — кружок ранга его цветом и полное название (Влад, 15.11.2026); рамка
+  // карточки — тот же цвет: сразу видно, чья это версия.
   return (
-    <div className="flex min-w-0 flex-col gap-2 rounded-[12px] border p-3" style={{ borderColor: 'var(--deep-card-border)', background: 'var(--deep-card-bg)' }}>
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>Your workout</span>
+    <div
+      className="flex min-w-0 flex-col gap-2 rounded-[12px] border p-3"
+      style={{ borderColor: lane.level ? levelColor(lane.level) : 'var(--deep-card-border)', background: 'var(--deep-card-bg)' }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="flex-none text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>Your workout</span>
+          {lane.level && <LevelTag level={lane.level} full />}
+        </span>
         <span className="text-[11px] font-bold" style={{ color: 'var(--t-text-3)' }}>
           <span className="hp-mono text-[12.5px] font-extrabold" style={{ color: 'var(--deep-text)' }}>{formatKm(levelMeters(workout, levelId))}</span> · send-off
         </span>
@@ -148,8 +167,9 @@ export function YourWorkout({ lane }: { lane: TrainingLane }) {
  */
 export function YourLane({ r }: { r: TrainingRsvp }) {
   const view = r.lane_view;
+  const myNo = useMyLaneNo(view?.lanes ?? []);
   if (!view || view.source === 'water') return null;
-  const lane = myLane(view.lanes);
+  const lane = laneByNo(view.lanes, myNo);
   // Новый workout занятия (CF6) заменяет старое задание дорожки.
   const workout = lane && !hasWorkout(lane.level_workout) ? workoutOneLine(lane.workout) : null;
   const answer = r.mine?.answer ?? null;
@@ -213,6 +233,7 @@ function MiniRow({
 export function MiniPool({ r, footer }: { r: TrainingRsvp; footer?: React.ReactNode }) {
   const { openLanes } = useTrainingsTab();
   const view = r.lane_view;
+  const myNo = useMyLaneNo(view?.lanes ?? []);
   if (!view) return null;
   const open = () => openLanes(r.date);
   const water = view.source === 'water';
@@ -238,7 +259,7 @@ export function MiniPool({ r, footer }: { r: TrainingRsvp; footer?: React.ReactN
               key={lane.lane_no}
               label={laneLabel(lane)}
               people={lane.people}
-              mine={lane.people.some((p) => p.is_me)}
+              mine={lane.lane_no === myNo}
               first={i === 0}
             />
           ))
@@ -320,6 +341,7 @@ function FullRow({
 export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolean }) {
   const { openLanes, marks } = useTrainingsTab();
   const view = r.lane_view;
+  const myNo = useMyLaneNo(view?.lanes ?? []);
   if (!view) return null;
   const water = view.source === 'water';
 
@@ -362,7 +384,7 @@ export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolea
                   ? `Workout · ${formatKm(levelMeters(lane.level_workout, lane.level?.id ?? null))}`
                   : workoutOneLine(lane.workout)}
                 people={lane.people}
-                mine={lane.people.some((p) => p.is_me)}
+                mine={lane.lane_no === myNo}
                 first={i === 0}
                 showMe={!coach}
               />
@@ -383,7 +405,7 @@ export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolea
         )}
       </div>
       {!coach && !water && (() => {
-        const mine = myLane(view.lanes);
+        const mine = laneByNo(view.lanes, myNo);
         return mine ? <YourWorkout lane={mine} /> : null;
       })()}
     </div>

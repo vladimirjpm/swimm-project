@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { fillByStep, formatSendOff, parseSendOff } from './workout-time.ts';
 import { formatKm, kmRange, levelMeters } from './workout-totals.ts';
 import { workoutForLevel } from './workout-for-level.ts';
-import { cellLabel, levelAbbr, lineSummary, parseCellLabel, parseRepsDistance, setAudience } from './workout-format.ts';
+import { cellLabel, intensityKeys, levelAbbr, lineDir, lineSummary, parseCellLabel, parseRepsDistance, setAudience } from './workout-format.ts';
 
 const ADV = 1, INT = 2, DEV = 3, BEG = 4;
 
@@ -120,4 +120,29 @@ test('подписи уровней и сетов', () => {
   assert.equal(setAudience({ level_ids: null }, levels), 'Everyone');
   assert.equal(setAudience({ level_ids: [ADV] }, levels), 'Advanced only');
   assert.equal(setAudience({ level_ids: [ADV, INT] }, levels), 'Adv, Int');
+});
+
+test('направление строки: иврит — rtl, латиница и пусто — ltr', () => {
+  assert.equal(lineDir("(75 חתירה 2V '15 + 25 ספרינט סגנון + 25 קל)"), 'rtl');
+  assert.equal(lineDir('free 2-3V'), 'ltr');
+  assert.equal(lineDir(null), 'ltr');
+  assert.equal(lineDir(''), 'ltr');
+});
+
+test('версия уровня: сет без названия — «Set N» по номеру у тренера, пропуск не сдвигает номера', () => {
+  const plain = (levelIds) => ({ title: null, repeat: 1, level_ids: levelIds, lines: [line(1, 100, 'x')] });
+  const w = { note: null, sets: [plain(null), plain([ADV]), plain(null)] };
+  assert.deepEqual(workoutForLevel(w, INT).sets.map((s) => s.title), ['Set 1', 'Set 3']);
+  assert.deepEqual(workoutForLevel(w, ADV).sets.map((s) => s.title), ['Set 1', 'Set 2', 'Set 3']);
+  assert.equal(workoutForLevel(sheet1, ADV).sets[0].title, 'Warm-up', 'своё название не трогаем');
+});
+
+test('нагрузка → чипы шкалы V0–V5', () => {
+  assert.deepEqual(intensityKeys('3V'), ['v3']);
+  assert.deepEqual(intensityKeys('V4'), ['v4']);
+  assert.deepEqual(intensityKeys('2-3V'), ['v2', 'v3']);
+  assert.deepEqual(intensityKeys('Sprint'), ['sprint']);
+  assert.equal(intensityKeys('easy'), null);
+  assert.equal(intensityKeys(null), null);
+  assert.equal(intensityKeys('3-2V'), null);
 });

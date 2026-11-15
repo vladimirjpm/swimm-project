@@ -79,6 +79,14 @@ export interface TrainingsTabState {
   group: HubGroupDetails;
   /** Управляющий группой (тот же гейт, что у таба Admin). Только прячет кнопки — права у сервера. */
   manages: boolean;
+  /**
+   * Режим «👁 View» управляющего (страница группы): вид участника, а «своя» дорожка — выбранная в
+   * ряду дорожек (`previewLane`), а не та, где стоит зритель. У участника всегда false.
+   */
+  lanePreview: boolean;
+  /** Выбранная в превью дорожка; null — по умолчанию (`next/lane-preview.ts`). */
+  previewLane: number | null;
+  setPreviewLane: (laneNo: number) => void;
   /** ≥960px: без переключателя, две колонки (Next | Trainings), Lanes — во всю ширину. */
   isDesktop: boolean;
   view: TrainingsView;
@@ -183,10 +191,11 @@ export function useTrainingsTab(): TrainingsTabState {
 }
 
 export function TrainingsTabProvider({
-  group, manages, rsvp, openSchedule, onNextTrainingsChanged, onMarksChange, children,
+  group, manages, lanePreview = false, rsvp, openSchedule, onNextTrainingsChanged, onMarksChange, children,
 }: {
   group: HubGroupDetails;
   manages: boolean;
+  lanePreview?: boolean;
   rsvp?: TrainingRsvpState | null;
   openSchedule?: () => void;
   onNextTrainingsChanged?: () => void;
@@ -256,6 +265,8 @@ export function TrainingsTabProvider({
     setLanesDate(date);
     applyView('lanes');
   }, [applyView]);
+
+  const [previewLane, setPreviewLane] = useState<number | null>(null);
 
   const [sheet, setSheet] = useState<TrainingsSheet | null>(null);
   const closeSheet = useCallback(() => setSheet(null), []);
@@ -395,12 +406,12 @@ export function TrainingsTabProvider({
   }, [rsvp, slot0, slot1, slot2, slot3, slot4, slot5, sharedId, upcomingIds.map((s) => s.id).join(',')]);
 
   const value = useMemo<TrainingsTabState>(() => ({
-    group, manages, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
+    group, manages, lanePreview, previewLane, setPreviewLane, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
     deskSession, openDesk, closeDesk,
     rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown,
     onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
-    group, manages, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, setRollIndex,
+    group, manages, lanePreview, previewLane, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, setRollIndex,
     deskSession, openDesk, closeDesk, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions,
     breaks, marks, closeSheet, sheet,
   ]);

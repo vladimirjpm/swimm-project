@@ -54,6 +54,33 @@ export function lineSummary(line: WorkoutLine, reps: number = line.reps): string
     + (line.intensity ? ` · ${line.intensity}` : '');
 }
 
+/**
+ * Направление строки workout: текст тренера с буквами иврита (или арабского) — `rtl`, иначе `ltr`.
+ * Нужно явно: у подписи число и текст — изолированные куски (`<bdi>`), а `dir="auto"` изоляты не
+ * читает и молча ставил ивритской строке LTR — номер слева, скобки «(…)» переставлены.
+ */
+export function lineDir(text: string | null | undefined): 'rtl' | 'ltr' {
+  return text && /[֐-׿؀-ۿ]/.test(text) ? 'rtl' : 'ltr';
+}
+
+/**
+ * Нагрузка строки → ключи шкалы `UI_IntensityIcon` (`v1`…`v5`, `sprint`): «3V» / «V3» → `['v3']`,
+ * «2-3V» → `['v2', 'v3']` (два чипа), «sprint» → `['sprint']`. Не по шкале — null (остаётся текстом).
+ */
+export function intensityKeys(raw: string | null | undefined): string[] | null {
+  const text = (raw ?? '').trim().toLowerCase();
+  if (!text) return null;
+  if (text === 'sprint') return ['sprint'];
+  const m = /^(?:v\s*([0-5])(?:\s*[-–]\s*([0-5]))?|([0-5])(?:\s*[-–]\s*([0-5]))?\s*v)$/.exec(text);
+  if (!m) return null;
+  const from = Number(m[1] ?? m[3]);
+  const to = m[2] ?? m[4];
+  if (to == null) return [`v${from}`];
+  const hi = Number(to);
+  if (hi <= from) return null;
+  return Array.from({ length: hi - from + 1 }, (_, i) => `v${from + i}`);
+}
+
 /** Короткая сводка сета для свёрнутой строки: «4×25 breast · 4×100 free · 50 easy». */
 export function setSummary(set: WorkoutSet): string {
   return set.lines.map((line) => lineSummary(line)).filter(Boolean).join(' · ');

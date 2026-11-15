@@ -585,22 +585,32 @@
   (телефон, светлая) — «Sheet: 2.0 km ✓», «4×125» подсвечен; «Add to the end» дал 8 сетов. Вид участника
   CF7 не трогает.
 
+Доработки после CF6/CF7 (15.11.2026, решения владельца по живому листу; коммит вместе с ними):
+
+- **Ивритская строка workout — справа налево** (`lineDir` в `workout-format.ts`): номер справа, время
+  выхода слева, скобки «(…)» на месте. Раньше `dir="auto"` не видел изолированные куски и ставил LTR.
+- **Вид уровня разбит на сеты** (`workout-level-view.tsx`): шапка «Set 1 · 2000 m», черта между сетами.
+  Сет без названия в версии уровня — «Set N» по номеру у ТРЕНЕРА (пропущенный сет номера не сдвигает) —
+  `WorkoutRules.ForLevel` и `workoutForLevel` одинаково. В шапке «Your workout» — уровень дорожки
+  (`LevelTag`, кружок ранга цветом уровня), рамка карточки — тот же цвет.
+- **Нагрузка — чип шкалы V0–V5** `UI_IntensityIcon` (как в таблице времён): «3V» → V3, «2-3V» → V2 + V3
+  (`intensityKeys`); не по шкале — текстом.
+- **Режим страницы «✎ Edit | 👁 View»** (вместо чипа «✎ You can edit», `DeepEditModeToggle` +
+  `useEditViewMode`, проп `editMode` у `DeepEntityPage`): управляющий видит группу как участник — без
+  правки и Admin; в Trainings — экран участника и ряд дорожек «Viewing as a swimmer of lane»
+  (`next/lane-preview-picker.tsx`, `next/lane-preview.ts`), по умолчанию своя. Сервер управляющему
+  кладёт `level_workout` на КАЖДУЮ дорожку (`TrainingLaneView.Build(workoutOnEveryLane)`). Красная метка
+  Next в View — как у участника (`redMark(rsvp, asCoach)`). Не как у участника пока: липкая полоса
+  (тренерские счётчики) и «+ New training» в ленте — их включают права с сервера.
+
 ### Как вернуться к работе (на 15.11.2026)
 
 Следующая задача — **CF5** (план по занятию, ключ и миграция). Задания на неё ещё нет — сначала
 подготовить `docs/tasks/trainings-coach-flow-cf5.md` по §5.1 и спросить владельца. Workout (CF6) лежит
 колонкой плана — при переносе ключа на занятие переедет сам.
 
-- **CF1–CF4 закоммичены** (до fe986264). **CF6 + CF7 не закоммичены** — в рабочей копии ветки
-  `claude/trainings-coach-flow`. Новые файлы: сервер — `WorkoutDtos.cs`, `Mapping/WorkoutRules.cs`, миграция
-  `20261115100733_AddLanePlanWorkout` (+ Designer, снимок модели), `WorkoutTests.cs`; клиент — вся папка
-  `trainings/workout/`. Правки: `LanePlan.cs`, `LanePlanDtos.cs`, `TrainingRsvpDtos.cs`, `ILanePlanService.cs`,
-  `LanePlanService.cs`, `TrainingLaneView.cs`, `TrainingRsvpService.cs`, `HubGroupLanePlansController.cs`;
-  `types.ts`, `lane-plans-api.ts`, `deep-sheet.tsx`, `group-lanes.tsx`, `group-lane-editor.tsx`,
-  `coach-desk-section.tsx`, `coach-sessions-section.tsx`, `next/lane-block.tsx`; доки — этот план и
-  `docs/ui-components.md`, правки владельца в `docs/tasks/trainings-coach-flow-cf6.md` / `cf7.md`.
-  Коммитить своими путями, не `git add -A` (в рабочей копии чужие неотслеживаемые файлы). Окно «что значит
-  вступить» уже закоммичено (e8327ee0).
+- **CF1–CF4, CF6, CF7 и доработки выше закоммичены** (CF6 + CF7 — dbb51cc5). Коммитить своими путями,
+  не `git add -A` (в рабочей копии чужие неотслеживаемые файлы).
 - **Четыре миграции ждут прода:** `AddLanePlanSwimmerPinned`, `AddLanePlanReservedLanes` (CF2),
   `AddUserMemberNotSwimmer` (CF4), `AddLanePlanWorkout` (CF6) — к локальной базе применены. **`/db-sync-from-prod`** откажет, пока
   их нет на проде. Pg-тесты (`*PgTests`) ходят в локальную базу — без применённой миграции падают с 42703.

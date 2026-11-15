@@ -71,7 +71,7 @@ export function useGroupTrainingsMark({
 
   if (!enabled) return { mark: null, reportTabMarks };
   const mark = tabMark({
-    next: redMark(rsvp),
+    next: redMark(rsvp, manages),
     lanes: fromTab ? fromTab.lanes : goldMark(plan, manages, rsvp),
     trainings: fromTab ? fromTab.trainings : accentMark(sessions),
   });

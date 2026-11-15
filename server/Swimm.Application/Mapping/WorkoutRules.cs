@@ -132,14 +132,17 @@ public static class WorkoutRules
     {
         if (workout == null) return null;
 
+        // Сет без названия получает «Set N» по номеру у ТРЕНЕРА: уровень, который пропускает сет 2,
+        // видит дальше «Set 3», а не «Set 2» — номер совпадает с листом и с тем, что говорит тренер.
         var sets = workout.Sets
-            .Where(s => s.LevelIds == null || (levelId is int id && s.LevelIds.Contains(id)))
-            .Select(s => new WorkoutSetDto
+            .Select((s, i) => (Set: s, No: i + 1))
+            .Where(x => x.Set.LevelIds == null || (levelId is int id && x.Set.LevelIds.Contains(id)))
+            .Select(x => new WorkoutSetDto
             {
-                Title = s.Title,
-                Repeat = s.Repeat,
+                Title = x.Set.Title ?? $"Set {x.No}",
+                Repeat = x.Set.Repeat,
                 LevelIds = null,
-                Lines = s.Lines.Select(l => new WorkoutLineDto
+                Lines = x.Set.Lines.Select(l => new WorkoutLineDto
                 {
                     Reps = l.Reps,
                     Distance = l.Distance,

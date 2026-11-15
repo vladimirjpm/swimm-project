@@ -16,10 +16,14 @@ export function setSwumBy(set: WorkoutSet, levelId: number | null): boolean {
 export function workoutForLevel(workout: Workout | null | undefined, levelId: number | null): Workout | null {
   if (!workout) return null;
   const key = levelId == null ? null : String(levelId);
+  // Сет без названия — «Set N» по номеру у ТРЕНЕРА (до отсева): уровень, пропускающий сет 2, видит
+  // дальше «Set 3», как на листе. Зеркало серверного `ForLevel`.
   const sets = workout.sets
-    .filter((set) => setSwumBy(set, levelId))
-    .map((set) => ({
+    .map((set, i) => ({ set, no: i + 1 }))
+    .filter(({ set }) => setSwumBy(set, levelId))
+    .map(({ set, no }) => ({
       ...set,
+      title: set.title ?? `Set ${no}`,
       level_ids: null,
       lines: set.lines.map((line) => {
         const cell = key != null ? line.per_level?.[key] : undefined;

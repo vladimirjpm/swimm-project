@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import DeepEntityPage from '../components/deep/entity-page';
+import { useEditViewMode } from '../components/deep/use-edit-view-mode';
 import type {
   EntityPageStatus, EntityTabNav, EntityTabSpec,
 } from '../components/deep/entity-page-types';
@@ -149,6 +150,12 @@ function GroupPage({ slug }: { slug: string }) {
   const manages = managesGroup || (group != null && isAdmin);
   const isMember = group != null && joined.some((j) => j.id === group.id && j.status === 'active');
 
+  // Режим «👁 View» управляющего (решение Влада 15.11.2026): страница рисуется как у участника —
+  // без правки, без Admin, Trainings участника с выбором дорожки. Права и ГРУЗКА данных не меняются
+  // (`manages` / `insider`), меняется только вид: им правит `coach`.
+  const [viewing, setViewing] = useEditViewMode(group && manages ? `group:${group.id}` : null);
+  const coach = manages && !viewing;
+
   // Виртуальное «Моё избранное» — реальной группы за ним нет: ни медиа (галерея висит на
   // HubGroupId, у виртуальной id <= 0), ни тренировок, ни админки. Зачёт, рекорды и состав
   // сервер ей считает тем же агрегатом, что и обычной группе, — эти табы работают.
@@ -170,7 +177,7 @@ function GroupPage({ slug }: { slug: string }) {
   const trainingsMark = useGroupTrainingsMark({
     groupId: real ? group!.id : null,
     nextDate: group?.next_training?.date ?? null,
-    manages,
+    manages: coach,
     rsvp: rsvp.rsvp,
     enabled: real && (manages || isMember) && !membersOnly,
   });
@@ -294,12 +301,12 @@ function GroupPage({ slug }: { slug: string }) {
       icon: '🏊',
       label: 'Following',
       shortLabel: 'Following',
-      sub: real && manages ? `${group.members.length} · levels` : `${group.members.length} swimmers`,
-      editable: real && manages,
+      sub: real && coach ? `${group.members.length} · levels` : `${group.members.length} swimmers`,
+      editable: real && coach,
       // Управляющему — выпадашка уровня у каждого пловца (docs/plans/lane-plans-plan.md).
       cards: () => [{
         id: 'members',
-        render: () => <GroupMembersCard group={group} editLevels={real && manages} insider={real && (manages || isMember)} />,
+        render: () => <GroupMembersCard group={group} editLevels={real && coach} insider={real && (manages || isMember)} />,
       }],
     },
     real && {
@@ -308,7 +315,7 @@ function GroupPage({ slug }: { slug: string }) {
       label: 'Media',
       sub: 'gallery · from members',
       // Галерея группы правится управляющим; заявки на публикацию — в Admin.
-      editable: manages,
+      editable: coach,
       cards: () => [
         // ⚠ `gallery` из API — это СВОИ медиа группы ПЛЮС одобренные public-публикации
         // участников (сервер домешивает их с отрицательными id, HubGroupsController).
@@ -339,7 +346,7 @@ function GroupPage({ slug }: { slug: string }) {
       // Управляющему — инструмент (Coach tools), участнику — обычный таб. Непайщику замок, а
       // не пропажа таба (правило каркаса: locked ≠ «не класть»). Внутри — Sessions | Lanes:
       // план дорожек был отдельным табом (docs/plans/lane-plans-plan.md).
-      pinned: manages,
+      pinned: coach,
       // Красная пилюля с числом не ответивших (тренеру); иначе метка точкой — участнику красная
       // «не ответил», обоим золотая (план дорожек) и акцентная (новые видео).
       badge: trainingsCount ? String(trainingsCount) : undefined,
@@ -356,7 +363,8 @@ function GroupPage({ slug }: { slug: string }) {
         render: () => (
           <GroupTrainingsTab
             group={group}
-            manages={manages}
+            manages={coach}
+            lanePreview={manages && viewing}
             rsvp={rsvp}
             onOpenSchedule={() => openScheduleCard(nav)}
             onNextTrainingsChanged={reloadNextTrainings}
@@ -367,7 +375,7 @@ function GroupPage({ slug }: { slug: string }) {
     },
     // Управление — только управляющим, и не показывается вовсе остальным (план §3.8):
     // постороннему незачем знать, что у группы есть инбокс.
-    real && manages && {
+    real && coach && {
       id: 'admin' as const,
       icon: '⚙',
       label: 'Admin',
@@ -487,6 +495,7 @@ function GroupPage({ slug }: { slug: string }) {
       ) : null}
       tabsAriaLabel="Group sections"
       tabs={tabs}
+      editMode={real && manages && !membersOnly ? { viewing, onChange: setViewing } : undefined}
     />
   );
 }

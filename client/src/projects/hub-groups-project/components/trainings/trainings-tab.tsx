@@ -29,10 +29,15 @@ import { TrainingsSheetHost } from './trainings-sheets';
  *   во всю ширину с «← Back to Next» (6b: редактору дорожек нужна ширина под колонки).
  */
 function GroupTrainingsTab({
-  group, manages, rsvp, onOpenSchedule, onNextTrainingsChanged, onMarksChange,
+  group, manages, lanePreview = false, rsvp, onOpenSchedule, onNextTrainingsChanged, onMarksChange,
 }: {
   group: HubGroupDetails;
   manages: boolean;
+  /**
+   * Режим «👁 View» управляющего: вид участника и над ним ряд дорожек — экран пловца выбранной
+   * дорожки (`next/lane-preview-picker.tsx`). `manages` при этом false.
+   */
+  lanePreview?: boolean;
   rsvp?: TrainingRsvpState | null;
   /** «Set schedule» тренера: открыть Admin и прокрутить к карточке расписания (страница группы). */
   onOpenSchedule?: () => void;
@@ -48,6 +53,7 @@ function GroupTrainingsTab({
     <TrainingsTabProvider
       group={group}
       manages={manages}
+      lanePreview={lanePreview}
       rsvp={rsvp}
       openSchedule={onOpenSchedule}
       onNextTrainingsChanged={onNextTrainingsChanged}

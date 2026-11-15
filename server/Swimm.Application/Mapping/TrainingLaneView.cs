@@ -44,7 +44,8 @@ public static class TrainingLaneView
 
     public static TrainingLaneViewDto? Build(
         string laneView, Plan? plan, int? usualLanes, int? lastPlanLaneCount,
-        IReadOnlyList<LevelInfo> levels, IReadOnlyList<Person> pool, int viewerUserId, bool namesVisible)
+        IReadOnlyList<LevelInfo> levels, IReadOnlyList<Person> pool, int viewerUserId, bool namesVisible,
+        bool workoutOnEveryLane = false)
     {
         if (laneView == GroupLaneView.Off) return null;
         if (plan == null && laneView == GroupLaneView.Plan) return null;
@@ -107,7 +108,9 @@ public static class TrainingLaneView
                             : [],
                     };
                     // Workout занятия (CF6): версия уровня — только на своей дорожке зрителя (§5.5).
-                    if (plan.Workout != null && lane.People.Any(p => p.IsMe))
+                    // Управляющему (`workoutOnEveryLane`) — на каждой: режим «View» страницы показывает
+                    // ему экран участника любой дорожки, а весь workout он и так видит в редакторе.
+                    if (plan.Workout != null && (workoutOnEveryLane || lane.People.Any(p => p.IsMe)))
                         lane.LevelWorkout = WorkoutRules.ForLevel(plan.Workout, lane.Level?.Id);
                     return lane;
                 })
