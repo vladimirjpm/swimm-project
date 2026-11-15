@@ -200,6 +200,32 @@ public class CoachFlowRsvpTests
     }
 
     [Fact]
+    public async Task MeWithoutCoachLabel_AccountGetsCoachAnswer_OwnAnswerReplacesIt()
+    {
+        await using var db = CreateDb(nameof(MeWithoutCoachLabel_AccountGetsCoachAnswer_OwnAnswerReplacesIt));
+        var s = await SeedAsync(db);
+        Assert.NotNull((await AnswerAsync(db, s, new TrainingRsvpInputDto { Answer = "yes", SwimmerId = s.Gil })).Rsvp);
+
+        // Vera завела аккаунт и отметила Gil «Me» — метку тренер не ставил, ответы никто не переносил.
+        db.UserFavorites.Add(new UserFavorite { UserId = s.Vera, TargetType = "swimmer", SwimmerId = s.Gil, IsPrimary = true });
+        await db.SaveChangesAsync();
+
+        var service = new TrainingRsvpService(db);
+        var mine = (await service.GetAsync(s.GroupId, TueKey, s.Vera, false, MondayNoon))!;
+        Assert.Equal(("yes", true), (mine.Mine?.Answer, mine.Mine!.SetByCoach));       // не «не ответила»
+
+        var coach = (await service.GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon))!;
+        Assert.Equal("yes", coach.People!.Single(p => p.UserId == s.Vera).Answer);
+        Assert.DoesNotContain(coach.People!, p => p.SwimmerId == s.Gil);              // человек один
+        Assert.Equal(1, coach.Yes);
+
+        // Сама ответила — ответ тренера за пловца удалён, двух ответов у Gil нет.
+        var own = (await AnswerAsync(db, s, new TrainingRsvpInputDto { Answer = "no" }, actor: s.Vera)).Rsvp!;
+        Assert.Equal((0, 1), (own.Yes, own.No));
+        Assert.False(await db.HubGroupTrainingRsvps.AnyAsync(r => r.SwimmerId == s.Gil));
+    }
+
+    [Fact]
     public async Task NotSwimmer_LeavesNeedsYou_LinkingClearsTheFlag()
     {
         await using var db = CreateDb(nameof(NotSwimmer_LeavesNeedsYou_LinkingClearsTheFlag));

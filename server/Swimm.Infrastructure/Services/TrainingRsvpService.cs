@@ -285,6 +285,12 @@ public class TrainingRsvpService : ITrainingRsvpService
             row.UpdatedAt = DateTime.UtcNow;
         }
 
+        // Ответ за аккаунт заменяет ответ тренера за его пловца на это занятие
+        // (TrainingAnswerFallback): иначе пловец получил бы два ответа, и снятый ответ аккаунта
+        // «воскрешал» бы старый ответ тренера.
+        if (targetUserId is int answeredUser)
+            await DropSwimmerShadowAsync(hubGroupId, answeredUser, date, start);
+
         // «Going» на занятие внутри перерыва — человек вернулся (Ш3.1): перерыв закрывается,
         // тренеру — пометка «back after …». Перерыв, который к этой дате и так кончится, не трогаем.
         if (answer == TrainingRsvpAnswer.Yes) await EndBreaksByRsvpAsync(hubGroupId, targetUserId, targetSwimmerId, date);
@@ -401,16 +407,18 @@ public class TrainingRsvpService : ITrainingRsvpService
         // В бассейне — ответившие «иду» и «не уверен». Пловцы — в порядке состава; аккаунты без
         // пловца — после состава, по имени (детерминированно, не «каждый раз по-разному»).
         static bool InPool(HubGroupTrainingRsvp a) => a.Answer is TrainingRsvpAnswer.Yes or TrainingRsvpAnswer.Maybe;
-        var coming = answers.Values.Where(a => InPool(a) && members.ContainsKey(a.UserId!.Value)).ToList();
+        // Ключ — аккаунт, а не `UserId` строки: ответ тренера за пловца аккаунта лежит строкой пловца
+        // (TrainingAnswerFallback).
+        var coming = answers.Where(kv => InPool(kv.Value) && members.ContainsKey(kv.Key)).ToList();
         var accountsOrder = coming
-            .Where(a => resolved[a.UserId!.Value] == null)
-            .OrderBy(a => members[a.UserId!.Value].Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(a => a.UserId)
-            .Select((a, i) => (UserId: a.UserId!.Value, i))
+            .Where(kv => resolved[kv.Key] == null)
+            .OrderBy(kv => members[kv.Key].Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(kv => kv.Key)
+            .Select((kv, i) => (UserId: kv.Key, i))
             .ToDictionary(x => x.UserId, x => roster.Count + x.i);
 
-        var pool = coming.Select(a =>
+        var pool = coming.Select(kv =>
         {
-            var userId = a.UserId!.Value;
+            var (userId, a) = (kv.Key, kv.Value);
             var member = members[userId];
             if (resolved[userId] is int sid && rosterAt.TryGetValue(sid, out var at))
             {
@@ -451,6 +459,16 @@ public class TrainingRsvpService : ITrainingRsvpService
         var namesVisible = isManager || schedule.EffectiveWhoIsComing == GroupWhoIsComing.Members;
         return TrainingLaneView.Build(mode, planModel, schedule.UsualLanes, lastPlanLanes, levels, pool,
             viewerUserId, namesVisible);
+    }
+
+    /// <summary>Убрать строку ответа за пловца, которым стоит аккаунт, на это занятие.</summary>
+    private async Task DropSwimmerShadowAsync(int hubGroupId, int userId, DateOnly date, string start)
+    {
+        var swimmerOf = await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, new[] { userId });
+        if (swimmerOf[userId] is not int swimmerId) return;
+        var shadow = await _db.HubGroupTrainingRsvps.FirstOrDefaultAsync(r =>
+            r.HubGroupId == hubGroupId && r.SessionDate == date && r.SessionStart == start && r.SwimmerId == swimmerId);
+        if (shadow != null) _db.HubGroupTrainingRsvps.Remove(shadow);
     }
 
     private Task<bool> IsActiveMemberAsync(int hubGroupId, int userId) =>
@@ -544,9 +562,12 @@ public class TrainingRsvpService : ITrainingRsvpService
         var rows = await _db.HubGroupTrainingRsvps.AsNoTracking()
             .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date && r.SessionStart == start)
             .ToListAsync();
-        var answers = rows
-            .Where(r => r.UserId is int u && memberIds.Contains(u))
-            .ToDictionary(r => r.UserId!.Value);
+        // Ответ тренера за пловца, которым аккаунт стал без метки тренера («Me», привязка сайта), —
+        // ответ этого аккаунта (TrainingAnswerFallback).
+        var answers = TrainingAnswerFallback.WithSwimmerAnswers(
+            rows.Where(r => r.UserId is int u && memberIds.Contains(u)).ToDictionary(r => r.UserId!.Value),
+            rows.Where(r => r.SwimmerId != null).ToDictionary(r => r.SwimmerId!.Value),
+            resolved);
         var swimmerAnswers = rows
             .Where(r => r.SwimmerId is int s && groupSwimmerIds.Contains(s))
             .ToDictionary(r => r.SwimmerId!.Value);
