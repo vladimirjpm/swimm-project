@@ -38,6 +38,13 @@ public interface ILanePlanService
     /// </summary>
     Task<HubGroupMemberSaveResult> SaveAsync(int hubGroupId, DateOnly date, LanePlanInputDto input, int userId);
 
+    /// <summary>
+    /// Сохранить workout занятия (CF6, §5.5 плана trainings-coach-flow): документ целиком, null —
+    /// стереть. План должен быть (workout живёт при нём и публикуется с ним): нет — <c>Found</c>
+    /// false. Уровни — только этой группы. Статус плана не меняется.
+    /// </summary>
+    Task<(bool Found, string? Error)> SaveWorkoutAsync(int hubGroupId, DateOnly date, WorkoutDto? workout);
+
     /// <summary>Раскладка «Distribute» по текущим уровням и порядку состава. Ничего не пишет.</summary>
     Task<(LanePlanDistributionDto? Result, string? Error)> DistributeAsync(int hubGroupId, LanePlanDistributeInputDto input);
 

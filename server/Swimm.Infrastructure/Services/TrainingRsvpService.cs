@@ -454,7 +454,8 @@ public class TrainingRsvpService : ITrainingRsvpService
         var planModel = plan == null ? null : new TrainingLaneView.Plan(
             plan.LaneCount,
             plan.Lanes.Select(l => new TrainingLaneView.PlanLane(l.LaneNo, l.LevelId, l.Workout)).ToList(),
-            plan.Swimmers.ToDictionary(s => s.SwimmerId, s => (s.LaneNo, s.OrderNo)));
+            plan.Swimmers.ToDictionary(s => s.SwimmerId, s => (s.LaneNo, s.OrderNo)),
+            WorkoutRules.Parse(plan.Workout));
 
         var namesVisible = isManager || schedule.EffectiveWhoIsComing == GroupWhoIsComing.Members;
         return TrainingLaneView.Build(mode, planModel, schedule.UsualLanes, lastPlanLanes, levels, pool,

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
-import type { HubGroupLevels, LanePlan, LanePlanStatus, LanePlanSummary } from '../types';
+import type { HubGroupLevels, LanePlan, LanePlanStatus, LanePlanSummary, Workout } from '../types';
 import GroupLaneBoard from './group-lane-board';
 import GroupLaneEditor from './group-lane-editor';
 import LanePlanStatusBar from './lane-plan-status';
@@ -48,7 +48,10 @@ function statusInfo(status: LanePlanStatus | null): { text: string; color: strin
 
 function GroupLanes({
   groupId, manages, desktop, initialDate = null, embedded = false, statusHost, onFocusPool, onDirtyChange, onPlansChanged, onPlanShown,
+  workout = null,
 }: {
+  /** Workout занятия (CF6, рабочий стол тренера) — сводка версии уровня в карточках дорожек. */
+  workout?: Workout | null;
   /**
    * Узел для строки статуса плана и Publish (рабочий стол тренера, CF3): `undefined` — некуда,
    * строка стоит под дорожками; `null` — узел ещё не появился.
@@ -418,6 +421,7 @@ function GroupLanes({
                 refreshPlans();
               }}
               onFocusPool={onFocusPool}
+              workout={workout}
               onSetStatus={setStatus}
               onDelete={() => setConfirmDelete(true)}
               onCopy={copyFrom}

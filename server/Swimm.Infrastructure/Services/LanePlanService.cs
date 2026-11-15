@@ -183,6 +183,8 @@ public class LanePlanService : ILanePlanService
             ReservedLanes = plan.ReservedLanes,
             Note = plan.Note,
             UpdatedAt = plan.UpdatedAt,
+            // Workout целиком — только управляющему; участнику — версия его уровня в lane_view (CF6).
+            Workout = isManager ? WorkoutRules.Parse(plan.Workout) : null,
             Lanes = plan.Lanes
                 .Where(l => l.LaneNo <= plan.LaneCount)
                 .OrderBy(l => l.LaneNo)
@@ -313,6 +315,36 @@ public class LanePlanService : ILanePlanService
 
             await _db.SaveChangesAsync();
             return HubGroupMemberSaveResult.Ok();
+        });
+    }
+
+    public async Task<(bool Found, string? Error)> SaveWorkoutAsync(int hubGroupId, DateOnly date, WorkoutDto? workout)
+    {
+        var (normalized, error) = WorkoutRules.Normalize(workout);
+        if (error != null) return (true, error);
+
+        if (normalized != null)
+        {
+            var used = WorkoutRules.LevelIdsUsed(normalized);
+            if (used.Count > 0)
+            {
+                var own = await _db.HubGroupLevels.AsNoTracking()
+                    .Where(l => l.HubGroupId == hubGroupId && used.Contains(l.Id))
+                    .CountAsync();
+                if (own != used.Count) return (true, "A level in the workout is not in this group. Reload and try again.");
+            }
+        }
+
+        return await GroupAdvisoryLock.InGroupTransactionAsync(_db, LanePlansLockClass, hubGroupId, async () =>
+        {
+            var plan = await _db.LanePlans.FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+            if (plan == null) return (false, (string?)null);
+
+            // Пишется только документ: раскладку дорожек сохраняет свой PUT, правки не перетирают друг друга.
+            plan.Workout = normalized == null ? null : WorkoutRules.Serialize(normalized);
+            plan.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return (true, (string?)null);
         });
     }
 

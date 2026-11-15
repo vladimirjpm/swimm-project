@@ -8,6 +8,7 @@ import { formatSheetDate } from '../sheets/link-helpers';
 import { useTrainingsTab } from '../trainings-context';
 import TrainingsEmpty, { TrainingsEmptyActions, TrainingsEmptyButton } from '../trainings-empty';
 import { MarkDot, TrainingsSection } from '../trainings-section';
+import { kmRange, levelMeters } from '../workout/workout-totals';
 
 /**
  * Список занятий УПРАВЛЯЮЩЕГО — вход в таб (docs/plans/trainings-coach-flow-plan.md, CF1; макет F1).
@@ -17,7 +18,7 @@ import { MarkDot, TrainingsSection } from '../trainings-section';
  * На карточке: дата, время и отсчёт, название / тип разового занятия, «Cancelled», строка ответов
  * (`upcoming[i].rsvp`) и статус плана дорожек на дату занятия (`lanePlans`). Метки внимания тренера
  * (не ответили — красная, черновик / неразложенные — золотая) стоят на ближайшем не отменённом
- * занятии. Строки «Workout» и «N need you» макета добавляют CF4 и CF6.
+ * занятии. «N need you» — CF4; «Workout» (CF6) — число сетов и разброс км по уровням дорожек плана.
  *
  * Расписания нет — пустое состояние с «Set schedule» (как было в виде Next тренера).
  */
@@ -46,6 +47,13 @@ function SessionCard({ session, index, first }: { session: NextTraining; index: 
   const unassigned = upcomingPlans[session.date]?.unassigned.length ?? 0;
   // «Needs you» занятия (CF4): идущие без уровня, переполненные дорожки, заявки, аккаунты без связи.
   const needs = needsCount(r?.needs);
+  // Workout занятия (CF6): км — по уровням дорожек плана; уровней на дорожках нет — одна сумма.
+  const fullPlan = upcomingPlans[session.date] ?? null;
+  const workout = fullPlan?.workout ?? null;
+  const laneLevels = [...new Set(fullPlan?.lanes.map((l) => l.level?.id).filter((id): id is number => id != null) ?? [])];
+  const workoutKm = workout && workout.sets.length > 0
+    ? kmRange((laneLevels.length > 0 ? laneLevels : [null]).map((id) => levelMeters(workout, id)))
+    : null;
 
   const until = session.cancelled ? '' : untilLabel(session.date, session.start, session.end);
 
@@ -90,6 +98,16 @@ function SessionCard({ session, index, first }: { session: NextTraining; index: 
           )}
         </Row>
         <Row label="Lanes">{state ? <PlanPill state={state} unassigned={unassigned} /> : null}</Row>
+        {plan && (
+          <Row label="Workout">
+            {workout && workout.sets.length > 0 ? (
+              <span>
+                {workout.sets.length} {workout.sets.length === 1 ? 'set' : 'sets'}
+                {workoutKm && <> · <span className="hp-mono">{workoutKm}</span></>}
+              </span>
+            ) : <span style={{ color: 'var(--t-text-3)' }}>Not written</span>}
+          </Row>
+        )}
         {needs > 0 && (
           <Row label="Needs you"><span style={{ color: 'var(--deep-gold)' }}>{needsLabel(needs)}</span></Row>
         )}

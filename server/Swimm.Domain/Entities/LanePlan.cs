@@ -49,6 +49,14 @@ public class LanePlan
     /// </summary>
     public int ReservedLanes { get; set; } = 1;
 
+    /// <summary>
+    /// Workout занятия одним документом JSON (docs/plans/trainings-coach-flow-plan.md, §5.5, CF6):
+    /// сеты, строки и времена по уровням группы; разбирает <c>WorkoutRules</c>. Публикуется вместе
+    /// с планом (тот же статус). null — workout нет; тогда дорожки показывают старое
+    /// <see cref="LanePlanLane.Workout"/>. CF5 перенесёт ключ плана на занятие — поле едет с ним.
+    /// </summary>
+    public string? Workout { get; set; }
+
     /// <summary><see cref="LanePlanStatus.Draft"/> | <see cref="LanePlanStatus.Published"/>.</summary>
     [Required, MaxLength(10)]
     public string Status { get; set; } = LanePlanStatus.Draft;
@@ -83,7 +91,10 @@ public class LanePlanLane
 
     public HubGroupLevel? Level { get; set; }
 
-    /// <summary>Задание на дорожку — пока обычный текст (структурные сеты — позже).</summary>
+    /// <summary>
+    /// Задание на дорожку обычным текстом — СТАРОЕ поле: с CF6 workout один на занятие
+    /// (<see cref="LanePlan.Workout"/>); новый редактор его не правит, прошлые планы показывают как раньше.
+    /// </summary>
     [MaxLength(4000)]
     public string? Workout { get; set; }
 }

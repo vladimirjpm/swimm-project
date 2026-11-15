@@ -305,9 +305,16 @@ public sealed class TrainingLaneDto
     [JsonPropertyName("level")]
     public LanePlanLevelDto? Level { get; set; }
 
-    /// <summary>Задание дорожки — только у плана.</summary>
+    /// <summary>Задание дорожки — только у плана (старое текстовое поле, до CF6).</summary>
     [JsonPropertyName("workout")]
     public string? Workout { get; set; }
+
+    /// <summary>
+    /// Workout занятия в версии уровня этой дорожки (CF6, §5.5 плана trainings-coach-flow) — только
+    /// на дорожке, где стоит сам зритель (<c>is_me</c>): сеты его уровня и его времена. null — нет.
+    /// </summary>
+    [JsonPropertyName("level_workout")]
+    public WorkoutDto? LevelWorkout { get; set; }
 
     [JsonPropertyName("people")]
     public List<TrainingLanePersonDto> People { get; set; } = [];

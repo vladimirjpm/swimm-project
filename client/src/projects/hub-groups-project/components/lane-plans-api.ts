@@ -1,5 +1,6 @@
 import type {
   BreakInput, HubGroupBreaks, HubGroupLevels, LaneChange, LanePlan, LanePlanInput, LanePlanPublishCheck, LanePlanSummary,
+  Workout,
 } from '../types';
 
 /**
@@ -68,6 +69,12 @@ export const lanePlansApi = {
   away: (groupId: number, date: string) => request<{ swimmer_ids: number[] }>('GET', `${base(groupId)}/${date}/away`),
   save: (groupId: number, date: string, input: LanePlanInput) =>
     request<LanePlan>('PUT', `${base(groupId)}/${date}`, input),
+  /**
+   * Workout занятия (CF6): документ целиком, null — стереть. Отдельно от PUT плана — редакторы
+   * дорожек и workout сохраняются сами и не перетирают друг друга. 404 — плана на дату нет.
+   */
+  saveWorkout: (groupId: number, date: string, workout: Workout | null) =>
+    request<void>('PUT', `${base(groupId)}/${date}/workout`, { workout }),
   /**
    * «Auto-arrange»: сервер сам делит дорожки между уровнями и раскладывает людей. Ничего не
    * сохраняет. `reserved_lanes` — сколько последних дорожек оставить пустыми про запас (всегда). `pinned` — закреплённые (CF2): остаются на своих дорожках, в ответе — с `pinned: true`.

@@ -616,6 +616,8 @@ export interface LanePlan {
   reserved_lanes?: number;
   note?: string | null;
   updated_at: string;
+  /** Workout занятия (CF6) — только управляющему; участнику — `level_workout` в виде по дорожкам. */
+  workout?: Workout | null;
   lanes: LanePlanLane[];
   unassigned: LanePlanSwimmer[];
   /** Только управляющему; участнику — пустой. */
@@ -634,6 +636,42 @@ export interface LanePlan {
      */
     moved_from_lane?: number | null;
   }[];
+}
+
+// ── Workout занятия (docs/plans/trainings-coach-flow-plan.md, §5.5, CF6) ────────
+// Один документ при плане дорожек, публикуется с ним. Метры не хранятся — считает клиент
+// (`trainings/workout/workout-totals.ts`).
+
+/** Ячейка уровня: время выхода строкой («:35», «1:40», «rest :20») и своё число повторов. */
+export interface WorkoutCell {
+  send_off?: string | null;
+  /** Перекрывает `reps` строки для этого уровня («3 או 100X4»). */
+  reps?: number | null;
+}
+
+export interface WorkoutLine {
+  reps: number;
+  /** Метров в повторе; null — строка без дистанции (отдых, пояснение). */
+  distance?: number | null;
+  text?: string | null;
+  /** «2V», «2-3V». */
+  intensity?: string | null;
+  /** Ключ — id уровня группы (строкой, как в JSON). */
+  per_level?: Record<string, WorkoutCell> | null;
+}
+
+export interface WorkoutSet {
+  title?: string | null;
+  /** Повтор сета целиком; 1 — один раз. */
+  repeat: number;
+  /** null — сет плывут все уровни; список — только названные. */
+  level_ids?: number[] | null;
+  lines: WorkoutLine[];
+}
+
+export interface Workout {
+  note?: string | null;
+  sets: WorkoutSet[];
 }
 
 /** `GET …/lane-plans/{date}/publish-check`: кто мешает опубликовать (решение 10 потока тренера). */
@@ -740,7 +778,13 @@ export interface TrainingLanePerson {
 export interface TrainingLane {
   lane_no: number;
   level: LanePlanLevel | null;
+  /** Старое текстовое задание дорожки (до CF6). */
   workout?: string | null;
+  /**
+   * Workout занятия в версии уровня этой дорожки (CF6) — только на своей дорожке зрителя: сеты его
+   * уровня, в ячейках — только его время. null — нет.
+   */
+  level_workout?: Workout | null;
   people: TrainingLanePerson[];
 }
 

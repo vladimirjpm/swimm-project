@@ -134,6 +134,13 @@ public sealed class LanePlanDto
     [JsonPropertyName("updated_at")]
     public DateTime UpdatedAt { get; set; }
 
+    /// <summary>
+    /// Workout занятия целиком (CF6, §5.5 плана trainings-coach-flow) — только управляющему;
+    /// участник получает версию своего уровня в <c>lane_view</c> ответа занятия. null — нет.
+    /// </summary>
+    [JsonPropertyName("workout")]
+    public WorkoutDto? Workout { get; set; }
+
     [JsonPropertyName("lanes")]
     public List<LanePlanLaneDto> Lanes { get; set; } = [];
 

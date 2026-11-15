@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
-import type { HubGroupLevel, HubGroupLevels, LaneChange, LanePlan, LanePlanInput, LanePlanSwimmer } from '../types';
+import type { HubGroupLevel, HubGroupLevels, LaneChange, LanePlan, LanePlanInput, LanePlanSwimmer, Workout } from '../types';
 import LaneChip from './group-lane-chip';
 import LaneMoveRow from './group-lane-move-row';
 import LanePlanStatus from './lane-plan-status';
@@ -11,6 +11,8 @@ import { laneShortNames } from './lane-short-names';
 import RollToast, { type RollToastData } from './trainings/coach/roll-toast';
 import { useTrainingsTab, type PoolCommand } from './trainings/trainings-context';
 import { useLaneAutosave } from './use-lane-autosave';
+import { hasWorkout } from './trainings/workout/workout-for-level';
+import WorkoutLaneSummary from './trainings/workout/workout-lane-summary';
 
 /**
  * Редактор плана дорожек — тренер (docs/plans/lane-plans-plan.md, L3; доведён в Т7 по решению
@@ -224,7 +226,7 @@ function inputKey(input: LanePlanInput): string {
 
 function GroupLaneEditor({
   groupId, date, plan, template = null, levels, laneCountHint, maxPerLaneHint = null, reservedLanesHint = 1, away = NO_AWAY, desktop, toolbarHost,
-  statusHost, abandon, copyFrom, onSaved, onSetStatus, onDelete, onCopy, onDirtyChange, onFocusPool,
+  statusHost, abandon, copyFrom, onSaved, onSetStatus, onDelete, onCopy, onDirtyChange, onFocusPool, workout = null,
 }: {
   groupId: number;
   date: string;
@@ -265,6 +267,11 @@ function GroupLaneEditor({
   onDirtyChange: (dirty: boolean) => void;
   /** Показать панель бассейна (телефон: переключатель People / Pool) — «перейти к человеку» из диалога публикации. */
   onFocusPool?: () => void;
+  /**
+   * Workout занятия (CF6, черновик редактора workout): в карточке дорожки — сводка версии её уровня
+   * вместо прежнего поля задания. null — workout нет; тогда видно старое задание дорожки, если было.
+   */
+  workout?: Workout | null;
 }) {
   // Исходный вид черновика: копия (если есть) или сохранённый план. Читается только при монтировании.
   const init = useMemo(
@@ -638,7 +645,6 @@ function GroupLaneEditor({
 
   const laneCard = (no: number) => {
     const lane = lanes[no - 1];
-    const prev = no > 1 ? lanes[no - 2] : null;
     const ids = buckets.lanes[no - 1];
     const over = maxPerLane != null && ids.length > maxPerLane;
     return (
@@ -676,28 +682,20 @@ function GroupLaneEditor({
             {maxPerLane != null ? `${ids.length} / ${maxPerLane}` : ids.length}
           </span>
         </header>
-        <textarea
-          value={lane.workout}
-          onChange={(e) => patchLane(no, { workout: e.target.value })}
-          rows={3}
-          maxLength={4000}
-          placeholder="Workout, e.g. 8×100 free @1:40"
-          aria-label={`Workout of lane ${no}`}
-          dir="auto"
-          className="hp-mono min-h-[56px] w-full resize-y rounded-[8px] border px-2.5 py-1.5 text-[12px] font-bold leading-[1.5]"
-          style={field}
-        />
-        {/* Копия задания — только соседу того же уровня (дорожки 2–3 одного уровня). */}
-        {prev && prev.levelId === lane.levelId && prev.workout.trim() !== '' && prev.workout !== lane.workout && (
-          <button
-            type="button"
-            className="cursor-pointer self-start border-0 bg-transparent p-0 text-[11.5px] font-extrabold underline"
-            style={{ color: 'var(--deep-accent)' }}
-            onClick={() => patchLane(no, { workout: prev.workout })}
+        {/* CF6: workout один на занятие — в дорожке сводка версии её уровня. Старое задание дорожки
+            (прошлые планы) — только для чтения, пока нового workout нет; в черновике оно сохраняется как было. */}
+        {hasWorkout(workout) ? (
+          <WorkoutLaneSummary workout={workout} levelId={lane.levelId} />
+        ) : lane.workout.trim() !== '' ? (
+          <div
+            dir="auto"
+            className="hp-mono max-h-[84px] overflow-y-auto whitespace-pre-line rounded-[8px] border px-2.5 py-1.5 text-[12px] font-bold leading-[1.5]"
+            style={field}
+            title="Lane note from before the shared workout — read only"
           >
-            Same workout as lane {no - 1}
-          </button>
-        )}
+            {lane.workout}
+          </div>
+        ) : null}
         {ids.length > 0 && chipList(ids)}
         {moveRow(no)}
         {dropHere}

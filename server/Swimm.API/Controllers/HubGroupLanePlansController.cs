@@ -136,6 +136,23 @@ public class HubGroupLanePlansController : ControllerBase
         return Ok(await _plans.GetAsync(id, day, isManager: true, CurrentUserId()));
     }
 
+    /// <summary>
+    /// Workout занятия (CF6, §5.5 плана trainings-coach-flow): документ целиком, <c>workout</c> null —
+    /// стереть. Отдельно от PUT плана: редактор дорожек и редактор workout сохраняются сами и не
+    /// перетирают друг друга. 404 — плана на дату нет (workout живёт при плане).
+    /// </summary>
+    [HttpPut("{date}/workout")]
+    public async Task<IActionResult> SaveWorkout(int id, string date, [FromBody] WorkoutInputDto input)
+    {
+        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var (found, error) = await _plans.SaveWorkoutAsync(id, day, input?.Workout);
+        if (!found) return NotFound();
+        if (error != null) return BadRequest(new { error });
+        return NoContent();
+    }
+
     /// <summary>«Distribute»: раскладка по уровням. Ничего не сохраняет.</summary>
     [HttpPost("distribute")]
     public async Task<IActionResult> Distribute(int id, [FromBody] LanePlanDistributeInputDto input)
