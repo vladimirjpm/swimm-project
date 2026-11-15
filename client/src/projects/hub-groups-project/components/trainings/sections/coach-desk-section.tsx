@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { useMediaQuery } from '../../../../../hooks/useMediaQuery';
 import { DEEP_DOCK_QUERY, useDockSlot } from '../../../../components/deep/dock-slot';
 import GroupLanes from '../../group-lanes';
+import NeedsYou from '../coach/needs-you';
 import RollCall from '../coach/roll-call';
 import SessionNav from '../coach/session-nav';
 import { nextSessions } from '../next/next-format';
@@ -24,6 +25,9 @@ import { SegmentBar, type SegmentOption } from '../trainings-segments';
  * Статус плана и единственный Publish (CF3): строка `LanePlanStatus`, которую редактор кладёт
  * порталом в узел этой секции — в шапке стола справа; на телефоне, где инструменты каркаса
  * закреплены панелью у низа экрана, — в слот ЭТОЙ ЖЕ панели (`components/deep/dock-slot.ts`).
+ *
+ * Над бассейном — полоса «Needs you» (CF4, `coach/needs-you.tsx`): идущие без уровня, дорожки сверх
+ * лимита, заявки и аккаунты без связи с пловцом; пусто — полосы нет.
  *
  * Смена занятия пересобирает редактор (`key` — id занятия). Правки плана сохраняются сами;
  * «Discard unsaved changes?» при уходе со стола и смене занятия контекст спрашивает, только когда
@@ -75,6 +79,8 @@ function CoachDeskSection() {
   );
 
   const pool = (
+    <div className="flex min-w-0 flex-col gap-3">
+    {r && <NeedsYou r={r} />}
     <GroupLanes
       key={deskSession.id}
       groupId={group.id}
@@ -87,6 +93,7 @@ function CoachDeskSection() {
       onDirtyChange={setLanesDirty}
       onPlansChanged={plansChanged}
     />
+    </div>
   );
 
   const header = (

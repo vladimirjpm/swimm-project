@@ -1982,6 +1982,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<DateTime>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("NotSwimmer")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Note")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");

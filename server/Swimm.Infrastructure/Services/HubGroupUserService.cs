@@ -235,8 +235,56 @@ public class HubGroupUserService : IHubGroupUserService
 
         member.SwimmerId = swimmerId;
         member.Note = NormalizeNote(note);
+        if (swimmerId != null) member.NotSwimmer = false;
+        if (swimmerId is int linked) await MoveSwimmerAnswersToAccountAsync(hubGroupId, linked, userId);
         await _db.SaveChangesAsync();
         return HubGroupMemberSaveResult.Ok();
+    }
+
+    public async Task<HubGroupMemberSaveResult> SetUserMemberNotSwimmerAsync(int hubGroupId, int userId)
+    {
+        var member = await _db.HubGroupUserMembers
+            .FirstOrDefaultAsync(m => m.HubGroupId == hubGroupId && m.UserId == userId);
+        if (member == null) return HubGroupMemberSaveResult.Fail("Участник не найден");
+
+        // Не пловец — метка о пловце теряет смысл; подпись тоже снимаем (она про пловца).
+        member.NotSwimmer = true;
+        member.SwimmerId = null;
+        member.Note = null;
+        await _db.SaveChangesAsync();
+        return HubGroupMemberSaveResult.Ok();
+    }
+
+    /// <summary>
+    /// Решение 15 плана trainings-coach-flow (CF4): ответы на ПРЕДСТОЯЩИЕ занятия, которые тренер
+    /// поставил за пловца без аккаунта (Р73), при привязке аккаунта к этому пловцу переходят аккаунту
+    /// (с пометкой «поставил тренер»). Аккаунт уже ответил на это занятие сам — остаётся его ответ,
+    /// строка пловца удаляется. Прошлые ответы — история, не трогаем.
+    /// </summary>
+    private async Task MoveSwimmerAnswersToAccountAsync(int hubGroupId, int swimmerId, int userId)
+    {
+        var today = DateOnly.FromDateTime(IsraelTime.ToLocal(DateTime.UtcNow));
+        var swimmerRows = await _db.HubGroupTrainingRsvps
+            .Where(r => r.HubGroupId == hubGroupId && r.SwimmerId == swimmerId && r.SessionDate >= today)
+            .ToListAsync();
+        if (swimmerRows.Count == 0) return;
+        var own = (await _db.HubGroupTrainingRsvps.AsNoTracking()
+                .Where(r => r.HubGroupId == hubGroupId && r.UserId == userId && r.SessionDate >= today)
+                .Select(r => new { r.SessionDate, r.SessionStart })
+                .ToListAsync())
+            .Select(r => (r.SessionDate, r.SessionStart))
+            .ToHashSet();
+        foreach (var row in swimmerRows)
+        {
+            if (own.Contains((row.SessionDate, row.SessionStart)))
+            {
+                _db.HubGroupTrainingRsvps.Remove(row);
+                continue;
+            }
+            row.SwimmerId = null;
+            // SetByUserId у строки пловца — всегда тренер (Р73): у аккаунта ответ будет «by coach».
+            row.UserId = userId;
+        }
     }
 
     private static string? NormalizeNote(string? note)

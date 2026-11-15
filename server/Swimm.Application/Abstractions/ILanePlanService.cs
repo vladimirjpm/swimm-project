@@ -53,6 +53,13 @@ public interface ILanePlanService
     /// </summary>
     Task<LanePlanPublishCheckDto?> GetPublishCheckAsync(int hubGroupId, DateOnly date);
 
+    /// <summary>
+    /// Поставить идущего пловца на дорожку его уровня по правилу ответа «Going» (§5.3 плана
+    /// trainings-coach-flow, CF4) — после того, как тренер задал ему уровень в карточке человека.
+    /// Уже на дорожке — не двигает. null — плана нет или сдвига нет.
+    /// </summary>
+    Task<LaneChangeDto?> PlaceAsync(int hubGroupId, DateOnly date, int swimmerId);
+
     /// <summary>Опубликовать с проверкой решения 10 (<see cref="GetPublishCheckAsync"/>).</summary>
     Task<LanePlanPublishResult> PublishAsync(int hubGroupId, DateOnly date);
 

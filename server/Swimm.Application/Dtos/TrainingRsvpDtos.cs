@@ -96,6 +96,101 @@ public sealed class TrainingRsvpDto
     /// </summary>
     [JsonPropertyName("people")]
     public List<TrainingRsvpPersonDto>? People { get; set; }
+
+    /// <summary>
+    /// Полоса «Needs you» рабочего стола тренера (CF4) — ТОЛЬКО управляющему. Считается из ответов,
+    /// уровней, плана и заявок; своего списка «проблем» в данных нет.
+    /// </summary>
+    [JsonPropertyName("needs")]
+    public TrainingNeedsDto? Needs { get; set; }
+
+    /// <summary>
+    /// Только в ответе PUT: ответ сдвинул пловца в плане дорожек даты (§5.3 плана
+    /// trainings-coach-flow) — для тоста «… is going → lane 2» и Undo. null — плана нет или не сдвинул.
+    /// </summary>
+    [JsonPropertyName("lane_change")]
+    public LaneChangeDto? LaneChange { get; set; }
+}
+
+/// <summary>Место пловца в плане дорожек: нет в плане («Not today»), Unassigned (lane_no null) или дорожка.</summary>
+public sealed class LanePlaceDto
+{
+    [JsonPropertyName("in_plan")]
+    public bool InPlan { get; set; }
+
+    [JsonPropertyName("lane_no")]
+    public int? LaneNo { get; set; }
+
+    /// <summary>Место внутри корзины (0 — ведёт).</summary>
+    [JsonPropertyName("order_no")]
+    public int OrderNo { get; set; }
+
+    [JsonPropertyName("pinned")]
+    public bool Pinned { get; set; }
+}
+
+/// <summary>Сдвиг одного пловца в плане дорожек: где был и где теперь.</summary>
+public sealed class LaneChangeDto
+{
+    [JsonPropertyName("swimmer_id")]
+    public int SwimmerId { get; set; }
+
+    [JsonPropertyName("before")]
+    public LanePlaceDto Before { get; set; } = new();
+
+    [JsonPropertyName("after")]
+    public LanePlaceDto After { get; set; } = new();
+}
+
+/// <summary>Что ждёт решения тренера на это занятие (CF4, полоса «Needs you»).</summary>
+public sealed class TrainingNeedsDto
+{
+    /// <summary>Идущие («Going») пловцы без уровня.</summary>
+    [JsonPropertyName("no_level")]
+    public List<TrainingNeedPersonDto> NoLevel { get; set; } = [];
+
+    /// <summary>Дорожки плана даты сверх «Max per lane».</summary>
+    [JsonPropertyName("over_lanes")]
+    public List<TrainingNeedLaneDto> OverLanes { get; set; } = [];
+
+    /// <summary>Ожидающие заявки на вступление.</summary>
+    [JsonPropertyName("requests")]
+    public List<TrainingNeedPersonDto> Requests { get; set; } = [];
+
+    /// <summary>Активные аккаунты, которых никто не связал с пловцом и тренер не сказал «Not a swimmer».</summary>
+    [JsonPropertyName("unlinked")]
+    public List<TrainingNeedPersonDto> Unlinked { get; set; } = [];
+}
+
+public sealed class TrainingNeedPersonDto
+{
+    [JsonPropertyName("user_id")]
+    public int? UserId { get; set; }
+
+    [JsonPropertyName("swimmer_id")]
+    public int? SwimmerId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    /// <summary>
+    /// Подсказка шторки «Who is this?»: пловец состава, которого человек отметил «Me», иначе
+    /// совпадение по имени; null — подсказки нет.
+    /// </summary>
+    [JsonPropertyName("suggested_swimmer_id")]
+    public int? SuggestedSwimmerId { get; set; }
+}
+
+public sealed class TrainingNeedLaneDto
+{
+    [JsonPropertyName("lane_no")]
+    public int LaneNo { get; set; }
+
+    [JsonPropertyName("count")]
+    public int Count { get; set; }
+
+    [JsonPropertyName("max")]
+    public int Max { get; set; }
 }
 
 public sealed class TrainingRsvpMineDto
@@ -153,6 +248,24 @@ public sealed class TrainingRsvpPersonDto
     /// <summary>Сам вернулся с перерыва недавно — сколько дней был на нём («back after …»).</summary>
     [JsonPropertyName("back_after_days")]
     public int? BackAfterDays { get; set; }
+
+    /// <summary>
+    /// Пловец состава, которым человек стоит в группе: у аккаунта — по <c>HubGroupPersonResolver</c>,
+    /// у пловца без аккаунта — он сам; null — аккаунт ни с кем не связан.
+    /// </summary>
+    [JsonPropertyName("linked_swimmer_id")]
+    public int? LinkedSwimmerId { get; set; }
+
+    /// <summary>Имя связанного пловца — строка «Account: linked to …» карточки (CF4).</summary>
+    [JsonPropertyName("linked_swimmer_name")]
+    public string? LinkedSwimmerName { get; set; }
+
+    /// <summary>Уровень в группе: пловца, иначе аккаунта; null — нет.</summary>
+    [JsonPropertyName("level_id")]
+    public int? LevelId { get; set; }
+
+    [JsonPropertyName("sub_level")]
+    public int? SubLevel { get; set; }
 }
 
 /// <summary>
@@ -253,6 +366,13 @@ public sealed class TrainingRsvpInputDto
     /// </summary>
     [JsonPropertyName("swimmer_id")]
     public int? SwimmerId { get; set; }
+
+    /// <summary>
+    /// Undo тоста (CF4), только управляющему: вернуть пловца в плане дорожек на это место вместо
+    /// правила «Going ставит на дорожку / Out снимает».
+    /// </summary>
+    [JsonPropertyName("restore_lane")]
+    public LanePlaceDto? RestoreLane { get; set; }
 }
 
 /// <summary>Отмена занятия (Р9): причина по желанию, до <c>TrainingRsvpRules.CancelReasonMax</c> символов.</summary>

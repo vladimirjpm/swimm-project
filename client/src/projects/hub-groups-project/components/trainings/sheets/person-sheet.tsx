@@ -9,11 +9,20 @@ import { findBreak, laneCaption, laneOfPerson, ANSWER_PILL } from '../coach/roll
 import { useTrainingsTab } from '../trainings-context';
 import type { TrainingsSheetProps } from '../trainings-sheets';
 import { addDays, formatSheetDate } from './link-helpers';
+import { useGroupLevels } from '../../use-group-levels';
+import { lanePlansApi as plansApi } from '../../lane-plans-api';
+import { PersonAccountField, PersonLaneField, PersonLevelField, placeInPlan } from './person-pool-fields';
 
 /**
  * Шторка человека переклички (Т6, хендофф Trainings Tab, 1d #3; тон `coach`): ответ на выбранное
  * занятие + заметка и статус в группе (в строю / перерыв до даты / «не тренируется с нами»).
- * Открывается из строки переклички — ⋮ или долгое нажатие.
+ * Открывается из строки переклички — ⋮ или долгое нажатие, из «Needs you» и из бассейна (кнопка
+ * «Card» строки «Move … to»).
+ *
+ * CF4 потока тренера (docs/plans/trainings-coach-flow-plan.md): уровень (тот же, что в Following:
+ * пловца, у аккаунта без пловца — аккаунта), дорожка на это занятие с закреплением и строка
+ * «Account: linked to …» со сменой привязки (шторка «Who is this?»). Новый уровень идущему —
+ * по Save он встаёт на дорожку уровня (`POST …/place`), редактор повторяет сдвиг.
  *
  * ВСЁ применяется по Save: ответ/заметка — `answerFor`, статус и дата — `breaks.setBreak`
  * (затем ответы занятия перечитываются: знаменатель и дорожки зависят от статуса). Ошибка
@@ -40,7 +49,8 @@ const MAX_DAYS_AHEAD = 366;
 const CAPTION_CLS = 'text-[10px] font-extrabold uppercase tracking-[.07em]';
 
 function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
-  const { rollIndex, upcoming, breaks, onRollChange } = useTrainingsTab();
+  const { group, rollIndex, upcoming, breaks, onRollChange, sendPoolCommand, upcomingPlans, openSheet, deskSession } = useTrainingsTab();
+  const levels = useGroupLevels(group.id);
   const roll = upcoming[rollIndex] ?? null;
   const r = roll?.rsvp ?? null;
 
@@ -58,14 +68,24 @@ function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
   const [note, setNote] = useState<RsvpNote | null>(startNote);
   const [status, setStatus] = useState<PersonStatus>(startStatus);
   const [until, setUntil] = useState(startUntil);
+  const linked = person.linked_swimmer_id ?? null;
+  const startLevel = person.level_id ?? null;
+  const startSub = person.sub_level ?? null;
+  const [levelId, setLevelId] = useState<number | null>(startLevel);
+  const [subLevel, setSubLevel] = useState<number | null>(startSub);
+  const plan = r ? upcomingPlans[r.date] ?? null : null;
+  const place = placeInPlan(plan, linked);
+  const [pinned, setPinned] = useState(!!place?.pinned);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const today = todayInIsrael();
   const canAnswer = !!r?.can_answer;
-  const lane = laneOfPerson(r?.lane_view, person);
+  // Есть план даты — шапка говорит то же, что поле «Lane this training» (CF4); `lane_view` — расчётный
+  // вид «по уровням» без плана, при плане он с ним расходится.
+  const lane = place ? null : laneOfPerson(r?.lane_view, person);
   const sub = [
-    lane ? laneCaption(lane) : null,
+    place ? (place.lane != null ? `Lane ${place.lane}` : place.inPlan ? 'Unassigned' : 'Not today') : lane ? laneCaption(lane) : null,
     person.user_id != null ? 'joined account' : 'no account — the coach answers for them',
   ].filter(Boolean).join(' · ');
 
@@ -77,6 +97,8 @@ function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
 
   const answerChanged = answer !== startAnswer || note !== startNote;
   const statusChanged = status !== startStatus || (status === 'break' && until !== startUntil);
+  const levelChanged = levelId !== startLevel || (levelId != null && subLevel !== startSub);
+  const pinChanged = place?.lane != null && pinned !== place.pinned;
 
   const save = async () => {
     if (busy) return;
@@ -84,15 +106,34 @@ function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
     setBusy(true);
 
     if (answerChanged && roll) {
-      const err = await roll.answerFor(person, answer, note);
+      const { error: err, laneChange } = await roll.answerFor(person, answer, note);
       if (err) { setError(err); setBusy(false); return; }
+      if (laneChange) sendPoolCommand({ kind: 'lane-change', change: laneChange });
       // Ответ «Going» снимает перерыв на сервере — если статус не правили, список перерывов устарел.
       if (answer === 'yes' && person.on_break && !statusChanged) breaks.reload();
       onRollChange?.({
         person,
         prev: { answer: startAnswer, note: startNote },
         next: { answer, note: answer ? note : null },
+        lane: laneChange,
       });
+    }
+
+    if (levelChanged) {
+      const err = linked != null
+        ? await levels.setSwimmerLevel(linked, levelId, subLevel)
+        : person.user_id != null ? await levels.setAccountLevel(person.user_id, levelId) : null;
+      if (err) { setError(err); setBusy(false); return; }
+      // Идущий с новым уровнем — на дорожку уровня по правилу ответа (CF4). Плана нет — 404, не ошибка.
+      if (linked != null && levelId != null && answer === 'yes' && r && plan) {
+        const placed = await plansApi.place(group.id, r.date, linked);
+        if (placed.ok && placed.data?.lane_change) sendPoolCommand({ kind: 'lane-change', change: placed.data.lane_change });
+      }
+      roll?.reload();
+    }
+
+    if (pinChanged && linked != null && place?.lane != null) {
+      sendPoolCommand({ kind: 'pin', swimmerId: linked, on: pinned });
     }
 
     if (statusChanged) {
@@ -105,6 +146,12 @@ function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
 
     onClose();
   };
+
+  // Строка «Account» ведёт в «Who is this?» — только у аккаунта (пловцу без аккаунта привязывать некого).
+  const changeLink = person.user_id != null
+    ? () => openSheet({ kind: 'who-is-this', who: { userId: person.user_id!, name: person.name, request: false, currentSwimmerId: linked } })
+    : null;
+  const onDesk = deskSession != null && r?.date === deskSession.date;
 
   return (
     <DeepSheet
@@ -158,6 +205,22 @@ function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
           <RsvpNotes current={note} onPick={setNote} disabled={!canAnswer} />
         )}
       </div>
+
+      <PersonLevelField
+        levels={levels.data?.levels ?? (levels.loadError ? [] : null)}
+        levelId={levelId}
+        subLevel={subLevel}
+        forAccount={linked == null}
+        disabled={busy || (linked == null && person.user_id == null)}
+        onChange={(l, s) => { setLevelId(l); setSubLevel(s); }}
+      />
+      <PersonLaneField
+        place={place}
+        pinned={pinned}
+        onPinned={setPinned}
+        onShow={onDesk && linked != null && place ? () => { sendPoolCommand({ kind: 'show-swimmer', swimmerId: linked }); onClose(); } : null}
+      />
+      <PersonAccountField person={person} onChange={changeLink} />
 
       <div className="flex flex-col gap-1">
         <span className={CAPTION_CLS} style={{ color: 'var(--t-text-3)' }}>Status</span>

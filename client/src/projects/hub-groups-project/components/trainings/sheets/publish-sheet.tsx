@@ -3,6 +3,7 @@ import { DeepSheet, SheetButton, SheetError, SheetFooter } from '../../../../com
 import type { LanePlan, LanePlanPublishCheck } from '../../../types';
 import GroupLaneBoard from '../../group-lane-board';
 import { formatPlanDate, lanePlansApi } from '../../lane-plans-api';
+import { useTrainingsTab } from '../trainings-context';
 import type { TrainingsSheetProps } from '../trainings-sheets';
 
 /**
@@ -14,7 +15,8 @@ import type { TrainingsSheetProps } from '../trainings-sheets';
  * Решение 10: пока есть идущий пловец без уровня не на дорожке, Publish недоступен. Кто это —
  * считает сервер (`GET …/publish-check`: «идущий» — это и ответ аккаунта, привязанного к пловцу,
  * клиент этой привязки не знает); сам Publish проверяет то же. Имя в списке — кнопка: шторка
- * закрывается, пловец выбран в редакторе (строка «Move … to»).
+ * закрывается и открывается карточка человека, где ему задают уровень (CF4); человека в
+ * перекличке этого занятия нет — пловец выбран в редакторе (строка «Move … to»).
  *
  * Открывает шторку редактор дорожек ПОСЛЕ того, как дослал несохранённые правки: `plan` — уже
  * сохранённый план, его и увидят участники.
@@ -38,6 +40,8 @@ const blockerName = (b: Blocker) => b.name || b.name_en;
 
 function PublishSheet({ sheet, onClose }: TrainingsSheetProps<'publish'>) {
   const { groupId, date, plan, onPublish, onPerson } = sheet.publish;
+  const { upcoming, rollIndex, openSheet } = useTrainingsTab();
+  const roll = upcoming[rollIndex]?.rsvp ?? null;
   /** null — проверка ещё идёт. */
   const [blockers, setBlockers] = useState<Blocker[] | null>(null);
   const [notify, setNotify] = useState(true);
@@ -69,6 +73,10 @@ function PublishSheet({ sheet, onClose }: TrainingsSheetProps<'publish'>) {
   };
 
   const toPerson = (swimmerId: number) => {
+    const person = roll?.date === date
+      ? roll.people?.find((p) => (p.linked_swimmer_id ?? p.swimmer_id) === swimmerId) ?? null
+      : null;
+    if (person) { openSheet({ kind: 'person', person }); return; }
     onClose();
     onPerson(swimmerId);
   };
@@ -114,7 +122,7 @@ function PublishSheet({ sheet, onClose }: TrainingsSheetProps<'publish'>) {
         >
           <p className={line} style={{ color: 'var(--deep-gold)' }}>
             {blockers.length === 1 ? 'Going, but has' : 'Going, but have'} no level and no lane. Put them on a
-            lane, or set a level in Admin → Levels, to publish.
+            lane, or set a level in their card, to publish.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {blockers.map((b) => (
@@ -124,7 +132,7 @@ function PublishSheet({ sheet, onClose }: TrainingsSheetProps<'publish'>) {
                 onClick={() => toPerson(b.swimmer_id)}
                 className="min-h-[36px] cursor-pointer rounded-full border bg-transparent px-3 text-[12px] font-extrabold"
                 style={{ borderColor: 'var(--deep-gold-border)', color: 'var(--deep-gold)' }}
-                title="Show in the pool"
+                title="Set a level"
               >
                 <bdi>{blockerName(b)}</bdi> ›
               </button>

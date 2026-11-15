@@ -1,6 +1,6 @@
 import type React from 'react';
 import type {
-  HubGroupBreak, RsvpAnswer, RsvpNote, TrainingLane, TrainingLaneView, TrainingRsvpPerson,
+  HubGroupBreak, LaneChange, RsvpAnswer, RsvpNote, TrainingLane, TrainingLaneView, TrainingRsvpPerson,
 } from '../../../types';
 
 /**
@@ -68,6 +68,18 @@ export function answerToastLabel(answer: RsvpAnswer | null): string {
   if (answer === 'maybe') return '? Not sure';
   if (answer === 'no') return '✕ Can’t';
   return '— No answer';
+}
+
+/**
+ * Тост после ответа, который сдвинул пловца в плане дорожек (CF4): «<имя> is going → lane 2»,
+ * «… is going → Unassigned» (уровня нет), «… → ✕ Can’t · Not today». Сдвига нет — обычный тост ответа.
+ */
+export function laneToastText(answer: RsvpAnswer | null, lane: LaneChange | null | undefined): { lead?: string; label?: string } {
+  if (!lane) return {};
+  const after = lane.after;
+  if (answer === 'yes' && after.in_plan) return { lead: 'is going', label: after.lane_no != null ? `lane ${after.lane_no}` : 'Unassigned' };
+  if (!after.in_plan) return { label: `${answerToastLabel(answer)} · Not today` };
+  return {};
 }
 
 /**

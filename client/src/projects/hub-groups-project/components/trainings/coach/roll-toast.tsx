@@ -26,6 +26,8 @@ export interface RollToastData {
   answer: RsvpAnswer | null;
   /** Свой текст после стрелки вместо подписи ответа — «lane 2» у переноса в редакторе дорожек (CF3). */
   label?: string;
+  /** Слова сразу после имени, до стрелки — «is going» у ответа, поставившего на дорожку (CF4). */
+  lead?: string;
 }
 
 function RollToast({
@@ -66,7 +68,7 @@ function RollToast({
         style={{ borderRadius: 12, padding: '0 6px 0 14px', background: 'var(--deep-text)', color: 'var(--deep-page-bg)' }}
       >
         <span className="min-w-0 flex-1 truncate">
-          <bdi>{toast.name}</bdi> → {toast.label ?? answerToastLabel(toast.answer)}
+          <bdi>{toast.name}</bdi>{toast.lead ? ` ${toast.lead}` : ''} → {toast.label ?? answerToastLabel(toast.answer)}
         </span>
         <button
           type="button"

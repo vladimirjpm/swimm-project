@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { LanePlan, TrainingRsvp, TrainingSessionList } from '../../types';
+import { needsCount, needsLabel } from './coach/needs-format';
 
 /**
  * Метки внимания таба Trainings (`marks-spec.md` хендоффа, docs/plans/trainings-tab-redesign-plan.md).
@@ -49,10 +50,15 @@ export function redMark(rsvp: TrainingRsvp | null): TrainingMark | null {
 }
 
 /**
- * Золотая: план дорожек на дату ближайшего занятия. Тренеру — черновик и/или неразложенные;
+ * Золотая: план дорожек на дату ближайшего занятия. Тренеру — прежде всего «Needs you» ближайшего
+ * занятия (CF4 потока тренера, число строк полосы: `rsvp.needs`), иначе черновик и/или неразложенные;
  * участнику — кого-то из «моих» пловцов тренер перенёс на другую дорожку. Всегда точка, без числа.
  */
-export function goldMark(plan: LanePlan | null, manages: boolean): TrainingMark | null {
+export function goldMark(plan: LanePlan | null, manages: boolean, rsvp: TrainingRsvp | null = null): TrainingMark | null {
+  if (manages) {
+    const needs = needsCount(rsvp?.needs);
+    if (needs > 0) return { tone: 'gold', count: needs, label: needsLabel(needs) };
+  }
   if (!plan) return null;
   if (manages) {
     const draft = plan.status === 'draft';
@@ -94,7 +100,7 @@ export function useTrainingMarks({
   return useMemo<TrainingMarks>(() => ({
     next: redMark(rsvp),
     // Тренеру Lanes ничего не гасит: метка держится, пока план черновик / есть неразложенные.
-    lanes: !manages && lanesSeen ? null : goldMark(nextPlan, manages),
+    lanes: !manages && lanesSeen ? null : goldMark(nextPlan, manages, rsvp),
     trainings: trainingsSeen ? null : accentMark(sessions),
   }), [rsvp, manages, nextPlan, sessions, trainingsSeen, lanesSeen]);
 }

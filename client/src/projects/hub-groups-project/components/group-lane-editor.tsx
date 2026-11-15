@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
-import type { HubGroupLevel, HubGroupLevels, LanePlan, LanePlanInput, LanePlanSwimmer } from '../types';
+import type { HubGroupLevel, HubGroupLevels, LaneChange, LanePlan, LanePlanInput, LanePlanSwimmer } from '../types';
 import LaneChip from './group-lane-chip';
 import LaneMoveRow from './group-lane-move-row';
 import LanePlanStatus from './lane-plan-status';
@@ -9,7 +9,7 @@ import { lanePlansApi, shortDay } from './lane-plans-api';
 import { levelColor } from './level-color';
 import { laneShortNames } from './lane-short-names';
 import RollToast, { type RollToastData } from './trainings/coach/roll-toast';
-import { useTrainingsTab } from './trainings/trainings-context';
+import { useTrainingsTab, type PoolCommand } from './trainings/trainings-context';
 import { useLaneAutosave } from './use-lane-autosave';
 
 /**
@@ -62,6 +62,11 @@ import { useLaneAutosave } from './use-lane-autosave';
  * Статус плана и единственная кнопка Publish / Unpublish — строка `LanePlanStatus`: в узле
  * `statusHost` (шапка рабочего стола или слот нижней панели каркаса), без узла — под дорожками.
  * Publish досылает правки и открывает диалог `trainings/sheets/publish-sheet.tsx`.
+ *
+ * Ответ сдвигает пловца на сервере (CF4: «Going» — на дорожку уровня, «Can’t» — в «Not today»):
+ * перекличка и карточка человека присылают сдвиг командой `lane-change` (`sendPoolCommand`
+ * контекста), редактор повторяет его в черновике — иначе следующее автосохранение вернуло бы
+ * пловца назад. Команды `show-swimmer` / `show-lane` — переход из «Needs you» и карточки.
  */
 
 const MAX_LANES = 12;
@@ -171,6 +176,20 @@ function initialDraft(
   };
 }
 
+/** Повторить в корзинах сдвиг пловца, сделанный сервером (CF4): убрать отовсюду, поставить на место `after`. */
+function applyLaneChange(b: Buckets, change: LaneChange): Buckets {
+  const id = change.swimmer_id;
+  const strip = (list: number[]) => list.filter((x) => x !== id);
+  const next: Buckets = { lanes: b.lanes.map(strip), unassigned: strip(b.unassigned), out: strip(b.out) };
+  const { after } = change;
+  const list = !after.in_plan ? next.out
+    : after.lane_no == null ? next.unassigned
+      : next.lanes[after.lane_no - 1];
+  if (!list) return b;
+  list.splice(Math.min(Math.max(0, after.order_no), list.length), 0, id);
+  return next;
+}
+
 /** Вход сохранения из черновика: видимые дорожки; люди убранных дорожек — в Unassigned. */
 function buildInput(
   laneCount: number, maxPerLane: number | null, reservedLanes: number, note: string, lanes: LaneDraft[],
@@ -267,7 +286,11 @@ function GroupLaneEditor({
   const [buckets, setBuckets] = useState<Buckets>(init.buckets);
   /** Закреплённые на своей дорожке: Auto-arrange их не двигает. */
   const [pinned, setPinned] = useState<ReadonlySet<number>>(init.pinned);
-  const { openSheet } = useTrainingsTab();
+  const { openSheet, setPoolListener, upcoming, rollIndex, deskSession } = useTrainingsTab();
+  // Человек переклички этого занятия по пловцу — для кнопки «Card» строки «Move … to» (CF4).
+  const deskRoll = deskSession ? upcoming[rollIndex]?.rsvp ?? null : null;
+  const personOf = (swimmerId: number) =>
+    deskRoll?.date === date ? deskRoll.people?.find((p) => (p.linked_swimmer_id ?? p.swimmer_id) === swimmerId) ?? null : null;
   const [publishing, setPublishing] = useState(false);
   /** Тост «<имя> → lane 2 · Undo» после переноса; `restore` — корзины и закрепление до него. */
   const [toast, setToast] = useState<(RollToastData & { restore: () => void }) | null>(null);
@@ -451,7 +474,52 @@ function GroupLaneEditor({
     if (where(swimmerId) === 'out') setOutOpen(true);
     setSelected(swimmerId);
     onFocusPool?.();
+    setReveal((n) => n + 1);
   };
+  // На телефоне бассейн ниже шапки страницы: без прокрутки выбранного не видно (CF4, «Show in pool»).
+  // Прокрутка — после отрисовки и после закрытия шторки. `window.scrollTo`, не `scrollIntoView` (как
+  // `entity-page.tsx`), и сразу, без `smooth`: плавную прокрутку здесь гасит закрытие шторки (проверено).
+  const [reveal, setReveal] = useState(0);
+  useEffect(() => {
+    if (reveal === 0) return;
+    const timer = window.setTimeout(() => {
+      const chip = document.querySelector('button[aria-pressed="true"][aria-label^="Move "]');
+      if (!chip) return;
+      const rect = chip.getBoundingClientRect();
+      if (rect.top >= 80 && rect.bottom <= window.innerHeight - 160) return;   // уже на экране
+      window.scrollTo({ top: window.scrollY + rect.top - window.innerHeight / 2 });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [reveal]);
+
+  // Команды редактору (CF4): сдвиг с сервера, «показать пловца / дорожку». Свежие функции — через ref.
+  const commandRef = useRef<(command: PoolCommand) => void>(() => {});
+  commandRef.current = (command) => {
+    if (command.kind === 'lane-change') {
+      const { change } = command;
+      setBuckets((b) => applyLaneChange(b, change));
+      setPin(change.swimmer_id, change.after.in_plan && change.after.lane_no != null && change.after.pinned);
+      // Undo прошлого переноса в редакторе вернул бы и этот сдвиг.
+      setToast(null);
+      return;
+    }
+    if (command.kind === 'pin') {
+      if (typeof where(command.swimmerId) === 'number') setPin(command.swimmerId, command.on);
+      return;
+    }
+    if (command.kind === 'show-swimmer') {
+      if (info.has(command.swimmerId)) showSwimmer(command.swimmerId);
+      return;
+    }
+    onFocusPool?.();
+    window.setTimeout(() => {
+      document.querySelector(`[data-lane-card="${command.laneNo}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }, 0);
+  };
+  useEffect(() => {
+    setPoolListener((command) => commandRef.current(command));
+    return () => setPoolListener(null);
+  }, [setPoolListener]);
 
   /** Publish: дослать правки, затем диалог с сохранённым планом (его и увидят участники). */
   const askPublish = async () => {
@@ -543,6 +611,10 @@ function GroupLaneEditor({
         onUnassign={() => move(selected, 'unassigned')}
         onOut={() => move(selected, 'out')}
         onLead={() => typeof target === 'number' && move(selected, target, { first: true })}
+        onCard={(() => {
+          const person = personOf(selected);
+          return person ? () => { setSelected(null); openSheet({ kind: 'person', person }); } : undefined;
+        })()}
       />
     );
   };
@@ -572,6 +644,7 @@ function GroupLaneEditor({
     return (
       <section
         key={no}
+        data-lane-card={no}
         {...dropProps(no)}
         className={`flex min-w-0 flex-col rounded-[16px] border ${desktop ? 'min-h-[220px] gap-2 p-2.5' : 'gap-2 px-3 py-2.5'}`}
         style={{ borderColor: 'var(--deep-pool-border)', background: 'var(--deep-pool-water)', ...dropOutline(no) }}

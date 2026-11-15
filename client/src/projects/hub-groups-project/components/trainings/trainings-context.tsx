@@ -3,7 +3,7 @@ import { DEEP_DESKTOP_QUERY, useMediaQuery } from '../../../../hooks/useMediaQue
 import { readViewParam, writeViewParam } from '../../../components/deep/view-chips';
 import { useTrainingSessions, type TrainingSessionsState } from '../../use-training-sessions';
 import { useTrainingRsvp, type TrainingRsvpState } from '../../use-training-rsvp';
-import type { HubGroupDetails, LanePlan, LanePlanSummary, NextTraining, RsvpAnswer, RsvpNote, TrainingRsvpPerson } from '../../types';
+import type { HubGroupDetails, LaneChange, LanePlan, LanePlanSummary, NextTraining, RsvpAnswer, RsvpNote, TrainingRsvpPerson } from '../../types';
 import ConfirmDialog from '../../../components/confirm-dialog/confirm-dialog';
 import { lanePlansApi } from '../lane-plans-api';
 import { useGroupBreaks } from '../use-group-breaks';
@@ -40,7 +40,21 @@ export interface RollChange {
   person: TrainingRsvpPerson;
   prev: RollAnswerState;
   next: RollAnswerState;
+  /** Ответ сдвинул пловца в плане дорожек (CF4): тост называет дорожку, Undo возвращает и её. */
+  lane?: LaneChange | null;
 }
+
+/**
+ * Команда редактору дорожек рабочего стола (CF4): ответ сдвинул пловца в плане на сервере —
+ * повторить сдвиг в черновике (иначе автосохранение вернуло бы старое); «Needs you» и карточка
+ * человека просят показать пловца или дорожку.
+ */
+export type PoolCommand =
+  | { kind: 'lane-change'; change: LaneChange }
+  | { kind: 'show-swimmer'; swimmerId: number }
+  | { kind: 'show-lane'; laneNo: number }
+  /** Закрепить / открепить пловца на его дорожке (карточка человека). */
+  | { kind: 'pin'; swimmerId: number; on: boolean };
 
 /** `?view=` — старое `sessions` (до редизайна) читается как `next`: неизвестное → по умолчанию. */
 const VIEWS: readonly TrainingsView[] = ['next', 'trainings', 'lanes'];
@@ -147,6 +161,10 @@ export interface TrainingsTabState {
   onRollChange?: (change: RollChange) => void;
   /** Слушатель `onRollChange` — регистрирует `roll-call.tsx` (`null` при размонтировании). */
   setRollChangeListener: (listener: ((change: RollChange) => void) | null) => void;
+  /** Передать команду редактору дорожек рабочего стола (CF4); редактора нет — ничего не делает. */
+  sendPoolCommand: (command: PoolCommand) => void;
+  /** Слушатель команд — регистрирует редактор дорожек (`null` при размонтировании). */
+  setPoolListener: (listener: ((command: PoolCommand) => void) | null) => void;
   sessions: TrainingSessionsState;
   breaks: ReturnType<typeof useGroupBreaks>;
   marks: TrainingMarks;
@@ -250,6 +268,11 @@ export function TrainingsTabProvider({
     rollListener.current = listener;
   }, []);
   const onRollChange = useCallback((change: RollChange) => { rollListener.current?.(change); }, []);
+  const poolListener = useRef<((command: PoolCommand) => void) | null>(null);
+  const setPoolListener = useCallback((listener: ((command: PoolCommand) => void) | null) => {
+    poolListener.current = listener;
+  }, []);
+  const sendPoolCommand = useCallback((command: PoolCommand) => { poolListener.current?.(command); }, []);
 
   // Планы дорожек: тренеру — статус «Draft / Published» на дату занятия; участнику (сервер отдаёт
   // ему только опубликованные) — чтобы знать, есть ли что показать во вкладке Lanes (`lanesHidden`).
@@ -375,10 +398,10 @@ export function TrainingsTabProvider({
     group, manages, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
     deskSession, openDesk, closeDesk,
     rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown,
-    onRollChange, setRollChangeListener, sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
+    onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
     group, manages, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, setRollIndex,
-    deskSession, openDesk, closeDesk, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sessions,
+    deskSession, openDesk, closeDesk, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions,
     breaks, marks, closeSheet, sheet,
   ]);
 

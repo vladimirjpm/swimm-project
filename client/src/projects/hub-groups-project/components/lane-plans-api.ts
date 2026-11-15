@@ -1,5 +1,5 @@
 import type {
-  BreakInput, HubGroupBreaks, HubGroupLevels, LanePlan, LanePlanInput, LanePlanPublishCheck, LanePlanSummary,
+  BreakInput, HubGroupBreaks, HubGroupLevels, LaneChange, LanePlan, LanePlanInput, LanePlanPublishCheck, LanePlanSummary,
 } from '../types';
 
 /**
@@ -30,7 +30,8 @@ async function antiforgery(): Promise<string | null> {
   return cachedToken;
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<ApiResult<T>> {
+/** Запрос с antiforgery и разбором ошибки — общий для клиентов таба Trainings (CF4: `account-link-api.ts`). */
+export async function request<T>(method: string, url: string, body?: unknown): Promise<ApiResult<T>> {
   const headers: Record<string, string> = {};
   if (method !== 'GET') {
     const token = await antiforgery();
@@ -89,6 +90,12 @@ export const lanePlansApi = {
   /** `notify` — push участникам «дорожки готовы». Отказ 400 с текстом — решение 10. */
   publish: (groupId: number, date: string, notify = false) =>
     request<void>('POST', `${base(groupId)}/${date}/publish`, { notify }),
+  /**
+   * Поставить идущего пловца на дорожку его уровня (CF4): тренер задал уровень в карточке человека.
+   * `lane_change` null — двигать не пришлось; 404 — плана на дату нет.
+   */
+  place: (groupId: number, date: string, swimmerId: number) =>
+    request<{ lane_change: LaneChange | null }>('POST', `${base(groupId)}/${date}/swimmers/${swimmerId}/place`),
   unpublish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/unpublish`),
   remove: (groupId: number, date: string) => request<void>('DELETE', `${base(groupId)}/${date}`),
   /** Зритель открыл вид Lanes (Т1б): гаснет «тебя перенесли». GET плана метку не гасит. */

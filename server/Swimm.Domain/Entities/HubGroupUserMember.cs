@@ -66,4 +66,11 @@ public class HubGroupUserMember
     /// группы и обнуляет поле; отказ — только обнуляет, членство остаётся. Само поле прав НЕ даёт.
     /// </summary>
     public DateTime? CoachRequestedAt { get; set; }
+
+    /// <summary>
+    /// «Not a swimmer» (решение 13 плана trainings-coach-flow, CF4): тренер решил, что аккаунт не
+    /// пловец (родитель, наблюдатель) — строка «Needs you: account not linked» больше не возвращается.
+    /// Привязка к пловцу (<see cref="SwimmerId"/>) признак снимает. Прав не меняет.
+    /// </summary>
+    public bool NotSwimmer { get; set; }
 }

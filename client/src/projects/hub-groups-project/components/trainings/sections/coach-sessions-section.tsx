@@ -1,5 +1,6 @@
 import React from 'react';
 import type { NextTraining } from '../../../types';
+import { needsCount, needsLabel } from '../coach/needs-format';
 import PlanPill, { type PlanPillState } from '../coach/plan-pill';
 import { nextSessions, timeRangeLabel, untilLabel } from '../next/next-format';
 import { CancelledPill, SessionTag } from '../next/session-tag';
@@ -43,6 +44,8 @@ function SessionCard({ session, index, first }: { session: NextTraining; index: 
   const plan = lanePlans?.find((p) => p.date === session.date) ?? null;
   const state: PlanPillState | null = lanePlans == null ? null : plan ? plan.status : 'none';
   const unassigned = upcomingPlans[session.date]?.unassigned.length ?? 0;
+  // «Needs you» занятия (CF4): идущие без уровня, переполненные дорожки, заявки, аккаунты без связи.
+  const needs = needsCount(r?.needs);
 
   const until = session.cancelled ? '' : untilLabel(session.date, session.start, session.end);
 
@@ -87,6 +90,9 @@ function SessionCard({ session, index, first }: { session: NextTraining; index: 
           )}
         </Row>
         <Row label="Lanes">{state ? <PlanPill state={state} unassigned={unassigned} /> : null}</Row>
+        {needs > 0 && (
+          <Row label="Needs you"><span style={{ color: 'var(--deep-gold)' }}>{needsLabel(needs)}</span></Row>
+        )}
       </div>
 
       {session.id && (

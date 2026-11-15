@@ -171,6 +171,21 @@ public class HubGroupLanePlansController : ControllerBase
     }
 
     /// <summary>
+    /// Поставить пловца на дорожку его уровня (CF4 плана trainings-coach-flow): тренер задал уровень
+    /// идущему в карточке человека. Ответ — сдвиг (<c>lane_change</c>) или <c>null</c>, если двигать
+    /// не пришлось; 404 — плана на дату нет.
+    /// </summary>
+    [HttpPost("{date}/swimmers/{swimmerId:int}/place")]
+    public async Task<IActionResult> Place(int id, string date, int swimmerId)
+    {
+        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var change = await _plans.PlaceAsync(id, day, swimmerId);
+        return Ok(new { lane_change = change });
+    }
+
+    /// <summary>
     /// Опубликовать. Отказ 400 с текстом — решение 10. Тело необязательно; <c>notify</c> — push
     /// участникам «дорожки готовы» (только когда статус действительно сменился).
     /// </summary>

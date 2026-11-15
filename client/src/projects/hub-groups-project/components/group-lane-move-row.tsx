@@ -5,10 +5,10 @@ import React from 'react';
  * Появляется в карточке дорожки / корзины выбранного пловца; кнопки — ДРУГИЕ места, «Lead» —
  * только если он в дорожке не первый. Выбор снимает повторный тап по плашке или Esc (в редакторе).
  * У закреплённого (CF2 плана trainings-coach-flow) — ещё «📌 Unpin»: следующий Auto-arrange снова
- * сможет его переставить.
+ * сможет его переставить. «Card» (CF4) — карточка человека: уровень, ответ, привязка аккаунта.
  */
 function LaneMoveRow({
-  name, laneNos, canUnassign, canOut, canLead, canUnpin = false, onLane, onUnassign, onOut, onLead, onUnpin,
+  name, laneNos, canUnassign, canOut, canLead, canUnpin = false, onLane, onUnassign, onOut, onLead, onUnpin, onCard,
 }: {
   name: string;
   /** Номера ДРУГИХ видимых дорожек. */
@@ -23,6 +23,8 @@ function LaneMoveRow({
   onOut: () => void;
   onLead: () => void;
   onUnpin?: () => void;
+  /** Открыть карточку человека (рабочий стол тренера, CF4); нет — кнопки нет. */
+  onCard?: () => void;
 }) {
   const btn = 'h-[36px] flex-none cursor-pointer rounded-[8px] border bg-transparent text-[12px] font-extrabold';
   const style = { borderColor: 'var(--deep-ow-border)', color: 'var(--deep-ow)' };
@@ -49,6 +51,7 @@ function LaneMoveRow({
           <span aria-hidden="true">📌 </span>Unpin
         </button>
       )}
+      {onCard && <button type="button" className={`${btn} px-2.5`} style={style} onClick={onCard} aria-label={`Card of ${name}`}>Card</button>}
     </div>
   );
 }

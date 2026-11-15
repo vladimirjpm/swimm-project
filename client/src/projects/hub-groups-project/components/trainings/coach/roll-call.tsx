@@ -5,7 +5,7 @@ import { useTrainingsTab, type RollChange } from '../trainings-context';
 import { CancelReason } from '../next/session-tag';
 import RollToast, { type RollToastData } from './roll-toast';
 import {
-  avatarBackground, findBreak, groupOf, nextAnswer, personMeta, pillStyle, sortRoll, statusLabel, statusSpoken,
+  avatarBackground, findBreak, groupOf, laneToastText, nextAnswer, personMeta, pillStyle, sortRoll, statusLabel, statusSpoken,
   type RollGroup,
 } from './roll-format';
 
@@ -241,7 +241,7 @@ function RollCall({ roll, r, narrow = false }: {
   /** Узкая колонка десктопа (рабочий стол тренера, CF1): строки в один столбец вместо двух. */
   narrow?: boolean;
 }) {
-  const { isDesktop, breaks, openSheet, setRollChangeListener } = useTrainingsTab();
+  const { isDesktop, breaks, openSheet, setRollChangeListener, sendPoolCommand } = useTrainingsTab();
   const [filter, setFilter] = useState<Filter>('all');
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastId = useRef(0);
@@ -266,16 +266,20 @@ function RollCall({ roll, r, narrow = false }: {
   useEffect(() => { setToast(null); }, [r.session_id]);
 
   const showToast = useCallback((change: RollChange) => {
-    const { answerFor } = live.current;
     toastId.current += 1;
     setToast({
       id: toastId.current,
       key: rsvpPersonKey(change.person),
       name: change.person.name,
       answer: change.next.answer,
-      undo: () => answerFor(change.person, change.prev.answer, change.prev.note),
+      // Ответ сдвинул пловца в плане (CF4): «… is going → lane 2»; Undo возвращает и ответ, и место.
+      ...laneToastText(change.next.answer, change.lane),
+      undo: async () => {
+        const res = await live.current.answerFor(change.person, change.prev.answer, change.prev.note, change.lane?.before ?? null);
+        if (res.laneChange) sendPoolCommand({ kind: 'lane-change', change: res.laneChange });
+      },
     });
-  }, []);
+  }, [sendPoolCommand]);
 
   useEffect(() => {
     setRollChangeListener(showToast);
@@ -286,14 +290,17 @@ function RollCall({ roll, r, narrow = false }: {
     if (!r.can_answer) return;
     const next = nextAnswer(p);
     const prevNote = p.note ?? null;
-    const err = await roll.answerFor(p, next, prevNote);
-    if (err) return; // текст ошибки — в `roll.error`, строкой под списком
+    const { error, laneChange } = await roll.answerFor(p, next, prevNote);
+    if (error) return; // текст ошибки — в `roll.error`, строкой под списком
+    // Сервер уже сдвинул пловца в плане — тот же сдвиг в черновике редактора (иначе автосохранение вернёт старое).
+    if (laneChange) sendPoolCommand({ kind: 'lane-change', change: laneChange });
     // Ответ «Going» снимает перерыв на сервере — список перерывов перечитываем.
     if (next === 'yes' && p.on_break) breaks.reload();
     showToast({
       person: p,
       prev: { answer: p.answer, note: prevNote },
       next: { answer: next, note: next ? prevNote : null },
+      lane: laneChange,
     });
   };
 

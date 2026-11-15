@@ -676,6 +676,51 @@ export interface TrainingRsvpPerson {
   not_training?: boolean;
   /** Сам вернулся с перерыва недавно — сколько дней был на нём. */
   back_after_days?: number | null;
+  /**
+   * Пловец состава, которым человек стоит в группе (CF4): у аккаунта — метка тренера / привязка /
+   * «Me», у пловца без аккаунта — он сам; null — аккаунт ни с кем не связан.
+   */
+  linked_swimmer_id?: number | null;
+  /** Имя связанного пловца — «Account: linked to …» карточки человека. */
+  linked_swimmer_name?: string | null;
+  /** Уровень в группе: пловца, иначе аккаунта. */
+  level_id?: number | null;
+  sub_level?: number | null;
+}
+
+/** Место пловца в плане дорожек (CF4): нет в плане — «Not today»; `lane_no` null — Unassigned. */
+export interface LanePlace {
+  in_plan: boolean;
+  lane_no: number | null;
+  order_no: number;
+  pinned: boolean;
+}
+
+/** Ответ сдвинул пловца в плане дорожек даты (§5.3 плана trainings-coach-flow) — тост и Undo. */
+export interface LaneChange {
+  swimmer_id: number;
+  before: LanePlace;
+  after: LanePlace;
+}
+
+export interface TrainingNeedPerson {
+  user_id: number | null;
+  swimmer_id: number | null;
+  name: string;
+  /** Подсказка «Who is this?»: «Me» человека в составе, иначе совпадение по имени. */
+  suggested_swimmer_id: number | null;
+}
+
+/** Полоса «Needs you» рабочего стола (CF4) — только управляющему; считает сервер. */
+export interface TrainingNeeds {
+  /** Идущие пловцы без уровня (и не стоящие на дорожке руками). */
+  no_level: TrainingNeedPerson[];
+  /** Дорожки плана сверх «Max per lane». */
+  over_lanes: { lane_no: number; count: number; max: number }[];
+  /** Ожидающие заявки на вступление. */
+  requests: TrainingNeedPerson[];
+  /** Аккаунты без связи с пловцом. */
+  unlinked: TrainingNeedPerson[];
 }
 
 /** Человек в бассейне вида по дорожкам (Ш3.2). Поля null — имя скрыто («Who's coming: coach»). */
@@ -739,6 +784,10 @@ export interface TrainingRsvp {
   break_until?: string | null;
   /** Вид по дорожкам (Ш3.2); null — выключен у группы или «только план», а плана нет. */
   lane_view?: TrainingLaneView | null;
+  /** «Needs you» — только управляющему. */
+  needs?: TrainingNeeds | null;
+  /** Только в ответе PUT: ответ сдвинул пловца в плане дорожек. */
+  lane_change?: LaneChange | null;
 }
 
 // ── «On break» (Ш3.1) — GET/PUT /api/hub-groups/{id}/breaks, личное ──────────────

@@ -20,7 +20,7 @@ public class LanePlanService : ILanePlanService
     public LanePlanService(SwimmDbContext db) => _db = db;
 
     /// <summary>Первый ключ advisory-блокировки «планы дорожек группы» (второй — id группы).</summary>
-    private const int LanePlansLockClass = 0x48474C50; // "HGLP" — hub group lane plans
+    internal const int LanePlansLockClass = 0x48474C50; // "HGLP" — hub group lane plans
 
     /// <summary>Сколько планов отдаёт список — выбор даты, а не архив.</summary>
     private const int ListLimit = 200;
@@ -445,6 +445,9 @@ public class LanePlanService : ILanePlanService
             .Select(r => new LanePlanBlockerDto { SwimmerId = r.SwimmerId, Name = r.Name, NameEn = r.NameEn })
             .ToList();
     }
+
+    public Task<LaneChangeDto?> PlaceAsync(int hubGroupId, DateOnly date, int swimmerId) =>
+        LanePlanPlacementStore.ApplyAsync(_db, hubGroupId, date, swimmerId, LanePlanPlacementStore.Intent.Going);
 
     public async Task<LanePlanPublishResult> PublishAsync(int hubGroupId, DateOnly date)
     {
