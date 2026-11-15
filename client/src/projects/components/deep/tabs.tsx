@@ -1,4 +1,5 @@
 import React from 'react';
+import { setDockSlotNode } from './dock-slot';
 
 /**
  * Плитки-табы «папка» (design_handoff_club_page_tabs, вариант 3a folder-tab).
@@ -16,7 +17,8 @@ import React from 'react';
  *   фиолетовый текст и ✎ в углу.
  * - `pinned` — инструменты управляющего (Trainings, Admin). На десктопе они в конце ряда
  *   за пунктиром с подписью `toolsLabel`; на телефоне — закреплённой панелью у низа экрана,
- *   а верхний ряд остаётся коротким (5 колонок вместо 7 — иначе колонка ~45px).
+ *   а верхний ряд остаётся коротким (5 колонок вместо 7 — иначе колонка ~45px). В этой панели
+ *   есть слот для строки активного таба (`dock-slot.ts`: статус плана и Publish тренера).
  *
  * Иконки декоративные (aria-hidden), имя таба — текст; тап-таргет в мобайле ≥48px
  * задан в deep-theme.css (.deep-tab).
@@ -117,6 +119,8 @@ function DeepTabs<T extends string>({ tabs, active, onSelect, ariaLabel, toolsLa
 
       {tools.length > 0 && (
         <div className="deep-tabs-tools">
+          {/* Слот содержимого активного таба в этой же панели (телефон) — см. dock-slot.ts. */}
+          <div ref={setDockSlotNode} className="deep-tabs-tools__slot" />
           <span className="deep-tabs-tools__label">{toolsLabel}</span>
           <div className="deep-tabs-tools__row">
             {tools.map((tab) => (

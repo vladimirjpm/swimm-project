@@ -456,6 +456,19 @@ public class MyHubGroupsController : ControllerBase
         return result.Success ? Ok() : BadRequest(new { error = result.Error });
     }
 
+    /// <summary>«Not a swimmer» (CF4): аккаунт не пловец — метка снимается, «Needs you» о нём молчит. Владелец/админ группы.</summary>
+    [HttpPut("{id:int}/user-members/{userId:int}/not-swimmer")]
+    public async Task<IActionResult> SetUserMemberNotSwimmer(int id, int userId)
+    {
+        var perms = await RequirePermissionsAsync(id);
+        if (perms == null) return Unauthorized();
+        if (!perms.Exists) return NotFound();
+        if (!perms.CanEdit) return Forbid();
+
+        var result = await _mine.SetUserMemberNotSwimmerAsync(id, userId);
+        return result.Success ? Ok() : BadRequest(new { error = result.Error });
+    }
+
     /// <summary>Одобрить заявку участника-аккаунта (pending → active). Владелец/админ группы.</summary>
     [HttpPost("{id:int}/user-members/{userId:int}/approve")]
     public async Task<IActionResult> ApproveUserMember(int id, int userId)

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
@@ -26,9 +27,13 @@ public class HubGroupLanePlansController : ControllerBase
     private readonly IHubGroupPermissionService _permissions;
     private readonly IHubGroupTrainingRepository _trainings;
 
+    private readonly ILanePlanNotifier _notifier;
+
     public HubGroupLanePlansController(
-        ILanePlanService plans, IHubGroupPermissionService permissions, IHubGroupTrainingRepository trainings)
+        ILanePlanService plans, IHubGroupPermissionService permissions, IHubGroupTrainingRepository trainings,
+        ILanePlanNotifier notifier)
     {
+        _notifier = notifier;
         _plans = plans;
         _permissions = permissions;
         _trainings = trainings;
@@ -131,6 +136,23 @@ public class HubGroupLanePlansController : ControllerBase
         return Ok(await _plans.GetAsync(id, day, isManager: true, CurrentUserId()));
     }
 
+    /// <summary>
+    /// Workout занятия (CF6, §5.5 плана trainings-coach-flow): документ целиком, <c>workout</c> null —
+    /// стереть. Отдельно от PUT плана: редактор дорожек и редактор workout сохраняются сами и не
+    /// перетирают друг друга. 404 — плана на дату нет (workout живёт при плане).
+    /// </summary>
+    [HttpPut("{date}/workout")]
+    public async Task<IActionResult> SaveWorkout(int id, string date, [FromBody] WorkoutInputDto input)
+    {
+        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var (found, error) = await _plans.SaveWorkoutAsync(id, day, input?.Workout);
+        if (!found) return NotFound();
+        if (error != null) return BadRequest(new { error });
+        return NoContent();
+    }
+
     /// <summary>«Distribute»: раскладка по уровням. Ничего не сохраняет.</summary>
     [HttpPost("distribute")]
     public async Task<IActionResult> Distribute(int id, [FromBody] LanePlanDistributeInputDto input)
@@ -151,8 +173,54 @@ public class HubGroupLanePlansController : ControllerBase
         return result == null ? BadRequest(new { error }) : Ok(result);
     }
 
+    /// <summary>
+    /// Что мешает опубликовать (решение 10 плана trainings-coach-flow): идущие пловцы без уровня не
+    /// на дорожке. Диалог публикации показывает их заранее; сам Publish проверяет то же.
+    /// </summary>
+    [HttpGet("{date}/publish-check")]
+    public async Task<IActionResult> PublishCheck(int id, string date)
+    {
+        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var check = await _plans.GetPublishCheckAsync(id, day);
+        return check == null ? NotFound() : Ok(check);
+    }
+
+    /// <summary>
+    /// Поставить пловца на дорожку его уровня (CF4 плана trainings-coach-flow): тренер задал уровень
+    /// идущему в карточке человека. Ответ — сдвиг (<c>lane_change</c>) или <c>null</c>, если двигать
+    /// не пришлось; 404 — плана на дату нет.
+    /// </summary>
+    [HttpPost("{date}/swimmers/{swimmerId:int}/place")]
+    public async Task<IActionResult> Place(int id, string date, int swimmerId)
+    {
+        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var change = await _plans.PlaceAsync(id, day, swimmerId);
+        return Ok(new { lane_change = change });
+    }
+
+    /// <summary>
+    /// Опубликовать. Отказ 400 с текстом — решение 10. Тело необязательно; <c>notify</c> — push
+    /// участникам «дорожки готовы» (только когда статус действительно сменился).
+    /// </summary>
     [HttpPost("{date}/publish")]
-    public Task<IActionResult> Publish(int id, string date) => SetStatusAsync(id, date, LanePlanStatus.Published);
+    public async Task<IActionResult> Publish(
+        int id, string date, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] LanePlanPublishInputDto? input)
+    {
+        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var result = await _plans.PublishAsync(id, day);
+        if (!result.Found) return NotFound();
+        if (result.Error != null) return BadRequest(new { error = result.Error });
+
+        if (result.Changed && input?.Notify == true)
+            await _notifier.NotifyPublishedAsync(id, day, CurrentUserId()!.Value, HttpContext.RequestAborted);
+        return NoContent();
+    }
 
     [HttpPost("{date}/unpublish")]
     public Task<IActionResult> Unpublish(int id, string date) => SetStatusAsync(id, date, LanePlanStatus.Draft);

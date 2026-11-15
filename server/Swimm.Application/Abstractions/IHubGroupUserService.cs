@@ -53,6 +53,12 @@ public interface IHubGroupUserService
     Task<HubGroupMemberSaveResult> SetUserMemberLabelAsync(int hubGroupId, int userId, int? swimmerId, string? note);
 
     /// <summary>
+    /// «Not a swimmer» (CF4, решение 13): аккаунт не пловец — снять метку о пловце и больше не звать
+    /// тренера в «Needs you». Новая привязка к пловцу признак снимает.
+    /// </summary>
+    Task<HubGroupMemberSaveResult> SetUserMemberNotSwimmerAsync(int hubGroupId, int userId);
+
+    /// <summary>
     /// Самозапись: вступить в публичную/видимую группу. При JoinPolicy=open — сразу active,
     /// при approval — заявка pending (активирует владелец/админ через ApproveUserMemberAsync).
     /// </summary>

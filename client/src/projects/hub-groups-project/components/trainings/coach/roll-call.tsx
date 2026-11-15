@@ -5,7 +5,7 @@ import { useTrainingsTab, type RollChange } from '../trainings-context';
 import { CancelReason } from '../next/session-tag';
 import RollToast, { type RollToastData } from './roll-toast';
 import {
-  avatarBackground, findBreak, groupOf, nextAnswer, personMeta, pillStyle, sortRoll, statusLabel, statusSpoken,
+  avatarBackground, findBreak, groupOf, laneToastText, nextAnswer, personMeta, pillStyle, sortRoll, statusLabel, statusSpoken,
   type RollGroup,
 } from './roll-format';
 
@@ -235,8 +235,13 @@ function RollRow({
   );
 }
 
-function RollCall({ roll, r }: { roll: TrainingRsvpState; r: TrainingRsvp }) {
-  const { isDesktop, breaks, openSheet, setRollChangeListener } = useTrainingsTab();
+function RollCall({ roll, r, narrow = false }: {
+  roll: TrainingRsvpState;
+  r: TrainingRsvp;
+  /** Узкая колонка десктопа (рабочий стол тренера, CF1): строки в один столбец вместо двух. */
+  narrow?: boolean;
+}) {
+  const { isDesktop, breaks, openSheet, setRollChangeListener, sendPoolCommand } = useTrainingsTab();
   const [filter, setFilter] = useState<Filter>('all');
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastId = useRef(0);
@@ -261,16 +266,20 @@ function RollCall({ roll, r }: { roll: TrainingRsvpState; r: TrainingRsvp }) {
   useEffect(() => { setToast(null); }, [r.session_id]);
 
   const showToast = useCallback((change: RollChange) => {
-    const { answerFor } = live.current;
     toastId.current += 1;
     setToast({
       id: toastId.current,
       key: rsvpPersonKey(change.person),
       name: change.person.name,
       answer: change.next.answer,
-      undo: () => answerFor(change.person, change.prev.answer, change.prev.note),
+      // Ответ сдвинул пловца в плане (CF4): «… is going → lane 2»; Undo возвращает и ответ, и место.
+      ...laneToastText(change.next.answer, change.lane),
+      undo: async () => {
+        const res = await live.current.answerFor(change.person, change.prev.answer, change.prev.note, change.lane?.before ?? null);
+        if (res.laneChange) sendPoolCommand({ kind: 'lane-change', change: res.laneChange });
+      },
     });
-  }, []);
+  }, [sendPoolCommand]);
 
   useEffect(() => {
     setRollChangeListener(showToast);
@@ -281,14 +290,17 @@ function RollCall({ roll, r }: { roll: TrainingRsvpState; r: TrainingRsvp }) {
     if (!r.can_answer) return;
     const next = nextAnswer(p);
     const prevNote = p.note ?? null;
-    const err = await roll.answerFor(p, next, prevNote);
-    if (err) return; // текст ошибки — в `roll.error`, строкой под списком
+    const { error, laneChange } = await roll.answerFor(p, next, prevNote);
+    if (error) return; // текст ошибки — в `roll.error`, строкой под списком
+    // Сервер уже сдвинул пловца в плане — тот же сдвиг в черновике редактора (иначе автосохранение вернёт старое).
+    if (laneChange) sendPoolCommand({ kind: 'lane-change', change: laneChange });
     // Ответ «Going» снимает перерыв на сервере — список перерывов перечитываем.
     if (next === 'yes' && p.on_break) breaks.reload();
     showToast({
       person: p,
       prev: { answer: p.answer, note: prevNote },
       next: { answer: next, note: next ? prevNote : null },
+      lane: laneChange,
     });
   };
 
@@ -332,8 +344,8 @@ function RollCall({ roll, r }: { roll: TrainingRsvpState; r: TrainingRsvp }) {
   return (
     <div className={`flex min-w-0 flex-col ${isDesktop ? 'gap-2' : 'gap-3'}`}>
       {isDesktop ? (
-        <div className="flex items-center justify-between gap-2.5">
-          <span className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
+        <div className={`flex items-center justify-between gap-x-2.5 gap-y-1 ${narrow ? 'flex-wrap' : ''}`}>
+          <span className="flex flex-none items-center gap-2 whitespace-nowrap text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
             Roll call
             {counts.none > 0 && (
               <span
@@ -359,7 +371,7 @@ function RollCall({ roll, r }: { roll: TrainingRsvpState; r: TrainingRsvp }) {
 
       {isDesktop ? (
         <>
-          <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>{list}</div>
+          <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${narrow ? 1 : 2}, minmax(0, 1fr))` }}>{list}</div>
           <div className="text-[10.5px] font-bold" style={{ color: 'var(--t-text-3)' }}>
             Click status: — → ✓ → ? → ✕ · ⋮ for status, break, note
           </div>

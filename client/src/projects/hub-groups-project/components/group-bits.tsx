@@ -3,6 +3,7 @@ import { routes } from '../../../utils/routes';
 import { HelperMedia } from '../../../utils/helpers';
 import { useCurrentIdentity, useHubGroupMembership, useMyHubGroups } from '../use-my-hub-groups';
 import type { HubGroupDetails, HubGroupLink, HubGroupMember } from '../types';
+import GroupJoinDialog from './group-join-dialog';
 
 /**
  * Мелочи страницы групп, нужные И списку `/groups`, И странице `/groups/{slug}`.
@@ -125,11 +126,15 @@ function swimmerDisplayName(last: string, first: string, lastEn: string, firstEn
   return ru.length > 0 ? ru : `${lastEn} ${firstEn}`.trim();
 }
 
-/** Самозапись в группу (для авторизованного пользователя; не для виртуального «избранного»). */
+/**
+ * Самозапись в группу (для авторизованного пользователя; не для виртуального «избранного»).
+ * Вступление и заявка идут через объяснение «что значит вступить» (`group-join-dialog.tsx`).
+ */
 function JoinButton({ group }: { group: HubGroupDetails }) {
   const { isAuthenticated } = useCurrentIdentity();
   const { joined, join, leave } = useHubGroupMembership();
   const [busy, setBusy] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
 
   if (group.is_virtual || group.id <= 0 || !isAuthenticated) return null;
 
@@ -137,10 +142,10 @@ function JoinButton({ group }: { group: HubGroupDetails }) {
   const isPending = membership?.status === 'pending';
 
   const toggle = async () => {
+    if (!membership) { setJoinOpen(true); return; }
     setBusy(true);
     try {
-      if (membership) await leave(group.id); // active — выход; pending — отмена заявки
-      else await join(group.id);
+      await leave(group.id); // active — выход; pending — отмена заявки
     } finally {
       setBusy(false);
     }
@@ -150,7 +155,7 @@ function JoinButton({ group }: { group: HubGroupDetails }) {
     ? (isPending ? 'Request sent — cancel' : 'Leave group')
     : (group.join_policy === 'approval' ? 'Request to join' : 'Join group');
 
-  return (
+  const button = (
     <button
       type="button"
       disabled={busy}
@@ -165,6 +170,19 @@ function JoinButton({ group }: { group: HubGroupDetails }) {
     >
       {label}
     </button>
+  );
+
+  return (
+    <>
+      {button}
+      {joinOpen && (
+        <GroupJoinDialog
+          approval={group.join_policy === 'approval'}
+          onJoin={() => join(group.id)}
+          onClose={() => setJoinOpen(false)}
+        />
+      )}
+    </>
   );
 }
 

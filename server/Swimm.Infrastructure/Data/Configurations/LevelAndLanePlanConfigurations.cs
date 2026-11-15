@@ -107,6 +107,7 @@ internal sealed class LanePlanConfiguration : IEntityTypeConfiguration<LanePlan>
         entity.HasCheckConstraint("CK_LanePlans_Status", @"""Status"" IN ('draft', 'published')");
         entity.HasCheckConstraint("CK_LanePlans_LaneCount", @"""LaneCount"" BETWEEN 1 AND 12");
         entity.HasCheckConstraint("CK_LanePlans_MaxPerLane", @"""MaxPerLane"" IS NULL OR ""MaxPerLane"" BETWEEN 1 AND 20");
+        entity.HasCheckConstraint("CK_LanePlans_ReservedLanes", @"""ReservedLanes"" BETWEEN 0 AND 11");
     }
 }
 

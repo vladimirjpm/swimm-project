@@ -7,6 +7,7 @@ import AnswersBlock, { AnswersCaption, useFirstUnanswered } from '../next/answer
 import { BreakLink, BreakRow, useHasBreakLink } from '../next/break-block';
 import { FullPool, MiniPool, NextHeader, PoolFooter, useNextRsvp, YourLane } from '../next/lane-block';
 import { nextSessions } from '../next/next-format';
+import LanePreviewPicker from '../next/lane-preview-picker';
 
 /**
  * Вид Next УЧАСТНИКА (Т5, docs/tasks/trainings-tab-t5-sonnet.md; хендофф Trainings Tab, 2a / 3a).
@@ -16,7 +17,9 @@ import { nextSessions } from '../next/next-format';
  *   (рамка `--deep-live-border`), строка перерыва;
  * - десктоп (3a) — ОДНА карточка: шапка, ответы сеткой, заметки + «Taking a break?», полный бассейн.
  *
- * Управляющему (`manages`) секция не показывается — у него `coach-next` (Т6).
+ * Управляющему (`manages`) секция не показывается — у него список занятий и рабочий стол (`coach-sessions` / `coach-desk`).
+ * В режиме страницы «👁 View» управляющий видит ЭТУ секцию, а над «Your lane» — ряд дорожек
+ * (`next/lane-preview-picker.tsx`): экран пловца выбранной дорожки.
  */
 
 const LIVE_BORDER = { borderColor: 'var(--deep-live-border)' } as const;
@@ -86,6 +89,7 @@ function PhoneNext() {
           <NextHeader variant="phone" next={next} r={r} />
           {r ? (
             <>
+              <LanePreviewPicker r={r} />
               <YourLane r={r} />
               <MiniPool r={r} />
               <PoolFooter r={r} />
@@ -134,6 +138,7 @@ function DesktopNext() {
           )}
         </div>
 
+        {r && <LanePreviewPicker r={r} />}
         {r ? <FullPool r={r} /> : (
           <p
             className="m-0 text-[12.5px] font-bold"

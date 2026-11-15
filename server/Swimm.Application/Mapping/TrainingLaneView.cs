@@ -40,11 +40,12 @@ public static class TrainingLaneView
 
     /// <summary>Опубликованный план на дату: дорожки и места пловцов (LaneNo null — Unassigned).</summary>
     public sealed record Plan(int LaneCount, IReadOnlyList<PlanLane> Lanes,
-        IReadOnlyDictionary<int, (int? LaneNo, int OrderNo)> Places);
+        IReadOnlyDictionary<int, (int? LaneNo, int OrderNo)> Places, WorkoutDto? Workout = null);
 
     public static TrainingLaneViewDto? Build(
         string laneView, Plan? plan, int? usualLanes, int? lastPlanLaneCount,
-        IReadOnlyList<LevelInfo> levels, IReadOnlyList<Person> pool, int viewerUserId, bool namesVisible)
+        IReadOnlyList<LevelInfo> levels, IReadOnlyList<Person> pool, int viewerUserId, bool namesVisible,
+        bool workoutOnEveryLane = false)
     {
         if (laneView == GroupLaneView.Off) return null;
         if (plan == null && laneView == GroupLaneView.Plan) return null;
@@ -95,14 +96,23 @@ public static class TrainingLaneView
             dto.Lanes = plan.Lanes
                 .Where(l => l.LaneNo <= plan.LaneCount)
                 .OrderBy(l => l.LaneNo)
-                .Select(l => new TrainingLaneDto
+                .Select(l =>
                 {
-                    LaneNo = l.LaneNo,
-                    Level = LevelDto(l.LevelId),
-                    Workout = l.Workout,
-                    People = placed.TryGetValue(l.LaneNo, out var list)
-                        ? list.OrderBy(x => x.Order).ThenBy(x => x.P.SortKey).Select(x => ToDto(x.P)).ToList()
-                        : [],
+                    var lane = new TrainingLaneDto
+                    {
+                        LaneNo = l.LaneNo,
+                        Level = LevelDto(l.LevelId),
+                        Workout = l.Workout,
+                        People = placed.TryGetValue(l.LaneNo, out var list)
+                            ? list.OrderBy(x => x.Order).ThenBy(x => x.P.SortKey).Select(x => ToDto(x.P)).ToList()
+                            : [],
+                    };
+                    // Workout занятия (CF6): версия уровня — только на своей дорожке зрителя (§5.5).
+                    // Управляющему (`workoutOnEveryLane`) — на каждой: режим «View» страницы показывает
+                    // ему экран участника любой дорожки, а весь workout он и так видит в редакторе.
+                    if (plan.Workout != null && (workoutOnEveryLane || lane.People.Any(p => p.IsMe)))
+                        lane.LevelWorkout = WorkoutRules.ForLevel(plan.Workout, lane.Level?.Id);
+                    return lane;
                 })
                 .ToList();
             return dto;

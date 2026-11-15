@@ -2,7 +2,9 @@ import React from 'react';
 import type { TrainingRsvpState } from '../../use-training-rsvp';
 import type { HubGroupDetails } from '../../types';
 import { TrainingsTabProvider, useTrainingsTab } from './trainings-context';
-import { LANES_SECTIONS, NEXT_SECTIONS, SectionList, TRAININGS_SECTIONS, VIEW_SECTIONS } from './trainings-sections';
+import {
+  COACH_DESK_SECTIONS, COACH_LIST_SECTIONS, LANES_SECTIONS, NEXT_SECTIONS, SectionList, TRAININGS_SECTIONS, VIEW_SECTIONS,
+} from './trainings-sections';
 import TrainingsSegments from './trainings-segments';
 import type { TrainingMarks } from './use-training-marks';
 import { TrainingsSheetHost } from './trainings-sheets';
@@ -18,16 +20,24 @@ import { TrainingsSheetHost } from './trainings-sheets';
  * - `trainings-sheets.tsx` — реестр форм (шторки / модалы), секция только просит открыть;
  * - `use-training-marks.ts` — метки внимания (считает Т8).
  *
- * Раскладка:
+ * Управляющий (docs/plans/trainings-coach-flow-plan.md, CF1): видов нет — список занятий
+ * (`coach-sessions` + лента) и рабочий стол одного занятия (`coach-desk`, `?session=<id>`).
+ *
+ * Раскладка участника:
  * - телефон — переключатель `Next · Trainings · Lanes` (`?view=`, старое `sessions` → Next);
  * - десктоп (≥960) — без переключателя: две колонки `1.1fr / 1fr` (Next | Trainings), а Lanes —
  *   во всю ширину с «← Back to Next» (6b: редактору дорожек нужна ширина под колонки).
  */
 function GroupTrainingsTab({
-  group, manages, rsvp, onOpenSchedule, onNextTrainingsChanged, onMarksChange,
+  group, manages, lanePreview = false, rsvp, onOpenSchedule, onNextTrainingsChanged, onMarksChange,
 }: {
   group: HubGroupDetails;
   manages: boolean;
+  /**
+   * Режим «👁 View» управляющего: вид участника и над ним ряд дорожек — экран пловца выбранной
+   * дорожки (`next/lane-preview-picker.tsx`). `manages` при этом false.
+   */
+  lanePreview?: boolean;
   rsvp?: TrainingRsvpState | null;
   /** «Set schedule» тренера: открыть Admin и прокрутить к карточке расписания (страница группы). */
   onOpenSchedule?: () => void;
@@ -43,6 +53,7 @@ function GroupTrainingsTab({
     <TrainingsTabProvider
       group={group}
       manages={manages}
+      lanePreview={lanePreview}
       rsvp={rsvp}
       openSchedule={onOpenSchedule}
       onNextTrainingsChanged={onNextTrainingsChanged}
@@ -55,7 +66,10 @@ function GroupTrainingsTab({
 }
 
 function TrainingsLayout() {
-  const { isDesktop, view, setView } = useTrainingsTab();
+  const { isDesktop, view, setView, manages, deskSession } = useTrainingsTab();
+
+  // Тренер: список занятий → рабочий стол занятия (CF1), на обеих ширинах; видов у него нет.
+  if (manages) return <SectionList sections={deskSession ? COACH_DESK_SECTIONS : COACH_LIST_SECTIONS} />;
 
   if (!isDesktop) {
     return (

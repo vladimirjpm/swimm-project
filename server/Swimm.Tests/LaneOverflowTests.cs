@@ -330,7 +330,7 @@ public class LaneOverflowTests
         Assert.Equal([(p1, (int?)1), (p2, 1), (p3, 2), (p4, 2)], distributed!.Swimmers.Select(x => (x.SwimmerId, x.LaneNo)));
 
         var (auto, autoError) = await service.AutoLanesAsync(s.GroupId,
-            new LanePlanAutoLanesInputDto { LaneCount = 2, MaxPerLane = 2 });
+            new LanePlanAutoLanesInputDto { LaneCount = 2, MaxPerLane = 2, ReservedLanes = 0 });
         Assert.Null(autoError);
         Assert.Equal([(p1, (int?)1), (p2, 1), (p3, 2), (p4, 2)], auto!.Swimmers.Select(x => (x.SwimmerId, x.LaneNo)));
 

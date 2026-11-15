@@ -42,6 +42,21 @@ public class LanePlan
     /// </summary>
     public int? MaxPerLane { get; set; }
 
+    /// <summary>
+    /// Сколько дорожек «Auto-arrange» оставляет пустыми про запас (0..11; решение Влада 14.11.2026,
+    /// CF2 плана trainings-coach-flow). Запас держится всегда, и когда дорожек не хватает; людям
+    /// остаётся хотя бы одна дорожка.
+    /// </summary>
+    public int ReservedLanes { get; set; } = 1;
+
+    /// <summary>
+    /// Workout занятия одним документом JSON (docs/plans/trainings-coach-flow-plan.md, §5.5, CF6):
+    /// сеты, строки и времена по уровням группы; разбирает <c>WorkoutRules</c>. Публикуется вместе
+    /// с планом (тот же статус). null — workout нет; тогда дорожки показывают старое
+    /// <see cref="LanePlanLane.Workout"/>. CF5 перенесёт ключ плана на занятие — поле едет с ним.
+    /// </summary>
+    public string? Workout { get; set; }
+
     /// <summary><see cref="LanePlanStatus.Draft"/> | <see cref="LanePlanStatus.Published"/>.</summary>
     [Required, MaxLength(10)]
     public string Status { get; set; } = LanePlanStatus.Draft;
@@ -76,7 +91,10 @@ public class LanePlanLane
 
     public HubGroupLevel? Level { get; set; }
 
-    /// <summary>Задание на дорожку — пока обычный текст (структурные сеты — позже).</summary>
+    /// <summary>
+    /// Задание на дорожку обычным текстом — СТАРОЕ поле: с CF6 workout один на занятие
+    /// (<see cref="LanePlan.Workout"/>); новый редактор его не правит, прошлые планы показывают как раньше.
+    /// </summary>
     [MaxLength(4000)]
     public string? Workout { get; set; }
 }
@@ -109,4 +127,11 @@ public class LanePlanSwimmer
 
     /// <summary>Когда перенесли (UTC) — сравнивается с <c>HubGroupUserSeen.LanesSeenAt</c> зрителя.</summary>
     public DateTime? MovedAt { get; set; }
+
+    /// <summary>
+    /// Закреплён на своей дорожке (docs/plans/trainings-coach-flow-plan.md, CF2): тренер перенёс
+    /// пловца руками — «Auto-arrange» его не двигает. Только у стоящего на дорожке; в Unassigned
+    /// закрепления нет (сбрасывает <c>LanePlanRules.Normalize</c>).
+    /// </summary>
+    public bool Pinned { get; set; }
 }

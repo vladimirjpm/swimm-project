@@ -221,14 +221,14 @@ public class HubGroupBreakTests
         var rsvp = new TrainingRsvpService(db);
 
         var before = (await rsvp.GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon))!;
-        Assert.Equal(1, before.Total);                                       // только Anna
+        Assert.Equal(2, before.Total);                                       // Anna и Gil (пловец без аккаунта, решение 14 CF4)
         var vera = before.People!.Single(p => p.UserId == s.Vera);
         Assert.Equal((true, false), (vera.NotTraining, vera.OnBreak));
         Assert.Equal(s.Vera, before.People!.Last().UserId);                  // после «on break»
 
         // Пришла разок — посчитана в этот день, статус остался.
         var going = (await rsvp.SetAsync(s.GroupId, TueKey, s.Vera, false, new TrainingRsvpInputDto { Answer = "yes" }, MondayNoon)).Rsvp!;
-        Assert.Equal((2, 1), (going.Total, going.Yes));
+        Assert.Equal((3, 1), (going.Total, going.Yes));
         Assert.True(going.NotTraining);
         Assert.Null((await db.HubGroupBreaks.SingleAsync(b => b.UserId == s.Vera)).EndedAt);
     }
@@ -244,7 +244,7 @@ public class HubGroupBreakTests
         var dto = (await new TrainingRsvpService(db).GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon))!;
 
         Assert.True(dto.People!.Single(p => p.UserId == s.Anna).NotTraining);
-        Assert.Equal(2, dto.Total);
+        Assert.Equal(3, dto.Total);                                          // Boris, Vera, Gil
     }
 
     // ── RSVP ────────────────────────────────────────────────────────────────
@@ -258,14 +258,14 @@ public class HubGroupBreakTests
         var rsvp = new TrainingRsvpService(db);
 
         var before = (await rsvp.GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon))!;
-        Assert.Equal(2, before.Total);                               // Vera на перерыве и молчит
+        Assert.Equal(3, before.Total);                               // Vera на перерыве и молчит; Gil — без аккаунта
         var vera = before.People!.Single(p => p.UserId == s.Vera);
         Assert.True(vera.OnBreak);
         Assert.Equal(s.Vera, before.People!.Last().UserId);          // в самом конце списка
 
         // «Не приду» на перерыве — ответ как у всех, в знаменателе он есть.
         var after = (await rsvp.SetAsync(s.GroupId, TueKey, s.Vera, false, new TrainingRsvpInputDto { Answer = "no" }, MondayNoon)).Rsvp!;
-        Assert.Equal((3, 1), (after.Total, after.No));
+        Assert.Equal((4, 1), (after.Total, after.No));
         Assert.True(after.OnBreak);
     }
 
@@ -320,7 +320,7 @@ public class HubGroupBreakTests
 
         var dto = (await rsvp.GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon))!;
         Assert.True(dto.People!.Single(p => p.UserId == s.Boris).OnBreak);   // метка тренера связывает
-        Assert.Equal(2, dto.Total);
+        Assert.Equal(3, dto.Total);                                          // Anna, Vera, Gil
 
         await rsvp.SetAsync(s.GroupId, TueKey, s.Boris, false, new TrainingRsvpInputDto { Answer = "yes" }, MondayNoon);
 

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { LanePlan, TrainingRsvp, TrainingSessionList } from '../../types';
+import { needsCount, needsLabel } from './coach/needs-format';
 
 /**
  * Метки внимания таба Trainings (`marks-spec.md` хендоффа, docs/plans/trainings-tab-redesign-plan.md).
@@ -35,10 +36,12 @@ export const NO_MARKS: TrainingMarks = { next: null, trainings: null, lanes: nul
 /**
  * Красная: нет ответа на ближайшее занятие. Тренеру — число не ответивших (метка только при
  * числе > 0), участнику — точка. `rsvp` — ответ именно на БЛИЖАЙШЕЕ занятие, не выбранное тренером.
+ * `asCoach` — вид тренера; по умолчанию права с сервера. Режим страницы «👁 View» передаёт false:
+ * права у зрителя тренерские, а метка должна быть как у участника.
  */
-export function redMark(rsvp: TrainingRsvp | null): TrainingMark | null {
+export function redMark(rsvp: TrainingRsvp | null, asCoach: boolean = rsvp?.can_manage === true): TrainingMark | null {
   if (!rsvp) return null;
-  if (rsvp.can_manage) {
+  if (asCoach) {
     const count = (rsvp.people ?? []).filter((p) => p.answer == null && !p.on_break && !p.not_training).length;
     return count > 0 ? { tone: 'red', count, label: `${count} haven’t answered` } : null;
   }
@@ -49,10 +52,15 @@ export function redMark(rsvp: TrainingRsvp | null): TrainingMark | null {
 }
 
 /**
- * Золотая: план дорожек на дату ближайшего занятия. Тренеру — черновик и/или неразложенные;
+ * Золотая: план дорожек на дату ближайшего занятия. Тренеру — прежде всего «Needs you» ближайшего
+ * занятия (CF4 потока тренера, число строк полосы: `rsvp.needs`), иначе черновик и/или неразложенные;
  * участнику — кого-то из «моих» пловцов тренер перенёс на другую дорожку. Всегда точка, без числа.
  */
-export function goldMark(plan: LanePlan | null, manages: boolean): TrainingMark | null {
+export function goldMark(plan: LanePlan | null, manages: boolean, rsvp: TrainingRsvp | null = null): TrainingMark | null {
+  if (manages) {
+    const needs = needsCount(rsvp?.needs);
+    if (needs > 0) return { tone: 'gold', count: needs, label: needsLabel(needs) };
+  }
   if (!plan) return null;
   if (manages) {
     const draft = plan.status === 'draft';
@@ -92,9 +100,9 @@ export function useTrainingMarks({
   rsvp, manages, nextPlan, sessions, trainingsSeen, lanesSeen,
 }: TrainingMarksInput): TrainingMarks {
   return useMemo<TrainingMarks>(() => ({
-    next: redMark(rsvp),
+    next: redMark(rsvp, manages),
     // Тренеру Lanes ничего не гасит: метка держится, пока план черновик / есть неразложенные.
-    lanes: !manages && lanesSeen ? null : goldMark(nextPlan, manages),
+    lanes: !manages && lanesSeen ? null : goldMark(nextPlan, manages, rsvp),
     trainings: trainingsSeen ? null : accentMark(sessions),
   }), [rsvp, manages, nextPlan, sessions, trainingsSeen, lanesSeen]);
 }

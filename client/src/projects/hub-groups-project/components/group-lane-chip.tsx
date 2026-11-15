@@ -8,10 +8,11 @@ import React from 'react';
  * - телефон: тап по пилюле выбирает пловца, строка «Move … to» рисуется в карточке дорожки;
  *   `draggable` на телефоне не ставим — он мешает прокрутке;
  * - десктоп: то же плюс перетаскивание мышью, бросок на другую пилюлю вставляет ПЕРЕД ней.
- * Выбранная — рамка `--deep-ow` в 2px.
+ * Выбранная — рамка `--deep-ow` в 2px. Закреплённая (тренер перенёс руками, Auto-arrange не
+ * двигает — CF2 плана trainings-coach-flow) — со значком 📌 после имени.
  */
 function LaneChip({
-  label, fullName, color, subLevel = null, leftGroup, selected, desktop, onSelect, dragProps, dropActive,
+  label, fullName, color, subLevel = null, pinned = false, leftGroup, selected, desktop, onSelect, dragProps, dropActive,
 }: {
   /** Короткая подпись: имя (у тёзок — с буквой фамилии). */
   label: string;
@@ -21,6 +22,8 @@ function LaneChip({
   color: string | null;
   /** ТЕКУЩИЙ подуровень (1 — верхний): мелкая цифра после имени — видно, кто перешёл с уровня выше. */
   subLevel?: number | null;
+  /** Закреплён на дорожке: Auto-arrange его не двигает. */
+  pinned?: boolean;
   /** Ушёл из группы (план — снимок): имя приглушено. */
   leftGroup: boolean;
   selected: boolean;
@@ -45,8 +48,8 @@ function LaneChip({
       {...(desktop ? dragProps : undefined)}
       onClick={onSelect}
       aria-pressed={selected}
-      aria-label={`Move ${fullName}`}
-      title={fullName}
+      aria-label={`Move ${fullName}${pinned ? ', pinned' : ''}`}
+      title={pinned ? `${fullName} · pinned to this lane` : fullName}
       className={`inline-flex h-[30px] max-w-full items-center gap-1 rounded-full px-3 text-left ${
         desktop ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
       }`}
@@ -65,6 +68,8 @@ function LaneChip({
           {subLevel}
         </span>
       )}
+      {/* Эмодзи, не свой значок (решение владельца, §8 плана): цвет не задаём. */}
+      {pinned && <span className="flex-none text-[10px] leading-none" aria-hidden="true">📌</span>}
     </button>
   );
 }

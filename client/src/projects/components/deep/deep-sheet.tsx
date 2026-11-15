@@ -37,6 +37,12 @@ const FIELD_BASE =
   + 'text-[13px] text-[var(--t-text)] outline-none focus:border-[color:var(--sheet-focus)] '
   + 'disabled:cursor-not-allowed disabled:opacity-60';
 
+/**
+ * Основа поля без высоты и кегля веса — для плотных таблиц (таблица workout, CF6), где поле ниже 44.
+ * Вне шторки фокус-рамку задаёт переменная `--sheet-focus` у предка.
+ */
+export const SHEET_FIELD_BASE_CLS = FIELD_BASE;
+
 /** Класс поля формы: высота 44, радиус 10, рамка карточки. Фокус — рамка тона шторки. */
 export const SHEET_FIELD_CLS = `h-11 font-bold ${FIELD_BASE}`;
 

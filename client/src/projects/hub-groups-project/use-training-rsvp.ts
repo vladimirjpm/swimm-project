@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { publicationsApiFetch } from './components/group-bits';
-import type { RsvpAnswer, RsvpNote, TrainingRsvp, TrainingRsvpPerson } from './types';
+import type { LaneChange, LanePlace, RsvpAnswer, RsvpNote, TrainingRsvp, TrainingRsvpPerson } from './types';
 
 /**
  * Ответы «иду / не уверен / не приду» на одно занятие (docs/plans/entity-hero-roles-plan.md, Ш2).
@@ -23,12 +23,21 @@ export interface TrainingRsvpState {
   answer: (answer: RsvpAnswer | null, note?: RsvpNote | null) => Promise<void>;
   /**
    * Управляющий ставит ответ за участника (попросил в WhatsApp) или за пловца группы без аккаунта.
-   * `note` — быстрая заметка к ответу (у «нет ответа» сервер её не хранит). Возвращает текст
-   * ошибки сервера либо `null` — как `setBreak` перерывов: форма показывает его у себя.
+   * `note` — быстрая заметка к ответу (у «нет ответа» сервер её не хранит). `restoreLane` — Undo
+   * тоста (CF4): вернуть пловца в плане дорожек на прежнее место вместо правила «Going ставит на
+   * дорожку». Итог — текст ошибки сервера (форма показывает его у себя) и сдвиг в плане дорожек.
    */
-  answerFor: (person: TrainingRsvpPerson, answer: RsvpAnswer | null, note?: RsvpNote | null) => Promise<string | null>;
+  answerFor: (
+    person: TrainingRsvpPerson, answer: RsvpAnswer | null, note?: RsvpNote | null, restoreLane?: LanePlace | null,
+  ) => Promise<RsvpSaveOutcome>;
   /** Перечитать с сервера — после того, что меняет ответы со стороны (перерыв, Ш3.1). */
   reload: () => void;
+}
+
+/** Итог записи ответа: ошибка (`null` — успех) и сдвиг пловца в плане дорожек, если был. */
+export interface RsvpSaveOutcome {
+  error: string | null;
+  laneChange: LaneChange | null;
 }
 
 const COUNT_KEY: Record<RsvpAnswer, 'yes' | 'maybe' | 'no'> = { yes: 'yes', maybe: 'maybe', no: 'no' };
@@ -74,8 +83,8 @@ export function useTrainingRsvp(groupId: number | null, sessionId: string | null
   }, [enabled, url, version]);
 
   /** Возвращает текст ошибки (он же уходит в `error`) или `null` при успехе. */
-  const send = useCallback(async (optimistic: TrainingRsvp, body: object): Promise<string | null> => {
-    if (!url) return null;
+  const send = useCallback(async (optimistic: TrainingRsvp, body: object): Promise<RsvpSaveOutcome> => {
+    if (!url) return { error: null, laneChange: null };
     setError(null);
     setRsvp(optimistic);
     let message = 'Could not save your answer.';
@@ -83,9 +92,11 @@ export function useTrainingRsvp(groupId: number | null, sessionId: string | null
       const r = await publicationsApiFetch(url, { method: 'PUT', body: JSON.stringify(body) });
       if (r.ok) {
         const data = (await r.json()) as TrainingRsvp;
-        confirmed.current = data;
-        setRsvp(data);
-        return null;
+        // Сдвиг в плане — только итог этого PUT; в состоянии его не держим.
+        const { lane_change: laneChange = null, ...rest } = data;
+        confirmed.current = rest;
+        setRsvp(rest);
+        return { error: null, laneChange };
       }
       const payload = await r.json().catch(() => null);
       message = payload?.error ?? message;
@@ -94,7 +105,7 @@ export function useTrainingRsvp(groupId: number | null, sessionId: string | null
     }
     setError(message);
     setRsvp(confirmed.current);
-    return message;
+    return { error: message, laneChange: null };
   }, [url]);
 
   const answer = useCallback(async (next: RsvpAnswer | null, note: RsvpNote | null = null) => {
@@ -109,13 +120,14 @@ export function useTrainingRsvp(groupId: number | null, sessionId: string | null
   }, [send]);
 
   const answerFor = useCallback(async (
-    target: TrainingRsvpPerson, next: RsvpAnswer | null, note: RsvpNote | null = null,
-  ): Promise<string | null> => {
+    target: TrainingRsvpPerson, next: RsvpAnswer | null, note: RsvpNote | null = null, restoreLane: LanePlace | null = null,
+  ): Promise<RsvpSaveOutcome> => {
+    const none = { error: null, laneChange: null };
     const current = confirmed.current;
-    if (!current?.people) return null;
+    if (!current?.people) return none;
     const key = rsvpPersonKey(target);
     const person = current.people.find((p) => rsvpPersonKey(p) === key);
-    if (!person) return null;
+    if (!person) return none;
     // Снятый ответ заметки не несёт.
     const sentNote = next ? note : null;
     const optimistic = {
@@ -125,9 +137,8 @@ export function useTrainingRsvp(groupId: number | null, sessionId: string | null
         ? { ...p, answer: next, note: sentNote, set_by_coach: next != null && p.user_id != null }
         : p)),
     };
-    return send(optimistic, person.user_id != null
-      ? { answer: next, note: sentNote, user_id: person.user_id }
-      : { answer: next, note: sentNote, swimmer_id: person.swimmer_id });
+    const subject = person.user_id != null ? { user_id: person.user_id } : { swimmer_id: person.swimmer_id };
+    return send(optimistic, { answer: next, note: sentNote, ...subject, ...(restoreLane ? { restore_lane: restoreLane } : {}) });
   }, [send]);
 
   return { rsvp, loading, error, answer, answerFor, reload };

@@ -38,6 +38,13 @@ public interface ILanePlanService
     /// </summary>
     Task<HubGroupMemberSaveResult> SaveAsync(int hubGroupId, DateOnly date, LanePlanInputDto input, int userId);
 
+    /// <summary>
+    /// Сохранить workout занятия (CF6, §5.5 плана trainings-coach-flow): документ целиком, null —
+    /// стереть. План должен быть (workout живёт при нём и публикуется с ним): нет — <c>Found</c>
+    /// false. Уровни — только этой группы. Статус плана не меняется.
+    /// </summary>
+    Task<(bool Found, string? Error)> SaveWorkoutAsync(int hubGroupId, DateOnly date, WorkoutDto? workout);
+
     /// <summary>Раскладка «Distribute» по текущим уровням и порядку состава. Ничего не пишет.</summary>
     Task<(LanePlanDistributionDto? Result, string? Error)> DistributeAsync(int hubGroupId, LanePlanDistributeInputDto input);
 
@@ -47,7 +54,26 @@ public interface ILanePlanService
     /// </summary>
     Task<(LanePlanAutoLanesDto? Result, string? Error)> AutoLanesAsync(int hubGroupId, LanePlanAutoLanesInputDto input);
 
-    /// <summary>Опубликовать / вернуть в черновик. false — плана нет.</summary>
+    /// <summary>
+    /// Идущие пловцы без уровня, которые не стоят на дорожке (решение 10 плана
+    /// trainings-coach-flow): пока они есть, план не публикуется. null — плана нет.
+    /// </summary>
+    Task<LanePlanPublishCheckDto?> GetPublishCheckAsync(int hubGroupId, DateOnly date);
+
+    /// <summary>
+    /// Поставить идущего пловца на дорожку его уровня по правилу ответа «Going» (§5.3 плана
+    /// trainings-coach-flow, CF4) — после того, как тренер задал ему уровень в карточке человека.
+    /// Уже на дорожке — не двигает. null — плана нет или сдвига нет.
+    /// </summary>
+    Task<LaneChangeDto?> PlaceAsync(int hubGroupId, DateOnly date, int swimmerId);
+
+    /// <summary>Опубликовать с проверкой решения 10 (<see cref="GetPublishCheckAsync"/>).</summary>
+    Task<LanePlanPublishResult> PublishAsync(int hubGroupId, DateOnly date);
+
+    /// <summary>
+    /// Сменить статус без проверок: вернуть в черновик (Unpublish). Публикацию из интерфейса ведёт
+    /// <see cref="PublishAsync"/>. false — плана нет.
+    /// </summary>
     Task<bool> SetStatusAsync(int hubGroupId, DateOnly date, string status);
 
     /// <summary>Удалить план. false — плана нет.</summary>

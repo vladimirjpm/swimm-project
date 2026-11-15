@@ -1,4 +1,7 @@
-import type { BreakInput, HubGroupBreaks, HubGroupLevels, LanePlan, LanePlanInput, LanePlanSummary } from '../types';
+import type {
+  BreakInput, HubGroupBreaks, HubGroupLevels, LaneChange, LanePlan, LanePlanInput, LanePlanPublishCheck, LanePlanSummary,
+  Workout,
+} from '../types';
 
 /**
  * Клиент плана дорожек группы (docs/plans/lane-plans-plan.md). Ручки —
@@ -28,7 +31,8 @@ async function antiforgery(): Promise<string | null> {
   return cachedToken;
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<ApiResult<T>> {
+/** Запрос с antiforgery и разбором ошибки — общий для клиентов таба Trainings (CF4: `account-link-api.ts`). */
+export async function request<T>(method: string, url: string, body?: unknown): Promise<ApiResult<T>> {
   const headers: Record<string, string> = {};
   if (method !== 'GET') {
     const token = await antiforgery();
@@ -65,19 +69,40 @@ export const lanePlansApi = {
   away: (groupId: number, date: string) => request<{ swimmer_ids: number[] }>('GET', `${base(groupId)}/${date}/away`),
   save: (groupId: number, date: string, input: LanePlanInput) =>
     request<LanePlan>('PUT', `${base(groupId)}/${date}`, input),
-  distribute: (
+  /**
+   * Workout занятия (CF6): документ целиком, null — стереть. Отдельно от PUT плана — редакторы
+   * дорожек и workout сохраняются сами и не перетирают друг друга. 404 — плана на дату нет.
+   */
+  saveWorkout: (groupId: number, date: string, workout: Workout | null) =>
+    request<void>('PUT', `${base(groupId)}/${date}/workout`, { workout }),
+  /**
+   * «Auto-arrange»: сервер сам делит дорожки между уровнями и раскладывает людей. Ничего не
+   * сохраняет. `reserved_lanes` — сколько последних дорожек оставить пустыми про запас (всегда). `pinned` — закреплённые (CF2): остаются на своих дорожках, в ответе — с `pinned: true`.
+   */
+  autoLanes: (
     groupId: number,
     input: {
-      lane_count: number; max_per_lane: number | null; lanes: LanePlanInput['lanes']; swimmer_ids: number[] | null;
+      lane_count: number; max_per_lane: number | null; reserved_lanes: number; swimmer_ids: number[] | null;
+      pinned?: { swimmer_id: number; lane_no: number }[];
     },
-  ) => request<{ swimmers: LanePlanInput['swimmers'] }>('POST', `${base(groupId)}/distribute`, input),
-  /** «Auto lanes»: сервер сам делит дорожки между уровнями и раскладывает людей. Ничего не сохраняет. */
-  autoLanes: (
-    groupId: number, input: { lane_count: number; max_per_lane: number | null; swimmer_ids: number[] | null },
   ) =>
     request<{ lanes: { lane_no: number; level_id: number | null }[]; swimmers: LanePlanInput['swimmers'] }>(
       'POST', `${base(groupId)}/auto-lanes`, input),
-  publish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/publish`),
+  /**
+   * Что мешает опубликовать (решение 10 потока тренера): идущие пловцы без уровня не на дорожке.
+   * Считает сервер — «идущий» это и ответ аккаунта, привязанного к пловцу.
+   */
+  publishCheck: (groupId: number, date: string) =>
+    request<LanePlanPublishCheck>('GET', `${base(groupId)}/${date}/publish-check`),
+  /** `notify` — push участникам «дорожки готовы». Отказ 400 с текстом — решение 10. */
+  publish: (groupId: number, date: string, notify = false) =>
+    request<void>('POST', `${base(groupId)}/${date}/publish`, { notify }),
+  /**
+   * Поставить идущего пловца на дорожку его уровня (CF4): тренер задал уровень в карточке человека.
+   * `lane_change` null — двигать не пришлось; 404 — плана на дату нет.
+   */
+  place: (groupId: number, date: string, swimmerId: number) =>
+    request<{ lane_change: LaneChange | null }>('POST', `${base(groupId)}/${date}/swimmers/${swimmerId}/place`),
   unpublish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/unpublish`),
   remove: (groupId: number, date: string) => request<void>('DELETE', `${base(groupId)}/${date}`),
   /** Зритель открыл вид Lanes (Т1б): гаснет «тебя перенесли». GET плана метку не гасит. */
@@ -104,6 +129,13 @@ export function todayInIsrael(): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date());
+}
+
+/** «Sun 27» — день недели и число: кнопка копии и её подтверждение. */
+export function shortDay(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+  return `${weekday} ${d}`;
 }
 
 /** «Sun, Sep 27» — короткая подпись даты плана (en-US: у en-GB месяц бывает «Sept»). */

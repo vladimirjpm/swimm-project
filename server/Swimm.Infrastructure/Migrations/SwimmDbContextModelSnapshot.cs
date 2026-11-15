@@ -1982,6 +1982,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<DateTime>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("NotSwimmer")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Note")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -2207,6 +2210,9 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int>("ReservedLanes")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -2214,6 +2220,9 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Workout")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -2227,6 +2236,8 @@ namespace Swimm.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_LanePlans_LaneCount", "\"LaneCount\" BETWEEN 1 AND 12");
 
                             t.HasCheckConstraint("CK_LanePlans_MaxPerLane", "\"MaxPerLane\" IS NULL OR \"MaxPerLane\" BETWEEN 1 AND 20");
+
+                            t.HasCheckConstraint("CK_LanePlans_ReservedLanes", "\"ReservedLanes\" BETWEEN 0 AND 11");
 
                             t.HasCheckConstraint("CK_LanePlans_Status", "\"Status\" IN ('draft', 'published')");
                         });
@@ -2276,6 +2287,9 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.Property<int>("OrderNo")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("Pinned")
+                        .HasColumnType("boolean");
 
                     b.HasKey("PlanId", "SwimmerId");
 

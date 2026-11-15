@@ -285,13 +285,43 @@ public class TrainingRsvpService : ITrainingRsvpService
             row.UpdatedAt = DateTime.UtcNow;
         }
 
+        // Ответ за аккаунт заменяет ответ тренера за его пловца на это занятие
+        // (TrainingAnswerFallback): иначе пловец получил бы два ответа, и снятый ответ аккаунта
+        // «воскрешал» бы старый ответ тренера.
+        if (targetUserId is int answeredUser)
+            await DropSwimmerShadowAsync(hubGroupId, answeredUser, date, start);
+
         // «Going» на занятие внутри перерыва — человек вернулся (Ш3.1): перерыв закрывается,
         // тренеру — пометка «back after …». Перерыв, который к этой дате и так кончится, не трогаем.
         if (answer == TrainingRsvpAnswer.Yes) await EndBreaksByRsvpAsync(hubGroupId, targetUserId, targetSwimmerId, date);
 
         await _db.SaveChangesAsync();
 
-        return TrainingRsvpSaveResult.Ok(await BuildAsync(hubGroupId, schedule, occurrence!, actorUserId, isManager, now));
+        var laneChange = await MoveInLanePlanAsync(hubGroupId, date, targetUserId, targetSwimmerId, answer,
+            isManager ? input.RestoreLane : null);
+
+        var dto = await BuildAsync(hubGroupId, schedule, occurrence!, actorUserId, isManager, now);
+        dto.LaneChange = laneChange;
+        return TrainingRsvpSaveResult.Ok(dto);
+    }
+
+    /// <summary>
+    /// Ответ двигает пловца в плане дорожек даты (§5.3 плана trainings-coach-flow, CF4): «Going» —
+    /// на дорожку его уровня, «Can't come» — в «Not today»; «Not sure» и снятый ответ план не
+    /// трогают. <paramref name="restore"/> (Undo тоста тренера) — вернуть на прежнее место вместо
+    /// правила. Аккаунт, который никем из состава не стоит, в плане не бывает.
+    /// </summary>
+    private async Task<LaneChangeDto?> MoveInLanePlanAsync(int hubGroupId, DateOnly date, int? userId, int? swimmerId,
+        string? answer, LanePlaceDto? restore)
+    {
+        if (restore == null && answer is not (TrainingRsvpAnswer.Yes or TrainingRsvpAnswer.No)) return null;
+        var target = swimmerId
+            ?? (await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, [userId!.Value]))[userId.Value];
+        if (target is not int sid) return null;
+
+        if (restore != null) return await LanePlanPlacementStore.RestoreAsync(_db, hubGroupId, date, sid, restore);
+        return await LanePlanPlacementStore.ApplyAsync(_db, hubGroupId, date, sid,
+            answer == TrainingRsvpAnswer.Yes ? LanePlanPlacementStore.Intent.Going : LanePlanPlacementStore.Intent.Out);
     }
 
     /// <summary>
@@ -377,16 +407,18 @@ public class TrainingRsvpService : ITrainingRsvpService
         // В бассейне — ответившие «иду» и «не уверен». Пловцы — в порядке состава; аккаунты без
         // пловца — после состава, по имени (детерминированно, не «каждый раз по-разному»).
         static bool InPool(HubGroupTrainingRsvp a) => a.Answer is TrainingRsvpAnswer.Yes or TrainingRsvpAnswer.Maybe;
-        var coming = answers.Values.Where(a => InPool(a) && members.ContainsKey(a.UserId!.Value)).ToList();
+        // Ключ — аккаунт, а не `UserId` строки: ответ тренера за пловца аккаунта лежит строкой пловца
+        // (TrainingAnswerFallback).
+        var coming = answers.Where(kv => InPool(kv.Value) && members.ContainsKey(kv.Key)).ToList();
         var accountsOrder = coming
-            .Where(a => resolved[a.UserId!.Value] == null)
-            .OrderBy(a => members[a.UserId!.Value].Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(a => a.UserId)
-            .Select((a, i) => (UserId: a.UserId!.Value, i))
+            .Where(kv => resolved[kv.Key] == null)
+            .OrderBy(kv => members[kv.Key].Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(kv => kv.Key)
+            .Select((kv, i) => (UserId: kv.Key, i))
             .ToDictionary(x => x.UserId, x => roster.Count + x.i);
 
-        var pool = coming.Select(a =>
+        var pool = coming.Select(kv =>
         {
-            var userId = a.UserId!.Value;
+            var (userId, a) = (kv.Key, kv.Value);
             var member = members[userId];
             if (resolved[userId] is int sid && rosterAt.TryGetValue(sid, out var at))
             {
@@ -422,11 +454,22 @@ public class TrainingRsvpService : ITrainingRsvpService
         var planModel = plan == null ? null : new TrainingLaneView.Plan(
             plan.LaneCount,
             plan.Lanes.Select(l => new TrainingLaneView.PlanLane(l.LaneNo, l.LevelId, l.Workout)).ToList(),
-            plan.Swimmers.ToDictionary(s => s.SwimmerId, s => (s.LaneNo, s.OrderNo)));
+            plan.Swimmers.ToDictionary(s => s.SwimmerId, s => (s.LaneNo, s.OrderNo)),
+            WorkoutRules.Parse(plan.Workout));
 
         var namesVisible = isManager || schedule.EffectiveWhoIsComing == GroupWhoIsComing.Members;
         return TrainingLaneView.Build(mode, planModel, schedule.UsualLanes, lastPlanLanes, levels, pool,
-            viewerUserId, namesVisible);
+            viewerUserId, namesVisible, workoutOnEveryLane: isManager);
+    }
+
+    /// <summary>Убрать строку ответа за пловца, которым стоит аккаунт, на это занятие.</summary>
+    private async Task DropSwimmerShadowAsync(int hubGroupId, int userId, DateOnly date, string start)
+    {
+        var swimmerOf = await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, new[] { userId });
+        if (swimmerOf[userId] is not int swimmerId) return;
+        var shadow = await _db.HubGroupTrainingRsvps.FirstOrDefaultAsync(r =>
+            r.HubGroupId == hubGroupId && r.SessionDate == date && r.SessionStart == start && r.SwimmerId == swimmerId);
+        if (shadow != null) _db.HubGroupTrainingRsvps.Remove(shadow);
     }
 
     private Task<bool> IsActiveMemberAsync(int hubGroupId, int userId) =>
@@ -436,15 +479,16 @@ public class TrainingRsvpService : ITrainingRsvpService
     private sealed record GroupSwimmer(int SwimmerId, string Name, string? Gender);
 
     /// <summary>
-    /// Пловцы группы без аккаунта, за которых отвечает тренер (Р73): <c>Swimmer.PrivateHubGroupId</c>
-    /// этой группы, в составе и не неактивны. Кем-то из <paramref name="claimed"/> (пловцы, которыми
+    /// Пловцы без аккаунта, за которых отвечает тренер (Р73, расширено решением 14 плана
+    /// trainings-coach-flow, CF4): ЛЮБОЙ пловец видимого состава — заведённый в группе
+    /// (<c>Swimmer.PrivateHubGroupId</c>) или из справочника федерации. Кем-то из <paramref name="claimed"/> (пловцы, которыми
     /// стоят активные участники, <see cref="HubGroupPersonResolver"/>) — нет: человек отвечает
     /// аккаунтом и дважды не считается. Имя — как в виде по дорожкам: иврит, иначе английское.
     /// </summary>
     private async Task<List<GroupSwimmer>> LoadGroupSwimmersAsync(int hubGroupId, IReadOnlySet<int> claimed)
     {
         var rows = await _db.HubGroupMembers.AsNoTracking()
-            .Where(m => m.HubGroupId == hubGroupId && !m.IsExcluded && m.Swimmer!.PrivateHubGroupId == hubGroupId)
+            .Where(m => m.HubGroupId == hubGroupId && !m.IsExcluded)
             .Select(m => new
             {
                 m.SwimmerId,
@@ -463,8 +507,7 @@ public class TrainingRsvpService : ITrainingRsvpService
     private async Task<string?> GroupSwimmerBlockReasonAsync(int hubGroupId, int swimmerId)
     {
         var inGroup = await _db.HubGroupMembers.AnyAsync(m =>
-            m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId && !m.IsExcluded
-            && m.Swimmer!.PrivateHubGroupId == hubGroupId);
+            m.HubGroupId == hubGroupId && m.SwimmerId == swimmerId && !m.IsExcluded);
         if (!inGroup) return "This swimmer is not an active swimmer of the group.";
 
         var memberIds = await ActiveMemberIdsAsync(hubGroupId);
@@ -520,9 +563,12 @@ public class TrainingRsvpService : ITrainingRsvpService
         var rows = await _db.HubGroupTrainingRsvps.AsNoTracking()
             .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date && r.SessionStart == start)
             .ToListAsync();
-        var answers = rows
-            .Where(r => r.UserId is int u && memberIds.Contains(u))
-            .ToDictionary(r => r.UserId!.Value);
+        // Ответ тренера за пловца, которым аккаунт стал без метки тренера («Me», привязка сайта), —
+        // ответ этого аккаунта (TrainingAnswerFallback).
+        var answers = TrainingAnswerFallback.WithSwimmerAnswers(
+            rows.Where(r => r.UserId is int u && memberIds.Contains(u)).ToDictionary(r => r.UserId!.Value),
+            rows.Where(r => r.SwimmerId != null).ToDictionary(r => r.SwimmerId!.Value),
+            resolved);
         var swimmerAnswers = rows
             .Where(r => r.SwimmerId is int s && groupSwimmerIds.Contains(s))
             .ToDictionary(r => r.SwimmerId!.Value);
@@ -563,7 +609,7 @@ public class TrainingRsvpService : ITrainingRsvpService
             members.ToDictionary(m => m.UserId, m => (m.Name, m.Gender)), resolved, answers, swimmerAnswers,
             viewerUserId, isManager);
 
-        return new TrainingRsvpDto
+        var dto = new TrainingRsvpDto
         {
             SessionId = TrainingRsvpRules.SessionKey(date, start),
             Date = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
@@ -627,5 +673,8 @@ public class TrainingRsvpService : ITrainingRsvpService
                 .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToList(),
         };
+        // Связь с пловцом, уровень и полоса «Needs you» (CF4) — только управляющему.
+        if (isManager) await TrainingCoachNeeds.FillAsync(_db, hubGroupId, date, dto, resolved);
+        return dto;
     }
 }

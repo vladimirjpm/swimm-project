@@ -570,6 +570,8 @@ export interface LanePlanSummary {
   lane_count: number;
   /** Лимит людей на дорожку (перелив по подуровням); null — без лимита. */
   max_per_lane?: number | null;
+  /** Сколько дорожек Auto-arrange всегда оставляет пустыми про запас. */
+  reserved_lanes?: number;
 }
 
 export interface LanePlanLevel {
@@ -593,6 +595,8 @@ export interface LanePlanSwimmer {
   left_group?: boolean;
   /** На перерыве в день плана (Ш3.1): в Unassigned новой раскладки не кладётся. */
   on_break?: boolean;
+  /** Закреплён на дорожке (тренер перенёс руками, CF2): Auto-arrange не двигает. Только управляющему. */
+  pinned?: boolean;
 }
 
 export interface LanePlanLane {
@@ -608,8 +612,12 @@ export interface LanePlan {
   status: LanePlanStatus;
   lane_count: number;
   max_per_lane?: number | null;
+  /** Сколько дорожек Auto-arrange всегда оставляет пустыми про запас. */
+  reserved_lanes?: number;
   note?: string | null;
   updated_at: string;
+  /** Workout занятия (CF6) — только управляющему; участнику — `level_workout` в виде по дорожкам. */
+  workout?: Workout | null;
   lanes: LanePlanLane[];
   unassigned: LanePlanSwimmer[];
   /** Только управляющему; участнику — пустой. */
@@ -630,14 +638,57 @@ export interface LanePlan {
   }[];
 }
 
+// ── Workout занятия (docs/plans/trainings-coach-flow-plan.md, §5.5, CF6) ────────
+// Один документ при плане дорожек, публикуется с ним. Метры не хранятся — считает клиент
+// (`trainings/workout/workout-totals.ts`).
+
+/** Ячейка уровня: время выхода строкой («:35», «1:40», «rest :20») и своё число повторов. */
+export interface WorkoutCell {
+  send_off?: string | null;
+  /** Перекрывает `reps` строки для этого уровня («3 או 100X4»). */
+  reps?: number | null;
+}
+
+export interface WorkoutLine {
+  reps: number;
+  /** Метров в повторе; null — строка без дистанции (отдых, пояснение). */
+  distance?: number | null;
+  text?: string | null;
+  /** «2V», «2-3V». */
+  intensity?: string | null;
+  /** Ключ — id уровня группы (строкой, как в JSON). */
+  per_level?: Record<string, WorkoutCell> | null;
+}
+
+export interface WorkoutSet {
+  title?: string | null;
+  /** Повтор сета целиком; 1 — один раз. */
+  repeat: number;
+  /** null — сет плывут все уровни; список — только названные. */
+  level_ids?: number[] | null;
+  lines: WorkoutLine[];
+}
+
+export interface Workout {
+  note?: string | null;
+  sets: WorkoutSet[];
+}
+
+/** `GET …/lane-plans/{date}/publish-check`: кто мешает опубликовать (решение 10 потока тренера). */
+export interface LanePlanPublishCheck {
+  blockers: { swimmer_id: number; name: string; name_en: string }[];
+}
+
 export interface LanePlanInput {
   lane_count: number;
   /** Лимит людей на дорожку; null — без лимита (перелива по подуровням нет). */
   max_per_lane: number | null;
+  /** Сколько дорожек Auto-arrange всегда оставляет пустыми про запас. */
+  reserved_lanes: number;
   note: string | null;
   lanes: { lane_no: number; level_id: number | null; workout: string | null }[];
   /** Порядок в массиве = порядок внутри дорожки; кого нет — «Not today». */
-  swimmers: { swimmer_id: number; lane_no: number | null }[];
+  swimmers: { swimmer_id: number; lane_no: number | null; pinned?: boolean }[];
 }
 
 // ── Ответы «иду / не приду» (docs/plans/entity-hero-roles-plan.md, Ш2) ──────────
@@ -663,6 +714,51 @@ export interface TrainingRsvpPerson {
   not_training?: boolean;
   /** Сам вернулся с перерыва недавно — сколько дней был на нём. */
   back_after_days?: number | null;
+  /**
+   * Пловец состава, которым человек стоит в группе (CF4): у аккаунта — метка тренера / привязка /
+   * «Me», у пловца без аккаунта — он сам; null — аккаунт ни с кем не связан.
+   */
+  linked_swimmer_id?: number | null;
+  /** Имя связанного пловца — «Account: linked to …» карточки человека. */
+  linked_swimmer_name?: string | null;
+  /** Уровень в группе: пловца, иначе аккаунта. */
+  level_id?: number | null;
+  sub_level?: number | null;
+}
+
+/** Место пловца в плане дорожек (CF4): нет в плане — «Not today»; `lane_no` null — Unassigned. */
+export interface LanePlace {
+  in_plan: boolean;
+  lane_no: number | null;
+  order_no: number;
+  pinned: boolean;
+}
+
+/** Ответ сдвинул пловца в плане дорожек даты (§5.3 плана trainings-coach-flow) — тост и Undo. */
+export interface LaneChange {
+  swimmer_id: number;
+  before: LanePlace;
+  after: LanePlace;
+}
+
+export interface TrainingNeedPerson {
+  user_id: number | null;
+  swimmer_id: number | null;
+  name: string;
+  /** Подсказка «Who is this?»: «Me» человека в составе, иначе совпадение по имени. */
+  suggested_swimmer_id: number | null;
+}
+
+/** Полоса «Needs you» рабочего стола (CF4) — только управляющему; считает сервер. */
+export interface TrainingNeeds {
+  /** Идущие пловцы без уровня (и не стоящие на дорожке руками). */
+  no_level: TrainingNeedPerson[];
+  /** Дорожки плана сверх «Max per lane». */
+  over_lanes: { lane_no: number; count: number; max: number }[];
+  /** Ожидающие заявки на вступление. */
+  requests: TrainingNeedPerson[];
+  /** Аккаунты без связи с пловцом. */
+  unlinked: TrainingNeedPerson[];
 }
 
 /** Человек в бассейне вида по дорожкам (Ш3.2). Поля null — имя скрыто («Who's coming: coach»). */
@@ -682,7 +778,13 @@ export interface TrainingLanePerson {
 export interface TrainingLane {
   lane_no: number;
   level: LanePlanLevel | null;
+  /** Старое текстовое задание дорожки (до CF6). */
   workout?: string | null;
+  /**
+   * Workout занятия в версии уровня этой дорожки (CF6) — только на своей дорожке зрителя: сеты его
+   * уровня, в ячейках — только его время. null — нет.
+   */
+  level_workout?: Workout | null;
   people: TrainingLanePerson[];
 }
 
@@ -726,6 +828,10 @@ export interface TrainingRsvp {
   break_until?: string | null;
   /** Вид по дорожкам (Ш3.2); null — выключен у группы или «только план», а плана нет. */
   lane_view?: TrainingLaneView | null;
+  /** «Needs you» — только управляющему. */
+  needs?: TrainingNeeds | null;
+  /** Только в ответе PUT: ответ сдвинул пловца в плане дорожек. */
+  lane_change?: LaneChange | null;
 }
 
 // ── «On break» (Ш3.1) — GET/PUT /api/hub-groups/{id}/breaks, личное ──────────────

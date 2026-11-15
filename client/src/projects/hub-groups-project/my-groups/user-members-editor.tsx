@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMyHubGroupEdit } from '../use-my-hub-groups';
 import { inputCls, btnCls, btnDangerCls } from './my-groups-shared';
 
-/** Инлайн-поиск пловца с выбором из выпадающего списка — переиспользуется для ярлыка «родитель». */
+/** Инлайн-поиск пловца с выбором из выпадающего списка — для ярлыка «за какого пловца» (сам или родитель). */
 function SwimmerPicker({
   edit, placeholder, onPick,
 }: {
@@ -74,7 +74,8 @@ export function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
                 )}
                 {m.swimmerId != null && (
                   <span className="ml-1 text-[11px] text-[var(--t-text-2)]">
-                    — {m.note || 'parent'}: {m.swimmerName}
+                    {/* Пустая подпись — аккаунт и есть этот пловец: «parent» не подставляем (CF4). */}
+                    — {m.note ? `${m.note}: ` : ''}{m.swimmerName}
                   </span>
                 )}
               </span>
@@ -111,7 +112,7 @@ export function UserMembersEditor({ hubGroupId }: { hubGroupId: number }) {
           </div>
         )}
         {labelSwimmer && (
-          <input className={inputCls} placeholder="Note (e.g. “parent”)" value={note}
+          <input className={inputCls} placeholder="Note: “parent”, … — empty if it’s the swimmer themself" value={note}
             onChange={(e) => setNote(e.target.value)} />
         )}
         <button type="button" className={btnCls} disabled={!email.trim()} onClick={submit}>+ Member</button>
@@ -156,7 +157,7 @@ function UserMemberLabelEditor({
           <button type="button" className={btnDangerCls} onClick={() => setSwimmer(null)}>✕</button>
         </div>
       )}
-      <input className={inputCls} placeholder="Note (e.g. “parent”)" value={note}
+      <input className={inputCls} placeholder="Note: “parent”, … — empty if it’s the swimmer themself" value={note}
         onChange={(e) => setNote(e.target.value)} />
       <div className="flex gap-2">
         <button type="button" className={btnCls} onClick={save}>Save</button>

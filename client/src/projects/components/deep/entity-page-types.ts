@@ -123,6 +123,13 @@ export interface DeepEntityPageProps<T extends string = string> {
    * аватар, имя одной строкой и статус справа. Не задана — полосы нет.
    */
   sticky?: EntityStickyBar;
+  /**
+   * Переключатель «✎ Edit | 👁 View» вместо чипа «✎ You can edit» — только тому, кто может править.
+   * `viewing` — страница уже собрана «как у участника» (табы без правки, без инструментов): тогда
+   * переключатель стоит над панелью КАЖДОГО таба, чтобы вернуться в Edit было откуда. Не задан —
+   * прежний чип над редактируемыми табами.
+   */
+  editMode?: { viewing: boolean; onChange: (viewing: boolean) => void };
 }
 
 export interface EntityStickyBar {

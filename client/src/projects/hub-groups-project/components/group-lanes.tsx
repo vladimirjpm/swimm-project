@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import ConfirmDialog from '../../components/confirm-dialog/confirm-dialog';
-import type { HubGroupLevels, LanePlan, LanePlanStatus, LanePlanSummary } from '../types';
+import type { HubGroupLevels, LanePlan, LanePlanStatus, LanePlanSummary, Workout } from '../types';
 import GroupLaneBoard from './group-lane-board';
 import GroupLaneEditor from './group-lane-editor';
+import LanePlanStatusBar from './lane-plan-status';
 import { formatPlanDate, lanePlansApi, pickDefaultDate, todayInIsrael } from './lane-plans-api';
 
 /**
@@ -19,8 +21,12 @@ import { formatPlanDate, lanePlansApi, pickDefaultDate, todayInIsrael } from './
  * управляющий (`manages` — тот же гейт, что у таба Admin); сервер проверяет права сам, клиентский
  * флаг только прячет кнопки.
  *
- * Уход с несохранёнными правками (стрелки, выбор даты) спрашивает «Discard unsaved changes?»;
- * флаг правок отдаётся наверх (`onDirtyChange`) — каркас таба спрашивает то же при смене вида.
+ * Редактор сохраняет правки сам (CF3 потока тренера, `use-lane-autosave.ts`). «Discard unsaved
+ * changes?» остался только для случая, когда запись НЕ УДАЛАСЬ: этот флаг редактор отдаёт сюда и
+ * наверх (`onDirtyChange`) — уход (стрелки, выбор даты, смена занятия) тогда спрашивает.
+ *
+ * Статус плана и Publish у тренера на рабочем столе стоят не здесь, а в узле `statusHost` (шапка
+ * стола / слот нижней панели каркаса) — строка `LanePlanStatus`, её кладёт туда редактор.
  */
 
 /** Нет плана на дату — отдельное состояние, не ошибка. */
@@ -41,15 +47,31 @@ function statusInfo(status: LanePlanStatus | null): { text: string; color: strin
 }
 
 function GroupLanes({
-  groupId, manages, desktop, initialDate = null, onDirtyChange, onPlansChanged, onPlanShown,
+  groupId, manages, desktop, initialDate = null, embedded = false, statusHost, onFocusPool, onDirtyChange, onPlansChanged, onPlanShown,
+  workout = null,
 }: {
+  /** Workout занятия (CF6, рабочий стол тренера) — сводка версии уровня в карточках дорожек. */
+  workout?: Workout | null;
+  /**
+   * Узел для строки статуса плана и Publish (рабочий стол тренера, CF3): `undefined` — некуда,
+   * строка стоит под дорожками; `null` — узел ещё не появился.
+   */
+  statusHost?: HTMLElement | null;
+  /** Показать панель бассейна (телефон: People / Pool) — «перейти к человеку» из диалога публикации. */
+  onFocusPool?: () => void;
+  /**
+   * План ОДНОГО занятия внутри рабочего стола тренера (docs/plans/trainings-coach-flow-plan.md, CF1):
+   * дата — `initialDate`, своей навигации по датам (стрелки, поле даты) нет — занятие выбирает шапка
+   * стола. Смена занятия — новый `key` у вызывающего.
+   */
+  embedded?: boolean;
   groupId: number;
   manages: boolean;
   /** ≥960px: шапка в одну строку с тулбаром, редактор колонками. */
   desktop: boolean;
   /** Дата занятия, с которого открыли Lanes; `null` — дата по умолчанию (`pickDefaultDate`). Читается при монтировании. */
   initialDate?: string | null;
-  /** В редакторе есть несохранённые правки (каркас таба спрашивает при смене вида). */
+  /** В редакторе есть правки, которые не удалось сохранить (каркас таба спрашивает при уходе). */
   onDirtyChange?: (dirty: boolean) => void;
   /** План создан / сохранён / опубликован / удалён — вид Next тренера перечитывает статус плана. */
   onPlansChanged?: () => void;
@@ -81,6 +103,8 @@ function GroupLanes({
   /** Узел шапки (десктоп), куда редактор выносит тулбар. */
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
   const dateInput = useRef<HTMLInputElement>(null);
+  /** План удаляют — редактор при размонтировании не досылает несохранённое (иначе план вернулся бы). */
+  const abandon = useRef(false);
 
   const loadList = useCallback(async () => {
     const result = await lanePlansApi.list(groupId);
@@ -169,11 +193,12 @@ function GroupLanes({
     onPlansChanged?.();
   };
 
-  const setStatus = async (publish: boolean): Promise<string | null> => {
-    if (!date || state.kind !== 'ready') return null;
-    const result = publish ? await lanePlansApi.publish(groupId, date) : await lanePlansApi.unpublish(groupId, date);
+  const setStatus = async (publish: boolean, notify = false): Promise<string | null> => {
+    if (!date) return null;
+    const result = publish ? await lanePlansApi.publish(groupId, date, notify) : await lanePlansApi.unpublish(groupId, date);
     if (!result.ok) return result.error ?? 'Could not change the status. Try again.';
-    setState({ kind: 'ready', plan: { ...state.plan, status: publish ? 'published' : 'draft' } });
+    // Через функцию: пока шёл запрос, автосохранение могло подменить план свежим.
+    setState((s) => (s.kind === 'ready' ? { kind: 'ready', plan: { ...s.plan, status: publish ? 'published' : 'draft' } } : s));
     refreshPlans();
     return null;
   };
@@ -182,6 +207,7 @@ function GroupLanes({
     if (!date) return { success: false };
     const result = await lanePlansApi.remove(groupId, date);
     if (!result.ok) return { success: false, error: result.error ?? 'Could not delete. Try again.' };
+    abandon.current = true;
     setConfirmDelete(false);
     setState({ kind: 'none' });
     setCreating(false);
@@ -195,6 +221,7 @@ function GroupLanes({
   const copyFrom = async (sourceDate: string): Promise<string | null> => {
     const result = await lanePlansApi.get(groupId, sourceDate);
     if (!result.ok || !result.data) return 'Could not load that plan. Try again.';
+    abandon.current = false;
     setTemplate(result.data);
     setCreating(true);
     setAwayNonce((n) => n + 1);
@@ -236,12 +263,16 @@ function GroupLanes({
   const laneCountHint = prevPlan?.lane_count ?? nextPlan?.lane_count ?? 6;
   // И лимит людей на дорожку — тот же, что у соседнего плана.
   const maxPerLaneHint = (prevPlan ?? nextPlan)?.max_per_lane ?? null;
+  // И запас дорожек; планов ещё не было — одна про запас.
+  const reservedLanesHint = (prevPlan ?? nextPlan)?.reserved_lanes ?? 1;
   // Откуда копировать: ближайший план до этой даты, иначе самый свежий из других.
   const copySource = prevPlan ?? plans.find((p) => p.date !== date) ?? null;
 
   const plan = state.kind === 'ready' ? state.plan : null;
   const editable = manages && (state.kind === 'none' || (state.kind === 'ready' && state.plan.can_edit));
   const status = statusInfo(plan?.status ?? null);
+  const editorShown = editable && (state.kind === 'ready' || (state.kind === 'none' && creating))
+    && levels != null && (awayIds != null || (plan != null && !template));
 
   const dateLabel = formatPlanDate(date);
   const dateButton = (extraClass: string, children: React.ReactNode) => (
@@ -274,24 +305,33 @@ function GroupLanes({
    */
   const header = (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <div className="flex items-center gap-1.5">{arrows(36)}</div>
-      {dateButton('flex-none', (
-        <div className="flex items-center gap-1.5 text-[18px]" style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}>
-          <span>Lanes · {dateLabel}</span>
-          {manages && <span aria-hidden="true" className="text-[11px]" style={{ color: 'var(--deep-ow)' }}>▾</span>}
-        </div>
-      ))}
-      <span
-        className="inline-flex flex-none items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-[11px] font-extrabold"
-        style={{
-          borderColor: status.border,
-          background: status.chip,
-          color: status.color,
-        }}
-      >
-        <span aria-hidden="true" className="inline-block flex-none rounded-full" style={{ width: 7, height: 7, background: status.bar }} />
-        {plan?.status === 'draft' ? 'Draft' : plan?.status === 'published' ? 'Published' : 'No plan'}
-      </span>
+      {embedded ? (
+        <div className="text-[18px]" style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}>Pool</div>
+      ) : (
+        <>
+          <div className="flex items-center gap-1.5">{arrows(36)}</div>
+          {dateButton('flex-none', (
+            <div className="flex items-center gap-1.5 text-[18px]" style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}>
+              <span>Lanes · {dateLabel}</span>
+              {manages && <span aria-hidden="true" className="text-[11px]" style={{ color: 'var(--deep-ow)' }}>▾</span>}
+            </div>
+          ))}
+        </>
+      )}
+      {/* На рабочем столе тренера статус плана — в шапке стола (`statusHost`), не здесь. */}
+      {!embedded && (
+        <span
+          className="inline-flex flex-none items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-[11px] font-extrabold"
+          style={{
+            borderColor: status.border,
+            background: status.chip,
+            color: status.color,
+          }}
+        >
+          <span aria-hidden="true" className="inline-block flex-none rounded-full" style={{ width: 7, height: 7, background: status.bar }} />
+          {plan?.status === 'draft' ? 'Draft' : plan?.status === 'published' ? 'Published' : 'No plan'}
+        </span>
+      )}
       {/* Сюда редактор выносит тулбар (портал). */}
       <div ref={setToolbarHost} className="ml-auto min-w-0" />
     </div>
@@ -300,7 +340,7 @@ function GroupLanes({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       {/* Порядок кнопок: ‹ › рядом на десктопе, по краям даты на телефоне — как в прототипе. */}
-      {desktop ? header : (
+      {desktop ? header : embedded ? null : (
         <div className="flex items-center gap-2">
           <PrevNext side="prev" size={40} disabled={!prevPlan} onClick={() => prevPlan && goTo(prevPlan.date)} />
           {dateButton('min-w-0 flex-1 text-center', (
@@ -334,7 +374,7 @@ function GroupLanes({
                 type="button"
                 className="h-[40px] cursor-pointer rounded-[10px] border-0 px-4 text-[12px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ background: 'var(--deep-ow)', color: 'var(--deep-accent-ink)' }}
-                onClick={() => { setAwayNonce((n) => n + 1); setCreating(true); }}
+                onClick={() => { abandon.current = false; setAwayNonce((n) => n + 1); setCreating(true); }}
                 disabled={busy}
               >
                 Create plan
@@ -366,18 +406,22 @@ function GroupLanes({
               levels={levels}
               laneCountHint={laneCountHint}
               maxPerLaneHint={maxPerLaneHint}
+              reservedLanesHint={reservedLanesHint}
               away={awayIds ?? undefined}
               desktop={desktop}
               toolbarHost={toolbarHost}
+              statusHost={statusHost}
+              abandon={abandon}
               copyFrom={copySource?.date ?? null}
               onSaved={(saved) => {
+                // Автосохранение: редактор НЕ пересобираем — тренер продолжает править.
                 setState({ kind: 'ready', plan: saved });
                 setTemplate(null);
                 setCreating(false);
-                setDirty(false);
-                setEditorNonce((n) => n + 1);
                 refreshPlans();
               }}
+              onFocusPool={onFocusPool}
+              workout={workout}
               onSetStatus={setStatus}
               onDelete={() => setConfirmDelete(true)}
               onCopy={copyFrom}
@@ -390,6 +434,9 @@ function GroupLanes({
           )
         )}
       </div>
+
+      {/* Редактора на экране нет (плана нет, загрузка) — в шапке стола только пилюля статуса. */}
+      {desktop && statusHost && !editorShown && createPortal(<LanePlanStatusBar status={plan?.status ?? null} />, statusHost)}
 
       {confirmDelete && (
         <ConfirmDialog
@@ -417,7 +464,7 @@ function GroupLanes({
           onClose={() => setPendingDate(null)}
         >
           <p className="m-0 mt-3 text-[13px] text-[var(--t-text-2)]">
-            The lane plan for {dateLabel} has changes that are not saved yet.
+            The last changes to the lane plan for {dateLabel} could not be saved.
           </p>
         </ConfirmDialog>
       )}

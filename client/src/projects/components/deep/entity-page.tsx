@@ -3,6 +3,7 @@ import './deep-theme.css';
 import AppTopbar from '../app-topbar/app-topbar';
 import DeepTabs from './tabs';
 import DeepStickyBar, { useEntitySticky } from './sticky-bar';
+import DeepEditModeToggle from './edit-mode-toggle';
 import { useDeepThemeClass } from './use-deep-theme-class';
 import type {
   DeepEntityPageProps, EntityCardSpec, EntityTabNav, EntityTabSpec,
@@ -22,7 +23,7 @@ import type {
 
 function DeepEntityPage<T extends string>({
   topbarActive, status, messages, hero, beforeTabs, tabsAriaLabel, tabs, defaultTabId,
-  activeTabId, onTabChange, noticeClassName, toolsLabel, sticky,
+  activeTabId, onTabChange, noticeClassName, toolsLabel, sticky, editMode,
 }: DeepEntityPageProps<T>) {
   const themeClass = useDeepThemeClass();
   const stickyState = useEntitySticky(status === 'ready' && sticky != null);
@@ -138,9 +139,11 @@ function DeepEntityPage<T extends string>({
                     : (
                       <>
                         {/* Фиолетовый — только вместе с подписью (правило хендоффа §3). */}
-                        {(activeTab.editable || activeTab.pinned) && (
+                        {(activeTab.editable || activeTab.pinned || editMode?.viewing) && (
                           <div className="deep-panel-row mb-3 flex justify-end">
-                            <span className="deep-edit-chip">✎ You can edit</span>
+                            {editMode
+                              ? <DeepEditModeToggle viewing={editMode.viewing} onChange={editMode.onChange} />
+                              : <span className="deep-edit-chip">✎ You can edit</span>}
                           </div>
                         )}
                         <EntityPanel cards={activeTab.cards(nav)} />

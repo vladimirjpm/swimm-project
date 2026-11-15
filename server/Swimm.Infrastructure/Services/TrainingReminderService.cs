@@ -62,12 +62,29 @@ public class TrainingReminderService(SwimmDbContext db, IPushSender sender, ILog
             onBreak[(groupId, date)] = (await HubGroupBreakQuery.LoadAsync(db, groupId, date)).UserIds;
 
         var candidateGroups = candidates.Select(c => c.HubGroupId).Distinct().ToList();
-        var answers = (await db.HubGroupTrainingRsvps.AsNoTracking()
-                .Where(r => candidateGroups.Contains(r.HubGroupId) && r.UserId != null
-                            && r.SessionDate >= today && r.SessionDate <= last)
-                .Select(r => new { r.HubGroupId, UserId = r.UserId!.Value, r.SessionDate, r.SessionStart, r.Answer })
-                .ToListAsync(ct))
-            .ToDictionary(r => (r.HubGroupId, r.UserId, r.SessionDate, r.SessionStart), r => r.Answer);
+        var rows = await db.HubGroupTrainingRsvps.AsNoTracking()
+            .Where(r => candidateGroups.Contains(r.HubGroupId) && r.SessionDate >= today && r.SessionDate <= last)
+            .Select(r => new { r.HubGroupId, r.UserId, r.SwimmerId, r.SessionDate, r.SessionStart, r.Answer })
+            .ToListAsync(ct);
+        var answers = rows.Where(r => r.UserId != null)
+            .ToDictionary(r => (r.HubGroupId, r.UserId!.Value, r.SessionDate, r.SessionStart), r => r.Answer);
+
+        // Ответ тренера за пловца, которым аккаунт стал без метки тренера («Me», привязка сайта), —
+        // ответ аккаунта (TrainingAnswerFallback): не напоминаем тому, кого уже записали.
+        foreach (var group in rows.Where(r => r.SwimmerId != null).GroupBy(r => r.HubGroupId))
+        {
+            var swimmerOf = await HubGroupPersonResolver.ResolveAsync(db, group.Key, members[group.Key]);
+            foreach (var session in group.GroupBy(r => (r.SessionDate, r.SessionStart)))
+            {
+                var key = session.Key;
+                var merged = TrainingAnswerFallback.WithSwimmerAnswers(
+                    new Dictionary<int, string>(),
+                    session.ToDictionary(r => r.SwimmerId!.Value, r => r.Answer),
+                    swimmerOf);
+                foreach (var (userId, answer) in merged)
+                    answers.TryAdd((group.Key, userId, key.SessionDate, key.SessionStart), answer);
+            }
+        }
 
         var settings = (await db.UserNotificationSettings.AsNoTracking()
                 .Where(s => usersWithDevices.Contains(s.UserId))
