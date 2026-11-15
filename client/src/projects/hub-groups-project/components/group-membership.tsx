@@ -3,6 +3,7 @@ import { DeepCtaChip, DeepMenuChip } from '../../components/deep/hero-identity';
 import { useLoginModal } from '../../components/login-modal/login-modal-context';
 import type { HubGroupDetails } from '../types';
 import type { SaveResult } from '../my-groups-types';
+import GroupJoinDialog from './group-join-dialog';
 
 /**
  * Чип членства в шапке группы (хендофф group-club-changes §1): «✓ Member ⋯» → Leave group.
@@ -21,6 +22,9 @@ import type { SaveResult } from '../my-groups-types';
  * Отказ сервера (группа заполнена, лимит заявок, самозапись закрыта — HubGroupQuotaRules,
  * rate limit) показывается строкой под чипом: раньше ответ выбрасывался и кнопка молча
  * «не работала».
+ *
+ * «Join» / «Request to join» сначала открывает объяснение, что значит вступить
+ * (`group-join-dialog.tsx`, три языка), и вступает только по кнопке в нём.
  */
 
 export interface GroupMembershipState {
@@ -37,6 +41,7 @@ function GroupMembershipChip({ group, membership }: { group: HubGroupDetails; me
   const { openLoginModal } = useLoginModal();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [joinOpen, setJoinOpen] = useState(false);
 
   // У виртуального «Моё избранное» вступать некуда.
   if (group.is_virtual || group.id <= 0) return null;
@@ -104,10 +109,21 @@ function GroupMembershipChip({ group, membership }: { group: HubGroupDetails; me
     );
   }
 
-  return withError(
-    <DeepCtaChip size="member" busy={busy} onClick={() => run(() => membership.join(group.id))}>
-      {joinLabel}
-    </DeepCtaChip>
+  return (
+    <>
+      {withError(
+        <DeepCtaChip size="member" busy={busy} onClick={() => { setError(null); setJoinOpen(true); }}>
+          {joinLabel}
+        </DeepCtaChip>,
+      )}
+      {joinOpen && (
+        <GroupJoinDialog
+          approval={group.join_policy === 'approval'}
+          onJoin={() => membership.join(group.id)}
+          onClose={() => setJoinOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
