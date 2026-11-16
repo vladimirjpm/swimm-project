@@ -1,6 +1,6 @@
 using Swimm.Application.Abstractions;
-using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
+using Swimm.Application.Dtos;
 using Swimm.Infrastructure.Services;
 
 namespace Swimm.API.BackgroundServices;
@@ -61,7 +61,8 @@ public sealed class RecordCountryRunBackgroundService : BackgroundService
                     {
                         var checks = scope.ServiceProvider.GetRequiredService<IRecordSourceCheckService>();
                         await checks.LogRunAsync(
-                            RecordSources.WorldRecordsCountries, status.Diff, null, stoppingToken);
+                            RecordSources.WorldRecordsCountries, status.Diff,
+                            RecordCountryRun.IncompleteError(status), stoppingToken);
                     }
 
                     _queue.SetCompleted(runId);

@@ -36,6 +36,9 @@ public interface IRecordSourceCheckService
     /// сейчас это прогон по странам (<c>RecordSources.WorldRecordsCountries</c>). Дифф он
     /// строит сам, и качать источник второй раз ради журнала незачем: сюда приходит уже
     /// готовый результат.
+    ///
+    /// <paramref name="error"/> вместе с <paramref name="diff"/> — прогон неполный (часть стран
+    /// не скачалась): строка <c>failed</c>, но с диффом, чтобы его Apply отметился в журнале.
     /// </summary>
     Task LogRunAsync(
         string source, RecordDiffResult? diff, string? error, CancellationToken ct = default);
