@@ -10,7 +10,7 @@ namespace Swimm.API.BackgroundServices;
 /// в <see cref="RecordCountryRunner"/>; здесь только обвязка: scope под scoped-сервисы
 /// (дифф ходит в БД), перевод статусов и лог.
 ///
-/// Прогон по всем странам — это 470 файлов и час-два работы, поэтому он и фоновый:
+/// Прогон по всем странам — это ~1300 JSON-запросов и полтора часа работы, поэтому он и фоновый:
 /// в HTTP-запрос админки такое не пролезет.
 /// </summary>
 public sealed class RecordCountryRunBackgroundService : BackgroundService
