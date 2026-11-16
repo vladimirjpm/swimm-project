@@ -189,6 +189,11 @@ public class RecordSourceCheckService : IRecordSourceCheckService
             var appliedAt = await _db.RecordSourceChecks.AsNoTracking()
                 .Where(c => c.Source == source && c.AppliedAt != null)
                 .MaxAsync(c => c.AppliedAt, ct);
+            // Витринное «checked»: данные сверены — без изменений или изменения применены.
+            var verifiedAt = await _db.RecordSourceChecks.AsNoTracking()
+                .Where(c => c.Source == source
+                            && (c.Outcome == RecordSourceCheckOutcomes.Unchanged || c.AppliedAt != null))
+                .MaxAsync(c => (DateTime?)c.CheckedAt, ct);
 
             // Ждёт Apply только последняя успешная проверка с изменениями: старые диффы
             // перекрыты ею (см. ApplyAsync), считать их — показывать то, что уже неправда.
@@ -207,7 +212,8 @@ public class RecordSourceCheckService : IRecordSourceCheckService
                 pending ? lastOk!.ChangedCount ?? 0 : 0,
                 appliedAt,
                 changedAt.GetValueOrDefault(source),
-                failed || stale));
+                failed || stale,
+                verifiedAt));
         }
         return result;
     }

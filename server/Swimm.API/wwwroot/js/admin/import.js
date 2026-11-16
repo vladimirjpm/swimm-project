@@ -694,12 +694,17 @@
                                 // trusted=false — на сайте федерации подпись ссылки не сходится с файлом,
                                 // автозагрузка её не возьмёт. Молча прятать нельзя: иначе «файл не найден»
                                 // выглядит нашей поломкой (docs/data-integrity.md, И-15).
+                                // Имя файла в подсказке: видно, КУДА на самом деле ведёт ссылка
+                                // (16.11.2026: «мастерс 25 м» → «שיאי ישראל בריכה ארוכה 17_08_2026.pdf»).
+                                const file = decodeURIComponent(l.url.split('/').pop() || '');
                                 const warn = l.trusted === false
-                                    ? ` <span class="text-admin-danger" title="Ссылка на сайте федерации ведёт не на тот файл — автозагрузка её пропустит, грузите вручную">⚠ битая ссылка</span>`
+                                    ? ` <span class="text-admin-danger" title="Подпись на сайте федерации не сходится с файлом: ссылка ведёт на «${file}». Автозагрузка её пропустит — грузите вручную">⚠ битая ссылка</span>`
                                     : '';
-                                return `<a href="${l.url}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${l.poolType}</a>${upd}${warn}`;
+                                // Каждая ссылка — своей строкой: через « · » при переносе метка
+                                // «битая» визуально прилипала к СЛЕДУЮЩЕМУ бассейну.
+                                return `<span class="block"><a href="${l.url}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${l.poolType}</a>${upd}${warn}</span>`;
                             })
-                            .join(' · ');
+                            .join('');
                     });
                 })
                 .catch(() => {

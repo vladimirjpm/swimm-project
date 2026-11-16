@@ -21,12 +21,25 @@ public class WorldRecordsSourceProvider : IRecordSourceProvider
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly WorldRecordsParser _parser;
     private readonly string _nationalCountryId;
+    private readonly TimeSpan _retryDelay;
 
+    /// <summary>
+    /// Таймаут на файл. Было 30 с, но замер 15.09 показал отчёты до 53 с: при 30 с такой файл
+    /// не скачался бы ни с какой попытки. С повторами (<see cref="WorldAquaticsDownload"/>)
+    /// худший случай — 4 файла × 3 попытки, обычный — 4 файла за десятки секунд.
+    /// </summary>
+    private static readonly TimeSpan FileTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>Пауза перед повтором: шлюз источника отвечает 504 под нагрузкой, сразу же — бесполезно.</summary>
+    private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromSeconds(5);
+
+    /// <param name="retryDelay">Пауза между повторами; в тестах — ноль, чтобы не спать.</param>
     public WorldRecordsSourceProvider(IHttpClientFactory httpClientFactory, WorldRecordsParser parser,
-        IConfiguration? configuration = null)
+        IConfiguration? configuration = null, TimeSpan? retryDelay = null)
     {
         _httpClientFactory = httpClientFactory;
         _parser = parser;
+        _retryDelay = retryDelay ?? DefaultRetryDelay;
         var configured = configuration?["RecordsImport:WorldAquaticsNationalCountryId"];
         _nationalCountryId = string.IsNullOrWhiteSpace(configured) ? WorldAquaticsSource.IsraelCountryId : configured;
     }
@@ -58,20 +71,21 @@ public class WorldRecordsSourceProvider : IRecordSourceProvider
                     (WorldAquaticsSource.ReportUrl($"recordCode=NR&pool=LCM&countryId={_nationalCountryId}"), "NR_LCM.xlsx"),
                 };
 
-                // 30 с — как было у этой кнопки. Замер 15.09 показал файлы до 53 с, но
-                // поднимать таймаут здесь нельзя вслепую: батч по странам (11.1.2) получит
-                // свой, с повторами, — а этот путь остаётся синхронным запросом админки.
-                var client = WorldAquaticsSource.CreateClient(_httpClientFactory, TimeSpan.FromSeconds(30));
+                var client = WorldAquaticsSource.CreateClient(_httpClientFactory, FileTimeout);
 
+                // По одному, и каждый файл со своими повторами (16.11.2026): раньше один 504
+                // на любом из четырёх ронял весь источник, а скачанные файлы пропадали.
                 var streams = new List<MemoryStream>();
-                foreach (var (url, _) in urls)
+                try
                 {
-                    var response = await client.GetAsync(url, ct);
-                    response.EnsureSuccessStatusCode();
-                    var ms = new MemoryStream();
-                    await response.Content.CopyToAsync(ms, ct);
-                    ms.Position = 0;
-                    streams.Add(ms);
+                    foreach (var (url, fileName) in urls)
+                        streams.Add(await WorldAquaticsDownload.DownloadAsync(
+                            client, url, Path.GetFileNameWithoutExtension(fileName).Replace('_', ' '), _retryDelay, ct));
+                }
+                catch
+                {
+                    streams.ForEach(s => s.Dispose());
+                    throw;
                 }
 
                 owned.AddRange(streams);

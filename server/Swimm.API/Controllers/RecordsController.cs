@@ -57,7 +57,10 @@ public class RecordsController : ControllerBase
     {
         var all = await checks.GetFreshnessAsync(HttpContext.RequestAborted);
         Response.Headers.CacheControl = "public, no-cache";
-        return Ok(all.Select(f => new { source = f.Source, checkedAt = f.CheckedAt, changedAt = f.ChangedAt }));
+        // checkedAt витрины — VerifiedAt, а не последняя проверка (решение Влада 16.11.2026):
+        // проверка с неприменёнными изменениями дату «checked» не сдвигает. changedAt — когда
+        // справочник этого источника у нас реально менялся («updated» на витрине).
+        return Ok(all.Select(f => new { source = f.Source, checkedAt = f.VerifiedAt, changedAt = f.ChangedAt }));
     }
 
     /// <summary>

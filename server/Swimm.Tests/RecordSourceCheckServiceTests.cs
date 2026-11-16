@@ -164,6 +164,50 @@ public class RecordSourceCheckServiceTests
     }
 
     /// <summary>
+    /// Витринное «checked» (VerifiedAt, решение Влада 16.11.2026) сдвигает только проверка,
+    /// после которой наши данные совпадают с источником: без изменений или применённая.
+    /// Проверка с неприменёнными изменениями двигает лишь админское CheckedAt.
+    /// </summary>
+    [Fact]
+    public async Task VerifiedAt_MovesOnlyWhenDataMatchesSource()
+    {
+        await using var db = CreateDb(nameof(VerifiedAt_MovesOnlyWhenDataMatchesSource));
+        var (service, provider, clock) = Build(db);
+        WaJuniorFreshness Fresh() => new(service);
+
+        // 1. Нашли новый рекорд, не применили: админ видит «проверено», сайт — нет.
+        provider.Rows = [Wjr("50m", "24.17")];
+        var check = await service.CheckAsync(RecordSources.WaJunior);
+        var f = await Fresh().GetAsync();
+        Assert.Equal(T0, f.CheckedAt);
+        Assert.Null(f.VerifiedAt);
+
+        // 2. Применили — данные совпали с источником на момент той проверки.
+        clock.Now = T0.AddMinutes(5);
+        await service.ApplyAsync(new RecordDiffApplyRequest(check.Diff!.DiffId, true, true));
+        Assert.Equal(T0, (await Fresh().GetAsync()).VerifiedAt);
+
+        // 3. Через день — без изменений: сайт пишет новую дату.
+        clock.Now = T0.AddDays(1);
+        await service.CheckAsync(RecordSources.WaJunior);
+        Assert.Equal(T0.AddDays(1), (await Fresh().GetAsync()).VerifiedAt);
+
+        // 4. Ещё через день источник поменялся, не применили: CheckedAt ушёл, VerifiedAt — нет.
+        clock.Now = T0.AddDays(2);
+        provider.Rows = [Wjr("50m", "24.01")];
+        await service.CheckAsync(RecordSources.WaJunior);
+        f = await Fresh().GetAsync();
+        Assert.Equal(T0.AddDays(2), f.CheckedAt);
+        Assert.Equal(T0.AddDays(1), f.VerifiedAt);
+    }
+
+    private sealed class WaJuniorFreshness(RecordSourceCheckService service)
+    {
+        public async Task<RecordSourceFreshnessDto> GetAsync() =>
+            Assert.Single(await service.GetFreshnessAsync(), x => x.Source == RecordSources.WaJunior);
+    }
+
+    /// <summary>
     /// Дифф вчерашней проверки после сегодняшней не применяется: журнал не должен врать,
     /// какое состояние источника легло в базу.
     /// </summary>
