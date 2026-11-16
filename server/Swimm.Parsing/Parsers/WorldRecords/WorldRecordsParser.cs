@@ -549,6 +549,18 @@ public class WorldRecordsParser : IFormatParser
     }
 
     /// <summary>
+    /// «SJOESTROEM Sarah» → «Sarah Sjoestroem» — держатель личного рекорда ровно в той форме,
+    /// в какой его пишет этот парсер. Публичный для JSON-пути worldrecords (16.11.2026): поле
+    /// <c>fullName</c> JSON-выдачи — та же строка, что колонка Athlete XLSX-отчёта, и имя обязано
+    /// выйти посимвольно тем же, иначе каждая запись в диффе «изменится».
+    /// </summary>
+    public static string FormatAthleteName(string athlete)
+    {
+        var (firstName, lastName) = ParseAthleteName(athlete);
+        return $"{firstName} {lastName}".Trim();
+    }
+
+    /// <summary>
     /// Разбирает имя спортсмена: "SJOESTROEM Sarah" -> ("Sarah", "Sjoestroem").
     /// Первое слово в верхнем регистре считается фамилией.
     /// </summary>

@@ -86,7 +86,10 @@ public class RecordDiffService : IRecordDiffService
 
             if (existingByKey.TryGetValue(key, out var ex))
             {
-                if (ex.Time != p.Time || (ex.HolderName ?? "") != (p.HolderName ?? "") || (ex.RecordDate ?? "") != (p.RecordDate ?? ""))
+                // Держатель-команда (HolderIsTeam: JSON WA не знает состава эстафеты) — не повод
+                // для «изменения»: та же запись, а состав из прежнего XLSX в базе ценнее.
+                var holderDiffers = !p.HolderIsTeam && (ex.HolderName ?? "") != (p.HolderName ?? "");
+                if (ex.Time != p.Time || holderDiffers || (ex.RecordDate ?? "") != (p.RecordDate ?? ""))
                 {
                     changed.Add(p);
                     changedEntries.Add(new RecordDiffEntry(

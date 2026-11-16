@@ -43,6 +43,29 @@ public class WorldAquaticsDownloadTests
     }
 
     [Fact]
+    public async Task Retry_goes_past_the_cloudfront_error_cache()
+    {
+        // CloudFront кэширует 504: повтор того же URL получает ошибку из кэша за 15 мс (16.11.2026).
+        var urls = new List<string>();
+        var handler = new RecordingHandler(urls, () => Status(HttpStatusCode.GatewayTimeout), Ok);
+
+        using var ms = await Download(handler);
+
+        Assert.Equal(Url.AbsoluteUri, urls[0]);
+        Assert.StartsWith(Url.AbsoluteUri + "&_retry=2-", urls[1]);
+        Assert.Equal(Url.Host, new Uri(urls[1]).Host);
+    }
+
+    private sealed class RecordingHandler(List<string> urls, params Func<HttpResponseMessage>[] steps) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            urls.Add(request.RequestUri!.AbsoluteUri);
+            return Task.FromResult(steps[Math.Min(urls.Count - 1, steps.Length - 1)]());
+        }
+    }
+
+    [Fact]
     public async Task Gives_up_after_max_attempts_and_names_the_file()
     {
         var handler = new ScriptedHandler(() => Status(HttpStatusCode.GatewayTimeout));
