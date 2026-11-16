@@ -16,6 +16,8 @@ import { useSeasonBestFilterHost } from './sb-filter-host';
 import SbFilterPanel from './components/sb-filter-panel';
 import SbFilterBar from './components/sb-filter-bar';
 import SbList from './components/sb-list';
+import SbPreviousBest from './components/sb-previous-best';
+import { usePreviousSeasonBest } from './use-previous-season-best';
 
 /**
  * Страница `/season-best` — списки «лучшие в сезоне»: кто быстрее всех в связке
@@ -109,6 +111,9 @@ function SeasonBestProject() {
     bestPerSwimmer: filters.bestPerSwimmer,
     limit,
   });
+
+  // Лучший прошлого сезона в этой же категории — карточка над списком.
+  const previousBest = usePreviousSeasonBest(filters, MODULES.previousSeasonBest);
 
   const patch = useCallback((next: Partial<SbFilters>) => {
     setLimit(PAGE_SIZE);   // сменили срез — страница снова первая
@@ -205,6 +210,10 @@ function SeasonBestProject() {
               season={filters.season}
               className="sb-season-note"
             />
+
+            {hasEvent && previousBest && (
+              <SbPreviousBest seasonLabel={previousBest.seasonLabel} lines={previousBest.lines} />
+            )}
 
             {!hasEvent ? (
               // Дисциплина не выбрана — списка нет и быть не может. Говорим это прямо и
