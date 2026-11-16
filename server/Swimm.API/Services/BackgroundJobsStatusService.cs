@@ -95,7 +95,8 @@ public sealed class BackgroundJobsStatusService(
             "5 мин", null),
         [JobNames.StartList] = ("Стартовые протоколы", "CompetitionDiscoveryBackgroundService (второй проход)",
             "Для будущих стартов в окне StartListDaysAhead добывает loglig-id и забирает стартовый " +
-            "протокол (CompetitionEntries). Интервал общий с «Входящими».",
+            "протокол (CompetitionEntries); loglig-id ищет и у прошедших за 30 дней со статусом new " +
+            "(iframe часто появляется после старта). Интервал общий с «Входящими».",
             "5 мин", "StartListDaysAhead"),
         [JobNames.LogligVerify] = ("Сверка предложенных loglig-id", "LogligSuggestionVerificationBackgroundService",
             "Берёт loglig-id, предложенные пользователями (Suggested), сверяет карточку loglig " +

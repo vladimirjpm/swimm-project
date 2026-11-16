@@ -25,9 +25,10 @@ internal static class DiscoveryCli
         return;
     }
 
-    // Дочитать детали будущих стартов без loglig-id (docs/plans/start-list-plan.md, шаг С2):
+    // Дочитать детали стартов без loglig-id (docs/plans/start-list-plan.md, шаг С2):
     //   dotnet run -- --refresh-upcoming [--days 14]
-    // Без этого у будущего старта нет logligId, и стартовый протокол начать нечем.
+    // --days — окно вперёд; назад всегда CompetitionDiscoveryService.RecentPastDays (iframe
+    // loglig часто появляется после старта). Без logligId не начать ни стартовый протокол, ни «Затянуть».
     internal static async Task RefreshUpcomingAsync(WebApplication app, string[] args)
     {
         var daysAhead = 14;
@@ -39,7 +40,7 @@ internal static class DiscoveryCli
         var svc = scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>();
         var (checkedCount, resolved) = await svc.RefreshUpcomingDetailsAsync(daysAhead);
 
-        Console.WriteLine($"Догрузка деталей будущих стартов (окно {daysAhead} дн.): проверено {checkedCount}, добыто {resolved}");
+        Console.WriteLine($"Догрузка деталей стартов без loglig-id (окно {daysAhead} дн. вперёд + недавно прошедшие): проверено {checkedCount}, добыто {resolved}");
         return;
     }
 
