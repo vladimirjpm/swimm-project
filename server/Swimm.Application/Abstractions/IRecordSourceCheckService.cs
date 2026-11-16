@@ -8,8 +8,8 @@ namespace Swimm.Application.Abstractions;
 /// (<c>Sys_RecordSourceChecks</c>). Применение — по-прежнему руками, но через этот же сервис,
 /// чтобы журнал знал, какая проверка применена.
 ///
-/// Расписания нет (решение §7-2): кнопка и CLI. Сервис написан так, чтобы на Azure его
-/// просто позвал <c>BackgroundService</c> — второй реализации не будет.
+/// Зовут его кнопка, CLI и расписание <c>records-check</c> (<c>RecordsCheckBackgroundService</c>,
+/// 16.11.2026) — одна реализация на всех.
 /// </summary>
 public interface IRecordSourceCheckService
 {

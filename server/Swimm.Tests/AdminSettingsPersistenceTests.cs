@@ -141,4 +141,16 @@ public class AdminSettingsPersistenceTests
         Assert.True(svc.Update("LogligVerifyEnabled", "false"));
         Assert.False(svc.Update("LogligVerifyIntervalHours", "often"));
     }
+
+    [Fact]
+    public void RecordsCheck_KeysAreInRegistry_EnabledDaily()
+    {
+        // Проверка источников рекордов по расписанию: включена, раз в сутки, выключается из админки.
+        var svc = Build(new FakeStore());
+
+        Assert.True(svc.GetValue("RecordsCheckEnabled", false));
+        Assert.Equal(24, svc.GetValue("RecordsCheckIntervalHours", 0));
+        Assert.True(svc.Update("RecordsCheckEnabled", "false"));
+        Assert.False(svc.Update("RecordsCheckIntervalHours", "often"));
+    }
 }

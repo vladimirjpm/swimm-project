@@ -106,6 +106,12 @@ public sealed class BackgroundJobsStatusService(
             "Прогоняет непривязанных пловцов через поиск и сверку. ПЛАТНО: каждый пловец — 1–3 " +
             "запроса Serper. Ручной батч в /Admin/Swimmers/Loglig пишет в историю, расписание не сдвигает.",
             "15 мин", "LogligBatchPerRun"),
+        [JobNames.RecordsCheck] = ("Проверка источников рекордов", "RecordsCheckBackgroundService",
+            "То же, что кнопка «Проверить все источники» на /Admin/Import: скачивает World Aquatics " +
+            "(open, masters, junior) и справочники isr.org.il, строит дифф с базой и пишет журнал " +
+            "Sys_RecordSourceChecks. Apply НЕ делает — «ждёт Apply» видно на дашборде и в /Admin/Import. " +
+            "Прогон по странам сюда не входит.",
+            "15 мин", null),
     };
 
     private async Task<IReadOnlyList<JobCard>> BuildSchedulesAsync(

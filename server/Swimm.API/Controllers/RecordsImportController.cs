@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;
 
@@ -115,9 +116,17 @@ public class RecordsImportController : ControllerBase
     /// Ничего не применяет. Долгий запрос — World Aquatics отвечает до полутора минут на отчёт.
     /// </summary>
     [HttpPost("check-all")]
-    public async Task<IActionResult> CheckAll()
+    public async Task<IActionResult> CheckAll([FromServices] IJobRunStore jobRuns)
     {
+        var startedAt = DateTime.UtcNow;
         var results = await _checks.CheckAllAsync(HttpContext.RequestAborted);
+
+        // Кнопка — тот же прогон, что у расписания records-check: пишем его в Sys_JobRuns, чтобы
+        // ночной джоб не повторил проверку сразу после ручной и прогон был виден в /Admin/Jobs.
+        await jobRuns.RecordAsync(new JobRunRecord(JobNames.RecordsCheck, JobTriggers.Manual, startedAt,
+            DateTime.UtcNow, Success: true, JobRunSummaries.RecordsCheck(results), null, null),
+            HttpContext.RequestAborted);
+
         return Ok(results.Select(r => new
         {
             r.Source, r.CheckId, r.Outcome, r.CheckedAt, r.Error,

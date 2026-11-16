@@ -134,6 +134,8 @@ if (backgroundJobsEnabled)
     // (Suggested) и проверяются этим джобом, когда запущена локальная админка (ProdAdmin).
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligSuggestionVerificationBackgroundService>();
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligBatchBackgroundService>();
+    // Проверка источников рекордов (records-freshness-plan §4): только дифф и журнал, Apply — руками.
+    builder.Services.AddHostedService<Swimm.API.BackgroundServices.RecordsCheckBackgroundService>();
 }
 
 // ПРОД-РАСПИСАНИЕ — третий сорт (docs/plans/web-push-reminders-plan.md §4): напоминания о
