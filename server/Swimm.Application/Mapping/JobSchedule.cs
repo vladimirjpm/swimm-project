@@ -1,5 +1,6 @@
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Domain.Entities;
 
 namespace Swimm.Application.Mapping;
 
@@ -19,6 +20,13 @@ public static class JobNames
     public const string LogligBatch = "loglig-batch";
 
     /// <summary>
+    /// Проверка источников справочника рекордов — то же, что кнопка «Проверить все источники»
+    /// на /Admin/Import (docs/plans/records-freshness-plan.md §4): fetch + dry-run дифф, журнал
+    /// <c>Sys_RecordSourceChecks</c>. Apply НЕ делает — применяет человек.
+    /// </summary>
+    public const string RecordsCheck = "records-check";
+
+    /// <summary>
     /// Напоминания о тренировках через Web Push (docs/plans/web-push-reminders-plan.md). НЕ в
     /// <see cref="All"/>: тик — минуты, а не часы из Admin/Settings, и работает она на ПРОДЕ под
     /// своим флагом (<c>PushReminders:Enabled</c>), а не под фоновыми расписаниями ProdAdmin.
@@ -36,6 +44,9 @@ public static class JobNames
         new(LogligVerify, "LogligVerifyEnabled", true, "LogligVerifyIntervalHours", 24),
         // Выключена по умолчанию: каждый пловец — 1–3 платных запроса Serper.
         new(LogligBatch, "LogligBatchEnabled", false, "LogligBatchIntervalHours", 24),
+        // Включена по умолчанию: пять скачиваний в сутки, ничего не применяет (решение Влада
+        // 16.11.2026 — расписание, отложенное «до Azure», records-freshness-plan §7-2).
+        new(RecordsCheck, "RecordsCheckEnabled", true, "RecordsCheckIntervalHours", 24),
     ];
 
     public static JobDefinition Get(string name) => All.First(j => j.Name == name);
@@ -113,6 +124,30 @@ public static class JobRunSummaries
 
     public static string LogligBatch(LogligBatchReport r, int perRun) =>
         $"лимит {perRun}: обработано {r.Processed}, привязано {r.Linked}, с кандидатами {r.WithCandidates}, впустую {r.NothingFound}";
+
+    /// <summary>
+    /// «источников 5: без изменений 3 · ждут Apply: wa-masters +2 ~1 · сбой: wa-junior».
+    /// Счёт изменений — как в журнале: клетка с двумя хозяевами (country/*/open, И-13) не
+    /// считается, иначе worldrecords «ждал бы Apply» каждый день.
+    /// </summary>
+    public static string RecordsCheck(IReadOnlyList<RecordSourceCheckResultDto> results)
+    {
+        var changed = results.Where(r => r.Outcome == RecordSourceCheckOutcomes.ChangesFound).ToList();
+        var failed = results.Where(r => r.Outcome == RecordSourceCheckOutcomes.Failed).ToList();
+        var unchanged = results.Count - changed.Count - failed.Count;
+
+        var parts = new List<string> { $"источников {results.Count}: без изменений {unchanged}" };
+        if (changed.Count > 0)
+            parts.Add("ждут Apply: " + string.Join(", ", changed.Select(r =>
+            {
+                var added = r.Diff?.Added.Count(e => !RecordPlausibility.IsContestedSlot(e)) ?? 0;
+                var edited = r.Diff?.Changed.Count(e => !RecordPlausibility.IsContestedSlot(e)) ?? 0;
+                return $"{r.Source} +{added} ~{edited}";
+            })));
+        if (failed.Count > 0)
+            parts.Add("сбой: " + string.Join(", ", failed.Select(r => r.Source)));
+        return string.Join(" · ", parts);
+    }
 }
 
 /// <summary>

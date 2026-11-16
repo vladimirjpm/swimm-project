@@ -65,6 +65,17 @@ public class JobScheduleTests
         Assert.Equal("start-list", JobNames.StartList);
         Assert.Equal("loglig-verify", JobNames.LogligVerify);
         Assert.Equal("loglig-batch", JobNames.LogligBatch);
+        Assert.Equal("records-check", JobNames.RecordsCheck);
+    }
+
+    [Fact]
+    public void Records_check_is_scheduled_daily_and_on_by_default()
+    {
+        var job = JobNames.Get(JobNames.RecordsCheck);
+        Assert.Equal("RecordsCheckEnabled", job.EnabledKey);
+        Assert.True(job.EnabledDefault);
+        Assert.Equal("RecordsCheckIntervalHours", job.IntervalKey);
+        Assert.Equal(24, job.DefaultIntervalHours);
     }
 
     // ── Журнал (JobRunStore) ────────────────────────────────────────────────────
@@ -277,10 +288,12 @@ public class JobScheduleTests
     public void Every_job_has_definition_with_stable_defaults()
     {
         Assert.Equal(
-            [JobNames.Discovery, JobNames.StartList, JobNames.LogligVerify, JobNames.LogligBatch],
+            [JobNames.Discovery, JobNames.StartList, JobNames.LogligVerify, JobNames.LogligBatch, JobNames.RecordsCheck],
             JobNames.All.Select(j => j.Name));
-        // По умолчанию включена только сверка loglig-id: без неё предложения висели бы вечно.
-        Assert.Equal([JobNames.LogligVerify], JobNames.All.Where(j => j.EnabledDefault).Select(j => j.Name));
+        // По умолчанию включены сверка loglig-id (без неё предложения висели бы вечно) и проверка
+        // источников рекордов (только дифф и журнал, ничего не применяет).
+        Assert.Equal([JobNames.LogligVerify, JobNames.RecordsCheck],
+            JobNames.All.Where(j => j.EnabledDefault).Select(j => j.Name));
         // Стартовый протокол живёт на интервале discovery (С10, решение 5).
         Assert.Equal(JobNames.Get(JobNames.Discovery).IntervalKey, JobNames.Get(JobNames.StartList).IntervalKey);
     }

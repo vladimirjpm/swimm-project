@@ -35,7 +35,9 @@ public class AdminSettingsServiceTests
         // + LogligVerifyEnabled/LogligVerifyIntervalHours (ночная сверка loglig-id — джоб читал
         //   их и раньше, но в реестре их не было; план деплоя §8.2, 2026-10-14).
         // + RecordTickerEnabled (бегущая лента внизу витрин, дефолт false, 2026-10-16)
-        Assert.Equal(31, all.Count);
+        // + RecordsCheckEnabled/RecordsCheckIntervalHours (проверка источников рекордов по
+        //   расписанию, records-freshness-plan §4, 2026-11-16)
+        Assert.Equal(33, all.Count);
     }
 
     [Fact]

@@ -149,6 +149,14 @@ public class AdminSettingsService : ISettingsService, IReloadableSettings
                 "Rejected. Джоб работает только там, где включены фоновые джобы (локальная админка, не прод)"),
             new("LogligVerifyIntervalHours", "24", "int", "admin",
                 "Интервал ночной сверки loglig-id в часах (минимум 1)"),
+            // Проверка источников рекордов по расписанию (records-freshness-plan §4, 16.11.2026).
+            new("RecordsCheckEnabled", "true", "bool", "admin",
+                "Проверка источников рекордов по расписанию: true — фоновый джоб раз в " +
+                "RecordsCheckIntervalHours делает то же, что кнопка «Проверить все источники» на " +
+                "/Admin/Import (скачать, построить дифф, записать журнал). Apply НЕ делает. Работает " +
+                "только там, где включены фоновые расписания (ProdAdmin)"),
+            new("RecordsCheckIntervalHours", "24", "int", "admin",
+                "Интервал проверки источников рекордов в часах (минимум 1)"),
             new("DebugDetails", "false", "bool", "both",
                 "Общий тумблер отладочных подробностей на витринах. Пока выключен, ни одна " +
                 "опция из Sys_DebugOptions не действует — одним движением гасится всё. " +

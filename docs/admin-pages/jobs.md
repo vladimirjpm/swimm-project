@@ -24,7 +24,7 @@
 
 | Вид | Службы | Откуда состояние |
 |---|---|---|
-| **Расписания** — сами ходят наружу по таймеру | `discovery`, `start-list` (`CompetitionDiscoveryBackgroundService`), `loglig-verify`, `loglig-batch` | журнал `Sys_JobRuns` (пора ли) + история `Sys_JobRunLog` (что сделали) |
+| **Расписания** — сами ходят наружу по таймеру | `discovery`, `start-list` (`CompetitionDiscoveryBackgroundService`), `loglig-verify`, `loglig-batch`, `records-check` (`RecordsCheckBackgroundService`, 16.11.2026: проверка источников рекордов — дифф и журнал `Sys_RecordSourceChecks`, Apply НЕ делает) | журнал `Sys_JobRuns` (пора ли) + история `Sys_JobRunLog` (что сделали) |
 | **Прод-расписание** — идёт с ПРОДА круглосуточно | `training-reminders` (`TrainingReminderBackgroundService`, напоминания о тренировках через Web Push, [web-push-reminders-plan.md](../plans/web-push-reminders-plan.md)) | тот же журнал; флаг свой — `PushReminders:Enabled` (true только на проде). Тик 5 мин: каждый сдвигает «последний тик» (`IJobRunStore.RecordStateAsync`), строку истории пишет только тик, который что-то отправил или упал. В ProdAdmin карточка «следит» за прод-джобом: тик старше 35 мин — «молчит» (жёлтая) |
 | **Очереди** — исполняют то, что поставила админка | импорт (`ImportBackgroundService`), рекорды по странам (`RecordCountryRunBackgroundService`) | снимок очереди в памяти + их собственные таблицы: `Sys_ImportHistory`, журнал свежести рекордов `Sys_RecordSourceChecks` (`worldrecords-countries`) |
 | **Служебные** | пинг БД (`DbPingBackgroundService`), отставание от прода (`DataSyncCheckBackgroundService`, только Development), мост кэша (`CacheBridgeListener`) | память процесса: `DbStatusService.LastPing`, `IDataSyncStatus.Current`, `ICacheBridgeStatus.State()` |
@@ -75,7 +75,10 @@
 - Кто пишет: `ScheduledJob.RunIfDueAsync` (фон, итог возвращает сама работа); кнопка «Проверить
   сейчас» в `/Admin/Competitions` (`DiscoveryAdminController.Sync`, текущий сезон — `RecordAsync`,
   прошлый сезон и неудача — `AppendLogAsync`); `--discovery-sync` (CLI); ручной батч в
-  `/Admin/Swimmers/Loglig` (`AppendLogAsync`: батч другого размера ночной не откладывает).
+  `/Admin/Swimmers/Loglig` (`AppendLogAsync`: батч другого размера ночной не откладывает);
+  кнопка «🔎 Проверить все источники» на `/Admin/Import` (`RecordsImportController.CheckAll`,
+  `RecordAsync` задачи `records-check`: после ручной проверки ночная сутки не повторяет).
+  CLI `--records-check` в историю Jobs не пишет — только журнал `Sys_RecordSourceChecks`.
 - Итог — одна строка из `JobRunSummaries` (один текст на задачу, кто бы ни запустил).
 - **Подробности — `Details` (jsonb, миграция `AddJobRunLogDetails`, 16.11.2026).** Пока пишет только
   discovery (фон, кнопка, CLI): список самих изменений прогона — `DiscoverySyncResult.Changes`
