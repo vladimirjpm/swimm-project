@@ -109,6 +109,7 @@ internal sealed class JobRunLogEntryConfiguration : IEntityTypeConfiguration<Job
         entity.Property(e => e.Trigger).HasMaxLength(20);
         entity.Property(e => e.Summary).HasMaxLength(1000);
         entity.Property(e => e.Error).HasMaxLength(1000);
+        entity.Property(e => e.Details).HasColumnType("jsonb");
         // Страница и обрезка спрашивают «последние N этой задачи».
         entity.HasIndex(e => new { e.Name, e.StartedAt });
     }

@@ -77,12 +77,44 @@
   прошлый сезон и неудача — `AppendLogAsync`); `--discovery-sync` (CLI); ручной батч в
   `/Admin/Swimmers/Loglig` (`AppendLogAsync`: батч другого размера ночной не откладывает).
 - Итог — одна строка из `JobRunSummaries` (один текст на задачу, кто бы ни запустил).
+- **Подробности — `Details` (jsonb, миграция `AddJobRunLogDetails`, 16.11.2026).** Пока пишет только
+  discovery (фон, кнопка, CLI): список самих изменений прогона — `DiscoverySyncResult.Changes`
+  (`DiscoveryChange`, виды — `DiscoveryChangeKinds`: new / postponed / restored / updated / missing),
+  JSON собирает и разбирает `JobRunDetails` (потолок `MaxChanges` = 300, обрезка помечается).
+  Прогон без изменений подробностей не пишет. Фон отдаёт их через `JobRunOutcome` в
+  `ScheduledJob.RunIfDueAsync` (перегрузка; старая, со строкой, осталась у остальных задач).
+
+## Попап «что изменилось» (discovery)
+
+В журнале карточки «Входящие isr.org.il» дата прогона, в котором что-то изменилось, — кнопка
+(пунктирное подчёркивание): открывает `<dialog id="run-changes-<Id строки>">`
+(`Pages/Admin/Shared/_JobRunChangesDialog.cshtml`). У прогонов без изменений и у старых строк
+(до миграции подробностей нет) дата обычным текстом.
+
+- Группы по порядку: **Новые**, **Перенесены** (старая дата зачёркнута → новая), **Обновлены**
+  (имя или даты без переноса; «было: …» у переименованных; отменённый перенос — с пометкой),
+  **Пропали**. Перенос входит и в счётчик «обновлено» итога — так и подписано.
+- Ссылки строки: `compID ↗` на isr.org.il и запись в /Admin/Competitions — «в базе #id» (правка
+  соревнования), если старт уже есть в базе, иначе «во Входящих» (поиск `?q=<имя>&season=<cYear>&discipline=all`
+  — ровно его строка). Есть ли в базе — `ICompetitionDiscoveryService.GetAllAsync` (штамп
+  OrgCompId, иначе матч имя+дата — как сама /Admin/Competitions); зовётся, только если попапы есть.
+- Вид собирает чистая `DiscoveryRunChangesBuilder` (`Swimm.Application/Mapping`), страница —
+  `JobsModel.RunChanges` (по Id строки журнала), карточка узнаёт кликабельные прогоны через
+  `ViewData[JobsModel.RunChangesKey]`. Закрытие: Esc, ✕, клик по фону; фокус — обратно на дату.
+- Тесты: `JobRunDetailsTests` (JSON, группы, ссылки, даты), `CompetitionDiscoveryServiceTests.Sync_RecordsChangeList_MatchingCounters`,
+  `JobRunStorePgTests.Details_jsonb_round_trip` (настоящий Postgres под swimm_rw).
 - Рост ограничен: после каждой записи у задачи остаются последние `JobRunLog.KeepPerJob` = 50.
 - `Trigger` ограничен CHECK `CK_Sys_JobRunLog_Trigger`: `schedule` / `manual` / `cli`.
 - Sys_, приватная: без гранта `swimm_ro`, **не** в `server/db/seed-tables.txt` — у каждой базы
   свой журнал (миграция `AddJobRunLog`).
 
 ## Грабли
+
+- **Колонка `Details` должна быть в базе раньше нового кода.** ProdAdmin с этим кодом на прод-базе
+  без миграции `AddJobRunLogDetails` падает на чтении и записи журнала (нет колонки). Порядок — по
+  docs/deploy.md «Выкатить код»: влить в master → остановить ProdAdmin → из master
+  `--launch-profile ProdAdmin -- --migrate` → деплой. Накатить миграцию на прод ДО вливания нельзя:
+  ProdAdminGuard сверяет миграции в обе стороны, и ProdAdmin со старого master не стартует.
 
 - **В ProdAdmin страница показывает журнал прод-базы** — расписания работают только там (В17).
   Локально (Development) расписания выключены: карточки «не в этом процессе», история там

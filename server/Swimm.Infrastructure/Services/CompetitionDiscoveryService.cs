@@ -63,6 +63,7 @@ public class CompetitionDiscoveryService(
                 // Имя/даты на сайте могут править — обновляем, статус не трогаем.
                 if (existing.Name != item.Name || existing.DateStart != item.DateStart || existing.DateEnd != item.DateEnd)
                 {
+                    var changeKind = DiscoveryChangeKinds.Updated;
                     // Перенос (В4): сдвинули ещё не прошедший старт — помним ПЕРВУЮ объявленную дату;
                     // вернули на неё — перенос отменён. Правка даты прошедшего — опечатка, не перенос.
                     switch (DiscoverySyncRules.ClassifyDateChange(
@@ -77,6 +78,7 @@ public class CompetitionDiscoveryService(
                             }
                             existing.DateChangedAt = now;
                             result.Postponed++;
+                            changeKind = DiscoveryChangeKinds.Postponed;
                             logger.LogInformation(
                                 "Discovery sync: перенос compID={OrgCompId} {Old:yyyy-MM-dd} → {New:yyyy-MM-dd}",
                                 item.OrgCompId, existing.DateStart, item.DateStart);
@@ -85,11 +87,18 @@ public class CompetitionDiscoveryService(
                             existing.PreviousDateStart = null;
                             existing.PreviousDateEnd = null;
                             existing.DateChangedAt = now;
+                            changeKind = DiscoveryChangeKinds.Restored;
                             logger.LogInformation(
                                 "Discovery sync: перенос compID={OrgCompId} отменён — старт вернулся на {New:yyyy-MM-dd}",
                                 item.OrgCompId, item.DateStart);
                             break;
                     }
+
+                    var datesChanged = existing.DateStart != item.DateStart || existing.DateEnd != item.DateEnd;
+                    result.Changes.Add(new DiscoveryChange(changeKind, item.OrgCompId, item.Name, item.DateStart, item.DateEnd,
+                        OldName: existing.Name != item.Name ? existing.Name : null,
+                        OldDateStart: datesChanged ? existing.DateStart : null,
+                        OldDateEnd: datesChanged ? existing.DateEnd : null));
 
                     existing.Name = item.Name;
                     existing.DateStart = item.DateStart;
@@ -116,6 +125,7 @@ public class CompetitionDiscoveryService(
                     LastSeenAt = now
                 });
                 result.Added++;
+                result.Changes.Add(new DiscoveryChange(DiscoveryChangeKinds.New, item.OrgCompId, item.Name, item.DateStart, item.DateEnd));
             }
         }
 
@@ -125,6 +135,7 @@ public class CompetitionDiscoveryService(
             if (row.MissingSince is not null) continue; // уже помечен прошлым забором
             row.MissingSince = now;
             result.Missing++;
+            result.Changes.Add(new DiscoveryChange(DiscoveryChangeKinds.Missing, id, row.Name, row.DateStart, row.DateEnd));
             logger.LogInformation(
                 "Discovery sync: будущий старт compID={OrgCompId} ({Date:yyyy-MM-dd}) пропал из списка сайта — отменён?",
                 id, row.DateStart);

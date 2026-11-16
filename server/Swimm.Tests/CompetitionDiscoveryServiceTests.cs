@@ -524,6 +524,54 @@ public class CompetitionDiscoveryServiceTests
         Assert.Null((await db.DiscoveredCompetitions.SingleAsync(d => d.OrgCompId == 604)).MissingSince);
     }
 
+    /// <summary>
+    /// Список изменений прогона (попап на /Admin/Jobs) — те же события, что счётчики: новые,
+    /// перенос со старой датой, переименование, отмена переноса, пропавший; без изменений — пусто.
+    /// </summary>
+    [Fact]
+    public async Task Sync_RecordsChangeList_MatchingCounters()
+    {
+        await using var db = CreateDb(nameof(Sync_RecordsChangeList_MatchingCounters));
+        var provider = new FakeProvider();
+        provider.Finished.Add(At(700, TodayUtcMidnight().AddDays(-5)));
+        for (var i = 1; i <= 4; i++) provider.Upcoming.Add(At(700 + i, InSeason(i * 7)));
+        var svc = CreateService(db, provider);
+
+        var first = await svc.SyncAsync();
+        Assert.Equal(5, first.Changes.Count);
+        Assert.All(first.Changes, c => Assert.Equal(DiscoveryChangeKinds.New, c.Kind));
+
+        // Без изменений на сайте — изменений нет.
+        Assert.Empty((await svc.SyncAsync()).Changes);
+
+        var oldStart = provider.Upcoming[0].DateStart;
+        provider.Upcoming[0] = At(701, oldStart.AddDays(3));                      // перенос
+        provider.Finished[0] = provider.Finished[0] with { Name = "שם חדש" };     // переименование прошедшего
+        provider.Upcoming.RemoveAt(3);                                            // пропал 704
+        var r = await svc.SyncAsync();
+
+        Assert.Equal(r.Updated + r.Missing, r.Changes.Count);
+        var moved = Assert.Single(r.Changes, c => c.Kind == DiscoveryChangeKinds.Postponed);
+        Assert.Equal(701, moved.OrgCompId);
+        Assert.Equal(oldStart, moved.OldDateStart);
+        Assert.Equal(oldStart.AddDays(3), moved.DateStart);
+        Assert.Null(moved.OldName);
+
+        var renamed = Assert.Single(r.Changes, c => c.Kind == DiscoveryChangeKinds.Updated);
+        Assert.Equal("תחרות 700", renamed.OldName);
+        Assert.Equal("שם חדש", renamed.Name);
+        Assert.Null(renamed.OldDateStart);
+
+        var gone = Assert.Single(r.Changes, c => c.Kind == DiscoveryChangeKinds.Missing);
+        Assert.Equal(704, gone.OrgCompId);
+
+        // Вернули на прежнюю дату — «перенос отменён».
+        provider.Upcoming[0] = At(701, oldStart);
+        var restored = Assert.Single((await svc.SyncAsync()).Changes);
+        Assert.Equal(DiscoveryChangeKinds.Restored, restored.Kind);
+        Assert.Equal(oldStart.AddDays(3), restored.OldDateStart);
+    }
+
     [Fact]
     public async Task Sync_EmptyUpcomingList_DoesNotCancelAnything()
     {

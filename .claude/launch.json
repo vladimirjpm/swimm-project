@@ -185,6 +185,25 @@
       "autoPort": false
     },
     {
+      "name": "swimm-api-5086-migr-admin",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "server/Swimm.API",
+        "--no-build",
+        "--configuration",
+        "Migr",
+        "--launch-profile",
+        "http",
+        "--",
+        "--urls",
+        "http://localhost:5086"
+      ],
+      "port": 5086,
+      "autoPort": false
+    },
+    {
       "name": "swimm-api-prodadmin",
       "runtimeExecutable": "powershell",
       "runtimeArgs": [

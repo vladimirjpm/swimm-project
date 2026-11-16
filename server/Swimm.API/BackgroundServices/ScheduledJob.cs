@@ -22,9 +22,19 @@ internal static class ScheduledJob
     /// лог. Отмена (остановка приложения) летит — её не записываем.
     /// </summary>
     /// <returns>true — работа запускалась (успешно или нет).</returns>
+    public static Task<bool> RunIfDueAsync(
+        IServiceScopeFactory scopeFactory, string name, TimeSpan interval,
+        Func<CancellationToken, Task<string?>> work, ILogger logger, CancellationToken ct) =>
+        RunIfDueAsync(scopeFactory, name, interval,
+            async c => new JobRunOutcome(await work(c)), logger, ct);
+
+    /// <summary>
+    /// То же, но работа отдаёт и подробности прогона (<see cref="JobRunOutcome.Details"/>, JSON
+    /// <see cref="JobRunDetails"/>) — они ложатся в <c>Sys_JobRunLog.Details</c>.
+    /// </summary>
     public static async Task<bool> RunIfDueAsync(
         IServiceScopeFactory scopeFactory, string name, TimeSpan interval,
-        Func<CancellationToken, Task<string?>> work, ILogger logger, CancellationToken ct)
+        Func<CancellationToken, Task<JobRunOutcome>> work, ILogger logger, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         await using (var scope = scopeFactory.CreateAsyncScope())
@@ -36,9 +46,10 @@ internal static class ScheduledJob
 
         string? error = null;
         string? summary = null;
+        string? details = null;
         try
         {
-            summary = await work(ct);
+            (summary, details) = await work(ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -55,7 +66,10 @@ internal static class ScheduledJob
         await using (var scope = scopeFactory.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<IJobRunStore>().RecordAsync(
                 new JobRunRecord(name, JobTriggers.Schedule, now, DateTime.UtcNow,
-                    Success: error is null, summary, error), ct);
+                    Success: error is null, summary, error, details), ct);
         return true;
     }
 }
+
+/// <summary>Что вернула работа расписания: итог одной строкой и (необязательно) подробности JSON-ом.</summary>
+internal sealed record JobRunOutcome(string? Summary, string? Details = null);

@@ -51,6 +51,7 @@ public class JobRunStore(SwimmDbContext db) : IJobRunStore
             Success = run.Success,
             Summary = JobRunLog.Clip(run.Summary),
             Error = run.Success ? null : JobRunLog.Clip(run.Error) ?? "ошибка без текста",
+            Details = string.IsNullOrWhiteSpace(run.Details) ? null : run.Details,
         });
         await db.SaveChangesAsync(ct);
 
@@ -79,7 +80,7 @@ public class JobRunStore(SwimmDbContext db) : IJobRunStore
         // Строк в таблице не больше KeepPerJob на задачу, а задач — единицы: читаем всё и режем в памяти.
         var rows = await db.JobRunLog.AsNoTracking()
             .OrderByDescending(e => e.StartedAt).ThenByDescending(e => e.Id)
-            .Select(e => new JobRunLogRow(e.Id, e.Name, e.Trigger, e.StartedAt, e.FinishedAt, e.Success, e.Summary, e.Error))
+            .Select(e => new JobRunLogRow(e.Id, e.Name, e.Trigger, e.StartedAt, e.FinishedAt, e.Success, e.Summary, e.Error, e.Details))
             .ToListAsync(ct);
         return rows.GroupBy(r => r.Name).SelectMany(g => g.Take(Math.Max(1, perJob))).ToList();
     }

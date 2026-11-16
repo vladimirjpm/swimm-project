@@ -94,7 +94,8 @@ public class DiscoveryAdminController : ControllerBase
         {
             var result = await _discovery.SyncAsync(year, ct);
             var run = new JobRunRecord(JobNames.Discovery, JobTriggers.Manual, startedAt, DateTime.UtcNow,
-                Success: true, seasonPrefix + JobRunSummaries.Discovery(result), Error: null);
+                Success: true, seasonPrefix + JobRunSummaries.Discovery(result), Error: null,
+                Details: JobRunDetails.Discovery(result));
             // Текущий сезон проверен руками — это тот же успех, что у фона (В12): иначе фоновое
             // расписание тут же сходило бы на сайт второй раз. Прошлый сезон (year) — другой
             // список: только строка истории, расписание не сдвигаем.

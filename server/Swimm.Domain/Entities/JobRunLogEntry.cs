@@ -32,4 +32,11 @@ public class JobRunLogEntry
 
     /// <summary>Текст ошибки у неудачного прогона.</summary>
     public string? Error { get; set; }
+
+    /// <summary>
+    /// Подробности прогона JSON-ом (jsonb, <c>JobRunDetails</c>): у discovery — список самих
+    /// изменений (новые / перенесены / обновлены / пропали) для попапа на /Admin/Jobs. null —
+    /// задача подробностей не пишет или изменений не было.
+    /// </summary>
+    public string? Details { get; set; }
 }
