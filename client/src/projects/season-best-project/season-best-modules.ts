@@ -53,6 +53,10 @@ export interface SeasonBestModules {
    *  на всех экранах, цена — список становится выше). */
   levelInRow: boolean;
 
+  /** Карточка над списком: лучшее время ПРОШЛОГО сезона в этой же категории (без клуба)
+   *  и разница с нынешним лидером. Цена — два лишних запроса, оба в серверном кэше. */
+  previousSeasonBest: boolean;
+
   /** Строка-оговорка под списком: места считаются среди импортированного. */
   footerNote: boolean;
 }
@@ -77,6 +81,7 @@ export const SEASON_BEST_MODULES: SeasonBestModules = {
   disciplineInRow: false,
   levelInRow: true,
 
+  previousSeasonBest: true,
   footerNote: true,
 };
 

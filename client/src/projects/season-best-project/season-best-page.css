@@ -220,6 +220,46 @@
 
 /* Оговорка «новый сезон откроется после зимнего чемпионата» (docs/season-boundary-rule.md).
    Пунктир, а не акцентная плашка: это сноска к сезону, а не предупреждение об ошибке. */
+/* ── Лучший прошлого сезона в этой категории (sb-previous-best.tsx) ─────────── */
+
+.sb-prev {
+  margin-bottom: 12px; padding: 10px 14px;
+  border: 1px solid var(--deep-card-border);
+  border-radius: 12px;
+  background: var(--deep-card-bg-raised);
+}
+.sb-prev__title {
+  margin-bottom: 6px;
+  font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--t-text-3);
+}
+.sb-prev__row {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px;
+  padding: 3px 0;
+}
+.sb-prev__gender { font-weight: 800; }
+.sb-prev__row--male .sb-prev__gender,
+.sb-prev__row--male .sb-prev__time { color: var(--deep-male); }
+.sb-prev__row--female .sb-prev__gender,
+.sb-prev__row--female .sb-prev__time { color: var(--deep-female); }
+.sb-prev__time { font-family: var(--deep-font-display); font-size: 16px; font-variant-numeric: tabular-nums; }
+.sb-prev__who {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px;
+  min-width: 0; flex: 1 1 auto;
+  font-size: 12.5px; color: var(--t-text-2);
+}
+.sb-prev__name { font-weight: 700; color: var(--t-text); text-decoration: none; }
+.sb-prev__name:hover { text-decoration: underline; }
+.sb-prev__club, .sb-prev__date { font-size: 11.5px; color: var(--t-text-3); }
+.sb-prev__date { font-variant-numeric: tabular-nums; }
+.sb-prev__delta {
+  margin-left: auto;
+  font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--t-text-2);
+}
+.sb-prev__delta--faster { color: var(--t-good); }
+.sb-prev__delta--slower { color: var(--t-danger); }
+
 .sb-season-note {
   margin-bottom: 12px; padding: 9px 13px;
   border: 1px dashed var(--deep-card-border);
