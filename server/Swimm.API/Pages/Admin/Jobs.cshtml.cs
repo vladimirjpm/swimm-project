@@ -14,7 +14,9 @@ namespace Swimm.API.Pages.Admin;
 /// прогонов discovery с изменениями (<see cref="RunChanges"/>).
 /// </summary>
 [Authorize(Roles = "Admin")]
-public class JobsModel(IBackgroundJobsStatus jobs, ICompetitionDiscoveryService discovery) : PageModel
+public class JobsModel(
+    IBackgroundJobsStatus jobs, ICompetitionDiscoveryService discovery, IRecordSourceCheckService recordChecks)
+    : PageModel
 {
     public const int HistoryRows = BackgroundJobsStatusService.HistoryRows;
 
@@ -29,10 +31,14 @@ public class JobsModel(IBackgroundJobsStatus jobs, ICompetitionDiscoveryService 
     public IReadOnlyDictionary<long, DiscoveryRunChangesView> RunChanges { get; private set; } =
         new Dictionary<long, DiscoveryRunChangesView>();
 
+    /// <summary>Плитка «Рекорды · источники»: давность проверки, что ждёт Apply, что упало.</summary>
+    public RecordsCheckTile RecordsTile { get; private set; } = null!;
+
     public async Task OnGetAsync(CancellationToken ct)
     {
         Report = await jobs.GetReportAsync(ct);
         RunChanges = await BuildRunChangesAsync(ct);
+        RecordsTile = RecordsCheckTileBuilder.Build(await recordChecks.GetFreshnessAsync(ct), DateTime.UtcNow);
     }
 
     private async Task<IReadOnlyDictionary<long, DiscoveryRunChangesView>> BuildRunChangesAsync(CancellationToken ct)
