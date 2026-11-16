@@ -53,6 +53,24 @@
             </a>
         }
     }
+
+    @* «Рекорды · источники» (RecordsCheckTileBuilder): давность проверки, что ждёт Apply, что упало,
+       и кнопка — тот же check-all, что на /Admin/Import. Не ссылка целиком: внутри кнопка. *@
+    @{
+        var rt = Model.RecordsTile;
+        var (rFrame, rValue) = TileTone(rt.Tone);
+    }
+    <div id="records-tile" class="admin-card block w-full min-w-0 p-3 text-left @rFrame">
+        <div class="text-[11px] font-semibold uppercase tracking-wide text-admin-text-muted">Рекорды · источники</div>
+        <div class="mt-1 truncate text-2xl font-bold leading-tight @rValue"
+             title="@(rt.LastCheckedAt is { } checkedAt ? "Последняя успешная проверка: " + JobTimeText.Format(checkedAt) : "Источники ещё не проверяли")">@rt.Value</div>
+        <div class="mt-0.5 text-[11px] leading-snug text-admin-text-muted">@rt.Sub</div>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+            <button type="button" id="btn-records-check" class="admin-btn admin-btn-primary py-1 px-2.5 text-xs">Проверить сейчас</button>
+            <a href="/Admin/Import?diff=records" class="text-[11px] text-admin-accent no-underline hover:underline">Import ›</a>
+        </div>
+        <div id="records-check-status" role="status" aria-live="polite" class="mt-1 text-[11px] leading-snug text-admin-text-muted"></div>
+    </div>
 </div>
 
 @* Список всех служб с коротким статусом (плитка «Службы»). Нативный <dialog>, как _ConfirmDialog:
@@ -190,6 +208,29 @@ else
     });
     // Ушли к карточке — фокус остаётся там, куда привёл якорь; иначе — обратно на плитку.
     dlg.addEventListener('close', () => { if (!toCard) open.focus({ preventScroll: true }); });
+})();
+
+// «Проверить сейчас» на плитке «Рекорды · источники»: тот же check-all, что на /Admin/Import —
+// скачать пять источников и построить дифф, ничего не применяя (до 5 минут). Прогон пишется в
+// журнал задачи records-check, поэтому после ответа страница перерисовывается целиком.
+(() => {
+    const btn = document.getElementById('btn-records-check');
+    const status = document.getElementById('records-check-status');
+    if (!btn || !status) return;
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        status.textContent = 'Проверяю источники по очереди… до 5 минут';
+        try {
+            const res = await fetch('/api/admin/records/check-all', {
+                method: 'POST', credentials: 'same-origin', headers: { 'X-XSRF-TOKEN': _csrfToken }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            location.reload();
+        } catch (err) {
+            status.textContent = `Ошибка: ${err.message}`;
+            btn.disabled = false;
+        }
+    });
 })();
 
 // «Что изменилось» за прогон discovery: дата в журнале карточки открывает свой <dialog>.
