@@ -190,6 +190,12 @@ public sealed record RecordSourceCheckResultDto(
 /// <param name="AppliedAt">Когда последний раз применяли дифф этого источника.</param>
 /// <param name="ChangedAt">Когда справочник этого источника реально менялся (max UpdatedAt по его оси).</param>
 /// <param name="NeedsCheck">Пора проверить: не проверялся, старше <c>RecordSources.StaleAfter</c> или последняя попытка упала.</param>
+/// <param name="VerifiedAt">
+/// «Checked» ВИТРИНЫ (решение Влада 16.11.2026): последняя проверка, после которой наши данные
+/// совпадают с источником, — без изменений или с изменениями, которые потом применили. Проверка,
+/// нашедшая неприменённые изменения, витринную дату НЕ сдвигает: иначе сайт писал «checked
+/// today», когда мы знаем, что справочник отстал. Админке — <see cref="CheckedAt"/>.
+/// </param>
 public sealed record RecordSourceFreshnessDto(
     string Source,
     DateTime? CheckedAt,
@@ -200,4 +206,5 @@ public sealed record RecordSourceFreshnessDto(
     int PendingChanged,
     DateTime? AppliedAt,
     DateTime? ChangedAt,
-    bool NeedsCheck);
+    bool NeedsCheck,
+    DateTime? VerifiedAt = null);

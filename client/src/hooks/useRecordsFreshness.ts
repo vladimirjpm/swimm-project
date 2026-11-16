@@ -15,7 +15,11 @@ import { useEffect, useState } from 'react';
 export interface RecordSourceFreshness {
   /** Ключ источника: worldrecords, wa-masters, wa-junior, isrorg-age, isrorg-masters. */
   source: string;
-  /** Последняя УСПЕШНАЯ сверка с источником (UTC); null — ещё не сверяли. */
+  /**
+   * Последняя сверка, после которой наши данные совпадают с источником (UTC): без изменений
+   * или изменения применены (16.11.2026). Нашли изменения и не применили — не сдвигается.
+   * null — такой сверки ещё не было.
+   */
   checkedAt: string | null;
   /** Когда справочник этого источника реально менялся. */
   changedAt: string | null;
