@@ -55,7 +55,7 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
                         var result = await discovery.SyncAsync(year: null, ct); // фон тянет только текущий сезон
                         var summary = JobRunSummaries.Discovery(result);
                         _logger.LogInformation("Discovery (фон): {Summary}", summary);
-                        return summary;
+                        return new JobRunOutcome(summary, JobRunDetails.Discovery(result));
                     }, _logger, stoppingToken);
                 }
 

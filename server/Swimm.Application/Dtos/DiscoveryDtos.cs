@@ -24,6 +24,11 @@ public sealed class DiscoverySyncResult
     public int Postponed { get; set; }
     /// <summary>Будущих стартов сезона, впервые пропавших из списка сайта (кандидаты в отменённые).</summary>
     public int Missing { get; set; }
+    /// <summary>
+    /// Сами изменения прогона (новые, перенесённые, обновлённые, пропавшие) — попап прогона на
+    /// /Admin/Jobs (<c>JobRunDetails.Discovery</c>). Счётчики выше считаются по тем же событиям.
+    /// </summary>
+    public List<DiscoveryChange> Changes { get; } = [];
 }
 
 /// <summary>Строка «входящих» для админки.</summary>

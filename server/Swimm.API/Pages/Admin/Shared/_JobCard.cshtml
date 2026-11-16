@@ -18,6 +18,10 @@
         _ => "text-admin-text",
     };
 }
+@{
+    // Прогоны с попапом «что изменилось» (пока только discovery) — кладёт Jobs.cshtml.
+    var runChanges = ViewData[JobsModel.RunChangesKey] as IReadOnlyDictionary<long, DiscoveryRunChangesView>;
+}
 <div class="admin-card p-4 min-w-0 scroll-mt-4" id="job-@Model.Key">
     <div class="flex flex-wrap items-center gap-2 mb-1">
         <span class="text-base font-semibold text-admin-text">@Model.Title</span>
@@ -52,7 +56,19 @@
                         @foreach (var run in Model.History)
                         {
                             <tr>
-                                <td class="whitespace-nowrap text-xs">@JobTimeText.Format(run.StartedAt)</td>
+                                <td class="whitespace-nowrap text-xs">
+                                    @if (runChanges?.ContainsKey(run.Id) == true)
+                                    {
+                                        @* Прогон с изменениями — дата открывает попап «что изменилось» (Jobs.cshtml). *@
+                                        <button type="button" data-run-changes-open="run-changes-@run.Id" aria-haspopup="dialog"
+                                                title="Показать, что изменилось"
+                                                class="cursor-pointer border-0 bg-transparent p-0 text-xs text-admin-accent underline decoration-dotted underline-offset-2 hover:decoration-solid">@JobTimeText.Format(run.StartedAt)</button>
+                                    }
+                                    else
+                                    {
+                                        @JobTimeText.Format(run.StartedAt)
+                                    }
+                                </td>
                                 <td class="whitespace-nowrap text-xs">@JobTimeText.Trigger(run.Trigger)</td>
                                 <td class="whitespace-nowrap text-xs">@JobTimeText.Duration(run.StartedAt, run.FinishedAt)</td>
                                 <td class="text-xs">

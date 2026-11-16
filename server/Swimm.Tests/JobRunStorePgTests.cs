@@ -70,6 +70,43 @@ public class JobRunStorePgTests
         }
     }
 
+    /// <summary>
+    /// Подробности прогона (jsonb <c>Details</c>, миграция AddJobRunLogDetails) пишутся рантайм-
+    /// ролью и читаются обратно: попап «что изменилось» на /Admin/Jobs. Иврит и кавычки в имени
+    /// старта переживают jsonb (он переформатирует JSON — сравниваем разобранное, не текст).
+    /// </summary>
+    [Fact]
+    public async Task Details_jsonb_round_trip()
+    {
+        await using var db = await TryCreate();
+        if (db is null) return;
+
+        var name = "utest-job-" + Guid.NewGuid().ToString("N")[..8];
+        var store = new JobRunStore(db);
+        var result = new Swimm.Application.Dtos.DiscoverySyncResult();
+        var date = new DateTime(2026, 12, 5, 0, 0, 0, DateTimeKind.Utc);
+        result.Changes.Add(new(Swimm.Application.Dtos.DiscoveryChangeKinds.Postponed, 777, "אליפות \"חורף\"",
+            date.AddDays(7), date.AddDays(8), OldDateStart: date, OldDateEnd: date.AddDays(1)));
+        try
+        {
+            await store.AppendLogAsync(new JobRunRecord(name, JobTriggers.Manual, DateTime.UtcNow, DateTime.UtcNow,
+                Success: true, "перенесено 1", Error: null, Details: JobRunDetails.Discovery(result)));
+            await store.AppendLogAsync(new JobRunRecord(name, JobTriggers.Manual, DateTime.UtcNow.AddMinutes(-1),
+                DateTime.UtcNow, Success: true, "без изменений", Error: null));
+
+            db.ChangeTracker.Clear();
+            var rows = (await store.ListLogAsync(5)).Where(r => r.Name == name).ToList();
+            var parsed = JobRunDetails.ParseDiscovery(rows.Single(r => r.Summary == "перенесено 1").Details);
+            Assert.NotNull(parsed);
+            Assert.Equal(result.Changes[0], Assert.Single(parsed.Changes));
+            Assert.Null(rows.Single(r => r.Summary == "без изменений").Details);
+        }
+        finally
+        {
+            await Cleanup(db, name);
+        }
+    }
+
     [Fact]
     public async Task Unknown_trigger_is_rejected_by_check()
     {

@@ -213,7 +213,8 @@ internal static class DiscoveryCli
         // как у кнопки «Проверить сейчас».
         await scope.ServiceProvider.GetRequiredService<IJobRunStore>().RecordAsync(new JobRunRecord(
             JobNames.Discovery, JobTriggers.Cli, startedAt, DateTime.UtcNow,
-            Success: true, JobRunSummaries.Discovery(sync), Error: null));
+            Success: true, JobRunSummaries.Discovery(sync), Error: null,
+            Details: JobRunDetails.Discovery(sync)));
         Console.WriteLine($"Discovery: на сайте {sync.TotalOnSite}, добавлено {sync.Added}, обновлено {sync.Updated}, " +
                           $"перенесено {sync.Postponed}, пропало {sync.Missing}");
         return;

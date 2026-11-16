@@ -9,6 +9,8 @@
     ViewData["PageSubtitle"] = "Фоновые службы: когда запускались, чем кончилось и что сделали";
     var r = Model.Report;
     var now = DateTime.UtcNow;
+    // Карточки берут отсюда, у каких прогонов дата открывает попап «что изменилось».
+    ViewData[JobsModel.RunChangesKey] = Model.RunChanges;
 }
 
 @* Справка — docs/admin-pages/jobs.md. Карточки и сводку собирает IBackgroundJobsStatus
@@ -83,6 +85,12 @@
         }
     </ul>
 </dialog>
+
+@* Попапы «что изменилось» у прогонов discovery с изменениями (клик по дате в журнале карточки). *@
+@foreach (var changes in Model.RunChanges.Values)
+{
+    <partial name="/Pages/Admin/Shared/_JobRunChangesDialog.cshtml" model="changes" />
+}
 
 <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
     <div class="mb-1">
@@ -182,6 +190,25 @@ else
     });
     // Ушли к карточке — фокус остаётся там, куда привёл якорь; иначе — обратно на плитку.
     dlg.addEventListener('close', () => { if (!toCard) open.focus({ preventScroll: true }); });
+})();
+
+// «Что изменилось» за прогон discovery: дата в журнале карточки открывает свой <dialog>.
+// Закрыть — Esc, ✕ или клик по фону; фокус возвращается на дату.
+(() => {
+    document.querySelectorAll('[data-run-changes-open]').forEach(btn => {
+        const dlg = document.getElementById(btn.dataset.runChangesOpen);
+        if (!dlg) return;
+        btn.addEventListener('click', () => {
+            dlg.showModal();
+            dlg.querySelector('button[data-close]').focus();
+        });
+        dlg.addEventListener('close', () => btn.focus({ preventScroll: true }));
+    });
+    document.querySelectorAll('dialog[data-run-changes]').forEach(dlg => {
+        dlg.addEventListener('click', e => {
+            if (e.target === dlg || e.target.closest('button[data-close]')) dlg.close();
+        });
+    });
 })();
 </script>
 }

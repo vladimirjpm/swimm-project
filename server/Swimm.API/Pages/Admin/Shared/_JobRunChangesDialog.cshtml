@@ -1,0 +1,69 @@
+@using Swimm.Application.Mapping
+@model DiscoveryRunChangesView
+@*
+    Попап «что изменилось за прогон discovery» (/Admin/Jobs): клик по дате прогона в журнале
+    карточки. Данные — Sys_JobRunLog.Details (JobRunDetails), вид — DiscoveryRunChangesBuilder.
+    Нативный <dialog>, как список служб: Esc закрывает сам, фон и ✕ — общий скрипт страницы.
+*@
+<dialog id="run-changes-@Model.RunId" aria-labelledby="run-changes-title-@Model.RunId" data-run-changes
+        class="m-auto w-[min(48rem,calc(100vw-2rem))] max-h-[calc(100vh-4rem)] rounded-lg border border-admin-border bg-admin-surface p-0 text-admin-text shadow-xl shadow-black/50">
+    <div class="sticky top-0 flex items-center gap-3 border-b border-admin-border bg-admin-surface px-5 py-3">
+        <h2 id="run-changes-title-@Model.RunId" class="m-0 flex-1 text-base font-semibold text-white">
+            Что изменилось <span class="text-sm font-normal text-admin-text-muted">— прогон @JobTimeText.Format(Model.StartedAt), изменений @Model.Total</span>
+        </h2>
+        <button type="button" data-close class="admin-btn admin-btn-ghost py-1 px-2.5" aria-label="Закрыть">✕</button>
+    </div>
+    @if (Model.Truncated is int all)
+    {
+        <div class="border-b border-admin-border px-5 py-2 text-xs text-admin-warning">
+            Показаны первые @Model.Total из @all — список за прогон обрезан (JobRunDetails.MaxChanges).
+        </div>
+    }
+    @foreach (var g in Model.Groups)
+    {
+        var tone = g.Kind switch
+        {
+            "new" => "text-admin-success",
+            "postponed" => "text-admin-warning",
+            "missing" => "text-admin-danger",
+            _ => "text-admin-accent",
+        };
+        <section class="border-b border-admin-border/70 last:border-b-0">
+            <h3 class="m-0 px-5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide @tone">
+                @g.Title · @g.Lines.Count
+                <span class="ml-1 font-normal normal-case tracking-normal text-admin-text-muted">— @g.Hint</span>
+            </h3>
+            <ul class="m-0 list-none p-0 pb-2">
+                @foreach (var l in g.Lines)
+                {
+                    <li class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-5 py-1.5 text-[0.85rem] hover:bg-admin-surface-hover">
+                        <span class="min-w-0 flex-1 basis-[16rem] font-semibold text-admin-text" dir="auto">@l.Name</span>
+                        <span class="whitespace-nowrap text-xs text-admin-text-muted">
+                            @if (l.OldDates is not null)
+                            {
+                                <span class="line-through">@l.OldDates</span><span> → </span><span class="text-admin-text">@l.Dates</span>
+                            }
+                            else
+                            {
+                                <span>@l.Dates</span>
+                            }
+                        </span>
+                        <span class="whitespace-nowrap text-xs">
+                            <a href="@l.SiteUrl" target="_blank" rel="noopener" class="text-admin-accent hover:underline">compID @l.OrgCompId ↗</a>
+                            <span class="text-admin-text-muted"> · </span>
+                            <a href="@l.AdminUrl" class="text-admin-accent hover:underline">@l.AdminText →</a>
+                        </span>
+                        @if (l.OldName is not null)
+                        {
+                            <span class="basis-full text-xs text-admin-text-muted">было: <span dir="auto">@l.OldName</span></span>
+                        }
+                        @if (l.Note is not null)
+                        {
+                            <span class="basis-full text-xs text-admin-text-muted">@l.Note</span>
+                        }
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+</dialog>

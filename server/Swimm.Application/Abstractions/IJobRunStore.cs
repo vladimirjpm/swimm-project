@@ -51,7 +51,8 @@ public sealed record JobRunStateRow(string Name, DateTime? LastAttemptAt, DateTi
 
 /// <summary>
 /// Один прогон задачи (UTC). <paramref name="Trigger"/> — <c>JobTriggers</c> (schedule/manual/cli),
-/// <paramref name="Summary"/> — что сделал, одной строкой (<c>JobRunSummaries</c>).
+/// <paramref name="Summary"/> — что сделал, одной строкой (<c>JobRunSummaries</c>),
+/// <paramref name="Details"/> — подробности JSON-ом (<c>JobRunDetails</c>; пока только discovery).
 /// </summary>
 public sealed record JobRunRecord(
     string Name,
@@ -60,9 +61,10 @@ public sealed record JobRunRecord(
     DateTime FinishedAt,
     bool Success,
     string? Summary,
-    string? Error);
+    string? Error,
+    string? Details = null);
 
-/// <summary>Строка истории прогонов (UTC).</summary>
+/// <summary>Строка истории прогонов (UTC). <paramref name="Details"/> — JSON <c>JobRunDetails</c> или null.</summary>
 public sealed record JobRunLogRow(
     long Id,
     string Name,
@@ -71,4 +73,5 @@ public sealed record JobRunLogRow(
     DateTime FinishedAt,
     bool Success,
     string? Summary,
-    string? Error);
+    string? Error,
+    string? Details = null);
