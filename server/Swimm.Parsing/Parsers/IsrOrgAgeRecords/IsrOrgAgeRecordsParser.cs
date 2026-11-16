@@ -83,7 +83,14 @@ public class IsrOrgAgeRecordsParser : IFormatParser
     private const string HebrewHaShi = "\u05D4\u05E9\u05D9\u05D0";       // ???? (??????, ? ?????????)
     private const string HebrewHaShiRev = "\u05D0\u05D9\u05E9\u05D4";   // ???? ? ???????? ???????
 
-    private static readonly Regex TimeRx = new(@"\d{2}:\d{2}\.\d{1,2}", RegexOptions.Compiled);
+    // Минуты — одна или две цифры: 16.11.2026 в PDF федерации (25 м, 07_11_2026) свежий рекорд
+    // вписан как «2:09.33» без ведущего нуля, и строгое \d{2} молча выкидывало строку — на её
+    // месте оставался рекорд World Aquatics. Нормализация к «02:09.33» — NormalizeTime.
+    private static readonly Regex TimeRx = new(@"(?<!\d)\d{1,2}:\d{2}\.\d{1,2}", RegexOptions.Compiled);
+
+    /// <summary>«2:09.33» → «02:09.33»: справочник хранит минуты двумя цифрами, как и WA.</summary>
+    public static string NormalizeTime(string time) =>
+        time.Length > 0 && time.IndexOf(':') == 1 ? "0" + time : time;
     private static readonly Regex DateRx = new(@"\d{2}/\d{2}/\d{4}", RegexOptions.Compiled);
 
     public IEnumerable<Result> Parse(ParseRequest request)
@@ -459,7 +466,7 @@ public class IsrOrgAgeRecordsParser : IFormatParser
         {
             var pr = dataRows[di];
 
-            var time = TimeRx.Match(pr.TimeRaw).Value;
+            var time = NormalizeTime(TimeRx.Match(pr.TimeRaw).Value);
             var date = ExtractDate(pr);
             var ageCategory = ExtractAgeCategory(pr.AgeRaw);
             var (swimmerName, club) = SplitNameAndClub(pr.NameWords, pr.ClubWords, pr.RowLayout);
