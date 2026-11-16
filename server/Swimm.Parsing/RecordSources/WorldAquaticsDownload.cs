@@ -30,7 +30,7 @@ public static class WorldAquaticsDownload
             var last = attempt >= MaxAttempts;
             try
             {
-                var response = await client.GetAsync(url, ct);
+                var response = await client.GetAsync(attempt == 1 ? url : CacheBusted(url, attempt), ct);
 
                 if (IsTransient(response.StatusCode))
                 {
@@ -61,6 +61,18 @@ public static class WorldAquaticsDownload
                     $"{what} не скачался за {MaxAttempts} попытки: {ex.Message}", ex);
             }
         }
+    }
+
+    /// <summary>
+    /// Повтор — мимо кэша CloudFront: он кэширует 504 (<c>X-Cache: Error from cloudfront</c>,
+    /// замер 16.11.2026), и повтор того же URL в ближайшие секунды получает ту же ошибку за 15 мс,
+    /// не дойдя до источника. Лишний параметр query источник игнорирует (проверено на отчёте и
+    /// на JSON-выдаче); хост и путь не меняются — whitelist домена в силе.
+    /// </summary>
+    public static Uri CacheBusted(Uri url, int attempt)
+    {
+        var sep = string.IsNullOrEmpty(url.Query) ? "?" : "&";
+        return new Uri($"{url.AbsoluteUri}{sep}_retry={attempt}-{DateTime.UtcNow.Ticks}");
     }
 
     private static bool IsTransient(HttpStatusCode status) =>

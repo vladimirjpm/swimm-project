@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Swimm.Application.Abstractions;
@@ -42,16 +41,6 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
     /// <summary>Пол × бассейн — по запросу на пару; X — смешанные эстафеты (Э3).</summary>
     private static readonly (string Gender, string Pool)[] Queries =
         [("F", "LCM"), ("F", "SCM"), ("M", "LCM"), ("M", "SCM"), ("X", "LCM"), ("X", "SCM")];
-
-    /// <summary>Индивидуальные стили; «Medley» без «Relay» — всегда комплекс.</summary>
-    private static readonly Dictionary<string, string> Styles = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Freestyle"] = "freestyle",
-        ["Backstroke"] = "backstroke",
-        ["Breaststroke"] = "breaststroke",
-        ["Butterfly"] = "butterfly",
-        ["Medley"] = "individual_medley",
-    };
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<WaJuniorRecordsSourceProvider> _logger;
@@ -106,96 +95,25 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
 
     public sealed record ParseResult(IReadOnlyList<ParsedRecordDto> Records, int SkippedRelays);
 
+    /// <summary>Оси юниорских: <c>world/junior</c>, полоса WJR в AgeKey, имя «Claire Curzan».</summary>
+    private static readonly WaJsonAxes Axes = new(
+        RegionType: "world",
+        RegionCode: "",
+        Category: "junior",
+        AgeKey: gender => gender switch { "male" => MaleBand, "female" => FemaleBand, _ => MixedBand },
+        IndividualHolder: row => HolderName(
+            WorldAquaticsRecordsJson.Str(row, "preferredFirstName"),
+            WorldAquaticsRecordsJson.Str(row, "preferredLastName")),
+        Label: SourceKey);
+
     /// <summary>
-    /// Один ответ эндпоинта → строки справочника. Проверяет, что ответ полный: страница одна
-    /// (<c>pageSize=50</c>, строк 18–25), и если источник однажды начнёт резать выдачу, мы
-    /// должны упасть, а не записать половину справочника.
+    /// Один ответ эндпоинта → строки справочника. Разбор общий с worldrecords —
+    /// <see cref="WorldAquaticsRecordsJson"/>; здесь только оси юниорских.
     /// </summary>
     public static ParseResult Parse(Stream json)
     {
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-
-        if (!root.TryGetProperty("records", out var records) || records.ValueKind != JsonValueKind.Array)
-            throw new InvalidOperationException("wa-junior: в ответе нет массива records — формат источника поменялся?");
-
-        if (root.TryGetProperty("totalRowCount", out var total) && total.TryGetInt32(out var totalRows)
-            && totalRows != records.GetArrayLength())
-            throw new InvalidOperationException(
-                $"wa-junior: источник отдал {records.GetArrayLength()} строк из {totalRows} — выдача " +
-                "стала постраничной, нужен проход по страницам.");
-
-        var result = new List<ParsedRecordDto>();
-        var relays = 0;
-        foreach (var row in records.EnumerateArray())
-        {
-            var group = Str(row, "disciplineGroup");
-            var isRelay = group.Contains("Relay", StringComparison.OrdinalIgnoreCase);
-
-            var dto = ToRecord(row, group, isRelay);
-            if (dto != null) result.Add(dto);
-            else if (isRelay) relays++;
-        }
-
-        return new ParseResult(result, relays);
-    }
-
-    /// <summary>
-    /// null — строка не ложится в оси <c>Record</c> (незнакомый стиль, пол, бассейн): как у
-    /// остальных источников, расхождение числа строк видно в диффе.
-    /// </summary>
-    private static ParsedRecordDto? ToRecord(JsonElement row, string group, bool isRelay)
-    {
-        // «Freestyle Relay» / «Medley Relay» → стиль без слова Relay; эстафету несёт дистанция.
-        var styleKey = isRelay ? group.Replace("Relay", "", StringComparison.OrdinalIgnoreCase).Trim() : group;
-        if (!Styles.TryGetValue(styleKey, out var style)) return null;
-        if (isRelay && style is not ("freestyle" or "individual_medley")) return null;
-
-        // Коды источника (J0, Э3): disciplineGender 0 — мужчины, 1 — женщины, 2 — смешанные;
-        // pool 0 — LCM, 1 — SCM.
-        var (gender, band) = Int(row, "disciplineGender") switch
-        {
-            0 => ("male", MaleBand),
-            1 => ("female", FemaleBand),
-            2 when isRelay => ("mixed", MixedBand),
-            _ => (null, null),
-        };
-        if (gender is null) return null;
-
-        var pool = Int(row, "pool") switch
-        {
-            0 => "50m",
-            1 => "25m",
-            _ => null,
-        };
-        if (pool is null) return null;
-
-        if (Int(row, "disciplineDistance") is not int distance || distance <= 0) return null;
-
-        // timeFormatted — ровно та форма, в которой лежит world/open («46.40», «01:42.00»);
-        // сырое time («00:00:24») без долей не годится.
-        var time = Str(row, "timeFormatted");
-        if (time.Length == 0) return null;
-
-        var holder = isRelay
-            ? Str(row, "fullName")
-            : HolderName(Str(row, "preferredFirstName"), Str(row, "preferredLastName"));
-        var country = Str(row, "nationalityCode");
-
-        return new ParsedRecordDto(
-            RegionType: "world",
-            RegionCode: "",
-            Category: "junior",
-            AgeKey: band!,
-            Gender: gender,
-            PoolType: pool,
-            Style: style,
-            Distance: (isRelay ? "4X" : "") + distance + "m",
-            Time: time,
-            HolderName: holder.Length == 0 ? null : holder,
-            Club: null,
-            HolderCountry: country.Length == 0 ? null : country,
-            RecordDate: NormalizeDate(Str(row, "date")));
+        var r = WorldAquaticsRecordsJson.Parse(json, Axes);
+        return new ParseResult(r.Records, r.SkippedRelays);
     }
 
     /// <summary>
@@ -217,26 +135,6 @@ public class WaJuniorRecordsSourceProvider : IRecordSourceProvider
         return string.Join('-', word.Split('-').Select(p =>
             p.Length <= 1 ? p : char.ToUpperInvariant(p[0]) + p[1..].ToLowerInvariant()));
     }
-
-    /// <summary>«2021-05-14T00:00:00» → «14/05/2021» — форма дат world/open.</summary>
-    private static string? NormalizeDate(string source)
-    {
-        if (source.Length == 0) return null;
-        return DateTime.TryParse(source, System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.None, out var d)
-            ? d.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)
-            : source.Trim();
-    }
-
-    private static string Str(JsonElement row, string name) =>
-        row.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
-            ? v.GetString()?.Trim() ?? ""
-            : "";
-
-    private static int? Int(JsonElement row, string name) =>
-        row.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i)
-            ? i
-            : null;
 
     private static async Task<Stream> FetchJsonAsync(
         HttpClient client, string gender, string pool, CancellationToken ct)

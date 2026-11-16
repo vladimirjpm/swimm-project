@@ -27,7 +27,14 @@ public sealed record ParsedRecordDto(
     string? HolderName,
     string? Club,
     string? HolderCountry,
-    string? RecordDate);
+    string? RecordDate,
+    /// <summary>
+    /// Держатель — КОМАНДА («Netherlands»), а не состав: JSON-выдача World Aquatics имён
+    /// участников эстафет не отдаёт (16.11.2026, worldrecords переехал с XLSX на JSON). Дифф у
+    /// такой строки держателя не сравнивает: совпали время и дата — запись та же, и состав,
+    /// принесённый XLSX-отчётом раньше, остаётся в базе. Новый рекорд пишется с командой.
+    /// </summary>
+    bool HolderIsTeam = false);
 
 /// <summary>Одна строка диффа (новая или изменившаяся) — для таблицы превью в UI.</summary>
 public sealed record RecordDiffEntry(
