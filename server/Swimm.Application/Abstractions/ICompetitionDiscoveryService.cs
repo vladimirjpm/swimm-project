@@ -22,8 +22,9 @@ public interface ICompetitionDiscoveryService
     Task<DiscoveredCompetitionDto?> RefreshDetailsAsync(int id, CancellationToken ct = default);
 
     /// <summary>
-    /// Дочитать детальные страницы будущих стартов, у которых ещё нет loglig-id.
-    /// Возвращает (проверено, добыто).
+    /// Дочитать детальные страницы стартов, у которых ещё нет loglig-id: будущих (до daysAhead
+    /// дней вперёд) и недавно прошедших со статусом new (iframe loglig часто появляется
+    /// только после старта). Возвращает (проверено, добыто).
     /// </summary>
     Task<(int Checked, int Resolved)> RefreshUpcomingDetailsAsync(
         int daysAhead, CancellationToken ct = default);

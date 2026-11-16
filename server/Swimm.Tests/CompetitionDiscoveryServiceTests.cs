@@ -314,9 +314,11 @@ public class CompetitionDiscoveryServiceTests
                 Id = 2, OrgCompId = 2, Name = "За окном", DateStart = today.AddDays(30), DateEnd = today.AddDays(30),
                 Status = DiscoveredCompetitionStatus.New
             },
-            new DiscoveredCompetition // прошедший, без loglig-id — не берём (решение 3)
+            new DiscoveredCompetition // давно прошедший (архив за окном назад) — не берём (решение 3)
             {
-                Id = 3, OrgCompId = 3, Name = "Прошедший", DateStart = today.AddDays(-5), DateEnd = today.AddDays(-5),
+                Id = 3, OrgCompId = 3, Name = "Архив",
+                DateStart = today.AddDays(-CompetitionDiscoveryService.RecentPastDays - 1),
+                DateEnd = today.AddDays(-CompetitionDiscoveryService.RecentPastDays - 1),
                 Status = DiscoveredCompetitionStatus.New
             },
             new DiscoveredCompetition // будущий, уже с loglig-id — не берём
@@ -341,6 +343,45 @@ public class CompetitionDiscoveryServiceTests
         Assert.Null((await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 2)).LogligId);
         Assert.Null((await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 3)).LogligId);
         Assert.Equal(999, (await db.DiscoveredCompetitions.SingleAsync(d => d.Id == 4)).LogligId);
+    }
+
+    /// <summary>
+    /// 16.11.2026: loglig-iframe появился на comp.asp уже после старта, а фон смотрел только
+    /// вперёд — шесть прошедших строк остались без loglig-id и не затягивались. Теперь недавно
+    /// прошедшие (статус new) тоже берутся; импортированные и скрытые — нет.
+    /// </summary>
+    [Fact]
+    public async Task RefreshUpcomingDetailsAsync_RecentPastNewRows_AreRechecked()
+    {
+        await using var db = CreateDb(nameof(RefreshUpcomingDetailsAsync_RecentPastNewRows_AreRechecked));
+        var today = DateTime.UtcNow.Date;
+        DiscoveredCompetition Past(int id, int daysAgo, string status, DateTime? emptyAt = null) => new()
+        {
+            Id = id, OrgCompId = id, Name = "Прошедший " + id,
+            DateStart = today.AddDays(-daysAgo), DateEnd = today.AddDays(-daysAgo),
+            Status = status, EmptySourceAt = emptyAt
+        };
+        db.DiscoveredCompetitions.AddRange(
+            Past(1, 3, DiscoveredCompetitionStatus.New),                                  // берём
+            Past(2, CompetitionDiscoveryService.RecentPastDays, DiscoveredCompetitionStatus.New), // граница окна — берём
+            Past(3, 4, DiscoveredCompetitionStatus.Imported),                             // импортирован — не берём
+            Past(4, 4, DiscoveredCompetitionStatus.Ignored),                              // скрыт — не берём
+            Past(5, 6, DiscoveredCompetitionStatus.New, emptyAt: DateTime.UtcNow.AddDays(-5))); // «нет протокола» — берём
+        await db.SaveChangesAsync();
+
+        var svc = CreateService(db, new FakeProvider());
+        var (checkedCount, resolved) = await svc.RefreshUpcomingDetailsAsync(daysAhead: 14);
+
+        Assert.Equal(3, checkedCount);
+        Assert.Equal(3, resolved);
+        var byId = await db.DiscoveredCompetitions.ToDictionaryAsync(d => d.Id);
+        Assert.Equal(123, byId[1].LogligId);
+        Assert.Equal(123, byId[2].LogligId);
+        Assert.Null(byId[3].LogligId);
+        Assert.Null(byId[4].LogligId);
+        Assert.Equal(123, byId[5].LogligId);
+        // Пометку «нет протокола» догрузка деталей не снимает — это делает удачный разбор.
+        Assert.NotNull(byId[5].EmptySourceAt);
     }
 
     [Fact]

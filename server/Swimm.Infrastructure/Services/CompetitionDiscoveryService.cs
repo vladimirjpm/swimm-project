@@ -187,21 +187,41 @@ public class CompetitionDiscoveryService(
     }
 
     /// <summary>
-    /// С2 (docs/plans/start-list-plan.md): дочитать детали будущих стартов без loglig-id —
-    /// без этого весь конвейер стартового протокола начать нечем. Ошибка по одной строке не
-    /// роняет прогон, RefreshDetailsAsync уже пишет её в LastError.
+    /// Сколько дней НАЗАД от сегодня фон ещё ищет loglig-id у прошедшего старта.
+    /// loglig-iframe на <c>comp.asp?compID=</c> часто появляется уже ПОСЛЕ старта (вместе с
+    /// результатами); окно только «вперёд» такие строки бросало навсегда, и они не затягивались
+    /// (16.11.2026 — шесть штук, самая старая 16851 стартовала месяцем раньше). Архив за окном
+    /// не трогаем: дёргать сайт ради 170 давних строк без loglig незачем (решение 3 С2 в силе).
+    /// </summary>
+    public const int RecentPastDays = 30;
+
+    /// <summary>
+    /// С2 (docs/plans/start-list-plan.md): дочитать детали стартов без loglig-id — будущих
+    /// (до <paramref name="daysAhead"/> дней вперёд) и недавно прошедших (до
+    /// <see cref="RecentPastDays"/> дней назад, только статус <c>new</c>: импортированным и
+    /// скрытым loglig-id уже не нужен). Без loglig-id не начать ни стартовый протокол, ни
+    /// «Затянуть». Ошибка по одной строке не роняет прогон, RefreshDetailsAsync уже пишет её
+    /// в LastError.
+    ///
+    /// Пометка «нет протокола» (<c>EmptySourceAt</c>) из выборки сознательно НЕ исключает:
+    /// у строки без loglig-id это чаще всего ручная пометка «тянуть нечего», а появившийся
+    /// iframe — ровно тот случай, когда протокол всё-таки выложили. Саму пометку здесь не
+    /// снимаем (это решение человека); снимает её первый удачный разбор при «Затянуть».
     /// </summary>
     public async Task<(int Checked, int Resolved)> RefreshUpcomingDetailsAsync(
         int daysAhead, CancellationToken ct = default)
     {
         var today = DateTime.UtcNow.Date;
         var horizon = today.AddDays(daysAhead);
+        var lookback = today.AddDays(-RecentPastDays);
 
         var candidates = await db.DiscoveredCompetitions
             .Where(d => d.LogligId == null
                 && d.Status != DiscoveredCompetitionStatus.Ignored
-                && d.DateStart >= today
-                && d.DateStart <= horizon)
+                && d.DateStart <= horizon
+                && (d.DateStart >= today
+                    || (d.DateStart >= lookback && d.Status == DiscoveredCompetitionStatus.New)))
+            .OrderByDescending(d => d.DateStart)
             .Select(d => d.Id)
             .ToListAsync(ct);
 
@@ -225,8 +245,8 @@ public class CompetitionDiscoveryService(
         }
 
         logger.LogInformation(
-            "Discovery: догрузка деталей будущих стартов (окно {Days} дн.) — проверено {Checked}, добыто {Resolved}",
-            daysAhead, candidates.Count, resolved);
+            "Discovery: догрузка деталей стартов без loglig-id (окно −{Back}…+{Days} дн.) — проверено {Checked}, добыто {Resolved}",
+            RecentPastDays, daysAhead, candidates.Count, resolved);
         return (candidates.Count, resolved);
     }
 
