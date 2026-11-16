@@ -47,7 +47,8 @@ public sealed class RecordsCheckBackgroundService : BackgroundService
                     await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.RecordsCheck, job.Interval(settings), async ct =>
                     {
                         var checks = scope.ServiceProvider.GetRequiredService<IRecordSourceCheckService>();
-                        var results = await checks.CheckAllAsync(ct);
+                        // Упавшие источники — ещё раз через минуту (RecordsCheckRun).
+                        var results = await RecordsCheckRun.RunAsync(checks, RecordsCheckRun.RetryDelay, ct);
                         var summary = JobRunSummaries.RecordsCheck(results);
                         _logger.LogInformation("Records check (фон): {Summary}", summary);
                         return summary;
