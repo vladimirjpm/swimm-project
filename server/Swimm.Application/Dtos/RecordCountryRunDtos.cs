@@ -109,4 +109,33 @@ public static class RecordCountryRun
     /// <c>--records-refresh</c>, где порядок источников зашит.
     /// </summary>
     public const string SkippedCode = "ISR";
+
+    /// <summary>Код «мировые рекорды» в списке упавших (<see cref="RecordCountryRunStatus.Failed"/>).</summary>
+    public const string WorldCode = "WR";
+
+    /// <summary>Сколько упавших стран перечислить в тексте ошибки журнала.</summary>
+    private const int ListedCodes = 20;
+
+    /// <summary>
+    /// Почему прогон по всем странам НЕЛЬЗЯ считать сверкой всех стран, — или null, если можно.
+    ///
+    /// Упала хоть одна страна — прогон неполный: в журнал он идёт как <c>failed</c>, и витринное
+    /// «checked» от него не сдвигается. Иначе сайт подписывает свежестью рекорды стран, которые
+    /// не скачались (16.11.2026: прошли 16 стран из 215, а «checked 16 Nov» встал на все).
+    /// Мировые (<see cref="WorldCode"/>) не в счёт: у них свой источник и своя проверка, а
+    /// сторож правдоподобия при их сбое берёт эталон из базы.
+    /// </summary>
+    public static string? IncompleteError(RecordCountryRunStatus status)
+    {
+        var countries = status.Failed
+            .Where(f => !string.Equals(f.Code, WorldCode, StringComparison.OrdinalIgnoreCase))
+            .Select(f => f.Code)
+            .ToList();
+        if (countries.Count == 0) return null;
+
+        var listed = string.Join(", ", countries.Take(ListedCodes));
+        var more = countries.Count > ListedCodes ? $" и ещё {countries.Count - ListedCodes}" : "";
+        return $"Прогон неполный: не скачались {countries.Count} из {status.Total} стран ({listed}{more}). "
+               + "Повторите прогон по всем странам — сверкой он не считается.";
+    }
 }

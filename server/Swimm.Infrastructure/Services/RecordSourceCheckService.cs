@@ -75,8 +75,8 @@ public class RecordSourceCheckService : IRecordSourceCheckService
             // WA приносит туда своё устаревшее значение при КАЖДОЙ проверке, а следующий шаг
             // цепочки кладёт федеральное обратно. Замер 21.09.2026: 86 «изменений» worldrecords,
             // все до одного — Израиль open. Считай мы их — «ждёт Apply» не гасло бы никогда.
-            check.AddedCount = diff.Added.Count(e => !RecordPlausibility.IsContestedSlot(e));
-            check.ChangedCount = diff.Changed.Count(e => !RecordPlausibility.IsContestedSlot(e));
+            check.AddedCount = diff.Added.Count(e => CountsAsChange(provider.Source, e));
+            check.ChangedCount = diff.Changed.Count(e => CountsAsChange(provider.Source, e));
             check.MissingCount = diff.MissingInSourceCount;
             // «Нет в источнике» Apply не удаляет — это не изменение, которое ждёт человека.
             check.Outcome = check.AddedCount + check.ChangedCount > 0
@@ -105,22 +105,25 @@ public class RecordSourceCheckService : IRecordSourceCheckService
     {
         var check = new RecordSourceCheck { Source = source, CheckedAt = _now() };
 
-        if (error != null)
-        {
-            check.Outcome = RecordSourceCheckOutcomes.Failed;
-            check.Error = Trim(error);
-        }
-        else if (diff != null)
+        // Дифф пишем и у сбоя: неполный прогон по странам (часть стран не скачалась) всё равно
+        // даёт настоящие изменения, и их Apply должен отметиться в журнале («updated»). Но
+        // исход у такой строки — failed, поэтому ни «проверено», ни витринное «checked» она
+        // не двигает и «ждёт Apply» не показывает.
+        if (diff != null)
         {
             check.DiffId = diff.DiffId;
-            // Счёт тот же, что у обычной проверки: клетка с двумя хозяевами не считается
-            // изменением (И-13), «нет в источнике» Apply не удаляет.
-            check.AddedCount = diff.Added.Count(e => !RecordPlausibility.IsContestedSlot(e));
-            check.ChangedCount = diff.Changed.Count(e => !RecordPlausibility.IsContestedSlot(e));
+            check.AddedCount = diff.Added.Count(e => CountsAsChange(source, e));
+            check.ChangedCount = diff.Changed.Count(e => CountsAsChange(source, e));
             check.MissingCount = diff.MissingInSourceCount;
             check.Outcome = check.AddedCount + check.ChangedCount > 0
                 ? RecordSourceCheckOutcomes.ChangesFound
                 : RecordSourceCheckOutcomes.Unchanged;
+        }
+
+        if (error != null)
+        {
+            check.Outcome = RecordSourceCheckOutcomes.Failed;
+            check.Error = Trim(error);
         }
 
         _db.RecordSourceChecks.Add(check);
@@ -192,6 +195,7 @@ public class RecordSourceCheckService : IRecordSourceCheckService
             // Витринное «checked»: данные сверены — без изменений или изменения применены.
             var verifiedAt = await _db.RecordSourceChecks.AsNoTracking()
                 .Where(c => c.Source == source
+                            && c.Outcome != RecordSourceCheckOutcomes.Failed
                             && (c.Outcome == RecordSourceCheckOutcomes.Unchanged || c.AppliedAt != null))
                 .MaxAsync(c => (DateTime?)c.CheckedAt, ct);
 
@@ -232,6 +236,16 @@ public class RecordSourceCheckService : IRecordSourceCheckService
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines)));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
+
+    /// <summary>
+    /// Считается ли строка диффа изменением, которое ждёт человека. Клетка country/*/open с
+    /// двумя хозяевами (И-13) — нет, но только у источников, где она чужая. У прогона по
+    /// странам country/*/open — это и есть всё, что он приносит (Израиль он не трогает), и
+    /// фильтр оставлял от 28 изменений одно мировое (16.11.2026).
+    /// </summary>
+    public static bool CountsAsChange(string source, RecordDiffEntry e) =>
+        string.Equals(source, RecordSources.WorldRecordsCountries, StringComparison.OrdinalIgnoreCase)
+        || !RecordPlausibility.IsContestedSlot(e);
 
     private static string Trim(string message) =>
         message.Length <= ErrorMaxLength ? message : message[..ErrorMaxLength];
