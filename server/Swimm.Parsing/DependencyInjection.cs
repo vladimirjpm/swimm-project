@@ -72,7 +72,7 @@ public static class DependencyInjection
 
         // Национальные рекорды одной страны по её GUID (11.1.3 п. 2) — кирпич батча.
         services.AddSingleton<IRecordCountryFetcher>(sp => new WorldAquaticsCountryFetcher(
-            sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<WorldRecordsParser>()));
+            sp.GetRequiredService<IHttpClientFactory>()));
 
         services.AddSingleton<Parsers.WaMastersRecords.WaMastersRecordsParser>();
 

@@ -102,15 +102,8 @@ public class WorldRecordsSourceProvider : IRecordSourceProvider
         return parsed;
     }
 
-    private static WaJsonAxes OpenAxes(string regionType, string? regionCode) => new(
-        RegionType: regionType,
-        RegionCode: regionCode,
-        Category: "open",
-        AgeKey: _ => "",
-        // fullName — «DOUGLASS Kate», та же строка, что колонка Athlete XLSX-отчёта: разбираем
-        // тем же кодом, чтобы держатель вышел посимвольно тем же, что лежит в базе.
-        IndividualHolder: row => WorldRecordsParser.FormatAthleteName(WorldAquaticsRecordsJson.Str(row, "fullName")),
-        Label: "worldrecords");
+    private static WaJsonAxes OpenAxes(string regionType, string? regionCode) =>
+        WorldAquaticsRecordsJson.OpenAxes(regionType, regionCode, "worldrecords");
 
     /// <summary>Ручная загрузка XLSX-отчётов (WR SCM + WR LCM) — прежний путь.</summary>
     private IReadOnlyList<ParsedRecordDto> ParseXlsx(RecordSourceRequest request)

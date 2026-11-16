@@ -1,50 +1,63 @@
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
-using Swimm.Parsing.Models;
-using Swimm.Parsing.Parsers;
-using Swimm.Parsing.Parsers.WorldRecords;
 
 namespace Swimm.Parsing.RecordSources;
 
 /// <summary>
-/// Национальные рекорды одной страны с api.worldaquatics.com (этап 11.1.3 п. 2) — два
-/// XLSX-отчёта (NR SCM + NR LCM) по GUID страны из <see cref="RecordCountryDto"/>.
+/// Национальные рекорды одной страны с api.worldaquatics.com (этап 11.1.3 п. 2) по GUID страны
+/// из <see cref="RecordCountryDto"/> — JSON-выдача <c>/fina/records/SW</c>, шесть запросов на
+/// страну (пол F/M/X × бассейн LCM/SCM).
 ///
-/// Чем отличается от <see cref="WorldRecordsSourceProvider"/>, кроме страны в запросе:
+/// ⚠ <b>С 16.11.2026 — JSON, а не XLSX-отчёт.</b> Отчёт <c>/fina/records/report</c> источник
+/// стал ограничивать по частоте: после пары десятков стран CloudFront отвечает 429 с
+/// <c>Retry-After: 300</c>, и боевой прогон дважды за вечер потерял половину стран (И-67).
+/// JSON того же API в это же время отвечал 200 за 4–6 с. Разбор — общий с
+/// <c>worldrecords</c> (<see cref="WorldAquaticsRecordsJson"/>), поэтому строки выходят в той
+/// же форме, что из отчёта (сверено вживую с прогоном 22.09). Эстафеты: состава JSON не отдаёт,
+/// держатель — команда (<see cref="ParsedRecordDto.HolderIsTeam"/>), дифф держателя не сравнивает
+/// и состав в базе сохраняется.
+///
+/// Что держится по-прежнему:
 /// <list type="bullet">
-/// <item><b><c>RegionCode</c> берётся из запроса.</b> Провайдер выводит его из строки отчёта
-/// (<c>NF Code</c>, а если тот пуст — из колонки <c>Country</c>, то есть из страны МЕСТА
-/// соревнования). На 215 странах этот фоллбек дал бы регионы вида «Great Britain», поэтому
-/// здесь он запрещён: строка, где источник назвал другую федерацию, не пишется вовсе, а
-/// уходит в отчёт прогона (решение Влада 16.09.2026, план §7 п. 2).</item>
-/// <item><b>Таймаут 120 с и два повтора.</b> Замер 15.09: отчёты отдаются от 2 до 53 с — то
-/// есть прежних 30 с не хватало двум файлам из восьми. Прогон идёт час-два, и одна
-/// подвисшая страна не повод терять весь батч.</item>
-/// <item><b>Мировые рекорды — отдельным методом.</b> <see cref="FetchWorldAsync"/> качает
-/// WR SCM/LCM один раз на прогон, а не на страну (11.1.2).</item>
+/// <item><b><c>RegionCode</c> берётся из запроса.</b> Строка, где источник назвал другую
+/// федерацию (или никакую — пустой <c>nationalityCode</c>), не пишется вовсе, а уходит в отчёт
+/// прогона (решение Влада 16.09.2026, план §7 п. 2).</item>
+/// <item><b>Повторы на каждый запрос</b> — общий <see cref="WorldAquaticsDownload"/>: сеть,
+/// таймаут, 5xx, а 429 — с ожиданием по <c>Retry-After</c>.</item>
+/// <item><b>Мировые рекорды — отдельным методом.</b> <see cref="FetchWorldAsync"/> качает WR один
+/// раз на прогон, а не на страну (11.1.2).</item>
 /// </list>
 /// </summary>
 public class WorldAquaticsCountryFetcher : IRecordCountryFetcher
 {
-    /// <summary>Таймаут на файл. 120 с — с запасом к замеренным 53 с (план §3а).</summary>
-    private static readonly TimeSpan FileTimeout = TimeSpan.FromSeconds(120);
+    /// <summary>Таймаут на запрос — с запасом: JSON отдаётся за секунды, но шлюз бывает медленным.</summary>
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(120);
 
-    /// <summary>Попыток на файл: первая + два повтора.</summary>
+    /// <summary>Попыток на запрос: первая + два повтора.</summary>
     public const int MaxAttempts = WorldAquaticsDownload.MaxAttempts;
 
     private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromSeconds(2);
 
+    /// <summary>Пол записи в query выдачи: F, M и X — смешанные эстафеты.</summary>
+    private static readonly string[] Genders = ["F", "M", "X"];
+
+    private static readonly string[] Pools = ["LCM", "SCM"];
+
+    private static readonly WaJsonAxes WorldAxes =
+        WorldAquaticsRecordsJson.OpenAxes("world", "", "worldrecords-countries");
+
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly WorldRecordsParser _parser;
     private readonly TimeSpan _retryDelay;
+    private readonly WorldAquaticsDownload.Delay? _delay;
 
     /// <param name="retryDelay">Пауза между повторами; в тестах — ноль, чтобы не спать.</param>
+    /// <param name="delay">Чем ждать (повтор, Retry-After); в тестах — запись вместо сна.</param>
     public WorldAquaticsCountryFetcher(
-        IHttpClientFactory httpClientFactory, WorldRecordsParser parser, TimeSpan? retryDelay = null)
+        IHttpClientFactory httpClientFactory, TimeSpan? retryDelay = null, WorldAquaticsDownload.Delay? delay = null)
     {
         _httpClientFactory = httpClientFactory;
-        _parser = parser;
         _retryDelay = retryDelay ?? DefaultRetryDelay;
+        _delay = delay;
     }
 
     public string Source => "worldrecords";
@@ -60,158 +73,71 @@ public class WorldAquaticsCountryFetcher : IRecordCountryFetcher
                 $"Идентификатор страны {country.SourceId} ({country.Code}) не похож на GUID источника.");
 
         var code = country.Code.Trim().ToUpperInvariant();
+        var axes = WorldAquaticsRecordsJson.OpenAxes("country", code, $"NR {code}");
 
-        var client = WorldAquaticsSource.CreateClient(_httpClientFactory, FileTimeout);
+        var rows = await FetchAllAsync(
+            $"recordCode=NR&countryId={countryId}", axes, $"NR для {code}", ct);
 
-        MemoryStream? scm = null, lcm = null;
-        try
-        {
-            scm = await DownloadAsync(
-                client, WorldAquaticsSource.ReportUrl($"recordCode=NR&pool=SCM&countryId={countryId}"),
-                code, "NR SCM", ct);
-            lcm = await DownloadAsync(
-                client, WorldAquaticsSource.ReportUrl($"recordCode=NR&pool=LCM&countryId={countryId}"),
-                code, "NR LCM", ct);
-
-            // Бассейн парсер берёт из колонки Pool каждой строки, а имена файлов идут только
-            // в отладочный лог — поэтому пишем в них страну: в логе прогона по 235 странам
-            // это единственный способ понять, чей файл разбирается.
-            var rows = _parser.Parse(new ParseRequest(
-                scm, $"NR_SCM_{code}.xlsx",
-                lcm, $"NR_LCM_{code}.xlsx",
-                IsAward: false,
-                PoolType: null));
-
-            return MapRows(code, rows);
-        }
-        finally
-        {
-            if (scm != null) await scm.DisposeAsync();
-            if (lcm != null) await lcm.DisposeAsync();
-        }
+        return Split(code, rows);
     }
 
     /// <summary>
-    /// Мировые рекорды — два файла на весь прогон (11.1.2). Национальные рекорды из
-    /// WR-отчёта здесь НЕ берём: ровно так в базе и заводились одиночки
-    /// <c>country/USA/open</c> и <c>country/JAM/open</c> (data-integrity И-19). В прогоне
-    /// национальный рекорд приходит только из NR-отчёта своей страны.
+    /// Мировые рекорды — шесть запросов на весь прогон (11.1.2). Национальные рекорды из WR-выдачи
+    /// здесь НЕ берём: ровно так в базе и заводились одиночки <c>country/USA/open</c> и
+    /// <c>country/JAM/open</c> (data-integrity И-19). В прогоне национальный рекорд приходит только
+    /// из NR-выдачи своей страны.
     /// </summary>
-    public async Task<IReadOnlyList<ParsedRecordDto>> FetchWorldAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<ParsedRecordDto>> FetchWorldAsync(CancellationToken ct = default) =>
+        FetchAllAsync("recordCode=WR", WorldAxes, "WR", ct);
+
+    /// <summary>Пол × бассейн по одному: шесть параллельных запросов — лишний повод для лимита.</summary>
+    private async Task<IReadOnlyList<ParsedRecordDto>> FetchAllAsync(
+        string query, WaJsonAxes axes, string what, CancellationToken ct)
     {
-        var client = WorldAquaticsSource.CreateClient(_httpClientFactory, FileTimeout);
+        var client = WorldAquaticsSource.CreateClient(_httpClientFactory, RequestTimeout);
+        var rows = new List<ParsedRecordDto>();
 
-        MemoryStream? scm = null, lcm = null;
-        try
-        {
-            scm = await DownloadAsync(
-                client, WorldAquaticsSource.ReportUrl("pool=SCM&recordCode=WR"), "world", "WR SCM", ct);
-            lcm = await DownloadAsync(
-                client, WorldAquaticsSource.ReportUrl("pool=LCM&recordCode=WR"), "world", "WR LCM", ct);
-
-            var rows = _parser.Parse(new ParseRequest(
-                scm, "WR_SCM.xlsx",
-                lcm, "WR_LCM.xlsx",
-                IsAward: false,
-                PoolType: null));
-
-            var world = new List<ParsedRecordDto>();
-            foreach (var r in rows)
+        foreach (var gender in Genders)
+            foreach (var pool in Pools)
             {
-                var distance = r.EventStyleLen.EndsWith('m') ? r.EventStyleLen : r.EventStyleLen + "m";
-                if (WorldAquaticsSource.RecordGender(r.EventStyleGender, distance) is not { } gender)
-                    continue;
-
-                // Тип рекорда «WR» парсер ставит и повторённому «=WR» (И-19). Всё, что им не
-                // помечено, в мировые не попадает — и в страны из этого файла тоже.
-                if (!string.Equals(r.Note, "WR", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                world.Add(new ParsedRecordDto(
-                    RegionType: "world",
-                    RegionCode: "",
-                    Category: "open",
-                    AgeKey: "",
-                    Gender: gender,
-                    PoolType: r.PoolType,
-                    Style: r.EventStyleName,
-                    Distance: distance,
-                    Time: r.Time,
-                    HolderName: $"{r.FirstName} {r.LastName}".Trim(),
-                    Club: null,
-                    HolderCountry: r.Country,
-                    RecordDate: r.Date));
+                await using var body = await WorldAquaticsDownload.DownloadAsync(
+                    client, WorldAquaticsSource.RecordsJsonUrl($"{query}&gender={gender}&pool={pool}"),
+                    $"{what} {gender} {pool}", _retryDelay, ct, _delay);
+                rows.AddRange(WorldAquaticsRecordsJson.Parse(body, axes).Records);
             }
 
-            return world;
-        }
-        finally
-        {
-            if (scm != null) await scm.DisposeAsync();
-            if (lcm != null) await lcm.DisposeAsync();
-        }
+        return rows;
     }
 
     /// <summary>
-    /// Строки отчёта → рекорды страны. Категория всегда <c>open</c>: age и masters остаются
-    /// исключительно израильскими (решение Влада 29.07.2026) — у других стран их у источника
-    /// просто нет.
+    /// Строки выдачи страны → рекорды и непринятые. Категория всегда <c>open</c>: age и masters
+    /// остаются исключительно израильскими (решение Влада 29.07.2026). Федерация строки —
+    /// <c>nationalityCode</c> (в отчёте это был NF Code); чужая или пустая — в отчёт прогона.
     /// </summary>
-    private static RecordCountryFetchResult MapRows(string requestedCode, IEnumerable<Result> rows)
+    private static RecordCountryFetchResult Split(string requestedCode, IReadOnlyList<ParsedRecordDto> rows)
     {
         var records = new List<ParsedRecordDto>();
         var mismatches = new List<RecordCountryMismatchDto>();
 
         foreach (var r in rows)
         {
-            // Смешанные эстафеты идут с полом mixed (Э3); прочее вне осей Record — мимо.
-            var distance = r.EventStyleLen.EndsWith('m') ? r.EventStyleLen : r.EventStyleLen + "m";
-            if (WorldAquaticsSource.RecordGender(r.EventStyleGender, distance) is not { } gender)
-                continue;
-
-            // r.Country — это NF Code строки (а если он пуст, парсер подставил туда страну
-            // места соревнования). Тип рекорда (r.Note) здесь не спрашиваем сознательно: у
-            // строки «NR, WR» он схлопывается в WR, и национальный рекорд страны потерялся бы.
-            var reported = (r.Country ?? "").Trim();
-
+            var reported = (r.HolderCountry ?? "").Trim();
             if (!string.Equals(reported, requestedCode, StringComparison.OrdinalIgnoreCase))
             {
                 mismatches.Add(new RecordCountryMismatchDto(
                     RequestedCode: requestedCode,
                     ReportedCountry: reported,
                     PoolType: r.PoolType,
-                    Style: r.EventStyleName,
-                    Distance: distance,
-                    Gender: gender,
+                    Style: r.Style,
+                    Distance: r.Distance,
+                    Gender: r.Gender,
                     Time: r.Time));
                 continue;
             }
 
-            records.Add(new ParsedRecordDto(
-                RegionType: "country",
-                RegionCode: requestedCode,
-                Category: "open",
-                AgeKey: "",
-                Gender: gender,
-                PoolType: r.PoolType,
-                Style: r.EventStyleName,
-                Distance: distance,
-                Time: r.Time,
-                HolderName: $"{r.FirstName} {r.LastName}".Trim(),
-                Club: null,
-                HolderCountry: requestedCode,
-                RecordDate: r.Date));
+            records.Add(r with { HolderCountry = requestedCode });
         }
 
         return new RecordCountryFetchResult(requestedCode, records, mismatches);
     }
-
-    /// <summary>
-    /// Скачивание одного отчёта с повторами — общий <see cref="WorldAquaticsDownload"/>
-    /// (тот же, что у <see cref="WorldRecordsSourceProvider"/>): сеть, таймаут, 5xx и 429
-    /// повторяются, 4xx — нет.
-    /// </summary>
-    private Task<MemoryStream> DownloadAsync(
-        HttpClient client, Uri url, string code, string what, CancellationToken ct) =>
-        WorldAquaticsDownload.DownloadAsync(client, url, $"{what} для {code}", _retryDelay, ct);
 }

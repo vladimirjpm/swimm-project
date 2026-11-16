@@ -20,11 +20,23 @@ public static class WorldAquaticsDownload
     /// <summary>Попыток на файл: первая + два повтора.</summary>
     public const int MaxAttempts = 3;
 
+    /// <summary>
+    /// Дольше этого по <c>Retry-After</c> не ждём: источник просит 300 с (замер 16.11.2026), и
+    /// запас сверху — на случай, если он поднимет. Просьба дольше — ждём столько и пробуем.
+    /// </summary>
+    public static readonly TimeSpan MaxRetryAfter = TimeSpan.FromMinutes(6);
+
+    /// <summary>Ожидание между попытками — подменяется в тестах, чтобы не спать пять минут.</summary>
+    public delegate Task Delay(TimeSpan wait, CancellationToken ct);
+
     /// <param name="what">Что качаем — для текста ошибки: «WR SCM», «NR LCM для AGU».</param>
     /// <param name="retryDelay">Пауза между попытками; в тестах — ноль.</param>
+    /// <param name="delay">Чем ждать; null — <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
     public static async Task<MemoryStream> DownloadAsync(
-        HttpClient client, Uri url, string what, TimeSpan retryDelay, CancellationToken ct)
+        HttpClient client, Uri url, string what, TimeSpan retryDelay, CancellationToken ct, Delay? delay = null)
     {
+        delay ??= Task.Delay;
+
         for (var attempt = 1; ; attempt++)
         {
             var last = attempt >= MaxAttempts;
@@ -34,11 +46,15 @@ public static class WorldAquaticsDownload
 
                 if (IsTransient(response.StatusCode))
                 {
+                    var wait = WaitBeforeRetry(response, retryDelay);
                     if (last)
                         throw new InvalidOperationException(
-                            $"{what}: источник отвечает {(int)response.StatusCode} после {MaxAttempts} попыток.");
+                            $"{what}: источник отвечает {(int)response.StatusCode} после {MaxAttempts} попыток"
+                            + (response.StatusCode == HttpStatusCode.TooManyRequests
+                                ? $" (лимит частоты, ждали по Retry-After до {wait.TotalSeconds:0} с)."
+                                : "."));
 
-                    await Task.Delay(retryDelay, ct);
+                    await delay(wait, ct);
                     continue;
                 }
 
@@ -53,7 +69,7 @@ public static class WorldAquaticsDownload
             }
             catch (Exception ex) when (!last && IsRetriable(ex, ct))
             {
-                await Task.Delay(retryDelay, ct);
+                await delay(retryDelay, ct);
             }
             catch (Exception ex) when (last && IsRetriable(ex, ct))
             {
@@ -73,6 +89,24 @@ public static class WorldAquaticsDownload
     {
         var sep = string.IsNullOrEmpty(url.Query) ? "?" : "&";
         return new Uri($"{url.AbsoluteUri}{sep}_retry={attempt}-{DateTime.UtcNow.Ticks}");
+    }
+
+    /// <summary>
+    /// Сколько ждать перед повтором. 429 с <c>Retry-After</c> — столько, сколько просит источник
+    /// (не больше <see cref="MaxRetryAfter"/>): повтор через 2 с, пока лимит действует, уходит
+    /// впустую и сам добавляет запросов. 16.11.2026 так за вечер дважды пропала половина стран
+    /// прогона — каждая падала за секунды, не дождавшись конца пятиминутного окна (И-67).
+    /// </summary>
+    public static TimeSpan WaitBeforeRetry(HttpResponseMessage response, TimeSpan retryDelay)
+    {
+        if (response.StatusCode != HttpStatusCode.TooManyRequests) return retryDelay;
+
+        var header = response.Headers.RetryAfter;
+        var asked = header?.Delta
+                    ?? (header?.Date is { } date ? date - DateTimeOffset.UtcNow : (TimeSpan?)null);
+        if (asked is not { } wait || wait <= retryDelay) return retryDelay;
+
+        return wait > MaxRetryAfter ? MaxRetryAfter : wait;
     }
 
     private static bool IsTransient(HttpStatusCode status) =>

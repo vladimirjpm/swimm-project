@@ -41,6 +41,20 @@ public static class WorldAquaticsRecordsJson
 {
     public sealed record Result(IReadOnlyList<ParsedRecordDto> Records, int SkippedRelays);
 
+    /// <summary>
+    /// Оси открытых рекордов (<c>world/open</c>, <c>country/…/open</c>) — общие у
+    /// <c>worldrecords</c> и прогона по странам. Держатель — <c>fullName</c> («DOUGLASS Kate»),
+    /// та же строка, что колонка Athlete XLSX-отчёта, и разбирается тем же кодом: имя выходит
+    /// посимвольно тем же, что лежит в базе.
+    /// </summary>
+    public static WaJsonAxes OpenAxes(string regionType, string? regionCode, string label) => new(
+        RegionType: regionType,
+        RegionCode: regionCode,
+        Category: "open",
+        AgeKey: _ => "",
+        IndividualHolder: row => Parsers.WorldRecords.WorldRecordsParser.FormatAthleteName(Str(row, "fullName")),
+        Label: label);
+
     /// <summary>Индивидуальные стили; «Medley» без «Relay» — всегда комплекс.</summary>
     private static readonly Dictionary<string, string> Styles = new(StringComparer.OrdinalIgnoreCase)
     {
