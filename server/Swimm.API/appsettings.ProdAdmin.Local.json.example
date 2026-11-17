@@ -20,5 +20,10 @@
     "ApiKey": "... (ключ serper.dev для прода: поиск кандидатов loglig — только в админке, на App Service не нужен)"
   },
   "_commentTelemetry": "Строка подключения Application Insights (az monitor app-insights component show -g swimm-rg --app swimhub-ai --query connectionString -o tsv). Задана — ProdAdmin шлёт телеметрию с ролью swimhub-prodadmin; пусто или ключа нет — не шлёт ничего. docs/plans/application-insights-plan.md А3.5.",
-  "APPLICATIONINSIGHTS_CONNECTION_STRING": ""
+  "APPLICATIONINSIGHTS_CONNECTION_STRING": "",
+  "_commentAppInsights": "Чтение телеметрии для /Admin/AppInsights и блока дашборда (docs/plans/application-insights-plan.md Б1) — под входом az, без секретов. WorkspaceId — customerId рабочей области: az monitor log-analytics workspace show -g swimm-rg -n swimhub-logs --query customerId -o tsv. ResourceId — id ресурса для ссылок в портал: az resource show -g swimm-rg -n swimhub-ai --resource-type microsoft.insights/components --query id -o tsv. Значения сюда, в git не попадут; пусто — карточка «не настроено».",
+  "AppInsights": {
+    "WorkspaceId": "",
+    "ResourceId": ""
+  }
 }

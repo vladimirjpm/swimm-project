@@ -5,5 +5,10 @@
     "MigrationConnection": "Host=PROD_HOST;Port=5432;Database=swimm;Username=swimm;Password=...",
     "AdminConnection":     "Host=PROD_HOST;Port=5432;Database=swimm;Username=swimm_rw;Password=...",
     "ReadConnection":      "Host=PROD_HOST;Port=5432;Database=swimm;Username=swimm_ro;Password=..."
+  },
+  "_commentAppInsights": "Чтение телеметрии для /Admin/AppInsights и блока дашборда (docs/plans/application-insights-plan.md Б1) — под входом az, без секретов. WorkspaceId — customerId рабочей области: az monitor log-analytics workspace show -g swimm-rg -n swimhub-logs --query customerId -o tsv. ResourceId — id ресурса для ссылок в портал: az resource show -g swimm-rg -n swimhub-ai --resource-type microsoft.insights/components --query id -o tsv. Значения сюда, в git не попадут; пусто — карточка «не настроено».",
+  "AppInsights": {
+    "WorkspaceId": "",
+    "ResourceId": ""
   }
 }

@@ -18,14 +18,14 @@ UptimeRobot), 1, 4, 5 — тоже 17.11: ProdAdmin да, почта — Gmail �
 **Что дальше, по порядку:**
 1. **А3.4** — память «после» 18.11 (команда в «Ход А3»), записать цифры.
 2. ✅ **А4** — оповещения созданы 17.11 (см. «Сделано 17.11» в А4).
-3. **Б1** — новым чатом, сам (не субагентом). До кода прочитать: «Сделано 17.11» (живая проверка —
+3. ✅ **Б1** — сделан 17.11 (см. «Сделано 17.11» в Б1). Было: новым чатом, сам (не субагентом). До кода прочитать: «Сделано 17.11» (живая проверка —
    там имена таблиц и полей, `Success=false` у 404, ошибки — по `ResultCode` 5xx), §4.1, Б1.
    Пакет чтения — `Azure.Monitor.Query.Logs` 1.0.0 + `Azure.Identity` (`AzureCliCredential`).
    KQL сверять запросами на живых данных: без расширения `az` — REST `https://api.loganalytics.io/v1/workspaces/<customerId>/query`
    с токеном `az account get-access-token --resource https://api.loganalytics.io` (customerId —
    `az monitor log-analytics workspace show -g swimm-rg -n swimhub-logs --query customerId -o tsv`;
    в репо и в чат не писать). Есть реальный трафик прода с 17.11 11:45 UTC.
-4. Б2 + Б3 — Sonnet через `/delegate` по таск-документу, который пишешь после Б1.
+4. Б2 + Б3 — Sonnet через `/delegate` по таск-документу [appinsights-page-sonnet.md](../tasks/appinsights-page-sonnet.md) (готов 17.11, не запущен).
 
 ### Сделано 17.11 — А1 (Opus 5.5, «да» Влада в чате)
 
@@ -344,6 +344,48 @@ ProdAdmin, лишь бы был `az login` и ключи в `appsettings.*.Local
 - KQL сверять на живых данных после А3: имена таблиц (`AppRequests`, `AppExceptions`,
   `AppDependencies`, `AppTraces`, `Usage`; `AppAvailabilityResults` пустая — теста доступности в Azure нет, §8.3) проверить запросом, не по памяти.
 
+**Сделано 17.11 (Opus 5.5, ветка `claude/app-insights-b1-5ff754`, не запушено).** Контракт API для
+Б2/Б3 — в [docs/tasks/appinsights-page-sonnet.md](../tasks/appinsights-page-sonnet.md).
+- **Файлы:** `Application/Abstractions/IAppInsightsReader.cs`; `Application/Dtos/AppInsightsDtos.cs`;
+  `Application/Mapping/AppInsightsOverviewBuilder.cs` (+ `AppInsightsThresholds`, `AppInsightsConnections`);
+  `Infrastructure/Services/AppInsights/` — `AppInsightsReader` (кэш, таймаут, состояния),
+  `AppInsightsQueries` (весь KQL), `AzureLogsQueryRunner` (SDK), `AppInsightsRowMapper`,
+  `AppInsightsErrorClassifier`, `AppInsightsPortalLinks`, `AppInsightsOptions`, регистрация;
+  `API/Controllers/AppInsightsAdminController.cs`; `API/Telemetry/AppInsightsReaderRegistration.cs`
+  (в `Program.cs` — одна строка в блоке `adminEnabled`); две строки в `ApiCatalog` (/Admin/Api).
+- **Пакеты** (в Infrastructure): `Azure.Monitor.Query.Logs` 1.0.0, `Azure.Identity` 1.21.0. Тянут
+  `Azure.Core` ≥ 1.53 → `Microsoft.Extensions.Hosting.Abstractions` поднят 10.0.0 → 10.0.3 (иначе NU1605).
+  Итоговый `Azure.Core` в API — 1.60 (от OpenTelemetry), как и был.
+- **Запросы — одним пакетом** (`QueryBatch`, один HTTP): страница — 5 запросов, блок — 1. Ответ
+  живьём 1,3–1,5 с (первый после старта — до 4 с: `az account get-access-token`). Токен кэширует клиент.
+- **Пороги** (`AppInsightsThresholds`, согласованы с А4): 5xx > 0 — жёлтое, доля > 5 % — красное;
+  тишина сайта > 15 мин — жёлтое, > 30 мин или нет за 7 дней — красное (у ProdAdmin тишина — норма,
+  серое); приём ≥ 80 % лимита — жёлтое (как письмо «Объём», 120 МБ), ≥ 100 % — красное; исключения,
+  сбои вне запроса, ошибки ProdAdmin — жёлтое; медленная операция — p95 > 1000 мс (на тон не влияет,
+  `info`); плитки «Ответ p95» > 1000 мс и «Postgres» p95 > 500 мс или сбой — жёлтые. Лимит 0,15 ГБ =
+  150 МБ (десятичные ГБ, как в Usage), сброс 10:00 UTC — `AppInsights:DailyCapGb`/`CapResetHourUtc`, умолчания в коде.
+- **Находки живой проверки (для Б2):** страницы SPA приходят в `Name` с адресом (`GET /swimmers/8318`),
+  маршруты API — шаблоном → в KQL числа пути сводятся к `{id}`. Метрики `AppMetrics` сайт шлёт ~20 в
+  минуту и без трафика, Postgres — пинг раз в минуту: «последняя телеметрия» — честный пульс.
+  ⚠ Log Analytics **сам кэширует** результат одинакового текста запроса на минуту-другую: итоги
+  сайта за 24 ч у `summary` и у `overview?range=24h` — один текст, поэтому `refresh=true` в эту
+  минуту может вернуть те же цифры. Это не баг. ⚠ `appsettings.Local.json` подключается в
+  `Program.cs` последним — переменная окружения `AppInsights__*` его НЕ перебивает.
+- **Сбой чужого/неверного WorkspaceId** в пакете приходит не HTTP-статусом, а `ErrorCode=InvalidTokenError`
+  (статус 0) — классифицируется как «нет доступа»; сырое тело ответа (там id каталогов) на страницу не идёт.
+- **Проверено вживую** (API Release на :5092, Development, ключи в gitignored `appsettings.Local.json`
+  worktree): `summary` и `overview` для 1h/24h/7d × web/prodadmin — реальные цифры прода (≈300 запросов,
+  5xx нет, 12 медленных операций, одна 404 `lane-plans/{date}`); `range=30d`, `role=dev` → 400;
+  «не настроено» (без файла ключей) — карточка с командами `az`, в Azure не ходит; «нет входа» —
+  `AZURE_CONFIG_DIR` на пустой каталог → «Please run 'az login'», подсказка `az login`; «не удалось
+  прочитать» — чужой WorkspaceId → «Нет доступа к рабочей области (InvalidTokenError)».
+- **Тесты:** `AppInsightsOverviewBuilderTests` (тоны, плитки, сводка, формат), `AppInsightsReaderTests`
+  (три состояния + сбои Azure, таймаут 15 с, отмена клиентом, кэш по периоду/роли, сбой не кэшируется,
+  разбор строк, ссылки), `AppInsightsQueriesTests` (белые списки роли/периода, правила данных в KQL,
+  контроллер → 400). 99 тестов.
+- **Не сделано (Б1 не требует):** ключи в `appsettings.Local.json` / `appsettings.ProdAdmin.Local.json`
+  основной копии Влада не вписаны — команды в `.example`, страница сама подскажет.
+
 ### Б2. Страница `/Admin/AppInsights`
 
 Исполнитель: **Sonnet** через `/delegate` (таск-документ `docs/tasks/appinsights-page-sonnet.md`
@@ -448,7 +490,7 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 | А2 код | ✅ 17.11 PR #197 (`d7a33136`), на проде |
 | А3 деплой | ◐ 17.11 на проде, телеметрия идёт, вычистка проверена; осталось: память «после» (18.11), ProdAdmin (§8.1) |
 | А4 оповещения | ✅ 17.11 `swimhub-alerts` + 3 правила (≈ $1,1/мес); ждёт: Влад видит письмо группы |
-| Б1 чтение | не начато |
+| Б1 чтение | ✅ 17.11 код + тесты, эндпоинты проверены вживую на данных прода (ветка `claude/app-insights-b1-5ff754`, не запушено); таск Б2+Б3 — `docs/tasks/appinsights-page-sonnet.md` |
 | Б2 страница | не начато |
 | Б3 блок | не начато |
 | Б4 документация | не начато |
