@@ -83,7 +83,7 @@ public class TrainingRsvpService : ITrainingRsvpService
         var now = Now(nowLocal);
         if (schedule == null) return null;
         var occurrence = await FindOccurrenceAsync(hubGroupId, schedule, date, start);
-        if (!TrainingRsvpRules.IsViewable(occurrence, now)) return null;
+        if (!TrainingRsvpRules.IsViewable(occurrence, now, isManager)) return null;
 
         return await BuildAsync(hubGroupId, schedule, occurrence!, viewerUserId, isManager, now);
     }
@@ -100,20 +100,59 @@ public class TrainingRsvpService : ITrainingRsvpService
         var cancellations = await CancellationsAsync(hubGroupId, today, last);
 
         return TrainingOccurrences.Upcoming(schedule, oneOffs, cancellations, now, TrainingRsvpRules.NextCount)
-            .Select(o => new NextTrainingDto
+            .Select(o => ToDto(o, schedule))
+            .ToList();
+    }
+
+    private static NextTrainingDto ToDto(TrainingOccurrences.Occurrence o, GroupTrainingSchedule schedule) => new()
+    {
+        Id = TrainingRsvpRules.SessionKey(o.Date, o.Start),
+        Date = o.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        Start = o.Start,
+        End = o.End,
+        Place = schedule.Place,
+        PoolType = o.PoolType ?? schedule.PoolType,
+        Title = o.Title,
+        Type = o.Type,
+        TrainingId = o.TrainingId,
+        OneOff = o.OneOff,
+        Cancelled = o.Cancelled,
+        CancelReason = o.CancelReason,
+    };
+
+    public async Task<List<PastTrainingDto>?> GetPastAsync(int hubGroupId, DateTime? nowLocal = null)
+    {
+        var schedule = await ScheduleAsync(hubGroupId);
+        if (schedule == null) return null;
+
+        var now = Now(nowLocal);
+        var today = DateOnly.FromDateTime(now);
+        var first = today.AddDays(-TrainingRsvpRules.PastDaysBack);
+        var oneOffs = await OneOffsAsync(hubGroupId, first, today);
+        var cancellations = await CancellationsAsync(hubGroupId, first, today);
+
+        // Ответы — счётчики по занятию сразу (ключ занятия — дата + начало).
+        var answers = await _db.HubGroupTrainingRsvps.AsNoTracking()
+            .Where(r => r.HubGroupId == hubGroupId && r.SessionDate >= first && r.SessionDate <= today)
+            .GroupBy(r => new { r.SessionDate, r.SessionStart, r.Answer })
+            .Select(g => new { g.Key.SessionDate, g.Key.SessionStart, g.Key.Answer, Count = g.Count() })
+            .ToListAsync();
+        var planDates = await _db.LanePlans.AsNoTracking()
+            .Where(p => p.HubGroupId == hubGroupId && p.Date >= first && p.Date <= today)
+            .Select(p => p.Date)
+            .ToListAsync();
+
+        int Count(DateOnly date, string start, string answer) =>
+            answers.Where(a => a.SessionDate == date && a.SessionStart == start && a.Answer == answer).Sum(a => a.Count);
+
+        return TrainingOccurrences.Past(schedule, oneOffs, cancellations,
+                answers.Select(a => (a.SessionDate, a.SessionStart)), planDates, now)
+            .Select(o => new PastTrainingDto
             {
-                Id = TrainingRsvpRules.SessionKey(o.Date, o.Start),
-                Date = o.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                Start = o.Start,
-                End = o.End,
-                Place = schedule.Place,
-                PoolType = o.PoolType ?? schedule.PoolType,
-                Title = o.Title,
-                Type = o.Type,
-                TrainingId = o.TrainingId,
-                OneOff = o.OneOff,
-                Cancelled = o.Cancelled,
-                CancelReason = o.CancelReason,
+                Session = ToDto(o, schedule),
+                Yes = Count(o.Date, o.Start, "yes"),
+                Maybe = Count(o.Date, o.Start, "maybe"),
+                No = Count(o.Date, o.Start, "no"),
             })
             .ToList();
     }

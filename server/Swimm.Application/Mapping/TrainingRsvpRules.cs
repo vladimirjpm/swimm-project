@@ -22,6 +22,12 @@ public static class TrainingRsvpRules
     /// </summary>
     public const int ManagerDaysBack = 7;
 
+    /// <summary>
+    /// Сколько дней назад управляющий видит прошедшие занятия — список «Past» и ответы на них
+    /// (CF9, docs/plans/trainings-coach-flow-plan.md). Только смотреть: править — <see cref="ManagerDaysBack"/>.
+    /// </summary>
+    public const int PastDaysBack = 90;
+
     /// <summary>Потолок причины отмены занятия (Р9) — символов.</summary>
     public const int CancelReasonMax = 200;
 
@@ -57,12 +63,15 @@ public static class TrainingRsvpRules
     /// <see cref="TrainingOccurrences.Find"/>) и лежит в окне
     /// [сегодня − <see cref="ManagerDaysBack"/>; сегодня + <see cref="DaysAhead"/>]. Отменённое
     /// смотреть можно: ответы при отмене не удаляются, а тренеру нужно видеть, что отменил.
+    /// Управляющий видит прошедшие глубже — на <see cref="PastDaysBack"/> дней (CF9, список «Past»);
+    /// отмена и возврат занятия зовут без флага и остаются в окне правки.
     /// </summary>
-    public static bool IsViewable(TrainingOccurrences.Occurrence? occurrence, DateTime nowLocal)
+    public static bool IsViewable(TrainingOccurrences.Occurrence? occurrence, DateTime nowLocal, bool isManager = false)
     {
         if (occurrence == null) return false;
         var today = DateOnly.FromDateTime(nowLocal);
-        return occurrence.Date >= today.AddDays(-ManagerDaysBack) && occurrence.Date <= today.AddDays(DaysAhead);
+        var back = isManager ? PastDaysBack : ManagerDaysBack;
+        return occurrence.Date >= today.AddDays(-back) && occurrence.Date <= today.AddDays(DaysAhead);
     }
 
     /// <summary>

@@ -48,6 +48,41 @@ public static class TrainingOccurrences
     }
 
     /// <summary>
+    /// Прошедшие занятия, по которым есть данные (docs/plans/trainings-coach-flow-plan.md, CF9):
+    /// ключи с ответами (<paramref name="answerKeys"/>) и даты планов дорожек
+    /// (<paramref name="planDates"/> — план живёт на дату, поэтому дата даёт все занятия этого дня:
+    /// слоты расписания и разовые). Ключ, которому занятие уже не находится (слот убрали из
+    /// расписания), выпадает — открыть его всё равно нельзя. Прошедшее — началось не позже «сейчас»
+    /// (зеркало «начавшееся — не ближайшее» у <see cref="Upcoming"/>). Сначала новые.
+    /// </summary>
+    public static List<Occurrence> Past(GroupTrainingSchedule schedule, IReadOnlyCollection<OneOff> oneOffs,
+        IReadOnlyCollection<Cancellation> cancellations, IEnumerable<(DateOnly Date, string Start)> answerKeys,
+        IEnumerable<DateOnly> planDates, DateTime nowLocal)
+    {
+        var keys = answerKeys.ToHashSet();
+        foreach (var date in planDates.Distinct())
+        {
+            var isoDay = date.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)date.DayOfWeek;
+            foreach (var slot in schedule.Slots.Where(s => s.IsValid && s.Day == isoDay)) keys.Add((date, slot.Start));
+            foreach (var o in oneOffs.Where(o => o.Date == date)) keys.Add((date, o.Start));
+        }
+
+        var result = new List<Occurrence>();
+        foreach (var (date, start) in keys)
+        {
+            if (!TimeOnly.TryParseExact(start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+                continue;
+            if (date.ToDateTime(time) > nowLocal) continue;
+            var occurrence = Find(schedule, oneOffs, cancellations, date, start);
+            if (occurrence != null) result.Add(occurrence);
+        }
+        return result
+            .OrderByDescending(o => o.Date)
+            .ThenByDescending(o => o.Start, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>
     /// <paramref name="count"/> ближайших НЕ отменённых занятий и отменённые между ними, по дате и
     /// началу. Начавшееся уже не ближайшее — как у <see cref="GroupTrainingSchedule.NextOccurrences"/>
     /// (то же правило для разовых). Дальше окна <see cref="TrainingRsvpRules.DaysAhead"/> занятия не

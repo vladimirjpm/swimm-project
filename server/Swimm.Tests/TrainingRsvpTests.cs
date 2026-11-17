@@ -93,6 +93,22 @@ public class TrainingRsvpTests
     }
 
     [Fact]
+    public void Viewable_Manager_SeesPastDaysBack_MemberStillWeek()
+    {
+        var today = DateOnly.FromDateTime(MondayNoon);
+        var schedule = Daily();
+        var old = Occ(schedule, today.AddDays(-TrainingRsvpRules.PastDaysBack), "20:00");
+        var tooOld = Occ(schedule, today.AddDays(-TrainingRsvpRules.PastDaysBack - 1), "20:00");
+
+        Assert.True(TrainingRsvpRules.IsViewable(old, MondayNoon, isManager: true));
+        Assert.False(TrainingRsvpRules.IsViewable(tooOld, MondayNoon, isManager: true));
+        Assert.False(TrainingRsvpRules.IsViewable(old, MondayNoon));          // участнику — по-прежнему неделя
+        // Смотреть глубже — не значит править: окно правки управляющего прежнее.
+        Assert.Equal("This training is too old to change.",
+            TrainingRsvpRules.EditBlockReason(old, MondayNoon, isManager: true));
+    }
+
+    [Fact]
     public void Edit_MemberUntilStart_ManagerAWeekAfter()
     {
         var schedule = Daily();
@@ -640,6 +656,43 @@ public class TrainingRsvpTests
     }
 
     private static DateTime IsraelTimeNow() => Swimm.Application.Constants.IsraelTime.ToLocal(DateTime.UtcNow);
+
+    [Fact]
+    public async Task Past_SessionsWithAnswersOrPlan_NewestFirst_CountsPerAnswer()
+    {
+        await using var db = CreateDb(nameof(Past_SessionsWithAnswersOrPlan_NewestFirst_CountsPerAnswer));
+        var s = await SeedAsync(db);
+        var service = new TrainingRsvpService(db);
+
+        // Вт 29.09: двое идут, один нет. Сб 03.10: ответов нет, но есть план дорожек. Вт 06.10 — ещё впереди.
+        await service.SetAsync(s.GroupId, TueKey, s.Anna, false, Answer("yes"), MondayNoon);
+        await service.SetAsync(s.GroupId, TueKey, s.Boris, false, Answer("yes"), MondayNoon);
+        await service.SetAsync(s.GroupId, TueKey, s.Vera, false, Answer("no"), MondayNoon);
+        db.LanePlans.Add(new LanePlan { HubGroupId = s.GroupId, Date = new DateOnly(2026, 10, 3), LaneCount = 4 });
+        await db.SaveChangesAsync();
+        var sundayNoon = new DateTime(2026, 10, 4, 12, 0, 0);
+        await service.SetAsync(s.GroupId, "2026-10-06-2000", s.Anna, false, Answer("yes"), sundayNoon);
+
+        var past = await service.GetPastAsync(s.GroupId, sundayNoon);
+
+        Assert.NotNull(past);
+        Assert.Equal(["2026-10-03-1000", TueKey], past!.Select(p => p.Session.Id));
+        Assert.Equal((0, 0, 0), (past[0].Yes, past[0].Maybe, past[0].No));
+        Assert.Equal((2, 0, 1), (past[1].Yes, past[1].Maybe, past[1].No));
+        Assert.Equal("21:00", past[1].Session.End);
+
+        // Тренер открывает прошедшее и через неделю с лишним; участнику окно прежнее.
+        var later = sundayNoon.AddDays(TrainingRsvpRules.ManagerDaysBack + 3);
+        Assert.NotNull(await service.GetAsync(s.GroupId, TueKey, s.Coach, true, later));
+        Assert.Null(await service.GetAsync(s.GroupId, TueKey, s.Anna, false, later));
+    }
+
+    [Fact]
+    public async Task Past_UnknownGroup_Null()
+    {
+        await using var db = CreateDb(nameof(Past_UnknownGroup_Null));
+        Assert.Null(await new TrainingRsvpService(db).GetPastAsync(12345, MondayNoon));
+    }
 
     private sealed class NullSettings : ISettingsService
     {

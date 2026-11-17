@@ -73,6 +73,23 @@ public class HubGroupTrainingRsvpController : ControllerBase
         return list == null ? NotFound(new { error = "Group not found." }) : Ok(list);
     }
 
+    /// <summary>
+    /// Прошедшие занятия с ответами или планом дорожек (CF9) — список «Past» тренера: только
+    /// управляющему, участнику 403. Открыть занятие — те же ответы <c>GET rsvp/{session}</c>,
+    /// управляющему они видны на <c>TrainingRsvpRules.PastDaysBack</c> дней назад.
+    /// </summary>
+    [HttpGet("/api/hub-groups/{id:int}/past-trainings")]
+    public async Task<IActionResult> PastTrainings(int id)
+    {
+        var (_, isManager, denied) = await ViewerAsync(id);
+        if (denied != null) return denied;
+        if (!isManager) return Forbid();
+
+        var list = await _rsvp.GetPastAsync(id);
+        Response.Headers.CacheControl = "private, no-store";
+        return list == null ? NotFound(new { error = "Group not found." }) : Ok(list);
+    }
+
     /// <summary>Ответы на занятие. 404 — такого занятия нет (не в расписании, не разовое или вне окна).</summary>
     [HttpGet("{session}")]
     public async Task<IActionResult> Get(int id, string session)

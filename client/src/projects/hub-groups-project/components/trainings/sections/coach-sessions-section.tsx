@@ -4,6 +4,7 @@ import { needsCount, needsLabel } from '../coach/needs-format';
 import PlanPill, { type PlanPillState } from '../coach/plan-pill';
 import { nextSessions, timeRangeLabel, untilLabel } from '../next/next-format';
 import { CancelledPill, SessionTag } from '../next/session-tag';
+import PastSessions from '../past/past-sessions';
 import { formatSheetDate } from '../sheets/link-helpers';
 import { useTrainingsTab } from '../trainings-context';
 import TrainingsEmpty, { TrainingsEmptyActions, TrainingsEmptyButton } from '../trainings-empty';
@@ -12,7 +13,8 @@ import { kmRange, levelMeters } from '../workout/workout-totals';
 
 /**
  * Список занятий УПРАВЛЯЮЩЕГО — вход в таб (docs/plans/trainings-coach-flow-plan.md, CF1; макет F1).
- * Ближайшие занятия (`nextSessions(group)`) карточками; лента прошедших — отдельной секцией ниже
+ * Ближайшие занятия (`nextSessions(group)`) карточками, под ними — прошедшие занятия с ответами или
+ * планом (`past/past-sessions.tsx`, CF9); лента записанных тренировок — отдельной секцией ниже
  * (`training-feed`). Open открывает рабочий стол занятия (`openDesk` → `?session=<id>`).
  *
  * На карточке: дата, время и отсчёт, название / тип разового занятия, «Cancelled», строка ответов
@@ -148,6 +150,7 @@ function CoachSessionsSection() {
               <TrainingsEmptyButton onClick={() => openSheet({ kind: 'new-training' })}>+ New training</TrainingsEmptyButton>
             </TrainingsEmptyActions>
           </TrainingsEmpty>
+          <PastSessions />
         </div>
       </TrainingsSection>
     );
@@ -167,6 +170,7 @@ function CoachSessionsSection() {
             <SessionCard key={s.id ?? `${s.date}-${s.start}`} session={s} index={i} first={i === firstIndex} />
           ))}
         </div>
+        <PastSessions />
       </div>
     </TrainingsSection>
   );

@@ -49,9 +49,9 @@ const MAX_DAYS_AHEAD = 366;
 const CAPTION_CLS = 'text-[10px] font-extrabold uppercase tracking-[.07em]';
 
 function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
-  const { group, rollIndex, upcoming, breaks, onRollChange, sendPoolCommand, upcomingPlans, openSheet, deskSession } = useTrainingsTab();
+  const { group, rsvp, selectedRoll, breaks, onRollChange, sendPoolCommand, upcomingPlans, openSheet, deskSession } = useTrainingsTab();
   const levels = useGroupLevels(group.id);
-  const roll = upcoming[rollIndex] ?? null;
+  const roll = selectedRoll;
   const r = roll?.rsvp ?? null;
 
   // Человек — по свежему ответу занятия (после правки строка в нём уже новая), иначе снимок со строки.
@@ -141,7 +141,7 @@ function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
       const err = await breaks.setBreak({ ...subject, status, until: status === 'break' ? (until || null) : undefined });
       if (err) { setError(err); setBusy(false); return; }
       // Ближайшее занятие перечитывает сам `breaks` (через ответы страницы); остальные — здесь.
-      if (rollIndex > 0) roll?.reload();
+      if (roll !== rsvp) roll?.reload();
     }
 
     onClose();

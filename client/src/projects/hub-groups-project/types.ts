@@ -370,6 +370,18 @@ export interface NextTraining {
 }
 
 /**
+ * Прошедшее занятие в списке «Past» тренера (CF9 docs/plans/trainings-coach-flow-plan.md) —
+ * `GET /api/hub-groups/{id}/past-trainings`, только управляющему. Счётчики — сколько ответило;
+ * знаменателя нет: состав группы с тех пор мог поменяться.
+ */
+export interface PastTraining {
+  session: NextTraining;
+  yes: number;
+  maybe: number;
+  no: number;
+}
+
+/**
  * Строка inbox-а модерации (GroupPublicationInboxItemDto, snake_case):
  * GET /api/hub-groups/{id}/media/publications. ⚠ Только модераторам — в ней владелец медиа.
  * Ленты зрителя (GET .../media/published?level=...) отдают {@link PublishedMediaItem}.

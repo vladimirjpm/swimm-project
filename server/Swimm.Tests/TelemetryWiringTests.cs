@@ -55,7 +55,9 @@ public class TelemetryWiringTests
             var attrs = app.Services.GetRequiredService<TracerProvider>().GetResource().Attributes
                 .ToDictionary(a => a.Key, a => a.Value);
 
-            Assert.Equal("azure_app_service", attrs["cloud.platform"]);   // детектор и правда отработал
+            // Детекторы Azure и правда отработали. Платформа — не строго App Service: раннер GitHub сам
+            // виртуалка Azure, и его детектор VM перебивает cloud.platform на «azure_vm» (CI 17.11.2026).
+            Assert.StartsWith("azure_", (string)attrs["cloud.platform"]!);
             Assert.Equal(expected, attrs["service.name"]);
         }
         finally

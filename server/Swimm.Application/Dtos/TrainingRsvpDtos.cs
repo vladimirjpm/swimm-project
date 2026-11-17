@@ -403,3 +403,24 @@ public sealed class TrainingRsvpSaveResult
     public static TrainingRsvpSaveResult Ok(TrainingRsvpDto dto) => new() { Rsvp = dto };
     public static TrainingRsvpSaveResult Fail(int status, string error) => new() { Status = status, Error = error };
 }
+
+/// <summary>
+/// Прошедшее занятие в списке «Past» тренера (CF9, docs/plans/trainings-coach-flow-plan.md) —
+/// <c>GET /api/hub-groups/{id}/past-trainings</c>. Только управляющему, без кэша. Занятие — та же
+/// форма, что у ближайших (его <c>id</c> открывает ответы), плюс сколько ответило: знаменателя нет —
+/// состав группы с тех пор мог поменяться.
+/// </summary>
+public sealed class PastTrainingDto
+{
+    [JsonPropertyName("session")]
+    public NextTrainingDto Session { get; set; } = new();
+
+    [JsonPropertyName("yes")]
+    public int Yes { get; set; }
+
+    [JsonPropertyName("maybe")]
+    public int Maybe { get; set; }
+
+    [JsonPropertyName("no")]
+    public int No { get; set; }
+}

@@ -8,6 +8,7 @@ import ConfirmDialog from '../../../components/confirm-dialog/confirm-dialog';
 import { lanePlansApi } from '../lane-plans-api';
 import { useGroupBreaks } from '../use-group-breaks';
 import { NEXT_ENTRIES_MAX, nextSessions } from './next/next-format';
+import { usePastTrainings, type PastTrainingsState } from './past/use-past-trainings';
 import type { TrainingsSheet } from './trainings-sheets';
 import { goldMark, useTrainingMarks, type TrainingMarks } from './use-training-marks';
 
@@ -114,6 +115,19 @@ export interface TrainingsTabState {
    * `null` — тренер видит список занятий. У участника всегда `null`.
    */
   deskSession: NextTraining | null;
+  /**
+   * На столе ПРОШЕДШЕЕ занятие (CF9): открыто из списка «Past», среди ближайших его нет. Шапка
+   * стола тогда без ‹ › и без Cancel / Restore (`past/past-session-head.tsx`).
+   */
+  deskIsPast: boolean;
+  /**
+   * Ответы выбранного занятия — того, что на столе (ближайшее или прошедшее), без стола —
+   * `upcoming[rollIndex]`. Одно место для переклички, бассейна и шторок: `upcoming[rollIndex]`
+   * прошедшего не знает.
+   */
+  selectedRoll: TrainingRsvpState | null;
+  /** Прошедшие занятия с данными — список «Past» тренера (CF9); участнику `list` всегда `null`. */
+  past: PastTrainingsState;
   /** Открыть рабочий стол занятия (кнопка Open карточки списка). */
   openDesk: (sessionId: string) => void;
   /** «← All trainings»: назад к списку. С несохранёнными правками плана — после «Discard?». */
@@ -252,11 +266,25 @@ export function TrainingsTabProvider({
   const openDesk = useCallback((id: string) => leaveDesk(id), [leaveDesk]);
   const closeDesk = useCallback(() => leaveDesk(null), [leaveDesk]);
   const deskIndex = manages && deskId ? upcomingIds.findIndex((s) => s.id === deskId) : -1;
-  const deskSession = deskIndex >= 0 ? upcomingIds[deskIndex] : null;
-  // Занятия из адреса нет среди ближайших (прошло, удалено, приватный список ещё не пришёл) —
-  // `deskSession` пуст и тренер видит список. Параметр при этом НЕ снимаем: общий ответ страницы
-  // приходит раньше приватного списка с разовыми занятиями, и диплинк на такое занятие стёрся бы
-  // до того, как оно появится (поймано на проверке CF1).
+  // Не среди ближайших — может быть прошедшим из списка «Past» (CF9).
+  const past = usePastTrainings(group.id, manages);
+  const pastDesk = manages && deskId && deskIndex < 0
+    ? past.list?.find((p) => p.session.id === deskId)?.session ?? null
+    : null;
+  const deskSession = deskIndex >= 0 ? upcomingIds[deskIndex] : pastDesk;
+  const deskIsPast = deskIndex < 0 && deskSession != null;
+  // Занятия из адреса нет ни среди ближайших, ни среди прошедших (удалено, приватный список ещё не
+  // пришёл) — `deskSession` пуст и тренер видит список. Параметр при этом НЕ снимаем: общий ответ
+  // страницы приходит раньше приватного списка с разовыми занятиями, и диплинк на такое занятие
+  // стёрся бы до того, как оно появится (поймано на проверке CF1).
+  // Вернулись со стола к списку — счётчики «Past» могли поменяться (поправил ответы задним числом).
+  const { reload: reloadPast } = past;
+  const deskShown = deskSession != null;
+  const wasDeskShown = useRef(deskShown);
+  useEffect(() => {
+    if (wasDeskShown.current && !deskShown) reloadPast();
+    wasDeskShown.current = deskShown;
+  }, [deskShown, reloadPast]);
   // У тренера видов Next / Trainings / Lanes нет: старые `?view=` ведут на список.
   useEffect(() => {
     if (manages && view !== DEFAULT_VIEW) applyView(DEFAULT_VIEW);
@@ -313,7 +341,11 @@ export function TrainingsTabProvider({
 
   // Полные планы ближайших занятий (Т8): метки и число неразложенных. Даты — строкой-ключом,
   // чтобы эффект не перезапускался на каждый новый массив `nextSessions`.
-  const planDatesKey = Array.from(new Set(nextSessions(group).map((s) => s.date))).join(',');
+  // Прошедшее на столе (CF9) — его план тоже нужен шторке человека и меткам бассейна.
+  const planDatesKey = Array.from(new Set([
+    ...nextSessions(group).map((s) => s.date),
+    ...(deskIsPast && deskSession ? [deskSession.date] : []),
+  ])).join(',');
   const [upcomingPlans, setUpcomingPlans] = useState<Record<string, LanePlan | null>>({});
   useEffect(() => {
     if (!planDatesKey) return undefined;
@@ -404,15 +436,18 @@ export function TrainingsTabProvider({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `upcomingIds` пересоздаётся на каждый рендер; ключ — состав id
   }, [rsvp, slot0, slot1, slot2, slot3, slot4, slot5, sharedId, upcomingIds.map((s) => s.id).join(',')]);
+  // Ответы прошедшего на столе (CF9) — свой экземпляр: среди слотов ближайших его нет.
+  const pastRoll = useTrainingRsvp(group.id, deskIsPast ? deskSession?.id : undefined, manages);
+  const selectedRoll = deskIsPast ? pastRoll : upcoming[rollIndex] ?? null;
 
   const value = useMemo<TrainingsTabState>(() => ({
     group, manages, lanePreview, previewLane, setPreviewLane, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
-    deskSession, openDesk, closeDesk,
+    deskSession, deskIsPast, selectedRoll, past, openDesk, closeDesk,
     rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown,
     onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
     group, manages, lanePreview, previewLane, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, setRollIndex,
-    deskSession, openDesk, closeDesk, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions,
+    deskSession, deskIsPast, selectedRoll, past, openDesk, closeDesk, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions,
     breaks, marks, closeSheet, sheet,
   ]);
 
