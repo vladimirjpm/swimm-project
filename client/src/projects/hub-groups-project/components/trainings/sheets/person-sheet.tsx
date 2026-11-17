@@ -73,7 +73,7 @@ function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
   const startSub = person.sub_level ?? null;
   const [levelId, setLevelId] = useState<number | null>(startLevel);
   const [subLevel, setSubLevel] = useState<number | null>(startSub);
-  const plan = r ? upcomingPlans[r.date] ?? null : null;
+  const plan = r ? upcomingPlans[r.session_id] ?? null : null;
   const place = placeInPlan(plan, linked);
   const [pinned, setPinned] = useState(!!place?.pinned);
   const [busy, setBusy] = useState(false);
@@ -126,7 +126,7 @@ function PersonSheet({ sheet, onClose }: TrainingsSheetProps<'person'>) {
       if (err) { setError(err); setBusy(false); return; }
       // Идущий с новым уровнем — на дорожку уровня по правилу ответа (CF4). Плана нет — 404, не ошибка.
       if (linked != null && levelId != null && answer === 'yes' && r && plan) {
-        const placed = await plansApi.place(group.id, r.date, linked);
+        const placed = await plansApi.place(group.id, r.session_id, linked);
         if (placed.ok && placed.data?.lane_change) sendPoolCommand({ kind: 'lane-change', change: placed.data.lane_change });
       }
       roll?.reload();

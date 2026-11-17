@@ -3,7 +3,7 @@ import {
   DeepSheet, SheetButton, SheetField, SheetFooter, SHEET_FIELD_CLS, SHEET_MONO_FIELD_CLS,
 } from '../../../../components/deep/deep-sheet';
 import type { HubGroupLevel } from '../../../types';
-import { shortDay } from '../../lane-plans-api';
+import { shortPlanKey } from '../../lane-plan-key';
 import type { TrainingsSheetProps } from '../trainings-sheets';
 
 /**
@@ -202,7 +202,7 @@ function PoolSetupSheet({ sheet, onClose }: TrainingsSheetProps<'pool-setup'>) {
         <div className="flex flex-col gap-2.5 border-t pt-3.5" style={{ borderColor: 'var(--deep-card-border)' }}>
           {setup.copyFrom && (
             <SheetButton kind="cancel" onClick={() => leaveTo(setup.onCopy)}>
-              Copy from {shortDay(setup.copyFrom)}
+              Copy from {shortPlanKey(setup.copyFrom)}
             </SheetButton>
           )}
           {setup.canDelete && (

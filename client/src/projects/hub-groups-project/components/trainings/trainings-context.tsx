@@ -98,12 +98,12 @@ export interface TrainingsTabState {
    */
   setView: (view: TrainingsView) => void;
   /**
-   * Открыть Lanes на дату занятия («✎ Edit lanes» / «Lanes ›» у бассейна): редактор и доска
-   * встают на день того занятия, из которого пришли, а не на дату по умолчанию (`pickDefaultDate`).
+   * Открыть Lanes на плане занятия («✎ Edit lanes» / «Lanes ›» у бассейна): доска встаёт на план того
+   * занятия, из которого пришли (ключ `yyyy-MM-dd-HHmm`, CF5), а не на план по умолчанию (`pickDefaultKey`).
    */
-  openLanes: (date: string) => void;
-  /** Дата, с которой открыт Lanes (`openLanes`); `null` — вход без даты (сегмент участника, `?view=lanes`). */
-  lanesDate: string | null;
+  openLanes: (sessionId: string) => void;
+  /** Занятие, с которого открыт Lanes (`openLanes`); `null` — вход без него (сегмент участника, `?view=lanes`). */
+  lanesKey: string | null;
   /**
    * В редакторе дорожек есть правки, которые НЕ УДАЛОСЬ сохранить (с CF3 редактор сохраняет сам);
    * ставит сам редактор (через секцию).
@@ -165,8 +165,9 @@ export interface TrainingsTabState {
    */
   reloadNextTrainings: () => void;
   /**
-   * Полные планы дорожек ближайших занятий (РАЗНЫЕ даты `nextSessions(group)`): ключ —
-   * yyyy-MM-dd. `null` — плана нет (404: участнику черновик тоже 404 — это не ошибка); ключа нет —
+   * Полные планы дорожек ближайших занятий (`nextSessions(group)`): ключ — id занятия
+   * `yyyy-MM-dd-HHmm` (CF5: план — у занятия). `null` — плана нет (404: участнику черновик тоже 404 —
+   * это не ошибка); ключа нет —
    * ещё не пришёл. Нужны меткам (черновик / неразложенные / «тебя перенесли») и числу
    * неразложенных в бассейне тренера. Перечитываются по `reloadLanePlans()`. Секции планы НЕ грузят.
    */
@@ -223,12 +224,12 @@ export function TrainingsTabProvider({
   const reloadNextTrainings = useCallback(() => { onNextTrainingsChanged?.(); }, [onNextTrainingsChanged]);
   const isDesktop = useMediaQuery(DEEP_DESKTOP_QUERY);
   const [view, setViewState] = useState<TrainingsView>(() => readViewParam(VIEWS, DEFAULT_VIEW));
-  const [lanesDate, setLanesDate] = useState<string | null>(null);
+  const [lanesKey, setLanesKey] = useState<string | null>(null);
   const applyView = useCallback((next: TrainingsView) => {
     setViewState(next);
     writeViewParam(next, DEFAULT_VIEW);
-    // Ушли из Lanes — дата занятия отработала: следующий вход без даты (сегмент) берёт дату по умолчанию.
-    if (next !== 'lanes') setLanesDate(null);
+    // Ушли из Lanes — занятие отработало: следующий вход без него (сегмент) берёт план по умолчанию.
+    if (next !== 'lanes') setLanesKey(null);
   }, []);
 
   // Несохранённые правки редактора Lanes (Т7): флаг дублируется в ref, чтобы `setView` оставался
@@ -289,8 +290,8 @@ export function TrainingsTabProvider({
   useEffect(() => {
     if (manages && view !== DEFAULT_VIEW) applyView(DEFAULT_VIEW);
   }, [manages, view, applyView]);
-  const openLanes = useCallback((date: string) => {
-    setLanesDate(date);
+  const openLanes = useCallback((sessionId: string) => {
+    setLanesKey(sessionId);
     applyView('lanes');
   }, [applyView]);
 
@@ -339,30 +340,30 @@ export function TrainingsTabProvider({
   // Перерыв меняет знаменатель и бассейн — после его правки ответы перечитываются.
   const breaks = useGroupBreaks(group.id, !!r && (r.is_member || r.can_manage), rsvp?.reload);
 
-  // Полные планы ближайших занятий (Т8): метки и число неразложенных. Даты — строкой-ключом,
-  // чтобы эффект не перезапускался на каждый новый массив `nextSessions`.
+  // Полные планы ближайших занятий (Т8): метки и число неразложенных. Ключ — id занятия (CF5),
+  // строкой, чтобы эффект не перезапускался на каждый новый массив `nextSessions`.
   // Прошедшее на столе (CF9) — его план тоже нужен шторке человека и меткам бассейна.
-  const planDatesKey = Array.from(new Set([
-    ...nextSessions(group).map((s) => s.date),
-    ...(deskIsPast && deskSession ? [deskSession.date] : []),
+  const planKeysKey = Array.from(new Set([
+    ...nextSessions(group).map((s) => s.id).filter((id): id is string => !!id),
+    ...(deskIsPast && deskSession?.id ? [deskSession.id] : []),
   ])).join(',');
   const [upcomingPlans, setUpcomingPlans] = useState<Record<string, LanePlan | null>>({});
   useEffect(() => {
-    if (!planDatesKey) return undefined;
+    if (!planKeysKey) return undefined;
     let cancelled = false;
-    planDatesKey.split(',').forEach((date) => {
-      lanePlansApi.get(group.id, date).then((res) => {
+    planKeysKey.split(',').forEach((key) => {
+      lanePlansApi.get(group.id, key).then((res) => {
         if (cancelled) return;
-        if (res.ok && res.data) setUpcomingPlans((prev) => ({ ...prev, [date]: res.data ?? null }));
-        else if (res.status === 404) setUpcomingPlans((prev) => ({ ...prev, [date]: null }));
+        if (res.ok && res.data) setUpcomingPlans((prev) => ({ ...prev, [key]: res.data ?? null }));
+        else if (res.status === 404) setUpcomingPlans((prev) => ({ ...prev, [key]: null }));
       });
     });
     return () => { cancelled = true; };
-  }, [group.id, planDatesKey, lanePlansVersion]);
+  }, [group.id, planKeysKey, lanePlansVersion]);
 
   // Метки внимания. Ближайшее занятие — `group.next_training` (ответы `rsvp`), не выбранное тренером.
-  const nextDate = group.next_training?.date ?? null;
-  const nextPlan = nextDate ? upcomingPlans[nextDate] ?? null : null;
+  const nextKey = group.next_training?.id ?? null;
+  const nextPlan = nextKey ? upcomingPlans[nextKey] ?? null : null;
   const [trainingsSeen, setTrainingsSeen] = useState(false);
   const [lanesSeen, setLanesSeen] = useState(false);
   const marks = useTrainingMarks({
@@ -371,7 +372,7 @@ export function TrainingsTabProvider({
 
   // Наверх — только посчитанное по пришедшим данным: пустые метки до ответа погасили бы таб группы.
   // План ближайшего занятия «пришёл», когда ключ даты есть (404 — тоже ответ, `null`).
-  const marksReady = sessions.data != null && (nextDate == null || nextDate in upcomingPlans);
+  const marksReady = sessions.data != null && (nextKey == null || nextKey in upcomingPlans);
   useEffect(() => {
     if (marksReady) onMarksChange?.(marks);
   }, [marksReady, marks, onMarksChange]);
@@ -441,12 +442,12 @@ export function TrainingsTabProvider({
   const selectedRoll = deskIsPast ? pastRoll : upcoming[rollIndex] ?? null;
 
   const value = useMemo<TrainingsTabState>(() => ({
-    group, manages, lanePreview, previewLane, setPreviewLane, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
+    group, manages, lanePreview, previewLane, setPreviewLane, isDesktop, view, setView, openLanes, lanesKey, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
     deskSession, deskIsPast, selectedRoll, past, openDesk, closeDesk,
     rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown,
     onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
-    group, manages, lanePreview, previewLane, isDesktop, view, setView, openLanes, lanesDate, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, setRollIndex,
+    group, manages, lanePreview, previewLane, isDesktop, view, setView, openLanes, lanesKey, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, setRollIndex,
     deskSession, deskIsPast, selectedRoll, past, openDesk, closeDesk, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions,
     breaks, marks, closeSheet, sheet,
   ]);

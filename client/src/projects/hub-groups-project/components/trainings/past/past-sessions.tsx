@@ -32,7 +32,7 @@ function answersLabel(p: PastTraining): React.ReactNode {
 function PastRow({ item }: { item: PastTraining }) {
   const { lanePlans, openDesk } = useTrainingsTab();
   const s = item.session;
-  const plan = lanePlans?.find((p) => p.date === s.date) ?? null;
+  const plan = lanePlans?.find((p) => p.session_id === s.id) ?? null;
 
   return (
     <li

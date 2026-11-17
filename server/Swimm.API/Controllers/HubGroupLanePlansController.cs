@@ -11,7 +11,9 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Swimm.API.Controllers;
 
 /// <summary>
-/// План дорожек группы на дату (docs/plans/lane-plans-plan.md, L2). Читают управляющие и
+/// План дорожек занятия группы (docs/plans/lane-plans-plan.md, L2). Адрес плана — ключ занятия
+/// <c>yyyy-MM-dd-HHmm</c>, тот же, что у <c>/rsvp/{id}</c> (CF5 плана trainings-coach-flow); голая дата
+/// <c>yyyy-MM-dd</c> — старые ссылки и план дня без занятия, только для чтения. Читают управляющие и
 /// активные участники-аккаунты (та же аудитория, что у тренировок; pending не пускает),
 /// участник — только опубликованные. Правят — управляющие (<see cref="HubGroupPermissions.CanEdit"/>).
 /// Приватные данные — без кэша. Тестовая группа для не-тестового зрителя — 404 (права это знают).
@@ -71,8 +73,17 @@ public class HubGroupLanePlansController : ControllerBase
         return null;
     }
 
-    private BadRequestObjectResult BadDate() =>
-        BadRequest(new { error = $"Date must look like {LanePlanRules.DateFormat}." });
+    private BadRequestObjectResult BadKey() =>
+        BadRequest(new { error = $"Plan key must look like yyyy-MM-dd-HHmm (or {LanePlanRules.DateFormat} to read a day plan)." });
+
+    /// <summary>Ключ плана для ЗАПИСИ: только занятие; голая дата — план дня, архив только для чтения (CF5).</summary>
+    private bool TryWriteKey(string raw, out LanePlanKey key, out IActionResult? bad)
+    {
+        bad = null;
+        if (!LanePlanKey.TryParse(raw, out key)) { bad = BadKey(); return false; }
+        if (!key.IsSession) { bad = BadRequest(new { error = LanePlanRules.ReadOnlyDayPlanMessage }); return false; }
+        return true;
+    }
 
     /// <summary>Планы группы, новые сверху (участнику — только опубликованные).</summary>
     [HttpGet]
@@ -83,7 +94,6 @@ public class HubGroupLanePlansController : ControllerBase
         return Ok(await _plans.ListAsync(id, isManager));
     }
 
-    /// <summary>Доска на дату. 404 — плана нет (или участнику — он ещё черновик).</summary>
     /// <summary>
     /// Зритель открыл вид Lanes (Т1б, `marks-spec.md`): гаснет золотая метка «тебя перенесли».
     /// Отдельной ручкой, а не побочным эффектом GET плана: план грузится и ради метки на табе
@@ -100,10 +110,14 @@ public class HubGroupLanePlansController : ControllerBase
         return NoContent();
     }
 
-    [HttpGet("{date}")]
-    public async Task<IActionResult> Get(int id, string date)
+    /// <summary>
+    /// Доска занятия. 404 — плана нет (или участнику — он ещё черновик). По голой дате — план дня без
+    /// занятия или первый план этой даты (старые ссылки участников на Lanes).
+    /// </summary>
+    [HttpGet("{key}")]
+    public async Task<IActionResult> Get(int id, string key)
     {
-        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (!LanePlanKey.TryParse(key, out var day)) return BadKey();
         var (isManager, denied) = await ViewerAsync(id);
         if (denied != null) return denied;
 
@@ -115,20 +129,20 @@ public class HubGroupLanePlansController : ControllerBase
     /// Кто в день плана «не в воде» (On break / Doesn't train / «Can't come») — редактор кладёт их в «Not today»
     /// нового плана. Только управляющему: статусы людей участникам не раздаём.
     /// </summary>
-    [HttpGet("{date}/away")]
-    public async Task<IActionResult> Away(int id, string date)
+    [HttpGet("{key}/away")]
+    public async Task<IActionResult> Away(int id, string key)
     {
-        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (!LanePlanKey.TryParse(key, out var day)) return BadKey();
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
         return Ok(await _plans.GetAwayAsync(id, day));
     }
 
     /// <summary>Сохранить план целиком (новый — черновиком); отвечает свежей доской.</summary>
-    [HttpPut("{date}")]
-    public async Task<IActionResult> Save(int id, string date, [FromBody] LanePlanInputDto input)
+    [HttpPut("{key}")]
+    public async Task<IActionResult> Save(int id, string key, [FromBody] LanePlanInputDto input)
     {
-        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (!TryWriteKey(key, out var day, out var bad)) return bad!;
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
         var result = await _plans.SaveAsync(id, day, input, CurrentUserId()!.Value);
@@ -139,12 +153,12 @@ public class HubGroupLanePlansController : ControllerBase
     /// <summary>
     /// Workout занятия (CF6, §5.5 плана trainings-coach-flow): документ целиком, <c>workout</c> null —
     /// стереть. Отдельно от PUT плана: редактор дорожек и редактор workout сохраняются сами и не
-    /// перетирают друг друга. 404 — плана на дату нет (workout живёт при плане).
+    /// перетирают друг друга. 404 — у занятия плана нет (workout живёт при плане).
     /// </summary>
-    [HttpPut("{date}/workout")]
-    public async Task<IActionResult> SaveWorkout(int id, string date, [FromBody] WorkoutInputDto input)
+    [HttpPut("{key}/workout")]
+    public async Task<IActionResult> SaveWorkout(int id, string key, [FromBody] WorkoutInputDto input)
     {
-        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (!TryWriteKey(key, out var day, out var bad)) return bad!;
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
         var (found, error) = await _plans.SaveWorkoutAsync(id, day, input?.Workout);
@@ -177,10 +191,10 @@ public class HubGroupLanePlansController : ControllerBase
     /// Что мешает опубликовать (решение 10 плана trainings-coach-flow): идущие пловцы без уровня не
     /// на дорожке. Диалог публикации показывает их заранее; сам Publish проверяет то же.
     /// </summary>
-    [HttpGet("{date}/publish-check")]
-    public async Task<IActionResult> PublishCheck(int id, string date)
+    [HttpGet("{key}/publish-check")]
+    public async Task<IActionResult> PublishCheck(int id, string key)
     {
-        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (!LanePlanKey.TryParse(key, out var day)) return BadKey();
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
         var check = await _plans.GetPublishCheckAsync(id, day);
@@ -190,12 +204,12 @@ public class HubGroupLanePlansController : ControllerBase
     /// <summary>
     /// Поставить пловца на дорожку его уровня (CF4 плана trainings-coach-flow): тренер задал уровень
     /// идущему в карточке человека. Ответ — сдвиг (<c>lane_change</c>) или <c>null</c>, если двигать
-    /// не пришлось; 404 — плана на дату нет.
+    /// не пришлось; 404 — у занятия плана нет.
     /// </summary>
-    [HttpPost("{date}/swimmers/{swimmerId:int}/place")]
-    public async Task<IActionResult> Place(int id, string date, int swimmerId)
+    [HttpPost("{key}/swimmers/{swimmerId:int}/place")]
+    public async Task<IActionResult> Place(int id, string key, int swimmerId)
     {
-        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (!TryWriteKey(key, out var day, out var bad)) return bad!;
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
         var change = await _plans.PlaceAsync(id, day, swimmerId);
@@ -206,11 +220,11 @@ public class HubGroupLanePlansController : ControllerBase
     /// Опубликовать. Отказ 400 с текстом — решение 10. Тело необязательно; <c>notify</c> — push
     /// участникам «дорожки готовы» (только когда статус действительно сменился).
     /// </summary>
-    [HttpPost("{date}/publish")]
+    [HttpPost("{key}/publish")]
     public async Task<IActionResult> Publish(
-        int id, string date, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] LanePlanPublishInputDto? input)
+        int id, string key, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] LanePlanPublishInputDto? input)
     {
-        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (!TryWriteKey(key, out var day, out var bad)) return bad!;
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
         var result = await _plans.PublishAsync(id, day);
@@ -222,21 +236,21 @@ public class HubGroupLanePlansController : ControllerBase
         return NoContent();
     }
 
-    [HttpPost("{date}/unpublish")]
-    public Task<IActionResult> Unpublish(int id, string date) => SetStatusAsync(id, date, LanePlanStatus.Draft);
+    [HttpPost("{key}/unpublish")]
+    public Task<IActionResult> Unpublish(int id, string key) => SetStatusAsync(id, key, LanePlanStatus.Draft);
 
-    [HttpDelete("{date}")]
-    public async Task<IActionResult> Delete(int id, string date)
+    [HttpDelete("{key}")]
+    public async Task<IActionResult> Delete(int id, string key)
     {
-        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (!TryWriteKey(key, out var day, out var bad)) return bad!;
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
         return await _plans.DeleteAsync(id, day) ? NoContent() : NotFound();
     }
 
-    private async Task<IActionResult> SetStatusAsync(int id, string date, string status)
+    private async Task<IActionResult> SetStatusAsync(int id, string key, string status)
     {
-        if (!LanePlanRules.TryParseDate(date, out var day)) return BadDate();
+        if (!TryWriteKey(key, out var day, out var bad)) return bad!;
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
         return await _plans.SetStatusAsync(id, day, status) ? NoContent() : NotFound();

@@ -275,7 +275,7 @@ public class TrainingLaneViewTests
         var s = await SeedAsync(db, new GroupTrainingSchedule { UsualLanes = 4 });
         var plan = new LanePlan
         {
-            HubGroupId = s.GroupId, Date = new DateOnly(2026, 9, 29), LaneCount = 2, Status = LanePlanStatus.Draft,
+            HubGroupId = s.GroupId, Date = new DateOnly(2026, 9, 29), Start = "20:00", LaneCount = 2, Status = LanePlanStatus.Draft,
             Lanes = [new LanePlanLane { LaneNo = 1 }, new LanePlanLane { LaneNo = 2, Workout = "kick" }],
             Swimmers = [new LanePlanSwimmer { SwimmerId = s.KidSw, LaneNo = 2 }],
         };

@@ -84,15 +84,17 @@ internal sealed class HubGroupAccountLevelConfiguration : IEntityTypeConfigurati
     }
 }
 
-// План дорожек на дату — ПРИВАТНЫЕ данные группы, Sys_-таблицы БЕЗ grant swimm_ro
+// План дорожек занятия — ПРИВАТНЫЕ данные группы, Sys_-таблицы БЕЗ grant swimm_ro
 // (docs/plans/lane-plans-plan.md, L2). План — снимок: удаление уровня только снимает
 // подпись с дорожки (SET NULL), уход пловца из состава план не трогает.
+// Ключ — занятие (группа + дата + начало, CF5 плана trainings-coach-flow). NULLS NOT DISTINCT:
+// план дня без занятия (Start null, архив) тоже один на дату.
 internal sealed class LanePlanConfiguration : IEntityTypeConfiguration<LanePlan>
 {
     public void Configure(EntityTypeBuilder<LanePlan> entity)
     {
         entity.ToTable("Sys_LanePlans");
-        entity.HasIndex(e => new { e.HubGroupId, e.Date }).IsUnique();
+        entity.HasIndex(e => new { e.HubGroupId, e.Date, e.Start }).IsUnique().AreNullsDistinct(false);
 
         entity.HasOne(e => e.HubGroup)
             .WithMany()
@@ -108,6 +110,7 @@ internal sealed class LanePlanConfiguration : IEntityTypeConfiguration<LanePlan>
         entity.HasCheckConstraint("CK_LanePlans_LaneCount", @"""LaneCount"" BETWEEN 1 AND 12");
         entity.HasCheckConstraint("CK_LanePlans_MaxPerLane", @"""MaxPerLane"" IS NULL OR ""MaxPerLane"" BETWEEN 1 AND 20");
         entity.HasCheckConstraint("CK_LanePlans_ReservedLanes", @"""ReservedLanes"" BETWEEN 0 AND 11");
+        entity.HasCheckConstraint("CK_LanePlans_Start", @"""Start"" IS NULL OR ""Start"" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'");
     }
 }
 

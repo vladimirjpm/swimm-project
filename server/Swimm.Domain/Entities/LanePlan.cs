@@ -11,10 +11,11 @@ public static class LanePlanStatus
 }
 
 /// <summary>
-/// План дорожек группы на дату (docs/plans/lane-plans-plan.md, L2): сколько дорожек, какой
-/// уровень и задание на каждой, кто где плывёт. ПРИВАТНЫЕ данные — <c>Sys_LanePlans</c>, БЕЗ
-/// grant <c>swimm_ro</c>. План — СНИМОК: смена уровней или состава группы его не переписывает.
-/// Один план на дату (UNIQUE HubGroupId+Date) — снять, когда появится время начала.
+/// План дорожек ЗАНЯТИЯ группы (docs/plans/lane-plans-plan.md, L2; с CF5 плана
+/// trainings-coach-flow — занятия, а не даты): сколько дорожек, какой уровень и задание на каждой,
+/// кто где плывёт. ПРИВАТНЫЕ данные — <c>Sys_LanePlans</c>, БЕЗ grant <c>swimm_ro</c>. План —
+/// СНИМОК: смена уровней или состава группы его не переписывает. Один план на занятие
+/// (UNIQUE HubGroupId+Date+Start).
 /// </summary>
 public class LanePlan
 {
@@ -29,6 +30,14 @@ public class LanePlan
 
     /// <summary>Дата тренировки (календарная, по Израилю).</summary>
     public DateOnly Date { get; set; }
+
+    /// <summary>
+    /// Начало занятия, «HH:mm» по стенным часам (CF5): вместе с <see cref="Date"/> — ключ занятия
+    /// <c>yyyy-MM-dd-HHmm</c>, тот же, что у ответов. null — старый план «на день», которому миграция
+    /// <c>AddLanePlanSessionStart</c> не нашла занятия: только для чтения (архив).
+    /// </summary>
+    [MaxLength(5)]
+    public string? Start { get; set; }
 
     /// <summary>Сколько дорожек свободно (1..12). Строки дорожек 1..LaneCount есть всегда.</summary>
     public int LaneCount { get; set; }

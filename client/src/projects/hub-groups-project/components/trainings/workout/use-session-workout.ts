@@ -5,12 +5,12 @@ import type { AutosaveStatus } from '../../use-lane-autosave';
 
 /**
  * Workout занятия на рабочем столе тренера (docs/plans/trainings-coach-flow-plan.md, §5.5, CF6):
- * загрузка с планом даты, черновик и автосохранение (`PUT …/lane-plans/{date}/workout`) — та же
+ * загрузка с планом занятия, черновик и автосохранение (`PUT …/lane-plans/{sessionId}/workout`) — та же
  * механика, что у дорожек (`use-lane-autosave.ts`): запись через паузу после последней правки,
  * запросы по одному, уход дошлёт несохранённое, закрытие вкладки до записи — предупреждение.
  *
- * Workout живёт при плане: плана на дату нет — `state: 'none'` (сначала «Create plan» в бассейне).
- * До CF5 ключ — дата занятия; CF5 перенесёт его на id занятия вместе с планом.
+ * Workout живёт при плане: у занятия плана нет — `state: 'none'` (сначала «Create plan» в бассейне).
+ * Ключ — id занятия `yyyy-MM-dd-HHmm` (CF5: план — у занятия, у двух занятий дня workout разный).
  */
 
 export type SessionWorkoutState = 'loading' | 'none' | 'error' | 'ready';
@@ -39,7 +39,7 @@ const EMPTY: Workout = { note: null, sets: [] };
 /** Ключ содержимого: пустой документ — `null` (на сервере это «workout нет»). */
 const keyOf = (w: Workout) => (w.sets.length === 0 && !w.note?.trim() ? 'null' : JSON.stringify(w));
 
-export function useSessionWorkout(groupId: number, date: string | null): SessionWorkout {
+export function useSessionWorkout(groupId: number, sessionId: string | null): SessionWorkout {
   const [state, setState] = useState<SessionWorkoutState>('loading');
   const [workout, setDraft] = useState<Workout>(EMPTY);
   const [plan, setPlan] = useState<LanePlan | null>(null);
@@ -67,9 +67,9 @@ export function useSessionWorkout(groupId: number, date: string | null): Session
   }, [groupId]);
 
   useEffect(() => {
-    if (!date) return undefined;
+    if (!sessionId) return undefined;
     let cancelled = false;
-    lanePlansApi.get(groupId, date).then((r) => {
+    lanePlansApi.get(groupId, sessionId).then((r) => {
       if (cancelled) return;
       if (r.ok && r.data) {
         setPlan(r.data);
@@ -86,16 +86,16 @@ export function useSessionWorkout(groupId: number, date: string | null): Session
       }
     });
     return () => { cancelled = true; };
-  }, [groupId, date, nonce]);
+  }, [groupId, sessionId, nonce]);
 
   const run = useCallback((): Promise<boolean> => {
     if (running.current) return running.current;
     const loop = async (): Promise<boolean> => {
-      while (date && keyOf(latest.current) !== savedKey.current) {
+      while (sessionId && keyOf(latest.current) !== savedKey.current) {
         const sent = latest.current;
         const key = keyOf(sent);
         if (mounted.current) { setStatus('saving'); setError(null); }
-        const r = await lanePlansApi.saveWorkout(groupId, date, key === 'null' ? null : sent);
+        const r = await lanePlansApi.saveWorkout(groupId, sessionId, key === 'null' ? null : sent);
         if (!r.ok) {
           failed.current = true;
           if (mounted.current) {
@@ -115,7 +115,7 @@ export function useSessionWorkout(groupId: number, date: string | null): Session
     const promise = loop().finally(() => { running.current = null; });
     running.current = promise;
     return promise;
-  }, [groupId, date]);
+  }, [groupId, sessionId]);
 
   // Правка → пауза → запись.
   const draftKey = keyOf(workout);

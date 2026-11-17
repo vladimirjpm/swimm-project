@@ -20,6 +20,9 @@ namespace Swimm.Tests;
 /// </summary>
 public class HubGroupBreakTests
 {
+    /// <summary>План занятия даты: CF5 — план у занятия (слот 20:00 в тестовых расписаниях).</summary>
+    private static LanePlanKey At(DateOnly date, string start = "20:00") => LanePlanKey.Session(date, start);
+
     // Вторник 29.09.2026 — ближайшее занятие; «сейчас» — понедельник 28.09, полдень.
     private static readonly DateOnly Today = new(2026, 9, 28);
     private static readonly DateTime MondayNoon = new(2026, 9, 28, 12, 0, 0);
@@ -356,25 +359,27 @@ public class HubGroupBreakTests
         var s = await SeedAsync(db);
         var day = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2);
         db.HubGroupBreaks.Add(new HubGroupBreak { HubGroupId = s.GroupId, SwimmerId = s.Gil, Until = day, SetByUserId = s.Coach });
+        // План — у занятия (CF5): занятие нужно и в день плана, и назавтра.
+        (await db.HubGroups.SingleAsync(g => g.Id == s.GroupId)).TrainingSchedule = TestSchedules.EveryDay();
         await db.SaveChangesAsync();
         var plans = new LanePlanService(db);
-        Assert.True((await plans.SaveAsync(s.GroupId, day, new LanePlanInputDto
+        Assert.True((await plans.SaveAsync(s.GroupId, At(day), new LanePlanInputDto
         {
             LaneCount = 1,
             Lanes = [new LanePlanLaneInputDto { LaneNo = 1 }],
             Swimmers = [new LanePlanSwimmerInputDto { SwimmerId = s.AnnaSwimmer, LaneNo = 1 }],
         }, s.Coach)).Success);
 
-        var board = (await plans.GetAsync(s.GroupId, day, isManager: true))!;
+        var board = (await plans.GetAsync(s.GroupId, At(day), isManager: true))!;
 
         Assert.True(board.NotToday.Single(w => w.SwimmerId == s.Gil).OnBreak);
         Assert.False(board.Lanes[0].Swimmers.Single().OnBreak);
         // На следующий день после конца перерыва Gil уже не на перерыве.
-        await plans.SaveAsync(s.GroupId, day.AddDays(1), new LanePlanInputDto
+        await plans.SaveAsync(s.GroupId, At(day.AddDays(1)), new LanePlanInputDto
         {
             LaneCount = 1, Lanes = [new LanePlanLaneInputDto { LaneNo = 1 }], Swimmers = [],
         }, s.Coach);
-        var next = (await plans.GetAsync(s.GroupId, day.AddDays(1), isManager: true))!;
+        var next = (await plans.GetAsync(s.GroupId, At(day.AddDays(1)), isManager: true))!;
         Assert.False(next.NotToday.Single(w => w.SwimmerId == s.Gil).OnBreak);
     }
 

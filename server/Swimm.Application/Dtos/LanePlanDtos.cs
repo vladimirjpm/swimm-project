@@ -13,6 +13,14 @@ public sealed class LanePlanSummaryDto
     [JsonPropertyName("date")]
     public string Date { get; set; } = "";
 
+    /// <inheritdoc cref="LanePlanDto.Start"/>
+    [JsonPropertyName("start")]
+    public string? Start { get; set; }
+
+    /// <inheritdoc cref="LanePlanDto.SessionId"/>
+    [JsonPropertyName("session_id")]
+    public string? SessionId { get; set; }
+
     [JsonPropertyName("status")]
     public string Status { get; set; } = "";
 
@@ -105,11 +113,22 @@ public sealed class LanePlanLaneDto
     public List<LanePlanSwimmerDto> Swimmers { get; set; } = [];
 }
 
-/// <summary>Доска плана на дату.</summary>
+/// <summary>Доска плана занятия.</summary>
 public sealed class LanePlanDto
 {
     [JsonPropertyName("date")]
     public string Date { get; set; } = "";
+
+    /// <summary>Начало занятия «HH:mm» (CF5); null — план дня без занятия (архив, только чтение).</summary>
+    [JsonPropertyName("start")]
+    public string? Start { get; set; }
+
+    /// <summary>
+    /// Ключ занятия плана <c>yyyy-MM-dd-HHmm</c> — тот же, что у ответов (<c>/rsvp/{id}</c>), и адрес
+    /// плана (<c>/lane-plans/{session_id}</c>). null — план дня без занятия: адрес — голая дата.
+    /// </summary>
+    [JsonPropertyName("session_id")]
+    public string? SessionId { get; set; }
 
     [JsonPropertyName("status")]
     public string Status { get; set; } = "";

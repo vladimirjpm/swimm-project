@@ -5,16 +5,22 @@ import type { HubGroupLevels, LanePlan, LanePlanStatus, LanePlanSummary, Workout
 import GroupLaneBoard from './group-lane-board';
 import GroupLaneEditor from './group-lane-editor';
 import LanePlanStatusBar from './lane-plan-status';
-import { formatPlanDate, lanePlansApi, pickDefaultDate, todayInIsrael } from './lane-plans-api';
+import { lanePlansApi, todayInIsrael } from './lane-plans-api';
+import { formatPlanKey, isSessionKey, keyDate, pickDefaultKey, planKey } from './lane-plan-key';
 
 /**
  * Вид `Lanes` таба Trainings группы (docs/plans/lane-plans-plan.md, L3; Т7 — хендофф Trainings Tab,
- * 1e / 6b, решения Р6): план дорожек на дату.
+ * 1e / 6b, решения Р6): план дорожек ЗАНЯТИЯ (с CF5 потока тренера ключ плана — занятие
+ * `yyyy-MM-dd-HHmm`, `lane-plan-key.ts`; у двух занятий одного дня планы разные).
  *
- * Шапка — навигация по датам: стрелки ходят по существующим планам (участнику — только
+ * Шапка — навигация по планам: стрелки ходят по существующим планам занятий (участнику — только
  * опубликованные, сервер черновики не отдаёт), управляющий открывает любой день полем даты
- * (прозрачный `<input type="date">` поверх даты). Пришли с занятия («✎ Edit lanes», «Lanes ›») —
- * его дата (`initialDate`); иначе ближайший план с сегодняшнего дня (по Израилю), иначе последний.
+ * (прозрачный `<input type="date">` поверх даты; по голой дате сервер отдаёт первый план дня).
+ * Пришли с занятия («✎ Edit lanes», «Lanes ›») — его ключ (`initialKey`); иначе ближайший план с
+ * сегодняшнего дня (по Израилю), иначе последний.
+ *
+ * Завести и править план можно только у занятия: по голой дате (план дня без занятия — архив после
+ * миграции CF5) — только доска, без «Create plan».
  *
  * Участник видит доску (`GroupLaneBoard`), управляющий — сразу редактор (`GroupLaneEditor`): режима
  * правки нет. Плана на дату нет — управляющему карточка «Create plan / Copy from …». Правит только
@@ -47,7 +53,7 @@ function statusInfo(status: LanePlanStatus | null): { text: string; color: strin
 }
 
 function GroupLanes({
-  groupId, manages, desktop, initialDate = null, embedded = false, statusHost, onFocusPool, onDirtyChange, onPlansChanged, onPlanShown,
+  groupId, manages, desktop, initialKey = null, embedded = false, statusHost, onFocusPool, onDirtyChange, onPlansChanged, onPlanShown,
   workout = null,
 }: {
   /** Workout занятия (CF6, рабочий стол тренера) — сводка версии уровня в карточках дорожек. */
@@ -61,7 +67,7 @@ function GroupLanes({
   onFocusPool?: () => void;
   /**
    * План ОДНОГО занятия внутри рабочего стола тренера (docs/plans/trainings-coach-flow-plan.md, CF1):
-   * дата — `initialDate`, своей навигации по датам (стрелки, поле даты) нет — занятие выбирает шапка
+   * занятие — `initialKey`, своей навигации (стрелки, поле даты) нет — занятие выбирает шапка
    * стола. Смена занятия — новый `key` у вызывающего.
    */
   embedded?: boolean;
@@ -69,8 +75,11 @@ function GroupLanes({
   manages: boolean;
   /** ≥960px: шапка в одну строку с тулбаром, редактор колонками. */
   desktop: boolean;
-  /** Дата занятия, с которого открыли Lanes; `null` — дата по умолчанию (`pickDefaultDate`). Читается при монтировании. */
-  initialDate?: string | null;
+  /**
+   * Ключ занятия, с которого открыли Lanes (`yyyy-MM-dd-HHmm`); `null` — план по умолчанию
+   * (`pickDefaultKey`). Читается при монтировании.
+   */
+  initialKey?: string | null;
   /** В редакторе есть правки, которые не удалось сохранить (каркас таба спрашивает при уходе). */
   onDirtyChange?: (dirty: boolean) => void;
   /** План создан / сохранён / опубликован / удалён — вид Next тренера перечитывает статус плана. */
@@ -84,7 +93,8 @@ function GroupLanes({
 }) {
   const [plans, setPlans] = useState<LanePlanSummary[] | null>(null);
   const [listError, setListError] = useState(false);
-  const [date, setDate] = useState<string | null>(initialDate);
+  /** Ключ открытого плана: занятие `yyyy-MM-dd-HHmm` или голая дата (только чтение). */
+  const [key, setKey] = useState<string | null>(initialKey);
   const [state, setState] = useState<PlanState>({ kind: 'loading' });
   /** Тренер нажал «Create plan» на дате без плана — открыт пустой редактор. */
   const [creating, setCreating] = useState(false);
@@ -98,8 +108,8 @@ function GroupLanes({
   /** Меняется, когда редактор надо собрать заново (копия, сохранение): `key` вместе с датой. */
   const [editorNonce, setEditorNonce] = useState(0);
   const [dirty, setDirty] = useState(false);
-  /** Дата, куда хотели уйти, но ждём ответа на «Discard unsaved changes?». */
-  const [pendingDate, setPendingDate] = useState<string | null>(null);
+  /** План, куда хотели уйти, но ждём ответа на «Discard unsaved changes?». */
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   /** Узел шапки (десктоп), куда редактор выносит тулбар. */
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
   const dateInput = useRef<HTMLInputElement>(null);
@@ -113,11 +123,11 @@ function GroupLanes({
     return result.data;
   }, [groupId]);
 
-  // Первый заход: список → дата по умолчанию.
+  // Первый заход: список → план по умолчанию.
   useEffect(() => {
     let cancelled = false;
     loadList().then((list) => {
-      if (!cancelled && list) setDate((d) => d ?? pickDefaultDate(list, todayInIsrael()));
+      if (!cancelled && list) setKey((k) => k ?? pickDefaultKey(list, todayInIsrael()));
     });
     return () => { cancelled = true; };
   }, [loadList]);
@@ -135,41 +145,41 @@ function GroupLanes({
     return () => { cancelled = true; };
   }, [groupId, manages]);
 
-  // Кто в этот день «не в воде» (On break / Doesn't train / «Can't come», а при настройке «Only who
+  // Кто на этом занятии «не в воде» (On break / Doesn't train / «Can't come», а при настройке «Only who
   // answered» — и молчащие) — редактор кладёт их в «Not today» нового плана и копии. Ошибка — пустой
   // список: раскладку из-за неё не блокируем.
-  // Перечитывается при КАЖДОМ «Create plan» / «Copy from …» (`awayNonce`), а не раз на дату: пока
+  // Перечитывается при КАЖДОМ «Create plan» / «Copy from …» (`awayNonce`), а не раз на план: пока
   // страница открыта, люди отвечают «Going», а тренер меняет настройку — старый список ставил на
   // дорожки тех, кто уже не придёт или так и не ответил (найдено Владом 09.11.2026).
   const [awayNonce, setAwayNonce] = useState(0);
-  const [away, setAway] = useState<{ date: string; nonce: number; ids: ReadonlySet<number> } | null>(null);
+  const [away, setAway] = useState<{ key: string; nonce: number; ids: ReadonlySet<number> } | null>(null);
   useEffect(() => {
-    if (!manages || !date) return undefined;
+    if (!manages || !key || !isSessionKey(key)) return undefined;
     let cancelled = false;
-    lanePlansApi.away(groupId, date).then((result) => {
+    lanePlansApi.away(groupId, key).then((result) => {
       if (!cancelled) {
-        setAway({ date, nonce: awayNonce, ids: new Set(result.ok ? result.data?.swimmer_ids ?? [] : []) });
+        setAway({ key, nonce: awayNonce, ids: new Set(result.ok ? result.data?.swimmer_ids ?? [] : []) });
       }
     });
     return () => { cancelled = true; };
-  }, [groupId, date, manages, awayNonce]);
-  const awayIds = away?.date === date && away.nonce === awayNonce ? away.ids : null;
+  }, [groupId, key, manages, awayNonce]);
+  const awayIds = away?.key === key && away.nonce === awayNonce ? away.ids : null;
 
-  // Смена даты — план на неё.
+  // Смена плана — его доска.
   useEffect(() => {
-    if (!date) return undefined;
+    if (!key) return undefined;
     let cancelled = false;
     setState({ kind: 'loading' });
     setCreating(false);
     setTemplate(null);
     setActionError(null);
-    lanePlansApi.get(groupId, date).then((result) => {
+    lanePlansApi.get(groupId, key).then((result) => {
       if (cancelled) return;
       if (result.ok && result.data) setState({ kind: 'ready', plan: result.data });
       else setState(result.status === 404 ? { kind: 'none' } : { kind: 'error' });
     });
     return () => { cancelled = true; };
-  }, [groupId, date]);
+  }, [groupId, key]);
 
   useEffect(() => {
     if (!manages && (state.kind === 'ready' || state.kind === 'none')) onPlanShown?.();
@@ -181,12 +191,16 @@ function GroupLanes({
 
   const handleDirty = useCallback((value: boolean) => setDirty(value), []);
 
-  /** Перейти на дату; с несохранёнными правками — после подтверждения. */
+  /** Перейти на план (ключ занятия или дата); с несохранёнными правками — после подтверждения. */
   const goTo = (next: string) => {
-    if (next === date) return;
-    if (dirty) setPendingDate(next);
-    else setDate(next);
+    if (next === key) return;
+    if (dirty) setPendingKey(next);
+    else setKey(next);
   };
+
+  // Куда писать: занятие открытого плана; плана нет — занятие из адреса. План дня без занятия
+  // (архив) и голая дата без плана — некуда: только доска, без «Create plan» (CF5).
+  const writeKey = state.kind === 'ready' ? state.plan.session_id ?? null : key && isSessionKey(key) ? key : null;
 
   const refreshPlans = () => {
     void loadList();
@@ -194,8 +208,8 @@ function GroupLanes({
   };
 
   const setStatus = async (publish: boolean, notify = false): Promise<string | null> => {
-    if (!date) return null;
-    const result = publish ? await lanePlansApi.publish(groupId, date, notify) : await lanePlansApi.unpublish(groupId, date);
+    if (!writeKey) return null;
+    const result = publish ? await lanePlansApi.publish(groupId, writeKey, notify) : await lanePlansApi.unpublish(groupId, writeKey);
     if (!result.ok) return result.error ?? 'Could not change the status. Try again.';
     // Через функцию: пока шёл запрос, автосохранение могло подменить план свежим.
     setState((s) => (s.kind === 'ready' ? { kind: 'ready', plan: { ...s.plan, status: publish ? 'published' : 'draft' } } : s));
@@ -204,8 +218,8 @@ function GroupLanes({
   };
 
   const remove = async () => {
-    if (!date) return { success: false };
-    const result = await lanePlansApi.remove(groupId, date);
+    if (!writeKey) return { success: false };
+    const result = await lanePlansApi.remove(groupId, writeKey);
     if (!result.ok) return { success: false, error: result.error ?? 'Could not delete. Try again.' };
     abandon.current = true;
     setConfirmDelete(false);
@@ -217,9 +231,9 @@ function GroupLanes({
     return { success: true };
   };
 
-  /** Копия плана `sourceDate` как заготовка редактора; редактор собирается заново. */
-  const copyFrom = async (sourceDate: string): Promise<string | null> => {
-    const result = await lanePlansApi.get(groupId, sourceDate);
+  /** Копия плана `sourceKey` (прошлое занятие) как заготовка редактора; редактор собирается заново. */
+  const copyFrom = async (sourceKey: string): Promise<string | null> => {
+    const result = await lanePlansApi.get(groupId, sourceKey);
     if (!result.ok || !result.data) return 'Could not load that plan. Try again.';
     abandon.current = false;
     setTemplate(result.data);
@@ -230,10 +244,10 @@ function GroupLanes({
   };
 
   /** Кнопка «Copy from …» карточки «No lane plan» (до открытия редактора). */
-  const startCopy = async (sourceDate: string) => {
+  const startCopy = async (sourceKey: string) => {
     setActionError(null);
     setBusy(true);
-    const err = await copyFrom(sourceDate);
+    const err = await copyFrom(sourceKey);
     setBusy(false);
     if (err) setActionError(err);
   };
@@ -246,7 +260,7 @@ function GroupLanes({
       </div>
     );
   }
-  if (!plans || !date) {
+  if (!plans || !key) {
     return (
       <div className="deep-card">
         <div className="deep-card-title">Lanes</div>
@@ -255,26 +269,29 @@ function GroupLanes({
     );
   }
 
-  // Стрелки ходят по существующим планам; список новыми сверху.
+  // Стрелки ходят по существующим планам занятий; список новыми сверху. Открыт по голой дате, а
+  // сервер отдал план занятия, — отсчёт от него (иначе ‹ › вели бы мимо соседей того же дня).
   const ascending = [...plans].reverse();
-  const prevPlan = [...ascending].reverse().find((p) => p.date < date);
-  const nextPlan = ascending.find((p) => p.date > date);
+  const shownKey = state.kind === 'ready' ? planKey(state.plan) : key;
+  const prevPlan = [...ascending].reverse().find((p) => planKey(p) < shownKey);
+  const nextPlan = ascending.find((p) => planKey(p) > shownKey);
   // Новый план — с числом дорожек последнего плана до этой даты (обычно бассейн тот же).
   const laneCountHint = prevPlan?.lane_count ?? nextPlan?.lane_count ?? 6;
   // И лимит людей на дорожку — тот же, что у соседнего плана.
   const maxPerLaneHint = (prevPlan ?? nextPlan)?.max_per_lane ?? null;
   // И запас дорожек; планов ещё не было — одна про запас.
   const reservedLanesHint = (prevPlan ?? nextPlan)?.reserved_lanes ?? 1;
-  // Откуда копировать: ближайший план до этой даты, иначе самый свежий из других.
-  const copySource = prevPlan ?? plans.find((p) => p.date !== date) ?? null;
+  // Откуда копировать: план прошлого занятия, иначе самый свежий из других.
+  const copySource = prevPlan ?? plans.find((p) => planKey(p) !== shownKey) ?? null;
 
   const plan = state.kind === 'ready' ? state.plan : null;
-  const editable = manages && (state.kind === 'none' || (state.kind === 'ready' && state.plan.can_edit));
+  const editable = manages && writeKey != null
+    && (state.kind === 'none' || (state.kind === 'ready' && state.plan.can_edit));
   const status = statusInfo(plan?.status ?? null);
   const editorShown = editable && (state.kind === 'ready' || (state.kind === 'none' && creating))
     && levels != null && (awayIds != null || (plan != null && !template));
 
-  const dateLabel = formatPlanDate(date);
+  const dateLabel = formatPlanKey(shownKey);
   const dateButton = (extraClass: string, children: React.ReactNode) => (
     <div className={`relative ${extraClass}`}>
       {children}
@@ -282,7 +299,7 @@ function GroupLanes({
         <input
           ref={dateInput}
           type="date"
-          value={date}
+          value={keyDate(shownKey)}
           onChange={(e) => { if (e.target.value) goTo(e.target.value); }}
           onClick={() => { try { dateInput.current?.showPicker?.(); } catch { /* браузер без showPicker — откроется сам */ } }}
           aria-label="Open any day"
@@ -294,8 +311,8 @@ function GroupLanes({
 
   const arrows = (size: number) => (
     <>
-      <PrevNext side="prev" size={size} disabled={!prevPlan} onClick={() => prevPlan && goTo(prevPlan.date)} />
-      <PrevNext side="next" size={size} disabled={!nextPlan} onClick={() => nextPlan && goTo(nextPlan.date)} />
+      <PrevNext side="prev" size={size} disabled={!prevPlan} onClick={() => prevPlan && goTo(planKey(prevPlan))} />
+      <PrevNext side="next" size={size} disabled={!nextPlan} onClick={() => nextPlan && goTo(planKey(nextPlan))} />
     </>
   );
 
@@ -342,7 +359,7 @@ function GroupLanes({
       {/* Порядок кнопок: ‹ › рядом на десктопе, по краям даты на телефоне — как в прототипе. */}
       {desktop ? header : embedded ? null : (
         <div className="flex items-center gap-2">
-          <PrevNext side="prev" size={40} disabled={!prevPlan} onClick={() => prevPlan && goTo(prevPlan.date)} />
+          <PrevNext side="prev" size={40} disabled={!prevPlan} onClick={() => prevPlan && goTo(planKey(prevPlan))} />
           {dateButton('min-w-0 flex-1 text-center', (
             <>
               <div className="flex items-center justify-center gap-1 text-[15px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
@@ -352,7 +369,7 @@ function GroupLanes({
               <div className="text-[10.5px] font-extrabold" style={{ color: status.color }}>{status.text}</div>
             </>
           ))}
-          <PrevNext side="next" size={40} disabled={!nextPlan} onClick={() => nextPlan && goTo(nextPlan.date)} />
+          <PrevNext side="next" size={40} disabled={!nextPlan} onClick={() => nextPlan && goTo(planKey(nextPlan))} />
         </div>
       )}
 
@@ -384,10 +401,10 @@ function GroupLanes({
                   type="button"
                   className="h-[40px] cursor-pointer rounded-[10px] border bg-transparent px-4 text-[12px] font-extrabold disabled:cursor-not-allowed disabled:opacity-50"
                   style={{ borderColor: 'var(--deep-card-border)', color: 'var(--t-text-3)' }}
-                  onClick={() => startCopy(copySource.date)}
+                  onClick={() => startCopy(planKey(copySource))}
                   disabled={busy}
                 >
-                  Copy from {formatPlanDate(copySource.date)}
+                  Copy from {formatPlanKey(planKey(copySource))}
                 </button>
               )}
             </div>
@@ -396,11 +413,11 @@ function GroupLanes({
 
         {editable && (state.kind === 'ready' || (state.kind === 'none' && creating)) && (
           // Новый план и копия ждут СВЕЖИЙ `away` (этого нажатия): редактор читает его один раз при монтировании.
-          levels && (awayIds || (plan && !template)) ? (
+          levels && writeKey && (awayIds || (plan && !template)) ? (
             <GroupLaneEditor
-              key={`${date}:${editorNonce}`}
+              key={`${writeKey}:${editorNonce}`}
               groupId={groupId}
-              date={date}
+              planKey={writeKey}
               plan={plan}
               template={template}
               levels={levels}
@@ -412,7 +429,7 @@ function GroupLanes({
               toolbarHost={toolbarHost}
               statusHost={statusHost}
               abandon={abandon}
-              copyFrom={copySource?.date ?? null}
+              copyFrom={copySource ? planKey(copySource) : null}
               onSaved={(saved) => {
                 // Автосохранение: редактор НЕ пересобираем — тренер продолжает править.
                 setState({ kind: 'ready', plan: saved });
@@ -451,17 +468,17 @@ function GroupLanes({
           </p>
         </ConfirmDialog>
       )}
-      {pendingDate && (
+      {pendingKey && (
         <ConfirmDialog
           title="Discard unsaved changes?"
           confirmLabel="Discard"
           onConfirm={async () => {
             setDirty(false);
-            setDate(pendingDate);
-            setPendingDate(null);
+            setKey(pendingKey);
+            setPendingKey(null);
             return { success: true };
           }}
-          onClose={() => setPendingDate(null)}
+          onClose={() => setPendingKey(null)}
         >
           <p className="m-0 mt-3 text-[13px] text-[var(--t-text-2)]">
             The last changes to the lane plan for {dateLabel} could not be saved.

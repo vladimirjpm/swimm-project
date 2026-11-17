@@ -7,6 +7,9 @@ import type {
  * Клиент плана дорожек группы (docs/plans/lane-plans-plan.md). Ручки —
  * `/api/hub-groups/{id}/lane-plans` (snake_case); уровни для редактора —
  * `/api/me/hub-groups/{id}/levels` (camelCase, только управляющим).
+ *
+ * `key` плана — ключ ЗАНЯТИЯ `yyyy-MM-dd-HHmm` (CF5 потока тренера; `lane-plan-key.ts`), голая дата —
+ * только чтение плана дня без занятия и старые ссылки.
  */
 
 /** Итог запроса: `data` при успехе, `error` — текст сервера, `status` — HTTP-код (0 — сети нет). */
@@ -64,17 +67,17 @@ const base = (groupId: number) => `/api/hub-groups/${groupId}/lane-plans`;
 
 export const lanePlansApi = {
   list: (groupId: number) => request<LanePlanSummary[]>('GET', base(groupId)),
-  get: (groupId: number, date: string) => request<LanePlan>('GET', `${base(groupId)}/${date}`),
+  get: (groupId: number, key: string) => request<LanePlan>('GET', `${base(groupId)}/${key}`),
   /** Кто в день плана «не в воде» (On break / Doesn't train / «Can't come») — в «Not today» нового плана. Только управляющему. */
-  away: (groupId: number, date: string) => request<{ swimmer_ids: number[] }>('GET', `${base(groupId)}/${date}/away`),
-  save: (groupId: number, date: string, input: LanePlanInput) =>
-    request<LanePlan>('PUT', `${base(groupId)}/${date}`, input),
+  away: (groupId: number, key: string) => request<{ swimmer_ids: number[] }>('GET', `${base(groupId)}/${key}/away`),
+  save: (groupId: number, key: string, input: LanePlanInput) =>
+    request<LanePlan>('PUT', `${base(groupId)}/${key}`, input),
   /**
    * Workout занятия (CF6): документ целиком, null — стереть. Отдельно от PUT плана — редакторы
-   * дорожек и workout сохраняются сами и не перетирают друг друга. 404 — плана на дату нет.
+   * дорожек и workout сохраняются сами и не перетирают друг друга. 404 — у занятия плана нет.
    */
-  saveWorkout: (groupId: number, date: string, workout: Workout | null) =>
-    request<void>('PUT', `${base(groupId)}/${date}/workout`, { workout }),
+  saveWorkout: (groupId: number, key: string, workout: Workout | null) =>
+    request<void>('PUT', `${base(groupId)}/${key}/workout`, { workout }),
   /**
    * «Auto-arrange»: сервер сам делит дорожки между уровнями и раскладывает людей. Ничего не
    * сохраняет. `reserved_lanes` — сколько последних дорожек оставить пустыми про запас (всегда). `pinned` — закреплённые (CF2): остаются на своих дорожках, в ответе — с `pinned: true`.
@@ -92,19 +95,19 @@ export const lanePlansApi = {
    * Что мешает опубликовать (решение 10 потока тренера): идущие пловцы без уровня не на дорожке.
    * Считает сервер — «идущий» это и ответ аккаунта, привязанного к пловцу.
    */
-  publishCheck: (groupId: number, date: string) =>
-    request<LanePlanPublishCheck>('GET', `${base(groupId)}/${date}/publish-check`),
+  publishCheck: (groupId: number, key: string) =>
+    request<LanePlanPublishCheck>('GET', `${base(groupId)}/${key}/publish-check`),
   /** `notify` — push участникам «дорожки готовы». Отказ 400 с текстом — решение 10. */
-  publish: (groupId: number, date: string, notify = false) =>
-    request<void>('POST', `${base(groupId)}/${date}/publish`, { notify }),
+  publish: (groupId: number, key: string, notify = false) =>
+    request<void>('POST', `${base(groupId)}/${key}/publish`, { notify }),
   /**
    * Поставить идущего пловца на дорожку его уровня (CF4): тренер задал уровень в карточке человека.
-   * `lane_change` null — двигать не пришлось; 404 — плана на дату нет.
+   * `lane_change` null — двигать не пришлось; 404 — у занятия плана нет.
    */
-  place: (groupId: number, date: string, swimmerId: number) =>
-    request<{ lane_change: LaneChange | null }>('POST', `${base(groupId)}/${date}/swimmers/${swimmerId}/place`),
-  unpublish: (groupId: number, date: string) => request<void>('POST', `${base(groupId)}/${date}/unpublish`),
-  remove: (groupId: number, date: string) => request<void>('DELETE', `${base(groupId)}/${date}`),
+  place: (groupId: number, key: string, swimmerId: number) =>
+    request<{ lane_change: LaneChange | null }>('POST', `${base(groupId)}/${key}/swimmers/${swimmerId}/place`),
+  unpublish: (groupId: number, key: string) => request<void>('POST', `${base(groupId)}/${key}/unpublish`),
+  remove: (groupId: number, key: string) => request<void>('DELETE', `${base(groupId)}/${key}`),
   /** Зритель открыл вид Lanes (Т1б): гаснет «тебя перенесли». GET плана метку не гасит. */
   markSeen: (groupId: number) => request<void>('PUT', `${base(groupId)}/seen`),
   levels: (groupId: number) => request<HubGroupLevels>('GET', `/api/me/hub-groups/${groupId}/levels`),
@@ -144,14 +147,4 @@ export function formatPlanDate(date: string): string {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
     weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC',
   });
-}
-
-/**
- * Какой план открыть по умолчанию: ближайший с даты «сегодня» и позже, иначе последний
- * прошедший; планов нет — сегодня. Список приходит новыми сверху.
- */
-export function pickDefaultDate(plans: LanePlanSummary[], today: string): string {
-  const upcoming = plans.filter((p) => p.date >= today);
-  if (upcoming.length > 0) return upcoming[upcoming.length - 1].date;
-  return plans[0]?.date ?? today;
 }
