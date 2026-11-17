@@ -96,23 +96,33 @@ internal sealed class AppInsightsReader(
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(Timeout);
-        try
+        for (var attempt = 1; ; attempt++)
         {
-            var rows = await runner.RunAsync(workspaceId.Trim(), queries, cts.Token);
-            var lost = queries.Select(q => q.Name).Where(n => !rows.ContainsKey(n)).ToList();
-            return lost.Count == 0
-                ? (rows, null)
-                : (null, AppInsightsConnections.Failed($"В ответе Log Analytics нет результатов: {string.Join(", ", lost)}."));
-        }
-        catch (Exception ex) when (!ct.IsCancellationRequested)
-        {
-            var failure = AppInsightsErrorClassifier.Classify(ex, Timeout);
-            // Текст ответа Azure в журнал не пишем (в нём бывает имя учётной записи): только вид сбоя.
-            if (failure.State == AppInsightsStates.NoLogin)
-                logger.LogInformation("App Insights: нет входа az ({Type})", ex.GetType().Name);
-            else
-                logger.LogWarning("App Insights: чтение не удалось ({Type})", ex.GetType().Name);
-            return (null, failure);
+            try
+            {
+                var rows = await runner.RunAsync(workspaceId.Trim(), queries, cts.Token);
+                var lost = queries.Select(q => q.Name).Where(n => !rows.ContainsKey(n)).ToList();
+                return lost.Count == 0
+                    ? (rows, null)
+                    : (null, AppInsightsConnections.Failed($"В ответе Log Analytics нет результатов: {string.Join(", ", lost)}."));
+            }
+            catch (Exception ex) when (attempt == 1 && !cts.IsCancellationRequested && AppInsightsErrorClassifier.IsUnreadableResponse(ex))
+            {
+                // Плавающий сбой 17.11 (~12:51–12:53 UTC, три раза подряд, потом прошёл сам): SDK не
+                // разобрал ответ пакета. Один повтор в пределах того же таймаута; стек — в журнал, чтобы
+                // в следующий раз было видно место (в исключении разбора данных аккаунта нет).
+                logger.LogWarning(ex, "App Insights: ответ Log Analytics не разобран, повторяю");
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                var failure = AppInsightsErrorClassifier.Classify(ex, Timeout);
+                // Текст ответа Azure в журнал не пишем (в нём бывает имя учётной записи): только вид сбоя.
+                if (failure.State == AppInsightsStates.NoLogin)
+                    logger.LogInformation("App Insights: нет входа az ({Type})", ex.GetType().Name);
+                else
+                    logger.LogWarning("App Insights: чтение не удалось ({Type})", ex.GetType().Name);
+                return (null, failure);
+            }
         }
     }
 

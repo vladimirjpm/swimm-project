@@ -29,6 +29,8 @@ public class AppInsightsReaderTests
     {
         public List<IReadOnlyList<AppInsightsQuery>> Calls { get; } = [];
         public Exception? Throw { get; set; }
+        /// <summary>Бросать <see cref="Throw"/> только первые N вызовов (null — всегда).</summary>
+        public int? ThrowTimes { get; set; }
         public TimeSpan Delay { get; set; }
         public Func<IReadOnlyList<AppInsightsQuery>, IReadOnlyDictionary<string, AppInsightsRows>>? Answer { get; set; }
 
@@ -37,7 +39,7 @@ public class AppInsightsReaderTests
         {
             Calls.Add(queries);
             if (Delay > TimeSpan.Zero) await Task.Delay(Delay, ct);
-            if (Throw is not null) throw Throw;
+            if (Throw is not null && (ThrowTimes is null || Calls.Count <= ThrowTimes)) throw Throw;
             return (Answer ?? DefaultAnswer)(queries);
         }
     }
@@ -187,6 +189,47 @@ public class AppInsightsReaderTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reader.GetSummaryAsync(cts.Token));
+    }
+
+    // Живьём 17.11: SDK трижды подряд не разобрал ответ пакета («requires an element of type 'Object',
+    // but the target element has type 'String'»), потом само прошло. Один повтор это закрывает.
+    private static readonly InvalidOperationException Unreadable =
+        new("The requested operation requires an element of type 'Object', but the target element has type 'String'.");
+
+    [Fact]
+    public async Task Unreadable_response_is_retried_once_and_then_succeeds()
+    {
+        var (reader, runner, _) = Make();
+        runner.Throw = Unreadable;
+        runner.ThrowTimes = 1;
+
+        var s = await reader.GetSummaryAsync();
+
+        Assert.Equal(AppInsightsStates.Ok, s.Connection.State);
+        Assert.Equal(2, runner.Calls.Count);
+    }
+
+    [Fact]
+    public async Task Unreadable_response_twice_is_human_failed_card()
+    {
+        var (reader, runner, _) = Make();
+        runner.Throw = Unreadable;
+
+        var o = await reader.GetOverviewAsync(TimeSpan.FromHours(1), "web");
+
+        Assert.Equal(AppInsightsStates.Failed, o.Connection.State);
+        Assert.Contains("не удалось разобрать", o.Connection.Text);
+        Assert.DoesNotContain("target element", o.Connection.Text);
+        Assert.Equal(2, runner.Calls.Count);
+    }
+
+    [Fact]
+    public async Task Login_and_access_errors_are_not_retried()
+    {
+        var (reader, runner, _) = Make();
+        runner.Throw = new CredentialUnavailableException("Please run 'az login'");
+        await reader.GetSummaryAsync();
+        Assert.Single(runner.Calls);
     }
 
     [Fact]

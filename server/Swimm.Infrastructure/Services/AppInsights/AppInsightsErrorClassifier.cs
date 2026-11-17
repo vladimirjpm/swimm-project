@@ -37,8 +37,21 @@ internal static class AppInsightsErrorClassifier
         OperationCanceledException or TimeoutException => AppInsightsConnections.Failed(
             $"Log Analytics не ответил за {timeout.TotalSeconds:0} с — повтори позже."),
 
+        _ when IsUnreadableResponse(ex) => AppInsightsConnections.Failed(
+            "Log Analytics вернул ответ, который не удалось разобрать (повтор тоже не помог) — обнови через минуту. "
+            + $"Подробности — в журнале API ({ex.GetType().Name})."),
+
         _ => AppInsightsConnections.Failed($"{ex.GetType().Name}: {Reason(ex.Message)}"),
     };
+
+    /// <summary>
+    /// SDK не смог разобрать ответ (живьём 17.11: <c>InvalidOperationException</c> «requires an element of
+    /// type 'Object', but the target element has type 'String'» — плавающий, не воспроизвёлся). Это не
+    /// «нет входа» и не «нет доступа»: такой сбой стоит один раз повторить.
+    /// </summary>
+    internal static bool IsUnreadableResponse(Exception ex) =>
+        ex is InvalidOperationException or System.Text.Json.JsonException or FormatException
+        && ex is not ObjectDisposedException;
 
     private static string Status(Exception ex) => ex is RequestFailedException rf
         ? string.Join(", ", new[] { rf.Status > 0 ? $"HTTP {rf.Status}" : null, rf.ErrorCode }.Where(s => !string.IsNullOrEmpty(s)))
