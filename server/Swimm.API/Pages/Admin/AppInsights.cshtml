@@ -1,0 +1,39 @@
+@page
+@model Swimm.API.Pages.Admin.AppInsightsModel
+@{
+    ViewData["Title"] = "App Insights";
+    ViewData["PageSubtitle"] = "Телеметрия прод-сайта: ошибки, медленные запросы, исключения";
+}
+
+@* Справка — docs/admin-pages/appinsights.md. Данные — только скриптом (GET /api/admin/appinsights/overview),
+   сервер в OnGet в Azure не ходит. Тоны приходят готовыми, на клиенте пороги не считаются. *@
+
+<div id="ai-head" class="admin-card p-4 mb-4 scroll-mt-4">
+    <div id="ai-conn" class="text-[0.85rem] text-admin-text-muted">Загрузка…</div>
+    <div id="ai-process" class="mt-1 text-[0.8rem] text-admin-text-muted"></div>
+    <div id="ai-last" class="mt-0.5 text-[0.8rem] text-admin-text-muted"></div>
+
+    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div class="inline-flex" role="group" aria-label="Период" id="ai-range">
+            <button type="button" data-range="1h" class="admin-btn admin-btn-ghost py-1 px-3 rounded-r-none">1 ч</button>
+            <button type="button" data-range="24h" class="admin-btn admin-btn-ghost py-1 px-3 rounded-none border-l-0">24 ч</button>
+            <button type="button" data-range="7d" class="admin-btn admin-btn-ghost py-1 px-3 rounded-l-none border-l-0">7 дней</button>
+        </div>
+        <div class="inline-flex" role="group" aria-label="Роль" id="ai-role">
+            <button type="button" data-role="web" class="admin-btn admin-btn-ghost py-1 px-3 rounded-r-none">Сайт</button>
+            <button type="button" data-role="prodadmin" class="admin-btn admin-btn-ghost py-1 px-3 rounded-l-none border-l-0">ProdAdmin</button>
+        </div>
+        <button type="button" id="ai-refresh" class="admin-btn admin-btn-primary py-1 px-3">Обновить</button>
+        <span id="ai-generated" class="text-[0.8rem] text-admin-text-muted"></span>
+    </div>
+    <div id="ai-links" class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[0.8rem]"></div>
+</div>
+
+<div id="ai-reasons"></div>
+<div id="ai-body" aria-live="polite">
+    <div class="admin-card p-6 text-admin-text-muted text-sm">Загрузка…</div>
+</div>
+
+@section Scripts {
+<script src="~/js/admin/appinsights.js" asp-append-version="true"></script>
+}

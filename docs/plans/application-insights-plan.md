@@ -25,7 +25,8 @@ UptimeRobot), 1, 4, 5 — тоже 17.11: ProdAdmin да, почта — Gmail �
    с токеном `az account get-access-token --resource https://api.loganalytics.io` (customerId —
    `az monitor log-analytics workspace show -g swimm-rg -n swimhub-logs --query customerId -o tsv`;
    в репо и в чат не писать). Есть реальный трафик прода с 17.11 11:45 UTC.
-4. Б2 + Б3 — Sonnet через `/delegate` по таск-документу [appinsights-page-sonnet.md](../tasks/appinsights-page-sonnet.md) (готов 17.11, не запущен).
+4. ✅ Б2 + Б3 — Sonnet по [appinsights-page-sonnet.md](../tasks/appinsights-page-sonnet.md), принято 17.11 (см. «Сделано 17.11 (Б2+Б3)»).
+5. Б4 часть Fable: `deploy.md` («если сломалось: куда смотреть»), отметка В14, строка ROADMAP, текст о приватности; потом PR 2.
 
 ### Сделано 17.11 — А1 (Opus 5.5, «да» Влада в чате)
 
@@ -423,6 +424,25 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
   выше 5 %; жёлтый — есть исключения или приём выше 80 % лимита. Пороги — в `AppInsightsOverviewBuilder`.
 - «Не настроено» и «нет входа» — серый блок с подсказкой, не красный.
 
+**Сделано 17.11 (Б2+Б3, Sonnet по [таску](../tasks/appinsights-page-sonnet.md), приёмка Opus 5.5).**
+Файлы: `Pages/Admin/AppInsights.cshtml(.cs)`, `wwwroot/js/admin/appinsights.js`, `buildAppInsightsBlock`
+в `dashboard.js`, пункт сайдбара после Jobs, запись в `ServicesCatalog`, пересобранный `admin.min.css`.
+Отклонения Sonnet (приняты): период и роль — в query (`?range=&role=`), hash занят якорями таблиц;
+плитки «Принято сегодня» и «Последняя телеметрия» ведут к шапке; у блока дашборда при зелёной ✓ и
+жёлтом/красном тоне по другой причине — точка цвета тона с причинами в `title`.
+Поправлено при приёмке: значение плитки переносится, а не обрезается («0,77 / 150…»); подпись таблицы
+фона «Warning+» → «Error+» (как в KQL); «данные на … (кэш 2 мин)» — только при прочитанных данных.
+**Найдено на живых данных:**
+- плавающий сбой Б1: SDK трижды подряд (~12:51–12:53 UTC) не разобрал ответ пакета
+  (`InvalidOperationException` «requires an element of type 'Object', but … 'String'»), потом прошло само;
+  сырые REST-пакеты, 30 одновременных и повтор на одном клиенте — не воспроизвели. Сделано: один
+  повтор в пределах 15 с, стек — в журнал, карточка «ответ не удалось разобрать» вместо текста SDK
+  (`AppInsightsErrorClassifier.IsUnreadableResponse`, три теста);
+- ⚠ ответы 5xx на проде видны как `GET /error`: обработчик ошибок перезапускает запрос на `/error`,
+  и исходный маршрут в `Name` теряется — для разбора 5xx это вопрос телеметрии А2, а не страницы;
+- на проде 17.11 ~12:40 UTC фоновые `System.TimeoutException` и `Npgsql.NpgsqlException` («The operation
+  has timed out»), 2 ответа 500 — смотреть Владу/следующему этапу.
+
 ### Б4. Документация
 
 | Что | Кто |
@@ -491,6 +511,6 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 | А3 деплой | ◐ 17.11 на проде, телеметрия идёт, вычистка проверена; осталось: память «после» (18.11), ProdAdmin (§8.1) |
 | А4 оповещения | ✅ 17.11 `swimhub-alerts` + 3 правила (≈ $1,1/мес); ждёт: Влад видит письмо группы |
 | Б1 чтение | ✅ 17.11 код + тесты, эндпоинты проверены вживую на данных прода (ветка `claude/app-insights-b1-5ff754`, не запушено); таск Б2+Б3 — `docs/tasks/appinsights-page-sonnet.md` |
-| Б2 страница | не начато |
-| Б3 блок | не начато |
-| Б4 документация | не начато |
+| Б2 страница | ✅ 17.11 Sonnet по таску, принято Opus: `/Admin/AppInsights` проверена глазами (3 состояния, 375 px; тема у админки одна — тёмная), не запушено |
+| Б3 блок | ✅ 17.11 блок 10 дашборда, грузится отдельно от `Promise.all`; проверен в «работает» и «нет входа» |
+| Б4 документация | ◐ 17.11 часть Sonnet готова (`admin-pages/appinsights.md`, README, п. 10 `index.md`, `ServicesCatalog`); часть Fable — `deploy.md`, отметка В14, строка ROADMAP, текст о приватности — НЕ сделана |

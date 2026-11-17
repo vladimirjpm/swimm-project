@@ -72,6 +72,15 @@ public static class ServicesCatalog
                 "Сколько стоит сайт за месяц. Бюджет «swimhub-monthly» на подписке Pay-As-You-Go: $60/мес, " +
                 "письма на 80 % и 100 % факта и 100 % прогноза (заведён 17.10.2026).",
                 [new("Расходы", "https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview")]),
+            new("Application Insights — телеметрия",
+                "Что делает прод-сайт: запросы, исключения, вызовы Postgres, логи Warning+ сайта и ProdAdmin. " +
+                "Оповещения приходят на почту. Читать цифры удобнее на странице админки /Admin/AppInsights " +
+                "(ошибки, медленные операции, сбои фона); в портале — подробности и запросы к логам.",
+                [
+                    new("Ресурсы Application Insights", "https://portal.azure.com/#browse/microsoft.insights%2Fcomponents"),
+                    new("Оповещения (Alerts)", "https://portal.azure.com/#view/Microsoft_Azure_Monitoring/AzureMonitoringBrowseBlade/~/alertsV2"),
+                ],
+                Access: "аккаунт Microsoft Влада; в терминале — az login"),
         ]),
 
         new("Код и выкатка — GitHub",
