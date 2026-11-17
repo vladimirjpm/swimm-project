@@ -16,7 +16,12 @@ namespace Swimm.Application.Mapping;
 ///
 /// Три правила:
 /// <list type="number">
-/// <item>мировой рекорд улучшен за раз больше чем на <see cref="WorldMaxImprovement"/>;</item>
+/// <item>мировой рекорд улучшен за раз больше чем на <see cref="WorldMaxImprovement"/>. У мастерсов
+/// (<c>world/masters</c>) такой скачок — находка, только если новое время ещё и быстрее рекорда
+/// соседней МЛАДШЕЙ полосы: сильный пловец, перешедший в новую полосу, легко обходит прежнего
+/// держателя на 5–10 %, но своей прежней полосы, как правило, не быстрее (17.11.2026: семь
+/// ложных кандидатов, все такие — data-integrity, раздел «Мастерсы и юниоры WA 17.11.2026»).
+/// Младшей полосы нет (25-29) или её рекорда нет в эталоне — прежний порог;</item>
 /// <item>не мировой рекорд (страна, возраст, мастерс) быстрее мирового той же дисциплины;
 /// мировой ЮНИОРСКИЙ (<c>world/junior</c>) — тоже: WJR законно медленнее WR, но не быстрее;</item>
 /// <item>строка стала МЕДЛЕННЕЕ той, что уже лежит в базе (И-21) — см. <see cref="IsContestedSlot"/>.</item>
@@ -121,11 +126,27 @@ public static class RecordPlausibility
                 if (SwimTime.ParseToMs(e.OldTime) is not int oldMs || newMs >= oldMs) continue;
 
                 var gain = (oldMs - newMs) / (double)oldMs;
-                if (gain > WorldMaxImprovement)
+                if (gain <= WorldMaxImprovement) continue;
+
+                // Мастерсы — своя мерка (17.11.2026): скачок там почти всегда — сильный пловец
+                // перешёл в новую полосу, и мерить его надо не прежним держателем, а младшей
+                // полосой. Не быстрее её рекорда — правдоподобно, находки нет.
+                if (IsMasters(e.Category) && YoungerBand(e.AgeKey) is { } younger
+                    && Lookup(worldReference, BandKey(younger, e.Gender, e.PoolType, e.Style, e.Distance)) is { } youngerRecord)
+                {
+                    if (newMs >= youngerRecord.Ms) continue;
+
                     found.Add(Finding(e, RecordIssueReasons.ImplausibleImprovement,
-                        $"Мировой рекорд улучшен за раз на {Percent(gain)}: {e.OldTime} → {e.NewTime}. " +
-                        $"Больше чем на {Percent(WorldMaxImprovement)} мировые рекорды не улучшают — " +
-                        "похоже на ошибку ввода у источника."));
+                        $"Мировой рекорд мастерсов в полосе {e.AgeKey.Trim()} улучшен за раз на {Percent(gain)}: " +
+                        $"{e.OldTime} → {e.NewTime} — и стал быстрее рекорда младшей полосы {younger} " +
+                        $"({youngerRecord.Time}). Переходом в новую полосу это не объяснить."));
+                    continue;
+                }
+
+                found.Add(Finding(e, RecordIssueReasons.ImplausibleImprovement,
+                    $"Мировой рекорд улучшен за раз на {Percent(gain)}: {e.OldTime} → {e.NewTime}. " +
+                    $"Больше чем на {Percent(WorldMaxImprovement)} мировые рекорды не улучшают — " +
+                    "похоже на ошибку ввода у источника."));
                 continue;
             }
 
@@ -183,6 +204,25 @@ public static class RecordPlausibility
         string ageKey, string gender, string poolType, string style, string distance) =>
         "masters|" + ageKey.Trim().ToLowerInvariant() + "|"
         + DisciplineKey(gender, poolType, style, distance);
+
+    /// <summary>
+    /// Соседняя младшая полоса мастерсов: «75-79» → «70-74». null — если полоса не вида «A-B»
+    /// или младше нет (25-29 — первая полоса World Aquatics).
+    /// </summary>
+    public static string? YoungerBand(string ageKey)
+    {
+        var parts = ageKey.Trim().Split('-');
+        if (parts.Length != 2
+            || !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var lo)
+            || !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var hi)
+            || hi - lo != 4 || lo < MastersFirstBandStart + 5)
+            return null;
+
+        return $"{lo - 5}-{hi - 5}";
+    }
+
+    /// <summary>Начало первой полосы мастерсов World Aquatics (25-29).</summary>
+    private const int MastersFirstBandStart = 25;
 
     private static bool IsJunior(string category) =>
         category.Trim().Equals("junior", StringComparison.OrdinalIgnoreCase);
