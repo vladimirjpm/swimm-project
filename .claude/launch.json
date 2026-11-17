@@ -215,6 +215,19 @@
       ],
       "port": 5078,
       "autoPort": false
+    },
+    {
+      "name": "swimm-api-prodadmin-window",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "server/run-prodadmin-window.ps1"
+      ],
+      "port": 5078,
+      "autoPort": false
     }
   ]
 }

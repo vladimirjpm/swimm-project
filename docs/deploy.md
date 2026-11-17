@@ -13,7 +13,7 @@
 | Домен, DNS, почта входящая | Cloudflare (все записи сайта — DNS only, серое облако) |
 | Письма с сайта | Resend, `noreply@swimhub.co.il` |
 | Вход | Google OAuth: прод-клиент `SwimHub prod`, dev-клиент `SwimProjectOAuth2` (localhost) |
-| Админка | **на проде нет** (решение В17). Кнопка **swimm-api-prodadmin** — локальная админка против прод-базы, красная полоса «PRODUCTION DATABASE» |
+| Админка | **на проде нет** (решение В17). Кнопка **swimm-api-prodadmin** — локальная админка против прод-базы, красная полоса «PRODUCTION DATABASE». Для долгих работ (прогон по странам, пакетный импорт) — **swimm-api-prodadmin-window**: то же, но в отдельном окне Windows, которое приложение Claude не погасит (`server/run-prodadmin-window.ps1`) |
 | Секреты | менеджер паролей Google; на машине — `server/Swimm.API/appsettings.ProdAdmin.Local.json` (в git не попадает) |
 
 **Главная база — прод.** Всё, что должно оказаться на сайте, делается в ProdAdmin. Локальная база —
