@@ -39,13 +39,15 @@ public static class DependencyInjection
         services.AddSingleton<CacheInvalidationInterceptor>();
 
         services.AddDbContext<SwimmDbContext>((sp, options) => options
-            .UseNpgsql(adminCs, npgsql =>
-                npgsql.EnableRetryOnFailure(maxRetryCount: 3))
+            .UseNpgsql(adminCs, npgsql => npgsql
+                .EnableRetryOnFailure(maxRetryCount: 3)
+                .ConfigureDataSource(NpgsqlTracingDefaults.Apply))
             .AddInterceptors(cacheDependencies, sp.GetRequiredService<CacheInvalidationInterceptor>()));
 
         services.AddDbContext<SwimmReadDbContext>(options => options
-            .UseNpgsql(readCs, npgsql =>
-                npgsql.EnableRetryOnFailure(maxRetryCount: 3))
+            .UseNpgsql(readCs, npgsql => npgsql
+                .EnableRetryOnFailure(maxRetryCount: 3)
+                .ConfigureDataSource(NpgsqlTracingDefaults.Apply))
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .AddInterceptors(cacheDependencies));
 
@@ -443,6 +445,8 @@ public static class DependencyInjection
             KeepAlive = 30,
             ApplicationName = "swimm-cache-bridge",
         };
-        return Npgsql.NpgsqlDataSource.Create(b.ConnectionString);
+        var ds = new Npgsql.NpgsqlDataSourceBuilder(b.ConnectionString);
+        NpgsqlTracingDefaults.Apply(ds);
+        return ds.Build();
     }
 }

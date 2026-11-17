@@ -25,8 +25,10 @@ public class LoggingEmailSenderTests
         var written = string.Join("\n", sink.Messages);
         Assert.DoesNotContain("SEKRET-TOKEN-123", written);
         Assert.DoesNotContain("reset-password?token=", written);
-        // Адрес и тема остаются: без них по логу не понять, что именно не ушло.
-        Assert.Contains("swimmer@example.com", written);
+        // Тема и маска адреса остаются: без них по логу не понять, что именно не ушло. Полного
+        // адреса нет — Error уходит в Application Insights (application-insights-plan.md, А2-бис).
+        Assert.DoesNotContain("swimmer@example.com", written);
+        Assert.Contains("s***@example.com", written);
         Assert.Contains("Reset your password", written);
         // Неотправленное письмо — отказ конфигурации, а не рядовое событие.
         Assert.Contains(LogLevel.Error, sink.Levels);

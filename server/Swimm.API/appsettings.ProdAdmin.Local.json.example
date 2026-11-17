@@ -18,5 +18,7 @@
   },
   "CandidateSearch": {
     "ApiKey": "... (ключ serper.dev для прода: поиск кандидатов loglig — только в админке, на App Service не нужен)"
-  }
+  },
+  "_commentTelemetry": "Строка подключения Application Insights (az monitor app-insights component show -g swimm-rg --app swimhub-ai --query connectionString -o tsv). Задана — ProdAdmin шлёт телеметрию с ролью swimhub-prodadmin; пусто или ключа нет — не шлёт ничего. docs/plans/application-insights-plan.md А3.5.",
+  "APPLICATIONINSIGHTS_CONNECTION_STRING": ""
 }
