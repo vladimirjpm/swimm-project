@@ -11,6 +11,7 @@ using Swimm.API.BackgroundServices;
 using Swimm.API.Hosting;
 using Swimm.API.Security;
 using Swimm.API.Services;
+using Swimm.API.Telemetry;
 using Swimm.Application;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Mapping;
@@ -39,6 +40,10 @@ if (builder.Environment.IsProdAdmin())
 // Фоновые расписания без явного ключа выключены и в Development (В10): локальный API наружу сам не ходит.
 var adminEnabled = HostingMode.AdminEnabled(builder.Configuration);
 var backgroundJobsEnabled = HostingMode.BackgroundJobsEnabled(builder.Configuration, builder.Environment);
+
+// Телеметрия в Application Insights — только если задана строка подключения (прод: App Service,
+// ProdAdmin: *.Local.json). Вычистка токенов и фильтры — в Telemetry/. docs/plans/application-insights-plan.md А2.
+builder.AddSwimmTelemetry();
 
 // Сжатие ответов. Замер 2026-08-25: справочники, которые тянет КАЖДАЯ страница
 // (records + normative-standards), весят 1.9 МБ несжатыми и 118 КБ в gzip — 94%.

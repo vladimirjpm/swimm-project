@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
+using Swimm.Infrastructure.Services.Email;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -42,10 +43,11 @@ public class LoggingEmailSender : IEmailSender
         }
         else
         {
-            // Ни тела, ни ссылки: токен одноразовый и даёт доступ к аккаунту.
+            // Ни тела, ни ссылки: токен одноразовый и даёт доступ к аккаунту. Адрес маскируем —
+            // Error уходит в Application Insights.
             _logger.LogError(
                 "Письмо НЕ отправлено — SMTP не настроен (пуст Email__Smtp__Host). To: {To}, Subject: {Subject}",
-                toEmail, subject);
+                EmailLogMask.Mask(toEmail), subject);
         }
 
         return Task.CompletedTask;

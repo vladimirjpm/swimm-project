@@ -61,6 +61,20 @@ public static class HostingMode
     /// </summary>
     public static bool PushRemindersEnabled(IConfiguration config) => config.GetValue(PushRemindersEnabledKey, false);
 
+    /// <summary>Строка подключения Application Insights — то же имя, что ищет пакет Azure Monitor.</summary>
+    public const string TelemetryConnectionStringKey = "APPLICATIONINSIGHTS_CONNECTION_STRING";
+    public const string TelemetryEnabledKey = "Telemetry:Enabled";
+
+    /// <summary>
+    /// Телеметрия в Azure (docs/plans/application-insights-plan.md, А2). Включается НАЛИЧИЕМ строки
+    /// подключения: на проде она в настройках App Service, в ProdAdmin — в
+    /// <c>appsettings.ProdAdmin.Local.json</c>. Нет строки — ни одного вызова наружу (разработка,
+    /// тесты, CI). <c>Telemetry:Enabled=false</c> — аварийный выключатель без удаления строки.
+    /// </summary>
+    public static bool TelemetryEnabled(IConfiguration config) =>
+        !string.IsNullOrWhiteSpace(config[TelemetryConnectionStringKey])
+        && config.GetValue(TelemetryEnabledKey, true);
+
     /// <summary>
     /// Путь принадлежит админке. Регистр не важен (<see cref="PathString.StartsWithSegments(PathString)"/>
     /// сравнивает без учёта регистра): <c>/ADMIN</c> не должен проскочить мимо выключателя.

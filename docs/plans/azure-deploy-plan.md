@@ -1028,6 +1028,7 @@ register→verify (письмо приходит, ссылка на `https://swi
 | `Email__Smtp__User`, `Email__Smtp__Password` | письма |
 | `WebPush__PublicKey`, `WebPush__PrivateKey` (+ не секрет `WebPush__Subject=mailto:noreply@swimhub.co.il`) | **20.10, напоминания о тренировках** ([web-push-reminders-plan.md](web-push-reminders-plan.md)): без них push не уходят, а пункт Reminders показывает «not available yet»; в логе старта — Critical. Сгенерировать ОДИН раз: `dotnet run --project server/Swimm.API -- --generate-vapid-keys`. ⚠ Смена пары аннулирует все подписки. Приватный — в менеджер паролей; в ProdAdmin не нужен (джоб там выключен) |
 | ~~`CandidateSearch__ApiKey`~~ | **14.10: на App Service не нужен** — читают его только админка и пакетный забор, а их на проде нет (В17); ключ — в `appsettings.ProdAdmin.Local.json` |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | **17.11, Application Insights** ([application-insights-plan.md](application-insights-plan.md) А2–А3): без неё сайт телеметрию не шлёт вовсе — ничего не ломается, просто нет графиков и оповещений. Задаётся шагом А3 (смена настройки перезапускает сайт). Аварийно выключить, не удаляя строку, — `Telemetry__Enabled=false`. В ProdAdmin — ключ того же имени в `appsettings.ProdAdmin.Local.json` |
 
 Все четыре строки — с `SslMode=Require` и `Maximum Pool Size`.
 

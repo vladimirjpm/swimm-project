@@ -61,6 +61,45 @@ public class HostingModeTests
         Assert.Equal(expected, HostingMode.BackgroundJobsEnabled(cfg, ProdAdmin));
     }
 
+    // ── Телеметрия (docs/plans/application-insights-plan.md, А2.2) ───────────
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Telemetry_WithoutConnectionString_Off(string? value)
+    {
+        // Разработка, тесты и CI ничего не шлют: строки подключения там нет.
+        var cfg = value is null ? Config() : Config((HostingMode.TelemetryConnectionStringKey, value));
+        Assert.False(HostingMode.TelemetryEnabled(cfg));
+    }
+
+    [Fact]
+    public void Telemetry_WithConnectionString_On()
+    {
+        var cfg = Config((HostingMode.TelemetryConnectionStringKey, "InstrumentationKey=00000000-0000-0000-0000-000000000000"));
+        Assert.True(HostingMode.TelemetryEnabled(cfg));
+    }
+
+    [Fact]
+    public void Telemetry_KillSwitch_WinsOverConnectionString()
+    {
+        var cfg = Config(
+            (HostingMode.TelemetryConnectionStringKey, "InstrumentationKey=00000000-0000-0000-0000-000000000000"),
+            (HostingMode.TelemetryEnabledKey, "false"));
+        Assert.False(HostingMode.TelemetryEnabled(cfg));
+    }
+
+    [Fact]
+    public void Telemetry_RoleName_PerEnvironment()
+    {
+        var cfg = Config();
+        Assert.Equal("swimhub-web", Swimm.API.Telemetry.TelemetryRoleName.Resolve(cfg, Production));
+        Assert.Equal("swimhub-prodadmin", Swimm.API.Telemetry.TelemetryRoleName.Resolve(cfg, ProdAdmin));
+        Assert.Equal("swimhub-dev", Swimm.API.Telemetry.TelemetryRoleName.Resolve(cfg, Development));
+        Assert.Equal("custom", Swimm.API.Telemetry.TelemetryRoleName.Resolve(Config(("Telemetry:RoleName", " custom ")), Production));
+    }
+
     [Fact]
     public void Flags_TurnOffByConfig()
     {

@@ -73,8 +73,9 @@ public class SmtpEmailSender : IEmailSender
         }
         catch (Exception ex)
         {
-            // Адресат — PII, тело (с токен-ссылкой) не логируем никогда.
-            _logger.LogError(ex, "Failed to send email to {To}: {Subject}", toEmail, subject);
+            // Адресат — PII: Error уходит в Application Insights, поэтому адрес маскируем.
+            // Тело (с токен-ссылкой) не логируем никогда.
+            _logger.LogError(ex, "Failed to send email to {To}: {Subject}", EmailLogMask.Mask(toEmail), subject);
             throw;
         }
     }
