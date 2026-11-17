@@ -14,6 +14,7 @@
 | Письма с сайта | Resend, `noreply@swimhub.co.il` |
 | Вход | Google OAuth: прод-клиент `SwimHub prod`, dev-клиент `SwimProjectOAuth2` (localhost) |
 | Админка | **на проде нет** (решение В17). Кнопка **swimm-api-prodadmin** — локальная админка против прод-базы, красная полоса «PRODUCTION DATABASE». Для долгих работ (прогон по странам, пакетный импорт) — **swimm-api-prodadmin-window**: то же, но в отдельном окне Windows, которое приложение Claude не погасит (`server/run-prodadmin-window.ps1`) |
+| Телеметрия | Application Insights `swimhub-ai` на рабочей области `swimhub-logs` (та же группа и регион): запросы, исключения, Postgres, логи Warning+ сайта (`swimhub-web`) и ProdAdmin (`swimhub-prodadmin`). Хранение 90 дней, дневной лимит приёма 0,15 ГБ. Оповещения — группа `swimhub-alerts` на почту владельца. План — [plans/application-insights-plan.md](plans/application-insights-plan.md) |
 | Секреты | менеджер паролей Google; на машине — `server/Swimm.API/appsettings.ProdAdmin.Local.json` (в git не попадает) |
 
 **Главная база — прод.** Всё, что должно оказаться на сайте, делается в ProdAdmin. Локальная база —
@@ -95,6 +96,36 @@ swimhub-pg-restore --yes`), он стоит денег. Самая ранняя 
 `https://swimhub.co.il/healthz` (жив ли процесс) и `/readyz` (видит ли базу). Лог старта:
 `az webapp log download -g swimm-rg -n swimhub --log-file logs.zip` → `LogFiles/*_default_docker.log`.
 Перезапуск: `az webapp restart -g swimm-rg -n swimhub`.
+
+### 5. Ошибки и медленные ответы: куда смотреть
+
+Сайт работает, но что-то не так (пришло письмо, пользователь пишет «не открывается страница»):
+
+- **`/Admin/AppInsights`** в локальной админке (Development или ProdAdmin) — 5xx, исключения,
+  медленные операции, ошибки по маршруту, сбои фона, сколько принято за сутки. Читает под входом `az`;
+  нужны ключи `AppInsights:WorkspaceId` / `ResourceId` в `appsettings.*.Local.json` (команды — в
+  `.example`). Страница сама скажет «не настроено» / «нет входа az». Справка — [admin-pages/appinsights.md](admin-pages/appinsights.md).
+- **Портал Azure** → ресурс `swimhub-ai`: **Failures** (ошибки и исключения со стеком), **Performance**
+  (медленные запросы), **Logs** (KQL по таблицам `AppRequests`, `AppExceptions`, `AppDependencies`,
+  `AppTraces`). Ссылки прямо на ресурс есть в шапке `/Admin/AppInsights`.
+  ⚠ Ответы 5xx видны как `GET /error`: обработчик ошибок перезапускает запрос, исходный маршрут в имени
+  теряется — смотри исключение с тем же временем (Failures → Exceptions).
+- **Письма группы `swimhub-alerts`** (оповещения Azure Monitor):
+  - `swimhub-5xx` — больше 5 ответов 5xx за 15 минут: сайт падает на запросах. Смотри Failures.
+  - `swimhub-bg-errors` — исключение или лог Error за час у ProdAdmin или у фона сайта (вне запроса:
+    пинг базы, мост кэша, напоминания). Смотри таблицу «Сбои фоновых служб» на `/Admin/AppInsights`.
+  - `swimhub-ingestion-80` — принято больше 80 % дневного лимита (120 из 150 МБ). На 100 % Azure
+    перестаёт принимать телеметрию до сброса в 10:00 UTC — сайт работает, но «слепнет». Причина —
+    обычно шумный лог или цикл ошибок; смотри, какая таблица выросла (плитка «Принято сегодня»).
+  - «Failure Anomalies - swimhub-ai» — бесплатное умное обнаружение Azure: необычный рост доли ошибок.
+- **UptimeRobot** — письмо «down», когда `/readyz` не отвечает 5 минут (сайт или база лежат) — тогда
+  это пункт 4, а не этот.
+
+**Аварийно выключить телеметрию** (например, если она тормозит сайт или съела лимит не по делу):
+`az webapp config appsettings set -g swimm-rg -n swimhub --settings Telemetry__Enabled=false -o none` —
+сайт перезапустится и перестанет слать что-либо, строку подключения удалять не надо. Включить обратно —
+то же с `true` (или удалить ключ). В ProdAdmin — `"Telemetry": { "Enabled": false }` в
+`appsettings.ProdAdmin.Local.json`.
 
 ## Частые мелочи
 

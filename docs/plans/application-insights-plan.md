@@ -452,6 +452,24 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 | [deploy.md](../deploy.md) — «если сломалось: куда смотреть», переменная в реестре §5 плана деплоя, отметка В14, строка в ROADMAP | Fable |
 | Текст о приватности на сайте — проверить, не нужна ли строка о технических журналах | Fable проверяет, решает Влад |
 
+**Б4-приватность — проверено 17.11, решает Влад (ничего не менялось).** Текст —
+`client/src/content/help/privacy/{en,ru,he}.md` (`/privacy`, редакция 23.10.2026). Сейчас там:
+провайдер «Microsoft Azure, Israel Central — hosting of the site and its database»; срок хранения
+«technical server logs (requests and errors, which may include IP addresses) — for the limited period
+needed to run and protect the site»; в «Cookies» — «no … third-party analytics». Что реально пишет
+телеметрия (запросом 17.11): IP — `0.0.0.0` (маскируется), город/страна — один на все записи (похоже,
+адрес прокси App Service, не посетителя), браузер и ОС из User-Agent — да, id пользователя и сессии —
+нет, значения параметров адреса — `Redacted`; хранение таблиц — 90 дней.
+Противоречия нет, но формулировка расплывчата. **Предложение** (во всех трёх языках):
+1. В списке провайдеров: «Microsoft Azure, Israel Central region — hosting of the site, its database
+   and technical monitoring».
+2. В сроках хранения заменить строку логов на: «technical logs — page addresses requested (without
+   search or link parameters), response times, errors and the browser and device type; the IP address
+   is not stored — up to 90 days».
+3. В «Cookies» добавить: «Technical monitoring runs on our server only: there is no analytics script
+   or cookie in your browser.»
+Дата редакции — новая; изменение не существенное для владельцев аккаунтов (объявлять не нужно).
+
 ## 5. Кто что делает
 
 | Этап | Что | Кто | Почему он | Оценка |
@@ -513,4 +531,4 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 | Б1 чтение | ✅ 17.11 код + тесты, эндпоинты проверены вживую на данных прода (ветка `claude/app-insights-b1-5ff754`, не запушено); таск Б2+Б3 — `docs/tasks/appinsights-page-sonnet.md` |
 | Б2 страница | ✅ 17.11 Sonnet по таску, принято Opus: `/Admin/AppInsights` проверена глазами (3 состояния, 375 px; тема у админки одна — тёмная), не запушено |
 | Б3 блок | ✅ 17.11 блок 10 дашборда, грузится отдельно от `Promise.all`; проверен в «работает» и «нет входа» |
-| Б4 документация | ◐ 17.11 часть Sonnet готова (`admin-pages/appinsights.md`, README, п. 10 `index.md`, `ServicesCatalog`); часть Fable — `deploy.md`, отметка В14, строка ROADMAP, текст о приватности — НЕ сделана |
+| Б4 документация | ◐ 17.11 сделано: часть Sonnet (`admin-pages/appinsights.md`, README, п. 10 `index.md`, `ServicesCatalog`) и часть Fable — `deploy.md` («Что где» + «Если сломалось» п. 5), В14 в плане деплоя, строка ROADMAP. **Ждёт Влада:** правка текста о приватности (§Б4-приватность ниже), сайт не менялся |
