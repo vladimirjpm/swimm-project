@@ -168,3 +168,50 @@ test('без уровней времена остаются текстом ст�
   assert.equal(line.per_level, null);
   assert.match(line.text, /1:40 \| 1:50/);
 });
+
+// Лист 17.11.2026 как есть: «יציאה:» с двоеточием, времена через «\», голые секунды, объём «2.4 או 2.2».
+const SHEET4 = String.raw`300 (100 חתירה + 100 סגנון + 100 חתירה)
+300 זומרס (100 מעורב + 100 רגליים + 100 חתירה)
+300 כפות (100 חתירה + 100 גב + 100 חתירה)
+
+100X4\3 חתירה 2V יציאה: 1:45 \ 1:55 \ 2:05 \ 2:15
+50X6\4 חתירה 3V יציאה: 50 \ 55 \ 1:00 \ 1:05
+200X2 חתירה כפות ראשון 2V, שני 10 שניות יותר מהר מנוחה 20' בינהם
+50 קל
+
+100X4 זומרס (75 חתירה 10' מנוחה + 25 סגנון 4V) יציאה: 1:50 \ 2:00 \ 2:10
+2.4 או 2.2
+
+200 מ' מדידה זמן הכי מהיר שאפשר בלי ציוד
+50 קל
+2.7 או 2.5`;
+
+test('лист 4: «יציאה: 1:45 \ 1:55» и голые секунды — по уровням, «2.4 או 2.2» — отметка объёма', () => {
+  const p = parseWorkoutText(SHEET4, LEVELS);
+  const sendOffs = (line) => LEVELS.map((id) => line.per_level?.[id]?.send_off ?? null);
+  const [hundreds, fifties] = p.workout.sets[1].lines;
+  assert.deepEqual(sendOffs(hundreds), ['1:45', '1:55', '2:05', '2:15']);
+  assert.deepEqual(sendOffs(fifties), [':50', ':55', '1:00', '1:05']);
+  assert.equal(hundreds.text, 'חתירה');
+  // Три времени на четыре уровня — четвёртое по шагу, с подсветкой.
+  const zoomers = p.workout.sets[2].lines[0];
+  assert.deepEqual(sendOffs(zoomers), ['1:50', '2:00', '2:10', '2:20']);
+  assert.ok(p.lineMarks['2:0'].includes('step'));
+  // «2.4 או 2.2» закрывает сет и не стал строкой; «4\3», «6\4» — два варианта повторов (ставит тренер).
+  assert.deepEqual(p.totals.map((t) => [t.label, ...t.expected]), [['2.4 או 2.2', 2400, 2200], ['2.7 או 2.5', 2700, 2500]]);
+  assert.equal(p.workout.sets.length, 4);
+  assert.ok(p.workout.sets.every((s) => s.lines.every((l) => l.distance != null)), 'строки объёма не попали в сеты');
+  assert.ok(p.lineMarks['1:0'].includes('reps') && p.lineMarks['1:1'].includes('reps'));
+  // Слово «או» живёт только в отметке объёма — её в тексте разбора и не должно быть.
+  assertNoLostWords(SHEET4.replace(/^\d\.\d או \d\.\d$/gm, ''), p);
+});
+
+test('«יציאה 1:50-2:00» через дефис по-прежнему; «50-55» без двоеточий — не времена', () => {
+  const p = parseWorkoutText('100X4 free יציאה 1:50-2:00\n50X4 kick יציאה 50-55', LEVELS);
+  const [a, b] = p.workout.sets[0].lines;
+  assert.equal(a.per_level[11].send_off, '1:50');
+  assert.equal(a.per_level[12].send_off, '2:00');
+  // Первое «50» — одно время всем уровням (как раньше), «-55» остаётся текстом.
+  assert.equal(b.per_level[11].send_off, ':50');
+  assert.match(b.text, /55/);
+});
