@@ -5,6 +5,8 @@
 # это не надо было помнить. Запускается кнопкой swimm-api-prodadmin (.claude/launch.json) или руками:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File server/run-prodadmin.ps1
 # -DryRun — только подготовить ветку, ProdAdmin не запускать.
+# Для долгих работ — кнопка swimm-api-prodadmin-window (run-prodadmin-window.ps1): тот же скрипт в
+# отдельном окне, которое приложение Claude не гасит вместе с сессией.
 param([switch]$DryRun)
 
 $ErrorActionPreference = 'Continue'
