@@ -11,7 +11,7 @@
 Sonnet через `/delegate`, таск-документ пишешь ты после Б1.
 
 **Где мы (17.11).** А2 сделан кодом на ветке `claude/app-insights-telemetry`, не закоммичен
-(ждёт просьбы Влада). А1 закрыт 17.11 по «да» Влада (лимит 0,15 ГБ). Из §8 отвечен вопрос 2, остальные запрошены 17.11. Что проверено и найдено — «Сделано 17.11»
+(ждёт просьбы Влада). А1 закрыт 17.11 по «да» Влада (лимит 0,15 ГБ). Из §8 отвечены вопросы 2 и 3 (доступность — уже UptimeRobot), остальные запрошены 17.11. Что проверено и найдено — «Сделано 17.11»
 ниже; дальше по §6: А3 → А4.
 
 ### Сделано 17.11 — А1 (Opus 5.5, «да» Влада в чате)
@@ -59,13 +59,38 @@ Sonnet через `/delegate`, таск-документ пишешь ты по�
   проде. Оставлены: `Admin {User}` в `ClubsAdminController`/`SwimmersAdminController` — только
   админка (ProdAdmin), имя самого Влада; `DevAdminBypass {Email}` — только Development, телеметрии
   там нет. `Include Error Detail` в строках подключения нет; `EnableSensitiveDataLogging` не включён.
-- **Statsbeat:** экспортёр по умолчанию шлёт в Microsoft свою служебную статистику (версия SDK,
-  регион, ikey — без наших данных). Выключается `APPLICATIONINSIGHTS_STATSBEAT_DISABLED=true` —
-  решить при А3, в тестах выключен.
+- **Statsbeat — ВЫКЛЮЧЕН (Влад, 17.11):** служебная статистика SDK для Microsoft (версия SDK,
+  регион, ikey, сколько пакетов ушло — без наших данных), нам пользы ноль. Выключается в коде:
+  `AddSwimmTelemetry` ставит `APPLICATIONINSIGHTS_STATSBEAT_DISABLED=true` до `UseAzureMonitor` —
+  так и на проде, и в ProdAdmin, настройка App Service не нужна. ⚠ Экспортёр читает переменную
+  один раз и кэширует (`DefaultPlatform`, исходник 1.8.3), поэтому порядок важен. Тест
+  `Statsbeat_DisabledByAddSwimmTelemetry` ловит событие экспортёра 30 «Statsbeat was disabled»
+  (мутацией проверено). `CustomerSdkStats` (статистика потерянной телеметрии — в НАШ ресурс) не трогаем.
 - **Для Б1:** актуальный пакет чтения — `Azure.Monitor.Query.Logs` 1.0.0 (старый
   `Azure.Monitor.Query` 1.7.1 ещё живёт).
-- **Локальная проверка с порталом** (А2, последний абзац) — не сделана: ресурса ещё нет. Сделать
-  после А1, ролью `swimhub-dev` через временную переменную.
+- **Локальная проверка на живой рабочей области — ✅ 17.11** (после А1). API Release на :5091,
+  Development, строка подключения — переменной окружения процесса (подстановкой из `az`, не
+  печаталась), роль `swimhub-dev`. Итог, запросами в `swimhub-logs`:
+  - запросы дошли за ~1 мин; у `/auth/reset-password`, `/auth/verify-email`, `/signin-google` в
+    `Url` строки запроса нет; поиск — `?q=Redacted`, и `competitionId=1581` тоже `Redacted` (встроенная
+    вычистка трогает все значения); `search 'LOCALSEKRET17'` по всем таблицам — 0 строк;
+  - `/healthz`, `/readyz`, `/version`, `/favicon.ico`, `/css/*` в `AppRequests` не попали;
+  - Postgres в `AppDependencies` (`DependencyType=postgresql`, `Target=host | db`) — SQL с
+    плейсхолдерами (`@hash`, `@purpose`), значений нет; исключение 500 у `/signin-google` (поддельный
+    `state`) — в `AppExceptions`, без кода;
+  - **⚠ найдено и починено:** Npgsql вешает на каждый спан событие `received-first-response`, а
+    экспортёр делает из него отдельную строку `AppTraces` уровня Verbose — по строке на SQL-запрос.
+    Выключено `EnableFirstResponseEvent(false)` (`Swimm.Infrastructure/Data/NpgsqlTracingDefaults.cs`)
+    у обоих контекстов EF (`ConfigureDataSource`) и у моста кэша. Повтор: 16 событий → 4, остаток —
+    мост (до правки моста) и проверка «локальная база отстаёт от прода» (сырой `NpgsqlConnection`,
+    только на старте, только локально). Тест `NpgsqlTracingPgTests` (мутацией проверено, что ловит);
+  - в `AppTraces` уходят только Warning+: EF «Compiling a query which loads related collections…»
+    и `DevAdminBypass` с email владельца — последний только в Development, на проде этой ветки нет;
+  - таблицы есть: `AppRequests`, `AppDependencies`, `AppExceptions`, `AppTraces`, `AppMetrics`;
+    поля `AppRoleName`, `Name`, `Url`, `ResultCode`, `Success`, `DurationMs` — как в плане. Для Б1:
+    `Success=false` и у 404, ошибки сервера считать по `ResultCode` 5xx; `AppAvailabilityResults` не будет (§8.3);
+  - запросы KQL без расширения `az log-analytics` — REST `api.loganalytics.io` с токеном
+    `az account get-access-token --resource https://api.loganalytics.io` (помощник был во временной папке).
 - Реестр переменных — строка в [azure-deploy-plan.md](azure-deploy-plan.md) §5; образец ключа — в
   `appsettings.ProdAdmin.Local.json.example`.
 
@@ -216,6 +241,18 @@ az webapp config appsettings set -g swimm-rg -n swimhub --settings APPLICATIONIN
 4. Память процесса на B1 (1,75 ГБ) до и после — записать в план.
 5. ProdAdmin (если «да» в §8, вопрос 1): ключ в `appsettings.ProdAdmin.Local.json`, имя — в `.example`.
 
+**Ход А3 (17.11):**
+- ✅ п. 2 сделан РАНЬШЕ п. 1 («да» Влада): `APPLICATIONINSIGHTS_CONNECTION_STRING` задана в App Service
+  10:30 UTC (значение подстановкой из `az resource show … --query properties.ConnectionString`,
+  вывод погашен). Сайт перезапустился, к 10:31 `/readyz` = `database: up`. На проде старая сборка
+  `57a288e5` — кода телеметрии в ней нет, строку она не читает; включится сама при деплое кода А2.
+  Деплой (`azure-deploy.yml`) настройки App Service не трогает — переменная переживёт выкатку.
+- ✅ п. 4 «до»: `MemoryWorkingSet` за сутки до 17.11 10:30 — в среднем 207 МБ, пик 375 МБ (из 1,75 ГБ).
+  Замер «после» — через сутки после деплоя тем же запросом:
+  `az monitor metrics list --resource <id swimhub> --metric MemoryWorkingSet --interval PT1H --offset 24h --aggregation Average Maximum`
+  (в Git Bash — с `MSYS_NO_PATHCONV=1`, иначе id ресурса искажается).
+- ⏳ п. 1 — код А2 в master и деплой (Влад); ⏳ п. 3 — проверка после деплоя; ⏳ п. 5 — ждёт §8.1.
+
 ### А4. Оповещения
 
 Исполнитель: **Fable** командами `az` после «да» Влада; адрес почты задаётся в Azure, в репо его нет.
@@ -224,7 +261,7 @@ az webapp config appsettings set -g swimm-rg -n swimhub --settings APPLICATIONIN
 |---|---|
 | Ошибки сервера | запросов с кодом 5xx > 5 за 15 минут |
 | Исключения в фоне | исключения роли `swimhub-prodadmin` или джоба напоминаний > 0 за час |
-| Сайт не отвечает | проверка доступности `/readyz` раз в 5 минут, 2 провала подряд (платная, ≈ $1–3/мес — §8, вопрос 3) |
+| ~~Сайт не отвечает~~ | **не ставим в Azure** (§8.3, 17.11): уже делает бесплатный UptimeRobot — `/readyz` раз в 5 минут, письмо Владу |
 | Объём | приём дошёл до 80 % дневного лимита |
 
 Приёмка: тестовое письмо группы оповещений дошло Владу.
@@ -261,7 +298,7 @@ ProdAdmin, лишь бы был `az login` и ключи в `appsettings.*.Local
 - Таймаут 15 секунд; сбой Azure не роняет страницу — состояние «не удалось прочитать» с текстом.
 - Регистрация под `adminEnabled` — на проде этот код не исполняется (админки там нет).
 - KQL сверять на живых данных после А3: имена таблиц (`AppRequests`, `AppExceptions`,
-  `AppDependencies`, `AppTraces`, `AppAvailabilityResults`, `Usage`) проверить запросом, не по памяти.
+  `AppDependencies`, `AppTraces`, `Usage`; `AppAvailabilityResults` пустая — теста доступности в Azure нет, §8.3) проверить запросом, не по памяти.
 
 ### Б2. Страница `/Admin/AppInsights`
 
@@ -276,7 +313,7 @@ ProdAdmin, лишь бы был `az login` и ключи в `appsettings.*.Local
    Ссылки в портал (Failures, Performance, Live metrics, Logs) собираются во время работы из
    `AppInsights:ResourceId` — в разметке и в репо идентификаторов нет.
 2. **Плитки:** запросов; доля ошибок (5xx); медиана и p95 ответа; исключений; Postgres — p95 и
-   сбои; доступность (если тест включён); принято сегодня / дневной лимит.
+   сбои; принято сегодня / дневной лимит.
 3. **Таблицы:** частые исключения (тип, начало сообщения, сколько, когда последний раз, операция);
    самые медленные операции (сколько, p50, p95); ошибки по маршруту и коду; сбои фоновых служб.
 4. Данные грузит скрипт `wwwroot/js/admin/appinsights.js` — страница открывается сразу, цифры
@@ -340,7 +377,7 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 - Health-check и статика без фильтра съедят объём (А2.4).
 - Идентификаторы Azure — не в коммит: ни в `appsettings.json`, ни в MD, ни в ссылках разметки.
 - Вход `az` истекает — страница должна говорить об этом словами, а не падать.
-- `Usage` и доступность появляются в рабочей области не сразу — «нет данных» ≠ ошибка.
+- `Usage` появляется в рабочей области не сразу — «нет данных» ≠ ошибка.
 - Пакет экспорта поднимает свой фоновый поток — посмотреть память на B1 (А3.4).
 - Новые Tailwind-классы → пересборка бандла, иначе CI «Бандл админки пересобран» упадёт.
 
@@ -350,8 +387,10 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
    главный повод. Цена — ключ в локальном файле.
 2. ✅ **Дневной лимит приёма** — 0,15 ГБ (Влад, 17.11). Рекомендовал 0,15 ГБ в день (≈ 4,5 ГБ в месяц, в бесплатных 5 ГБ).
    При достижении запись останавливается до следующих суток.
-3. **Платная проверка доступности** (≈ $1–3 в месяц). Рекомендую да: без неё о лежащем сайте
-   узнаём только по отсутствию запросов.
+3. ✅ **Платная проверка доступности — НЕ ставим** (Влад, 17.11). Уже есть бесплатный монитор
+   UptimeRobot «swimhub.co.il» с 17.10: `https://swimhub.co.il/readyz` каждые 5 минут, письмо
+   владельцу при падении и подъёме ([azure-deploy-handoff.md](azure-deploy-handoff.md), карточка на
+   `/Admin/Services`). Он же ловит истёкший сертификат и слетевший DNS.
 4. **Куда слать оповещения** — какой адрес.
 5. **Название пункта** — «App Insights» или иначе.
 
@@ -362,8 +401,8 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 | Этап | Статус |
 |---|---|
 | А1 ресурсы | ✅ 17.11 `swimhub-logs` + `swimhub-ai`, дневной лимит 0,15 ГБ |
-| А2 код | ✅ 17.11 код и тесты на ветке `claude/app-insights-telemetry`, не закоммичено; проверка с порталом — после А1 |
-| А3 деплой | не начато |
+| А2 код | ✅ 17.11 код и тесты (`1af78422` на ветке `claude/app-insights-telemetry`), проверено на живой рабочей области; правка Npgsql-событий — не закоммичена |
+| А3 деплой | ◐ 17.11 строка подключения в App Service, замер памяти «до»; ждёт деплоя кода А2 |
 | А4 оповещения | не начато |
 | Б1 чтение | не начато |
 | Б2 страница | не начато |

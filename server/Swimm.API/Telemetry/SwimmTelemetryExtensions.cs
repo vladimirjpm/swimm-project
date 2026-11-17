@@ -18,12 +18,22 @@ public static class SwimmTelemetryExtensions
     internal const string AspNetCoreRedactionOffKey = "OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION";
     internal const string HttpClientRedactionOffKey = "OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION";
 
+    /// <summary>
+    /// Statsbeat — служебная статистика SDK для Microsoft (версия, регион, сколько пакетов ушло).
+    /// Нам пользы ноль, выключено решением Влада 17.11. Экспортёр читает только переменную
+    /// окружения процесса и кэширует её при создании (DefaultPlatform), поэтому ставим её здесь,
+    /// до UseAzureMonitor, — а не настройкой App Service: так выключено и на проде, и в ProdAdmin.
+    /// </summary>
+    internal const string StatsbeatDisabledVariable = "APPLICATIONINSIGHTS_STATSBEAT_DISABLED";
+
     public static WebApplicationBuilder AddSwimmTelemetry(this WebApplicationBuilder builder)
     {
         if (!HostingMode.TelemetryEnabled(builder.Configuration)) return builder;
 
         var roleName = TelemetryRoleName.Resolve(builder.Configuration, builder.Environment);
         var connectionString = builder.Configuration[HostingMode.TelemetryConnectionStringKey]!;
+
+        Environment.SetEnvironmentVariable(StatsbeatDisabledVariable, "true");
 
         // ⚠ ДО UseAzureMonitor: процессор вычистки должен стоять в цепочке раньше экспортёра.
         builder.Services.AddSwimmTelemetryGuards(builder.Configuration);

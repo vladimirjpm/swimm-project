@@ -25,10 +25,9 @@ public class TelemetryWiringTests
     private const string FakeConnectionString =
         "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=http://127.0.0.1:9/;LiveEndpoint=http://127.0.0.1:9/";
 
+    // Statsbeat здесь НЕ выключаем руками — это делает сам AddSwimmTelemetry (проверяет тест ниже).
     private static WebApplication Build(string environment, string? connectionString = FakeConnectionString)
     {
-        Environment.SetEnvironmentVariable("APPLICATIONINSIGHTS_STATSBEAT_DISABLED", "true");
-
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -93,6 +92,45 @@ public class TelemetryWiringTests
         var rule = Assert.Single(rules, r => r.ProviderName == typeof(OpenTelemetryLoggerProvider).FullName);
         Assert.Null(rule.CategoryName);
         Assert.Equal(LogLevel.Warning, rule.LogLevel);
+    }
+
+    [Fact]
+    public async Task Statsbeat_DisabledByAddSwimmTelemetry()
+    {
+        // Решение Влада 17.11: служебная статистика SDK для Microsoft не уходит. Экспортёр, увидев
+        // выключатель, пишет в свой журнал событие 30 «Statsbeat was disabled via environment variable».
+        Environment.SetEnvironmentVariable(SwimmTelemetryExtensions.StatsbeatDisabledVariable, null);
+        using var events = new ExporterEventsListener();
+
+        // Своя строка подключения: транспорт экспортёра кэшируется по ней, и чужой тест не должен его создать раньше.
+        await using var app = Build("Production",
+            "InstrumentationKey=11111111-1111-1111-1111-111111111111;IngestionEndpoint=http://127.0.0.1:9/;LiveEndpoint=http://127.0.0.1:9/");
+        Assert.Equal("true", Environment.GetEnvironmentVariable(SwimmTelemetryExtensions.StatsbeatDisabledVariable));
+
+        // Транспорт экспортёра создаётся не с TracerProvider, а с провайдерами метрик и логов.
+        _ = app.Services.GetRequiredService<TracerProvider>();
+        _ = app.Services.GetRequiredService<OpenTelemetry.Metrics.MeterProvider>();
+        _ = app.Services.GetRequiredService<OpenTelemetry.Logs.LoggerProvider>();
+        Assert.True(events.EventIds.Contains(30), "events: " + string.Join(",", events.EventIds));
+    }
+
+    private sealed class ExporterEventsListener : System.Diagnostics.Tracing.EventListener
+    {
+        private const string ExporterEventSource = "OpenTelemetry-AzureMonitor-Exporter";
+        private readonly List<int> _ids = new();
+        public IReadOnlyList<int> EventIds { get { lock (_ids) return _ids.ToList(); } }
+
+        protected override void OnEventSourceCreated(System.Diagnostics.Tracing.EventSource source)
+        {
+            if (source.Name == ExporterEventSource)
+                EnableEvents(source, System.Diagnostics.Tracing.EventLevel.Informational);
+        }
+
+        protected override void OnEventWritten(System.Diagnostics.Tracing.EventWrittenEventArgs e)
+        {
+            if (e.EventSource.Name == ExporterEventSource)
+                lock (_ids) _ids.Add(e.EventId);
+        }
     }
 
     [Fact]
