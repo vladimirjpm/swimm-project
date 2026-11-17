@@ -315,6 +315,8 @@ if (googleEnabled)
         options.Scope.Add("email");
         // Признак «email подтверждён» — без него новый пользователь Google не войдёт (GoogleClaims).
         GoogleClaims.Configure(options);
+        // «Отмена» у Google, «назад», старая вкладка — обратно на страницу, а не страница 500.
+        options.Events.OnRemoteFailure = GoogleRemoteFailure.HandleAsync;
     });
 }
 
