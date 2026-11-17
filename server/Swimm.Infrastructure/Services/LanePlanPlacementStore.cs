@@ -8,10 +8,10 @@ using Swimm.Infrastructure.Data;
 namespace Swimm.Infrastructure.Services;
 
 /// <summary>
-/// Ответ сдвигает ОДНОГО пловца в плане дорожек даты (docs/plans/trainings-coach-flow-plan.md §5.3,
-/// CF4): «Going» ставит на дорожку его уровня (<see cref="LanePlanPlacement"/>), «Can't come»
-/// снимает в «Not today», Undo тоста возвращает на прежнее место. Работает и в черновике, и в
-/// опубликованном плане; плана на дату нет — ничего не делает (вид по дорожкам «auto» считает сам).
+/// Ответ сдвигает ОДНОГО пловца в плане дорожек занятия (docs/plans/trainings-coach-flow-plan.md §5.3,
+/// CF4; с CF5 план — у занятия): «Going» ставит на дорожку его уровня (<see cref="LanePlanPlacement"/>),
+/// «Can't come» снимает в «Not today», Undo тоста возвращает на прежнее место. Работает и в черновике,
+/// и в опубликованном плане; плана у занятия нет — ничего не делает (вид по дорожкам «auto» считает сам).
 ///
 /// Под тем же advisory-lock группы, что и сохранение плана (<see cref="LanePlanService"/>): иначе
 /// сохранение редактора и ответ в одну секунду переписали бы друг друга посередине.
@@ -21,16 +21,14 @@ internal static class LanePlanPlacementStore
     public enum Intent { Going, Out }
 
     /// <summary>Применить правило ответа. null — сдвига нет (плана нет, уже на дорожке, …).</summary>
-    public static Task<LaneChangeDto?> ApplyAsync(SwimmDbContext db, int hubGroupId, DateOnly date, int swimmerId, Intent intent) =>
-        RunAsync(db, hubGroupId, date, swimmerId, async plan =>
+    public static Task<LaneChangeDto?> ApplyAsync(SwimmDbContext db, int hubGroupId, LanePlanKey key, int swimmerId, Intent intent) =>
+        RunAsync(db, hubGroupId, key, swimmerId, async plan =>
         {
             var row = plan.Swimmers.FirstOrDefault(s => s.SwimmerId == swimmerId);
             if (intent == Intent.Out)
             {
+                // План — у занятия (CF5): ответ на другое занятие того же дня этот план не держит.
                 if (row == null) return false;
-                // Занятий в дату может быть несколько, план один (до CF5): «иду» или «не уверен» на
-                // другое занятие этого дня держит человека в плане.
-                if (await AnsweredElsewhereAsync(db, hubGroupId, date, swimmerId)) return false;
                 plan.Swimmers.Remove(row);
                 Renumber(plan, row.LaneNo);
                 return true;
@@ -77,8 +75,8 @@ internal static class LanePlanPlacementStore
         });
 
     /// <summary>Undo: вернуть пловца на место <paramref name="place"/> (InPlan false — «Not today»).</summary>
-    public static Task<LaneChangeDto?> RestoreAsync(SwimmDbContext db, int hubGroupId, DateOnly date, int swimmerId, LanePlaceDto place) =>
-        RunAsync(db, hubGroupId, date, swimmerId, async plan =>
+    public static Task<LaneChangeDto?> RestoreAsync(SwimmDbContext db, int hubGroupId, LanePlanKey key, int swimmerId, LanePlaceDto place) =>
+        RunAsync(db, hubGroupId, key, swimmerId, async plan =>
         {
             var row = plan.Swimmers.FirstOrDefault(s => s.SwimmerId == swimmerId);
             if (!place.InPlan)
@@ -106,15 +104,16 @@ internal static class LanePlanPlacementStore
             return true;
         });
 
-    private static async Task<LaneChangeDto?> RunAsync(SwimmDbContext db, int hubGroupId, DateOnly date, int swimmerId,
+    private static async Task<LaneChangeDto?> RunAsync(SwimmDbContext db, int hubGroupId, LanePlanKey key, int swimmerId,
         Func<LanePlan, Task<bool>> change) =>
         await GroupAdvisoryLock.InGroupTransactionAsync<LaneChangeDto?>(db, LanePlanService.LanePlansLockClass, hubGroupId, async () =>
         {
+            var (date, start) = (key.Date, key.Start);
             var plan = await db.LanePlans
                 .Include(p => p.Lanes)
                 .Include(p => p.Swimmers)
                 .AsSplitQuery()
-                .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+                .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date && p.Start == start);
             if (plan == null) return null;
 
             var before = PlaceOf(plan, swimmerId);
@@ -156,23 +155,5 @@ internal static class LanePlanPlacementStore
         var i = 0;
         foreach (var s in plan.Swimmers.Where(s => s.LaneNo == laneNo).OrderBy(s => s.OrderNo).ThenBy(s => s.SwimmerId))
             s.OrderNo = i++;
-    }
-
-    /// <summary>
-    /// Есть ли у пловца «иду» / «не уверен» на другое занятие той же даты — его собственный ответ или
-    /// ответ аккаунта, который им стоит.
-    /// </summary>
-    private static async Task<bool> AnsweredElsewhereAsync(SwimmDbContext db, int hubGroupId, DateOnly date, int swimmerId)
-    {
-        var rows = await db.HubGroupTrainingRsvps.AsNoTracking()
-            .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date
-                        && (r.Answer == TrainingRsvpAnswer.Yes || r.Answer == TrainingRsvpAnswer.Maybe))
-            .Select(r => new { r.UserId, r.SwimmerId })
-            .ToListAsync();
-        if (rows.Any(r => r.SwimmerId == swimmerId)) return true;
-        var users = rows.Where(r => r.UserId != null).Select(r => r.UserId!.Value).Distinct().ToList();
-        if (users.Count == 0) return false;
-        var resolved = await HubGroupPersonResolver.ResolveAsync(db, hubGroupId, users);
-        return resolved.Values.Contains(swimmerId);
     }
 }

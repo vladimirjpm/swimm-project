@@ -235,7 +235,7 @@ export function MiniPool({ r, footer }: { r: TrainingRsvp; footer?: React.ReactN
   const view = r.lane_view;
   const myNo = useMyLaneNo(view?.lanes ?? []);
   if (!view) return null;
-  const open = () => openLanes(r.date);
+  const open = () => openLanes(r.session_id);
   const water = view.source === 'water';
 
   return (
@@ -285,7 +285,7 @@ export function PoolFooter({ r }: { r: TrainingRsvp }) {
       </div>
       <button
         type="button"
-        onClick={() => openLanes(r.date)}
+        onClick={() => openLanes(r.session_id)}
         className="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-[12px] font-extrabold"
         style={{ color: 'var(--deep-accent)' }}
       >
@@ -356,7 +356,7 @@ export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolea
           </span>
           <button
             type="button"
-            onClick={() => openLanes(r.date)}
+            onClick={() => openLanes(r.session_id)}
             className="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-[12px] font-extrabold"
             style={{ color: 'var(--deep-accent)' }}
           >

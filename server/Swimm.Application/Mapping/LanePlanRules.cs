@@ -45,15 +45,20 @@ public static class LanePlanRules
 
     /// <summary>
     /// Push участникам об опубликованном плане (CF3): заголовок — название группы, текст — «Lanes
-    /// for Sat, Nov 14 are ready». Адрес зеркалит <c>routes.group(slug)</c> клиента + <c>?tab=</c>;
-    /// тег — ключ плана: повторная публикация заменяет уведомление, а не копит.
+    /// for Sat, Nov 14, 10:00 are ready» (с CF5 план — у занятия, а занятий в день бывает два).
+    /// Адрес зеркалит <c>routes.group(slug)</c> клиента + <c>?tab=</c>; тег — ключ плана: повторная
+    /// публикация заменяет уведомление, а не копит.
     /// </summary>
     public static (string Title, string Body, string Url, string Tag) PublishedPush(
-        int hubGroupId, string groupName, string slug, DateOnly date) =>
+        int hubGroupId, string groupName, string slug, LanePlanKey key) =>
         (groupName,
-         $"Lanes for {date.ToString("ddd, MMM d", CultureInfo.InvariantCulture)} are ready",
+         $"Lanes for {key.Date.ToString("ddd, MMM d", CultureInfo.InvariantCulture)}{(key.Start == null ? "" : $", {key.Start}")} are ready",
          $"/groups/{Uri.EscapeDataString(slug)}?tab=trainings",
-         $"lanes-{hubGroupId}-{FormatDate(date)}");
+         $"lanes-{hubGroupId}-{key}");
+
+    /// <summary>Отказ в записи плана дня без занятия (CF5): такой план — архив только для чтения.</summary>
+    public const string ReadOnlyDayPlanMessage =
+        "This plan belongs to a day without a training and is read-only.";
 
     public sealed record NormalizedLane(int LaneNo, int? LevelId, string? Workout);
 

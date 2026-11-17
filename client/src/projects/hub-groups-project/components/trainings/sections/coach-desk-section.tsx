@@ -10,7 +10,7 @@ import PastSessionHead from '../past/past-session-head';
 import { useTrainingsTab } from '../trainings-context';
 import { TrainingsSection } from '../trainings-section';
 import { SegmentBar, type SegmentOption } from '../trainings-segments';
-import { formatPlanDate } from '../../lane-plans-api';
+import { formatPlanKey } from '../../lane-plan-key';
 import { useSessionWorkout } from '../workout/use-session-workout';
 import WorkoutEditor from '../workout/workout-editor';
 import WorkoutStrip from '../workout/workout-strip';
@@ -71,7 +71,7 @@ function DeskBody() {
   const [headerHost, setHeaderHost] = useState<HTMLElement | null>(null);
   const statusHost = docked ? dockSlot : headerHost;
   const showPool = useCallback(() => setPanel('pool'), []);
-  const ws = useSessionWorkout(group.id, deskSession?.date ?? null);
+  const ws = useSessionWorkout(group.id, deskSession?.id ?? null);
   const [workoutOpen, setWorkoutOpen] = useState(false);
   const levels = ws.levels ?? [];
 
@@ -110,7 +110,7 @@ function DeskBody() {
       groupId={group.id}
       manages
       desktop={isDesktop}
-      initialDate={deskSession.date}
+      initialKey={deskSession.id ?? null}
       embedded
       statusHost={statusHost}
       onFocusPool={showPool}
@@ -147,7 +147,7 @@ function DeskBody() {
     <WorkoutEditor
       ws={ws}
       levels={levels}
-      dateLabel={formatPlanDate(deskSession.date)}
+      dateLabel={formatPlanKey(deskSession.id ?? deskSession.date)}
       desktop={isDesktop}
       // Список занятий показывает «Workout · N sets» из планов контекста — перечитать после записи.
       onBack={() => { setWorkoutOpen(false); void ws.flush().then(() => reloadLanePlans()); }}

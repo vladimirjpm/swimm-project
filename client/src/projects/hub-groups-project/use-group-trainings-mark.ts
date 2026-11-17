@@ -20,11 +20,14 @@ import type { LanePlan, TrainingRsvp, TrainingSessionList } from './types';
  * ленивая загрузка к тому времени устарела бы (сервер уже отметил «увидел»).
  */
 export function useGroupTrainingsMark({
-  groupId, nextDate, manages, rsvp, enabled,
+  groupId, nextKey, manages, rsvp, enabled,
 }: {
   groupId: number | null;
-  /** Дата ближайшего занятия (`group.next_training.date`); нет занятия — плана не ищем. */
-  nextDate: string | null;
+  /**
+   * Ключ ближайшего занятия (`group.next_training.id`, CF5: план — у занятия); нет занятия — плана
+   * не ищем.
+   */
+  nextKey: string | null;
   manages: boolean;
   rsvp: TrainingRsvp | null;
   /** Только своим (участнику / управляющему): остальным сервер ответил бы 403. */
@@ -45,8 +48,8 @@ export function useGroupTrainingsMark({
         .then((r) => (r.ok ? (r.json() as Promise<TrainingSessionList>) : null))
         .then((data) => { if (alive) setSessions(data); })
         .catch(() => { /* метка — необязательная подсказка: нет ответа — нет метки */ });
-      if (nextDate) {
-        lanePlansApi.get(groupId, nextDate).then((res) => {
+      if (nextKey) {
+        lanePlansApi.get(groupId, nextKey).then((res) => {
           if (alive && res.ok && res.data) setPlan(res.data);
         });
       }
@@ -61,7 +64,7 @@ export function useGroupTrainingsMark({
       if (idle != null) window.cancelIdleCallback(idle);
       if (timer != null) window.clearTimeout(timer);
     };
-  }, [enabled, groupId, nextDate]);
+  }, [enabled, groupId, nextKey]);
 
   const reportTabMarks = useCallback((marks: TrainingMarks) => {
     setFromTab((prev) => (prev?.lanes === marks.lanes && prev?.trainings === marks.trainings

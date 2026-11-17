@@ -578,6 +578,13 @@ export type LanePlanStatus = 'draft' | 'published';
 export interface LanePlanSummary {
   /** yyyy-MM-dd */
   date: string;
+  /** Начало занятия «HH:mm» (CF5); `null` — план дня без занятия (архив, только чтение). */
+  start?: string | null;
+  /**
+   * Ключ занятия плана `yyyy-MM-dd-HHmm` — тот же, что у ответов, и адрес плана; `null` — план дня
+   * без занятия (адрес — дата). Ключ для запросов — `planKey()` из `lane-plan-key.ts`.
+   */
+  session_id?: string | null;
   status: LanePlanStatus;
   lane_count: number;
   /** Лимит людей на дорожку (перелив по подуровням); null — без лимита. */
@@ -621,6 +628,10 @@ export interface LanePlanLane {
 
 export interface LanePlan {
   date: string;
+  /** См. `LanePlanSummary.start`. */
+  start?: string | null;
+  /** См. `LanePlanSummary.session_id`. */
+  session_id?: string | null;
   status: LanePlanStatus;
   lane_count: number;
   max_per_lane?: number | null;

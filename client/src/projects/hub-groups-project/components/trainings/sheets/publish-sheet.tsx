@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { DeepSheet, SheetButton, SheetError, SheetFooter } from '../../../../components/deep/deep-sheet';
 import type { LanePlan, LanePlanPublishCheck } from '../../../types';
 import GroupLaneBoard from '../../group-lane-board';
-import { formatPlanDate, lanePlansApi } from '../../lane-plans-api';
+import { lanePlansApi } from '../../lane-plans-api';
+import { formatPlanKey } from '../../lane-plan-key';
 import { useTrainingsTab } from '../trainings-context';
 import type { TrainingsSheetProps } from '../trainings-sheets';
 
@@ -24,8 +25,8 @@ import type { TrainingsSheetProps } from '../trainings-sheets';
 
 export interface PublishRequest {
   groupId: number;
-  /** yyyy-MM-dd — ключ плана. */
-  date: string;
+  /** Ключ занятия плана `yyyy-MM-dd-HHmm` (CF5). */
+  planKey: string;
   /** Сохранённый план (после автосохранения). */
   plan: LanePlan;
   /** Опубликовать; вернул текст ошибки или null. */
@@ -39,7 +40,7 @@ type Blocker = LanePlanPublishCheck['blockers'][number];
 const blockerName = (b: Blocker) => b.name || b.name_en;
 
 function PublishSheet({ sheet, onClose }: TrainingsSheetProps<'publish'>) {
-  const { groupId, date, plan, onPublish, onPerson } = sheet.publish;
+  const { groupId, planKey, plan, onPublish, onPerson } = sheet.publish;
   const { selectedRoll, openSheet } = useTrainingsTab();
   const roll = selectedRoll?.rsvp ?? null;
   /** null — проверка ещё идёт. */
@@ -50,13 +51,13 @@ function PublishSheet({ sheet, onClose }: TrainingsSheetProps<'publish'>) {
 
   useEffect(() => {
     let cancelled = false;
-    lanePlansApi.publishCheck(groupId, date).then((result) => {
+    lanePlansApi.publishCheck(groupId, planKey).then((result) => {
       if (cancelled) return;
       // Проверка не ответила — не блокируем: сервер проверит то же при публикации.
       setBlockers(result.ok ? result.data?.blockers ?? [] : []);
     });
     return () => { cancelled = true; };
-  }, [groupId, date]);
+  }, [groupId, planKey]);
 
   const placed = plan.lanes.reduce((n, l) => n + l.swimmers.length, 0);
   const usedLanes = plan.lanes.filter((l) => l.swimmers.length > 0).length;
@@ -73,7 +74,7 @@ function PublishSheet({ sheet, onClose }: TrainingsSheetProps<'publish'>) {
   };
 
   const toPerson = (swimmerId: number) => {
-    const person = roll?.date === date
+    const person = roll?.session_id === planKey
       ? roll.people?.find((p) => (p.linked_swimmer_id ?? p.swimmer_id) === swimmerId) ?? null
       : null;
     if (person) { openSheet({ kind: 'person', person }); return; }
@@ -84,7 +85,7 @@ function PublishSheet({ sheet, onClose }: TrainingsSheetProps<'publish'>) {
   const line = 'm-0 text-[12.5px] font-bold';
   return (
     <DeepSheet
-      title={`Publish ${formatPlanDate(date)}?`}
+      title={`Publish ${formatPlanKey(planKey)}?`}
       sub="Members see the lanes after you publish"
       tone="coach"
       width={520}

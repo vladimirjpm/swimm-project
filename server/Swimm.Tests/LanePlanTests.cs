@@ -16,6 +16,9 @@ namespace Swimm.Tests;
 /// </summary>
 public class LanePlanTests
 {
+    /// <summary>План занятия даты: CF5 — план у занятия (слот 20:00 в тестовых расписаниях).</summary>
+    private static LanePlanKey At(DateOnly date, string start = "20:00") => LanePlanKey.Session(date, start);
+
     // ── LaneDistribution ────────────────────────────────────────────────────
 
     private static List<LaneDistribution.Swimmer> Swimmers(params (int Count, int? Level)[] groups)
@@ -248,7 +251,7 @@ public class LanePlanTests
         db.AppUsers.Add(owner);
         await db.SaveChangesAsync();
 
-        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true, TrainingSchedule = TestSchedules.EveryDay() };
         var other = new HubGroup { Name = "O", Slug = "o", OwnerUserId = owner.Id, IsPublic = true };
         var a = new Swimmer { LastName = "א", FirstName = "א", BirthYear = 1980 };
         var b = new Swimmer { LastName = "ב", FirstName = "ב", BirthYear = 1981 };
@@ -308,10 +311,10 @@ public class LanePlanTests
         var input = Plan(s);
         input.Swimmers.RemoveAt(2);  // C сегодня не плывёт
 
-        var result = await service.SaveAsync(s.GroupId, Day, input, s.UserId);
+        var result = await service.SaveAsync(s.GroupId, At(Day), input, s.UserId);
 
         Assert.True(result.Success, result.Error);
-        var board = (await service.GetAsync(s.GroupId, Day, isManager: true))!;
+        var board = (await service.GetAsync(s.GroupId, At(Day), isManager: true))!;
         Assert.Equal(LanePlanStatus.Draft, board.Status);
         Assert.Equal("2026-09-27", board.Date);
         Assert.Equal([1, 2, 3], board.Lanes.Select(l => l.LaneNo));
@@ -336,24 +339,24 @@ public class LanePlanTests
         var service = new LanePlanService(db);
         var input = Plan(s);
         input.Swimmers.RemoveAt(2);
-        await service.SaveAsync(s.GroupId, Day, input, s.UserId);
+        await service.SaveAsync(s.GroupId, At(Day), input, s.UserId);
 
-        Assert.Null(await service.GetAsync(s.GroupId, Day, isManager: false));
+        Assert.Null(await service.GetAsync(s.GroupId, At(Day), isManager: false));
         Assert.Empty(await service.ListAsync(s.GroupId, isManager: false));
         Assert.Single(await service.ListAsync(s.GroupId, isManager: true));
 
-        Assert.True(await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published));
-        var board = (await service.GetAsync(s.GroupId, Day, isManager: false))!;
+        Assert.True(await service.SetStatusAsync(s.GroupId, At(Day), LanePlanStatus.Published));
+        var board = (await service.GetAsync(s.GroupId, At(Day), isManager: false))!;
         Assert.Equal(LanePlanStatus.Published, board.Status);
         Assert.Empty(board.NotToday);
         Assert.False(board.CanEdit);
         Assert.Equal("published", Assert.Single(await service.ListAsync(s.GroupId, isManager: false)).Status);
 
         // Повторное сохранение статус не сбрасывает; снять публикацию — отдельная ручка.
-        await service.SaveAsync(s.GroupId, Day, input, s.UserId);
-        Assert.NotNull(await service.GetAsync(s.GroupId, Day, isManager: false));
-        Assert.True(await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Draft));
-        Assert.Null(await service.GetAsync(s.GroupId, Day, isManager: false));
+        await service.SaveAsync(s.GroupId, At(Day), input, s.UserId);
+        Assert.NotNull(await service.GetAsync(s.GroupId, At(Day), isManager: false));
+        Assert.True(await service.SetStatusAsync(s.GroupId, At(Day), LanePlanStatus.Draft));
+        Assert.Null(await service.GetAsync(s.GroupId, At(Day), isManager: false));
     }
 
     [Fact]
@@ -362,10 +365,10 @@ public class LanePlanTests
         await using var db = CreateDb(nameof(Save_ReplacesInPlace_ShrinksLanes_KeepsOrderWithinLane));
         var s = await SeedAsync(db);
         var service = new LanePlanService(db);
-        await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId);
+        await service.SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId);
 
         // Две дорожки вместо трёх; все на первой, C ведёт; B снят с плана.
-        var result = await service.SaveAsync(s.GroupId, Day, new LanePlanInputDto
+        var result = await service.SaveAsync(s.GroupId, At(Day), new LanePlanInputDto
         {
             LaneCount = 2,
             Lanes = [new() { LaneNo = 1, LevelId = s.Slow, Workout = "Easy" }],
@@ -373,7 +376,7 @@ public class LanePlanTests
         }, s.UserId);
 
         Assert.True(result.Success, result.Error);
-        var board = (await service.GetAsync(s.GroupId, Day, isManager: true))!;
+        var board = (await service.GetAsync(s.GroupId, At(Day), isManager: true))!;
         Assert.Equal([1, 2], board.Lanes.Select(l => l.LaneNo));
         Assert.Equal("Slow", board.Lanes[0].Level!.Name);
         Assert.Null(board.Lanes[1].Workout);
@@ -398,9 +401,9 @@ public class LanePlanTests
         var foreign = Plan(s);
         foreign.Lanes[1].LevelId = s.ForeignLevel;
 
-        Assert.False((await service.SaveAsync(s.GroupId, Day, outsider, s.UserId)).Success);
-        Assert.False((await service.SaveAsync(s.GroupId, Day, hidden, s.UserId)).Success);
-        Assert.False((await service.SaveAsync(s.GroupId, Day, foreign, s.UserId)).Success);
+        Assert.False((await service.SaveAsync(s.GroupId, At(Day), outsider, s.UserId)).Success);
+        Assert.False((await service.SaveAsync(s.GroupId, At(Day), hidden, s.UserId)).Success);
+        Assert.False((await service.SaveAsync(s.GroupId, At(Day), foreign, s.UserId)).Success);
         Assert.False(await db.LanePlans.AnyAsync());
     }
 
@@ -421,27 +424,27 @@ public class LanePlanTests
         await db.SaveChangesAsync();
         var service = new LanePlanService(db);
 
-        Assert.Equal([s.A, s.B], (await service.GetAwayAsync(s.GroupId, Day)).SwimmerIds);
-        Assert.Equal([s.A], (await service.GetAwayAsync(s.GroupId, Day.AddDays(1))).SwimmerIds);
-        Assert.Empty((await service.GetAwayAsync(s.OtherGroupId, Day)).SwimmerIds);
+        Assert.Equal([s.A, s.B], (await service.GetAwayAsync(s.GroupId, At(Day))).SwimmerIds);
+        Assert.Equal([s.A], (await service.GetAwayAsync(s.GroupId, At(Day.AddDays(1)))).SwimmerIds);
+        Assert.Empty((await service.GetAwayAsync(s.OtherGroupId, At(Day))).SwimmerIds);
     }
 
     [Fact]
-    public async Task Away_CantComeOnPlanDay_GoingBringsDoesntTrainBack()
+    public async Task Away_CantComeOnThisTraining_GoingBringsDoesntTrainBack_OtherTrainingOfTheDayIsApart()
     {
-        await using var db = CreateDb(nameof(Away_CantComeOnPlanDay_GoingBringsDoesntTrainBack));
+        await using var db = CreateDb(nameof(Away_CantComeOnThisTraining_GoingBringsDoesntTrainBack_OtherTrainingOfTheDayIsApart));
         var s = await SeedAsync(db);
         var parent = await ParentOfAAsync(db, s);
         HubGroupTrainingRsvp Answer(DateOnly day, string start, string answer, int? userId = null, int? swimmerId = null) =>
             new() { HubGroupId = s.GroupId, SessionDate = day, SessionStart = start, UserId = userId, SwimmerId = swimmerId, Answer = answer };
         db.HubGroupTrainingRsvps.AddRange(
-            // A — «Can't come» аккаунтом, привязанным к пловцу A.
+            // A — «Can't come» на утреннее занятие аккаунтом, привязанным к пловцу A.
             Answer(Day, "10:00", TrainingRsvpAnswer.No, userId: parent),
-            // B — «нет» утром, «не уверен» вечером: в этот день может прийти, не away. На завтра — «нет».
+            // B — «нет» утром, «не уверен» вечером. На завтра утром — «нет».
             Answer(Day, "10:00", TrainingRsvpAnswer.No, swimmerId: s.B),
             Answer(Day, "20:00", TrainingRsvpAnswer.Maybe, swimmerId: s.B),
             Answer(Day.AddDays(1), "10:00", TrainingRsvpAnswer.No, swimmerId: s.B),
-            // C — «Doesn't train», но на Day ответил «Going»: в этот день он в воде.
+            // C — «Doesn't train», но на утро Day ответил «Going»: на утреннем он в воде.
             Answer(Day, "10:00", TrainingRsvpAnswer.Yes, swimmerId: s.C));
         db.HubGroupBreaks.Add(new HubGroupBreak
         {
@@ -450,8 +453,13 @@ public class LanePlanTests
         await db.SaveChangesAsync();
         var service = new LanePlanService(db);
 
-        Assert.Equal([s.A], (await service.GetAwayAsync(s.GroupId, Day)).SwimmerIds);
-        Assert.Equal([s.B, s.C], (await service.GetAwayAsync(s.GroupId, Day.AddDays(1))).SwimmerIds);
+        // План — у занятия (CF5): утро и вечер одного дня считают каждое свои ответы.
+        Assert.Equal([s.A, s.B], (await service.GetAwayAsync(s.GroupId, At(Day, "10:00"))).SwimmerIds);
+        // Вечером A и B не отвечали «нет» (B — «не уверен»); «Going» C был только на утро.
+        Assert.Equal([s.C], (await service.GetAwayAsync(s.GroupId, At(Day, "20:00"))).SwimmerIds);
+        Assert.Equal([s.B, s.C], (await service.GetAwayAsync(s.GroupId, At(Day.AddDays(1), "10:00"))).SwimmerIds);
+        // План дня без занятия (архив) — ответы всей даты, как до CF5.
+        Assert.Equal([s.A], (await service.GetAwayAsync(s.GroupId, new LanePlanKey(Day, null))).SwimmerIds);
     }
 
     [Fact]
@@ -471,16 +479,16 @@ public class LanePlanTests
         var service = new LanePlanService(db);
 
         // По умолчанию (everyone) молчащий C в воде.
-        Assert.Empty((await service.GetAwayAsync(s.GroupId, Day)).SwimmerIds);
+        Assert.Empty((await service.GetAwayAsync(s.GroupId, At(Day))).SwimmerIds);
 
         (await db.HubGroups.SingleAsync(g => g.Id == s.GroupId)).TrainingSchedule =
             new GroupTrainingSchedule { LanePresence = GroupLanePresence.Answered }.ToJson();
         await db.SaveChangesAsync();
 
         // answered: C не ответил — в Not today; «Not sure» B остаётся в воде. Скрытый из состава не в списке.
-        Assert.Equal([s.C], (await service.GetAwayAsync(s.GroupId, Day)).SwimmerIds);
-        Assert.Empty((await service.GetAwayAsync(s.GroupId, Day.AddDays(1))).SwimmerIds);
-        Assert.Empty((await service.GetAwayAsync(s.GroupId, Day.AddDays(2))).SwimmerIds);
+        Assert.Equal([s.C], (await service.GetAwayAsync(s.GroupId, At(Day))).SwimmerIds);
+        Assert.Empty((await service.GetAwayAsync(s.GroupId, At(Day.AddDays(1)))).SwimmerIds);
+        Assert.Empty((await service.GetAwayAsync(s.GroupId, At(Day.AddDays(2)))).SwimmerIds);
     }
 
     [Fact]
@@ -489,21 +497,21 @@ public class LanePlanTests
         await using var db = CreateDb(nameof(Snapshot_KeepsSwimmerWhoLeftTheGroup));
         var s = await SeedAsync(db);
         var service = new LanePlanService(db);
-        await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId);
+        await service.SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId);
 
         db.HubGroupMembers.Remove(await db.HubGroupMembers.SingleAsync(m => m.SwimmerId == s.B));
         await db.SaveChangesAsync();
 
-        var board = (await service.GetAsync(s.GroupId, Day, isManager: true))!;
+        var board = (await service.GetAsync(s.GroupId, At(Day), isManager: true))!;
         var gone = Assert.Single(board.Lanes[1].Swimmers);
         Assert.Equal(s.B, gone.SwimmerId);
         Assert.True(gone.LeftGroup);
         Assert.Equal("ב ב", gone.Name);
 
         // Пересохранить план с ушедшим можно — он уже стоял в этом плане.
-        Assert.True((await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId)).Success);
+        Assert.True((await service.SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId)).Success);
         // А в новый план на другой день — нельзя.
-        Assert.False((await service.SaveAsync(s.GroupId, Day.AddDays(1), Plan(s), s.UserId)).Success);
+        Assert.False((await service.SaveAsync(s.GroupId, At(Day.AddDays(1)), Plan(s), s.UserId)).Success);
     }
 
     [Fact]
@@ -563,7 +571,7 @@ public class LanePlanTests
     {
         await using var db = CreateDb(nameof(RemovingLevel_ClearsLaneLabel_PlanStays));
         var s = await SeedAsync(db);
-        await new LanePlanService(db).SaveAsync(s.GroupId, Day, Plan(s), s.UserId);
+        await new LanePlanService(db).SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId);
 
         var levels = new HubGroupLevelService(db);
         var saved = await levels.SaveLevelsAsync(s.GroupId, new HubGroupLevelsInputDto
@@ -572,7 +580,7 @@ public class LanePlanTests
         });
 
         Assert.True(saved.Success, saved.Error);
-        var board = (await new LanePlanService(db).GetAsync(s.GroupId, Day, isManager: true))!;
+        var board = (await new LanePlanService(db).GetAsync(s.GroupId, At(Day), isManager: true))!;
         Assert.Null(board.Lanes[0].Level);
         Assert.Equal([s.A], board.Lanes[0].Swimmers.Select(w => w.SwimmerId));
         Assert.Equal("Slow", board.Lanes[1].Level!.Name);
@@ -601,15 +609,15 @@ public class LanePlanTests
         var s = await SeedAsync(db);
         var service = new LanePlanService(db);
         var parent = await ParentOfAAsync(db, s);
-        await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId);
-        await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published);
+        await service.SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId);
+        await service.SetStatusAsync(s.GroupId, At(Day), LanePlanStatus.Published);
 
-        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 3), s.UserId);
-        var moved = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        await service.SaveAsync(s.GroupId, At(Day), PlanWithA(s, 3), s.UserId);
+        var moved = (await service.GetAsync(s.GroupId, At(Day), isManager: false, parent))!.MySwimmers.Single();
         // GET плана метку НЕ гасит — его грузит и бейдж таба.
-        var again = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        var again = (await service.GetAsync(s.GroupId, At(Day), isManager: false, parent))!.MySwimmers.Single();
         await service.MarkSeenAsync(s.GroupId, parent);
-        var seen = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        var seen = (await service.GetAsync(s.GroupId, At(Day), isManager: false, parent))!.MySwimmers.Single();
 
         Assert.Equal((s.A, (int?)1), (moved.SwimmerId, moved.MovedFromLane));
         Assert.Equal(1, again.MovedFromLane);
@@ -625,22 +633,22 @@ public class LanePlanTests
         var parent = await ParentOfAAsync(db, s);
 
         // Черновик: переносы не считаются — участник его не видел.
-        await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId);
-        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 2), s.UserId);
-        await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published);
-        var draftMove = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        await service.SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId);
+        await service.SaveAsync(s.GroupId, At(Day), PlanWithA(s, 2), s.UserId);
+        await service.SetStatusAsync(s.GroupId, At(Day), LanePlanStatus.Published);
+        var draftMove = (await service.GetAsync(s.GroupId, At(Day), isManager: false, parent))!.MySwimmers.Single();
 
         // Вернули туда, откуда переносили, — для зрителя ничего не изменилось.
-        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 3), s.UserId);
-        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 2), s.UserId);
-        var movedBack = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        await service.SaveAsync(s.GroupId, At(Day), PlanWithA(s, 3), s.UserId);
+        await service.SaveAsync(s.GroupId, At(Day), PlanWithA(s, 2), s.UserId);
+        var movedBack = (await service.GetAsync(s.GroupId, At(Day), isManager: false, parent))!.MySwimmers.Single();
 
         // Из Unassigned на дорожку — «поставили», а не «перенесли»; с дорожки в Unassigned — перенос.
-        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, null), s.UserId);
-        var toUnassigned = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        await service.SaveAsync(s.GroupId, At(Day), PlanWithA(s, null), s.UserId);
+        var toUnassigned = (await service.GetAsync(s.GroupId, At(Day), isManager: false, parent))!.MySwimmers.Single();
         await service.MarkSeenAsync(s.GroupId, parent);
-        await service.SaveAsync(s.GroupId, Day, PlanWithA(s, 1), s.UserId);
-        var placed = (await service.GetAsync(s.GroupId, Day, isManager: false, parent))!.MySwimmers.Single();
+        await service.SaveAsync(s.GroupId, At(Day), PlanWithA(s, 1), s.UserId);
+        var placed = (await service.GetAsync(s.GroupId, At(Day), isManager: false, parent))!.MySwimmers.Single();
 
         Assert.Null(draftMove.MovedFromLane);
         Assert.Null(movedBack.MovedFromLane);
@@ -656,8 +664,8 @@ public class LanePlanTests
         var service = new LanePlanService(db);
         var input = Plan(s);
         input.Swimmers.RemoveAt(2);  // C — Not today
-        await service.SaveAsync(s.GroupId, Day, input, s.UserId);
-        await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published);
+        await service.SaveAsync(s.GroupId, At(Day), input, s.UserId);
+        await service.SetStatusAsync(s.GroupId, At(Day), LanePlanStatus.Published);
 
         var viewer = new AppUser { Email = "parent@example.com", DisplayName = "P", SecurityStamp = "s", SwimmerId = s.B };
         var stranger = new AppUser { Email = "x@example.com", DisplayName = "X", SecurityStamp = "s" };
@@ -670,12 +678,12 @@ public class LanePlanTests
             new UserFavorite { UserId = stranger.Id, TargetType = "swimmer", SwimmerId = s.A, IsPrimary = true });
         await db.SaveChangesAsync();
 
-        var board = (await service.GetAsync(s.GroupId, Day, isManager: false, viewer.Id))!;
+        var board = (await service.GetAsync(s.GroupId, At(Day), isManager: false, viewer.Id))!;
         Assert.Equal([(s.B, "me"), (s.A, "family")], board.MySwimmers.Select(m => (m.SwimmerId, m.Kind)));
 
         // Без зрителя — пусто; чужое избранное не протекает.
-        Assert.Empty((await service.GetAsync(s.GroupId, Day, isManager: false))!.MySwimmers);
-        var strangers = (await service.GetAsync(s.GroupId, Day, isManager: false, stranger.Id))!.MySwimmers;
+        Assert.Empty((await service.GetAsync(s.GroupId, At(Day), isManager: false))!.MySwimmers);
+        var strangers = (await service.GetAsync(s.GroupId, At(Day), isManager: false, stranger.Id))!.MySwimmers;
         Assert.Equal([(s.A, "me")], strangers.Select(m => (m.SwimmerId, m.Kind)));
     }
 
@@ -685,8 +693,8 @@ public class LanePlanTests
         await using var db = CreateDb(nameof(MySwimmers_MembershipLabel_IsFamily_AndOnlyInThisGroup));
         var s = await SeedAsync(db);
         var service = new LanePlanService(db);
-        await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId);
-        await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published);
+        await service.SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId);
+        await service.SetStatusAsync(s.GroupId, At(Day), LanePlanStatus.Published);
 
         var viewer = new AppUser { Email = "m@example.com", DisplayName = "M", SecurityStamp = "s" };
         db.AppUsers.Add(viewer);
@@ -696,7 +704,7 @@ public class LanePlanTests
             new HubGroupUserMember { HubGroupId = s.GroupId, UserId = viewer.Id, SwimmerId = s.C });
         await db.SaveChangesAsync();
 
-        var board = (await service.GetAsync(s.GroupId, Day, isManager: false, viewer.Id))!;
+        var board = (await service.GetAsync(s.GroupId, At(Day), isManager: false, viewer.Id))!;
 
         // C стоит в Unassigned — он в плане, подсветка есть; метка из другой группы (A) — нет.
         Assert.Equal([(s.C, "family")], board.MySwimmers.Select(m => (m.SwimmerId, m.Kind)));
@@ -708,11 +716,11 @@ public class LanePlanTests
         await using var db = CreateDb(nameof(Delete_RemovesPlanWithRows));
         var s = await SeedAsync(db);
         var service = new LanePlanService(db);
-        await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId);
+        await service.SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId);
 
-        Assert.True(await service.DeleteAsync(s.GroupId, Day));
-        Assert.False(await service.DeleteAsync(s.GroupId, Day));
-        Assert.False(await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published));
+        Assert.True(await service.DeleteAsync(s.GroupId, At(Day)));
+        Assert.False(await service.DeleteAsync(s.GroupId, At(Day)));
+        Assert.False(await service.SetStatusAsync(s.GroupId, At(Day), LanePlanStatus.Published));
         Assert.False(await db.LanePlanLanes.AnyAsync());
         Assert.False(await db.LanePlanSwimmers.AnyAsync());
     }
@@ -781,17 +789,17 @@ public class LanePlanTests
         var service = new LanePlanService(db);
 
         // Клиент поле не прислал — одна дорожка про запас.
-        Assert.True((await service.SaveAsync(s.GroupId, Day, Plan(s), s.UserId)).Success);
-        Assert.Equal(1, (await service.GetAsync(s.GroupId, Day, isManager: true))!.ReservedLanes);
+        Assert.True((await service.SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId)).Success);
+        Assert.Equal(1, (await service.GetAsync(s.GroupId, At(Day), isManager: true))!.ReservedLanes);
 
         var input = Plan(s);
         input.ReservedLanes = 0;
-        Assert.True((await service.SaveAsync(s.GroupId, Day, input, s.UserId)).Success);
-        Assert.Equal(0, (await service.GetAsync(s.GroupId, Day, isManager: true))!.ReservedLanes);
+        Assert.True((await service.SaveAsync(s.GroupId, At(Day), input, s.UserId)).Success);
+        Assert.Equal(0, (await service.GetAsync(s.GroupId, At(Day), isManager: true))!.ReservedLanes);
         Assert.Equal(0, (await service.ListAsync(s.GroupId, isManager: true)).Single().ReservedLanes);
 
         input.ReservedLanes = 12;
-        Assert.False((await service.SaveAsync(s.GroupId, Day, input, s.UserId)).Success);
+        Assert.False((await service.SaveAsync(s.GroupId, At(Day), input, s.UserId)).Success);
 
         // Запас держится и когда уровней больше, чем оставшихся дорожек: оба уровня — на первой.
         var (auto, error) = await service.AutoLanesAsync(s.GroupId, new LanePlanAutoLanesInputDto { LaneCount = 2, ReservedLanes = 1 });
@@ -884,15 +892,15 @@ public class LanePlanTests
         // A (Fast) тренер руками поставил на дорожку Slow.
         input.Swimmers[0] = new() { SwimmerId = s.A, LaneNo = 2, Pinned = true };
 
-        Assert.True((await service.SaveAsync(s.GroupId, Day, input, s.UserId)).Success);
+        Assert.True((await service.SaveAsync(s.GroupId, At(Day), input, s.UserId)).Success);
 
-        var board = (await service.GetAsync(s.GroupId, Day, isManager: true))!;
+        var board = (await service.GetAsync(s.GroupId, At(Day), isManager: true))!;
         Assert.Equal(
             [(s.A, true), (s.B, false)],
             board.Lanes[1].Swimmers.Select(w => (w.SwimmerId, w.Pinned)));
 
-        await service.SetStatusAsync(s.GroupId, Day, LanePlanStatus.Published);
-        var member = (await service.GetAsync(s.GroupId, Day, isManager: false))!;
+        await service.SetStatusAsync(s.GroupId, At(Day), LanePlanStatus.Published);
+        var member = (await service.GetAsync(s.GroupId, At(Day), isManager: false))!;
         Assert.DoesNotContain(member.Lanes.SelectMany(l => l.Swimmers), w => w.Pinned);
 
         // Auto lanes: дорожки делятся как раньше (Fast — 1, Slow — 2), A остаётся на дорожке 2.
@@ -908,7 +916,7 @@ public class LanePlanTests
 
         // Сняли с дорожки — закрепление пропало.
         input.Swimmers[0] = new() { SwimmerId = s.A, LaneNo = null, Pinned = true };
-        Assert.True((await service.SaveAsync(s.GroupId, Day, input, s.UserId)).Success);
+        Assert.True((await service.SaveAsync(s.GroupId, At(Day), input, s.UserId)).Success);
         Assert.False(await db.LanePlanSwimmers.AnyAsync(w => w.Pinned));
     }
 }

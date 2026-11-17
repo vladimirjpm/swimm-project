@@ -16,6 +16,9 @@ namespace Swimm.Tests;
 /// </summary>
 public class WorkoutTests
 {
+    /// <summary>План занятия даты: CF5 — план у занятия (слот 20:00 в тестовых расписаниях).</summary>
+    private static LanePlanKey At(DateOnly date, string start = "20:00") => LanePlanKey.Session(date, start);
+
     private const int Adv = 11, Int = 12;
     private static readonly DateOnly Day = new(2026, 11, 17);
 
@@ -168,7 +171,7 @@ public class WorkoutTests
         var coach = new AppUser { Email = "coach@example.com", DisplayName = "coach", SecurityStamp = "s" };
         db.AppUsers.Add(coach);
         await db.SaveChangesAsync();
-        var group = new HubGroup { Name = "Dolphin", Slug = "dolphin", OwnerUserId = coach.Id, IsPublic = true };
+        var group = new HubGroup { Name = "Dolphin", Slug = "dolphin", OwnerUserId = coach.Id, IsPublic = true, TrainingSchedule = TestSchedules.EveryDay() };
         var other = new HubGroup { Name = "Other", Slug = "other", OwnerUserId = coach.Id, IsPublic = true };
         db.AddRange(group, other);
         await db.SaveChangesAsync();
@@ -191,25 +194,25 @@ public class WorkoutTests
         var (groupId, level, _) = await SeedAsync(db);
         var service = new LanePlanService(db);
 
-        Assert.False((await service.SaveWorkoutAsync(groupId, Day, OneSet(level))).Found);
+        Assert.False((await service.SaveWorkoutAsync(groupId, At(Day), OneSet(level))).Found);
 
-        Assert.True((await service.SaveAsync(groupId, Day, new LanePlanInputDto { LaneCount = 2 }, 1)).Success);
-        var (found, error) = await service.SaveWorkoutAsync(groupId, Day, OneSet(level));
+        Assert.True((await service.SaveAsync(groupId, At(Day), new LanePlanInputDto { LaneCount = 2 }, 1)).Success);
+        var (found, error) = await service.SaveWorkoutAsync(groupId, At(Day), OneSet(level));
         Assert.True(found);
         Assert.Null(error);
 
         // PUT плана (автосохранение дорожек) workout не трогает.
-        Assert.True((await service.SaveAsync(groupId, Day, new LanePlanInputDto { LaneCount = 3 }, 1)).Success);
-        var plan = await service.GetAsync(groupId, Day, isManager: true);
+        Assert.True((await service.SaveAsync(groupId, At(Day), new LanePlanInputDto { LaneCount = 3 }, 1)).Success);
+        var plan = await service.GetAsync(groupId, At(Day), isManager: true);
         Assert.Equal("1:40", plan!.Workout!.Sets[0].Lines[0].PerLevel![level].SendOff);
 
         // Участнику целиком не отдаётся — его версия едет в lane_view.
-        await service.PublishAsync(groupId, Day);
-        Assert.Null((await service.GetAsync(groupId, Day, isManager: false))!.Workout);
+        await service.PublishAsync(groupId, At(Day));
+        Assert.Null((await service.GetAsync(groupId, At(Day), isManager: false))!.Workout);
 
         // Пустой документ стирает.
-        await service.SaveWorkoutAsync(groupId, Day, new WorkoutDto());
-        Assert.Null((await service.GetAsync(groupId, Day, isManager: true))!.Workout);
+        await service.SaveWorkoutAsync(groupId, At(Day), new WorkoutDto());
+        Assert.Null((await service.GetAsync(groupId, At(Day), isManager: true))!.Workout);
     }
 
     [Fact]
@@ -218,9 +221,9 @@ public class WorkoutTests
         await using var db = CreateDb(nameof(SaveWorkout_ForeignLevel_Rejected));
         var (groupId, _, foreign) = await SeedAsync(db);
         var service = new LanePlanService(db);
-        await service.SaveAsync(groupId, Day, new LanePlanInputDto { LaneCount = 2 }, 1);
+        await service.SaveAsync(groupId, At(Day), new LanePlanInputDto { LaneCount = 2 }, 1);
 
-        var (found, error) = await service.SaveWorkoutAsync(groupId, Day, OneSet(foreign));
+        var (found, error) = await service.SaveWorkoutAsync(groupId, At(Day), OneSet(foreign));
 
         Assert.True(found);
         Assert.NotNull(error);

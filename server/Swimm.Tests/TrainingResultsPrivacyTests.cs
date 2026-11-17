@@ -46,9 +46,10 @@ public class TrainingResultsPrivacyTests
             "тренировки как записи (заводит тренер, Е1 group-events-media-plan): сама сессия и только " +
             "«есть ли времена» (Any) и ★ ключевого сета (KeySetNo) — времён не читает: повторы для ленты берёт у " +
             "IHubGroupTrainingRepository; аудиторию проверяет контроллер",
-        ["Swimm.Infrastructure/Services/TrainingRsvpService.cs"] =
+        ["Swimm.Infrastructure/Services/TrainingOccurrenceQuery.cs"] =
             "разовые занятия (Р9): из сессий группы с галкой «Ask who's coming» читает только дату, начало, " +
-            "название, тип и бассейн — занятие для Next и ответов; времён (Results) не трогает",
+            "название, тип и бассейн — занятие для Next, ответов (TrainingRsvpService) и плана дорожек " +
+            "(LanePlanService, CF5: план только у существующего занятия); времён (Results) не трогает",
         ["Swimm.Infrastructure/Services/TrainingReminderService.cs"] =
             "напоминания о тренировках (web-push-reminders-plan): те же разовые занятия, что у TrainingRsvpService, " +
             "— дата, начало, название, тип, бассейн; push получают только активные участники группы; времён не трогает",

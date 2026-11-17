@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
@@ -19,6 +20,9 @@ namespace Swimm.Tests;
 [Collection(LiveDbCollection.Name)]
 public class LanePlanPgTests
 {
+    /// <summary>План занятия даты: CF5 — план у занятия (слот 20:00 в тестовых расписаниях).</summary>
+    private static LanePlanKey At(DateOnly date, string start = "20:00") => LanePlanKey.Session(date, start);
+
     private const string Conn =
         "Host=localhost;Port=5445;Database=swimm;Username=swimm;Password=swimm_local_dev";
 
@@ -43,7 +47,7 @@ public class LanePlanPgTests
         if (ownerId == null) return;
 
         var tag = Guid.NewGuid().ToString("N")[..8];
-        var group = new HubGroup { Name = "PG lanes test", Slug = $"pg-lanes-{tag}", OwnerUserId = ownerId.Value };
+        var group = new HubGroup { Name = "PG lanes test", Slug = $"pg-lanes-{tag}", OwnerUserId = ownerId.Value, TrainingSchedule = TestSchedules.EveryDay() };
         var canon = new Swimmer { LastName = "PgLanes", FirstName = $"Canon {tag}", BirthYear = 1980, Origin = "local" };
         var dup = new Swimmer { LastName = "PgLanes", FirstName = $"Dup {tag}", BirthYear = 1980, Origin = "local" };
         probe.AddRange(group, canon, dup);
@@ -76,21 +80,21 @@ public class LanePlanPgTests
                 };
                 var (dist, error) = await plans.DistributeAsync(group.Id, new LanePlanDistributeInputDto { LaneCount = 3, Lanes = lanes });
                 Assert.Null(error);
-                var save = await plans.SaveAsync(group.Id, day,
+                var save = await plans.SaveAsync(group.Id, At(day),
                     new LanePlanInputDto { LaneCount = 3, Lanes = lanes, Swimmers = dist!.Swimmers }, ownerId.Value);
                 Assert.True(save.Success, save.Error);
 
                 // Сокращение 3 → 1: удаление строк дорожек и перенос людей одним SaveChanges.
-                save = await plans.SaveAsync(group.Id, day, new LanePlanInputDto
+                save = await plans.SaveAsync(group.Id, At(day), new LanePlanInputDto
                 {
                     LaneCount = 1,
                     Lanes = [new() { LaneNo = 1, LevelId = slow }],
                     Swimmers = [new() { SwimmerId = dup.Id, LaneNo = 1 }, new() { SwimmerId = canon.Id, LaneNo = 1 }],
                 }, ownerId.Value);
                 Assert.True(save.Success, save.Error);
-                Assert.True(await plans.SetStatusAsync(group.Id, day, LanePlanStatus.Published));
+                Assert.True(await plans.SetStatusAsync(group.Id, At(day), LanePlanStatus.Published));
 
-                var board = (await plans.GetAsync(group.Id, day, isManager: false))!;
+                var board = (await plans.GetAsync(group.Id, At(day), isManager: false))!;
                 Assert.Equal([dup.Id, canon.Id], Assert.Single(board.Lanes).Swimmers.Select(s => s.SwimmerId));
             }
 
@@ -134,7 +138,7 @@ public class LanePlanPgTests
         if (ownerId == null) return;
 
         var tag = Guid.NewGuid().ToString("N")[..8];
-        var group = new HubGroup { Name = "PG sublevels test", Slug = $"pg-sub-{tag}", OwnerUserId = ownerId.Value };
+        var group = new HubGroup { Name = "PG sublevels test", Slug = $"pg-sub-{tag}", OwnerUserId = ownerId.Value, TrainingSchedule = TestSchedules.EveryDay() };
         var first = new Swimmer { LastName = "PgSub", FirstName = $"One {tag}", BirthYear = 1980, Origin = "local" };
         var second = new Swimmer { LastName = "PgSub", FirstName = $"Two {tag}", BirthYear = 1981, Origin = "local" };
         probe.AddRange(group, first, second);
@@ -173,7 +177,7 @@ public class LanePlanPgTests
                 Assert.Null(error);
                 // Advanced 1 ведёт; Advanced 2 при лимите 1 уходит на дорожку Intermediate.
                 Assert.Equal([(second.Id, (int?)1), (first.Id, 2)], dist!.Swimmers.Select(s => (s.SwimmerId, s.LaneNo)));
-                var save = await plans.SaveAsync(group.Id, day,
+                var save = await plans.SaveAsync(group.Id, At(day),
                     new LanePlanInputDto { LaneCount = 2, MaxPerLane = 1, Lanes = lanes, Swimmers = dist.Swimmers }, ownerId.Value);
                 Assert.True(save.Success, save.Error);
             }

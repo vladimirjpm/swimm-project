@@ -5,7 +5,8 @@ import type { HubGroupLevel, HubGroupLevels, LaneChange, LanePlan, LanePlanInput
 import LaneChip from './group-lane-chip';
 import LaneMoveRow from './group-lane-move-row';
 import LanePlanStatus from './lane-plan-status';
-import { lanePlansApi, shortDay } from './lane-plans-api';
+import { lanePlansApi } from './lane-plans-api';
+import { shortPlanKey } from './lane-plan-key';
 import { levelColor } from './level-color';
 import { laneShortNames } from './lane-short-names';
 import RollToast, { type RollToastData } from './trainings/coach/roll-toast';
@@ -225,12 +226,13 @@ function inputKey(input: LanePlanInput): string {
 }
 
 function GroupLaneEditor({
-  groupId, date, plan, template = null, levels, laneCountHint, maxPerLaneHint = null, reservedLanesHint = 1, away = NO_AWAY, desktop, toolbarHost,
+  groupId, planKey, plan, template = null, levels, laneCountHint, maxPerLaneHint = null, reservedLanesHint = 1, away = NO_AWAY, desktop, toolbarHost,
   statusHost, abandon, copyFrom, onSaved, onSetStatus, onDelete, onCopy, onDirtyChange, onFocusPool, workout = null,
 }: {
   groupId: number;
-  date: string;
-  /** Сохранённый план этой даты; null — плана ещё нет. */
+  /** Ключ занятия плана `yyyy-MM-dd-HHmm` (CF5) — адрес записи. */
+  planKey: string;
+  /** Сохранённый план этого занятия; null — плана ещё нет. */
   plan: LanePlan | null;
   /** Заготовка черновика — копия другого плана («Copy from …»); перекрывает `plan` как исходный вид. */
   template?: LanePlan | null;
@@ -241,7 +243,7 @@ function GroupLaneEditor({
   maxPerLaneHint?: number | null;
   /** Запас дорожек нового плана (как в прошлом плане); по умолчанию одна. */
   reservedLanesHint?: number;
-  /** Кто в этот день «не в воде» — в «Not today» нового плана и копии. Читается при монтировании. */
+  /** Кто на этом занятии «не в воде» — в «Not today» нового плана и копии. Читается при монтировании. */
   away?: ReadonlySet<number>;
   desktop: boolean;
   /** Десктоп: узел шапки вида, куда выносится тулбар (портал); пока его нет — тулбар не рисуем. */
@@ -253,7 +255,7 @@ function GroupLaneEditor({
   statusHost?: HTMLElement | null;
   /** План удаляют: несохранённые правки при размонтировании не досылать. */
   abandon?: React.MutableRefObject<boolean>;
-  /** Дата плана, с которого можно скопировать; null — копировать не с чего. */
+  /** Ключ плана (прошлого занятия), с которого можно скопировать; null — копировать не с чего. */
   copyFrom: string | null;
   /** План сохранился (автосохранение). Редактор при этом НЕ пересобирается. */
   onSaved: (plan: LanePlan) => void;
@@ -262,7 +264,7 @@ function GroupLaneEditor({
   /** Запросить удаление плана (подтверждение — в родителе). */
   onDelete: () => void;
   /** Загрузить план-источник и пересоздать редактор с копией; вернул текст ошибки или null. */
-  onCopy: (sourceDate: string) => Promise<string | null>;
+  onCopy: (sourceKey: string) => Promise<string | null>;
   /** Запись не удалась — есть правки, которых нет на сервере. */
   onDirtyChange: (dirty: boolean) => void;
   /** Показать панель бассейна (телефон: переключатель People / Pool) — «перейти к человеку» из диалога публикации. */
@@ -297,7 +299,7 @@ function GroupLaneEditor({
   // Человек переклички этого занятия по пловцу — для кнопки «Card» строки «Move … to» (CF4).
   const deskRoll = deskSession ? selectedRoll?.rsvp ?? null : null;
   const personOf = (swimmerId: number) =>
-    deskRoll?.date === date ? deskRoll.people?.find((p) => (p.linked_swimmer_id ?? p.swimmer_id) === swimmerId) ?? null : null;
+    deskRoll?.session_id === planKey ? deskRoll.people?.find((p) => (p.linked_swimmer_id ?? p.swimmer_id) === swimmerId) ?? null : null;
   const [publishing, setPublishing] = useState(false);
   /** Тост «<имя> → lane 2 · Undo» после переноса; `restore` — корзины и закрепление до него. */
   const [toast, setToast] = useState<(RollToastData & { restore: () => void }) | null>(null);
@@ -343,7 +345,7 @@ function GroupLaneEditor({
       : null,
   }));
   const autosave = useLaneAutosave({
-    groupId, date, draftKey, input: draftInput, plan: openedWith.plan, savedKey: openedWith.key, abandon, onSaved,
+    groupId, planKey, draftKey, input: draftInput, plan: openedWith.plan, savedKey: openedWith.key, abandon, onSaved,
   });
   const saveFailed = autosave.status === 'error';
 
@@ -537,7 +539,7 @@ function GroupLaneEditor({
     if (!saved) return; // запись не удалась — причина в строке ошибки, Publish ждёт
     openSheet({
       kind: 'publish',
-      publish: { groupId, date, plan: saved, onPublish: (notify) => onSetStatus(true, notify), onPerson: showSwimmer },
+      publish: { groupId, planKey, plan: saved, onPublish: (notify) => onSetStatus(true, notify), onPerson: showSwimmer },
     });
   };
 
@@ -907,7 +909,7 @@ function GroupLaneEditor({
       )}
       {confirm === 'copy' && copyFrom && (
         <ConfirmDialog
-          title={`Replace this plan with a copy of ${shortDay(copyFrom)}?`}
+          title={`Replace this plan with a copy of ${shortPlanKey(copyFrom)}?`}
           confirmLabel="Replace"
           busyLabel="Copying…"
           onConfirm={async () => {

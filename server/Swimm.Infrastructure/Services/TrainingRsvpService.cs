@@ -32,48 +32,16 @@ public class TrainingRsvpService : ITrainingRsvpService
         return row == null ? null : GroupTrainingSchedule.Parse(row.TrainingSchedule);
     }
 
-    private static DateTime DayStart(DateOnly date) =>
-        DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+    private Task<List<TrainingOccurrences.OneOff>> OneOffsAsync(int hubGroupId, DateOnly from, DateOnly to) =>
+        TrainingOccurrenceQuery.OneOffsAsync(_db, hubGroupId, from, to);
 
-    /// <summary>
-    /// Разовые занятия группы (тренировки с «Ask who's coming» и заданным началом) за даты
-    /// [<paramref name="from"/>; <paramref name="to"/>]. Дата тренировки в базе — полночь UTC
-    /// (<c>Sys_TrainingSessions.Date</c> — timestamptz), поэтому границы берём по дню.
-    /// </summary>
-    private async Task<List<TrainingOccurrences.OneOff>> OneOffsAsync(int hubGroupId, DateOnly from, DateOnly to)
-    {
-        var fromDb = DayStart(from);
-        var toDb = DayStart(to.AddDays(1));
-        var rows = await _db.TrainingSessions.AsNoTracking()
-            .Where(s => s.HubGroupId == hubGroupId && s.AsksRsvp && s.StartTime != null
-                        && s.Date >= fromDb && s.Date < toDb)
-            .OrderBy(s => s.Id)
-            .Select(s => new { s.Id, s.Date, s.StartTime, s.Title, s.Type, s.PoolType })
-            .ToListAsync();
-        return rows.Select(r => new TrainingOccurrences.OneOff(
-                r.Id, DateOnly.FromDateTime(r.Date), r.StartTime!, r.Title, r.Type,
-                string.IsNullOrWhiteSpace(r.PoolType) ? null : r.PoolType))
-            .ToList();
-    }
-
-    private async Task<List<TrainingOccurrences.Cancellation>> CancellationsAsync(
-        int hubGroupId, DateOnly from, DateOnly to)
-    {
-        var rows = await _db.HubGroupTrainingCancellations.AsNoTracking()
-            .Where(c => c.HubGroupId == hubGroupId && c.Date >= from && c.Date <= to)
-            .Select(c => new { c.Date, c.Start, c.Reason })
-            .ToListAsync();
-        return rows.Select(r => new TrainingOccurrences.Cancellation(r.Date, r.Start, r.Reason)).ToList();
-    }
+    private Task<List<TrainingOccurrences.Cancellation>> CancellationsAsync(int hubGroupId, DateOnly from, DateOnly to) =>
+        TrainingOccurrenceQuery.CancellationsAsync(_db, hubGroupId, from, to);
 
     /// <summary>Занятие с этим ключом (слот расписания или разовое) вместе с пометкой «отменено»; null — такого нет.</summary>
-    private async Task<TrainingOccurrences.Occurrence?> FindOccurrenceAsync(
-        int hubGroupId, GroupTrainingSchedule schedule, DateOnly date, string start)
-    {
-        var oneOffs = await OneOffsAsync(hubGroupId, date, date);
-        var cancellations = await CancellationsAsync(hubGroupId, date, date);
-        return TrainingOccurrences.Find(schedule, oneOffs, cancellations, date, start);
-    }
+    private Task<TrainingOccurrences.Occurrence?> FindOccurrenceAsync(
+        int hubGroupId, GroupTrainingSchedule schedule, DateOnly date, string start) =>
+        TrainingOccurrenceQuery.FindAsync(_db, hubGroupId, schedule, date, start);
 
     public async Task<TrainingRsvpDto?> GetAsync(int hubGroupId, string sessionKey, int viewerUserId, bool isManager,
         DateTime? nowLocal = null)
@@ -137,16 +105,20 @@ public class TrainingRsvpService : ITrainingRsvpService
             .GroupBy(r => new { r.SessionDate, r.SessionStart, r.Answer })
             .Select(g => new { g.Key.SessionDate, g.Key.SessionStart, g.Key.Answer, Count = g.Count() })
             .ToListAsync();
-        var planDates = await _db.LanePlans.AsNoTracking()
+        // План — на занятие (CF5): его ключ — такой же, как у ответов. План дня без занятия (архив,
+        // Start null) даёт все занятия своей даты, как до CF5.
+        var plans = await _db.LanePlans.AsNoTracking()
             .Where(p => p.HubGroupId == hubGroupId && p.Date >= first && p.Date <= today)
-            .Select(p => p.Date)
+            .Select(p => new { p.Date, p.Start })
             .ToListAsync();
+        var sessionKeys = answers.Select(a => (a.SessionDate, a.SessionStart))
+            .Concat(plans.Where(p => p.Start != null).Select(p => (p.Date, p.Start!)));
 
         int Count(DateOnly date, string start, string answer) =>
             answers.Where(a => a.SessionDate == date && a.SessionStart == start && a.Answer == answer).Sum(a => a.Count);
 
         return TrainingOccurrences.Past(schedule, oneOffs, cancellations,
-                answers.Select(a => (a.SessionDate, a.SessionStart)), planDates, now)
+                sessionKeys, plans.Where(p => p.Start == null).Select(p => p.Date), now)
             .Select(o => new PastTrainingDto
             {
                 Session = ToDto(o, schedule),
@@ -336,7 +308,7 @@ public class TrainingRsvpService : ITrainingRsvpService
 
         await _db.SaveChangesAsync();
 
-        var laneChange = await MoveInLanePlanAsync(hubGroupId, date, targetUserId, targetSwimmerId, answer,
+        var laneChange = await MoveInLanePlanAsync(hubGroupId, LanePlanKey.Session(date, start), targetUserId, targetSwimmerId, answer,
             isManager ? input.RestoreLane : null);
 
         var dto = await BuildAsync(hubGroupId, schedule, occurrence!, actorUserId, isManager, now);
@@ -345,12 +317,13 @@ public class TrainingRsvpService : ITrainingRsvpService
     }
 
     /// <summary>
-    /// Ответ двигает пловца в плане дорожек даты (§5.3 плана trainings-coach-flow, CF4): «Going» —
+    /// Ответ двигает пловца в плане дорожек ЭТОГО занятия (§5.3 плана trainings-coach-flow, CF4; с CF5 план —
+    /// у занятия, а не у даты): «Going» —
     /// на дорожку его уровня, «Can't come» — в «Not today»; «Not sure» и снятый ответ план не
     /// трогают. <paramref name="restore"/> (Undo тоста тренера) — вернуть на прежнее место вместо
     /// правила. Аккаунт, который никем из состава не стоит, в плане не бывает.
     /// </summary>
-    private async Task<LaneChangeDto?> MoveInLanePlanAsync(int hubGroupId, DateOnly date, int? userId, int? swimmerId,
+    private async Task<LaneChangeDto?> MoveInLanePlanAsync(int hubGroupId, LanePlanKey plan, int? userId, int? swimmerId,
         string? answer, LanePlaceDto? restore)
     {
         if (restore == null && answer is not (TrainingRsvpAnswer.Yes or TrainingRsvpAnswer.No)) return null;
@@ -358,8 +331,8 @@ public class TrainingRsvpService : ITrainingRsvpService
             ?? (await HubGroupPersonResolver.ResolveAsync(_db, hubGroupId, [userId!.Value]))[userId.Value];
         if (target is not int sid) return null;
 
-        if (restore != null) return await LanePlanPlacementStore.RestoreAsync(_db, hubGroupId, date, sid, restore);
-        return await LanePlanPlacementStore.ApplyAsync(_db, hubGroupId, date, sid,
+        if (restore != null) return await LanePlanPlacementStore.RestoreAsync(_db, hubGroupId, plan, sid, restore);
+        return await LanePlanPlacementStore.ApplyAsync(_db, hubGroupId, plan, sid,
             answer == TrainingRsvpAnswer.Yes ? LanePlanPlacementStore.Intent.Going : LanePlanPlacementStore.Intent.Out);
     }
 
@@ -393,7 +366,7 @@ public class TrainingRsvpService : ITrainingRsvpService
     /// <see cref="TrainingLaneView"/>. Только в этом личном ответе: имена и ответы — приватные.
     /// </summary>
     private async Task<TrainingLaneViewDto?> BuildLaneViewAsync(int hubGroupId, GroupTrainingSchedule schedule,
-        DateOnly date, IReadOnlyDictionary<int, (string Name, string? Gender)> members,
+        DateOnly date, string start, IReadOnlyDictionary<int, (string Name, string? Gender)> members,
         IReadOnlyDictionary<int, int?> resolved, IReadOnlyDictionary<int, HubGroupTrainingRsvp> answers,
         IReadOnlyDictionary<int, HubGroupTrainingRsvp> swimmerAnswers, int viewerUserId, bool isManager)
     {
@@ -404,11 +377,12 @@ public class TrainingRsvpService : ITrainingRsvpService
             .Include(p => p.Lanes)
             .Include(p => p.Swimmers)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date && p.Status == LanePlanStatus.Published);
+            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date && p.Start == start
+                                       && p.Status == LanePlanStatus.Published);
         if (plan == null && mode == GroupLaneView.Plan) return null;
         var lastPlanLanes = plan != null || schedule.UsualLanes != null ? null : await _db.LanePlans.AsNoTracking()
             .Where(p => p.HubGroupId == hubGroupId)
-            .OrderByDescending(p => p.Date)
+            .OrderByDescending(p => p.Date).ThenByDescending(p => p.Start)
             .Select(p => (int?)p.LaneCount)
             .FirstOrDefaultAsync();
 
@@ -644,7 +618,7 @@ public class TrainingRsvpService : ITrainingRsvpService
         var isMember = memberIds.Contains(viewerUserId);
         answers.TryGetValue(viewerUserId, out var mine);
 
-        var laneView = await BuildLaneViewAsync(hubGroupId, schedule, date,
+        var laneView = await BuildLaneViewAsync(hubGroupId, schedule, date, start,
             members.ToDictionary(m => m.UserId, m => (m.Name, m.Gender)), resolved, answers, swimmerAnswers,
             viewerUserId, isManager);
 
@@ -713,7 +687,7 @@ public class TrainingRsvpService : ITrainingRsvpService
                 .ToList(),
         };
         // Связь с пловцом, уровень и полоса «Needs you» (CF4) — только управляющему.
-        if (isManager) await TrainingCoachNeeds.FillAsync(_db, hubGroupId, date, dto, resolved);
+        if (isManager) await TrainingCoachNeeds.FillAsync(_db, hubGroupId, LanePlanKey.Session(date, start), dto, resolved);
         return dto;
     }
 }

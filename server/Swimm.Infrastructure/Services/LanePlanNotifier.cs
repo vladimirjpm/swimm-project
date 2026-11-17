@@ -12,7 +12,7 @@ public class LanePlanNotifier(SwimmDbContext db, IPushSender sender, ILogger<Lan
     : ILanePlanNotifier
 {
     public async Task<int> NotifyPublishedAsync(
-        int hubGroupId, DateOnly date, int publisherUserId, CancellationToken ct = default)
+        int hubGroupId, LanePlanKey key, int publisherUserId, CancellationToken ct = default)
     {
         if (!sender.IsConfigured) return 0;
 
@@ -44,7 +44,7 @@ public class LanePlanNotifier(SwimmDbContext db, IPushSender sender, ILogger<Lan
         var devices = await db.UserPushSubscriptions.Where(s => recipients.Contains(s.UserId)).ToListAsync(ct);
         if (devices.Count == 0) return 0;
 
-        var m = LanePlanRules.PublishedPush(hubGroupId, group.Name, group.Slug, date);
+        var m = LanePlanRules.PublishedPush(hubGroupId, group.Name, group.Slug, key);
         var payload = new PushPayload(m.Title, m.Body, m.Url, m.Tag);
 
         var reached = new HashSet<int>();

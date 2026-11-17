@@ -1,3 +1,5 @@
+using Swimm.Application.Mapping;
+
 namespace Swimm.Application.Abstractions;
 
 /// <summary>
@@ -11,5 +13,5 @@ namespace Swimm.Application.Abstractions;
 public interface ILanePlanNotifier
 {
     /// <returns>Сколько человек получили push хотя бы на одно устройство.</returns>
-    Task<int> NotifyPublishedAsync(int hubGroupId, DateOnly date, int publisherUserId, CancellationToken ct = default);
+    Task<int> NotifyPublishedAsync(int hubGroupId, LanePlanKey key, int publisherUserId, CancellationToken ct = default);
 }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -13,7 +14,7 @@ namespace Swimm.Infrastructure.Services;
 /// </summary>
 internal static class TrainingCoachNeeds
 {
-    public static async Task FillAsync(SwimmDbContext db, int hubGroupId, DateOnly date, TrainingRsvpDto dto,
+    public static async Task FillAsync(SwimmDbContext db, int hubGroupId, LanePlanKey planKey, TrainingRsvpDto dto,
         IReadOnlyDictionary<int, int?> resolved)
     {
         var people = dto.People ?? [];
@@ -48,9 +49,11 @@ internal static class TrainingCoachNeeds
             else if (p.UserId is int u && accountLevels.TryGetValue(u, out var accountLevel)) p.LevelId = accountLevel;
         }
 
+        // План ЭТОГО занятия (CF5): у второго занятия того же дня план свой.
+        var (date, start) = (planKey.Date, planKey.Start);
         var plan = await db.LanePlans.AsNoTracking()
             .Include(x => x.Swimmers)
-            .FirstOrDefaultAsync(x => x.HubGroupId == hubGroupId && x.Date == date);
+            .FirstOrDefaultAsync(x => x.HubGroupId == hubGroupId && x.Date == date && x.Start == start);
         var onLane = plan?.Swimmers.Where(s => s.LaneNo is int no && no <= plan.LaneCount).Select(s => s.SwimmerId).ToHashSet()
                      ?? [];
 

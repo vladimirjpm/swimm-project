@@ -176,7 +176,7 @@ function GroupPage({ slug }: { slug: string }) {
   // подгрузкой плана и ленты, пока таб не открыт; открыт — их подаёт сам таб.
   const trainingsMark = useGroupTrainingsMark({
     groupId: real ? group!.id : null,
-    nextDate: group?.next_training?.date ?? null,
+    nextKey: group?.next_training?.id ?? group?.next_training?.date ?? null,
     manages: coach,
     rsvp: rsvp.rsvp,
     enabled: real && (manages || isMember) && !membersOnly,

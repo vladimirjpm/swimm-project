@@ -18,7 +18,7 @@ import { kmRange, levelMeters } from '../workout/workout-totals';
  * (`training-feed`). Open открывает рабочий стол занятия (`openDesk` → `?session=<id>`).
  *
  * На карточке: дата, время и отсчёт, название / тип разового занятия, «Cancelled», строка ответов
- * (`upcoming[i].rsvp`) и статус плана дорожек на дату занятия (`lanePlans`). Метки внимания тренера
+ * (`upcoming[i].rsvp`) и статус плана дорожек занятия (`lanePlans`). Метки внимания тренера
  * (не ответили — красная, черновик / неразложенные — золотая) стоят на ближайшем не отменённом
  * занятии. «N need you» — CF4; «Workout» (CF6) — число сетов и разброс км по уровням дорожек плана.
  *
@@ -44,13 +44,14 @@ function SessionCard({ session, index, first }: { session: NextTraining; index: 
   const none = r ? Math.max(0, r.total - r.yes - r.maybe - r.no) : 0;
 
   // Планов ещё нет в памяти (грузятся) — статус не показываем, чтобы не мигать «No lane plan».
-  const plan = lanePlans?.find((p) => p.date === session.date) ?? null;
+  // План — у занятия (CF5): у второго занятия того же дня статус свой.
+  const plan = lanePlans?.find((p) => p.session_id === session.id) ?? null;
   const state: PlanPillState | null = lanePlans == null ? null : plan ? plan.status : 'none';
-  const unassigned = upcomingPlans[session.date]?.unassigned.length ?? 0;
+  const unassigned = (session.id ? upcomingPlans[session.id] : null)?.unassigned.length ?? 0;
   // «Needs you» занятия (CF4): идущие без уровня, переполненные дорожки, заявки, аккаунты без связи.
   const needs = needsCount(r?.needs);
   // Workout занятия (CF6): км — по уровням дорожек плана; уровней на дорожках нет — одна сумма.
-  const fullPlan = upcomingPlans[session.date] ?? null;
+  const fullPlan = (session.id ? upcomingPlans[session.id] : null) ?? null;
   const workout = fullPlan?.workout ?? null;
   const laneLevels = [...new Set(fullPlan?.lanes.map((l) => l.level?.id).filter((id): id is number => id != null) ?? [])];
   const workoutKm = workout && workout.sets.length > 0

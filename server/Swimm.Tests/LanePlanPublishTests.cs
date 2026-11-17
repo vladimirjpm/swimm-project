@@ -17,6 +17,9 @@ namespace Swimm.Tests;
 /// </summary>
 public class LanePlanPublishTests
 {
+    /// <summary>План занятия даты: CF5 — план у занятия (слот 20:00 в тестовых расписаниях).</summary>
+    private static LanePlanKey At(DateOnly date, string start = "20:00") => LanePlanKey.Session(date, start);
+
     private static readonly DateOnly Day = new(2026, 9, 27);
 
     private static SwimmDbContext CreateDb(string name) =>
@@ -36,7 +39,7 @@ public class LanePlanPublishTests
         db.AppUsers.AddRange(coach, member, muted, off);
         await db.SaveChangesAsync();
 
-        var group = new HubGroup { Name = "Dolphin", Slug = "dolphin", OwnerUserId = coach.Id, IsPublic = true };
+        var group = new HubGroup { Name = "Dolphin", Slug = "dolphin", OwnerUserId = coach.Id, IsPublic = true, TrainingSchedule = TestSchedules.EveryDay() };
         var levelled = new Swimmer { LastName = "א", FirstName = "א", BirthYear = 1980 };
         var noLevel = new Swimmer { LastName = "", FirstName = "", LastNameEn = "Tom", BirthYear = 1981 };
         var other = new Swimmer { LastName = "ניב", FirstName = "", BirthYear = 1982 };
@@ -63,7 +66,7 @@ public class LanePlanPublishTests
 
     private static HubGroupTrainingRsvp Going(Seed s, int swimmerId, string answer = TrainingRsvpAnswer.Yes) => new()
     {
-        HubGroupId = s.GroupId, SessionDate = Day, SessionStart = "10:00", SwimmerId = swimmerId, Answer = answer,
+        HubGroupId = s.GroupId, SessionDate = Day, SessionStart = "20:00", SwimmerId = swimmerId, Answer = answer,
     };
 
     private static LanePlanInputDto Plan(params (int SwimmerId, int? LaneNo)[] swimmers) => new()
@@ -81,28 +84,28 @@ public class LanePlanPublishTests
         // NoLevel идёт и стоит в Unassigned; Other идёт и снят в «Not today» (в плане его нет).
         db.HubGroupTrainingRsvps.AddRange(Going(s, s.Levelled), Going(s, s.NoLevel), Going(s, s.Other));
         await db.SaveChangesAsync();
-        await service.SaveAsync(s.GroupId, Day, Plan((s.Levelled, null), (s.NoLevel, null)), s.Coach);
+        await service.SaveAsync(s.GroupId, At(Day), Plan((s.Levelled, null), (s.NoLevel, null)), s.Coach);
 
-        var check = (await service.GetPublishCheckAsync(s.GroupId, Day))!;
+        var check = (await service.GetPublishCheckAsync(s.GroupId, At(Day)))!;
         // С уровнем без дорожки публикации не мешает; порядок — как в составе.
         Assert.Equal([s.NoLevel, s.Other], check.Blockers.Select(b => b.SwimmerId));
-        var blocked = await service.PublishAsync(s.GroupId, Day);
+        var blocked = await service.PublishAsync(s.GroupId, At(Day));
         Assert.False(blocked.Success);
         Assert.Equal("Tom and ניב are going but have no level and no lane. Set a level or put them on a lane to publish.", blocked.Error);
-        Assert.Null(await service.GetAsync(s.GroupId, Day, isManager: false));
+        Assert.Null(await service.GetAsync(s.GroupId, At(Day), isManager: false));
 
         // Одного — на дорожку, второму — уровень: можно.
-        await service.SaveAsync(s.GroupId, Day, Plan((s.Levelled, null), (s.NoLevel, 2)), s.Coach);
+        await service.SaveAsync(s.GroupId, At(Day), Plan((s.Levelled, null), (s.NoLevel, 2)), s.Coach);
         db.HubGroupSwimmerLevels.Add(new HubGroupSwimmerLevel { HubGroupId = s.GroupId, SwimmerId = s.Other, LevelId = s.LevelId });
         await db.SaveChangesAsync();
 
-        Assert.Empty((await service.GetPublishCheckAsync(s.GroupId, Day))!.Blockers);
-        var published = await service.PublishAsync(s.GroupId, Day);
+        Assert.Empty((await service.GetPublishCheckAsync(s.GroupId, At(Day)))!.Blockers);
+        var published = await service.PublishAsync(s.GroupId, At(Day));
         Assert.True(published.Success);
         Assert.True(published.Changed);
-        Assert.NotNull(await service.GetAsync(s.GroupId, Day, isManager: false));
+        Assert.NotNull(await service.GetAsync(s.GroupId, At(Day), isManager: false));
         // Повторный Publish — не ошибка и не «сменился».
-        Assert.False((await service.PublishAsync(s.GroupId, Day)).Changed);
+        Assert.False((await service.PublishAsync(s.GroupId, At(Day))).Changed);
     }
 
     [Fact]
@@ -114,18 +117,18 @@ public class LanePlanPublishTests
         // NoLevel «не уверен», Other молчит — оба без уровня и без дорожки, но не «идущие».
         db.HubGroupTrainingRsvps.Add(Going(s, s.NoLevel, TrainingRsvpAnswer.Maybe));
         await db.SaveChangesAsync();
-        await service.SaveAsync(s.GroupId, Day, Plan((s.NoLevel, null), (s.Other, null)), s.Coach);
-        Assert.Empty((await service.GetPublishCheckAsync(s.GroupId, Day))!.Blockers);
+        await service.SaveAsync(s.GroupId, At(Day), Plan((s.NoLevel, null), (s.Other, null)), s.Coach);
+        Assert.Empty((await service.GetPublishCheckAsync(s.GroupId, At(Day)))!.Blockers);
 
         // Other идёт и стоит на дорожке 2; дорожек стало одна — строка осталась, но дорожки нет.
         db.HubGroupTrainingRsvps.Add(Going(s, s.Other));
         await db.SaveChangesAsync();
-        await service.SaveAsync(s.GroupId, Day, Plan((s.Other, 2)), s.Coach);
-        Assert.Empty((await service.GetPublishCheckAsync(s.GroupId, Day))!.Blockers);
+        await service.SaveAsync(s.GroupId, At(Day), Plan((s.Other, 2)), s.Coach);
+        Assert.Empty((await service.GetPublishCheckAsync(s.GroupId, At(Day)))!.Blockers);
         var plan = await db.LanePlans.SingleAsync();
         plan.LaneCount = 1;
         await db.SaveChangesAsync();
-        Assert.Equal([s.Other], (await service.GetPublishCheckAsync(s.GroupId, Day))!.Blockers.Select(b => b.SwimmerId));
+        Assert.Equal([s.Other], (await service.GetPublishCheckAsync(s.GroupId, At(Day)))!.Blockers.Select(b => b.SwimmerId));
     }
 
     [Fact]
@@ -135,8 +138,8 @@ public class LanePlanPublishTests
         var s = await SeedAsync(db);
         var service = new LanePlanService(db);
 
-        Assert.Null(await service.GetPublishCheckAsync(s.GroupId, Day));
-        Assert.False((await service.PublishAsync(s.GroupId, Day)).Found);
+        Assert.Null(await service.GetPublishCheckAsync(s.GroupId, At(Day)));
+        Assert.False((await service.PublishAsync(s.GroupId, At(Day))).Found);
     }
 
     [Theory]
@@ -169,7 +172,7 @@ public class LanePlanPublishTests
         var sender = new PushSubscriptionServiceTests.FakeSender(e => e.EndsWith("gone") ? PushDeliveryOutcome.Gone : PushDeliveryOutcome.Delivered);
 
         var reached = await new LanePlanNotifier(db, sender, NullLogger<LanePlanNotifier>.Instance)
-            .NotifyPublishedAsync(s.GroupId, Day, s.Coach);
+            .NotifyPublishedAsync(s.GroupId, At(Day), s.Coach);
 
         Assert.Equal(1, reached);
         Assert.Equal(
@@ -177,9 +180,10 @@ public class LanePlanPublishTests
             sender.Sent.Select(x => x.Target.Endpoint).Order());
         var payload = sender.Sent[0].Payload;
         Assert.Equal("Dolphin", payload.Title);
-        Assert.Equal("Lanes for Sun, Sep 27 are ready", payload.Body);
+        // План — у занятия (CF5): в тексте и в теге — время занятия.
+        Assert.Equal("Lanes for Sun, Sep 27, 20:00 are ready", payload.Body);
         Assert.Equal("/groups/dolphin?tab=trainings", payload.Url);
-        Assert.Equal($"lanes-{s.GroupId}-2026-09-27", payload.Tag);
+        Assert.Equal($"lanes-{s.GroupId}-2026-09-27-2000", payload.Tag);
         Assert.False(await db.UserPushSubscriptions.AnyAsync(d => d.Endpoint.EndsWith("gone")));
     }
 }

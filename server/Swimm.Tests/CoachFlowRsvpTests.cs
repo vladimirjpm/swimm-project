@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -18,6 +19,9 @@ namespace Swimm.Tests;
 /// </summary>
 public class CoachFlowRsvpTests
 {
+    /// <summary>План занятия даты: CF5 — план у занятия (слот 20:00 в тестовых расписаниях).</summary>
+    private static LanePlanKey At(DateOnly date, string start = "20:00") => LanePlanKey.Session(date, start);
+
     private static readonly DateTime MondayNoon = new(2026, 9, 28, 12, 0, 0);
     private static readonly DateOnly Tue = new(2026, 9, 29);
     private const string TueKey = "2026-09-29-2000";
@@ -66,7 +70,7 @@ public class CoachFlowRsvpTests
 
         if (withPlan)
         {
-            var saved = await new LanePlanService(db).SaveAsync(group.Id, Tue, new LanePlanInputDto
+            var saved = await new LanePlanService(db).SaveAsync(group.Id, At(Tue), new LanePlanInputDto
             {
                 LaneCount = 2,
                 Lanes = [new LanePlanLaneInputDto { LaneNo = 1, LevelId = fast.Id }, new LanePlanLaneInputDto { LaneNo = 2, LevelId = fast.Id }],
@@ -138,7 +142,7 @@ public class CoachFlowRsvpTests
 
         db.HubGroupSwimmerLevels.Add(new HubGroupSwimmerLevel { HubGroupId = s.GroupId, SwimmerId = s.Dan, LevelId = s.Fast });
         await db.SaveChangesAsync();
-        var placed = await new LanePlanService(db).PlaceAsync(s.GroupId, Tue, s.Dan);
+        var placed = await new LanePlanService(db).PlaceAsync(s.GroupId, At(Tue), s.Dan);
         Assert.Equal(1, placed!.After.LaneNo);
 
         var after = (await new TrainingRsvpService(db).GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon))!;

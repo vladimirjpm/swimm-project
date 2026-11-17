@@ -16,6 +16,9 @@ namespace Swimm.Tests;
 /// </summary>
 public class LaneOverflowTests
 {
+    /// <summary>План занятия даты: CF5 — план у занятия (слот 20:00 в тестовых расписаниях).</summary>
+    private static LanePlanKey At(DateOnly date, string start = "20:00") => LanePlanKey.Session(date, start);
+
     // ── Чистые функции ──────────────────────────────────────────────────────
 
     /// <summary>Пловцы подряд с id 1..N, SortKey = id: (сколько, уровень, подуровень).</summary>
@@ -241,7 +244,7 @@ public class LaneOverflowTests
         db.AppUsers.Add(owner);
         await db.SaveChangesAsync();
 
-        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true };
+        var group = new HubGroup { Name = "G", Slug = "g", OwnerUserId = owner.Id, IsPublic = true, TrainingSchedule = TestSchedules.EveryDay() };
         var swimmers = Enumerable.Range(1, 4)
             .Select(i => new Swimmer { LastName = $"ש{i}", FirstName = "א", BirthYear = 1980 + i })
             .ToList();
@@ -340,12 +343,12 @@ public class LaneOverflowTests
 
         // Лимит сохраняется с планом и приходит в доске и в списке; у пловца — подуровень.
         var day = new DateOnly(2026, 10, 20);
-        var saved = await service.SaveAsync(s.GroupId, day, new LanePlanInputDto
+        var saved = await service.SaveAsync(s.GroupId, At(day), new LanePlanInputDto
         {
             LaneCount = 2, MaxPerLane = 2, Lanes = lanes, Swimmers = distributed.Swimmers,
         }, userId: 1);
         Assert.True(saved.Success, saved.Error);
-        var board = (await service.GetAsync(s.GroupId, day, isManager: true))!;
+        var board = (await service.GetAsync(s.GroupId, At(day), isManager: true))!;
         Assert.Equal(2, board.MaxPerLane);
         Assert.Equal([p3, p4], board.Lanes[1].Swimmers.Select(x => x.SwimmerId));
         Assert.Equal(2, board.Lanes[1].Swimmers[0].SubLevel);

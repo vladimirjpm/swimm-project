@@ -10,8 +10,9 @@ using Swimm.Infrastructure.Data;
 namespace Swimm.Infrastructure.Services;
 
 /// <summary>
-/// План дорожек группы на дату (docs/plans/lane-plans-plan.md, L2). Запись — под advisory-lock
-/// группы: два первых «Save» одного дня в одну секунду иначе упали бы на UNIQUE (группа, дата).
+/// План дорожек занятия группы (docs/plans/lane-plans-plan.md, L2; ключ — занятие с CF5 плана
+/// trainings-coach-flow, <see cref="LanePlanKey"/>). Запись — под advisory-lock группы: два первых
+/// «Save» одного занятия в одну секунду иначе упали бы на UNIQUE (группа, дата, начало).
 /// </summary>
 public class LanePlanService : ILanePlanService
 {
@@ -32,31 +33,32 @@ public class LanePlanService : ILanePlanService
     {
         var rows = await _db.LanePlans.AsNoTracking()
             .Where(p => p.HubGroupId == hubGroupId && (isManager || p.Status == LanePlanStatus.Published))
-            .OrderByDescending(p => p.Date)
+            .OrderByDescending(p => p.Date).ThenByDescending(p => p.Start)
             .Take(ListLimit)
-            .Select(p => new { p.Date, p.Status, p.LaneCount, p.MaxPerLane, p.ReservedLanes })
+            .Select(p => new { p.Date, p.Start, p.Status, p.LaneCount, p.MaxPerLane, p.ReservedLanes })
             .ToListAsync();
 
         return rows.Select(p => new LanePlanSummaryDto
         {
-            Date = LanePlanRules.FormatDate(p.Date), Status = p.Status, LaneCount = p.LaneCount, MaxPerLane = p.MaxPerLane,
-            ReservedLanes = p.ReservedLanes,
+            Date = LanePlanRules.FormatDate(p.Date), Start = p.Start, SessionId = SessionIdOf(p.Date, p.Start),
+            Status = p.Status, LaneCount = p.LaneCount, MaxPerLane = p.MaxPerLane, ReservedLanes = p.ReservedLanes,
         }).ToList();
     }
 
-    public async Task<LanePlanAwayDto> GetAwayAsync(int hubGroupId, DateOnly date)
+    public async Task<LanePlanAwayDto> GetAwayAsync(int hubGroupId, LanePlanKey key)
     {
-        var onBreak = await HubGroupBreakQuery.LoadAsync(_db, hubGroupId, date);
+        var onBreak = await HubGroupBreakQuery.LoadAsync(_db, hubGroupId, key.Date);
 
-        var (bySwimmer, anyGoing) = await LoadAnswersBySwimmerAsync(hubGroupId, date);
-        // «Can't come» — только если на эту дату нет другого ответа: «нет» утром и «иду» вечером — в воде.
+        var (bySwimmer, anyGoing) = await LoadAnswersBySwimmerAsync(hubGroupId, key);
+        // «Can't come» — по ответам этого занятия (CF5); у плана дня (архив) — всей даты, и тогда
+        // «нет» утром и «иду» вечером — в воде.
         var cantCome = bySwimmer.Where(g => g.Value.All(a => a == TrainingRsvpAnswer.No)).Select(g => g.Key).ToHashSet();
-        // «Going» на эту дату перебивает «Doesn't train» (Р74: человек посчитан на этот день).
+        // «Going» на это занятие перебивает «Doesn't train» (Р74: человек посчитан на этот день).
         var going = bySwimmer.Where(g => g.Value.Contains(TrainingRsvpAnswer.Yes)).Select(g => g.Key).ToHashSet();
 
         var away = onBreak.SwimmerIds.Where(id => !going.Contains(id)).Concat(cantCome).ToHashSet();
 
-        // Настройка расписания «answered» (решение Влада 09.11.2026): раз на дату кто-то ответил «Going»,
+        // Настройка расписания «answered» (решение Влада 09.11.2026): раз на занятие кто-то ответил «Going»,
         // перекличка идёт — кто из состава не ответил вовсе, тоже не в воде. «Going» аккаунта без
         // пловца состава перекличку тоже открывает. Ответов «Going» нет — молчащие в воде, как при everyone.
         var scheduleJson = await _db.HubGroups.AsNoTracking()
@@ -82,15 +84,17 @@ public class LanePlanService : ILanePlanService
     }
 
     /// <summary>
-    /// Ответы на занятия даты по пловцам состава (занятий в день может быть несколько — план один на
-    /// день). Ответ аккаунта — его пловцу (тот же резолвер, что у вида по дорожкам), за пловца — ему.
-    /// <c>AnyGoing</c> — «Going» есть хоть у кого-то, в том числе у аккаунта без пловца состава.
+    /// Ответы на занятие плана по пловцам состава (CF5: план — у занятия; у плана дня без занятия —
+    /// на все занятия даты). Ответ аккаунта — его пловцу (тот же резолвер, что у вида по дорожкам),
+    /// за пловца — ему. <c>AnyGoing</c> — «Going» есть хоть у кого-то, в том числе у аккаунта без
+    /// пловца состава.
     /// </summary>
     private async Task<(Dictionary<int, List<string>> BySwimmer, bool AnyGoing)> LoadAnswersBySwimmerAsync(
-        int hubGroupId, DateOnly date)
+        int hubGroupId, LanePlanKey key)
     {
+        var (date, start) = (key.Date, key.Start);
         var answers = await _db.HubGroupTrainingRsvps.AsNoTracking()
-            .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date)
+            .Where(r => r.HubGroupId == hubGroupId && r.SessionDate == date && (start == null || r.SessionStart == start))
             .Select(r => new { r.UserId, r.SwimmerId, r.Answer })
             .ToListAsync();
         var userIds = answers.Where(a => a.UserId != null).Select(a => a.UserId!.Value).Distinct().ToList();
@@ -103,13 +107,20 @@ public class LanePlanService : ILanePlanService
         return (bySwimmer, answers.Any(a => a.Answer == TrainingRsvpAnswer.Yes));
     }
 
-    public async Task<LanePlanDto?> GetAsync(int hubGroupId, DateOnly date, bool isManager, int? viewerUserId = null)
+    public async Task<LanePlanDto?> GetAsync(int hubGroupId, LanePlanKey key, bool isManager, int? viewerUserId = null)
     {
+        // По ключу занятия — его план. По голой дате (старые адреса Lanes, план дня без занятия) —
+        // план дня, иначе первый по времени план этой даты; участнику — первый ОПУБЛИКОВАННЫЙ (утренний
+        // черновик не должен прятать опубликованный вечерний).
+        var (date, start, bySession) = (key.Date, key.Start, key.IsSession);
         var plan = await _db.LanePlans.AsNoTracking()
             .Include(p => p.Lanes).ThenInclude(l => l.Level)
             .Include(p => p.Swimmers)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+            .Where(p => p.HubGroupId == hubGroupId && p.Date == date && (!bySession || p.Start == start)
+                        && (isManager || p.Status == LanePlanStatus.Published))
+            .OrderBy(p => p.Start != null).ThenBy(p => p.Start)
+            .FirstOrDefaultAsync();
         if (plan == null || (!isManager && plan.Status != LanePlanStatus.Published)) return null;
 
         var roster = await LoadRosterAsync(hubGroupId);
@@ -177,6 +188,8 @@ public class LanePlanService : ILanePlanService
         return new LanePlanDto
         {
             Date = LanePlanRules.FormatDate(plan.Date),
+            Start = plan.Start,
+            SessionId = SessionIdOf(plan.Date, plan.Start),
             Status = plan.Status,
             LaneCount = plan.LaneCount,
             MaxPerLane = plan.MaxPerLane,
@@ -204,7 +217,8 @@ public class LanePlanService : ILanePlanService
             NotToday = isManager
                 ? roster.Where(r => !inPlan.Contains(r.SwimmerId)).Select(r => ToDto(r.SwimmerId)).ToList()
                 : [],
-            CanEdit = isManager,
+            // План дня без занятия (архив, CF5) не правится никем.
+            CanEdit = isManager && plan.Start != null,
             MySwimmers = mySwimmers,
         };
     }
@@ -236,8 +250,10 @@ public class LanePlanService : ILanePlanService
             .ToList();
     }
 
-    public async Task<HubGroupMemberSaveResult> SaveAsync(int hubGroupId, DateOnly date, LanePlanInputDto input, int userId)
+    public async Task<HubGroupMemberSaveResult> SaveAsync(int hubGroupId, LanePlanKey key, LanePlanInputDto input, int userId)
     {
+        if (!key.IsSession) return HubGroupMemberSaveResult.Fail(LanePlanRules.ReadOnlyDayPlanMessage);
+        var (date, start) = (key.Date, key.Start!);
         var (normalized, error) = LanePlanRules.Normalize(input);
         if (normalized == null) return HubGroupMemberSaveResult.Fail(error!);
 
@@ -250,7 +266,12 @@ public class LanePlanService : ILanePlanService
                 .Include(p => p.Lanes)
                 .Include(p => p.Swimmers)
                 .AsSplitQuery()
-                .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+                .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date && p.Start == start);
+
+            // Новый план — только у существующего занятия (CF5, решение 1): плана на день без
+            // тренировки нет. Отменённое занятие — тоже занятие (план к нему не запрещаем).
+            if (plan == null && await TrainingOccurrenceQuery.FindAsync(_db, hubGroupId, date, start) == null)
+                return HubGroupMemberSaveResult.Fail("There is no such training. Reload and try again.");
 
             // Пловец — из видимого состава или уже стоял в этом плане (ушёл из группы, снимок держит).
             var allowed = (await _db.HubGroupMembers
@@ -267,7 +288,7 @@ public class LanePlanService : ILanePlanService
             {
                 plan = new LanePlan
                 {
-                    HubGroupId = hubGroupId, Date = date, Status = LanePlanStatus.Draft,
+                    HubGroupId = hubGroupId, Date = date, Start = start, Status = LanePlanStatus.Draft,
                     CreatedByUserId = userId, CreatedAt = now,
                 };
                 _db.LanePlans.Add(plan);
@@ -318,7 +339,7 @@ public class LanePlanService : ILanePlanService
         });
     }
 
-    public async Task<(bool Found, string? Error)> SaveWorkoutAsync(int hubGroupId, DateOnly date, WorkoutDto? workout)
+    public async Task<(bool Found, string? Error)> SaveWorkoutAsync(int hubGroupId, LanePlanKey key, WorkoutDto? workout)
     {
         var (normalized, error) = WorkoutRules.Normalize(workout);
         if (error != null) return (true, error);
@@ -337,7 +358,7 @@ public class LanePlanService : ILanePlanService
 
         return await GroupAdvisoryLock.InGroupTransactionAsync(_db, LanePlansLockClass, hubGroupId, async () =>
         {
-            var plan = await _db.LanePlans.FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+            var plan = await FindWritableAsync(hubGroupId, key);
             if (plan == null) return (false, (string?)null);
 
             // Пишется только документ: раскладку дорожек сохраняет свой PUT, правки не перетирают друг друга.
@@ -446,22 +467,20 @@ public class LanePlanService : ILanePlanService
         }, null);
     }
 
-    public async Task<LanePlanPublishCheckDto?> GetPublishCheckAsync(int hubGroupId, DateOnly date)
+    public async Task<LanePlanPublishCheckDto?> GetPublishCheckAsync(int hubGroupId, LanePlanKey key)
     {
-        var plan = await _db.LanePlans.AsNoTracking()
-            .Include(p => p.Swimmers)
-            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+        var plan = await FindWritableAsync(hubGroupId, key, withSwimmers: true, tracking: false);
         return plan == null ? null : new LanePlanPublishCheckDto { Blockers = await LoadBlockersAsync(plan) };
     }
 
     /// <summary>
-    /// Решение 10: идущий («Going» хоть на одно занятие даты) пловец видимого состава без уровня,
+    /// Решение 10: идущий («Going» на занятие плана) пловец видимого состава без уровня,
     /// который не стоит на дорожке плана (Unassigned, «Not today» или дорожка сверх числа дорожек).
     /// Порядок — как в составе.
     /// </summary>
     private async Task<List<LanePlanBlockerDto>> LoadBlockersAsync(LanePlan plan)
     {
-        var going = (await LoadAnswersBySwimmerAsync(plan.HubGroupId, plan.Date)).BySwimmer
+        var going = (await LoadAnswersBySwimmerAsync(plan.HubGroupId, new LanePlanKey(plan.Date, plan.Start))).BySwimmer
             .Where(g => g.Value.Contains(TrainingRsvpAnswer.Yes))
             .Select(g => g.Key)
             .ToHashSet();
@@ -478,14 +497,13 @@ public class LanePlanService : ILanePlanService
             .ToList();
     }
 
-    public Task<LaneChangeDto?> PlaceAsync(int hubGroupId, DateOnly date, int swimmerId) =>
-        LanePlanPlacementStore.ApplyAsync(_db, hubGroupId, date, swimmerId, LanePlanPlacementStore.Intent.Going);
+    public async Task<LaneChangeDto?> PlaceAsync(int hubGroupId, LanePlanKey key, int swimmerId) =>
+        !key.IsSession ? null
+            : await LanePlanPlacementStore.ApplyAsync(_db, hubGroupId, key, swimmerId, LanePlanPlacementStore.Intent.Going);
 
-    public async Task<LanePlanPublishResult> PublishAsync(int hubGroupId, DateOnly date)
+    public async Task<LanePlanPublishResult> PublishAsync(int hubGroupId, LanePlanKey key)
     {
-        var plan = await _db.LanePlans
-            .Include(p => p.Swimmers)
-            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+        var plan = await FindWritableAsync(hubGroupId, key, withSwimmers: true);
         if (plan == null) return new LanePlanPublishResult(false, null, false);
         if (plan.Status == LanePlanStatus.Published) return new LanePlanPublishResult(true, null, false);
 
@@ -500,9 +518,9 @@ public class LanePlanService : ILanePlanService
         return new LanePlanPublishResult(true, null, true);
     }
 
-    public async Task<bool> SetStatusAsync(int hubGroupId, DateOnly date, string status)
+    public async Task<bool> SetStatusAsync(int hubGroupId, LanePlanKey key, string status)
     {
-        var plan = await _db.LanePlans.FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+        var plan = await FindWritableAsync(hubGroupId, key);
         if (plan == null) return false;
         if (plan.Status == status) return true;
 
@@ -512,18 +530,38 @@ public class LanePlanService : ILanePlanService
         return true;
     }
 
-    public async Task<bool> DeleteAsync(int hubGroupId, DateOnly date)
+    public async Task<bool> DeleteAsync(int hubGroupId, LanePlanKey key)
     {
+        if (!key.IsSession) return false;
+        var (date, start) = (key.Date, key.Start);
         var plan = await _db.LanePlans
             .Include(p => p.Lanes)
             .Include(p => p.Swimmers)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date);
+            .FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date && p.Start == start);
         if (plan == null) return false;
 
         _db.LanePlans.Remove(plan);
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    /// <summary>Ключ занятия плана для ответа API; план дня без занятия (архив) — null.</summary>
+    private static string? SessionIdOf(DateOnly date, string? start) =>
+        start == null ? null : TrainingRsvpRules.SessionKey(date, start);
+
+    /// <summary>
+    /// План ЗАНЯТИЯ для записи (статус, workout, публикация, проверка публикации); по голой дате —
+    /// null: план дня без занятия правке не подлежит (CF5).
+    /// </summary>
+    private async Task<LanePlan?> FindWritableAsync(
+        int hubGroupId, LanePlanKey key, bool withSwimmers = false, bool tracking = true)
+    {
+        if (!key.IsSession) return null;
+        var (date, start) = (key.Date, key.Start);
+        IQueryable<LanePlan> query = tracking ? _db.LanePlans : _db.LanePlans.AsNoTracking();
+        if (withSwimmers) query = query.Include(p => p.Swimmers);
+        return await query.FirstOrDefaultAsync(p => p.HubGroupId == hubGroupId && p.Date == date && p.Start == start);
     }
 
     /// <summary>

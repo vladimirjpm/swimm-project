@@ -1,10 +1,13 @@
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.Application.Abstractions;
 
 /// <summary>
-/// План дорожек группы на дату (docs/plans/lane-plans-plan.md, L2). Правила формы —
-/// <c>LanePlanRules</c>, раскладка — <c>LaneDistribution</c>.
+/// План дорожек занятия группы (docs/plans/lane-plans-plan.md, L2; ключ — занятие с CF5 плана
+/// trainings-coach-flow, <see cref="LanePlanKey"/>). Правила формы — <c>LanePlanRules</c>, раскладка —
+/// <c>LaneDistribution</c>. Запись — только по ключу занятия (<see cref="LanePlanKey.IsSession"/>):
+/// план дня без занятия — архив только для чтения; проверяет контроллер.
 ///
 /// Права здесь НЕ проверяются: контроллер уже решил, управляющий ли зритель (CanEdit) или
 /// активный участник. Флаг <c>isManager</c> только выбирает, что отдать: черновики и
@@ -16,34 +19,35 @@ public interface ILanePlanService
     Task<List<LanePlanSummaryDto>> ListAsync(int hubGroupId, bool isManager);
 
     /// <summary>
-    /// Доска на дату; null — плана нет (или он черновик, а зритель не управляющий).
+    /// Доска занятия; null — плана нет (или он черновик, а зритель не управляющий). По голой дате
+    /// (старые адреса Lanes) — план дня без занятия, иначе первый по времени план этой даты.
     /// <paramref name="viewerUserId"/> задан — в ответе его пловцы плана (<c>my_swimmers</c>).
     /// </summary>
-    Task<LanePlanDto?> GetAsync(int hubGroupId, DateOnly date, bool isManager, int? viewerUserId = null);
+    Task<LanePlanDto?> GetAsync(int hubGroupId, LanePlanKey key, bool isManager, int? viewerUserId = null);
 
     /// <summary>
-    /// Кто из видимого состава в день <paramref name="date"/> «не в воде» (On break / Doesn't
-    /// train без «Going» на эту дату, или «Can't come» на занятия этой даты) — для «Not today»
-    /// нового плана в редакторе. Только управляющему.
+    /// Кто из видимого состава на занятии <paramref name="key"/> «не в воде» (On break / Doesn't
+    /// train без «Going» на это занятие, или «Can't come» на него) — для «Not today» нового плана
+    /// в редакторе. Только управляющему.
     /// </summary>
-    Task<LanePlanAwayDto> GetAwayAsync(int hubGroupId, DateOnly date);
+    Task<LanePlanAwayDto> GetAwayAsync(int hubGroupId, LanePlanKey key);
 
     /// <summary>Зритель открыл вид Lanes (Т1б): гаснет золотая метка «тебя перенесли».</summary>
     Task MarkSeenAsync(int hubGroupId, int viewerUserId);
 
     /// <summary>
-    /// Сохранить план целиком (создать черновиком, если его нет; статус существующего не
-    /// меняется). Уровни дорожек — только этой группы; пловцы — видимого состава или уже
+    /// Сохранить план целиком (создать черновиком, если его нет — только у существующего занятия, CF5;
+    /// статус существующего не меняется). Уровни дорожек — только этой группы; пловцы — видимого состава или уже
     /// стоявшие в этом плане (ушедший из группы остаётся в снимке).
     /// </summary>
-    Task<HubGroupMemberSaveResult> SaveAsync(int hubGroupId, DateOnly date, LanePlanInputDto input, int userId);
+    Task<HubGroupMemberSaveResult> SaveAsync(int hubGroupId, LanePlanKey key, LanePlanInputDto input, int userId);
 
     /// <summary>
     /// Сохранить workout занятия (CF6, §5.5 плана trainings-coach-flow): документ целиком, null —
     /// стереть. План должен быть (workout живёт при нём и публикуется с ним): нет — <c>Found</c>
     /// false. Уровни — только этой группы. Статус плана не меняется.
     /// </summary>
-    Task<(bool Found, string? Error)> SaveWorkoutAsync(int hubGroupId, DateOnly date, WorkoutDto? workout);
+    Task<(bool Found, string? Error)> SaveWorkoutAsync(int hubGroupId, LanePlanKey key, WorkoutDto? workout);
 
     /// <summary>Раскладка «Distribute» по текущим уровням и порядку состава. Ничего не пишет.</summary>
     Task<(LanePlanDistributionDto? Result, string? Error)> DistributeAsync(int hubGroupId, LanePlanDistributeInputDto input);
@@ -58,24 +62,24 @@ public interface ILanePlanService
     /// Идущие пловцы без уровня, которые не стоят на дорожке (решение 10 плана
     /// trainings-coach-flow): пока они есть, план не публикуется. null — плана нет.
     /// </summary>
-    Task<LanePlanPublishCheckDto?> GetPublishCheckAsync(int hubGroupId, DateOnly date);
+    Task<LanePlanPublishCheckDto?> GetPublishCheckAsync(int hubGroupId, LanePlanKey key);
 
     /// <summary>
     /// Поставить идущего пловца на дорожку его уровня по правилу ответа «Going» (§5.3 плана
     /// trainings-coach-flow, CF4) — после того, как тренер задал ему уровень в карточке человека.
     /// Уже на дорожке — не двигает. null — плана нет или сдвига нет.
     /// </summary>
-    Task<LaneChangeDto?> PlaceAsync(int hubGroupId, DateOnly date, int swimmerId);
+    Task<LaneChangeDto?> PlaceAsync(int hubGroupId, LanePlanKey key, int swimmerId);
 
     /// <summary>Опубликовать с проверкой решения 10 (<see cref="GetPublishCheckAsync"/>).</summary>
-    Task<LanePlanPublishResult> PublishAsync(int hubGroupId, DateOnly date);
+    Task<LanePlanPublishResult> PublishAsync(int hubGroupId, LanePlanKey key);
 
     /// <summary>
     /// Сменить статус без проверок: вернуть в черновик (Unpublish). Публикацию из интерфейса ведёт
     /// <see cref="PublishAsync"/>. false — плана нет.
     /// </summary>
-    Task<bool> SetStatusAsync(int hubGroupId, DateOnly date, string status);
+    Task<bool> SetStatusAsync(int hubGroupId, LanePlanKey key, string status);
 
     /// <summary>Удалить план. false — плана нет.</summary>
-    Task<bool> DeleteAsync(int hubGroupId, DateOnly date);
+    Task<bool> DeleteAsync(int hubGroupId, LanePlanKey key);
 }

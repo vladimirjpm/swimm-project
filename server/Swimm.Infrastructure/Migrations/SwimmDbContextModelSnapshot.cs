@@ -2216,6 +2216,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("ReservedLanes")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Start")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -2231,8 +2235,10 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.HasIndex("CreatedByUserId");
 
-                    b.HasIndex("HubGroupId", "Date")
+                    b.HasIndex("HubGroupId", "Date", "Start")
                         .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("HubGroupId", "Date", "Start"), false);
 
                     b.ToTable("Sys_LanePlans", null, t =>
                         {
@@ -2241,6 +2247,8 @@ namespace Swimm.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_LanePlans_MaxPerLane", "\"MaxPerLane\" IS NULL OR \"MaxPerLane\" BETWEEN 1 AND 20");
 
                             t.HasCheckConstraint("CK_LanePlans_ReservedLanes", "\"ReservedLanes\" BETWEEN 0 AND 11");
+
+                            t.HasCheckConstraint("CK_LanePlans_Start", "\"Start\" IS NULL OR \"Start\" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'");
 
                             t.HasCheckConstraint("CK_LanePlans_Status", "\"Status\" IN ('draft', 'published')");
                         });

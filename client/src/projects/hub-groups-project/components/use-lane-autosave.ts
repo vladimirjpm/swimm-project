@@ -31,10 +31,11 @@ export interface LaneAutosave {
 const SAVE_DELAY_MS = 700;
 
 export function useLaneAutosave({
-  groupId, date, draftKey, input, plan, savedKey: initialSavedKey, abandon, onSaved, delay = SAVE_DELAY_MS,
+  groupId, planKey, draftKey, input, plan, savedKey: initialSavedKey, abandon, onSaved, delay = SAVE_DELAY_MS,
 }: {
   groupId: number;
-  date: string;
+  /** Ключ занятия плана `yyyy-MM-dd-HHmm` (CF5) — адрес `PUT …/lane-plans/{planKey}`. */
+  planKey: string;
   /** Ключ содержимого черновика (`inputKey` редактора). */
   draftKey: string;
   input: LanePlanInput;
@@ -67,7 +68,7 @@ export function useLaneAutosave({
       while (latest.current.key !== savedKey.current) {
         const sent = latest.current;
         if (mounted.current) { setStatus('saving'); setError(null); }
-        const result = await lanePlansApi.save(groupId, date, sent.input);
+        const result = await lanePlansApi.save(groupId, planKey, sent.input);
         if (!result.ok || !result.data) {
           failed.current = true;
           if (mounted.current) {
@@ -87,7 +88,7 @@ export function useLaneAutosave({
     const promise = loop().finally(() => { running.current = null; });
     running.current = promise;
     return promise;
-  }, [groupId, date]);
+  }, [groupId, planKey]);
 
   // Правка: ждём паузу и пишем. Вернулся к сохранённому (Undo) — писать нечего.
   useEffect(() => {
