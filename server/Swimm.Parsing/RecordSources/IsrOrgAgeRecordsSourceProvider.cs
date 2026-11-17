@@ -51,8 +51,8 @@ public class IsrOrgAgeRecordsSourceProvider : IRecordSourceProvider
             }
             else
             {
-                var url25 = _configuration["RecordsImport:IsrOrgAgeRecordsUrl25m"];
-                var url50 = _configuration["RecordsImport:IsrOrgAgeRecordsUrl50m"];
+                var url25 = _configuration[IsrOrgRecordsPageResolver.PinnedUrlKey(isMasters: false, "25m")];
+                var url50 = _configuration[IsrOrgRecordsPageResolver.PinnedUrlKey(isMasters: false, "50m")];
 
                 // Перехват ПОФАЙЛОВЫЙ — см. близнеца в IsrOrgMastersRecordsSourceProvider:
                 // условие «пусты ОБА» превращало один заданный адрес в отмену второго файла.

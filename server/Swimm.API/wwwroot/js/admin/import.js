@@ -697,12 +697,21 @@
                                 // Имя файла в подсказке: видно, КУДА на самом деле ведёт ссылка
                                 // (16.11.2026: «мастерс 25 м» → «שיאי ישראל בריכה ארוכה 17_08_2026.pdf»).
                                 const file = decodeURIComponent(l.url.split('/').pop() || '');
+                                // pinnedUrl — адрес, закреплённый в настройках: Fetch качает его, а
+                                // ссылку со страницы не смотрит. Без этой строки «битая ссылка»
+                                // читалась как «файл не грузится», хотя он грузится (17.11.2026).
+                                const pinnedFile = l.pinnedUrl ? hebrewFileName(decodeURIComponent(l.pinnedUrl.split('/').pop() || '')) : '';
+                                const pinned = l.pinnedUrl
+                                    ? ` <span class="block text-admin-text-muted">берём закреплённый: <a href="${l.pinnedUrl}" target="_blank" rel="noopener" class="text-admin-accent hover:underline" title="Адрес из настроек (RecordsImport:IsrOrg…RecordsUrl${l.poolType}) — Fetch качает его, а не ссылку со страницы">${pinnedFile}</a></span>`
+                                    : '';
                                 const warn = l.trusted === false
-                                    ? ` <span class="text-admin-danger" title="Подпись на сайте федерации не сходится с файлом: ссылка ведёт на «${file}». Автозагрузка её пропустит — грузите вручную">⚠ битая ссылка</span>`
+                                    ? (l.pinnedUrl
+                                        ? ` <span class="text-admin-warning" title="Подпись на сайте федерации не сходится с файлом: ссылка ведёт на «${file}». На загрузку не влияет — Fetch берёт закреплённый адрес">⚠ на сайте битая</span>`
+                                        : ` <span class="text-admin-danger" title="Подпись на сайте федерации не сходится с файлом: ссылка ведёт на «${file}». Автозагрузка её пропустит — грузите вручную">⚠ битая ссылка</span>`)
                                     : '';
                                 // Каждая ссылка — своей строкой: через « · » при переносе метка
                                 // «битая» визуально прилипала к СЛЕДУЮЩЕМУ бассейну.
-                                return `<span class="block"><a href="${l.url}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${l.poolType}</a>${upd}${warn}</span>`;
+                                return `<span class="block"><a href="${l.url}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${l.poolType}</a>${upd}${warn}${pinned}</span>`;
                             })
                             .join('');
                     });
@@ -717,6 +726,16 @@
     function fmtDateOnly(d) {
         const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || ''));
         return m ? `${m[3]}/${m[2]}/${m[1]}` : String(d || '');
+    }
+
+    // Имя файла федерации («שיאים מאסטרס קצרה - 1_26.pdf») в HTML для строки слева-направо.
+    // Целиком в <bdi> хвост переворачивался: «pdf.26_1 - שיאים…» — цифры через «_» и «.pdf»
+    // в контексте справа-налево переставляются. Поэтому иврит изолируем отдельно, а хвост
+    // после последней ивритской буквы печатаем слева-направо (17.11.2026).
+    function hebrewFileName(name) {
+        const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const m = /^(.*[֐-׿])(.*)$/s.exec(name);
+        return m ? `<bdi>${esc(m[1])}</bdi><span dir="ltr">${esc(m[2])}</span>` : esc(name);
     }
 
     // «3 дн. назад»; полная дата — в title. Свежесть из журнала проверок (U4).

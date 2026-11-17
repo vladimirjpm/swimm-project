@@ -123,13 +123,20 @@ public sealed record RecordSourceStatusDto(string Source, DateTime? LastUpdatedA
 /// Админке это надо показать: иначе «файл не найден» выглядит поломкой у нас, а сломана
 /// ссылка у федерации (docs/data-integrity.md, И-15).
 /// </param>
+/// <param name="PinnedUrl">
+/// Адрес этого файла, закреплённый в настройках (ручной перехват, например
+/// <c>RecordsImport:IsrOrgMastersRecordsUrl25m</c>). Не null — Fetch качает ЕГО, а ссылку со
+/// страницы не смотрит вовсе. Админке это надо показать: иначе «битая ссылка» выглядит так,
+/// будто файл не грузится, а он грузится по закреплённому адресу (17.11.2026).
+/// </param>
 public sealed record RecordSourceLinkDto(
     string Url,
     string Label,
     string PoolType,
     bool IsMasters,
     DateOnly? UpdatedOn,
-    bool Trusted = true);
+    bool Trusted = true,
+    string? PinnedUrl = null);
 
 /// <summary>
 /// Страна источника рекордов (11.1.1): чем её обозначает наша модель (<paramref name="Code"/>,
