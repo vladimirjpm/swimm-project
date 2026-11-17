@@ -16,8 +16,11 @@ namespace Swimm.Infrastructure.Services;
 /// федерация обязана применяться ПОСЛЕ World Aquatics (И-13), иначе батч молча откатит
 /// более свежие рекорды федерации. Израиль обновляет только <c>--records-refresh</c>.</item>
 /// <item><b>Упавшая страна не роняет прогон.</b> 215 стран по шесть запросов — что-нибудь
-/// обязательно отвалится; список упавших виден в статусе, повтор — новый прогон с этими же
-/// кодами.</item>
+/// обязательно отвалится; список упавших виден в статусе.</item>
+/// <item><b>Скачанное не теряется</b> (И-68). Каждая страна сразу после скачивания ложится на
+/// диск (<see cref="IRecordCountryRunProgress"/>). Следующий прогон по всем странам — после
+/// обрыва процесса или с упавшими — берёт уже скачанное оттуда и ходит в источник только за
+/// остальным. Прошли все без сбоев — сохранённое стирается, и следующий прогон снова полный.</item>
 /// <item><b>Дифф строится один, в конце.</b> Он живёт до Apply (12 часов), а не десять минут
 /// превью: сам прогон идёт час-два.</item>
 /// <item><b>Удаления нет.</b> Apply только upsert — инвариант 1 плана (age/masters
@@ -45,6 +48,7 @@ public sealed class RecordCountryRunner
     private readonly IRecordCountryFetcher _fetcher;
     private readonly IRecordDiffService _diff;
     private readonly IRecordRunArchive? _archive;
+    private readonly IRecordCountryRunProgress? _progress;
     private readonly TimeSpan _pause;
 
     /// <param name="archive">
@@ -52,18 +56,24 @@ public sealed class RecordCountryRunner
     /// которым диск не нужен).
     /// </param>
     /// <param name="pause">Пауза между странами; в тестах — ноль.</param>
+    /// <param name="progress">
+    /// Куда сохранять скачанное по ходу прогона, чтобы оборванный прогон продолжился, а не начался
+    /// заново (И-68). null — не сохраняем.
+    /// </param>
     public RecordCountryRunner(
         IRecordCountriesProvider countries,
         IRecordCountryFetcher fetcher,
         IRecordDiffService diff,
         IRecordRunArchive? archive = null,
-        TimeSpan? pause = null)
+        TimeSpan? pause = null,
+        IRecordCountryRunProgress? progress = null)
     {
         _countries = countries;
         _fetcher = fetcher;
         _diff = diff;
         _archive = archive;
         _pause = pause ?? DefaultPause;
+        _progress = progress;
     }
 
     /// <summary>
@@ -91,18 +101,33 @@ public sealed class RecordCountryRunner
         var rows = new List<ParsedRecordDto>();
         var mismatches = new List<RecordCountryMismatchDto>();
 
+        // Сохранённое прошлым прогоном (И-68) — только у прогона по ВСЕМ странам: подмножество
+        // — отладка, и пусть оно честно ходит в источник. Ничего нет или устарело — копим заново.
+        var saved = await LoadSavedAsync(status, codes, ct);
+
         // Мировые — один раз на прогон. Не скачались: прогон продолжается, а сторож
         // правдоподобия возьмёт эталон из базы (RecordDiffService.WorldReferenceAsync).
-        try
+        if (saved?.World is { } savedWorld)
         {
-            rows.AddRange(await _fetcher.FetchWorldAsync(ct));
+            rows.AddRange(savedWorld);
             status.WorldFetched = true;
             status.RowsFetched = rows.Count;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        else
         {
-            failed.Add(new RecordCountryRunFailure("WR", ex.Message));
-            status.Failed = failed.ToArray();
+            try
+            {
+                var world = await _fetcher.FetchWorldAsync(ct);
+                rows.AddRange(world);
+                status.WorldFetched = true;
+                status.RowsFetched = rows.Count;
+                if (IsFullRun(codes)) await _progress!.SaveWorldAsync(world, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                failed.Add(new RecordCountryRunFailure(RecordCountryRun.WorldCode, ex.Message));
+                status.Failed = failed.ToArray();
+            }
         }
 
         var first = true;
@@ -110,6 +135,17 @@ public sealed class RecordCountryRunner
         {
             ct.ThrowIfCancellationRequested();
 
+            // Страна уже скачана оборванным прогоном — берём из сохранённого, источник не трогаем.
+            if (saved != null && saved.Countries.TryGetValue(country.Code, out var kept))
+            {
+                Take(kept, rows, mismatches, status);
+                status.Resumed++;
+                status.Done++;
+                status.RowsFetched = rows.Count;
+                continue;
+            }
+
+            // Пауза — только между походами в источник: сохранённые страны его не нагружают.
             if (!first) await Task.Delay(_pause, ct);
             first = false;
 
@@ -117,15 +153,8 @@ public sealed class RecordCountryRunner
             try
             {
                 var fetched = await _fetcher.FetchAsync(country, ct);
-                rows.AddRange(fetched.Records);
-
-                status.MismatchCount += fetched.Mismatches.Count;
-                foreach (var m in fetched.Mismatches)
-                {
-                    if (mismatches.Count >= MismatchSample) break;
-                    mismatches.Add(m);
-                }
-                status.Mismatches = mismatches.ToArray();
+                Take(fetched, rows, mismatches, status);
+                if (IsFullRun(codes)) await _progress!.SaveCountryAsync(fetched, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -150,13 +179,55 @@ public sealed class RecordCountryRunner
         // снова остаётся без ответа — ровно как в И-21 и И-22.
         if (_archive != null)
         {
-            var saved = await _archive.SaveCountryRunAsync(
+            var archived = await _archive.SaveCountryRunAsync(
                 _fetcher.Source, codes, RecordCsvDump.Build(rows), ct);
-            status.ArchivePath = saved.Path;
-            status.ArchiveError = saved.Error;
+            status.ArchivePath = archived.Path;
+            status.ArchiveError = archived.Error;
         }
 
         status.Diff = await _diff.BuildDiffAsync(_fetcher.Source, rows, DiffTtl, ct);
+
+        // Прошли все — сохранённое больше не нужно: следующий прогон обязан сходить в источник
+        // заново, иначе «проверить ещё раз» молча вернул бы те же ответы. Упал кто-то (страна или
+        // мировые) — держим: следующий прогон докачает только упавших.
+        if (IsFullRun(codes) && failed.Count == 0)
+            await _progress!.ClearAsync(ct);
+    }
+
+    /// <summary>Прогон по всем странам, и есть куда сохранять скачанное.</summary>
+    private bool IsFullRun(IReadOnlyList<string>? codes) =>
+        _progress != null && codes is not { Count: > 0 };
+
+    private async Task<RecordCountryRunSaved?> LoadSavedAsync(
+        RecordCountryRunStatus status, IReadOnlyList<string>? codes, CancellationToken ct)
+    {
+        if (!IsFullRun(codes)) return null;
+
+        var saved = await _progress!.LoadAsync(_fetcher.Source, ct);
+        if (saved is null)
+        {
+            await _progress.BeginAsync(_fetcher.Source, ct);
+            return null;
+        }
+
+        status.ResumedFrom = saved.StartedAt;
+        return saved;
+    }
+
+    /// <summary>Страна — в строки прогона и в счёт непринятых.</summary>
+    private static void Take(
+        RecordCountryFetchResult fetched, List<ParsedRecordDto> rows,
+        List<RecordCountryMismatchDto> mismatches, RecordCountryRunStatus status)
+    {
+        rows.AddRange(fetched.Records);
+
+        status.MismatchCount += fetched.Mismatches.Count;
+        foreach (var m in fetched.Mismatches)
+        {
+            if (mismatches.Count >= MismatchSample) break;
+            mismatches.Add(m);
+        }
+        status.Mismatches = mismatches.ToArray();
     }
 
     /// <summary>

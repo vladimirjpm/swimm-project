@@ -144,11 +144,18 @@ public static class DependencyInjection
                 dir, sp.GetRequiredService<ILogger<FileRecordRunArchive>>());
         });
 
+        // Скачанное прогоном — по стране на диск, чтобы оборванный прогон продолжился (И-68).
+        // Папка из RecordsImport:CountryRunProgressDir; пусто — во временной папке системы.
+        services.AddSingleton<IRecordCountryRunProgress>(sp => new FileRecordCountryRunProgress(
+            configuration["RecordsImport:CountryRunProgressDir"],
+            sp.GetRequiredService<ILogger<FileRecordCountryRunProgress>>()));
+
         services.AddScoped(sp => new RecordCountryRunner(
             sp.GetRequiredService<IRecordCountriesProvider>(),
             sp.GetRequiredService<IRecordCountryFetcher>(),
             sp.GetRequiredService<IRecordDiffService>(),
-            sp.GetRequiredService<IRecordRunArchive>()));
+            sp.GetRequiredService<IRecordRunArchive>(),
+            progress: sp.GetRequiredService<IRecordCountryRunProgress>()));
 
         // Repositories
         services.AddScoped<IResultRepository, ResultRepository>();

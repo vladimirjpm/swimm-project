@@ -928,6 +928,9 @@
     // Прогон идёт час-два: опрашивать чаще смысла нет, а лишние запросы в лог попадут.
     const CR_POLL_MS = 4000;
     let crTimer = null;
+    // Последний запуск был по всем странам — тогда «повторить упавшие» = тот же полный прогон:
+    // скачанное он возьмёт из сохранённого (И-68), а в журнал и архив попадёт как полный.
+    let crLastFull = false;
 
     // Элемент ищем внутри, а не держим в const выше: функцию зовёт setTopMode, который при
     // заходе с ?diff=records отрабатывает РАНЬШЕ этих объявлений — const в temporal dead zone
@@ -956,6 +959,7 @@
         crMismatch.classList.add('hidden');
         crArchive.classList.add('hidden');
         crHint.textContent = '';
+        crLastFull = !(codes && codes.length);
         try {
             const data = await api('/api/admin/records/countries/run', {
                 method: 'POST',
@@ -971,11 +975,31 @@
         }
     }
 
+    // Сервер пропал — это должно быть ВИДНО на месте прогресса, а не тостом на 5 секунд:
+    // 16.11.2026 ProdAdmin закрылся посреди прогона, а страница так и показывала «страна 103
+    // из 214», будто прогон идёт (И-68).
+    function crLost(text) {
+        crState.textContent = text;
+        crState.classList.replace('text-admin-accent', 'text-admin-danger');
+    }
+
     function pollCountryRun(runId) {
         clearTimeout(crTimer);
         fetch(`/api/admin/records/countries/run/${runId}`, { credentials: 'same-origin' })
-            .then(r => r.ok ? r.json() : Promise.reject(new Error('прогон не найден — API перезапускали?')))
+            .then(r => {
+                if (r.ok) return r.json();
+                // 404 — сервер жив, но прогона не помнит: его перезапускали, статус пропал.
+                if (r.status === 404) {
+                    crBusy(false);
+                    crLost('прогон потерян: сервер перезапускали. Нажмите «Прогнать все страны» — '
+                        + 'уже скачанные страны возьмутся из сохранённого');
+                    return null;
+                }
+                // Остальное (502, 503, редирект на логин…) — ждём, что сервер оживёт.
+                return Promise.reject(new Error('ответ ' + r.status));
+            })
             .then(s => {
+                if (!s) return;
                 renderCountryRun(s);
                 if (s.state === 'Running' || s.state === 'Queued') {
                     crTimer = setTimeout(() => pollCountryRun(runId), CR_POLL_MS);
@@ -992,11 +1016,18 @@
                     recordsDiff.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             })
-            .catch(e => { crBusy(false); toast('Ошибка: ' + e.message, 5000); });
+            .catch(e => {
+                // Сеть / сервер не отвечает: опрос не бросаем — поднимут ProdAdmin, и следующий
+                // ответ скажет, жив ли прогон (скорее всего нет — тогда 404 выше).
+                crLost(`сервер не отвечает (${e.message || 'нет связи'}) — ProdAdmin остановлен? `
+                    + 'Скачанные страны сохранены, жду сервер…');
+                crTimer = setTimeout(() => pollCountryRun(runId), CR_POLL_MS);
+            });
     }
 
     function renderCountryRun(s) {
         crProgress.classList.remove('hidden');
+        crState.classList.replace('text-admin-danger', 'text-admin-accent');
 
         const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0;
         crBar.style.width = pct + '%';
@@ -1005,6 +1036,12 @@
             : s.state === 'Failed'
                 ? 'прогон упал'
                 : `страна ${s.done} из ${s.total}${s.currentCode ? ' · ' + s.currentCode : ''}`;
+        // Сколько стран взято из сохранённого оборванным прогоном, а не скачано заново (И-68).
+        if (s.resumed > 0) {
+            const from = s.resumedFrom ? new Date(s.resumedFrom).toLocaleString('ru-RU',
+                { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+            crState.textContent += ` · из сохранённого${from ? ' (прогон от ' + from + ')' : ''}: ${s.resumed}`;
+        }
 
         crRows.textContent = fmtN(s.rowsFetched || 0);
         crWorld.textContent = s.worldFetched ? '✓' : '—';
@@ -1017,9 +1054,12 @@
             crFailed.innerHTML =
                 `<div class="text-admin-danger mb-1">не скачались: ${failed.length}</div>` +
                 `<div class="text-admin-text-muted mb-2">${failed.map(f => `${esc(f.code)} — ${esc(f.error)}`).join('<br>')}</div>` +
-                `<button class="admin-btn admin-btn-ghost py-1 px-3 text-xs" id="cr-retry">Повторить упавшие</button>`;
-            // Отдельного эндпоинта для ретрая нет: это тот же запуск, но со списком кодов.
-            document.getElementById('cr-retry').onclick = () => startCountryRun(failed.map(f => f.code));
+                `<button class="admin-btn admin-btn-ghost py-1 px-3 text-xs" id="cr-retry">${crLastFull ? 'Докачать упавшие' : 'Повторить упавшие'}</button>`;
+            // Отдельного эндпоинта для ретрая нет. После полного прогона это снова полный прогон:
+            // скачанные страны он возьмёт из сохранённого (И-68), сходит только за упавшими и
+            // ляжет в журнал и архив как полный. После прогона подмножеством — те же коды.
+            document.getElementById('cr-retry').onclick = () =>
+                startCountryRun(crLastFull ? null : failed.map(f => f.code));
         }
 
         // Архив источников: путь показываем, чтобы файл не пришлось искать перед коммитом.
