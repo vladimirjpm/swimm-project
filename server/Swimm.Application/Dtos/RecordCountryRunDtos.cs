@@ -37,8 +37,9 @@ public sealed record RecordCountryRunFailure(string Code, string Error);
 /// Мутабельный класс по образцу <see cref="ImportJobStatus"/>: очередь отдаёт ссылку, а
 /// фоновая задача правит поля по ходу дела.
 ///
-/// ⚠ Рестарт API прогон теряет — это принято сознательно (план 11.1.2): прогон идёт час-два,
-/// хранить его в БД ради выживания при рестарте дороже, чем запустить заново.
+/// ⚠ Рестарт API теряет статус и дифф — но не скачанное: страны уже лежат на диске
+/// (<c>IRecordCountryRunProgress</c>, И-68), и новый прогон по всем странам докачивает только
+/// остальные.
 /// </summary>
 public sealed class RecordCountryRunStatus
 {
@@ -52,6 +53,15 @@ public sealed class RecordCountryRunStatus
 
     /// <summary>Сколько стран пройдено — и успешных, и упавших.</summary>
     public int Done { get; set; }
+
+    /// <summary>
+    /// Сколько стран из <see cref="Done"/> взято из сохранённого оборванным прогоном, а не скачано
+    /// заново (И-68).
+    /// </summary>
+    public int Resumed { get; set; }
+
+    /// <summary>Когда начат прогон, чьё сохранённое продолжаем; null — прогон с нуля.</summary>
+    public DateTimeOffset? ResumedFrom { get; set; }
 
     /// <summary>Какую страну качаем прямо сейчас; null — ещё не начали или уже закончили.</summary>
     public string? CurrentCode { get; set; }
