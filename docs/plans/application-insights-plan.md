@@ -10,9 +10,22 @@
 Везде ниже, где исполнитель «Fable», — это теперь ты. Б1 делай сам, а не субагентом; Б2 и Б3 —
 Sonnet через `/delegate`, таск-документ пишешь ты после Б1.
 
-**Где мы (17.11).** А2 сделан кодом на ветке `claude/app-insights-telemetry`, не закоммичен
-(ждёт просьбы Влада). А1 закрыт 17.11 по «да» Влада (лимит 0,15 ГБ). Из §8 отвечены вопросы 2 и 3 (доступность — уже UptimeRobot), остальные запрошены 17.11. Что проверено и найдено — «Сделано 17.11»
-ниже; дальше по §6: А3 → А4.
+**Где мы (17.11, конец сессии).** А1 закрыт (лимит 0,15 ГБ). А2 на проде — PR #197 (`d7a33136`),
+телеметрия с роли `swimhub-web` идёт и проверена (ход А3). Из §8 отвечены 2 и 3 (доступность —
+UptimeRobot), 1, 4, 5 — тоже 17.11: ProdAdmin да, почта — Gmail Влада, пункт «App Insights». Мерж и деплой делает агент сам
+(`gh pr merge --merge` после зелёного CI → `gh workflow run azure-deploy.yml --ref master`).
+
+**Что дальше, по порядку:**
+1. **А3.4** — память «после» 18.11 (команда в «Ход А3»), записать цифры.
+2. ✅ **А4** — оповещения созданы 17.11 (см. «Сделано 17.11» в А4).
+3. **Б1** — новым чатом, сам (не субагентом). До кода прочитать: «Сделано 17.11» (живая проверка —
+   там имена таблиц и полей, `Success=false` у 404, ошибки — по `ResultCode` 5xx), §4.1, Б1.
+   Пакет чтения — `Azure.Monitor.Query.Logs` 1.0.0 + `Azure.Identity` (`AzureCliCredential`).
+   KQL сверять запросами на живых данных: без расширения `az` — REST `https://api.loganalytics.io/v1/workspaces/<customerId>/query`
+   с токеном `az account get-access-token --resource https://api.loganalytics.io` (customerId —
+   `az monitor log-analytics workspace show -g swimm-rg -n swimhub-logs --query customerId -o tsv`;
+   в репо и в чат не писать). Есть реальный трафик прода с 17.11 11:45 UTC.
+4. Б2 + Б3 — Sonnet через `/delegate` по таск-документу, который пишешь после Б1.
 
 ### Сделано 17.11 — А1 (Opus 5.5, «да» Влада в чате)
 
@@ -251,7 +264,17 @@ az webapp config appsettings set -g swimm-rg -n swimhub --settings APPLICATIONIN
   Замер «после» — через сутки после деплоя тем же запросом:
   `az monitor metrics list --resource <id swimhub> --metric MemoryWorkingSet --interval PT1H --offset 24h --aggregation Average Maximum`
   (в Git Bash — с `MSYS_NO_PATHCONV=1`, иначе id ресурса искажается).
-- ⏳ п. 1 — код А2 в master и деплой (Влад); ⏳ п. 3 — проверка после деплоя; ⏳ п. 5 — ждёт §8.1.
+- ✅ п. 1: PR #197 влит (`d7a33136`), деплой `gh workflow run azure-deploy.yml --ref master` —
+  агент сам (Влад, 17.11: деплой делает агент, «жмёт Влад» в этом плане устарело). На проде с 11:45 UTC.
+- ✅ п. 3, 17.11 11:46–11:50 UTC: роль `swimhub-web`, данные через ~2,5 мин, живой трафик (пловцы,
+  клубы), 5xx нет. `/auth/reset-password?token=PRODSEKRET17` → в `Url` без строки запроса, `search
+  'PRODSEKRET17'` по всем таблицам — 0; поиск — `q=Redacted`; `/healthz`, `/readyz`, `/assets/*` в
+  `AppRequests` нет; на 100 зависимостей Postgres — 1 строка `AppTraces` (Warning EF «Skip/Take без
+  OrderBy»), событий `received-first-response` нет.
+  Мелочь на потом: в `Url` схема `http://` — инструментарий снимает адрес до `UseForwardedHeaders`
+  (App Service терминирует TLS). На данные не влияет.
+- ⏳ п. 4 «после» — 18.11, тем же запросом (процесс перезапущен деплоем 17.11 11:45).
+- ✅ п. 5 (§8.1 «да», 17.11): строка подключения записана скриптом в `appsettings.ProdAdmin.Local.json` (gitignored, значение не печаталось). Роль `swimhub-prodadmin` появится при следующем запуске ProdAdmin.
 
 ### А4. Оповещения
 
@@ -265,6 +288,27 @@ az webapp config appsettings set -g swimm-rg -n swimhub --settings APPLICATIONIN
 | Объём | приём дошёл до 80 % дневного лимита |
 
 Приёмка: тестовое письмо группы оповещений дошло Владу.
+
+**Сделано 17.11 (Opus 5.5, «да» Влада).** Цены сверены по `prices.azure.com` (Israel Central / West
+Europe): правило по журналу с частотой 15 мин и реже — $0,50/мес, метрическое — ≈ $0,10 → **≈ $1,1/мес**.
+- `swimhub-alerts` — группа действий (global, short name `swimhub`), email Влада (Gmail, как у
+  UptimeRobot), получатель `Enabled`. Тест `az monitor action-group test-notifications create` падает
+  «There are no valid receivers» (баг/формат CLI) — не добит; Azure сам шлёт письмо «добавлены в
+  группу действий» при создании — **Влад проверяет, что оно пришло**.
+- `swimhub-5xx` — метрическое правило App Service `Http5xx` total > 5 за 15 мин, проверка каждые 5 мин, sev 2.
+- `swimhub-bg-errors` — правило по журналу раз в час, окно 1 ч, sev 2: `AppExceptions` **и**
+  `AppTraces` с `SeverityLevel >= 3` (ловит и LogError без исключения — «Письмо НЕ отправлено») роли
+  `swimhub-prodadmin` либо роли `swimhub-web` с пустым `OperationId` (вне запроса — фон). Ошибки
+  внутри запросов ловит `swimhub-5xx`. ⚠ `OperationName` пуст и у исключений из запросов — по нему
+  фон не отличить, только по `OperationId`/`ParentId`.
+- `swimhub-ingestion-80` — правило по журналу раз в час, окно 1 сутки, sev 3:
+  `Usage | where IsBillable == true | summarize mb=sum(Quantity) | where mb > 120`, повтор письма не
+  чаще раза в 12 ч (`muteActionsDuration`).
+- Создано без расширений `az`: правила по журналу — `az rest --method put` на
+  `Microsoft.Insights/scheduledQueryRules` (api-version `2023-12-01`, `kind: LogAlert`, заголовок
+  `Content-Type=application/json` обязателен), тела JSON собирались во временной папке.
+- Сам Azure при создании `swimhub-ai` завёл **«Failure Anomalies - swimhub-ai»** (smart detection,
+  бесплатно, своя группа «Application Insights Smart Detection») — оставлено.
 
 ## 4. Часть Б — админка
 
@@ -383,7 +427,7 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 
 ## 8. Открытые решения — ждут Влада
 
-1. **ProdAdmin тоже шлёт телеметрию?** Рекомендую да: там идут джобы и импорт, их сбои и есть
+1. ✅ **ProdAdmin тоже шлёт телеметрию — ДА** (Влад, 17.11). Рекомендовал да: там идут джобы и импорт, их сбои и есть
    главный повод. Цена — ключ в локальном файле.
 2. ✅ **Дневной лимит приёма** — 0,15 ГБ (Влад, 17.11). Рекомендовал 0,15 ГБ в день (≈ 4,5 ГБ в месяц, в бесплатных 5 ГБ).
    При достижении запись останавливается до следующих суток.
@@ -391,8 +435,8 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
    UptimeRobot «swimhub.co.il» с 17.10: `https://swimhub.co.il/readyz` каждые 5 минут, письмо
    владельцу при падении и подъёме ([azure-deploy-handoff.md](azure-deploy-handoff.md), карточка на
    `/Admin/Services`). Он же ловит истёкший сертификат и слетевший DNS.
-4. **Куда слать оповещения** — какой адрес.
-5. **Название пункта** — «App Insights» или иначе.
+4. ✅ **Куда слать оповещения** — тот же Gmail Влада, что у UptimeRobot (17.11). Адрес — только в группе действий Azure, в репо его нет.
+5. ✅ **Название пункта** — «App Insights» (Влад, 17.11).
 
 ## 9. Как вернуться к работе
 
@@ -401,9 +445,9 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 | Этап | Статус |
 |---|---|
 | А1 ресурсы | ✅ 17.11 `swimhub-logs` + `swimhub-ai`, дневной лимит 0,15 ГБ |
-| А2 код | ✅ 17.11 код и тесты (`1af78422` на ветке `claude/app-insights-telemetry`), проверено на живой рабочей области; правка Npgsql-событий — не закоммичена |
-| А3 деплой | ◐ 17.11 строка подключения в App Service, замер памяти «до»; ждёт деплоя кода А2 |
-| А4 оповещения | не начато |
+| А2 код | ✅ 17.11 PR #197 (`d7a33136`), на проде |
+| А3 деплой | ◐ 17.11 на проде, телеметрия идёт, вычистка проверена; осталось: память «после» (18.11), ProdAdmin (§8.1) |
+| А4 оповещения | ✅ 17.11 `swimhub-alerts` + 3 правила (≈ $1,1/мес); ждёт: Влад видит письмо группы |
 | Б1 чтение | не начато |
 | Б2 страница | не начато |
 | Б3 блок | не начато |
