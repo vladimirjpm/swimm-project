@@ -92,10 +92,31 @@ public class IsrOrgRecordsPageResolver : IRecordSourceLinksProvider
     public async Task<IReadOnlyList<RecordSourceLinkDto>> GetLinksAsync(CancellationToken ct = default)
     {
         var links = await ResolveAsync(PageUrl, ct);
-        return links
-            .Select(l => new RecordSourceLinkDto(l.Url, l.Label, l.PoolType, l.IsMasters, l.UpdatedOn, l.Trusted))
-            .ToList();
+        return ToLinkDtos(links, key => _configuration?[key]);
     }
+
+    /// <summary>
+    /// Ссылки страницы → DTO админки, с закреплённым в настройках адресом того же файла.
+    /// Чистая функция: тест подставляет настройки словарём.
+    /// </summary>
+    public static IReadOnlyList<RecordSourceLinkDto> ToLinkDtos(
+        IEnumerable<IsrOrgRecordsLink> links, Func<string, string?> setting) =>
+        links
+            .Select(l =>
+            {
+                var pinned = setting(PinnedUrlKey(l.IsMasters, l.PoolType));
+                return new RecordSourceLinkDto(l.Url, l.Label, l.PoolType, l.IsMasters, l.UpdatedOn, l.Trusted,
+                    string.IsNullOrWhiteSpace(pinned) ? null : pinned.Trim());
+            })
+            .ToList();
+
+    /// <summary>
+    /// Ключ настроек, которым файл закрепляют вручную в обход страницы:
+    /// <c>RecordsImport:IsrOrg{Age|Masters}RecordsUrl{25m|50m}</c>. Одно место на оба
+    /// провайдера и админку — иначе админка показала бы не тот адрес, что качает Fetch.
+    /// </summary>
+    public static string PinnedUrlKey(bool isMasters, string poolType) =>
+        $"RecordsImport:IsrOrg{(isMasters ? "Masters" : "Age")}RecordsUrl{poolType.Trim().ToLowerInvariant()}";
 
     /// <summary>Скачивает страницу-оглавление и возвращает найденные ссылки на PDF.</summary>
     public async Task<IReadOnlyList<IsrOrgRecordsLink>> ResolveAsync(

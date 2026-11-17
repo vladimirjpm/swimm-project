@@ -217,6 +217,24 @@
       "autoPort": false
     },
     {
+      "name": "swimm-api-5091-sidebuild",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "server/Swimm.API",
+        "--artifacts-path",
+        "server/.tmp-artifacts-api",
+        "--launch-profile",
+        "http",
+        "--",
+        "--urls",
+        "http://localhost:5091"
+      ],
+      "port": 5091,
+      "autoPort": false
+    },
+    {
       "name": "swimm-api-prodadmin-window",
       "runtimeExecutable": "powershell",
       "runtimeArgs": [

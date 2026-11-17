@@ -47,8 +47,8 @@ public class IsrOrgMastersRecordsSourceProvider : IRecordSourceProvider
             }
             else
             {
-                var url50 = _configuration["RecordsImport:IsrOrgMastersRecordsUrl50m"];
-                var url25 = _configuration["RecordsImport:IsrOrgMastersRecordsUrl25m"];
+                var url50 = _configuration[IsrOrgRecordsPageResolver.PinnedUrlKey(isMasters: true, "50m")];
+                var url25 = _configuration[IsrOrgRecordsPageResolver.PinnedUrlKey(isMasters: true, "25m")];
 
                 // Перехват ПОФАЙЛОВЫЙ: страница опрашивается, если руками задан не каждый
                 // адрес, и заполняет только пустые. Раньше условие было «пусты ОБА», и один
