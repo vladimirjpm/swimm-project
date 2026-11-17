@@ -182,6 +182,45 @@ public class TrainingOccurrencesTests
     }
 
     [Fact]
+    public void Past_AnswerKeysAndPlanDates_StartedOnly_NewestFirst()
+    {
+        // «Сейчас» — среда 09.09, 18:30: среда 18:00 уже началась — она прошедшая.
+        var now = new DateTime(2026, 9, 9, 18, 30, 0);
+        var mon = new DateOnly(2026, 9, 7);
+        var tue = new DateOnly(2026, 9, 8);
+        var wed = new DateOnly(2026, 9, 9);
+        var oneOffs = new[] { Single(1, tue, "20:00") };   // вторник — разовое
+
+        var past = Past(MonWed(), oneOffs, NoCancels,
+            answerKeys: [(mon, "18:00"), (new DateOnly(2026, 9, 14), "18:00")],   // понедельник 14 — впереди
+            planDates: [tue, wed, wed],                                            // план на дату даёт её занятия
+            nowLocal: now);
+
+        Assert.Equal([(wed, "18:00"), (tue, "20:00"), (mon, "18:00")], Keys(past));
+        Assert.True(past[1].OneOff);
+    }
+
+    [Fact]
+    public void Past_KeyNoLongerInSchedule_IsLeftOut()
+    {
+        // Ответы на вторник 18:00 остались, а слота во вторник в расписании нет — открыть нечего.
+        var past = Past(MonWed(), NoOneOffs, NoCancels, [(new DateOnly(2026, 9, 1), "18:00")], [],
+            new DateTime(2026, 9, 9, 9, 0, 0));
+
+        Assert.Empty(past);
+    }
+
+    [Fact]
+    public void Past_Cancelled_KeepsFlag()
+    {
+        var mon = new DateOnly(2026, 9, 7);
+        var past = Past(MonWed(), NoOneOffs, [new Cancellation(mon, "18:00", "Pool closed")], [(mon, "18:00")], [],
+            new DateTime(2026, 9, 9, 9, 0, 0));
+
+        Assert.True(Assert.Single(past).Cancelled);
+    }
+
+    [Fact]
     public void Upcoming_ZeroCount_Empty()
     {
         Assert.Empty(Upcoming(MonWed(), NoOneOffs, NoCancels, MondayMorning, 0));

@@ -36,8 +36,8 @@ const CAPTION_CLS = 'text-[10px] font-extrabold uppercase tracking-[.07em]';
 
 function WhoIsThisSheet({ sheet, onClose }: TrainingsSheetProps<'who-is-this'>) {
   const { who } = sheet;
-  const { group, rollIndex, upcoming, reloadLanePlans } = useTrainingsTab();
-  const roll = upcoming[rollIndex] ?? null;
+  const { group, selectedRoll, reloadLanePlans } = useTrainingsTab();
+  const roll = selectedRoll;
   const levels = useGroupLevels(group.id);
 
   const initialSwimmer = who.currentSwimmerId ?? who.suggestedSwimmerId ?? null;

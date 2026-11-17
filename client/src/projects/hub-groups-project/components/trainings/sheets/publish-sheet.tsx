@@ -40,8 +40,8 @@ const blockerName = (b: Blocker) => b.name || b.name_en;
 
 function PublishSheet({ sheet, onClose }: TrainingsSheetProps<'publish'>) {
   const { groupId, date, plan, onPublish, onPerson } = sheet.publish;
-  const { upcoming, rollIndex, openSheet } = useTrainingsTab();
-  const roll = upcoming[rollIndex]?.rsvp ?? null;
+  const { selectedRoll, openSheet } = useTrainingsTab();
+  const roll = selectedRoll?.rsvp ?? null;
   /** null — проверка ещё идёт. */
   const [blockers, setBlockers] = useState<Blocker[] | null>(null);
   const [notify, setNotify] = useState(true);

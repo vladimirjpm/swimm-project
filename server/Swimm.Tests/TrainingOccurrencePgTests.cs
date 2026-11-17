@@ -131,4 +131,59 @@ public class TrainingOccurrencePgTests
             await cleanup.HubGroups.Where(g => g.Id == group.Id).ExecuteDeleteAsync();
         }
     }
+
+    /// <summary>
+    /// Список «Past» тренера (CF9): счётчики ответов — GroupBy, который InMemory не переводит в SQL;
+    /// здесь он проходит через настоящий Npgsql. Дата плана без ответов тоже даёт занятие.
+    /// </summary>
+    [Fact]
+    public async Task PastTrainings_AnswersAndPlanDates_OnPostgres()
+    {
+        await using var probe = TryCreate();
+        if (probe == null) return; // PG недоступен — пропуск
+        var ownerId = await probe.AppUsers.OrderBy(u => u.Id).Select(u => (int?)u.Id).FirstOrDefaultAsync();
+        if (ownerId == null) return;
+
+        var daily = new Swimm.Domain.GroupTrainingSchedule
+        {
+            Slots = Enumerable.Range(1, 7).Select(d => new Swimm.Domain.GroupTrainingSlot { Day = d, Start = "20:00", End = "21:00" }).ToList(),
+        };
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var group = new HubGroup
+        {
+            Name = "PG past test", Slug = $"pg-past-{tag}", OwnerUserId = ownerId.Value, TrainingSchedule = daily.ToJson(),
+        };
+        probe.Add(group);
+        await probe.SaveChangesAsync();
+
+        try
+        {
+            var nowLocal = IsraelTime.ToLocal(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(nowLocal);
+            var answered = today.AddDays(-3);
+            var planned = today.AddDays(-5);
+            probe.HubGroupTrainingRsvps.Add(new HubGroupTrainingRsvp
+            {
+                HubGroupId = group.Id, SessionDate = answered, SessionStart = "20:00", UserId = ownerId.Value,
+                Answer = "yes", UpdatedAt = DateTime.UtcNow,
+            });
+            probe.LanePlans.Add(new LanePlan { HubGroupId = group.Id, Date = planned, LaneCount = 4 });
+            await probe.SaveChangesAsync();
+
+            await using var db = NewContext();
+            var past = await new TrainingRsvpService(db).GetPastAsync(group.Id, nowLocal);
+
+            Assert.NotNull(past);
+            Assert.Equal(
+                [TrainingRsvpRules.SessionKey(answered, "20:00"), TrainingRsvpRules.SessionKey(planned, "20:00")],
+                past!.Select(p => p.Session.Id));
+            Assert.Equal((1, 0, 0), (past[0].Yes, past[0].Maybe, past[0].No));
+            Assert.Equal(0, past[1].Yes);
+        }
+        finally
+        {
+            await using var cleanup = NewContext();
+            await cleanup.HubGroups.Where(g => g.Id == group.Id).ExecuteDeleteAsync();
+        }
+    }
 }

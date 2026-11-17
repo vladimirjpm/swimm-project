@@ -6,6 +6,7 @@ import NeedsYou from '../coach/needs-you';
 import RollCall from '../coach/roll-call';
 import SessionNav from '../coach/session-nav';
 import { nextSessions } from '../next/next-format';
+import PastSessionHead from '../past/past-session-head';
 import { useTrainingsTab } from '../trainings-context';
 import { TrainingsSection } from '../trainings-section';
 import { SegmentBar, type SegmentOption } from '../trainings-segments';
@@ -19,7 +20,8 @@ import WorkoutStrip from '../workout/workout-strip';
  * перекличка и план дорожек одного занятия на одном экране. Открывается из списка занятий
  * (`coach-sessions-section.tsx`), занятие — `deskSession` контекста (`?session=<id>`).
  *
- * - шапка: «← All trainings» и существующий `SessionNav` (‹ ›, Cancel training / Restore);
+ * - шапка: «← All trainings» и существующий `SessionNav` (‹ ›, Cancel training / Restore); у
+ *   прошедшего занятия из списка «Past» (CF9) — `PastSessionHead` без стрелок и отмены;
  * - десктоп — две колонки: слева `RollCall`, справа `GroupLanes` на дату занятия, без своей
  *   навигации по датам (`embedded`);
  * - телефон — переключатель `People · Pool` (вид сегментов таба), под ним одна панель. Вторая
@@ -59,7 +61,7 @@ function CoachDeskSection() {
 
 function DeskBody() {
   const {
-    group, isDesktop, deskSession, closeDesk, rollIndex, upcoming, setLanesDirty, reloadLanePlans,
+    group, isDesktop, deskSession, deskIsPast, closeDesk, selectedRoll, setLanesDirty, reloadLanePlans,
   } = useTrainingsTab();
   const [panel, setPanel] = useState<DeskPanel>('people');
   const sessions = nextSessions(group);
@@ -73,7 +75,7 @@ function DeskBody() {
   const [workoutOpen, setWorkoutOpen] = useState(false);
   const levels = ws.levels ?? [];
 
-  const roll = deskSession ? upcoming[rollIndex] ?? null : null;
+  const roll = deskSession ? selectedRoll : null;
   // Ответы пришли именно на выбранное занятие (при переходе ‹ › на секунду там ещё пусто).
   const r = roll?.rsvp && deskSession && roll.rsvp.session_id === deskSession.id ? roll.rsvp : null;
   const reloadRoll = roll?.reload;
@@ -132,7 +134,9 @@ function DeskBody() {
         </button>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1 basis-[280px]"><SessionNav sessions={sessions} /></div>
+        <div className="min-w-0 flex-1 basis-[280px]">
+          {deskIsPast ? <PastSessionHead session={deskSession} desktop={isDesktop} /> : <SessionNav sessions={sessions} />}
+        </div>
         {/* Сюда редактор дорожек выносит статус плана и Publish (портал); на телефоне — в нижнюю панель. */}
         {!docked && <div ref={setHeaderHost} className="min-w-0 flex-none" />}
       </div>

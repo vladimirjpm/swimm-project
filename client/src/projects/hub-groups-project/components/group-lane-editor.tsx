@@ -293,9 +293,9 @@ function GroupLaneEditor({
   const [buckets, setBuckets] = useState<Buckets>(init.buckets);
   /** Закреплённые на своей дорожке: Auto-arrange их не двигает. */
   const [pinned, setPinned] = useState<ReadonlySet<number>>(init.pinned);
-  const { openSheet, setPoolListener, upcoming, rollIndex, deskSession } = useTrainingsTab();
+  const { openSheet, setPoolListener, selectedRoll, deskSession } = useTrainingsTab();
   // Человек переклички этого занятия по пловцу — для кнопки «Card» строки «Move … to» (CF4).
-  const deskRoll = deskSession ? upcoming[rollIndex]?.rsvp ?? null : null;
+  const deskRoll = deskSession ? selectedRoll?.rsvp ?? null : null;
   const personOf = (swimmerId: number) =>
     deskRoll?.date === date ? deskRoll.people?.find((p) => (p.linked_swimmer_id ?? p.swimmer_id) === swimmerId) ?? null : null;
   const [publishing, setPublishing] = useState(false);
