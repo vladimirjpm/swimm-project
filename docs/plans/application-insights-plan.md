@@ -18,14 +18,15 @@ UptimeRobot), 1, 4, 5 — тоже 17.11: ProdAdmin да, почта — Gmail �
 **Что дальше, по порядку:**
 1. **А3.4** — память «после» 18.11 (команда в «Ход А3»), записать цифры.
 2. ✅ **А4** — оповещения созданы 17.11 (см. «Сделано 17.11» в А4).
-3. **Б1** — новым чатом, сам (не субагентом). До кода прочитать: «Сделано 17.11» (живая проверка —
+3. ✅ **Б1** — сделан 17.11 (см. «Сделано 17.11» в Б1). Было: новым чатом, сам (не субагентом). До кода прочитать: «Сделано 17.11» (живая проверка —
    там имена таблиц и полей, `Success=false` у 404, ошибки — по `ResultCode` 5xx), §4.1, Б1.
    Пакет чтения — `Azure.Monitor.Query.Logs` 1.0.0 + `Azure.Identity` (`AzureCliCredential`).
    KQL сверять запросами на живых данных: без расширения `az` — REST `https://api.loganalytics.io/v1/workspaces/<customerId>/query`
    с токеном `az account get-access-token --resource https://api.loganalytics.io` (customerId —
    `az monitor log-analytics workspace show -g swimm-rg -n swimhub-logs --query customerId -o tsv`;
    в репо и в чат не писать). Есть реальный трафик прода с 17.11 11:45 UTC.
-4. Б2 + Б3 — Sonnet через `/delegate` по таск-документу, который пишешь после Б1.
+4. ✅ Б2 + Б3 — Sonnet по [appinsights-page-sonnet.md](../tasks/appinsights-page-sonnet.md), принято 17.11 (см. «Сделано 17.11 (Б2+Б3)»).
+5. Б4 часть Fable: `deploy.md` («если сломалось: куда смотреть»), отметка В14, строка ROADMAP, текст о приватности; потом PR 2.
 
 ### Сделано 17.11 — А1 (Opus 5.5, «да» Влада в чате)
 
@@ -344,6 +345,48 @@ ProdAdmin, лишь бы был `az login` и ключи в `appsettings.*.Local
 - KQL сверять на живых данных после А3: имена таблиц (`AppRequests`, `AppExceptions`,
   `AppDependencies`, `AppTraces`, `Usage`; `AppAvailabilityResults` пустая — теста доступности в Azure нет, §8.3) проверить запросом, не по памяти.
 
+**Сделано 17.11 (Opus 5.5, ветка `claude/app-insights-b1-5ff754`, не запушено).** Контракт API для
+Б2/Б3 — в [docs/tasks/appinsights-page-sonnet.md](../tasks/appinsights-page-sonnet.md).
+- **Файлы:** `Application/Abstractions/IAppInsightsReader.cs`; `Application/Dtos/AppInsightsDtos.cs`;
+  `Application/Mapping/AppInsightsOverviewBuilder.cs` (+ `AppInsightsThresholds`, `AppInsightsConnections`);
+  `Infrastructure/Services/AppInsights/` — `AppInsightsReader` (кэш, таймаут, состояния),
+  `AppInsightsQueries` (весь KQL), `AzureLogsQueryRunner` (SDK), `AppInsightsRowMapper`,
+  `AppInsightsErrorClassifier`, `AppInsightsPortalLinks`, `AppInsightsOptions`, регистрация;
+  `API/Controllers/AppInsightsAdminController.cs`; `API/Telemetry/AppInsightsReaderRegistration.cs`
+  (в `Program.cs` — одна строка в блоке `adminEnabled`); две строки в `ApiCatalog` (/Admin/Api).
+- **Пакеты** (в Infrastructure): `Azure.Monitor.Query.Logs` 1.0.0, `Azure.Identity` 1.21.0. Тянут
+  `Azure.Core` ≥ 1.53 → `Microsoft.Extensions.Hosting.Abstractions` поднят 10.0.0 → 10.0.3 (иначе NU1605).
+  Итоговый `Azure.Core` в API — 1.60 (от OpenTelemetry), как и был.
+- **Запросы — одним пакетом** (`QueryBatch`, один HTTP): страница — 5 запросов, блок — 1. Ответ
+  живьём 1,3–1,5 с (первый после старта — до 4 с: `az account get-access-token`). Токен кэширует клиент.
+- **Пороги** (`AppInsightsThresholds`, согласованы с А4): 5xx > 0 — жёлтое, доля > 5 % — красное;
+  тишина сайта > 15 мин — жёлтое, > 30 мин или нет за 7 дней — красное (у ProdAdmin тишина — норма,
+  серое); приём ≥ 80 % лимита — жёлтое (как письмо «Объём», 120 МБ), ≥ 100 % — красное; исключения,
+  сбои вне запроса, ошибки ProdAdmin — жёлтое; медленная операция — p95 > 1000 мс (на тон не влияет,
+  `info`); плитки «Ответ p95» > 1000 мс и «Postgres» p95 > 500 мс или сбой — жёлтые. Лимит 0,15 ГБ =
+  150 МБ (десятичные ГБ, как в Usage), сброс 10:00 UTC — `AppInsights:DailyCapGb`/`CapResetHourUtc`, умолчания в коде.
+- **Находки живой проверки (для Б2):** страницы SPA приходят в `Name` с адресом (`GET /swimmers/8318`),
+  маршруты API — шаблоном → в KQL числа пути сводятся к `{id}`. Метрики `AppMetrics` сайт шлёт ~20 в
+  минуту и без трафика, Postgres — пинг раз в минуту: «последняя телеметрия» — честный пульс.
+  ⚠ Log Analytics **сам кэширует** результат одинакового текста запроса на минуту-другую: итоги
+  сайта за 24 ч у `summary` и у `overview?range=24h` — один текст, поэтому `refresh=true` в эту
+  минуту может вернуть те же цифры. Это не баг. ⚠ `appsettings.Local.json` подключается в
+  `Program.cs` последним — переменная окружения `AppInsights__*` его НЕ перебивает.
+- **Сбой чужого/неверного WorkspaceId** в пакете приходит не HTTP-статусом, а `ErrorCode=InvalidTokenError`
+  (статус 0) — классифицируется как «нет доступа»; сырое тело ответа (там id каталогов) на страницу не идёт.
+- **Проверено вживую** (API Release на :5092, Development, ключи в gitignored `appsettings.Local.json`
+  worktree): `summary` и `overview` для 1h/24h/7d × web/prodadmin — реальные цифры прода (≈300 запросов,
+  5xx нет, 12 медленных операций, одна 404 `lane-plans/{date}`); `range=30d`, `role=dev` → 400;
+  «не настроено» (без файла ключей) — карточка с командами `az`, в Azure не ходит; «нет входа» —
+  `AZURE_CONFIG_DIR` на пустой каталог → «Please run 'az login'», подсказка `az login`; «не удалось
+  прочитать» — чужой WorkspaceId → «Нет доступа к рабочей области (InvalidTokenError)».
+- **Тесты:** `AppInsightsOverviewBuilderTests` (тоны, плитки, сводка, формат), `AppInsightsReaderTests`
+  (три состояния + сбои Azure, таймаут 15 с, отмена клиентом, кэш по периоду/роли, сбой не кэшируется,
+  разбор строк, ссылки), `AppInsightsQueriesTests` (белые списки роли/периода, правила данных в KQL,
+  контроллер → 400). 99 тестов.
+- **Не сделано (Б1 не требует):** ключи в `appsettings.Local.json` / `appsettings.ProdAdmin.Local.json`
+  основной копии Влада не вписаны — команды в `.example`, страница сама подскажет.
+
 ### Б2. Страница `/Admin/AppInsights`
 
 Исполнитель: **Sonnet** через `/delegate` (таск-документ `docs/tasks/appinsights-page-sonnet.md`
@@ -381,6 +424,25 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
   выше 5 %; жёлтый — есть исключения или приём выше 80 % лимита. Пороги — в `AppInsightsOverviewBuilder`.
 - «Не настроено» и «нет входа» — серый блок с подсказкой, не красный.
 
+**Сделано 17.11 (Б2+Б3, Sonnet по [таску](../tasks/appinsights-page-sonnet.md), приёмка Opus 5.5).**
+Файлы: `Pages/Admin/AppInsights.cshtml(.cs)`, `wwwroot/js/admin/appinsights.js`, `buildAppInsightsBlock`
+в `dashboard.js`, пункт сайдбара после Jobs, запись в `ServicesCatalog`, пересобранный `admin.min.css`.
+Отклонения Sonnet (приняты): период и роль — в query (`?range=&role=`), hash занят якорями таблиц;
+плитки «Принято сегодня» и «Последняя телеметрия» ведут к шапке; у блока дашборда при зелёной ✓ и
+жёлтом/красном тоне по другой причине — точка цвета тона с причинами в `title`.
+Поправлено при приёмке: значение плитки переносится, а не обрезается («0,77 / 150…»); подпись таблицы
+фона «Warning+» → «Error+» (как в KQL); «данные на … (кэш 2 мин)» — только при прочитанных данных.
+**Найдено на живых данных:**
+- плавающий сбой Б1: SDK трижды подряд (~12:51–12:53 UTC) не разобрал ответ пакета
+  (`InvalidOperationException` «requires an element of type 'Object', but … 'String'»), потом прошло само;
+  сырые REST-пакеты, 30 одновременных и повтор на одном клиенте — не воспроизвели. Сделано: один
+  повтор в пределах 15 с, стек — в журнал, карточка «ответ не удалось разобрать» вместо текста SDK
+  (`AppInsightsErrorClassifier.IsUnreadableResponse`, три теста);
+- ⚠ ответы 5xx на проде видны как `GET /error`: обработчик ошибок перезапускает запрос на `/error`,
+  и исходный маршрут в `Name` теряется — для разбора 5xx это вопрос телеметрии А2, а не страницы;
+- на проде 17.11 ~12:40 UTC фоновые `System.TimeoutException` и `Npgsql.NpgsqlException` («The operation
+  has timed out»), 2 ответа 500 — смотреть Владу/следующему этапу.
+
 ### Б4. Документация
 
 | Что | Кто |
@@ -389,6 +451,26 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 | Запись в `ServicesCatalog.Groups` (группа Azure) | Sonnet |
 | [deploy.md](../deploy.md) — «если сломалось: куда смотреть», переменная в реестре §5 плана деплоя, отметка В14, строка в ROADMAP | Fable |
 | Текст о приватности на сайте — проверить, не нужна ли строка о технических журналах | Fable проверяет, решает Влад |
+
+**Б4-приватность — ✅ внесено 17.11 (решение Влада: «Да, вноси»)** — все три пункта ниже в
+`en/ru/he`, дата редакции 17.11.2026, пользователям не объявляется. `/privacy` проверена глазами на
+трёх языках (иврит — `rtl`), `npm run build` и `npm test` клиента зелёные. Было до правки — текст —
+`client/src/content/help/privacy/{en,ru,he}.md` (`/privacy`, редакция 23.10.2026). Сейчас там:
+провайдер «Microsoft Azure, Israel Central — hosting of the site and its database»; срок хранения
+«technical server logs (requests and errors, which may include IP addresses) — for the limited period
+needed to run and protect the site»; в «Cookies» — «no … third-party analytics». Что реально пишет
+телеметрия (запросом 17.11): IP — `0.0.0.0` (маскируется), город/страна — один на все записи (похоже,
+адрес прокси App Service, не посетителя), браузер и ОС из User-Agent — да, id пользователя и сессии —
+нет, значения параметров адреса — `Redacted`; хранение таблиц — 90 дней.
+Противоречия нет, но формулировка расплывчата. **Предложение** (во всех трёх языках):
+1. В списке провайдеров: «Microsoft Azure, Israel Central region — hosting of the site, its database
+   and technical monitoring».
+2. В сроках хранения заменить строку логов на: «technical logs — page addresses requested (without
+   search or link parameters), response times, errors and the browser and device type; the IP address
+   is not stored — up to 90 days».
+3. В «Cookies» добавить: «Technical monitoring runs on our server only: there is no analytics script
+   or cookie in your browser.»
+Дата редакции — новая; изменение не существенное для владельцев аккаунтов (объявлять не нужно).
 
 ## 5. Кто что делает
 
@@ -448,7 +530,7 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 | А2 код | ✅ 17.11 PR #197 (`d7a33136`), на проде |
 | А3 деплой | ◐ 17.11 на проде, телеметрия идёт, вычистка проверена; осталось: память «после» (18.11), ProdAdmin (§8.1) |
 | А4 оповещения | ✅ 17.11 `swimhub-alerts` + 3 правила (≈ $1,1/мес); ждёт: Влад видит письмо группы |
-| Б1 чтение | не начато |
-| Б2 страница | не начато |
-| Б3 блок | не начато |
-| Б4 документация | не начато |
+| Б1 чтение | ✅ 17.11 код + тесты, эндпоинты проверены вживую на данных прода (ветка `claude/app-insights-b1-5ff754`, не запушено); таск Б2+Б3 — `docs/tasks/appinsights-page-sonnet.md` |
+| Б2 страница | ✅ 17.11 Sonnet по таску, принято Opus: `/Admin/AppInsights` проверена глазами (3 состояния, 375 px; тема у админки одна — тёмная), не запушено |
+| Б3 блок | ✅ 17.11 блок 10 дашборда, грузится отдельно от `Promise.all`; проверен в «работает» и «нет входа» |
+| Б4 документация | ✅ 17.11 часть Sonnet (`admin-pages/appinsights.md`, README, п. 10 `index.md`, `ServicesCatalog`) и часть Fable — `deploy.md` («Что где» + «Если сломалось» п. 5), В14 в плане деплоя, строка ROADMAP, текст `/privacy` (решение Влада, §Б4-приватность) |

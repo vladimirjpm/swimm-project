@@ -45,6 +45,8 @@ public static class AdminNav
         new("Cache", "database", "/Admin/Cache", "System"),
         // Фоновые службы процесса: расписания, очереди, служебные — когда и что сделали.
         new("Jobs", "activity", "/Admin/Jobs", "System"),
+        // Телеметрия прод-сайта из Application Insights: ошибки, медленные запросы, исключения.
+        new("App Insights", "activity", "/Admin/AppInsights", "System"),
         new("Settings", "settings", "/Admin/Settings", "System"),
         new("Services", "globe", "/Admin/Services", "System"),
 

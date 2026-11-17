@@ -38,6 +38,8 @@ public class DirectMemoryCacheTests
             "состояние сценария «дифф рекордов → применить» (10 мин), не кэш данных",
         ["Swimm.Infrastructure/Services/DiscoveryPreviewService.cs"] =
             "состояние сценария «превью Discovery → импорт», не кэш данных",
+        ["Swimm.Infrastructure/Services/AppInsights/AppInsightsReader.cs"] =
+            "телеметрия прод-сайта из Azure Log Analytics (/Admin/AppInsights) — внешний источник, не наша база; 2 мин",
         ["Swimm.API/Controllers/AdminController.cs"] =
             "состояние сценария «превью PDF → импорт» (15 мин), не кэш данных",
     };

@@ -1,6 +1,6 @@
 # Privacy policy
 
-Last updated: 23 October 2026.
+Last updated: 17 November 2026.
 
 SwimHub (swimhub.co.il) shows results of swimming competitions in Israel and swimming records. This policy explains what information we hold, why, who can see or receive it and what you can ask of us. Using the site is also governed by the [Terms of use](route:terms).
 
@@ -41,7 +41,7 @@ We don’t use your information for advertising, we don’t sell it and we don�
 
 We also use service providers that operate the site for us, each for its own task:
 
-- **Microsoft Azure**, Israel Central region — hosting of the site and its database;
+- **Microsoft Azure**, Israel Central region — hosting of the site, its database and technical monitoring;
 - **Resend** — sending account emails;
 - **Google** — “Sign in with Google”; we receive only your name, email and profile picture;
 - **Cloudflare** — the site’s domain name and email routing for swimhub.co.il.
@@ -66,7 +66,7 @@ Pages of competitions, clubs and adult swimmers can appear in search engines suc
 - swimmers’ results — while the site exists, as part of the competition record;
 - account information and what you added — until you remove it or your account is deleted;
 - sign-in history — about 90 days;
-- technical server logs (requests and errors, which may include IP addresses) — for the limited period needed to run and protect the site;
+- technical logs — page addresses requested (without search or link parameters), response times, errors and the browser and device type; the IP address is not stored — up to 90 days;
 - emails you send us — as long as needed to handle your request;
 - database backups — 14 days; information deleted from the site disappears from backups within that time.
 
@@ -84,7 +84,7 @@ Write to **privacy@swimhub.co.il**. We give access to information within 30 days
 
 ## Cookies and your browser
 
-We use only cookies the site needs: one that keeps you signed in, a temporary one during “Sign in with Google”, and a security cookie that protects forms. Display settings — light or dark mode, the language of explanations — are kept in your browser. We don’t use advertising or tracking cookies or third-party analytics, and account emails are sent without open or click tracking. Embedded videos use YouTube’s privacy-enhanced mode; profile pictures from Google are loaded from Google’s servers.
+We use only cookies the site needs: one that keeps you signed in, a temporary one during “Sign in with Google”, and a security cookie that protects forms. Display settings — light or dark mode, the language of explanations — are kept in your browser. We don’t use advertising or tracking cookies or third-party analytics, and account emails are sent without open or click tracking. Technical monitoring runs on our server only: there is no analytics script or cookie in your browser. Embedded videos use YouTube’s privacy-enhanced mode; profile pictures from Google are loaded from Google’s servers.
 
 ## Security
 

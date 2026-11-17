@@ -119,6 +119,20 @@ public static class ApiCatalog
                 [new ApiParam("refresh", "bool", "query", "Пересчитать кэш схемы (по умолчанию false)", BoolFalseFirst: true)],
                 AuthBadge: "Admin"),
 
+            new("GET", "/api/admin/appinsights/overview",
+                "Телеметрия прод-сайта из Application Insights для /Admin/AppInsights: состояние подключения, плитки, "
+                + "частые исключения, медленные операции, ошибки по маршруту, сбои фона. Читает под входом az; кэш 2 мин.",
+                [
+                    new ApiParam("range", "string", "query", "1h | 24h | 7d (по умолчанию 24h)", "24h", "60px"),
+                    new ApiParam("role", "string", "query", "web (сайт) | prodadmin (локальная админка)", "web", "90px"),
+                    new ApiParam("refresh", "bool", "query", "Мимо двухминутного кэша", BoolFalseFirst: true),
+                ],
+                AuthBadge: "Admin"),
+
+            new("GET", "/api/admin/appinsights/summary",
+                "Сводка прод-сайта за 24 ч для блока «App Insights» дашборда: ошибки 5xx, тон, подпись, метрики.",
+                AuthBadge: "Admin"),
+
             new("GET", "/api/admin/clearable-tables",
                 "Список таблиц, очищаемых при вызове import/clear. Источник: <code>JsonImportService.ClearableTables</code>.",
                 AuthBadge: "Admin"),

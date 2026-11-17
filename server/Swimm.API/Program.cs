@@ -126,6 +126,9 @@ if (adminEnabled)
 
     // Прогон рекордов по странам (11.1.2) — 470 файлов, час-два; в HTTP-запрос не пролезет.
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.RecordCountryRunBackgroundService>();
+
+    // Чтение Application Insights для /Admin/AppInsights и блока дашборда (план Б1) — только с админкой.
+    builder.AddAppInsightsAdminReader();
 }
 
 // РАСПИСАНИЯ сами ходят наружу по таймеру (isr.org.il, loglig) — только под backgroundJobsEnabled:

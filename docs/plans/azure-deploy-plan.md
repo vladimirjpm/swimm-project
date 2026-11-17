@@ -1323,7 +1323,10 @@ Communication Services — все дают SMTP-endpoint, под который 
 **В14. Мелочи:** ✅ `client/public/data/json` удалён 19.09.2026 (13 МБ, 14 файлов; данные давно
 в БД). `/excel` — **оставить** (решение Влада 19.09.2026). Добавлять ли `postgres:16` в CI
 ради PG-тестов? *(11.10: их уже не два, а 12 файлов + PG-ветки кэш-тестов — §8.9; вопрос
-стал весомее.)* Нужен ли Application Insights сразу?
+стал весомее.)* ~~Нужен ли Application Insights сразу?~~ ✅ **Сделано 17.11.2026** — телеметрия
+сайта и ProdAdmin в `swimhub-ai`/`swimhub-logs` (Israel Central, лимит 0,15 ГБ/сутки), три оповещения
+на почту, страница `/Admin/AppInsights` и блок дашборда; план и ход —
+[application-insights-plan.md](application-insights-plan.md), куда смотреть при сбое — [deploy.md](../deploy.md) «Если сломалось» п. 5.
 
 **В15. Индексация `/records` и `/records/compare` (11.10).** ✅ **РЕШЕНО 11.10: закрыть.**
 Сделано: `noindex, nofollow` в `records.html` и `records-compare.html`, `robots.txt` не

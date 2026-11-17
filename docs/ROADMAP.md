@@ -938,6 +938,12 @@ NOTIFY, настройки в БД, синхронизация «прод → л
 пловца из поиска, `www` → корень), план §0-пять. Ресурсов Azure ещё нет — команды готовы:
 [plans/azure-a7-commands.md](plans/azure-a7-commands.md).
 
+- ◐ **Application Insights** (В14, 17.11.2026) — телеметрия прода: запросы, исключения, Postgres,
+  логи Warning+ сайта и ProdAdmin с вычисткой токенов (А1–А3, на проде с 17.11, PR #197); оповещения
+  `swimhub-alerts` — 5xx, сбои фона, объём (А4); страница `/Admin/AppInsights` и блок 10 дашборда
+  (Б1–Б3, ветка `claude/app-insights-b1-5ff754`, не влито). Осталось: PR 2, замер памяти «после».
+  План — [plans/application-insights-plan.md](plans/application-insights-plan.md).
+
 ## Порядок и зависимости
 
 ```

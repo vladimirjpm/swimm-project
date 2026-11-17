@@ -55,6 +55,7 @@
     let dashStatus = null;
     let dashCache = null;   // сводка кэша — отдельным живым запросом (buildCacheBlock)
     let dashJobs = null;    // сводка фоновых служб — отдельным живым запросом (buildJobsBlock)
+    let dashAi;             // сводка App Insights: undefined — грузится, null — упала; отдельный запрос (buildAppInsightsBlock)
     // Свежесть источников рекордов из журнала проверок (records-freshness-plan U4) — тоже
     // своим запросом: сбой журнала не роняет блок «Рекорды».
     let recFresh = null;
@@ -139,7 +140,64 @@
             },
             buildCacheBlock(dashCache),
             buildJobsBlock(dashJobs),
+            buildAppInsightsBlock(dashAi),
         ];
+    }
+
+    // Блок «App Insights» (docs/admin-pages/index.md п. 10): сводка телеметрии прод-сайта из
+    // GET /api/admin/appinsights/summary. Тоны и тексты считает сервер — здесь только раскраска.
+    // dashAi: undefined — ещё грузится, null — запрос упал (роняет только этот блок).
+    const AI_TONE = { ok: 'ok', warning: 'warn', danger: 'danger', info: 'info', neutral: 'gray' };
+    const AI_VALUE_CLS = { ok: 'text-admin-success', warning: 'text-admin-warning', danger: 'text-admin-danger' };
+    const AI_ANCHOR = { errors: '#errors', exceptions: '#exceptions', background: '#background', slow: '#slow', ingestion: '#ingestion' };
+    function buildAppInsightsBlock(s) {
+        const base = { key: 'appinsights', title: 'App Insights', href: '/Admin/AppInsights', metrics: [] };
+        if (s === undefined) return { ...base, heroValue: '…', heroSubs: 'Загрузка…' };
+        if (!s) return { ...base, heroValue: '—', heroSubs: 'сводка App Insights не загрузилась' };
+
+        const valueCls = AI_VALUE_CLS[s.valueTone] || 'text-admin-text-muted';
+        const reasons = s.reasons || [];
+        // Главная цифра — по valueTone; если блок жёлтый/красный по другой причине (сайт молчит, сбои фона),
+        // рядом точка цвета блока: одна зелёная ✓ при проблемах вводила бы в заблуждение.
+        const dot = (s.tone === 'warning' || s.tone === 'danger') && s.valueTone === 'ok'
+            ? ` <span class="${AI_VALUE_CLS[s.tone]} text-base" title="${esc(reasons.join('; '))}">●</span>` : '';
+
+        // Пилюли метрик умеют только числа: нечисловое («0,1 % лимита») уходит в rowNote.
+        const metrics = [];
+        const notes = [];
+        for (const m of (s.metrics || [])) {
+            const val = String(m.value ?? '');
+            if (/^\d[\d\s\u00a0]*$/.test(val)) {
+                metrics.push({ v: parseInt(val.replace(/\D/g, ''), 10), label: m.label, tone: AI_TONE[m.tone] || 'gray',
+                               href: `/Admin/AppInsights${AI_ANCHOR[m.key] || ''}` });
+            } else {
+                notes.push(`${m.label.toLowerCase()} ${val}`);
+            }
+        }
+
+        const c = s.connection || {};
+        let detail;
+        if (c.state !== 'ok') {
+            detail = `<div class="mt-3 px-2 text-[12px] text-admin-text-muted leading-relaxed">
+                <div class="text-admin-text font-semibold">${esc(c.title)}</div>
+                <div>${esc(c.text)}</div>
+                ${c.hint ? `<pre class="mt-2 mb-0 overflow-x-auto rounded-md border border-admin-border bg-admin-bg p-2 text-[11px]"><code>${esc(c.hint)}</code></pre>` : ''}
+            </div>`;
+        } else if (reasons.length) {
+            detail = `<div class="mt-3 px-2 text-[11px] uppercase tracking-wide text-admin-text-muted">Почему такой тон</div>
+                <ul class="mt-1 mb-0 pl-6 text-[12px] ${AI_VALUE_CLS[s.tone] || 'text-admin-text'}">${reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>`;
+        } else {
+            detail = '<div class="mt-3 px-2 text-[12px] text-admin-text-muted">Замечаний нет.</div>';
+        }
+
+        return {
+            ...base,
+            heroValue: `<span class="${valueCls}">${esc(s.value)}</span>${dot}`,
+            heroSubs: (reasons.length ? `${reasons[0]} · ` : '') + (s.caption || ''),
+            rowNote: notes.join(' · '),
+            metrics,
+            extraDetailHtml: detail,
+        };
     }
 
     // Блок «Jobs» (docs/admin-pages/index.md): сводка фоновых служб из GET /api/admin/jobs/summary —
@@ -721,6 +779,9 @@
     }
 
     async function loadStatus() {
+        // App Insights — ОТДЕЛЬНО от Promise.all: ответ идёт до 15 с (таймаут Azure) и не должен
+        // задерживать остальные блоки. Блок сначала рисуется как «Загрузка…», по ответу — перерисовка.
+        loadAppInsights();
         // Сводка кэша — своим запросом: сбой её не роняет остальные блоки.
         [dashStatus, dashCache, dashJobs, recFresh] = await Promise.all([
             api(`${API}/dashboard/status`),
@@ -729,6 +790,11 @@
             api(`${API}/records/freshness`).catch(() => null),
         ]);
         renderRows();
+    }
+
+    async function loadAppInsights() {
+        dashAi = await api(`${API}/appinsights/summary`).catch(() => null);
+        if (dashStatus) renderRows(); // если основной запрос ещё идёт — блок возьмёт готовое при его отрисовке
     }
 
     async function reloadCache() {
