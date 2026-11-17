@@ -452,7 +452,9 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
 | [deploy.md](../deploy.md) — «если сломалось: куда смотреть», переменная в реестре §5 плана деплоя, отметка В14, строка в ROADMAP | Fable |
 | Текст о приватности на сайте — проверить, не нужна ли строка о технических журналах | Fable проверяет, решает Влад |
 
-**Б4-приватность — проверено 17.11, решает Влад (ничего не менялось).** Текст —
+**Б4-приватность — ✅ внесено 17.11 (решение Влада: «Да, вноси»)** — все три пункта ниже в
+`en/ru/he`, дата редакции 17.11.2026, пользователям не объявляется. `/privacy` проверена глазами на
+трёх языках (иврит — `rtl`), `npm run build` и `npm test` клиента зелёные. Было до правки — текст —
 `client/src/content/help/privacy/{en,ru,he}.md` (`/privacy`, редакция 23.10.2026). Сейчас там:
 провайдер «Microsoft Azure, Israel Central — hosting of the site and its database»; срок хранения
 «technical server logs (requests and errors, which may include IP addresses) — for the limited period
@@ -531,4 +533,4 @@ needed to run and protect the site»; в «Cookies» — «no … third-party an
 | Б1 чтение | ✅ 17.11 код + тесты, эндпоинты проверены вживую на данных прода (ветка `claude/app-insights-b1-5ff754`, не запушено); таск Б2+Б3 — `docs/tasks/appinsights-page-sonnet.md` |
 | Б2 страница | ✅ 17.11 Sonnet по таску, принято Opus: `/Admin/AppInsights` проверена глазами (3 состояния, 375 px; тема у админки одна — тёмная), не запушено |
 | Б3 блок | ✅ 17.11 блок 10 дашборда, грузится отдельно от `Promise.all`; проверен в «работает» и «нет входа» |
-| Б4 документация | ◐ 17.11 сделано: часть Sonnet (`admin-pages/appinsights.md`, README, п. 10 `index.md`, `ServicesCatalog`) и часть Fable — `deploy.md` («Что где» + «Если сломалось» п. 5), В14 в плане деплоя, строка ROADMAP. **Ждёт Влада:** правка текста о приватности (§Б4-приватность ниже), сайт не менялся |
+| Б4 документация | ✅ 17.11 часть Sonnet (`admin-pages/appinsights.md`, README, п. 10 `index.md`, `ServicesCatalog`) и часть Fable — `deploy.md` («Что где» + «Если сломалось» п. 5), В14 в плане деплоя, строка ROADMAP, текст `/privacy` (решение Влада, §Б4-приватность) |
