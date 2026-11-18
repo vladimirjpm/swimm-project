@@ -94,6 +94,19 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
 
 ## 4. API
 
+**Права на контент (18.11.2026, [plans/content-permissions-plan.md](plans/content-permissions-plan.md)).**
+Четыре точки записи спрашивают `IContentPermissionService` первым делом и отвечают
+`403 {error}` с текстом причины: `POST /api/me/media` — право на тип (`video` → видео, `image` /
+`album` → фото), своё медиа приватно, поэтому без права публикации; `POST /api/me/media/{id}/publications`
+— «показывать другим»; `POST /api/hub-groups/{id}/media` и `POST /api/hub-groups/{id}/sessions/{sid}/media`
+— тип **и** «показывать другим» (это видят другие; управляющего группой не освобождает — группу
+заводит любой). Реакции (лайк, «болею») прав не требуют. `GET /auth/me` отдаёт
+`permissions: { addPhotos, addVideos, publish }` тем же правилом; клиент (`useAuth().permissions`,
+`canAddMediaType` / `canAddAnyMedia`) прячет «+ Add link», «+» в карточках, тумблер «Add video» в
+результатах, «Add media» в шапке соревнования, Share, «Add video» тренировок и форму редактора
+медиа группы, а в модалах Add link / Add video не даёт сохранить запрещённый тип. Withdraw и
+Delete остаются всегда.
+
 Все под `[Authorize]` + `[AutoValidateAntiforgeryToken]` в
 `server/Swimm.API/Controllers/MediaController.cs` (маршрут-база `api/me/media`, часть
 эндпоинтов через явный `[HttpGet("/api/me/swims")]`/`[HttpGet("/api/me/moderation/media")]`

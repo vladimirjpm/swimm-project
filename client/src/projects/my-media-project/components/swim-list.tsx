@@ -23,6 +23,7 @@ import UI_MedalIcon from '../../components/mix/medal-icon/medal-icon';
 import UI_ClubLogo from '../../components/mix/club-logo/club-logo';
 import MobileFiltersDrawer from '../../components/filter-section/mobile-filters-drawer';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
+import { useAuth } from '../../../hooks/useAuth';
 import { useDeepThemeClass } from '../../components/deep/use-deep-theme-class';
 import { isMedal, styleLabel, swimMarks } from '../swim-marks';
 import { CoverButton, CoverDialogHost } from '../cover/cover-entry';
@@ -38,8 +39,9 @@ import { PosterButton, PosterDialogHost, canMakePoster } from '../poster/poster-
 export interface SwimListCallbacks {
   publicationsByMedia: Map<number, UserMediaPublicationDto[]>;
   onPlay: (media: SwimMediaDto) => void;
-  onAddVideo: (swim: MySwimDto) => void;
-  onAddCompMedia: (competitionId: number, competitionName: string) => void;
+  /** Нет — добавлять медиа нельзя (права на контент): кнопок «+» нет. */
+  onAddVideo?: (swim: MySwimDto) => void;
+  onAddCompMedia?: (competitionId: number, competitionName: string) => void;
   onSubmitShare: (mediaId: number, target: PublishTargetRef, level: 'members' | 'public') => Promise<boolean>;
   onWithdraw: (mediaId: number, target: PublishTargetRef) => void;
   onDelete: (mediaId: number) => void;
@@ -453,6 +455,9 @@ function MediaLine({
   };
 
   const withdrawable = pubs.filter((p) => p.status === 'pending' || p.status === 'approved');
+  // Права на контент (content-permissions-plan): нет права показывать другим — нет и «Share».
+  // Withdraw остаётся: убрать своё можно всегда (уже опубликованное снятие права не трогает).
+  const { permissions } = useAuth();
 
   return (
     // Перенос оставлен: три контрола публикации требуют ~430px, и на узкой панели нести
@@ -473,7 +478,7 @@ function MediaLine({
         </span>
       )}
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
-        {targets != null && options.length > 0 && !m.moderation_state && (
+        {permissions.publish && targets != null && options.length > 0 && !m.moderation_state && (
           <>
             <select
               value={group}
@@ -676,10 +681,10 @@ function MySwimRow({ swim, first, showSwimmerName, showDate, swimmerName, swimme
         >
           <IconChevron dir={sheet ? 'up' : 'right'} />
         </button>
-      ) : (
+      ) : cb.onAddVideo && (
         <button
           type="button"
-          onClick={() => cb.onAddVideo(swim)}
+          onClick={() => cb.onAddVideo?.(swim)}
           aria-label="Add video to this result"
           title="+ Add video"
           className="mmc-btn mmc-btn--add"
@@ -763,7 +768,8 @@ function MediaPane({ head, media, addLabel, onAdd, onClose, actions, cb }: {
   /** Видео первыми, затем фото. */
   media: SwimMediaDto[];
   addLabel: string;
-  onAdd: () => void;
+  /** Нет — добавлять нельзя (права на контент), плитки «+» нет. */
+  onAdd?: () => void;
   /** Есть только у выезжающей панели и шторки; рядом со списком закрывать нечего. */
   onClose?: () => void;
   /** Кнопки открытого результата (обложка YouTube); у медиа соревнования их нет. */
@@ -805,9 +811,11 @@ function MediaPane({ head, media, addLabel, onAdd, onClose, actions, cb }: {
             </button>
           );
         })}
-        <button type="button" onClick={onAdd} aria-label={addLabel} title={`+ ${addLabel}`} className="mmc-thumb mmc-thumb--add">
-          <IconPlus />
-        </button>
+        {onAdd && (
+          <button type="button" onClick={onAdd} aria-label={addLabel} title={`+ ${addLabel}`} className="mmc-thumb mmc-thumb--add">
+            <IconPlus />
+          </button>
+        )}
       </div>
       {/* `key` — у `MediaLine` своё состояние селектов публикации: при смене медиа оно обязано
           начаться заново, а не унаследовать выбор соседа. */}
@@ -1021,7 +1029,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
           )}
           media={compMedia}
           addLabel="Add photo or video to the competition"
-          onAdd={() => cb.onAddCompMedia(earliest.competition_id, earliest.competition_name)}
+          onAdd={cb.onAddCompMedia && (() => cb.onAddCompMedia?.(earliest.competition_id, earliest.competition_name))}
           onClose={onClose}
           cb={cb}
         />
@@ -1036,7 +1044,7 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
         head={<SwimPaneHead swim={swim} showSwimmerName={showSwimmerName} swimmerName={owner.name} swimmerId={owner.id} cb={cb} />}
         media={[...swim.media.filter((m) => m.media_type === 'video'), ...swim.media.filter((m) => m.media_type !== 'video')]}
         addLabel="Add photo or video"
-        onAdd={() => cb.onAddVideo(swim)}
+        onAdd={cb.onAddVideo && (() => cb.onAddVideo?.(swim))}
         onClose={onClose}
         actions={<CoverButton onClick={() => setCoverSwim(swim)} />}
         cb={cb}
@@ -1090,15 +1098,17 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
           <Counter kind="video" count={videoCount} large />
           <Counter kind="photo" count={photoCount} large />
           {preferredSwimmerId != null && canMakePoster(swims) && <PosterButton onClick={() => setPosterOpen(true)} />}
-          <button
-            type="button"
-            onClick={() => cb.onAddCompMedia(earliest.competition_id, earliest.competition_name)}
-            aria-label="Add photo or video to the competition"
-            title="+ Photo or video to the whole competition"
-            className="mmc-btn mmc-btn--accent mmc-btn--lg"
-          >
-            <IconPlus />
-          </button>
+          {cb.onAddCompMedia && (
+            <button
+              type="button"
+              onClick={() => cb.onAddCompMedia?.(earliest.competition_id, earliest.competition_name)}
+              aria-label="Add photo or video to the competition"
+              title="+ Photo or video to the whole competition"
+              className="mmc-btn mmc-btn--accent mmc-btn--lg"
+            >
+              <IconPlus />
+            </button>
+          )}
         </div>
       </div>
 

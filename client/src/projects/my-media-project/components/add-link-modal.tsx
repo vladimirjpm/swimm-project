@@ -12,6 +12,7 @@ import { HelperMedia } from '../../../utils/helpers';
 import { useDeepThemeClass } from '../../components/deep/use-deep-theme-class';
 import '../../components/deep/deep-theme.css';
 import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
+import { canAddMediaType, useAuth } from '../../../hooks/useAuth';
 
 export interface AddLinkSwimmerOption {
   id: number;
@@ -62,7 +63,10 @@ function AddLinkModal({
   const deepThemeClass = useDeepThemeClass();
   const [step, setStep] = useState<1 | 2 | 3>(initialStep ?? 1);
   const [url, setUrl] = useState(initialUrl ?? '');
-  const [otherKind, setOtherKind] = useState<'video' | 'photo'>('video');
+  // Права на контент (content-permissions-plan): видео и фото — разные права. Кнопки, открывающие
+  // модал, уже спрятаны у того, кому нельзя ничего; здесь — когда можно только один тип.
+  const { permissions } = useAuth();
+  const [otherKind, setOtherKind] = useState<'video' | 'photo'>(permissions.addVideos ? 'video' : 'photo');
   const [swimmerId, setSwimmerId] = useState<number | null>(initialSwimmerId ?? null);
   const [competitions, setCompetitions] = useState<SwimmerCompetitionBrief[]>([]);
   const [competitionId, setCompetitionId] = useState<number | null>(null);
@@ -98,8 +102,10 @@ function AddLinkModal({
     return { media_type: kind === 'photo' ? 'image' : 'video', source_type: 'other' };
   };
 
+  const typeAllowed = canAddMediaType(permissions, mediaTypeSourceType().media_type);
+
   const save = async (attach: 'result' | 'competition' | 'none') => {
-    if (swimmerId == null || saving) return;
+    if (swimmerId == null || saving || !typeAllowed) return;
     setSaving(true);
     const { media_type, source_type } = mediaTypeSourceType();
     setSaveError(null);
@@ -122,7 +128,7 @@ function AddLinkModal({
     <div role="alert" className="text-[12px] font-bold text-[var(--t-danger)]">{saveError}</div>
   );
 
-  const canNext = step === 1 ? url.trim().length > 0 : step === 2 ? swimmerId != null : true;
+  const canNext = step === 1 ? url.trim().length > 0 && typeAllowed : step === 2 ? swimmerId != null : true;
 
   const stepDots = [1, 2, 3].map((n) => (
     <span
@@ -176,6 +182,11 @@ function AddLinkModal({
                     </div>
                   )}
                 </div>
+                {!typeAllowed && (
+                  <div role="alert" className="text-[12px] font-bold text-[var(--t-danger)]">
+                    {kind === 'video' ? 'Adding videos' : 'Adding photos'} is not available for your account.
+                  </div>
+                )}
                 <div className="flex aspect-video items-center justify-center rounded-[12px] border border-[var(--t-border)] bg-[var(--t-surface2)]">
                   {isAlbum ? (
                     <span className="flex flex-col items-center gap-1 px-4 text-center text-[12.5px] text-[var(--t-text-2)]">

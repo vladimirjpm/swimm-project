@@ -5,6 +5,7 @@ import {
 } from '../../../../components/deep/deep-sheet';
 import { sessionLabel } from '../../../use-training-sessions';
 import { useTrainingsTab } from '../trainings-context';
+import { canAddMediaType, useAuth } from '../../../../../hooks/useAuth';
 import type { TrainingsSheetProps } from '../trainings-sheets';
 import { trainingTypeOf } from '../training-types';
 import {
@@ -61,7 +62,11 @@ function AddVideoSheet({ sheet, onClose }: TrainingsSheetProps<'add-video'>) {
   const showThumb = thumb != null && thumb !== badThumb;
 
   const mine = selected ? selected.media.filter((m) => m.mine).length : 0;
-  const canAdd = !sessions.busy && valid && sessionId != null;
+  // Права на контент (content-permissions-plan): видео и фото/альбом — разные права. Кнопку
+  // «Add video» лента прячет, когда нельзя ничего; здесь — когда нельзя выбранный тип.
+  const { permissions } = useAuth();
+  const typeAllowed = canAddMediaType(permissions, kind);
+  const canAdd = !sessions.busy && valid && sessionId != null && typeAllowed;
 
   const add = async () => {
     if (!canAdd || sessionId == null) return;
@@ -198,6 +203,11 @@ function AddVideoSheet({ sheet, onClose }: TrainingsSheetProps<'add-video'>) {
           </SheetField>
         </div>
       </div>
+      {!typeAllowed && (
+        <p role="alert" className="m-0 text-[12px] font-extrabold" style={{ color: 'var(--deep-danger)' }}>
+          {kind === 'video' ? 'Adding videos' : 'Adding photos'} is not available for your account.
+        </p>
+      )}
 
       <SheetField label="Caption">
         <input

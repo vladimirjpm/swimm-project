@@ -108,6 +108,20 @@ public class AdminSettingsService : ISettingsService, IReloadableSettings
             new(HubGroupQuotaRules.SelfJoinEnabledKey, "true", "bool", "livesite",
                 "Самозапись в группы: false — кнопка «Join» закрыта всем (рубильник на волну спама). " +
                 "Добавление участника админом группы по email работает"),
+            // Права на контент (docs/plans/content-permissions-plan.md): политика для тех, у кого
+            // в /Admin/Users нет своего исключения. Дефолт true — сайт ведёт себя как до плана
+            // (решение Влада 18.11.2026). Правило — ContentPermissionRules.
+            new(ContentPermissionRules.DefaultCanAddPhotosKey, "true", "bool", "livesite",
+                "Права на контент: может ли пользователь без своего исключения в /Admin/Users добавлять " +
+                "ФОТО и альбомы (ссылки). Админу сайта всегда можно"),
+            new(ContentPermissionRules.DefaultCanAddVideosKey, "true", "bool", "livesite",
+                "Права на контент: может ли пользователь без своего исключения в /Admin/Users добавлять " +
+                "ВИДЕО (ссылки). Админу сайта всегда можно"),
+            new(ContentPermissionRules.DefaultCanPublishKey, "true", "bool", "livesite",
+                "Права на контент: может ли пользователь без своего исключения в /Admin/Users показывать " +
+                "медиа другим — заявки на публикацию в клуб/группу, галерея группы, ссылки к тренировкам. " +
+                "false — «новым только после одобрения админом» (исключение «да» в /Admin/Users). " +
+                "Уже опубликованное смена не трогает"),
             // Жалобы «Report» (Р62, 29.09.2026): правило и пределы — MediaReportRules.
             new(MediaReportRules.HideThresholdKey, MediaReportRules.DefaultHideThreshold.ToString(), "int", "livesite",
                 "Жалобы на медиа: сколько ОТКРЫТЫХ жалоб от разных аккаунтов прячет медиа со всех витрин " +

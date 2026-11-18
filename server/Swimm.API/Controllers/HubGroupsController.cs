@@ -366,10 +366,18 @@ public class HubGroupsController : ControllerBase
     [HttpPost("/api/hub-groups/{id:int}/media")]
     [Authorize]
     [AutoValidateAntiforgeryToken]
-    public async Task<IActionResult> AddMedia(int id, [FromBody] HubGroupMediaInputDto input)
+    public async Task<IActionResult> AddMedia(int id, [FromBody] HubGroupMediaInputDto input,
+        [FromServices] IContentPermissionService contentPermissions)
     {
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
+
+        // Права на контент (content-permissions-plan): галерею группы видят другие — нужно и
+        // право добавлять этот тип, и право показывать. Группу может завести любой, поэтому
+        // управляющий группой от проверки не освобождён.
+        var denied = await contentPermissions.DenyReasonAsync(userId.Value, User.IsInRole("Admin"),
+            ContentPermissionRules.AddActionFor(input.MediaType), ContentAction.Publish);
+        if (denied != null) return StatusCode(StatusCodes.Status403Forbidden, new { error = denied });
 
         var perms = await _permissions.GetPermissionsAsync(id, userId.Value, User.IsInRole("Admin"));
         if (!perms.Exists) return NotFound();

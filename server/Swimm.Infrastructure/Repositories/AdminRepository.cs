@@ -42,7 +42,10 @@ public class AdminRepository : IAdminRepository
                 Logins7d = _db.UserLoginHistory.Count(h => h.UserId == u.Id && h.Success && h.LoginAt >= since7d),
                 Logins30d = _db.UserLoginHistory.Count(h => h.UserId == u.Id && h.Success && h.LoginAt >= since30d),
                 HubGroupsOwned = _db.HubGroups.Count(g => g.OwnerUserId == u.Id),
-                HubGroupLimit = u.HubGroupLimit
+                HubGroupLimit = u.HubGroupLimit,
+                CanAddPhotos = u.CanAddPhotos,
+                CanAddVideos = u.CanAddVideos,
+                CanPublish = u.CanPublish
             })
             .ToListAsync();
     }
@@ -134,6 +137,23 @@ public class AdminRepository : IAdminRepository
 
         // Штамп НЕ бампаем: лимит не в claims, проверка читает его из БД каждый раз.
         user.HubGroupLimit = limit;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> SetContentPermissionAsync(int userId, ContentAction action, bool? value)
+    {
+        var user = await _db.AppUsers.FindAsync(userId);
+        if (user == null) return false;
+
+        // Штамп НЕ бампаем: права не в claims, проверка читает их из БД каждый раз.
+        switch (action)
+        {
+            case ContentAction.AddPhoto: user.CanAddPhotos = value; break;
+            case ContentAction.AddVideo: user.CanAddVideos = value; break;
+            default: user.CanPublish = value; break;
+        }
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         return true;
@@ -249,6 +269,9 @@ public class AdminRepository : IAdminRepository
             LocalLockoutEnd = user.LocalCredential?.LockoutEnd,
             HubGroupsOwned = await _db.HubGroups.CountAsync(g => g.OwnerUserId == userId),
             HubGroupLimit = user.HubGroupLimit,
+            CanAddPhotos = user.CanAddPhotos,
+            CanAddVideos = user.CanAddVideos,
+            CanPublish = user.CanPublish,
             ProfileRoleSwimmer = user.ProfileRoleSwimmer,
             ProfileRoleParent = user.ProfileRoleParent,
             ProfileRoleCoach = user.ProfileRoleCoach,

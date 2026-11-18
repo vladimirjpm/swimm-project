@@ -126,6 +126,8 @@ public class PersonaSeeder : IPersonaSeeder
         user.ProfileSetupDismissedAt = null;
         user.ProfileSkipMe = user.ProfileSkipClub = user.ProfileSkipGroup = user.ProfileSkipFamily = false;
         user.ProfileStepsSeen = null;
+        // Права на контент — по политике, как у нового (исключения ставят руками для проверок).
+        user.CanAddPhotos = user.CanAddVideos = user.CanPublish = null;
         // Роли менялись — сессии персонажа (если входил по-настоящему) перечитают claims.
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         await _db.SaveChangesAsync();
@@ -204,6 +206,7 @@ public class PersonaSeeder : IPersonaSeeder
             if (user.DisplayName != p.Nick || user.AvatarUrl != null || user.SwimmerId != null) diff.Add("имя / фото / привязка");
             if (user.IsActive != p.IsActive) diff.Add("активность");
             if (user.HubGroupLimit != p.HubGroupLimit) diff.Add("лимит групп");
+            if (user.CanAddPhotos != null || user.CanAddVideos != null || user.CanPublish != null) diff.Add("права на контент");
             if (user.ProfileRoleSwimmer || user.ProfileRoleParent || user.ProfileRoleCoach || user.ProfileRoleWatcher
                 || user.ProfileRolesAnsweredAt != null) diff.Add("опрос «Who are you?»");
             if (user.ProfileSkipMe || user.ProfileSkipClub || user.ProfileSkipGroup || user.ProfileSkipFamily

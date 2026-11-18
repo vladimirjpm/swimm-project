@@ -100,6 +100,17 @@ rate limit — константа, не настройка. Ответ отка�
 возвращает. Правило — `MediaReportRules`, решения Р62/Р64 в `docs/data-integrity.md`. Rate limit
 подачи — политика `reports`, **10 жалоб в минуту на пользователя** (константа, не настройка).
 
+## Права на контент: политика (2026-11-18)
+
+`ContentDefaultCanAddPhotos`, `ContentDefaultCanAddVideos`, `ContentDefaultCanPublish` (bool, все
+дефолт **true**) — что можно пользователю БЕЗ своего исключения в [/Admin/Users](users.md): добавлять
+фото и альбомы, добавлять видео, показывать медиа другим (публикация в клуб/группу, галерея группы,
+ссылки к тренировкам). Дефолт `true` — сайт ведёт себя как до плана (решение Влада 18.11.2026).
+`ContentDefaultCanPublish=false` — режим «новым — только после одобрения админом»: разрешать
+конкретным — исключением «Можно». Смена политики уже опубликованное не трогает; админу сайта
+можно всегда. Правило — `ContentPermissionRules`, план —
+[plans/content-permissions-plan.md](../plans/content-permissions-plan.md).
+
 ## Бегущая лента внизу витрин (2026-10-16)
 
 `RecordTickerEnabled` (bool, дефолт **false**, scope livesite) — лента «NEW RECORD · LIVE · …»

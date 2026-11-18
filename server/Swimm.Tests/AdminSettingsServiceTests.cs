@@ -37,7 +37,9 @@ public class AdminSettingsServiceTests
         // + RecordTickerEnabled (бегущая лента внизу витрин, дефолт false, 2026-10-16)
         // + RecordsCheckEnabled/RecordsCheckIntervalHours (проверка источников рекордов по
         //   расписанию, records-freshness-plan §4, 2026-11-16)
-        Assert.Equal(33, all.Count);
+        // + ContentDefaultCanAddPhotos/CanAddVideos/CanPublish (политика прав на контент,
+        //   content-permissions-plan, 2026-11-18)
+        Assert.Equal(36, all.Count);
     }
 
     [Fact]

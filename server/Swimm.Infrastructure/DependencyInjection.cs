@@ -207,6 +207,8 @@ public static class DependencyInjection
         services.AddScoped<IHubGroupPermissionService, HubGroupPermissionService>();
         services.AddScoped<IEntityDisplayRepository, EntityDisplayRepository>();
         services.AddScoped<IHubGroupUserService, HubGroupUserService>();
+        // Права на контент отдельно от входа (docs/plans/content-permissions-plan.md).
+        services.AddScoped<IContentPermissionService, ContentPermissionService>();
         // «Set up profile» (docs/plans/profile-setup-plan.md) — личное, без кэша.
         services.AddScoped<IProfileSetupService, ProfileSetupService>();
         // Удаление аккаунта (docs/plans/account-deletion-plan.md): кнопка на /setup-profile и /Admin/Users.

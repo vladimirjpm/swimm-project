@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Application.Validation;
 using Swimm.Domain.Entities;
 
@@ -24,19 +25,22 @@ public class MediaController : ControllerBase
     private readonly IUserMediaPublicationService _publications;
     private readonly IHubGroupPermissionService _groupPermissions;
     private readonly IMediaReportService _reports;
+    private readonly IContentPermissionService _contentPermissions;
 
     public MediaController(
         IUserMediaRepository media,
         IMySwimsRepository mySwims,
         IUserMediaPublicationService publications,
         IHubGroupPermissionService groupPermissions,
-        IMediaReportService reports)
+        IMediaReportService reports,
+        IContentPermissionService contentPermissions)
     {
         _media = media;
         _mySwims = mySwims;
         _publications = publications;
         _groupPermissions = groupPermissions;
         _reports = reports;
+        _contentPermissions = contentPermissions;
     }
 
     private int? CurrentUserId()
@@ -81,6 +85,12 @@ public class MediaController : ControllerBase
     {
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
+
+        // Право на контент — первым делом (docs/plans/content-permissions-plan.md): своё медиа
+        // приватно, поэтому здесь только «добавлять фото / видео», без права публикации.
+        var denied = await _contentPermissions.DenyReasonAsync(userId.Value, User.IsInRole("Admin"),
+            ContentPermissionRules.AddActionFor(request.MediaType));
+        if (denied != null) return StatusCode(StatusCodes.Status403Forbidden, new { error = denied });
 
         if (request.SwimmerId <= 0)
             return BadRequest(new { error = "swimmer_id is required" });
@@ -147,6 +157,12 @@ public class MediaController : ControllerBase
     {
         var userId = CurrentUserId();
         if (userId == null) return Unauthorized();
+
+        // Право показывать своё другим (content-permissions-plan). Управляющих группой не
+        // освобождает: группу может завести любой, а снятое право — именно про «показывать».
+        var denied = await _contentPermissions.DenyReasonAsync(userId.Value, User.IsInRole("Admin"),
+            ContentAction.Publish);
+        if (denied != null) return StatusCode(StatusCodes.Status403Forbidden, new { error = denied });
 
         // Кто «и так решает по этой цели» — тот подаёт сразу в approved, минуя inbox.
         // У группы это владелец/админ группы/site-админ; у клуба управляющих не существует,

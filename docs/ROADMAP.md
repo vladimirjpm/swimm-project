@@ -497,6 +497,12 @@ Razor + Tailwind, Competitions/Categories CRUD, фоновый импорт.)
   участие active + метка на его «Me»; Decline — снять заявку. Push владельцу о новой заявке.
   Решения Т1–Т3 и устройство — [plans/coach-access-request-plan.md](plans/coach-access-request-plan.md).
   На проде с 10.11 (PR #169, 173adfc7; миграция применена). Push владельцу на телефоне не проверен.
+- ✅ 8.18. (2026-11-18, P0–P6) **Права на медиа отдельно от входа** — добавлять фото, добавлять видео,
+  показывать другим: исключение у пользователя (`Sys_AppUsers.CanAddPhotos/CanAddVideos/CanPublish`,
+  миграция `AddUserContentPermissions`) важнее политики `ContentDefault*` (дефолт — всё можно);
+  одно правило `ContentPermissionRules`; 4 точки записи → 403; `/auth/me.permissions` прячет кнопки;
+  блок в `/Admin/Users` с аудитом. Решения Влада 18.11: дефолт как сейчас, на реакции прав нет,
+  опубликованное при снятии права остаётся — [plans/content-permissions-plan.md](plans/content-permissions-plan.md).
 
 **Критерий приёмки (8.1–8.10, выполнено):** группа создаётся в админке и пользователем по правам,
 публичная страница показывает состав/рекорды/заплывы/сезонный зачёт/галерею, избранное работает

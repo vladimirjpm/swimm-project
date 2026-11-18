@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import '../home-project/home.css';
 import '../components/deep/deep-theme.css';
 import './my-media.css';
-import { useAuth } from '../../hooks/useAuth';
+import { canAddAnyMedia, useAuth } from '../../hooks/useAuth';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import { useFavorites } from '../../hooks/useFavorites';
 import { useMyMediaPublications, type PublishTargetRef } from '../../hooks/useUserMedia';
@@ -367,11 +367,14 @@ function MyMediaContent({ deep }: { deep: string }) {
     />
   );
 
+  // Права на контент (content-permissions-plan): нельзя добавлять ни фото, ни видео — все «+»
+  // и «Add link» спрятаны (колбэка нет — кнопки нет).
+  const canAdd = canAddAnyMedia(auth.permissions);
   const swimListCallbacks = {
     publicationsByMedia,
     onPlay,
-    onAddVideo: (s: MySwimDto) => setAddVideoSwim(s),
-    onAddCompMedia: (id: number, name: string) => setAddCompTarget({ id, name }),
+    onAddVideo: canAdd ? (s: MySwimDto) => setAddVideoSwim(s) : undefined,
+    onAddCompMedia: canAdd ? (id: number, name: string) => setAddCompTarget({ id, name }) : undefined,
     onSubmitShare: submitInlineShare,
     onWithdraw: (mediaId: number, target: PublishTargetRef) => withdrawPublication(mediaId, target),
     onDelete: handleDelete,
@@ -425,9 +428,11 @@ function MyMediaContent({ deep }: { deep: string }) {
           )}
         </nav>
 
-        <button type="button" className="mm-add" onClick={() => setAddOpen(true)}>
-          + Add link
-        </button>
+        {canAdd && (
+          <button type="button" className="mm-add" onClick={() => setAddOpen(true)}>
+            + Add link
+          </button>
+        )}
       </header>
 
       <section className="mm-panel">
@@ -598,12 +603,12 @@ function MyMediaContent({ deep }: { deep: string }) {
                             onDelete={() => handleDelete(item.id)}
                             onWithdraw={(target) => withdrawPublication(item.id, target)}
                             onLinkToSwim={() => setLinkSwimTarget(item)}
-                            onShareWithGroup={() => openShare(item)}
+                            onShareWithGroup={auth.permissions.publish ? () => openShare(item) : undefined}
                           />
                         ))}
                       </div>
                     )}
-                    {unlinkedOpen && (
+                    {unlinkedOpen && canAdd && (
                       <button
                         type="button"
                         onClick={() => setAddOpen(true)}
@@ -628,7 +633,7 @@ function MyMediaContent({ deep }: { deep: string }) {
       </section>
 
       {/* Floating + Add link (mobile) */}
-      {tab === 'media' && (
+      {tab === 'media' && canAdd && (
         <button
           type="button"
           onClick={() => setAddOpen(true)}

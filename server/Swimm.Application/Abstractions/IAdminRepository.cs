@@ -1,4 +1,5 @@
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.Application.Abstractions;
 
@@ -19,6 +20,13 @@ public interface IAdminRepository
     /// false — пользователь не найден. Сессии не трогает: лимит читается из БД при каждой проверке.
     /// </summary>
     Task<bool> SetHubGroupLimitAsync(int userId, int? limit);
+
+    /// <summary>
+    /// Персональное исключение права на контент (docs/plans/content-permissions-plan.md):
+    /// true / false — свой ответ, null — по политике. false — пользователь не найден. Сессии
+    /// не трогает: права читаются из БД при каждой проверке.
+    /// </summary>
+    Task<bool> SetContentPermissionAsync(int userId, ContentAction action, bool? value);
 
     /// <summary>Сводка по логинам (онлайн сейчас, логины 7/30д, фейлы 7д) для панели Admin/Users.</summary>
     Task<LoginStatsDto> GetLoginStatsAsync();

@@ -143,10 +143,17 @@ public class HubGroupTrainingSessionsController : ControllerBase
     /// поставила «только тренер». Видна той же аудитории, что и тренировка.
     /// </summary>
     [HttpPost("{sessionId:int}/media")]
-    public async Task<IActionResult> AddMedia(int id, int sessionId, [FromBody] TrainingSessionMediaInputDto input)
+    public async Task<IActionResult> AddMedia(int id, int sessionId, [FromBody] TrainingSessionMediaInputDto input,
+        [FromServices] IContentPermissionService contentPermissions)
     {
         var (userId, isManager, denied) = await ViewerAsync(id);
         if (denied != null) return denied;
+
+        // Права на контент (content-permissions-plan): ссылку к тренировке видят участники —
+        // нужно право на этот тип и право показывать. Тренера не освобождает (см. AddMedia группы).
+        var noRight = await contentPermissions.DenyReasonAsync(userId, User.IsInRole("Admin"),
+            ContentPermissionRules.AddActionFor(input.MediaType), ContentAction.Publish);
+        if (noRight != null) return StatusCode(StatusCodes.Status403Forbidden, new { error = noRight });
 
         var result = await _sessions.AddMediaAsync(id, sessionId, userId, isManager, input);
         Response.Headers.CacheControl = "private, no-store";
