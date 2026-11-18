@@ -48,6 +48,11 @@ public class DataQualityService(SwimmDbContext db) : IDataQualityService
                 // (в него склеены другие) — он висел бы в списке вечно как невыполнимая задача.
                 // Предсказано в docs/admin-pages/clubs.md, случилось 2026-08-03 с двумя клубами.
                 .Where(c => !db.Clubs.Any(x => x.MergedIntoId == c.Id))
+                // Клуб из журнала смен клуба пловца (Р95/Р98) — не мусор: на него ссылается
+                // история «было → стало» и откат на /Admin/Swimmers (FK нет — удаление оборвало
+                // бы журнал молча). 18.11.2026 пересчёт клубов опустошил так 1255 и 1259.
+                .Where(c => !db.SwimmerClubChanges.Any(x => x.FromClubId == c.Id || x.ToClubId == c.Id))
+                .Where(c => !db.SwimmerClubCandidates.Any(x => x.FromClubId == c.Id || x.ToClubId == c.Id))
                 .Where(c => !db.Swimmers.Any(s => s.ClubId == c.Id))
                 .Where(c => !db.Results.Any(r => r.ClubId == c.Id)),
             "no-country" => db.Clubs.AsNoTracking()

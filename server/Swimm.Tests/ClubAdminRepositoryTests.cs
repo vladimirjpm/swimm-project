@@ -155,6 +155,24 @@ public class ClubAdminRepositoryTests
     }
 
     [Fact]
+    public async Task DeleteEmpty_ClubInClubChangeJournal_Fails()
+    {
+        // Журнал смен клуба (Sys_SwimmerClubChanges) держит id без FK — удаление прошло бы
+        // и молча оборвало историю «было → стало» и откат.
+        await using var db = CreateDb(nameof(DeleteEmpty_ClubInClubChangeJournal_Fails));
+        var was = new Club { Name = "Maccabi Jerusalem" };
+        db.Clubs.Add(was);
+        await db.SaveChangesAsync();
+        db.SwimmerClubChanges.Add(new SwimmerClubChange { SwimmerId = 1, FromClubId = was.Id, ToClubId = 999, Source = "loglig" });
+        await db.SaveChangesAsync();
+
+        var res = await Repo(db).DeleteEmptyAsync(was.Id);
+
+        Assert.False(res.Success);
+        Assert.Equal(1, await db.Clubs.CountAsync());
+    }
+
+    [Fact]
     public async Task DeleteEmpty_MergeTargetClub_Fails()
     {
         // Приёмник склейки: удаление оборвало бы MergedIntoId дубля (в БД — FK RESTRICT).

@@ -222,6 +222,26 @@ public class DataQualityServiceTests
     }
 
     [Fact]
+    public async Task GetClubQuality_NoSwimmers_ExcludesClubsFromClubChangeJournal()
+    {
+        // 18.11.2026: пересчёт клубов увёл последних пловцов с 1255/1259 — клубы опустели, но
+        // на них ссылается журнал смен «было → стало» (FK нет). Это история, а не мусор.
+        await using var db = CreateDb(nameof(GetClubQuality_NoSwimmers_ExcludesClubsFromClubChangeJournal));
+        var was = new Club { Name = "Maccabi Ramat Hagolan" };
+        var candidate = new Club { Name = "Кандидат" };
+        var junk = new Club { Name = "Мусор" };
+        db.AddRange(was, candidate, junk);
+        await db.SaveChangesAsync();
+        db.SwimmerClubChanges.Add(new SwimmerClubChange { SwimmerId = 1, FromClubId = was.Id, ToClubId = 999, Source = "loglig" });
+        db.SwimmerClubCandidates.Add(new SwimmerClubCandidate { SwimmerId = 2, FromClubId = 998, ToClubId = candidate.Id });
+        await db.SaveChangesAsync();
+
+        var result = await new DataQualityService(db).GetClubQualityAsync("no-swimmers");
+
+        Assert.Equal(junk.Id, Assert.Single(result.Items).Id);
+    }
+
+    [Fact]
     public async Task GetResultAnomalies_ExactDuplicates_OnlyIdenticalRows()
     {
         // И10: одну дорожку в одном заплыве занимает один пловец один раз, поэтому полное
