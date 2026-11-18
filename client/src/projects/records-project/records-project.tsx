@@ -5,7 +5,7 @@ import './records-page.css';
 import { useTheme } from '../../hooks/useTheme';
 import { useMode } from '../../hooks/useMode';
 import AppTopbar from '../components/app-topbar/app-topbar';
-import { parseRecordsQuery, routes, type RecordsTab } from '../../utils/routes';
+import { parseRecordsCompareQuery, parseRecordsQuery, type RecordsTab } from '../../utils/routes';
 import { useRecordsRanking } from '../../hooks/useRecordsRanking';
 import { useRegionRecords } from '../../hooks/useRegionRecords';
 import { useRecordCountries } from '../../hooks/useRecordsCompare';
@@ -21,6 +21,7 @@ import RkMastersTable, { mastersBands } from './components/rk-masters-table';
 import RkJuniorTable from './components/rk-junior-table';
 import RkFilterBar from './components/rk-filter-bar';
 import UI_RecordsChecked from '../components/mix/records-checked/records-checked';
+import RcComparePanel, { compareSources, type CompareFilters } from './components/rc-compare-panel';
 import {
   HOME_REGION, RK_DEFAULT, disciplineLabel, genderLabel, isRelay, strokeByKey,
   strongestCountries, type RkFilters,
@@ -33,8 +34,11 @@ import {
  * - **World records** — все мировые рекорды бассейна и пола (`RkWorldList`);
  * - **Masters** — мастерсы Израиля против мирового рекорда своей полосы (`RkMastersTable`);
  * - **World Junior** — возрастные рекорды Израиля против World Junior Record (`RkJuniorTable`,
- *   21.09.2026): WJR один на полосу (ж 14–17, м 15–18), строки — возрасты внутри неё.
- * Дисциплина и пикер общие для всех табов, таб живёт в адресе (`?tab=`).
+ *   21.09.2026): WJR один на полосу (ж 14–17, м 15–18), строки — возрасты внутри неё;
+ * - **H2H** — сравнение двух стран по всем дисциплинам (`RcComparePanel`, 18.11.2026; до того
+ *   отдельная страница `/records/compare`, её адрес теперь переадресует сюда).
+ * Дисциплина и пикер общие для первых четырёх табов; у H2H свой разрез (бассейн и пол, где
+ * пусто — «все») и пара стран. Таб живёт в адресе (`?tab=`).
  *
  * Показывает одну дисциплину: кто из стран быстрее и насколько отстаёт от мирового.
  * Данные — `GET /api/records/ranking` (11.2.1): места, мировой рекорд отдельным полем,
@@ -60,6 +64,8 @@ const TAB_SOURCES: Record<RecordsTab, string[]> = {
   world: ['worldrecords'],
   masters: ['wa-masters', 'isrorg-masters'],
   junior: ['wa-junior', 'isrorg-age'],
+  // Зависят от выбранной пары — считаются на месте (`compareSources`).
+  h2h: [],
 };
 
 /**
@@ -110,6 +116,26 @@ function RecordsProject() {
     ageGroup: query.ageGroup,
   }));
 
+  // Пара стран и разрез таба H2H. Отдельно от `filters`: у сравнения пустой пол и бассейн
+  // значат «все», а у рейтинга дисциплина выбрана всегда. Разрез из адреса берём, только
+  // если адрес и открыт на H2H: иначе `pool`/`gender` там — ось рейтинга, а не сравнения.
+  // Левая сторона по умолчанию домашняя, правая пустая: «с кем сравнить» — это и есть
+  // вопрос экрана, и подставлять за человека вторую страну значит отвечать за него.
+  const [compare, setCompare] = useState<CompareFilters>(() => {
+    const c = parseRecordsCompareQuery();
+    const own = query.tab === 'h2h';
+    return {
+      a: c.a ?? HOME_REGION,
+      b: c.b,
+      poolType: own ? c.poolType : null,
+      gender: own ? c.gender : null,
+    };
+  });
+  const h2hSources = useMemo(
+    () => compareSources({ a: compare.a, b: compare.b }),
+    [compare.a, compare.b],
+  );
+
   // Пол «mixed» бывает только у эстафеты (Э5, records-relays-plan). Правило — ВЫВОДОМ, а не
   // эффектом после отрисовки: иначе успевает уйти запрос ?gender=mixed&distance=100m (400).
   // Выбор пользователя в состоянии не теряется: вернулся на эстафету — снова mixed. Таб World
@@ -132,15 +158,21 @@ function RecordsProject() {
       else url.searchParams.set(key, value);
     };
     set('tab', tab === 'countries' ? null : tab);
-    set('stroke', filters.stroke);
-    set('distance', filters.distance);
-    set('gender', filters.gender);
-    set('pool', filters.poolType);
-    set('country', filters.highlight);
+    // У H2H в адресе только пара и разрез: дисциплина рейтинга к сравнению отношения не
+    // имеет, а `pool`/`gender` у них общие ключи с разным смыслом. Состояние рейтинга при
+    // этом не теряется — вернулся на его таб, и оно снова в адресе.
+    const h2h = tab === 'h2h';
+    set('stroke', h2h ? null : filters.stroke);
+    set('distance', h2h ? null : filters.distance);
+    set('gender', h2h ? compare.gender : filters.gender);
+    set('pool', h2h ? compare.poolType : filters.poolType);
+    set('country', h2h ? null : filters.highlight);
     set('age', tab === 'masters' ? filters.ageGroup : null);
     set('region', tab === 'world' ? region : null);
+    set('a', h2h ? compare.a : null);
+    set('b', h2h ? compare.b : null);
     window.history.replaceState(null, '', url.toString());
-  }, [filters, tab, region]);
+  }, [filters, tab, region, compare]);
 
   // У мастерсов эстафет нет ни в одной оси (решение 3 docs/plans/records-relays-plan.md);
   // юниорские эстафеты есть с Э1/Э3 того же плана. Пришли на таб Masters с «4×100m» — берём
@@ -198,12 +230,19 @@ function RecordsProject() {
     // Юниоры стоят ПЕРЕД мастерсами (просьба Влада 23.09.2026): порядок табов читается
     // как возрастная лестница — страна, мир, юниоры, мастерсы.
     {
-      id: 'junior', icon: '🌱', label: 'World Junior',
+      // Короткие подписи на телефоне — с пятым табом (H2H) полные имена там обрезались.
+      id: 'junior', icon: '🌱', label: 'World Junior', shortLabel: 'Junior',
       sub: 'Israel ages vs world junior',
     },
     {
-      id: 'masters', icon: '⏱', label: 'Masters WR',
+      id: 'masters', icon: '⏱', label: 'Masters WR', shortLabel: 'Masters',
       sub: 'Israel vs world · by age band',
+    },
+    // Сравнение двух стран — последним: это не ещё одна ступень лестницы, а другой вопрос
+    // («кто сильнее из двух»). Был отдельной страницей, табом стал 18.11.2026.
+    {
+      id: 'h2h', icon: '🆚', label: 'H2H',
+      sub: compare.a && compare.b ? `${compare.a} vs ${compare.b}` : 'two countries · every event',
     },
   ];
 
@@ -231,20 +270,19 @@ function RecordsProject() {
         <div className="rk-topline">
           <div>
             <h1 className="rk-head__title">Records</h1>
+            {/* Ссылки «compare two countries» здесь больше нет: вход в сравнение — таб H2H. */}
             <div className="rk-head__sub">
-              {tab === 'world'
-                ? `${region ? `${region} national records · ` : ''}${filters.poolType} pool · ${genderLabel(filters.gender)}`
-                : title}
-              {tab !== 'world' && isRelay(filters.distance) && <span className="rk-head__tag">relay</span>}
-              {' · '}
-              {/* Единственный вход на `/records/compare`: в топбаре пункт один, «Records» —
-                  это рейтинг. Дисциплину не переносим (там все сразу), а бассейн и пол —
-                  те же оси, что и здесь. */}
-              <a className="rc-link" href={routes.recordsCompare({
-                poolType: filters.poolType, gender: filters.gender,
-              })}>compare two countries</a>
+              {tab === 'h2h'
+                ? 'two countries across every event'
+                : tab === 'world'
+                  ? `${region ? `${region} national records · ` : ''}${filters.poolType} pool · ${genderLabel(filters.gender)}`
+                  : title}
+              {tab !== 'world' && tab !== 'h2h' && isRelay(filters.distance) && <span className="rk-head__tag">relay</span>}
             </div>
-            <UI_RecordsChecked sources={tabSources(tab, region)} className="rk-head__checked" />
+            <UI_RecordsChecked
+              sources={tab === 'h2h' ? h2hSources : tabSources(tab, region)}
+              className="rk-head__checked"
+            />
           </div>
         </div>
 
@@ -254,6 +292,10 @@ function RecordsProject() {
           <DeepTabs ariaLabel="Records sections" active={tab} onSelect={setTab} tabs={tabs} />
 
           <div className="deep-tabs-panel rk-panel">
+            {tab === 'h2h' && <RcComparePanel filters={compare} onChange={setCompare} />}
+
+            {/* У H2H дисциплины нет — он сравнивает все сразу, разрез у него свой. */}
+            {tab !== 'h2h' && (
             <RkDisciplinePicker
               filters={filters}
               onChange={patch}
@@ -283,6 +325,7 @@ function RecordsProject() {
                 </div>
               ) : undefined}
             />
+            )}
 
             {tab === 'world' && (
               <UI_H2HPickerModal
