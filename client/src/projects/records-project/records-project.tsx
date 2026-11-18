@@ -403,7 +403,7 @@ function RecordsProject() {
                       </span>
                     )}
                   </div>
-                  <RkTable rows={data.rows} highlight={filters.highlight} />
+                  <RkTable rows={data.rows} distance={data.distance} highlight={filters.highlight} />
                 </>
               )}
               </>

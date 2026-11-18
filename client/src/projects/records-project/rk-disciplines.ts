@@ -11,6 +11,7 @@
 
 import type { RecordGender } from '../../utils/routes';
 import { genderLabel } from '../../utils/helpers/helper-gender';
+import { toAlpha2 } from '../components/mix/flag-icon/flag-icon';
 
 export interface RkFilters {
   stroke: string | null;
@@ -144,6 +145,60 @@ export function bandStart(band: string): number {
  * латиница — только когда иврита нет (CLAUDE.md, «имена пловцов — ивритские»). У мировых
  * рекордов иврита нет в принципе, поэтому там сама собой печатается латиница.
  */
-export function holderLabel(r: { holder_name?: string | null; holder_name_en?: string | null }): string | null {
-  return r.holder_name?.trim() || r.holder_name_en?.trim() || null;
+export function holderLabel(r: {
+  holder_name?: string | null;
+  holder_name_en?: string | null;
+  distance?: string | null;
+  club?: string | null;
+  holder_country?: string | null;
+  region_code?: string | null;
+}): string | null {
+  return r.holder_name?.trim() || r.holder_name_en?.trim()
+    || relayTeamLabel(r.distance, r.holder_country || r.region_code, r.club);
+}
+
+/** Эстафета ли дистанция справочника («4X100m»). */
+export const isRelayDistance = (distance?: string | null) => /^4X/i.test(distance ?? '');
+
+let regionNames: Intl.DisplayNames | null | undefined;
+
+/**
+ * Код страны World Aquatics (alpha-3: PUR, NED) → английское название («Puerto Rico»).
+ * Маппинг кодов — тот же, что у флага (`toAlpha2`); название — из `Intl.DisplayNames`.
+ * Незнакомый код или браузер без `DisplayNames` — сам код: лучше «PUR», чем пусто.
+ */
+export function countryNameEn(code?: string | null): string | null {
+  const c = code?.trim();
+  if (!c) return null;
+  const alpha2 = toAlpha2(c);
+  if (!alpha2) return c.toUpperCase();
+  if (regionNames === undefined) {
+    try {
+      regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+    } catch {
+      regionNames = null;
+    }
+  }
+  try {
+    return regionNames?.of(alpha2.toUpperCase()) ?? c.toUpperCase();
+  } catch {
+    return c.toUpperCase();
+  }
+}
+
+/**
+ * Команда эстафеты вместо пропавшего состава. Источник отдаёт часть эстафет БЕЗ имён
+ * (World Aquatics — 149 национальных, PDF федерации — 16 возрастных Израиля, замер 18.11.2026),
+ * и прочерк там читался как «не загрузилось». Клуб известен — он (возрастные Израиля),
+ * иначе сборная страны: национальный рекорд эстафеты держит команда страны. Так же их
+ * пишет и JSON World Aquatics с 16.11 («Lebanon»), так что старые и новые строки сходятся.
+ * Не эстафета — null: у личного рекорда держатель — человек, подставлять за него нечего.
+ */
+export function relayTeamLabel(
+  distance: string | null | undefined,
+  countryCode: string | null | undefined,
+  club?: string | null,
+): string | null {
+  if (!isRelayDistance(distance)) return null;
+  return club?.trim() || countryNameEn(countryCode);
 }

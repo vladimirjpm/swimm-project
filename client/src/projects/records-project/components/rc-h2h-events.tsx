@@ -6,7 +6,7 @@ import UI_H2HDivider from '../../components/mix/h2h/h2h-divider';
 import UI_SwimmStyleIcon from '../../components/mix/swimm-style-icon/swimm-style-icon';
 import type { H2HPoolSide } from '../../components/mix/h2h/h2h-pool-row';
 import type { RecordCompareRow, RecordCompareSide } from '../../../hooks/useRecordsCompare';
-import { RK_STROKES, genderLabel } from '../rk-disciplines';
+import { RK_STROKES, genderLabel, relayTeamLabel } from '../rk-disciplines';
 
 /**
  * Карточки дисциплин сравнения стран в вёрстке H2H: одна карточка — стиль × дистанция,
@@ -23,6 +23,9 @@ import { RK_STROKES, genderLabel } from '../rk-disciplines';
  */
 interface Props {
   rows: RecordCompareRow[];
+  /** Коды сторон: у эстафеты без состава держатель — сборная этой страны. */
+  a: string;
+  b: string;
   /** Разрез по полу выбран фильтром — тогда пол не печатается на каждой карточке. */
   genderFixed: boolean;
 }
@@ -81,15 +84,22 @@ function groupRows(rows: RecordCompareRow[]): EventGroup[] {
 }
 
 /** Сторона строки → ячейка времени H2H. Нет рекорда — ячейка пустая («—» рисует сама). */
-const poolSide = (side: RecordCompareSide | null | undefined, won: boolean): H2HPoolSide | null => {
+const poolSide = (
+  side: RecordCompareSide | null | undefined,
+  won: boolean,
+  distance: string,
+  country: string,
+): H2HPoolSide | null => {
   if (!side) return null;
+  // Эстафета без состава (источник его не отдал) — держатель сборная страны стороны.
+  const name = side.holder_name?.trim() || relayTeamLabel(distance, country);
   return {
     time: side.time,
     // Дата обязательна рядом со временем: без неё рекорд 2002 года читается просто как
     // «медленнее», хотя может значить «старше» (11.3.3).
     date: side.record_date || null,
     quality: side.issue_reason ? { kind: 'record', reason: side.issue_reason } : null,
-    who: side.holder_name ? { name: side.holder_name } : null,
+    who: name ? { name } : null,
     isWinner: won,
   };
 };
@@ -127,7 +137,9 @@ function sameHolders(rows: RecordCompareRow[]): string[] {
   return [...names.values()];
 }
 
-const Card: React.FC<{ group: EventGroup; showGender: boolean }> = ({ group, showGender }) => {
+const Card: React.FC<{ group: EventGroup; showGender: boolean; a: string; b: string }> = ({
+  group, showGender, a, b,
+}) => {
   const shared = sameHolders(group.rows);
   return (
   <UI_H2HEventCard
@@ -156,8 +168,8 @@ const Card: React.FC<{ group: EventGroup; showGender: boolean }> = ({ group, sho
         key={row.pool_type}
         poolType={row.pool_type}
         emptyLabel="no record"
-        left={poolSide(row.a, row.outcome === 'a')}
-        right={poolSide(row.b, row.outcome === 'b')}
+        left={poolSide(row.a, row.outcome === 'a', row.distance, a)}
+        right={poolSide(row.b, row.outcome === 'b', row.distance, b)}
         deltaMs={signedDelta(row)}
       />
     ))}
@@ -170,7 +182,7 @@ const Card: React.FC<{ group: EventGroup; showGender: boolean }> = ({ group, sho
   );
 };
 
-const RcH2HEvents: React.FC<Props> = ({ rows, genderFixed }) => {
+const RcH2HEvents: React.FC<Props> = ({ rows, a, b, genderFixed }) => {
   const groups = React.useMemo(() => groupRows(rows), [rows]);
   const compared = groups.filter((g) => !g.oneSided);
   const lonely = groups.filter((g) => g.oneSided);
@@ -181,14 +193,14 @@ const RcH2HEvents: React.FC<Props> = ({ rows, genderFixed }) => {
   return (
     <>
       <div className="h2h-events">
-        {compared.map((g) => <Card key={g.key} group={g} showGender={showGender} />)}
+        {compared.map((g) => <Card key={g.key} group={g} showGender={showGender} a={a} b={b} />)}
       </div>
 
       {lonely.length > 0 && (
         <>
           <UI_H2HDivider text="only one country" />
           <div className="h2h-events" title={NO_DATA_TITLE}>
-            {lonely.map((g) => <Card key={g.key} group={g} showGender={showGender} />)}
+            {lonely.map((g) => <Card key={g.key} group={g} showGender={showGender} a={a} b={b} />)}
           </div>
         </>
       )}

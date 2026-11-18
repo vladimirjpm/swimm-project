@@ -305,7 +305,7 @@ function RecordsCompareProject() {
               Neither {data.a} nor {data.b} has records in this cut.
             </div>
           ) : data ? (
-            <RcH2HEvents rows={data.rows} genderFixed={filters.gender != null} />
+            <RcH2HEvents rows={data.rows} a={data.a} b={data.b} genderFixed={filters.gender != null} />
           ) : null}
         </div>
       </main>

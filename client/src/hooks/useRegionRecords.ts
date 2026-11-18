@@ -29,6 +29,8 @@ export interface RegionRecord {
   /** Латиница держателя — есть у тех, чьё имя источник отдаёт латиницей (World Aquatics). */
   holder_name_en?: string | null;
   holder_country?: string | null;
+  /** Клуб-держатель: у эстафет федерации — команда, когда состава в источнике нет. */
+  club?: string | null;
   record_date?: string | null;
   /** Открытая претензия к записи справочника; null — не оспаривается. */
   issue_reason?: string | null;
