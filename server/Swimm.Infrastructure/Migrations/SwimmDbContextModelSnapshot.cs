@@ -153,6 +153,15 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text");
 
+                    b.Property<bool?>("CanAddPhotos")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("CanAddVideos")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("CanPublish")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 

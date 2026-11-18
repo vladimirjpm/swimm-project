@@ -3,6 +3,7 @@ import { ROUND_ORDER, roundSectionTitle } from '../components/mix/round-label/ro
 import './results-table.css';
 import { rootActions,useAppDispatch, useAppSelector } from '../../store/store';
 import { useFavoritesContext } from '../../hooks/favorites-context';
+import { canAddAnyMedia, useAuth } from '../../hooks/useAuth';
 import { useLoginModal } from '../components/login-modal/login-modal-context';
 import Helper from '../../utils/helpers/data-helper'
 import HelperResults from '../../utils/helpers/helper-results'
@@ -60,8 +61,11 @@ function ResultsTable() {
   // Медиа заплывов, видимое зрителю (своё + одобренные публикации) — иконки видео на строках.
   const { byResultId: mediaByResultId, refresh: refreshMedia } = useCompetitionMedia(selectedSource?.sourceParams);
 
-  // Режим «добавить видео» (тумблер в шапке) — только локальный стейт, не persist, только залогиненным.
+  // Режим «добавить видео» (тумблер в шапке) — только локальный стейт, не persist, только залогиненным
+  // и только тем, кому можно добавлять медиа (права на контент, content-permissions-plan).
   const [addVideoMode, setAddVideoMode] = useState(false);
+  const { permissions } = useAuth();
+  const canAddMedia = isAuthenticated && canAddAnyMedia(permissions);
   // Заплыв, для которого сейчас открыт попап AddLinkModal (single-step)
   const [addVideoFor, setAddVideoFor] = useState<{
     resultId: number;
@@ -485,7 +489,7 @@ function ResultsTable() {
                 showDate={showDate}
                 hasInternationalPoints={hasInternationalPoints}
                 addVideoMode={addVideoMode}
-                onToggleAddVideoMode={isAuthenticated ? () => setAddVideoMode((v) => !v) : undefined}
+                onToggleAddVideoMode={canAddMedia ? () => setAddVideoMode((v) => !v) : undefined}
               />
             </div>
             <div className="lg:hidden">
@@ -499,7 +503,7 @@ function ResultsTable() {
                 showAllOpen={showAllOpen}
                 onToggleShowAllOpen={handleToggleShowAllOpen}
                 addVideoMode={addVideoMode}
-                onToggleAddVideoMode={isAuthenticated ? () => setAddVideoMode((v) => !v) : undefined}
+                onToggleAddVideoMode={canAddMedia ? () => setAddVideoMode((v) => !v) : undefined}
               />
             </div>
           </div>
@@ -631,7 +635,7 @@ function ResultsTable() {
 
               // Иконка «добавить видео» — только режим включён + числовой result id + не эстафета (п.4 таска)
               const resultIdForVideo = typeof (res as any).id === 'number' ? (res as any).id : null;
-              const canAddVideo = addVideoMode && swimmerId != null && resultIdForVideo != null && !res.is_relay;
+              const canAddVideo = addVideoMode && canAddMedia && swimmerId != null && resultIdForVideo != null && !res.is_relay;
               const onAddVideo = canAddVideo
                 ? () => {
                     const swimmerLabel = `${res.first_name}${res.last_name ? ' ' + res.last_name : ''}`;

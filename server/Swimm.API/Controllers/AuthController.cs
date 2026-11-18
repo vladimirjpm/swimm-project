@@ -245,7 +245,7 @@ public class AuthController : Controller
     /// Текущий пользователь (без редиректа).
     /// </summary>
     [HttpGet("me")]
-    public async Task<IActionResult> Me()
+    public async Task<IActionResult> Me([FromServices] ISettingsService settings)
     {
         if (User.Identity?.IsAuthenticated != true)
             return Ok(new { isAuthenticated = false });
@@ -277,6 +277,7 @@ public class AuthController : Controller
         if (user == null)
             return Ok(new { isAuthenticated = false });
 
+        var roles = user.UserRoles.Select(r => r.Role.Name).ToArray();
         return Ok(new
         {
             isAuthenticated = true,
@@ -284,8 +285,12 @@ public class AuthController : Controller
             email = user.Email,
             displayName = user.DisplayName,
             avatarUrl = user.AvatarUrl,
-            roles = user.UserRoles.Select(r => r.Role.Name).ToArray(),
-            swimmerId = user.SwimmerId
+            roles,
+            swimmerId = user.SwimmerId,
+            // Права на контент (content-permissions-plan): клиент прячет «Add video» / «Publish».
+            // Тем же правилом, что проверка в эндпоинтах — ответы не разойдутся.
+            permissions = ContentPermissionRules.Evaluate(settings, roles.Contains("Admin"),
+                user.CanAddPhotos, user.CanAddVideos, user.CanPublish)
         });
     }
 

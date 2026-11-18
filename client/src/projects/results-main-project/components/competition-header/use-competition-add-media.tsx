@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import AddLinkModal, { AddLinkSwimmerOption } from '../../../my-media-project/components/add-link-modal';
 import { addUserMedia, AllUserMediaDto } from '../../../my-media-project/use-all-my-media';
 import type { FavoriteDto } from '../../../../hooks/useFavorites';
+import { canAddAnyMedia, useAuth } from '../../../../hooks/useAuth';
 import type { CompetitionOverview } from './types';
 
 // Оркестрация «Add media» для шапки соревнования (hero-кнопка + пустое состояние
@@ -35,7 +36,9 @@ export function useCompetitionAddMedia({ sourceParams, overview, title, refresh 
     return firstDay != null ? firstDay : null;
   }, [sourceParams, overview]);
 
-  const canAdd = competitionId != null;
+  // Права на контент (content-permissions-plan): нельзя добавлять ни фото, ни видео — кнопок нет.
+  const { permissions } = useAuth();
+  const canAdd = competitionId != null && canAddAnyMedia(permissions);
 
   const openModal = useCallback(async () => {
     if (!canAdd || loadingSwimmers) return;

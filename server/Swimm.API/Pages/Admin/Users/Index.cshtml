@@ -120,6 +120,10 @@
                         {
                             <span class="admin-badge border-admin-danger/30 bg-admin-danger/15 text-admin-danger">disabled</span>
                         }
+                        @if (Swimm.API.Pages.Admin.Users.IndexModel.HasContentOverride(u))
+                        {
+                            <span class="admin-badge border-admin-accent/30 bg-admin-accent/15 text-admin-accent ml-1" title="Есть исключения прав на контент — подробности в панели пользователя">права</span>
+                        }
                     </td>
                     <td class="text-right whitespace-nowrap">
                         @* Тестовый персонаж — вернуть в исходное состояние (только Development). *@
@@ -246,6 +250,47 @@
             <p class="mt-2 text-xs text-admin-text-muted">
                 Пусто — лимит по роли, 0 — запретить создавать группы. Считаются группы, которыми
                 пользователь владеет (официальные тоже); уже созданные при снижении лимита остаются.
+            </p>
+        </div>
+        @* ── Права на контент: исключения и действующее значение (правило — ContentPermissionRules,
+              docs/plans/content-permissions-plan.md) ── *@
+        <div class="mb-4 rounded-md border border-admin-border p-3">
+            <div class="mb-2 text-sm text-admin-text">Права на контент</div>
+            @foreach (var r in Model.ContentRights(d))
+            {
+                <div class="mb-2 flex flex-wrap items-center gap-2">
+                    <span class="text-sm text-admin-text" style="min-width: 11rem">@r.Label</span>
+                    @if (r.Effective)
+                    {
+                        <span class="admin-badge border-admin-success/30 bg-admin-success/15 text-admin-success">можно</span>
+                    }
+                    else
+                    {
+                        <span class="admin-badge border-admin-danger/30 bg-admin-danger/15 text-admin-danger">нельзя</span>
+                    }
+                    <span class="text-xs text-admin-text-muted">· @r.Source</span>
+                    @foreach (var (val, label, current) in new[]
+                    {
+                        ("allow", "Можно", r.Personal == true),
+                        ("deny", "Нельзя", r.Personal == false),
+                        ("default", "По политике", r.Personal == null),
+                    })
+                    {
+                        <form method="post" asp-page-handler="SetContentPermission" asp-route-show="@Model.Show" class="inline">
+                            <input type="hidden" name="userId" value="@d.Id" />
+                            <input type="hidden" name="right" value="@r.Key" />
+                            <input type="hidden" name="value" value="@val" />
+                            <button type="submit" class="admin-btn @(current ? "admin-btn-primary" : "admin-btn-ghost") py-1 px-2.5"
+                                    disabled="@current">@label</button>
+                        </form>
+                    }
+                </div>
+            }
+            <p class="mt-2 text-xs text-admin-text-muted">
+                «Показывать другим» — заявки на публикацию в клуб/группу, галерея группы, ссылки к
+                тренировкам. Своё медиа (видно только ему) — это «добавлять». Снятое право уже
+                опубликованное не трогает — его снимают вручную. Политика — ContentDefault* на
+                /Admin/Settings; реакции (лайк, «болею») правом не закрываются.
             </p>
         </div>
         @* ── Удаление аккаунта по просьбе (privacy@, родитель) — тот же сервис и правило, что у

@@ -3,6 +3,7 @@ import { useHubGroupMedia } from '../use-my-hub-groups';
 import type { HubGroupMediaInput } from '../my-groups-types';
 import type { HubGroupMediaItem } from '../../../utils/interfaces/results';
 import { inputCls, btnCls, btnDangerCls } from './my-groups-shared';
+import { canAddAnyMedia, canAddMediaType, useAuth } from '../../../hooks/useAuth';
 
 const EMPTY_MEDIA_INPUT: HubGroupMediaInput = {
   mediaType: 'image', sourceType: 'other', url: '', caption: '', trainingId: null,
@@ -43,6 +44,12 @@ export function MediaEditor({ hubGroupId, slug }: { hubGroupId: number; slug: st
 
   const kind: 'image' | 'video' | 'album' =
     form.mediaType === 'album' ? 'album' : form.mediaType === 'video' ? 'video' : 'image';
+
+  // Права на контент (content-permissions-plan): галерею группы видят другие — нужно право
+  // показывать и право на выбранный тип. Нет ничего — формы добавления нет, удаление остаётся.
+  const { permissions } = useAuth();
+  const canAddHere = permissions.publish && canAddAnyMedia(permissions);
+  const typeAllowed = canAddMediaType(permissions, kind);
 
   const submit = async () => {
     setSaving(true);
@@ -86,12 +93,18 @@ export function MediaEditor({ hubGroupId, slug }: { hubGroupId: number; slug: st
         </div>
       ))}
 
+      {!canAddHere && (
+        <p className="text-[12.5px] font-bold text-[var(--t-text-2)]">
+          Adding media to the group is not available for your account.
+        </p>
+      )}
+      {canAddHere && (
       <div className="flex flex-wrap gap-2">
         <select className={`${inputCls} max-w-[110px]`} value={kind}
           onChange={(e) => onKindChange(e.target.value as 'image' | 'video' | 'album')}>
-          <option value="image">Image</option>
-          <option value="video">Video</option>
-          <option value="album">Album</option>
+          <option value="image" disabled={!permissions.addPhotos}>Image</option>
+          <option value="video" disabled={!permissions.addVideos}>Video</option>
+          <option value="album" disabled={!permissions.addPhotos}>Album</option>
         </select>
         {kind === 'video' && (
           <select className={`${inputCls} max-w-[110px]`} value={form.sourceType}
@@ -142,10 +155,11 @@ export function MediaEditor({ hubGroupId, slug }: { hubGroupId: number; slug: st
             ))}
           </select>
         )}
-        <button type="button" className={btnCls} disabled={saving || !form.url.trim()} onClick={submit}>
+        <button type="button" className={btnCls} disabled={saving || !form.url.trim() || !typeAllowed} onClick={submit}>
           {saving ? '…' : '+ Add media'}
         </button>
       </div>
+      )}
 
       {/* Members-разборы — отдельным списком, иначе после добавления их негде увидеть/удалить. */}
       {media.membersMedia.length > 0 && (

@@ -6,6 +6,7 @@ import { trainingTypeOf } from '../training-types';
 import FeedFilters, { type FeedFilter } from './feed-filters';
 import { monthKey } from './feed-format';
 import TrainingCard from './training-card';
+import { canAddAnyMedia, useAuth } from '../../../../../hooks/useAuth';
 
 /**
  * Лента тренировок вида Trainings (прототип 2a / 3a / 3b): фильтр, записи с разделителями
@@ -40,6 +41,10 @@ export function NewTrainingButton({ height }: { height: number }) {
 
 function TrainingFeed({ data }: { data: TrainingSessionList }) {
   const { manages, isDesktop, sessions } = useTrainingsTab();
+  // Ссылку к тренировке видят участники — нужны право показывать и право добавлять хоть что-то
+  // (права на контент, content-permissions-plan); иначе кнопок «Add video» нет.
+  const { permissions } = useAuth();
+  const canAddMedia = data.can_add_media && permissions.publish && canAddAnyMedia(permissions);
   const [filter, setFilter] = useState<FeedFilter>('all');
   /** Тип тренировки из второго ряда чипов; null — все типы. */
   const [typeFilter, setTypeFilter] = useState<TrainingType | null>(null);
@@ -144,7 +149,7 @@ function TrainingFeed({ data }: { data: TrainingSessionList }) {
         <TrainingCard
           key={s.id}
           session={s}
-          canAddMedia={data.can_add_media}
+          canAddMedia={canAddMedia}
           monthDivider={i === 0 || monthKey(shown[i - 1].date) !== monthKey(s.date)}
           expanded={expanded === s.id}
           onToggleSets={() => toggleSets(s.id)}

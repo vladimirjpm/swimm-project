@@ -21,6 +21,10 @@ public class UserDto
     public int HubGroupsOwned { get; set; }
     /// <summary>Персональный лимит групп; null — действует лимит по роли.</summary>
     public int? HubGroupLimit { get; set; }
+    /// <summary>Исключения прав на контент; null — по политике (ContentPermissionRules).</summary>
+    public bool? CanAddPhotos { get; set; }
+    public bool? CanAddVideos { get; set; }
+    public bool? CanPublish { get; set; }
 }
 
 /// <summary>Сводка по логинам для шапки Admin/Users.</summary>
@@ -114,6 +118,10 @@ public class UserDetailDto
     public int HubGroupsOwned { get; set; }
     /// <summary>Персональный лимит групп; null — действует лимит по роли.</summary>
     public int? HubGroupLimit { get; set; }
+    /// <summary>Исключения прав на контент; null — по политике (ContentPermissionRules).</summary>
+    public bool? CanAddPhotos { get; set; }
+    public bool? CanAddVideos { get; set; }
+    public bool? CanPublish { get; set; }
 
     // Опрос «Who are you?» со страницы /setup-profile (docs/plans/profile-setup-plan.md):
     // только ответ человека о себе, ни на что не влияет; ProfileRoleCoach — НЕ роль Coach.

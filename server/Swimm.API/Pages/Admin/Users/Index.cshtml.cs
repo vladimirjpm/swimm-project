@@ -74,6 +74,31 @@ public class IndexModel : PageModel
         : $"по роли ({HubGroupCreationRules.MaxPerUserKey})";
 
     /// <summary>
+    /// Права на контент (docs/plans/content-permissions-plan.md): строки панели деталей —
+    /// ключ формы, подпись, исключение пользователя, действующее значение (тем же правилом,
+    /// что проверка в эндпоинтах и /auth/me) и откуда оно взялось.
+    /// </summary>
+    public IReadOnlyList<(string Key, string Label, bool? Personal, bool Effective, string Source)> ContentRights(UserDetailDto d)
+    {
+        var isAdmin = d.Roles.Contains("Admin");
+        var effective = ContentPermissionRules.Evaluate(_settings, isAdmin, d.CanAddPhotos, d.CanAddVideos, d.CanPublish);
+        string Source(bool? personal, ContentAction action) =>
+            isAdmin ? "админ — всегда можно"
+            : personal != null ? "персональное"
+            : $"по политике ({ContentPermissionRules.PolicyKey(action)})";
+        return
+        [
+            ("photos", "Добавлять фото", d.CanAddPhotos, effective.AddPhotos, Source(d.CanAddPhotos, ContentAction.AddPhoto)),
+            ("videos", "Добавлять видео", d.CanAddVideos, effective.AddVideos, Source(d.CanAddVideos, ContentAction.AddVideo)),
+            ("publish", "Показывать другим", d.CanPublish, effective.Publish, Source(d.CanPublish, ContentAction.Publish)),
+        ];
+    }
+
+    /// <summary>Есть ли у пользователя хоть одно исключение прав на контент — метка в списке.</summary>
+    public static bool HasContentOverride(UserDto u) =>
+        u.CanAddPhotos != null || u.CanAddVideos != null || u.CanPublish != null;
+
+    /// <summary>
     /// Ответ опроса «Who are you?» (/setup-profile) одной строкой — подписями, как их видит
     /// пользователь. null — не отвечал; пустая строка — ответил, сняв все галочки.
     /// </summary>
@@ -253,6 +278,48 @@ public class IndexModel : PageModel
         TempData["Flash"] = hubGroupLimit == null
             ? "Персональный лимит снят — действует лимит по роли"
             : $"Персональный лимит групп: {hubGroupLimit}";
+        return RedirectToPage(new { userId, show = Show });
+    }
+
+    /// <summary>
+    /// Исключение права на контент: <paramref name="right"/> — photos / videos / publish,
+    /// <paramref name="value"/> — allow / deny / default (снять исключение, действует политика).
+    /// Снятое «publish» уже опубликованное не трогает (решение Влада 18.11.2026).
+    /// </summary>
+    public async Task<IActionResult> OnPostSetContentPermissionAsync(int userId, string? right, string? value)
+    {
+        ContentAction? action = right switch
+        {
+            "photos" => ContentAction.AddPhoto,
+            "videos" => ContentAction.AddVideo,
+            "publish" => ContentAction.Publish,
+            _ => null,
+        };
+        (bool Ok, bool? Value) parsed = value switch
+        {
+            "allow" => (true, true),
+            "deny" => (true, false),
+            "default" => (true, null),
+            _ => (false, null),
+        };
+        if (action == null || !parsed.Ok)
+        {
+            TempData["Flash"] = "Неизвестное право или значение — ничего не изменено";
+            return RedirectToPage(new { userId, show = Show });
+        }
+
+        if (!await _repo.SetContentPermissionAsync(userId, action.Value, parsed.Value))
+        {
+            TempData["Flash"] = "Пользователь не найден";
+            return RedirectToPage(new { show = Show });
+        }
+
+        var said = parsed.Value switch { true => "можно", false => "нельзя", null => "по политике" };
+        await _audit.LogAsync("user.content-permission", "User", userId.ToString(),
+            $"Право «{right}» пользователя #{userId}: {said}",
+            new { userId, right, value = parsed.Value });
+
+        TempData["Flash"] = $"Право «{right}»: {said}";
         return RedirectToPage(new { userId, show = Show });
     }
 }

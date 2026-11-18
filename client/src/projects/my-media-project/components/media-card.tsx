@@ -13,7 +13,8 @@ interface Props {
   onDelete: () => void;
   onWithdraw: (target: PublishTargetRef) => void;
   onLinkToSwim: () => void;
-  onShareWithGroup: () => void;
+  /** Нет — показывать другим нельзя (права на контент): кнопки «Share with a group» нет. */
+  onShareWithGroup?: () => void;
   /** Есть ли группы, куда можно подать (для disabled + tooltip) — считается лениво по клику. */
   shareDisabledHint?: string | null;
 }
@@ -115,15 +116,17 @@ function MediaCard({ item, publications, onOpenLightbox, onDelete, onWithdraw, o
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-dashed border-[var(--t-accent-soft)] pt-2">
-          <button
-            type="button"
-            onClick={onShareWithGroup}
-            disabled={!!shareDisabledHint}
-            title={shareDisabledHint ?? undefined}
-            className="cursor-pointer text-[11.5px] font-extrabold text-[var(--t-accent)] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Share with a group
-          </button>
+          {onShareWithGroup ? (
+            <button
+              type="button"
+              onClick={onShareWithGroup}
+              disabled={!!shareDisabledHint}
+              title={shareDisabledHint ?? undefined}
+              className="cursor-pointer text-[11.5px] font-extrabold text-[var(--t-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Share with a group
+            </button>
+          ) : <span />}
           <div className="relative">
             <button
               type="button"

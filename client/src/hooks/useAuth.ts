@@ -2,6 +2,23 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+/**
+ * Права на контент (docs/plans/content-permissions-plan.md): решает сервер тем же правилом,
+ * что проверка эндпоинтов. Запрещённое — кнопку прячем, а не показываем, чтобы потом отказать.
+ * `publish` — показывать своё другим (публикация в клуб/группу, галерея группы, ссылки к тренировке).
+ */
+export interface ContentPermissions {
+  addPhotos: boolean;
+  addVideos: boolean;
+  publish: boolean;
+}
+
+/** Гостю нельзя ничего (кнопки у него и так ведут ко входу). */
+const NO_PERMISSIONS: ContentPermissions = { addPhotos: false, addVideos: false, publish: false };
+
+/** Старый сервер без поля `permissions` — как до плана: всё можно. */
+const ALL_PERMISSIONS: ContentPermissions = { addPhotos: true, addVideos: true, publish: true };
+
 export interface AuthUser {
   isAuthenticated: boolean;
   userId: number | null;
@@ -11,6 +28,7 @@ export interface AuthUser {
   roles: string[];
   isAdmin: boolean;
   swimmerId: number | null;
+  permissions: ContentPermissions;
 }
 
 const GUEST: AuthUser = {
@@ -22,7 +40,28 @@ const GUEST: AuthUser = {
   roles: [],
   isAdmin: false,
   swimmerId: null,
+  permissions: NO_PERMISSIONS,
 };
+
+function readPermissions(raw: unknown): ContentPermissions {
+  if (!raw || typeof raw !== 'object') return ALL_PERMISSIONS;
+  const p = raw as Partial<ContentPermissions>;
+  return {
+    addPhotos: p.addPhotos !== false,
+    addVideos: p.addVideos !== false,
+    publish: p.publish !== false,
+  };
+}
+
+/** Можно ли добавить медиа этого типа: видео — своё право, остальное (image, album) — фото. */
+export function canAddMediaType(permissions: ContentPermissions, mediaType: string | null | undefined): boolean {
+  return mediaType === 'video' ? permissions.addVideos : permissions.addPhotos;
+}
+
+/** Можно ли добавить хоть что-то (кнопка «Add link» без выбранного типа). */
+export function canAddAnyMedia(permissions: ContentPermissions): boolean {
+  return permissions.addPhotos || permissions.addVideos;
+}
 
 // ── Модульный кэш на страницу ────────────────────────────────────────────────
 // Один запрос /auth/me на загрузку страницы, сколько бы компонентов ни звало
@@ -53,6 +92,7 @@ async function fetchMe(): Promise<AuthUser> {
       roles,
       isAdmin: roles.includes('Admin'),
       swimmerId: me.swimmerId ?? null,
+      permissions: readPermissions(me.permissions),
     };
   } catch {
     return GUEST;
