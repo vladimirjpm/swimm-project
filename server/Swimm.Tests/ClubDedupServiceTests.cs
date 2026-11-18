@@ -87,6 +87,111 @@ public class ClubDedupServiceTests
         Assert.Equal([b.Id, c.Id], report.Candidates.Select(x => x.DuplicateId).OrderBy(x => x));
     }
 
+    [Fact]
+    public async Task SameNameHeuristic_GereshVsApostrophe_Sure()
+    {
+        // Ф0 (swimmer-club-change-plan): гереш U+05F3 и апостроф — один и тот же клуб.
+        // Точное сравнение имён и левенштейн (na == nb → continue) такую пару пропускали.
+        await using var db = CreateDb(nameof(SameNameHeuristic_GereshVsApostrophe_Sure));
+        var geresh = new Club { Name = "הפועל ג׳מים אילת" };
+        var apostrophe = new Club { Name = "הפועל ג'מים אילת" };
+        var comp = NewCompetition();
+        var style = new Style { Name = "Freestyle" };
+        var s = new Swimmer { LastName = "A", FirstName = "A", BirthYear = 2010 };
+        db.AddRange(geresh, apostrophe, comp, style, s);
+        db.Results.AddRange(
+            NewResult(s, geresh, comp, style),
+            NewResult(s, geresh, comp, style, "100"),
+            NewResult(s, apostrophe, comp, style, "200"));
+        await db.SaveChangesAsync();
+
+        var report = await new ClubDedupService(db).FindCandidatesAsync();
+
+        var cand = Assert.Single(report.Candidates);
+        Assert.Equal("same-name", cand.Heuristic);
+        Assert.True(cand.Sure);
+        Assert.Equal(geresh.Id, cand.CanonicalId);   // больше результатов
+        Assert.Equal(apostrophe.Id, cand.DuplicateId);
+    }
+
+    // ── Эвристика word-order: те же слова в другом порядке ───────────────────
+
+    [Theory]
+    [InlineData("SWIM TLV", "TLV SWIM")]
+    [InlineData("Swimming Eilat", "Eilat Swimming")]
+    [InlineData("swim  tlv", "TLV Swim")]   // регистр и двойной пробел не мешают
+    public async Task WordOrderHeuristic_PermutedWords_Unsure(string a, string b)
+    {
+        await using var db = CreateDb($"{nameof(WordOrderHeuristic_PermutedWords_Unsure)}_{a}_{b}");
+        var big = new Club { Name = a };
+        var small = new Club { Name = b };
+        var comp = NewCompetition();
+        var style = new Style { Name = "Freestyle" };
+        var s = new Swimmer { LastName = "A", FirstName = "A", BirthYear = 2010 };
+        db.AddRange(big, small, comp, style, s);
+        db.Results.AddRange(
+            NewResult(s, big, comp, style),
+            NewResult(s, big, comp, style, "100"),
+            NewResult(s, small, comp, style, "200"));
+        await db.SaveChangesAsync();
+
+        var report = await new ClubDedupService(db).FindCandidatesAsync();
+
+        var cand = Assert.Single(report.Candidates);
+        Assert.Equal("word-order", cand.Heuristic);
+        Assert.False(cand.Sure);                     // порядок слов может нести смысл
+        Assert.Equal(big.Id, cand.CanonicalId);
+        Assert.Equal(small.Id, cand.DuplicateId);
+    }
+
+    [Fact]
+    public async Task WordOrderHeuristic_SameNameTwinIsNotChained()
+    {
+        // «SWIM TLV» ×2 (same-name) + «TLV SWIM»: дубль same-name не должен стать
+        // каноном word-order-пары, иначе получится цепочка склеек A→B→C.
+        await using var db = CreateDb(nameof(WordOrderHeuristic_SameNameTwinIsNotChained));
+        var a = new Club { Name = "SWIM TLV" };
+        var b = new Club { Name = "SWIM TLV" };
+        var c = new Club { Name = "TLV SWIM" };
+        var comp = NewCompetition();
+        var style = new Style { Name = "Freestyle" };
+        var s = new Swimmer { LastName = "A", FirstName = "A", BirthYear = 2010 };
+        db.AddRange(a, b, c, comp, style, s);
+        db.Results.AddRange(
+            NewResult(s, a, comp, style),
+            NewResult(s, b, comp, style, "100"),
+            NewResult(s, b, comp, style, "200"),
+            NewResult(s, c, comp, style, "400"));
+        await db.SaveChangesAsync();
+
+        var report = await new ClubDedupService(db).FindCandidatesAsync();
+
+        // b больше всех результатов — канон same-name; a — его дубль, c — дубль word-order.
+        Assert.Equal(2, report.Candidates.Count);
+        Assert.All(report.Candidates, x => Assert.Equal(b.Id, x.CanonicalId));
+        Assert.DoesNotContain(report.Candidates, x => x.CanonicalId == a.Id || x.CanonicalId == c.Id);
+    }
+
+    [Fact]
+    public async Task WordOrderAndSameName_DifferentClubs_NotMerged()
+    {
+        await using var db = CreateDb(nameof(WordOrderAndSameName_DifferentClubs_NotMerged));
+        db.AddRange(
+            new Club { Name = "SWIM TLV" },
+            new Club { Name = "SWIM EILAT" },            // другой набор слов
+            new Club { Name = "Swimming Eilat" },
+            new Club { Name = "Hapoel Eilat" },
+            new Club { Name = "הפועל ג׳מים אילת" },
+            new Club { Name = "הפועל ג'ימס אילת" },      // другая буква — не гереш/апостроф
+            new Club { Name = "Eilat" },                 // однословные не переставляются
+            new Club { Name = "Hapoel Haifa Swim" });
+        await db.SaveChangesAsync();
+
+        var report = await new ClubDedupService(db).FindCandidatesAsync();
+
+        Assert.DoesNotContain(report.Candidates, c => c.Heuristic is "same-name" or "word-order");
+    }
+
     // ── Эвристика 1: мусорный суффикс ────────────────────────────────────────
 
     [Fact]

@@ -8,7 +8,7 @@ namespace Swimm.Infrastructure.Services;
 
 /// <summary>
 /// Кандидаты на склейку клубов (docs/tasks/club-merge-plan.md, фаза B). Реальных клубов
-/// сотни — попарное сравнение в памяти дешёвое. Три эвристики по убыванию уверенности:
+/// сотни — попарное сравнение в памяти дешёвое. Эвристики по убыванию уверенности (same-name по Normalize и word-order — см. ниже):
 /// 1) мусорный хвост парсера («… DNS», «… 4.4 SW /») при существующем «чистом» клубе —
 ///    sure, можно лить пачкой; 2) пересечение пловцов (≥3 общих и ≥30% меньшего клуба) —
 ///    ловит кросс-скриптовые пары без транслитерации; 3) Левенштейн ≤ 1 внутри одного
@@ -25,6 +25,18 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
 
     /// <summary>Название без мусорного хвоста (или исходное, если хвоста нет).</summary>
     public static string StripGarbageTail(string name) => TailRx.Replace(name, "").Trim();
+
+    /// <summary>
+    /// Ключ «набор слов»: Normalize, слова отсортированы. Пусто, если слов меньше двух
+    /// (перестановка однословного названия ничего не значит).
+    /// </summary>
+    internal static string WordSetKey(string name)
+    {
+        var words = SwimmerDedupService.Normalize(name).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length < 2) return "";
+        Array.Sort(words, StringComparer.Ordinal);
+        return string.Join(' ', words);
+    }
 
     private static bool HasHebrew(string s) => s.Any(c => c is >= 'א' and <= 'ת');
 
@@ -80,12 +92,14 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
         // роняет merge-вызов («один и тот же дубль в нескольких парах»). Эвристики
         // идут по убыванию уверенности, поэтому оставляем первую найденную.
         var dupUsed = new HashSet<int>();
+        var canonUsed = new HashSet<int>();
 
         void Add(ClubInfo canon, ClubInfo dup, string heuristic, int sharedSwimmers, bool sure)
         {
             if (!seen.Add((Math.Min(canon.Id, dup.Id), Math.Max(canon.Id, dup.Id))))
                 return;
             if (!dupUsed.Add(dup.Id)) return;
+            canonUsed.Add(canon.Id);
             report.Candidates.Add(new ClubDedupCandidate(
                 canon.Id, canon.Name, canon.NameEn, canon.ResultCount,
                 dup.Id, dup.Name, dup.NameEn, dup.ResultCount,
@@ -101,7 +115,13 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
         // тот же Name и заполненный NameEn (65 групп, 68 дублей, 7793 результата).
         // Канон — у кого больше результатов (при равенстве меньший Id): к нему уедут
         // связи, а пустой NameEn канона merge дозаполнит из дубля.
-        foreach (var group in real.GroupBy(c => c.Name.Trim()).Where(g => g.Count() > 1))
+        //
+        // Группируем по Normalize(Name), а не по точному имени (Р-Ф0, 18.11.2026): иначе
+        // «הפועל ג׳מים אילת» (гереш U+05F3) и «הפועל ג'מים אילת» (апостроф) не находились
+        // ни здесь (разные строки), ни левенштейном (после Normalize они равны → continue).
+        // Normalize сводит гереш/апостроф, финальные буквы, регистр и пробелы — это не
+        // «похожие» имена, а одно и то же имя в разной записи, так что уверенность sure.
+        foreach (var group in real.GroupBy(c => SwimmerDedupService.Normalize(c.Name)).Where(g => g.Count() > 1))
         {
             var ordered = group
                 .OrderByDescending(c => c.ResultCount)
@@ -110,6 +130,35 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
             var canon = ordered[0];
             foreach (var dup in ordered.Skip(1))
                 Add(canon, dup, "same-name", 0, sure: true);
+        }
+
+        // ── 0б. ТОТ ЖЕ НАБОР СЛОВ в другом порядке → unsure ───────────────
+        // «SWIM TLV» / «TLV SWIM», «Swimming Eilat» / «Eilat Swimming» (после Normalize).
+        // Почему НЕ sure: порядок слов в названии клуба иногда несёт смысл (конструкт-
+        // состояние иврита, «Hapoel X» против «X Hapoel» — теоретически разные клубы),
+        // а ложная склейка необратима по смыслу (результаты уезжают к приёмнику). Совпадение
+        // набора слов — сильный сигнал, но человек должен взглянуть. Минимум два слова:
+        // у однословных порядок тривиален. Канон — у кого больше результатов (при равенстве
+        // меньший Id). Клуб, уже ставший дублем (same-name), канон не берём, а канона
+        // другой пары дублем не делаем — иначе получится цепочка склеек.
+        foreach (var group in real
+                     .Where(c => !dupUsed.Contains(c.Id))
+                     .GroupBy(c => WordSetKey(c.Name))
+                     .Where(g => g.Key.Length > 0 && g.Count() > 1))
+        {
+            var ordered = group
+                .OrderByDescending(c => c.ResultCount)
+                .ThenBy(c => c.Id)
+                .ToList();
+            var canon = ordered[0];
+            var canonNorm = SwimmerDedupService.Normalize(canon.Name);
+            foreach (var dup in ordered.Skip(1))
+            {
+                // Та же запись, что у канона, — это работа same-name, не порядка слов.
+                if (SwimmerDedupService.Normalize(dup.Name) == canonNorm) continue;
+                if (canonUsed.Contains(dup.Id)) continue;
+                Add(canon, dup, "word-order", 0, sure: false);
+            }
         }
 
         // ── 1. Мусорный суффикс: Name = Name другого клуба + хвост → sure ──
