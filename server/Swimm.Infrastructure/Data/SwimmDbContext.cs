@@ -143,6 +143,7 @@ public class SwimmDbContext : DbContext
     public DbSet<LanePlan> LanePlans => Set<LanePlan>();
     public DbSet<LanePlanLane> LanePlanLanes => Set<LanePlanLane>();
     public DbSet<LanePlanSwimmer> LanePlanSwimmers => Set<LanePlanSwimmer>();
+    public DbSet<LanePlanEvent> LanePlanEvents => Set<LanePlanEvent>();
     public DbSet<HubGroupTrainingRsvp> HubGroupTrainingRsvps => Set<HubGroupTrainingRsvp>();
     public DbSet<HubGroupBreak> HubGroupBreaks => Set<HubGroupBreak>();
     public DbSet<HubGroupTrainingCancellation> HubGroupTrainingCancellations => Set<HubGroupTrainingCancellation>();

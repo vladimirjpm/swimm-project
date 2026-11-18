@@ -309,7 +309,7 @@ public class TrainingRsvpService : ITrainingRsvpService
         await _db.SaveChangesAsync();
 
         var laneChange = await MoveInLanePlanAsync(hubGroupId, LanePlanKey.Session(date, start), targetUserId, targetSwimmerId, answer,
-            isManager ? input.RestoreLane : null);
+            isManager ? input.RestoreLane : null, actorUserId, forOther);
 
         var dto = await BuildAsync(hubGroupId, schedule, occurrence!, actorUserId, isManager, now);
         dto.LaneChange = laneChange;
@@ -324,7 +324,7 @@ public class TrainingRsvpService : ITrainingRsvpService
     /// правила. Аккаунт, который никем из состава не стоит, в плане не бывает.
     /// </summary>
     private async Task<LaneChangeDto?> MoveInLanePlanAsync(int hubGroupId, LanePlanKey plan, int? userId, int? swimmerId,
-        string? answer, LanePlaceDto? restore)
+        string? answer, LanePlaceDto? restore, int actorUserId, bool byCoach)
     {
         if (restore == null && answer is not (TrainingRsvpAnswer.Yes or TrainingRsvpAnswer.No)) return null;
         var target = swimmerId
@@ -332,8 +332,11 @@ public class TrainingRsvpService : ITrainingRsvpService
         if (target is not int sid) return null;
 
         if (restore != null) return await LanePlanPlacementStore.RestoreAsync(_db, hubGroupId, plan, sid, restore);
+        var going = answer == TrainingRsvpAnswer.Yes;
+        // Строка ленты «Since publishing» (CF8): кто ответил и ответил ли тренер за человека.
         return await LanePlanPlacementStore.ApplyAsync(_db, hubGroupId, plan, sid,
-            answer == TrainingRsvpAnswer.Yes ? LanePlanPlacementStore.Intent.Going : LanePlanPlacementStore.Intent.Out);
+            going ? LanePlanPlacementStore.Intent.Going : LanePlanPlacementStore.Intent.Out,
+            new LanePlanEventLog.Source(going ? LanePlanEventKind.Going : LanePlanEventKind.CantCome, actorUserId, byCoach));
     }
 
     /// <summary>

@@ -1,10 +1,12 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useMediaQuery } from '../../../../../hooks/useMediaQuery';
 import { DEEP_DOCK_QUERY, useDockSlot } from '../../../../components/deep/dock-slot';
 import GroupLanes from '../../group-lanes';
 import NeedsYou from '../coach/needs-you';
 import RollCall from '../coach/roll-call';
 import SessionNav from '../coach/session-nav';
+import SincePublishing from '../coach/since-publishing';
+import { usePlanEvents } from '../coach/use-plan-events';
 import { nextSessions } from '../next/next-format';
 import PastSessionHead from '../past/past-session-head';
 import { useTrainingsTab } from '../trainings-context';
@@ -61,7 +63,7 @@ function CoachDeskSection() {
 
 function DeskBody() {
   const {
-    group, isDesktop, deskSession, deskIsPast, closeDesk, selectedRoll, setLanesDirty, reloadLanePlans,
+    group, isDesktop, deskSession, deskIsPast, closeDesk, selectedRoll, setLanesDirty, reloadLanePlans, lanePlans,
   } = useTrainingsTab();
   const [panel, setPanel] = useState<DeskPanel>('people');
   const sessions = nextSessions(group);
@@ -81,6 +83,11 @@ function DeskBody() {
   const reloadRoll = roll?.reload;
   // План создан / опубликован / удалён: статус в списке занятий и вид по дорожкам ответов меняются.
   const reloadWorkout = ws.reload;
+  // Лента «Since publishing» (CF8) — только у опубликованного плана; перечитывается, когда план
+  // сохранён / опубликован (новый список планов) и когда пришли ответы занятия (новый `r`).
+  const published = lanePlans?.find((p) => p.session_id === deskSession?.id)?.status === 'published';
+  const eventsVersion = useMemo(() => ({}), [lanePlans, r]); // eslint-disable-line react-hooks/exhaustive-deps -- новый объект = «перечитай»
+  const events = usePlanEvents(group.id, deskSession?.id ?? null, published, eventsVersion);
   const plansChanged = useCallback(() => {
     reloadLanePlans();
     reloadRoll?.();
@@ -105,6 +112,7 @@ function DeskBody() {
     <div className="flex min-w-0 flex-col gap-3">
     {r && <NeedsYou r={r} />}
     <WorkoutStrip ws={ws} levels={levels} onOpen={() => { setWorkoutOpen(true); window.scrollTo({ top: 0 }); }} />
+    {events && <SincePublishing events={events} />}
     <GroupLanes
       key={deskSession.id}
       groupId={group.id}

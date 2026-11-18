@@ -83,6 +83,9 @@ public class LanePlan
     public ICollection<LanePlanLane> Lanes { get; set; } = new List<LanePlanLane>();
 
     public ICollection<LanePlanSwimmer> Swimmers { get; set; } = new List<LanePlanSwimmer>();
+
+    /// <summary>Лента «Since publishing» (CF8): только у опубликованного плана.</summary>
+    public ICollection<LanePlanEvent> Events { get; set; } = new List<LanePlanEvent>();
 }
 
 /// <summary>Дорожка плана: уровень (для «Distribute» и подписи) и задание текстом.</summary>

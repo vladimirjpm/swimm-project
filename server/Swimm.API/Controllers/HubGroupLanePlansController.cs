@@ -167,16 +167,6 @@ public class HubGroupLanePlansController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>«Distribute»: раскладка по уровням. Ничего не сохраняет.</summary>
-    [HttpPost("distribute")]
-    public async Task<IActionResult> Distribute(int id, [FromBody] LanePlanDistributeInputDto input)
-    {
-        if (await RequireCanEditAsync(id) is { } denied) return denied;
-
-        var (result, error) = await _plans.DistributeAsync(id, input);
-        return result == null ? BadRequest(new { error }) : Ok(result);
-    }
-
     /// <summary>«Auto lanes»: дорожки между уровнями по числу пришедших + раскладка. Ничего не сохраняет.</summary>
     [HttpPost("auto-lanes")]
     public async Task<IActionResult> AutoLanes(int id, [FromBody] LanePlanAutoLanesInputDto input)
@@ -212,7 +202,7 @@ public class HubGroupLanePlansController : ControllerBase
         if (!TryWriteKey(key, out var day, out var bad)) return bad!;
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
-        var change = await _plans.PlaceAsync(id, day, swimmerId);
+        var change = await _plans.PlaceAsync(id, day, swimmerId, CurrentUserId()!.Value);
         return Ok(new { lane_change = change });
     }
 
@@ -227,13 +217,28 @@ public class HubGroupLanePlansController : ControllerBase
         if (!TryWriteKey(key, out var day, out var bad)) return bad!;
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
-        var result = await _plans.PublishAsync(id, day);
+        var result = await _plans.PublishAsync(id, day, CurrentUserId()!.Value);
         if (!result.Found) return NotFound();
         if (result.Error != null) return BadRequest(new { error = result.Error });
 
         if (result.Changed && input?.Notify == true)
             await _notifier.NotifyPublishedAsync(id, day, CurrentUserId()!.Value, HttpContext.RequestAborted);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Лента «Since publishing» (CF8 плана trainings-coach-flow): что изменилось в опубликованном плане,
+    /// новые сверху. Только управляющему — участникам лента не показывается. 404 — у занятия плана нет.
+    /// </summary>
+    [HttpGet("{key}/events")]
+    public async Task<IActionResult> Events(int id, string key)
+    {
+        if (!LanePlanKey.TryParse(key, out var day)) return BadKey();
+        if (await RequireCanEditAsync(id) is { } denied) return denied;
+
+        var events = await _plans.GetEventsAsync(id, day, CurrentUserId()!.Value);
+        Response.Headers.CacheControl = "private, no-store";
+        return events == null ? NotFound() : Ok(events);
     }
 
     [HttpPost("{key}/unpublish")]
@@ -253,6 +258,6 @@ public class HubGroupLanePlansController : ControllerBase
         if (!TryWriteKey(key, out var day, out var bad)) return bad!;
         if (await RequireCanEditAsync(id) is { } denied) return denied;
 
-        return await _plans.SetStatusAsync(id, day, status) ? NoContent() : NotFound();
+        return await _plans.SetStatusAsync(id, day, status, CurrentUserId()) ? NoContent() : NotFound();
     }
 }

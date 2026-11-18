@@ -3,7 +3,7 @@ import type { LanePlanStatus } from '../../../types';
 
 /**
  * Пилюля статуса плана дорожек занятия — карточка списка занятий тренера
- * (docs/plans/trainings-coach-flow-plan.md, CF1). Перенесена из `coach-pool-block.tsx` без правок:
+ * (docs/plans/trainings-coach-flow-plan.md, CF1; перенесена из прежнего блока бассейна тренера без правок):
  * «● Draft plan» / «● Draft · 3 unassigned» золотом, «Published» (с числом неразложенных —
  * «Published · 3 unassigned») зелёным, «No lane plan» серым.
  */

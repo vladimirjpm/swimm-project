@@ -207,7 +207,7 @@ public class WorkoutTests
         Assert.Equal("1:40", plan!.Workout!.Sets[0].Lines[0].PerLevel![level].SendOff);
 
         // Участнику целиком не отдаётся — его версия едет в lane_view.
-        await service.PublishAsync(groupId, At(Day));
+        await service.PublishAsync(groupId, At(Day), 1);
         Assert.Null((await service.GetAsync(groupId, At(Day), isManager: false))!.Workout);
 
         // Пустой документ стирает.

@@ -10,7 +10,7 @@ namespace Swimm.Infrastructure.Services;
 /// <summary>
 /// Склейка пловцов-дублей. Перевешивает на канонического: Results, Sys_UserFavorites,
 /// HubGroupMembers, Sys_HubGroupUserMembers, Sys_UserMedia, Sys_HubGroupMedia,
-/// Sys_TrainingResults, Sys_HubGroupSwimmerLevels, Sys_HubGroupBreaks, Sys_LanePlanSwimmers, Sys_AppUsers.SwimmerId;
+/// Sys_TrainingResults, Sys_HubGroupSwimmerLevels, Sys_HubGroupBreaks, Sys_LanePlanSwimmers, Sys_LanePlanEvents, Sys_AppUsers.SwimmerId;
 /// пустые поля канонического дозаполняет
 /// из дубля (и привязку к loglig — <see cref="MoveLoglig"/>); дубль удаляет. Конфликты (общий заплыв, membership/favorite уже есть у
 /// канонического — последние решаются удалением строки дубля) — см. по месту.
@@ -265,6 +265,12 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
                 });
             }
             Note(res, "Sys_LanePlanSwimmers", dupPlaces.Count);
+
+            // Лента «Since publishing» (CF8): у строки свой Id — пловца просто переписываем. FK каскадный:
+            // без переноса удаление дубля унесло бы строки ленты.
+            var dupEvents = await db.LanePlanEvents.Where(e => e.SwimmerId == duplicate.Id).ToListAsync(ct);
+            foreach (var e in dupEvents) e.SwimmerId = canonical.Id;
+            Note(res, "Sys_LanePlanEvents", dupEvents.Count);
 
             var appUsers = await db.AppUsers.Where(u => u.SwimmerId == duplicate.Id).ToListAsync(ct);
             foreach (var u in appUsers) u.SwimmerId = canonical.Id;

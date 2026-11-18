@@ -1,5 +1,5 @@
 import type {
-  BreakInput, HubGroupBreaks, HubGroupLevels, LaneChange, LanePlan, LanePlanInput, LanePlanPublishCheck, LanePlanSummary,
+  BreakInput, HubGroupBreaks, HubGroupLevels, LaneChange, LanePlan, LanePlanEvent, LanePlanInput, LanePlanPublishCheck, LanePlanSummary,
   Workout,
 } from '../types';
 
@@ -106,6 +106,11 @@ export const lanePlansApi = {
    */
   place: (groupId: number, key: string, swimmerId: number) =>
     request<{ lane_change: LaneChange | null }>('POST', `${base(groupId)}/${key}/swimmers/${swimmerId}/place`),
+  /**
+   * Лента «Since publishing» опубликованного плана (CF8), новые сверху; только управляющему. Черновик —
+   * пустой список, 404 — у занятия плана нет.
+   */
+  events: (groupId: number, key: string) => request<LanePlanEvent[]>('GET', `${base(groupId)}/${key}/events`),
   unpublish: (groupId: number, key: string) => request<void>('POST', `${base(groupId)}/${key}/unpublish`),
   remove: (groupId: number, key: string) => request<void>('DELETE', `${base(groupId)}/${key}`),
   /** Зритель открыл вид Lanes (Т1б): гаснет «тебя перенесли». GET плана метку не гасит. */

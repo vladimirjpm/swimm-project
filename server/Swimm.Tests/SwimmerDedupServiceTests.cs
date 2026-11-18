@@ -443,7 +443,7 @@ public class SwimmerDedupServiceTests
             typeof(ResultRecord), typeof(RelayMember), typeof(HubGroupMember), typeof(HubGroupUserMember),
             typeof(UserFavorite), typeof(UserMedia), typeof(HubGroupMedia), typeof(TrainingResult),
             typeof(CompetitionEntry), typeof(AppUser), typeof(HubGroupSwimmerLevel), typeof(LanePlanSwimmer),
-            typeof(HubGroupBreak), typeof(HubGroupTrainingRsvp),
+            typeof(HubGroupBreak), typeof(HubGroupTrainingRsvp), typeof(LanePlanEvent),
         ];
 
         var referencing = db.Model.GetEntityTypes()

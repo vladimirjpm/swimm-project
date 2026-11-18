@@ -2254,6 +2254,59 @@ namespace Swimm.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.LanePlanEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("ActorUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("ByCoach")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("FromLane")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int?>("OnLanes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PlanId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("SwimmerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ToLane")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("SwimmerId");
+
+                    b.HasIndex("PlanId", "At");
+
+                    b.ToTable("Sys_LanePlanEvents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_LanePlanEvents_Kind", "\"Kind\" IN ('published', 'going', 'cant_come', 'moved')");
+
+                            t.HasCheckConstraint("CK_LanePlanEvents_Lanes", "(\"FromLane\" IS NULL OR \"FromLane\" >= 0) AND (\"ToLane\" IS NULL OR \"ToLane\" >= 0)");
+                        });
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.LanePlanLane", b =>
                 {
                     b.Property<int>("PlanId")
@@ -5150,6 +5203,31 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("HubGroup");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.LanePlanEvent", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.AppUser", "Actor")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Swimm.Domain.Entities.LanePlan", "Plan")
+                        .WithMany("Events")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.Swimmer", "Swimmer")
+                        .WithMany()
+                        .HasForeignKey("SwimmerId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Actor");
+
+                    b.Navigation("Plan");
+
+                    b.Navigation("Swimmer");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.LanePlanLane", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.HubGroupLevel", "Level")
@@ -5700,6 +5778,8 @@ namespace Swimm.Infrastructure.Migrations
 
             modelBuilder.Entity("Swimm.Domain.Entities.LanePlan", b =>
                 {
+                    b.Navigation("Events");
+
                     b.Navigation("Lanes");
 
                     b.Navigation("Swimmers");

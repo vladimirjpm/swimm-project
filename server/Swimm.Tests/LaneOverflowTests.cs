@@ -48,7 +48,7 @@ public class LaneOverflowTests
         // 2 дорожки, лимит 6: Advanced 9 (Advanced 1 — шестеро, Advanced 2 — трое), Intermediate 3.
         var people = People((6, 1, 1), (3, 1, 2), (3, 2, 1));
 
-        var result = LaneDistribution.Distribute(Lanes(1, 2), people, Levels, maxPerLane: 6);
+        var result = OverflowByLevel.Distribute(Lanes(1, 2), people, Levels, maxPerLane: 6);
 
         Assert.Equal([1, 2, 3, 4, 5, 6], On(result, 1));
         // Пришедшие сверху сильнее — ведут на дорожке Intermediate.
@@ -60,7 +60,7 @@ public class LaneOverflowTests
     {
         var people = People((6, 1, 1), (3, 1, 2), (3, 2, 1));
 
-        var result = LaneDistribution.Distribute(Lanes(1, 2), people, Levels);
+        var result = OverflowByLevel.Distribute(Lanes(1, 2), people, Levels);
 
         Assert.Equal(9, On(result, 1).Length);
         Assert.Equal([10, 11, 12], On(result, 2));
@@ -72,7 +72,7 @@ public class LaneOverflowTests
         // Лимит 7: лишних двое — уходят двое последних из Advanced 2, третий остаётся.
         var people = People((6, 1, 1), (3, 1, 2), (3, 2, 1));
 
-        var result = LaneDistribution.Distribute(Lanes(1, 2), people, Levels, maxPerLane: 7);
+        var result = OverflowByLevel.Distribute(Lanes(1, 2), people, Levels, maxPerLane: 7);
 
         Assert.Equal([1, 2, 3, 4, 5, 6, 7], On(result, 1));
         Assert.Equal([8, 9, 10, 11, 12], On(result, 2));
@@ -84,7 +84,7 @@ public class LaneOverflowTests
         // Тесно у Intermediate (9 при лимите 6), у Advanced место есть — вверх никто не поднимается.
         var people = People((3, 1, null), (3, 2, 1), (6, 2, 2));
 
-        var result = LaneDistribution.Distribute(Lanes(1, 2), people, Levels, maxPerLane: 6);
+        var result = OverflowByLevel.Distribute(Lanes(1, 2), people, Levels, maxPerLane: 6);
 
         Assert.Equal([1, 2, 3], On(result, 1));
         Assert.Equal(9, On(result, 2).Length);
@@ -96,7 +96,7 @@ public class LaneOverflowTests
         // Advanced 8 при лимите 6, но Intermediate уже полон и отдать вниз ему некого.
         var people = People((6, 1, 1), (2, 1, 2), (6, 4, null));
 
-        var result = LaneDistribution.Distribute(Lanes(1, 4), people, Levels, maxPerLane: 6);
+        var result = OverflowByLevel.Distribute(Lanes(1, 4), people, Levels, maxPerLane: 6);
 
         Assert.Equal(8, On(result, 1).Length);
         Assert.Equal(6, On(result, 2).Length);
@@ -109,7 +109,7 @@ public class LaneOverflowTests
         // подуровень может уйти к Developing (2 человека) — цепочка освобождает место.
         var people = People((5, 1, 1), (2, 1, 2), (4, 2, 1), (2, 2, 2), (2, 3, null));
 
-        var result = LaneDistribution.Distribute(Lanes(1, 2, 3), people, Levels, maxPerLane: 6);
+        var result = OverflowByLevel.Distribute(Lanes(1, 2, 3), people, Levels, maxPerLane: 6);
 
         Assert.Equal([1, 2, 3, 4, 5, 6], On(result, 1));
         Assert.Equal([7, 8, 9, 10, 11, 12], On(result, 2));
@@ -123,7 +123,7 @@ public class LaneOverflowTests
         // Advanced 2 через уровень не прыгает, а своих нижних у Intermediate нет.
         var people = People((4, 1, 1), (4, 1, 2), (4, 2, null), (1, 3, null));
 
-        var result = LaneDistribution.Distribute(Lanes(1, 2, 3), people, Levels, maxPerLane: 5);
+        var result = OverflowByLevel.Distribute(Lanes(1, 2, 3), people, Levels, maxPerLane: 5);
 
         Assert.Equal([1, 2, 3, 4, 5, 6, 7], On(result, 1));
         Assert.Equal([8, 9, 10, 11, 12], On(result, 2));
@@ -135,13 +135,13 @@ public class LaneOverflowTests
     {
         // У Advanced 2 подуровня, но никому подуровень не задан — уходить некому.
         var noSub = People((8, 1, null), (2, 2, 1));
-        var result = LaneDistribution.Distribute(Lanes(1, 2), noSub, Levels, maxPerLane: 6);
+        var result = OverflowByLevel.Distribute(Lanes(1, 2), noSub, Levels, maxPerLane: 6);
         Assert.Equal(8, On(result, 1).Length);
 
         // Уровень без подуровней (SubLevels = 1): подуровень пловца не в счёт.
         LaneAllocation.Level[] flat = [new(1, 1, 1), new(2, 2, 1)];
         var flatPeople = People((8, 1, 1), (2, 2, null));
-        var flatResult = LaneDistribution.Distribute(Lanes(1, 2), flatPeople, flat, maxPerLane: 6);
+        var flatResult = OverflowByLevel.Distribute(Lanes(1, 2), flatPeople, flat, maxPerLane: 6);
         Assert.Equal(8, On(flatResult, 1).Length);
     }
 
@@ -155,11 +155,11 @@ public class LaneOverflowTests
         };
 
         // Без лимита: внутри уровня подуровень 1 первым.
-        var plain = LaneDistribution.Distribute(Lanes(2, 1), people, Levels);
+        var plain = OverflowByLevel.Distribute(Lanes(2, 1), people, Levels);
         Assert.Equal([2, 4, 1, 3], On(plain, 2));
 
         // Лимит 3: перелив идёт к следующему по силе уровню (дорожка 1), а не к следующему номеру.
-        var limited = LaneDistribution.Distribute(Lanes(2, 1), people, Levels, maxPerLane: 3);
+        var limited = OverflowByLevel.Distribute(Lanes(2, 1), people, Levels, maxPerLane: 3);
         Assert.Equal([2, 4, 1], On(limited, 2));
         Assert.Equal([3, 5], On(limited, 1));
     }
@@ -170,7 +170,7 @@ public class LaneOverflowTests
         // У Intermediate сегодня никого, но дорожка у него есть — Advanced 2 переходит туда.
         var people = People((1, 1, 1), (1, 1, 2));
 
-        var result = LaneDistribution.Distribute(Lanes(1, 2), people, Levels, maxPerLane: 1);
+        var result = OverflowByLevel.Distribute(Lanes(1, 2), people, Levels, maxPerLane: 1);
 
         Assert.Equal([1], On(result, 1));
         Assert.Equal([2], On(result, 2));
@@ -198,7 +198,7 @@ public class LaneOverflowTests
     {
         var people = People((2, 1, 2), (2, 1, 1)).Append(new LaneDistribution.Swimmer(9, null, 0)).ToList();
 
-        var result = LaneDistribution.Distribute(Lanes(1), people, Levels);
+        var result = OverflowByLevel.Distribute(Lanes(1), people, Levels);
 
         // Подуровень 1 ведёт, без уровня — в конце.
         Assert.Equal([(3, (int?)1), (4, 1), (1, 1), (2, 1), (9, null)], result.Select(p => (p.SwimmerId, p.LaneNo)));
@@ -313,9 +313,9 @@ public class LaneOverflowTests
     }
 
     [Fact]
-    public async Task LanePlan_MaxPerLane_IsSaved_AndDrivesDistributeAndAutoLanes()
+    public async Task LanePlan_MaxPerLane_IsSaved_AndDrivesAutoLanes()
     {
-        await using var db = CreateDb(nameof(LanePlan_MaxPerLane_IsSaved_AndDrivesDistributeAndAutoLanes));
+        await using var db = CreateDb(nameof(LanePlan_MaxPerLane_IsSaved_AndDrivesAutoLanes));
         var s = await SeedAsync(db);
         var levels = new HubGroupLevelService(db);
         var service = new LanePlanService(db);
@@ -327,25 +327,20 @@ public class LaneOverflowTests
         await levels.SetSwimmerLevelAsync(s.GroupId, p4, s.Intermediate);
         List<LanePlanLaneInputDto> lanes = [new() { LaneNo = 1, LevelId = s.Advanced }, new() { LaneNo = 2, LevelId = s.Intermediate }];
 
-        var (distributed, error) = await service.DistributeAsync(s.GroupId,
-            new LanePlanDistributeInputDto { LaneCount = 2, MaxPerLane = 2, Lanes = lanes });
-        Assert.Null(error);
-        Assert.Equal([(p1, (int?)1), (p2, 1), (p3, 2), (p4, 2)], distributed!.Swimmers.Select(x => (x.SwimmerId, x.LaneNo)));
-
         var (auto, autoError) = await service.AutoLanesAsync(s.GroupId,
             new LanePlanAutoLanesInputDto { LaneCount = 2, MaxPerLane = 2, ReservedLanes = 0 });
         Assert.Null(autoError);
         Assert.Equal([(p1, (int?)1), (p2, 1), (p3, 2), (p4, 2)], auto!.Swimmers.Select(x => (x.SwimmerId, x.LaneNo)));
 
-        var (_, bad) = await service.DistributeAsync(s.GroupId,
-            new LanePlanDistributeInputDto { LaneCount = 2, MaxPerLane = 0, Lanes = lanes });
+        var (_, bad) = await service.AutoLanesAsync(s.GroupId,
+            new LanePlanAutoLanesInputDto { LaneCount = 2, MaxPerLane = 0, ReservedLanes = 0 });
         Assert.NotNull(bad);
 
         // Лимит сохраняется с планом и приходит в доске и в списке; у пловца — подуровень.
         var day = new DateOnly(2026, 10, 20);
         var saved = await service.SaveAsync(s.GroupId, At(day), new LanePlanInputDto
         {
-            LaneCount = 2, MaxPerLane = 2, Lanes = lanes, Swimmers = distributed.Swimmers,
+            LaneCount = 2, MaxPerLane = 2, Lanes = lanes, Swimmers = auto.Swimmers,
         }, userId: 1);
         Assert.True(saved.Success, saved.Error);
         var board = (await service.GetAsync(s.GroupId, At(day), isManager: true))!;

@@ -176,7 +176,7 @@ public class LanePlanSessionKeyTests
         // Писать по дате нельзя ничего.
         Assert.False((await service.SaveAsync(s.GroupId, day, Plan(s, 2), s.Coach)).Success);
         Assert.False(await service.SetStatusAsync(s.GroupId, day, LanePlanStatus.Draft));
-        Assert.False((await service.PublishAsync(s.GroupId, day)).Found);
+        Assert.False((await service.PublishAsync(s.GroupId, day, s.Coach)).Found);
         Assert.False((await service.SaveWorkoutAsync(s.GroupId, day, null)).Found);
         Assert.Null(await service.GetPublishCheckAsync(s.GroupId, day));
         Assert.False(await service.DeleteAsync(s.GroupId, day));

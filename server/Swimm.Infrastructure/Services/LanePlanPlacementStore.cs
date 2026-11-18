@@ -20,9 +20,16 @@ internal static class LanePlanPlacementStore
 {
     public enum Intent { Going, Out }
 
-    /// <summary>Применить правило ответа. null — сдвига нет (плана нет, уже на дорожке, …).</summary>
-    public static Task<LaneChangeDto?> ApplyAsync(SwimmDbContext db, int hubGroupId, LanePlanKey key, int swimmerId, Intent intent) =>
-        RunAsync(db, hubGroupId, key, swimmerId, async plan =>
+    /// <summary>
+    /// Применить правило ответа. null — сдвига нет (плана нет, уже на дорожке, …). У опубликованного
+    /// плана сдвиг уходит строкой в ленту «Since publishing» (CF8) с описанием <paramref name="source"/>.
+    /// </summary>
+    public static Task<LaneChangeDto?> ApplyAsync(SwimmDbContext db, int hubGroupId, LanePlanKey key, int swimmerId, Intent intent,
+        LanePlanEventLog.Source source) =>
+        RunAsync(db, hubGroupId, key, swimmerId,
+            (plan, before, after, now) => LanePlanEventLog.RecordAsync(db, plan, swimmerId,
+                LanePlanEventRules.Place(before), LanePlanEventRules.Place(after), source, now),
+            async plan =>
         {
             var row = plan.Swimmers.FirstOrDefault(s => s.SwimmerId == swimmerId);
             if (intent == Intent.Out)
@@ -74,9 +81,16 @@ internal static class LanePlanPlacementStore
             return true;
         });
 
-    /// <summary>Undo: вернуть пловца на место <paramref name="place"/> (InPlan false — «Not today»).</summary>
+    /// <summary>
+    /// Undo: вернуть пловца на место <paramref name="place"/> (InPlan false — «Not today»). Строка ленты
+    /// об отменённом сдвиге уходит вместе с ним (CF8).
+    /// </summary>
     public static Task<LaneChangeDto?> RestoreAsync(SwimmDbContext db, int hubGroupId, LanePlanKey key, int swimmerId, LanePlaceDto place) =>
-        RunAsync(db, hubGroupId, key, swimmerId, async plan =>
+        RunAsync(db, hubGroupId, key, swimmerId,
+            (plan, _, _, _) => plan.Status == LanePlanStatus.Published
+                ? LanePlanEventLog.UndoLastAsync(db, plan.Id, swimmerId)
+                : Task.CompletedTask,
+            async plan =>
         {
             var row = plan.Swimmers.FirstOrDefault(s => s.SwimmerId == swimmerId);
             if (!place.InPlan)
@@ -105,7 +119,7 @@ internal static class LanePlanPlacementStore
         });
 
     private static async Task<LaneChangeDto?> RunAsync(SwimmDbContext db, int hubGroupId, LanePlanKey key, int swimmerId,
-        Func<LanePlan, Task<bool>> change) =>
+        Func<LanePlan, LanePlaceDto, LanePlaceDto, DateTime, Task> log, Func<LanePlan, Task<bool>> change) =>
         await GroupAdvisoryLock.InGroupTransactionAsync<LaneChangeDto?>(db, LanePlanService.LanePlansLockClass, hubGroupId, async () =>
         {
             var (date, start) = (key.Date, key.Start);
@@ -121,7 +135,9 @@ internal static class LanePlanPlacementStore
             var after = PlaceOf(plan, swimmerId);
             if (Same(before, after)) return null;
 
-            plan.UpdatedAt = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
+            plan.UpdatedAt = now;
+            await log(plan, before, after, now);
             await db.SaveChangesAsync();
             return new LaneChangeDto { SwimmerId = swimmerId, Before = before, After = after };
         });

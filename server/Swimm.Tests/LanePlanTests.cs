@@ -41,7 +41,7 @@ public class LanePlanTests
         };
         var swimmers = Swimmers((4, 1), (7, 2), (6, 3), (3, 4));
 
-        var result = LaneDistribution.Distribute(lanes, swimmers);
+        var result = OverflowByLevel.Distribute(lanes, swimmers);
 
         var perLane = result.GroupBy(p => p.LaneNo).ToDictionary(g => g.Key!.Value, g => g.Count());
         Assert.Equal(new Dictionary<int, int> { [1] = 4, [2] = 4, [3] = 3, [4] = 3, [5] = 3, [6] = 3 }, perLane);
@@ -54,7 +54,7 @@ public class LanePlanTests
         var lanes = new[] { new LaneDistribution.Lane(3, 7), new LaneDistribution.Lane(2, 7) };
         var swimmers = Swimmers((5, 7));
 
-        var result = LaneDistribution.Distribute(lanes, swimmers);
+        var result = OverflowByLevel.Distribute(lanes, swimmers);
 
         // Первые по порядку — на меньший номер дорожки, подряд; лишний — в первую дорожку.
         Assert.Equal([2, 2, 2, 3, 3], result.Select(p => p.LaneNo!.Value));
@@ -67,7 +67,7 @@ public class LanePlanTests
         var lanes = new[] { new LaneDistribution.Lane(1, 1), new LaneDistribution.Lane(2, null) };
         var swimmers = Swimmers((1, 1), (1, null), (1, 9));
 
-        var result = LaneDistribution.Distribute(lanes, swimmers);
+        var result = OverflowByLevel.Distribute(lanes, swimmers);
 
         Assert.Equal([1, null, null], result.Select(p => p.LaneNo));
     }
@@ -82,8 +82,8 @@ public class LanePlanTests
             new LaneDistribution.Swimmer(12, 1, 2), new LaneDistribution.Swimmer(13, 1, 0),
         };
 
-        var first = LaneDistribution.Distribute(lanes, swimmers);
-        var second = LaneDistribution.Distribute(lanes, swimmers.Reverse());
+        var first = OverflowByLevel.Distribute(lanes, swimmers);
+        var second = OverflowByLevel.Distribute(lanes, swimmers.Reverse());
 
         Assert.Equal(first, second);
         Assert.Equal([13, 11, 12, 10], first.Select(p => p.SwimmerId));
@@ -512,33 +512,6 @@ public class LanePlanTests
         Assert.True((await service.SaveAsync(s.GroupId, At(Day), Plan(s), s.UserId)).Success);
         // А в новый план на другой день — нельзя.
         Assert.False((await service.SaveAsync(s.GroupId, At(Day.AddDays(1)), Plan(s), s.UserId)).Success);
-    }
-
-    [Fact]
-    public async Task Distribute_UsesCurrentLevelsAndRosterOrder()
-    {
-        await using var db = CreateDb(nameof(Distribute_UsesCurrentLevelsAndRosterOrder));
-        var s = await SeedAsync(db);
-        var service = new LanePlanService(db);
-
-        var (result, error) = await service.DistributeAsync(s.GroupId, new LanePlanDistributeInputDto
-        {
-            LaneCount = 3,
-            Lanes = [new() { LaneNo = 1, LevelId = s.Fast }, new() { LaneNo = 3, LevelId = s.Slow }],
-        });
-
-        Assert.Null(error);
-        Assert.Equal(
-            [(s.A, (int?)1), (s.B, 3), (s.C, null)],
-            result!.Swimmers.Select(p => (p.SwimmerId, p.LaneNo)));
-        Assert.False(await db.LanePlans.AnyAsync());  // ничего не сохранено
-
-        // Пришли только B и C.
-        var (partial, _) = await service.DistributeAsync(s.GroupId, new LanePlanDistributeInputDto
-        {
-            LaneCount = 3, Lanes = [new() { LaneNo = 3, LevelId = s.Slow }], SwimmerIds = [s.C, s.B],
-        });
-        Assert.Equal([(s.B, (int?)3), (s.C, null)], partial!.Swimmers.Select(p => (p.SwimmerId, p.LaneNo)));
     }
 
     [Fact]

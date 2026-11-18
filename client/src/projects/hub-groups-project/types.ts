@@ -593,6 +593,33 @@ export interface LanePlanSummary {
   reserved_lanes?: number;
 }
 
+/** Что случилось с опубликованным планом (CF8 потока тренера): лента «Since publishing». */
+export type LanePlanEventKind = 'published' | 'going' | 'cant_come' | 'moved';
+
+/**
+ * Строка ленты «Since publishing» (`GET …/lane-plans/{sessionId}/events`, только управляющему).
+ * Место: `null` — не в плане («Not today»), `0` — Unassigned, N — дорожка N.
+ */
+export interface LanePlanEvent {
+  id: number;
+  /** ISO, UTC. */
+  at: string;
+  kind: LanePlanEventKind;
+  swimmer_id: number | null;
+  name: string;
+  name_en: string;
+  from_lane: number | null;
+  to_lane: number | null;
+  /** У `published`: сколько людей стояло на дорожках. */
+  on_lanes: number | null;
+  /** Ответ поставил тренер за человека. */
+  by_coach: boolean;
+  /** Кто сделал; `null` — аккаунт удалён. */
+  actor_name: string | null;
+  /** Сделал сам смотрящий — «You …». */
+  by_me: boolean;
+}
+
 export interface LanePlanLevel {
   id: number;
   rank: number;

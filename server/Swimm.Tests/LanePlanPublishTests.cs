@@ -89,7 +89,7 @@ public class LanePlanPublishTests
         var check = (await service.GetPublishCheckAsync(s.GroupId, At(Day)))!;
         // С уровнем без дорожки публикации не мешает; порядок — как в составе.
         Assert.Equal([s.NoLevel, s.Other], check.Blockers.Select(b => b.SwimmerId));
-        var blocked = await service.PublishAsync(s.GroupId, At(Day));
+        var blocked = await service.PublishAsync(s.GroupId, At(Day), s.Coach);
         Assert.False(blocked.Success);
         Assert.Equal("Tom and ניב are going but have no level and no lane. Set a level or put them on a lane to publish.", blocked.Error);
         Assert.Null(await service.GetAsync(s.GroupId, At(Day), isManager: false));
@@ -100,12 +100,12 @@ public class LanePlanPublishTests
         await db.SaveChangesAsync();
 
         Assert.Empty((await service.GetPublishCheckAsync(s.GroupId, At(Day)))!.Blockers);
-        var published = await service.PublishAsync(s.GroupId, At(Day));
+        var published = await service.PublishAsync(s.GroupId, At(Day), s.Coach);
         Assert.True(published.Success);
         Assert.True(published.Changed);
         Assert.NotNull(await service.GetAsync(s.GroupId, At(Day), isManager: false));
         // Повторный Publish — не ошибка и не «сменился».
-        Assert.False((await service.PublishAsync(s.GroupId, At(Day))).Changed);
+        Assert.False((await service.PublishAsync(s.GroupId, At(Day), s.Coach)).Changed);
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class LanePlanPublishTests
         var service = new LanePlanService(db);
 
         Assert.Null(await service.GetPublishCheckAsync(s.GroupId, At(Day)));
-        Assert.False((await service.PublishAsync(s.GroupId, At(Day))).Found);
+        Assert.False((await service.PublishAsync(s.GroupId, At(Day), s.Coach)).Found);
     }
 
     [Theory]
