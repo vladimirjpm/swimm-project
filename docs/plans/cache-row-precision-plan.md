@@ -354,6 +354,10 @@ using (_read.CacheRows<HubGroup>(groupId, typeof(HubGroupMember), typeof(HubGrou
 - **Состав** — сужается целиком: `Swimmers WHERE ClubId` и `Results WHERE ClubId AND SwimmerId IN
   (…)` — блок `Club`(rid) по `Swimmers`, `Results`. Правка пловца клуба X роняет состав только X;
   переход пловца в другой клуб — старый и новый `ClubId` (п. 2).
+  ⚠ **С сезоном (`?season=`, с 18.11.2026)** состав — кто стартовал за клуб в сезоне (`Results`
+  по `ClubId`, план swimmer-club-change К7), и `Swimmers` в нём уже НЕ по `ClubId`: там есть
+  ушедшие в другой клуб, их правка роняет метку чужого клуба. Поэтому с сезоном сужен только
+  `Results`, `Swimmers` — меткой таблицы. Без сезона — как выше.
 - **Season-best клуба** — не сужается: лидер ступени выбирается по всей стране, фильтр по клубу
   идёт в памяти уже после (`ClubPublicRepository` ~328).
 - **Стена рекордов** — `Clubs` сузился бы (строка клуба и склеенные дубли: `MergedIntoId` — тоже FK

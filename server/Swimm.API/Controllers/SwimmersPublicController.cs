@@ -94,6 +94,8 @@ public class SwimmersPublicController : ControllerBase
         dto.AgeInSeason = SeasonMath.AgeInSeason(displaySeason, dto.BirthYear);
 
         dto.AgeGroup = await _swims.GetLadderGroupAsync(rows.Select(r => r.CompetitionId));
+        // История клубов — из строк результатов, а не из карточки (план swimmer-club-change, Ф2).
+        dto.ClubHistory = await ClubHistoryAsync(rows);
         // Счётчик и список — из ОДНОГО запроса: разными они рано или поздно разошлись бы,
         // и бейдж «4 records» стоял бы над секцией с тремя строками.
         var held = await _swims.GetRecordsHeldAsync(id);
@@ -234,9 +236,20 @@ public class SwimmersPublicController : ControllerBase
         // ОБЕ дельты считаются по ОДНОЙ и той же ступени (решение Влада 2026-08-27):
         // раньше клубная брала минимум по всему клубу любого возраста, и две цифры рядом
         // меряли разное, выглядя одинаково. Нет года рождения — нет ни одной из них.
-        var clubBest = profile.ClubId is int clubId && age is int clubAge
-            ? await _swims.GetClubBestMsAsync(clubId, clubAge)
-            : new Dictionary<string, int>();
+        // Клуб — СТРОКИ личного рекорда, а не карточки (план swimmer-club-change, Ф3): рекорд,
+        // поставленный за прежний клуб, меряется лучшими временами того клуба. Ключ — id клуба
+        // в строке; склеенный клуб меряется своим приёмником, у псевдоклуба (сборная) дельты нет.
+        var clubBest = new Dictionary<int, IReadOnlyDictionary<string, int>>();
+        if (age is int clubAge)
+        {
+            var clubIds = SwimmerClubHistory.ClubIdsOf(rows);
+            var clubs = await _swims.GetClubRefsAsync(clubIds);
+            foreach (var rowClubId in clubIds)
+            {
+                if (SwimmerClubHistory.Resolve(rowClubId, clubs) is { } club)
+                    clubBest[rowClubId] = await _swims.GetClubBestMsAsync(club.Id, clubAge);
+            }
+        }
 
         // Ступени справочника — ПО ЗАПЛЫВАМ, как в сравнении: мастерский старт меряется
         // полосой «45-49», обычный взрослый — открытым рекордом страны, ребёнок — своей
@@ -423,7 +436,18 @@ public class SwimmersPublicController : ControllerBase
         // обязаны его учитывать (тот же список, что в плитке достижений профиля).
         var held = profile is null ? [] : await _swims.GetRecordsHeldAsync(profile.Id);
 
-        return new SwimmerPageBuilder.SwimmerCompareInput(rows, profile, cohort, records, held);
+        // История клубов: по ней сторона при выбранном сезоне показывает клуб того сезона (Ф3),
+        // и она же открывается окном у значка «несколько клубов».
+        var clubHistory = await ClubHistoryAsync(rows);
+
+        return new SwimmerPageBuilder.SwimmerCompareInput(rows, profile, cohort, records, held, clubHistory);
+    }
+
+    /// <summary>История клубов пловца по его заплывам (<see cref="SwimmerClubHistory"/>).</summary>
+    private async Task<List<SwimmerClubSeasonDto>> ClubHistoryAsync(IReadOnlyList<SeasonSwimRow> rows)
+    {
+        var clubs = await _swims.GetClubRefsAsync(SwimmerClubHistory.ClubIdsOf(rows));
+        return SwimmerClubHistory.Build(rows, clubs);
     }
 
     /// <summary>

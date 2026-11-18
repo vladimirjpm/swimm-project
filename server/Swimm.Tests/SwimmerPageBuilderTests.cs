@@ -337,6 +337,32 @@ public class SwimmerPageBuilderTests
         SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>> NoRecords() =>
         new Dictionary<SwimmerPageBuilder.RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>>();
 
+    /// <summary>Лучшие клуба по клубу строки; <c>Row</c> по умолчанию без клуба (ClubId = 0).</summary>
+    private static IReadOnlyDictionary<int, IReadOnlyDictionary<string, int>> ClubBest(
+        Dictionary<string, int> best, int clubId = 0) =>
+        new Dictionary<int, IReadOnlyDictionary<string, int>> { [clubId] = best };
+
+    private static readonly IReadOnlyDictionary<int, IReadOnlyDictionary<string, int>> NoClubBest =
+        new Dictionary<int, IReadOnlyDictionary<string, int>>();
+
+    [Fact]
+    public void PersonalBests_ClubBest_IsTheClubOfTheRow_NotOfTheCard()
+    {
+        // План swimmer-club-change, Ф3: личный рекорд поставлен за прежний клуб (7) — дельта
+        // меряется лучшими временами клуба 7, а не нынешнего (9).
+        var rows = new[] { Row(1, "2026-02-16", ms: 59000) with { ClubId = 7 } };
+        var key = SeasonAggregator.DisciplineKey(rows[0]);
+        var bests = new Dictionary<int, IReadOnlyDictionary<string, int>>
+        {
+            [7] = new Dictionary<string, int> { [key] = 58000 },
+            [9] = new Dictionary<string, int> { [key] = 50000 },
+        };
+
+        var pb = Assert.Single(SwimmerPageBuilder.PersonalBests(rows, null, bests, NoRecords()));
+
+        Assert.Equal(1000, pb.DeltaToClubBestMs);
+    }
+
     [Fact]
     public void PersonalBests_DeltasToClubBestAndNationalRecord()
     {
@@ -346,7 +372,7 @@ public class SwimmerPageBuilderTests
         // Заплыв 2026 года у пловца 2014 г.р. (ось календарная) — ступень age/12.
         var pbs = SwimmerPageBuilder.PersonalBests(
             rows, poolType: null,
-            clubBestMs: new Dictionary<string, int> { [key] = 58500 },
+            clubBestByClub: ClubBest(new() { [key] = 58500 }),
             nationalRecords: Step("age", "12", key, new("58.00", 58000, "Кто-то", "12")),
             birthYear: 2014);
 
@@ -366,7 +392,7 @@ public class SwimmerPageBuilderTests
 
         var pbs = SwimmerPageBuilder.PersonalBests(
             rows, poolType: null,
-            clubBestMs: new Dictionary<string, int> { [key] = 58000 },   // он же и есть лучший
+            clubBestByClub: ClubBest(new() { [key] = 58000 }),   // он же и есть лучший
             nationalRecords: Step("age", "12", key, new("58.50", 58500, "Тёзка", "12")),
             birthYear: 2014);
 
@@ -386,7 +412,7 @@ public class SwimmerPageBuilderTests
         var key = SeasonAggregator.DisciplineKey(rows[0]);
 
         var byBand = SwimmerPageBuilder.PersonalBests(
-            rows, poolType: null, clubBestMs: new Dictionary<string, int>(),
+            rows, poolType: null, clubBestByClub: NoClubBest,
             nationalRecords: Step("masters", "45-49", key, new("00:60.00", 60000, null, "45-49")),
             birthYear: 1981);
 
@@ -396,7 +422,7 @@ public class SwimmerPageBuilderTests
 
         // Тот же рекорд в детской ступени к мастерскому заплыву не относится.
         var byChildStep = SwimmerPageBuilder.PersonalBests(
-            rows, poolType: null, clubBestMs: new Dictionary<string, int>(),
+            rows, poolType: null, clubBestByClub: NoClubBest,
             nationalRecords: Step("age", "45", key, new("00:60.00", 60000, null, "45")),
             birthYear: 1981);
 
@@ -411,7 +437,7 @@ public class SwimmerPageBuilderTests
         var key = SeasonAggregator.DisciplineKey(rows[0]);
 
         var pbs = SwimmerPageBuilder.PersonalBests(
-            rows, poolType: null, clubBestMs: new Dictionary<string, int>(),
+            rows, poolType: null, clubBestByClub: NoClubBest,
             nationalRecords: Step("open", "", key, new("00:58.00", 58000, null, "")),
             birthYear: 1997);
 
@@ -429,7 +455,7 @@ public class SwimmerPageBuilderTests
         var key = SeasonAggregator.DisciplineKey(rows[0]);
 
         var pbs = SwimmerPageBuilder.PersonalBests(
-            rows, poolType: null, clubBestMs: new Dictionary<string, int>(),
+            rows, poolType: null, clubBestByClub: NoClubBest,
             nationalRecords: Step("open", "", key, new("00:24.46", 24460, null, "")),
             birthYear: 2017);
 
@@ -447,8 +473,8 @@ public class SwimmerPageBuilderTests
             Row(2, "2026-07-16", ms: 61000, pool: "50m"),
         };
 
-        var shortCourse = SwimmerPageBuilder.PersonalBests(rows, "25m", new Dictionary<string, int>(), NoRecords());
-        var longCourse = SwimmerPageBuilder.PersonalBests(rows, "50m", new Dictionary<string, int>(), NoRecords());
+        var shortCourse = SwimmerPageBuilder.PersonalBests(rows, "25m", NoClubBest, NoRecords());
+        var longCourse = SwimmerPageBuilder.PersonalBests(rows, "50m", NoClubBest, NoRecords());
 
         Assert.Equal(59000, Assert.Single(shortCourse).TimeMs);
         Assert.Equal(61000, Assert.Single(longCourse).TimeMs);

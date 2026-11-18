@@ -1,3 +1,5 @@
+import type { ClubSeason } from '../club-history/club-history.types';
+
 /**
  * Общие типы семейства `UI_H2H*` — таба H2H страницы пловца
  * (макет `!design_handoff/design_handoff_h2h/`).
@@ -31,6 +33,8 @@ export interface H2HSwimmer {
   id: number;
   name: string;
   club?: string | null;
+  /** История клубов: больше одного клуба — под клубом значок ⇄ с окном истории (Ф2). */
+  clubHistory?: ClubSeason[] | null;
   /** Готовая подпись чипа: «9 y · 2017». Пусто — чип не рисуется. */
   ageLabel?: string | null;
   avatarUrl?: string | null;

@@ -361,6 +361,47 @@ public class SeasonBestRepositoryTests
     }
 
     [Fact]
+    public async Task ListBestPerSwimmer_SwimmerOfTwoClubs_IsVisibleUnderBoth()
+    {
+        // План swimmer-club-change, Ф3: зимой Mover плыл за Old, весной перешёл в New. Раньше
+        // «лучший раз» схлопывался ДО фильтра клуба, и под фильтром клуба, где не случился его
+        // лучший заплыв, пловца не было вовсе.
+        using var db = CreateDb(nameof(ListBestPerSwimmer_SwimmerOfTwoClubs_IsVisibleUnderBoth));
+        var style = FreestyleStyle();
+        var oldClub = new Club { Name = "Old", NameEn = "Old" };
+        var newClub = new Club { Name = "New", NameEn = "New" };
+        var winter = MakeCompetition(date: "10/12/2025");
+        var spring = MakeCompetition(date: "15/03/2026");
+        var mover = MakeSwimmer(newClub, "Mover", 2016);
+        var rival = MakeSwimmer(oldClub, "Rival", 2016);
+        db.AddRange(oldClub, newClub, winter, spring, style, mover, rival);
+        db.Add(Swim(winter, oldClub, mover, style, new DateTime(2025, 12, 10), timeMs: 33_000));
+        db.Add(Swim(spring, newClub, mover, style, new DateTime(2026, 3, 15), timeMs: 30_000));
+        db.Add(Swim(spring, oldClub, rival, style, new DateTime(2026, 3, 15), timeMs: 31_000));
+        await db.SaveChangesAsync();
+
+        var repo = Repo(db);
+        var oldId = (await repo.GetSeasonBestListAsync(ListQuery())).Data.Single(i => i.Name == "Rival X").ClubId;
+        var newId = (await repo.GetSeasonBestListAsync(ListQuery())).Data.First(i => i.Name == "Mover X").ClubId;
+
+        var underOld = await repo.GetSeasonBestListAsync(ListQuery(clubId: oldId, best: true));
+        var underNew = await repo.GetSeasonBestListAsync(ListQuery(clubId: newId, best: true));
+
+        // Под старым клубом — его лучший раз ЗА СТАРЫЙ клуб (33.00) с местом, которое это время
+        // заняло бы в общем рейтинге лучших: быстрее 30.00 (его же, за New) и 31.00 → 3-й.
+        Assert.Equal(["Rival X", "Mover X"], underOld.Data.Select(i => i.Name));
+        Assert.Equal([2, 3], underOld.Data.Select(i => i.Place));
+        Assert.Equal(33_000, underOld.Data[1].TimeMs);
+        Assert.Equal(2, underOld.Swimmers);
+        // Под новым — общий лучший (30.00), первое место.
+        var mine = Assert.Single(underNew.Data);
+        Assert.Equal((30_000, 1), (mine.TimeMs, mine.Place));
+        // В опциях фильтра он считается в обоих клубах.
+        Assert.Equal(2, underNew.Clubs.Single(c => c.ClubId == oldId).Swims);
+        Assert.Equal(1, underNew.Clubs.Single(c => c.ClubId == newId).Swims);
+    }
+
+    [Fact]
     public async Task ListClubFilterKeepsPlacesFromFullRanking()
     {
         // Фильтр по клубу — это ПОКАЗ, а не пересчёт: пользователь видит своих пловцов с их

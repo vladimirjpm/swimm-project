@@ -829,8 +829,22 @@ public sealed class SwimmerCompareSideDto
     [JsonPropertyName("gender")]
     public string? Gender { get; set; }
 
+    /// <summary>
+    /// Клуб стороны: при выбранном сезоне — клуб ПОСЛЕДНЕГО старта в этом сезоне, за карьеру
+    /// (и в сезоне без стартов) — текущий клуб карточки (план swimmer-club-change, Ф3, К6).
+    /// </summary>
+    [JsonPropertyName("clubId")]
+    public int? ClubId { get; set; }
+
     [JsonPropertyName("clubName")]
     public string? ClubName { get; set; }
+
+    /// <summary>
+    /// История клубов по сезонам — для значка «несколько клубов» у карточки стороны и окна
+    /// истории. Та же, что в профиле (<c>clubHistory</c>): у соперника профиль на табе не грузится.
+    /// </summary>
+    [JsonPropertyName("clubHistory")]
+    public List<SwimmerClubSeasonDto> ClubHistory { get; set; } = [];
 
     /// <summary>
     /// Фото пловца и его страна — мини-карточка шапки рисует такой же портрет с флагом,

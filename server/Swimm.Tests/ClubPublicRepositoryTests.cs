@@ -140,8 +140,14 @@ public class ClubPublicRepositoryTests
         db.Add(club);
         // Возраст в сезоне = год ОКОНЧАНИЯ сезона минус год рождения (SeasonMath.AgeInSeason):
         // сезон 2025/26 считается по 2026 году.
-        db.Add(MakeSwimmer(club, "Young", "One", 2015)); // возраст в сезоне 2025/26 = 11
-        db.Add(MakeSwimmer(club, "Old", "One", 2010));   // возраст в сезоне 2025/26 = 16
+        // С сезоном в составе — кто СТАРТОВАЛ за клуб в нём (К7 плана swimmer-club-change).
+        var style = FreestyleStyle();
+        var comp = MakeCompetition("25m");
+        var young = MakeSwimmer(club, "Young", "One", 2015); // возраст в сезоне 2025/26 = 11
+        var old = MakeSwimmer(club, "Old", "One", 2010);     // возраст в сезоне 2025/26 = 16
+        db.AddRange(style, comp, young, old);
+        db.Add(Swim(comp, club, young, new DateTime(2026, 2, 15)));
+        db.Add(Swim(comp, club, old, new DateTime(2026, 2, 15)));
         await db.SaveChangesAsync();
 
         var result = await Repo(db).GetRosterAsync(club.Id, 1, 50, gender: null, ageFrom: 11, ageTo: 11, season: 2025);
@@ -152,12 +158,48 @@ public class ClubPublicRepositoryTests
     }
 
     [Fact]
+    public async Task Roster_WithSeason_IsWhoSwamForTheClubInIt_NotTheCardClub()
+    {
+        // План swimmer-club-change, К7: пловчиха 2025/26 плыла за Old, в 2026/27 перешла в New
+        // (карточка уже New). Состав сезона — по строкам результатов, без сезона — по карточке.
+        using var db = CreateDb(nameof(Roster_WithSeason_IsWhoSwamForTheClubInIt_NotTheCardClub));
+        var oldClub = new Club { Name = "Old", NameEn = "Old" };
+        var newClub = new Club { Name = "New", NameEn = "New" };
+        var style = FreestyleStyle();
+        var past = MakeCompetition("25m", date: "15/02/2026");
+        var now = MakeCompetition("25m", date: "05/11/2026");
+        var mover = MakeSwimmer(newClub, "Mover", "One", 2013, gender: "F");
+        db.AddRange(oldClub, newClub, style, past, now, mover);
+        db.Add(Swim(past, oldClub, mover, new DateTime(2026, 2, 15)));
+        db.Add(Swim(now, newClub, mover, new DateTime(2026, 11, 5)));
+        // Эстафета за старый клуб в новом сезоне в состав не тянет (как подписка группы).
+        db.Add(Swim(now, oldClub, mover, new DateTime(2026, 11, 6), relayId: 77));
+        await db.SaveChangesAsync();
+
+        var repo = Repo(db);
+        async Task<int> Total(Club club, int? season) =>
+            (await repo.GetRosterAsync(club.Id, 1, 50, null, null, null, season)).Total;
+
+        Assert.Equal(1, await Total(oldClub, 2025));
+        Assert.Equal(0, await Total(newClub, 2025));
+        Assert.Equal(0, await Total(oldClub, 2026));
+        Assert.Equal(1, await Total(newClub, 2026));
+        // Без сезона — текущий клуб карточки.
+        Assert.Equal(0, await Total(oldClub, null));
+        Assert.Equal(1, await Total(newClub, null));
+    }
+
+    [Fact]
     public async Task Roster_Age_ComputedFromGivenSeason_NotToday()
     {
         using var db = CreateDb(nameof(Roster_Age_ComputedFromGivenSeason_NotToday));
         var club = new Club { Name = "Alpha", NameEn = "Alpha" };
         db.Add(club);
-        db.Add(MakeSwimmer(club, "Swimmer", "One", 2000));
+        var style = FreestyleStyle();
+        var comp = MakeCompetition("25m", date: "15/02/2021");
+        var swimmer = MakeSwimmer(club, "Swimmer", "One", 2000);
+        db.AddRange(style, comp, swimmer);
+        db.Add(Swim(comp, club, swimmer, new DateTime(2021, 2, 15)));
         await db.SaveChangesAsync();
 
         // season=2020 передан явно — возраст обязан считаться от него, а не от сегодняшней

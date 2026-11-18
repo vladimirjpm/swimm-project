@@ -66,8 +66,23 @@ public class ClubPublicRepository : IClubPublicRepository
         var ageYear = seasonYear + 1;
 
         // Пловцы группы (Р71) в составе клуба не видны, даже если им проставлен клуб.
-        var query = _read.Swimmers.AsNoTracking()
-            .Where(s => s.ClubId == resolvedClubId && s.PrivateHubGroupId == null);
+        //
+        // Кто в составе (план swimmer-club-change, К7): при выбранном сезоне — кто СТАРТОВАЛ
+        // за клуб в этом сезоне (по строкам результатов, индивидуальные заплывы — как подписка
+        // группы на клуб, HubGroupClubRoster), без сезона — у кого это текущий клуб карточки.
+        // Перешедший в другой клуб остаётся в составе старого за те сезоны, где за него плыл.
+        var query = _read.Swimmers.AsNoTracking().Where(s => s.PrivateHubGroupId == null);
+        if (season is int rosterSeason)
+        {
+            var (from, until) = SeasonMath.RangeOf(rosterSeason);
+            query = query.Where(s => _read.Results.Any(r => r.SwimmerId == s.Id
+                && r.ClubId == resolvedClubId && r.RelayId == null
+                && r.CompetitionDate >= from && r.CompetitionDate < until));
+        }
+        else
+        {
+            query = query.Where(s => s.ClubId == resolvedClubId);
+        }
 
         if (!string.IsNullOrWhiteSpace(gender))
         {
@@ -92,7 +107,13 @@ public class ClubPublicRepository : IClubPublicRepository
         // правка пловца или результата чужого клуба её не роняет, переход пловца между клубами
         // роняет оба состава (старое и новое значение FK). ⚠ Правило блока: каждый запрос ниже
         // фильтрует Swimmers и Results по ClubId — новый запрос без такого фильтра ставить ДО.
-        using var narrowed = _read.CacheRows<Club>(resolvedClubId, typeof(Swimmer), typeof(ResultRecord));
+        //
+        // ⚠ С сезоном состав отбирается по Results.ClubId, а Swimmers — уже НЕ по ClubId: в нём
+        // есть ушедшие в другой клуб, и правка такого пловца (имя, год) сбрасывает метку ЧУЖОГО
+        // клуба. Поэтому с сезоном Swimmers не сужаем — они остаются меткой таблицы.
+        using var narrowed = season.HasValue
+            ? _read.CacheRows<Club>(resolvedClubId, typeof(ResultRecord))
+            : _read.CacheRows<Club>(resolvedClubId, typeof(Swimmer), typeof(ResultRecord));
 
         var total = await query.CountAsync();
 

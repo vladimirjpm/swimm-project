@@ -110,6 +110,15 @@ public class SwimmerProfileDto
     public int? ShowcaseSeason { get; set; }
 
     /// <summary>
+    /// История клубов по сезонам, новые сверху (план swimmer-club-change, Ф2,
+    /// <see cref="Mapping.SwimmerClubHistory"/>). Значок «несколько клубов» у чипа клуба стоит,
+    /// когда клубов в ней больше одного. Шапка при этом показывает ТЕКУЩИЙ клуб
+    /// (<see cref="ClubId"/>) при любом сезоне карусели (К6).
+    /// </summary>
+    [JsonPropertyName("clubHistory")]
+    public List<SwimmerClubSeasonDto> ClubHistory { get; set; } = [];
+
+    /// <summary>
     /// Копия, в которую страница пловца дописывает поля шапки (сезоны, рекорды, программы).
     /// Базовый профиль лежит в кэше (<c>swimmer-profile:{id}</c>), и дописывать в САМ объект из
     /// кэша нельзя: в памяти правка видна всем следующим читателям, в Redis — нет, там копия
@@ -122,6 +131,7 @@ public class SwimmerProfileDto
         copy.Programs = [.. Programs];
         copy.Records = [.. Records];
         copy.Seasons = [.. Seasons];
+        copy.ClubHistory = [.. ClubHistory];
         return copy;
     }
 }

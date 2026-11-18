@@ -307,6 +307,33 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             .ToList();
     }
 
+    public async Task<IReadOnlyDictionary<int, SwimmerClubRef>> GetClubRefsAsync(IEnumerable<int> clubIds)
+    {
+        var result = new Dictionary<int, SwimmerClubRef>();
+        var pending = clubIds.Where(id => id > 0).Distinct().ToList();
+
+        // Приёмники склеенных дочитываются волнами: цепочка «A → B → C» бывает, а петлю
+        // (данные с ошибкой) обрывает предел волн. Клубов у пловца единицы — запросов тоже.
+        for (var wave = 0; pending.Count > 0 && wave < 8; wave++)
+        {
+            var batch = pending;
+            var loaded = await _read.Clubs.AsNoTracking()
+                .Where(c => batch.Contains(c.Id))
+                .Select(c => new SwimmerClubRef(c.Id, c.Name, c.NameEn, c.IsPseudo, c.MergedIntoId))
+                .ToListAsync();
+
+            foreach (var club in loaded) result[club.Id] = club;
+
+            pending = loaded
+                .Where(c => c.MergedIntoId is int target && !result.ContainsKey(target))
+                .Select(c => c.MergedIntoId!.Value)
+                .Distinct()
+                .ToList();
+        }
+
+        return result;
+    }
+
     public async Task<IReadOnlyDictionary<string, int>> GetClubBestMsAsync(int clubId, int age)
     {
         if (clubId <= 0 || age <= 0) return new Dictionary<string, int>();
