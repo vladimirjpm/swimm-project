@@ -186,11 +186,24 @@ public class ResultDto
     [JsonPropertyName("club_id")]
     public int ClubId { get; set; }
 
+    /// <summary>
+    /// Клуб КАК НАПЕЧАТАН в протоколе (Р97, план swimmer-club-change §5 Н9): клуб с тех пор
+    /// переименован — здесь прежнее название (<c>Results.ClubNameId</c>), а текущее — в
+    /// <see cref="ClubNameNow"/>. Иначе — текущее название клуба.
+    /// </summary>
     [JsonPropertyName("club")]
     public string ClubName { get; set; } = string.Empty;
 
     [JsonPropertyName("club_en")]
     public string ClubNameEn { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Текущее название клуба, когда строка напечатана под прежним (подсказка «now: …»).
+    /// null — напечатано текущее, подсказки нет. Не пишется, когда null.
+    /// </summary>
+    [JsonPropertyName("club_now")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ClubNameNow { get; set; }
 
     [JsonPropertyName("time_ms")]
     public int? TimeMillisecond { get; set; }

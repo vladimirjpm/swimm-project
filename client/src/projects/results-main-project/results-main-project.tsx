@@ -1,3 +1,5 @@
+import { ClubNowProvider } from '../components/mix/club-now/club-now';
+import { mergeClubNow } from '../components/mix/club-now/club-now-model';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import '../../index.css'; // общий Tailwind + твои базовые стили
@@ -261,6 +263,12 @@ function ResultsMain() {
   }, [selectedEventDay]);
   const { overview: dayOverview, loading: dayOverviewLoading } =
     useCompetitionOverview(overviewDayId != null ? { competitionId: String(overviewDayId) } : undefined);
+  // Клубы, напечатанные под прежним названием (Р97): карта «id → текущее» для подсказки
+  // «now: …» и текущей эмблемы — на всех экранах соревнования (Overview, Clubs, протокол).
+  const clubNowMap = useMemo(
+    () => mergeClubNow(compOverview?.club_now, dayOverview?.club_now),
+    [compOverview, dayOverview],
+  );
   const handleOverviewDay = useCallback((day: number | null) => {
     setOverviewDay(day);
     writeOverviewDayParam(day);
@@ -483,6 +491,7 @@ function ResultsMain() {
   return (
     // Горизонтальных паддингов у корня НЕТ (handoff v2, 5a): полосы-фоны идут
     // край-в-край, ширину держит PAGE_CONTAINER внутри полос и вокруг контента.
+    <ClubNowProvider map={clubNowMap}>
     <div className="dolphine-training md:py-4 pt-safe pb-safe min-h-screen bg-[var(--theme-mode-page-bg)]">
       {/* Топбар full-bleed: гасим паддинги корня, чтобы полоса шла от края до края
           и шапка селектора/группы прижималась к ней слитным блоком (без зазора).
@@ -723,6 +732,7 @@ function ResultsMain() {
       {isPopup && <Popup />}
       </div>
     </div>
+    </ClubNowProvider>
   );
 }
 

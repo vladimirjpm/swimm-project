@@ -169,7 +169,10 @@ public partial class ResultRepository : IResultRepository
                 r.Swimmer.FirstNameEn.StartsWith(filter.Name));
 
         if (!string.IsNullOrWhiteSpace(filter.Club))
-            query = query.Where(r => r.Club.Name.StartsWith(filter.Club) || r.Club.NameEn.StartsWith(filter.Club));
+            // Клуб — и текущим, и напечатанным названием (Р97): строка протокола показывает
+            // прежнее название, сводка клубов соревнования ключуется им же.
+            query = query.Where(r => r.Club.Name.StartsWith(filter.Club) || r.Club.NameEn.StartsWith(filter.Club)
+                || (r.ClubName != null && (r.ClubName.Name.StartsWith(filter.Club) || r.ClubName.NameEn.StartsWith(filter.Club))));
 
         if (filter.SwimmerIds is { Count: > 0 })
             query = query.Where(r => filter.SwimmerIds.Contains(r.SwimmerId));
@@ -250,8 +253,10 @@ public partial class ResultRepository : IResultRepository
                 r.Id,
                 r.CompetitionId,
                 r.ClubId,
-                ClubName = r.Club.Name,
-                ClubNameEn = r.Club.NameEn,
+                // Как напечатано (Р97): зачёт соревнования — экран протокола.
+                ClubName = r.ClubName != null ? r.ClubName.Name : r.Club.Name,
+                ClubNameEn = r.ClubName != null ? r.ClubName.NameEn : r.Club.NameEn,
+                ClubNow = r.ClubName != null ? r.Club.Name : null,
                 RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
                 r.SwimmerId,
                 // Место prelim-заплыва — ранжир сессии, не награда: медали и клубные очки
@@ -330,6 +335,15 @@ public partial class ResultRepository : IResultRepository
                 Bronze = c.Bronze
             })
             .ToList();
+
+        // Текущее название у строки, напечатанной под прежним (Р97): «now: …» в зачёте и подпись
+        // фильтра клуба. Ключ — то же имя, что у ClubStandingCalculator (club → команда → EN).
+        var nowByKey = rows
+            .Where(r => r.ClubNow != null)
+            .GroupBy(r => FirstNonEmpty(r.ClubName, r.RelayTeamName, r.ClubNameEn) ?? "")
+            .ToDictionary(g => g.Key, g => g.First().ClubNow);
+        foreach (var s in summary)
+            if (nowByKey.TryGetValue(s.Club, out var now) && now != s.Club) s.ClubNow = now;
 
         // Прежние названия (Н7): поиск в фильтре клуба находит клуб и по старому названию —
         // протокол 2024/25 напечатан под «הפועל …», а строка фильтра уже под текущим именем.

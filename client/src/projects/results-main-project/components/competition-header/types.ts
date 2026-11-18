@@ -45,7 +45,10 @@ export interface OverviewBestSwim {
 
 /** Строка клубного зачёта — контракт /api/club-summary (useClubSummary). */
 export interface OverviewClub {
+  /** Клуб как напечатан в протоколе (Р97) — после переименования прежнее название. */
   club: string;
+  /** Текущее название, когда `club` — напечатанное прежнее; подсказка «now: …». */
+  clubNow?: string | null;
   /** Id клуба — ссылка на /clubs/{id}. */
   clubId: number;
   points: number;
@@ -316,6 +319,9 @@ export interface CompetitionOverview {
    *  Пусто — карточки нет. Старый сервер поля не знает → undefined. */
   official_awards?: OverviewOfficialAwardsDay[];
   records: OverviewRecord[];
+  /** Клубы, напечатанные в протоколе под прежним названием (Р97): id → текущее название.
+   *  Карточки пишут название как в протоколе, «now: …» — по этой карте (`ClubNowProvider`). */
+  club_now?: Record<string, string>;
 }
 
 export interface CompetitionHeaderProps {

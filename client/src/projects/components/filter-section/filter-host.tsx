@@ -19,6 +19,9 @@ import { useFilteredByTypeResults } from './use-filtered-results';
 import { useResultsLoadMode } from '../../../hooks/useResultsLoadMode';
 import { useFilterHints } from '../../../hooks/useFilterHints';
 import { ClubSummary, useClubSummary } from '../../../hooks/useClubSummary';
+import { useClubNowMap } from '../mix/club-now/club-now';
+import { clubNowLabel } from '../mix/club-now/club-now-model';
+import { clubFilterLabel } from './filter-club-match';
 
 /**
  * ШОВ ПАНЕЛИ ФИЛЬТРОВ (Ф2 плана `docs/plans/filters-reusable-panel-plan.md`).
@@ -346,6 +349,7 @@ export function useReduxFilterHost(active = true): FilterHost {
 
   const pagedClubs = useClubSummary(sourceParams, paged);
   const pointsUnofficial = useAppSelector((state) => state.clubPointsUnofficial);
+  const clubNowMap = useClubNowMap();
 
   const clubs = useMemo<FilterClubOptions | undefined>(() => {
     if (!active) return undefined;
@@ -353,10 +357,11 @@ export function useReduxFilterHost(active = true): FilterHost {
     return {
       // На results значение фильтра — само ИМЯ клуба (`FilterSelected.club`), поэтому
       // value === label. У страницы с club_id они разойдутся, компонент это переживёт.
+      // Р97: строки протокола — под напечатанным названием, а фильтр подписан ТЕКУЩИМ;
+      // напечатанное и прежние находятся поиском (clubFilterLabel).
       items: list.map((c) => ({
         value: c.club,
-        label: c.club,
-        aliases: c.formerNames,
+        ...clubFilterLabel(c.club, clubNowLabel(c.club, c.clubNow, c.clubId, clubNowMap), c.formerNames),
         stats: {
           points: c.points,
           swimmerCount: c.swimmerCount,
@@ -369,7 +374,7 @@ export function useReduxFilterHost(active = true): FilterHost {
       searchable: paged,
       pointsUnofficial,
     };
-  }, [active, paged, pagedClubs, summaryClubs, pointsUnofficial]);
+  }, [active, paged, pagedClubs, summaryClubs, pointsUnofficial, clubNowMap]);
 
   const options = useMemo<FilterOptions>(
     () => ({

@@ -3,6 +3,7 @@ import { useAppSelector } from '../../../../store/store';
 import { useClubSummary } from '../../../../hooks/useClubSummary';
 import { routes } from '../../../../utils/routes';
 import UI_ClubPointsUnofficialChip from '../../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
+import UI_ClubNowHint from '../../../components/mix/club-now/club-now';
 import type { Result } from '../../../../utils/interfaces/results';
 import HelperResults from '../../../../utils/helpers/helper-results';
 
@@ -190,7 +191,11 @@ export default function CompetitionClubs({ sourceParams, onOpenSwimsForClub, uno
                   onClick={() => selectClub(selectedClub === c.club ? null : c.club)}
                 >
                   <td className="py-1.5 pr-2 font-bold" style={{ color: 'var(--theme-mode-text-muted)' }}>{i + 1}</td>
-                  <td className="py-1.5 pr-2 font-bold" dir="auto">{c.club}</td>
+                  <td className="py-1.5 pr-2 font-bold">
+                    <span dir="auto">{c.club}</span>{' '}
+                    {/* Зачёт соревнования — как в протоколе (Р97), текущее мелко. */}
+                    <UI_ClubNowHint printed={c.club} clubId={c.clubId} now={c.clubNow} />
+                  </td>
                   <td className="py-1.5 pr-2">{c.swimmerCount}</td>
                   <td className="py-1.5 pr-2 whitespace-nowrap">🥇{c.gold} 🥈{c.silver} 🥉{c.bronze}</td>
                   <td className="py-1.5 text-right font-extrabold" style={{ color: 'var(--theme-primary)' }}>{c.points}</td>

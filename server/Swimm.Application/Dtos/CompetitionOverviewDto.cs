@@ -91,6 +91,14 @@ public sealed class CompetitionOverviewDto
     public bool ClubPointsUnofficial { get; init; }
     [JsonPropertyName("top_clubs_men")] public IReadOnlyList<ClubSummaryDto> TopClubsMen { get; init; } = [];
     [JsonPropertyName("top_clubs_women")] public IReadOnlyList<ClubSummaryDto> TopClubsWomen { get; init; } = [];
+
+    /// <summary>
+    /// Текущие названия клубов, которые в этом протоколе напечатаны под ПРЕЖНИМ названием
+    /// (Р97, план swimmer-club-change §5 Н9): id клуба → текущее название. Карточки Overview
+    /// пишут название как в протоколе (<c>club</c> строк), а по этой карте добавляют «now: …».
+    /// Пусто — переименованных клубов в протоколе нет.
+    /// </summary>
+    [JsonPropertyName("club_now")] public IReadOnlyDictionary<int, string> ClubNow { get; init; } = new Dictionary<int, string>();
     /// <summary>
     /// Самые титулованные пловцы соревнования: личные медали ПЛЮС эстафетные (эстафетная
     /// медаль засчитывается каждому участнику по <c>RelayMembers</c>, а не владельцу строки).

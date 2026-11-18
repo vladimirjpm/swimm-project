@@ -1,3 +1,4 @@
+import { useClubNow } from '../club-now/club-now';
 import './club-icon.css';
 import { useAppDispatch } from '../../../../store/store';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -47,7 +48,10 @@ const UI_ClubIcon: React.FC<UI_ClubIconProps> = ({
   const dispatch = useAppDispatch();
 
   const base = import.meta.env.BASE_URL;
-  const safeClubName = (clubName ?? '').trim();
+  // Эмблема — клуба, а не названия: напечатанный под прежним названием клуб (Р97) рисуется
+  // своей ТЕКУЩЕЙ эмблемой, если экран положил карту «id → текущее» (ClubNowProvider).
+  const logoName = useClubNow(clubName, clubId) ?? clubName;
+  const safeClubName = (logoName ?? '').trim();
   const fileBaseName = safeClubName
     .replaceAll(' ', '-')
     .replaceAll('"', '-')

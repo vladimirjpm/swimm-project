@@ -15,3 +15,23 @@ export function matchesClubQuery(option: ClubMatchable, query: string): boolean 
   if (option.label.toLowerCase().includes(q)) return true;
   return (option.aliases ?? []).some((a) => a.toLowerCase().includes(q));
 }
+
+/**
+ * Подпись и синонимы строки фильтра клуба (Р97). Значение фильтра — название КАК НАПЕЧАТАНО
+ * в протоколе (по нему фильтруются строки), а подпись — ТЕКУЩЕЕ название клуба: фильтры, как
+ * и страница клуба, говорят текущим (решение Влада 18.11.2026). Напечатанное и прежние
+ * названия уходят в синонимы поиска.
+ */
+export function clubFilterLabel(
+  printed: string,
+  now: string | null | undefined,
+  formerNames?: string[] | null,
+): { label: string; aliases?: string[] } {
+  const current = now?.trim();
+  const aliases = [...(current && current !== printed ? [printed] : []), ...(formerNames ?? [])]
+    .filter((a, i, all) => a && all.indexOf(a) === i && a !== (current || printed));
+  return {
+    label: current || printed,
+    aliases: aliases.length > 0 ? aliases : undefined,
+  };
+}

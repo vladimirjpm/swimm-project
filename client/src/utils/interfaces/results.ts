@@ -62,8 +62,11 @@ export interface ResultWrap {
     birth_year: number;
     /** Id клуба — для ссылки на /clubs/{id}. Опционален: у статических источников его нет. */
     club_id?: number;
+    /** Клуб КАК НАПЕЧАТАН в протоколе (Р97): после переименования клуба — прежнее название. */
     club: string;
     club_en: string;
+    /** Текущее название клуба, если `club` — прежнее (подсказка «now: …», `UI_ClubNowHint`). */
+    club_now?: string | null;
     time: string;
     time_split: string;
     time_fail: boolean;

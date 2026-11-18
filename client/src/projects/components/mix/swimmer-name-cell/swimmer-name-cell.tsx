@@ -1,6 +1,7 @@
 import React from 'react';
 import { RelaySwimmer } from '../../../../utils/interfaces/results';
 import UI_ClubIcon from '../club-icon/club-icon';
+import UI_ClubNowHint, { useClubNow } from '../club-now/club-now';
 import UI_RecordBadge, { type RecordKind } from '../record-badge/record-badge';
 import UI_SwimTime from '../swim-time/swim-time';
 import '../text-effect/text-effect.css';
@@ -11,6 +12,12 @@ interface SwimmerNameCellProps {
   firstNameEn?: string;
   lastNameEn?: string;
   club?: string;
+  /**
+   * Текущее название клуба, когда `club` — напечатанное в протоколе прежнее (Р97, `club_now`
+   * строки). Не задано — ячейка берёт его из `ClubNowProvider` по `clubId`. Под названием
+   * клуба встаёт «now: …», эмблема ищется по текущему.
+   */
+  clubNow?: string | null;
   /** Id клуба — задан, эмблема клуба становится ссылкой на /clubs/{id} (UI_ClubIcon). */
   clubId?: number | null;
   isRelay?: boolean;
@@ -46,6 +53,7 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   firstNameEn,
   lastNameEn,
   club,
+  clubNow,
   clubId,
   isRelay,
   relaySwimmersName,
@@ -67,6 +75,10 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
   const displayName = isRelay
     ? club || 'Relay Team'
     : `${firstName}${lastName ? ` ${lastName}` : ''}`;
+
+  // Клуб напечатан под прежним названием (Р97): подсказка «now: …» и эмблема по текущему.
+  const nowName = useClubNow(club, clubId, clubNow);
+  const iconClubName = nowName ?? club ?? '';
 
   const hasEnglishName =
     Boolean(firstNameEn && firstNameEn.trim()) ||
@@ -128,7 +140,12 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
         )}
       </div>
       {relayList}
-      {subText && <div className={secondLineClassName}>{subText}</div>}
+      {subText && (
+        <div className={secondLineClassName}>
+          {subText}
+          {nowName && <> <UI_ClubNowHint printed={club} now={nowName} /></>}
+        </div>
+      )}
     </div>
   );
 
@@ -148,11 +165,11 @@ const UI_SwimmerNameCell: React.FC<SwimmerNameCellProps> = ({
       {showRightClubIcon ? (
         <div className={`rowJustify flex items-center gap-2 ${rowJustify === 'end' ? 'justify-end' : 'justify-start'}`}>
           {clubIconSide === 'left' && (
-            <UI_ClubIcon clubName={club!} clubId={clubId} className="shrink-0" iconWidth={clubIconWidth} styleType="icon-notext" />
+            <UI_ClubIcon clubName={iconClubName} clubId={clubId} className="shrink-0" iconWidth={clubIconWidth} styleType="icon-notext" />
           )}
           {nameBlock}
           {clubIconSide === 'right' && (
-            <UI_ClubIcon clubName={club!} clubId={clubId} className="shrink-0" iconWidth={clubIconWidth} styleType="icon-notext" />
+            <UI_ClubIcon clubName={iconClubName} clubId={clubId} className="shrink-0" iconWidth={clubIconWidth} styleType="icon-notext" />
           )}
         </div>
       ) : nameBlock}
