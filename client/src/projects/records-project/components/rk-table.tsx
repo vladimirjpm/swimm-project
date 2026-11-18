@@ -2,7 +2,7 @@ import React from 'react';
 import UI_FlagEmoji from '../../components/mix/flag-icon/flag-icon';
 import UI_SwimTime, { swimFlaggedRowProps } from '../../components/mix/swim-time/swim-time';
 import type { RecordsRankingRow } from '../../../hooks/useRecordsRanking';
-import { HOME_REGION, behindLabel } from '../rk-disciplines';
+import { HOME_REGION, behindLabel, relayTeamLabel } from '../rk-disciplines';
 
 /**
  * Таблица рейтинга: страна, её рекорд, отставание от мирового, держатель и дата.
@@ -14,6 +14,8 @@ import { HOME_REGION, behindLabel } from '../rk-disciplines';
 
 interface Props {
   rows: RecordsRankingRow[];
+  /** Дистанция рейтинга («4X100m»): у эстафеты без состава вместо прочерка пишется сборная. */
+  distance?: string | null;
   /** Страна из адреса — подсвечивается дополнительно к домашней. */
   highlight?: string | null;
 }
@@ -35,7 +37,7 @@ const AHEAD_TITLE =
   + 'has only ratified 4×50 relay records since 2013, so the best swim ever can be older than '
   + 'the record list. We publish both rows exactly as the source gives them.';
 
-const RkTable: React.FC<Props> = ({ rows, highlight }) => (
+const RkTable: React.FC<Props> = ({ rows, distance, highlight }) => (
   <div className="rk-table" role="table" aria-label="Country records ranking">
     <div className="rk-row rk-row--head" role="row">
       <span role="columnheader">#</span>
@@ -98,8 +100,10 @@ const RkTable: React.FC<Props> = ({ rows, highlight }) => (
 
           <span className="rk-cell rk-cell--holder" role="cell">
             {row.holder_name?.trim()
-              // Источник отдаёт часть рекордов (почти все эстафетные) без имён. Прочерк, а не
-              // пустое место: пустота читается как «не успело загрузиться».
+              // Источник отдаёт часть эстафет без состава — тогда держатель сборная страны
+              // (relayTeamLabel). Прочерк остаётся для прочего: пустота читается как «не
+              // успело загрузиться».
+              || relayTeamLabel(distance, row.region_code)
               || <span className="rk-dash" title="The source publishes this record without a name">—</span>}
           </span>
 

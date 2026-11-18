@@ -69,8 +69,12 @@ const ALPHA3_TO_ALPHA2: Record<string, string> = {
   KOS: 'xk',   // Косово: 'xk' — временный код, flagcdn его понимает
 };
 
-/** ISR → il; il/IL → il; неизвестный код → null (флаг не рисуем). */
-function toAlpha2(countryCode: string): string | null {
+/**
+ * ISR → il; il/IL → il; неизвестный код → null (флаг не рисуем).
+ * Экспортирована для `countryNameEn` (rk-disciplines): название страны берётся из того же
+ * маппинга, что и флаг, — второй таблицы кодов не заводим.
+ */
+export function toAlpha2(countryCode: string): string | null {
   const norm = countryCode.trim().toUpperCase();
   if (norm.length === 2) return norm.toLowerCase();
   if (norm.length === 3) return ALPHA3_TO_ALPHA2[norm] ?? null;
