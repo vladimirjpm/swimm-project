@@ -26,3 +26,17 @@ internal sealed class DedupIgnoredPairConfiguration : IEntityTypeConfiguration<D
         entity.HasIndex(e => new { e.EntityType, e.IdA, e.IdB }).IsUnique();
     }
 }
+
+// Журнал смен клуба в карточке пловца (Р95, docs/plans/swimmer-club-change-plan.md Ф1) —
+// Sys_-таблица, БЕЗ grant swimm_ro и не в seed-tables.txt. FK нет: запись переживает склейку.
+internal sealed class SwimmerClubChangeConfiguration : IEntityTypeConfiguration<SwimmerClubChange>
+{
+    public void Configure(EntityTypeBuilder<SwimmerClubChange> entity)
+    {
+        entity.ToTable("Sys_SwimmerClubChanges", t => t.HasCheckConstraint(
+            "CK_Sys_SwimmerClubChanges_Source",
+            @"""Source"" IN ('import', 'cli', 'admin')"));
+        entity.HasIndex(e => e.ChangedAt);                    // карточка дашборда «за 7 дней»
+        entity.HasIndex(e => new { e.SwimmerId, e.ChangedAt }); // история пловца
+    }
+}

@@ -81,7 +81,9 @@
                     { v: sw.noOrgId, label: 'Без SwimmerOrgId', sub: 'isr без ID федерации', tone: 'warn', href: '/Admin/Swimmers?filter=no-org-id' },
                     { v: sw.noResults, label: 'Без результатов', sub: 'ни одного заплыва', tone: 'warn', href: '/Admin/Swimmers?filter=no-results' },
                     { v: sw.loglig.unlinked, label: 'Loglig не привязано', sub: `на проверке ${fmtN(sw.loglig.suggested)} · отклонено ${fmtN(sw.loglig.rejected)}`, tone: 'info', href: '/Admin/Swimmers/Loglig?filter=loglig-unlinked' },
+                    { v: sw.clubChanges7d || 0, label: 'Club changes, 7 days', sub: 'клуб в карточке сменился сам (импорт) или руками', tone: 'info', href: '/Admin/Swimmers?filter=club-changes' },
                 ],
+                extraDetailHtml: renderClubChanges(sw.recentClubChanges || []),
             },
             {
                 key: 'clubs', title: 'Клубы', href: '/Admin/Clubs',
@@ -687,6 +689,22 @@
             <div class="flex-1 flex flex-wrap gap-1.5 items-center min-w-0">${b.metrics.map(renderMini).join('')}${b.rowNote ? `<span class="text-[11px] text-admin-text-muted">${esc(b.rowNote)}</span>` : ''}</div>
             <div class="text-admin-text-muted/60 text-sm flex-shrink-0">›</div>
         </div>`;
+    }
+
+    // Последние смены клуба в карточках пловцов (журнал Sys_SwimmerClubChanges, Р95): автоматика
+    // меняет клуб сама при импорте — здесь её видно, а откатить можно на /Admin/Swimmers.
+    function renderClubChanges(list) {
+        if (!list.length) return '';
+        const src = { import: 'импорт', cli: 'догон', admin: 'руками' };
+        const rows = list.map(c => `
+            <div class="flex items-baseline gap-2 py-1 px-2 text-[12px]">
+                <a href="/swimmers/${c.swimmerId}" target="_blank" rel="noopener" dir="rtl" class="text-admin-text hover:underline">${esc(c.swimmerName)}</a>
+                <span class="text-admin-text-muted">#${c.swimmerId}</span>
+                <span class="flex-1 min-w-0 truncate text-admin-text-muted" dir="auto">${esc(c.fromClubName ?? '—')} → <span class="text-admin-text">${esc(c.toClubName ?? '—')}</span></span>
+                <span class="text-admin-text-muted/70 text-[11px] whitespace-nowrap">${esc(src[c.source] ?? c.source)} · ${fmtDT(c.changedAt)}</span>
+            </div>`).join('');
+        return `<div class="mt-3 text-admin-text-muted/70 text-[11px] uppercase tracking-wide px-2">Club changes, 7 days</div>${rows}
+            <a href="/Admin/Swimmers?filter=club-changes" class="block px-2 mt-1 text-admin-accent text-[11px] no-underline hover:underline">весь журнал →</a>`;
     }
 
     function renderDetailRow(m) {

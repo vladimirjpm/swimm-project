@@ -48,6 +48,9 @@ public class DashboardStatusService(
     /// федерации (см. SwimmerDedupService/dedup-report.sql) — исключаются из «живых» счётчиков.</summary>
     private const string SyntheticOrgIdPrefix = "SYNTH-";
 
+    /// <summary>Окно карточки «Club changes, 7 days» (Р95).</summary>
+    private const int ClubChangeDays = 7;
+
     public async Task<DashboardStatusSummary> GetStatusAsync(CancellationToken ct = default)
     {
         var cached = await cache.GetOrCreateAsync(CacheKey, async entry =>
@@ -314,7 +317,9 @@ public class DashboardStatusService(
             Orphans: FromRegistry("swimmers.orphans", () => swimmerReport.Orphans.Count),
             NoOrgId: noOrgId,
             NoResults: noResults,
-            Loglig: loglig);
+            Loglig: loglig,
+            ClubChanges7d: await SwimmerClubRefreshService.CountRecentAsync(db, ClubChangeDays, ct),
+            RecentClubChanges: await new SwimmerClubRefreshService(db).RecentChangesAsync(ClubChangeDays, 20, ct));
     }
 
     private async Task<DashboardClubStatus> BuildClubsAsync(CancellationToken ct)

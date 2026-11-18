@@ -2,7 +2,7 @@
 @model Swimm.API.Pages.Admin.Swimmers.IndexModel
 @{
     ViewData["Title"] = "Swimmers";
-    ViewData["PageSubtitle"] = "Дубли пловцов: кандидаты, dry-run и склейка";
+    ViewData["PageSubtitle"] = "Дубли пловцов: кандидаты, dry-run и склейка; клуб пловца";
 }
 
 <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
@@ -77,6 +77,23 @@
         <button id="btn-search-hide" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[13px] font-semibold">Скрыть из поиска</button>
     </div>
     <div id="search-hidden-body" class="text-[13px] text-admin-text-muted">Загружаю…</div>
+</details>
+
+<details id="club-wrap" class="mt-10 max-w-[900px]">
+    <summary id="club-summary" class="cursor-pointer select-none text-sm font-semibold text-admin-text">Клуб пловца</summary>
+    <div class="mt-2 mb-3 text-[12.5px] text-admin-text-muted leading-relaxed">
+        Клуб в карточке ставится сам — клуб <b>последнего соревнования</b> (импорт пересчитывает затронутых
+        пловцов, Р95). Здесь — поправить руками и <b>закрепить</b>: закреплённый клуб импорт не меняет.
+        Без закрепления следующий импорт может вернуть клуб последнего старта. Каждая смена — в журнал.
+    </div>
+    <div class="mb-3 flex flex-wrap items-center gap-2 text-[13px]">
+        <input id="club-swimmer-id" type="number" min="1" placeholder="Id пловца"
+               class="w-32 rounded-md border border-admin-border bg-transparent px-2 py-1.5 text-admin-text" />
+        <button id="btn-club-load" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[13px] font-semibold">Показать</button>
+    </div>
+    <div id="club-card" class="hidden admin-card p-4 mb-4 text-[13px]"></div>
+    <div class="mt-4 mb-1 text-[12px] uppercase tracking-wide text-admin-text-muted">Журнал смен, 30 дней</div>
+    <div id="club-changes-body" class="text-[13px] text-admin-text-muted">Загружаю…</div>
 </details>
 
 <details id="quality-wrap" class="mt-10 max-w-[900px]">

@@ -3811,6 +3811,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("ClubId")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("ClubLocked")
+                        .HasColumnType("boolean");
+
                     b.Property<int?>("CountryId")
                         .HasColumnType("integer");
 
@@ -3895,6 +3898,46 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Swimmers", null, t =>
                         {
                             t.HasCheckConstraint("CK_Swimmers_Gender", "\"Gender\" IS NULL OR \"Gender\" IN ('male', 'female')");
+                        });
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.SwimmerClubChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("FromClubId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("LastSwimDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("SwimmerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ToClubId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedAt");
+
+                    b.HasIndex("SwimmerId", "ChangedAt");
+
+                    b.ToTable("Sys_SwimmerClubChanges", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Sys_SwimmerClubChanges_Source", "\"Source\" IN ('import', 'cli', 'admin')");
                         });
                 });
 

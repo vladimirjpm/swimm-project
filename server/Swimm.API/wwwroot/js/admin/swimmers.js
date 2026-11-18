@@ -291,5 +291,98 @@
         loadHidden();
     })();
 
+    // ── Клуб пловца (Р95): клуб карточки ставит импорт сам; здесь — поправить и закрепить. ──
+    (function () {
+        const wrap = document.getElementById('club-wrap');
+        const card = document.getElementById('club-card');
+        const input = document.getElementById('club-swimmer-id');
+        const journal = document.getElementById('club-changes-body');
+        const SRC = { import: 'импорт', cli: 'догон', admin: 'руками' };
+        const club = (id, name) => id == null ? '—'
+            : `<a href="/clubs/${id}" target="_blank" rel="noopener" dir="auto" class="text-admin-text hover:underline">${esc(name ?? '')}</a> <span class="text-[#546e7a]">#${id}</span>`;
+        const dt = s => s ? new Date(s).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '';
+
+        async function loadSwimmer(id) {
+            try {
+                const d = await apiJson(`${API}/${id}/club`);
+                card.classList.remove('hidden');
+                const differs = d.ruleClubId != null && d.ruleClubId !== d.clubId;
+                card.innerHTML = `
+                    <div class="mb-2"><a href="/swimmers/${d.swimmerId}" target="_blank" rel="noopener" dir="rtl" class="text-admin-text font-semibold hover:underline">${esc(d.swimmerName)}</a>
+                        <span class="text-[#546e7a]">#${d.swimmerId}</span></div>
+                    <div class="mb-1">В карточке: ${club(d.clubId, d.clubName)} ${d.clubLocked ? '<span class="ml-1 rounded bg-admin-accent/15 px-1.5 py-0.5 text-[11px] text-admin-accent">🔒 закреплён</span>' : ''}</div>
+                    <div class="mb-3 text-admin-text-muted">По правилу (последнее соревнование): ${d.ruleClubId == null ? 'не определить — ничья или нет строк с настоящим клубом' : club(d.ruleClubId, d.ruleClubName)}
+                        ${differs ? '<span class="ml-1 text-admin-warning">≠ карточке</span>' : ''}</div>
+                    <div class="mb-1 text-[12px] uppercase tracking-wide text-admin-text-muted">Клубы по протоколам</div>
+                    <div class="mb-3">${d.periods.length === 0 ? '<span class="italic text-admin-text-muted">личных стартов нет</span>' : d.periods.map(p => `
+                        <div class="flex flex-wrap items-baseline gap-2 py-0.5">
+                            <span>${club(p.clubId, p.clubName)}</span>
+                            <span class="text-admin-text-muted text-[12px]">${p.first} — ${p.last} · строк ${p.rows}</span>
+                            <button class="club-pick cursor-pointer text-admin-accent text-[12px] hover:underline" data-club="${p.clubId}">выбрать</button>
+                        </div>`).join('')}</div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input id="club-new-id" type="number" min="1" value="${d.clubId ?? ''}" placeholder="Id клуба"
+                               class="w-28 rounded-md border border-admin-border bg-transparent px-2 py-1.5 text-admin-text" />
+                        <label class="flex items-center gap-1.5 text-admin-text-muted"><input id="club-locked" type="checkbox" ${d.clubLocked ? 'checked' : ''} /> закрепить</label>
+                        <button id="btn-club-save" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[13px] font-semibold">Сохранить</button>
+                    </div>
+                    ${d.history.length ? `<div class="mt-3 mb-1 text-[12px] uppercase tracking-wide text-admin-text-muted">История смен</div>${d.history.map(h => `
+                        <div class="text-[12px] text-admin-text-muted">${dt(h.changedAt)} · ${esc(SRC[h.source] ?? h.source)}: <span dir="auto">${esc(h.fromClubName ?? '—')}</span> → <span dir="auto" class="text-admin-text">${esc(h.toClubName ?? '—')}</span></div>`).join('')}` : ''}`;
+
+                card.querySelectorAll('.club-pick').forEach(b =>
+                    b.addEventListener('click', () => { document.getElementById('club-new-id').value = b.dataset.club; }));
+                document.getElementById('btn-club-save').addEventListener('click', async () => {
+                    const raw = document.getElementById('club-new-id').value.trim();
+                    const clubId = raw === '' ? null : parseInt(raw, 10);
+                    const locked = document.getElementById('club-locked').checked;
+                    try {
+                        await apiJson(`${API}/${d.swimmerId}/club`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ clubId, locked })
+                        });
+                        toast('Клуб пловца сохранён', 3000);
+                        await loadSwimmer(d.swimmerId);
+                        await loadJournal();
+                    } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+                });
+            } catch (e) { card.classList.remove('hidden'); card.textContent = 'Ошибка: ' + e.message; }
+        }
+
+        async function loadJournal() {
+            try {
+                const list = await apiJson(`${API}/club-changes?days=30`);
+                document.getElementById('club-summary').textContent = `Клуб пловца (смен за 30 дней: ${list.length})`;
+                journal.innerHTML = list.length === 0
+                    ? '<div class="italic py-1">Смен нет.</div>'
+                    : list.map(c => `
+                        <div class="mb-1">
+                            <a href="/swimmers/${c.swimmerId}" target="_blank" rel="noopener" dir="rtl" class="text-admin-text hover:underline">${esc(c.swimmerName)}</a>
+                            <span class="text-[#546e7a]">#${c.swimmerId}</span>:
+                            <span dir="auto">${esc(c.fromClubName ?? '—')}</span> → <span dir="auto" class="text-admin-text">${esc(c.toClubName ?? '—')}</span>
+                            <span class="text-[12px]">· ${esc(SRC[c.source] ?? c.source)} · ${dt(c.changedAt)}</span>
+                            <button class="club-open cursor-pointer ml-1 text-admin-accent text-[12px] hover:underline" data-id="${c.swimmerId}">править</button>
+                        </div>`).join('');
+                journal.querySelectorAll('.club-open').forEach(b => b.addEventListener('click', () => {
+                    input.value = b.dataset.id;
+                    loadSwimmer(+b.dataset.id);
+                    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }));
+            } catch (e) { journal.textContent = 'Ошибка: ' + e.message; }
+        }
+
+        document.getElementById('btn-club-load').addEventListener('click', () => {
+            const id = parseInt(input.value, 10);
+            if (!(id > 0)) { toast('Укажи Id пловца', 3000); return; }
+            loadSwimmer(id);
+        });
+
+        // Deep-link с дашборда: ?filter=club-changes — раскрыть журнал.
+        if (qsFilter === 'club-changes') {
+            wrap.open = true;
+            setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+        }
+        loadJournal();
+    })();
+
     load();
 })();
