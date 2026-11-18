@@ -222,6 +222,53 @@ public class DataQualityServiceTests
     }
 
     [Fact]
+    public async Task GetClubQuality_NoSwimmers_ExcludesClubsFromClubChangeJournal()
+    {
+        // 18.11.2026: пересчёт клубов увёл последних пловцов с 1255/1259 — клубы опустели, но
+        // на них ссылается журнал смен «было → стало» (FK нет). Это история, а не мусор.
+        await using var db = CreateDb(nameof(GetClubQuality_NoSwimmers_ExcludesClubsFromClubChangeJournal));
+        var was = new Club { Name = "Maccabi Ramat Hagolan" };
+        var candidate = new Club { Name = "Кандидат" };
+        var junk = new Club { Name = "Мусор" };
+        db.AddRange(was, candidate, junk);
+        await db.SaveChangesAsync();
+        db.SwimmerClubChanges.Add(new SwimmerClubChange { SwimmerId = 1, FromClubId = was.Id, ToClubId = 999, Source = "loglig" });
+        db.SwimmerClubCandidates.Add(new SwimmerClubCandidate { SwimmerId = 2, FromClubId = 998, ToClubId = candidate.Id });
+        await db.SaveChangesAsync();
+
+        var result = await new DataQualityService(db).GetClubQualityAsync("no-swimmers");
+
+        Assert.Equal(junk.Id, Assert.Single(result.Items).Id);
+    }
+
+    [Fact]
+    public async Task GetResultAnomalies_ExactDuplicates_PrelimAndFinalWithSameTime_NotADuplicate()
+    {
+        // 18.11.2026, comp 1867: רוזנברג נתאי, 50 батт. — утро (prelim) и вечер (final), оба
+        // заплыв 2, дорожка 1, 25.78 (loglig 58492 и 60512). Это два заплыва, не след импорта.
+        await using var db = CreateDb(nameof(GetResultAnomalies_ExactDuplicates_PrelimAndFinalWithSameTime_NotADuplicate));
+        var club = new Club { Name = "Club" };
+        var style = new Style { Name = "butterfly" };
+        var swimmer = new Swimmer { LastName = "רוזנברג", FirstName = "נתאי", BirthYear = 2008 };
+        var comp = new Competition { Name = "Arena", Date = "01/12/2024", PoolType = "50m" };
+        db.AddRange(club, style, swimmer, comp);
+        await db.SaveChangesAsync();
+
+        ResultRecord Row(string heatType) => new()
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", Heat = 2, Lane = 1, TimeOriginal = "00:25.78",
+            HeatType = heatType, Round = "final-open", CompetitionDate = new DateTime(2024, 12, 1)
+        };
+        db.Results.AddRange(Row("prelim"), Row("final"));
+        await db.SaveChangesAsync();
+
+        var result = await new DataQualityService(db).GetResultAnomaliesAsync();
+
+        Assert.Equal(0, result.ExactDuplicates.Total);
+    }
+
+    [Fact]
     public async Task GetResultAnomalies_ExactDuplicates_OnlyIdenticalRows()
     {
         // И10: одну дорожку в одном заплыве занимает один пловец один раз, поэтому полное

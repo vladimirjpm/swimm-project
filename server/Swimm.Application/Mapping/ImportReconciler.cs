@@ -7,6 +7,10 @@ public sealed record ReconciliationRow(int CompetitionId, string EventKey, int E
     public string Status => IsMismatch ? "mismatch" : "ok";
 }
 
+/// <summary>Одна сверка (один загруженный файл) соревнования: итог и строки по заплывам.</summary>
+public sealed record ReconciliationImport(
+    DateTime ImportedAt, string FileName, ReconciliationRow Total, IReadOnlyList<ReconciliationRow> Events);
+
 /// <summary>
 /// Сверка «файл против БД» (docs/data-integrity.md, фаза Д1). Чистая функция без EF —
 /// вся её логика проверяема тестом, а не только через реальный импорт.
@@ -76,14 +80,61 @@ public static class ImportReconciler
             .ToList();
     }
 
+    /// <summary>
+    /// Файл был ДОБАВКОЙ к уже загруженному дню (вечерняя сессия, эстафеты, затягивание идущего
+    /// соревнования по частям — docs/pull-to-prod.md, <c>overwriteExisting</c> без
+    /// <c>deleteMissing</c>), а не полным протоколом дня.
+    ///
+    /// Сверка «файл против всего дня» для такого файла бессмысленна: в файле 99 строк вечера, в
+    /// дне 766 (Эйлат 05.11.2026, comp 1874 — ложная ошибка <c>import.reconciliation-mismatch</c>).
+    /// Признак берётся из фактов, без флага импорта: день вырос РОВНО на размер файла
+    /// (<c>было + в файле = стало</c>) и каждый заплыв из файла лёг целиком. Переимпорт полного
+    /// протокола, после которого остались лишние строки, этому не удовлетворяет (Лига 5, comp
+    /// 1580: 501 + 501 ≠ 515) — и остаётся расхождением, ради которого сверка и есть.
+    /// </summary>
+    /// <param name="previousTotalActual">Сколько строк было в дне по предыдущей сверке; null — сверок не было.</param>
+    /// <param name="total">Итоговая строка (пустой EventKey) этой сверки.</param>
+    /// <param name="eventRows">Строки по заплывам этой сверки.</param>
+    public static bool IsAddition(int? previousTotalActual, ReconciliationRow total, IEnumerable<ReconciliationRow> eventRows)
+    {
+        if (previousTotalActual is not int previous || previous <= 0) return false;
+        if (total.Expected <= 0 || previous + total.Expected != total.Actual) return false;
+        return eventRows.Where(r => r.EventKey.Length > 0 && r.Expected > 0).All(r => r.Actual >= r.Expected);
+    }
+
+    /// <summary>
+    /// Какая сверка решает судьбу соревнования. Идём от последней назад, пропуская добавки
+    /// (<see cref="IsAddition"/>): после дневного файла и двух добавок вердикт — у дневного файла.
+    /// Добавка, в которой строки НЕ легли, — сама расхождение и стоит на месте.
+    /// </summary>
+    /// <param name="imports">Сверки одного соревнования по времени, старые первыми.</param>
+    /// <returns>Решающая сверка и сколько добавок после неё пропущено; null — сверок нет.</returns>
+    public static (ReconciliationImport Decisive, int AdditionsAfter)? Verdict(IReadOnlyList<ReconciliationImport> imports)
+    {
+        if (imports.Count == 0) return null;
+        var i = imports.Count - 1;
+        while (i > 0 && imports[i].Total.IsMismatch
+               && IsAddition(imports[i - 1].Total.Actual, imports[i].Total, imports[i].Events))
+            i--;
+        return (imports[i], imports.Count - 1 - i);
+    }
+
     /// <summary>Человекочитаемая сводка для лога импорта и панели затягивания.</summary>
-    public static string Describe(IReadOnlyCollection<ReconciliationRow> rows)
+    /// <param name="additions">Соревнования, для которых файл — добавка (<see cref="IsAddition"/>).</param>
+    public static string Describe(IReadOnlyCollection<ReconciliationRow> rows, IReadOnlySet<int>? additions = null)
     {
         var totals = rows.Where(r => r.EventKey.Length == 0).ToList();
-        var bad = rows.Where(r => r.EventKey.Length > 0 && r.IsMismatch).ToList();
+        var added = totals.Where(t => additions?.Contains(t.CompetitionId) == true).ToList();
+        var bad = rows.Where(r => r.EventKey.Length > 0 && r.IsMismatch
+                                  && additions?.Contains(r.CompetitionId) != true).ToList();
+
+        var addedNote = added.Count == 0 ? "" : " Добавка к дню: " + string.Join("; ", added.Select(t =>
+            $"comp {t.CompetitionId} +{t.Expected} строк легли, всего в дне {t.Actual}")) + ".";
 
         if (bad.Count == 0)
-            return $"Сверка с файлом: сошлось ({totals.Sum(t => t.Expected)} строк).";
+            return added.Count > 0 && added.Count == totals.Count
+                ? $"Сверка с файлом: сошлось.{addedNote}"
+                : $"Сверка с файлом: сошлось ({totals.Where(t => !added.Contains(t)).Sum(t => t.Expected)} строк).{addedNote}";
 
         var details = string.Join("; ", bad.Take(5).Select(r => $"{r.EventKey}: файл {r.Expected}, БД {r.Actual}"));
         var tail = bad.Count > 5 ? $" и ещё {bad.Count - 5}" : "";

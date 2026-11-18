@@ -128,4 +128,101 @@ public class ImportReconcilerTests
         Assert.Equal(30, totals[0].Expected);
         Assert.Equal(20, totals[1].Expected);
     }
+
+    // ── Добавки к уже загруженному дню (Эйлат 05.11.2026, comp 1874) ──────────────────────
+
+    private static ReconciliationRow Total(int expected, int actual) => new(1874, "", expected, actual);
+
+    private static ReconciliationImport Import(string file, int minute, int expected, int actual,
+        params ReconciliationRow[] events) =>
+        new(new System.DateTime(2026, 11, 5, 19, minute, 0), file, Total(expected, actual), events);
+
+    [Fact]
+    public void IsAddition_DayGrewExactlyByFile_AndFileLanded()
+    {
+        // Вечер: было 667, файл 99, стало 766; заплывы файла легли целиком.
+        var events = new[]
+        {
+            new ReconciliationRow(1874, "freestyle|200|0|13", 30, 30),
+            new ReconciliationRow(1874, "freestyle|4X50|1|", 21, 31),   // + эстафеты прошлой добавки
+            new ReconciliationRow(1874, "butterfly|50|0|10", 0, 18),    // дневная сессия — не из файла
+        };
+        Assert.True(ImportReconciler.IsAddition(667, Total(99, 766), events));
+    }
+
+    [Fact]
+    public void IsAddition_FullReimportWithLeftovers_IsNot()
+    {
+        // Лига 5 (comp 1580): было 501, тот же протокол 501, стало 515 — лишние строки, не добавка.
+        Assert.False(ImportReconciler.IsAddition(501, new ReconciliationRow(1580, "", 501, 515), []));
+    }
+
+    [Fact]
+    public void IsAddition_RowsOfTheFileLost_IsNot()
+    {
+        // День вырос на размер файла, но один заплыв файла лёг не весь (а «лишнее» пришло
+        // откуда-то ещё) — это расхождение, его нельзя прятать за арифметикой итога.
+        var events = new[]
+        {
+            new ReconciliationRow(1874, "freestyle|200|0|13", 30, 28),
+            new ReconciliationRow(1874, "freestyle|200|0|14", 0, 2),
+        };
+        Assert.False(ImportReconciler.IsAddition(100, Total(30, 130), events));
+    }
+
+    [Fact]
+    public void IsAddition_FirstImport_IsNot()
+    {
+        Assert.False(ImportReconciler.IsAddition(null, Total(99, 766), []));
+        Assert.False(ImportReconciler.IsAddition(0, Total(99, 99), []));
+    }
+
+    [Fact]
+    public void Verdict_SkipsAdditions_BackToTheDayFile()
+    {
+        // Ровно история 1874: дневной файл 657 сошёлся, эстафеты +10, вечер +99.
+        var imports = new[]
+        {
+            Import("day1.json", 47, 657, 657),
+            Import("day1-relays.json", 50, 10, 667, new ReconciliationRow(1874, "freestyle|4X50|1|", 10, 10)),
+            Import("day1-evening.json", 55, 99, 766, new ReconciliationRow(1874, "freestyle|200|0|13", 78, 78),
+                new ReconciliationRow(1874, "freestyle|4X50|1|", 21, 31)),
+        };
+
+        var verdict = ImportReconciler.Verdict(imports);
+
+        Assert.NotNull(verdict);
+        Assert.Equal("day1.json", verdict!.Value.Decisive.FileName);
+        Assert.Equal(2, verdict.Value.AdditionsAfter);
+        Assert.False(verdict.Value.Decisive.Total.IsMismatch);
+    }
+
+    [Fact]
+    public void Verdict_MismatchedDayFile_NotHiddenByLaterAddition()
+    {
+        // Добавка, легшая целиком, не «чинит» расхождение дневного файла под ней.
+        var imports = new[]
+        {
+            Import("day1.json", 47, 657, 650),
+            Import("day1-evening.json", 55, 99, 749, new ReconciliationRow(1874, "freestyle|200|0|13", 99, 99)),
+        };
+
+        var verdict = ImportReconciler.Verdict(imports)!.Value;
+
+        Assert.Equal("day1.json", verdict.Decisive.FileName);
+        Assert.True(verdict.Decisive.Total.IsMismatch);
+    }
+
+    [Fact]
+    public void Describe_Addition_SaysSoInsteadOfMismatch()
+    {
+        var rows = ImportReconciler.Build(
+            Map((1874, "freestyle|200|0|13", 99)),
+            Map((1874, "freestyle|200|0|13", 99), (1874, "butterfly|50|0|10", 667)));
+
+        var text = ImportReconciler.Describe(rows, new HashSet<int> { 1874 });
+
+        Assert.Contains("Добавка к дню", text);
+        Assert.DoesNotContain("РАСХОЖДЕНИЕ", text);
+    }
 }

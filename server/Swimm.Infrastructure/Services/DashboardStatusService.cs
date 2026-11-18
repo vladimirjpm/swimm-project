@@ -337,6 +337,8 @@ public class DashboardStatusService(
         // Из реестра (clubs.empty), пока он не гонялся — вживую.
         var noSwimmers = await FromRegistryAsync("clubs.empty", () => db.Clubs.AsNoTracking()
             .Where(c => !c.IsPseudo && !c.Name.StartsWith("SYNTH") && c.MergedIntoId == null)
+            .Where(c => !db.SwimmerClubChanges.Any(x => x.FromClubId == c.Id || x.ToClubId == c.Id))
+            .Where(c => !db.SwimmerClubCandidates.Any(x => x.FromClubId == c.Id || x.ToClubId == c.Id))
             .Where(c => !db.Swimmers.Any(s => s.ClubId == c.Id))
             .Where(c => !db.Results.Any(r => r.ClubId == c.Id))
             .CountAsync(ct));

@@ -127,6 +127,10 @@ public class ClubAdminRepository(SwimmDbContext db) : IClubAdminRepository
             return $"Клуб #{id} у кого-то в избранном";
         if (await db.HubGroupClubRequests.AnyAsync(r => r.ClubId == id, ct))
             return $"На клуб #{id} есть заявка на статус клуба";
+        // FK у журнала нет — без этой проверки удаление прошло бы и молча оборвало историю.
+        if (await db.SwimmerClubChanges.AnyAsync(x => x.FromClubId == id || x.ToClubId == id, ct)
+            || await db.SwimmerClubCandidates.AnyAsync(x => x.FromClubId == id || x.ToClubId == id, ct))
+            return $"Клуб #{id} есть в журнале смен клуба пловцов — удаление оборвёт историю и откат";
 
         return null;
     }
