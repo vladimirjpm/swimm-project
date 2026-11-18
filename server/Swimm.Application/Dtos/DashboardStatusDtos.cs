@@ -82,7 +82,11 @@ public sealed record DashboardSwimmerStatus(
     int NoOrgId,
     /// <summary>Нет ни одной строки в Results, ни в RelayMembers (синтетика исключена).</summary>
     int NoResults,
-    DashboardLogligStatus Loglig);
+    DashboardLogligStatus Loglig,
+    /// <summary>Смен клуба в карточках за 7 дней (журнал Sys_SwimmerClubChanges, Р94).</summary>
+    int ClubChanges7d = 0,
+    /// <summary>Последние смены клуба за 7 дней (до 20) — список в панели деталей.</summary>
+    IReadOnlyList<SwimmerClubChangeDto>? RecentClubChanges = null);
 
 /// <summary>Блок «Клубы»: дедуп-кандидаты, клубы без пловцов/страны, заявки на официальный статус.</summary>
 public sealed record DashboardClubStatus(

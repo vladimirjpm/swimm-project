@@ -23,6 +23,7 @@ public class SwimmersAdminController : ControllerBase
     private readonly IDataQualityService _quality;
     private readonly IDataCheckRunner _checks;
     private readonly ISearchVisibilityService _visibility;
+    private readonly ISwimmerClubRefreshService _clubs;
     private readonly ILogger<SwimmersAdminController> _logger;
 
     public SwimmersAdminController(
@@ -33,6 +34,7 @@ public class SwimmersAdminController : ControllerBase
         IDataQualityService quality,
         IDataCheckRunner checks,
         ISearchVisibilityService visibility,
+        ISwimmerClubRefreshService clubs,
         ILogger<SwimmersAdminController> logger)
     {
         _dedup = dedup;
@@ -42,6 +44,7 @@ public class SwimmersAdminController : ControllerBase
         _quality = quality;
         _checks = checks;
         _visibility = visibility;
+        _clubs = clubs;
         _logger = logger;
     }
 
@@ -159,6 +162,46 @@ public class SwimmersAdminController : ControllerBase
             new { swimmerId = id, request.Hidden }, ct);
         return Ok();
     }
+
+    /// <summary>
+    /// Блок «Клуб пловца» (Р94): клуб в карточке, закреплён ли, что сказало бы правило
+    /// «клуб последнего соревнования», периоды клубов по протоколам и последние смены.
+    /// </summary>
+    [HttpGet("{id:int}/club")]
+    public async Task<IActionResult> GetClub(int id, CancellationToken ct)
+        => await _clubs.GetForAdminAsync(id, ct) is { } dto ? Ok(dto) : NotFound(new { error = "Пловец не найден" });
+
+    public sealed record SetClubRequest(int? ClubId, bool Locked);
+
+    /// <summary>
+    /// Ручная правка клуба и закрепление (К3). Закреплённый клуб импорт не меняет; без
+    /// закрепления следующий импорт может вернуть клуб последнего соревнования. Смена клуба
+    /// пишет журнал Sys_SwimmerClubChanges (source=admin) и аудит.
+    /// </summary>
+    [HttpPost("{id:int}/club")]
+    public async Task<IActionResult> SetClub(int id, [FromBody] SetClubRequest request, CancellationToken ct)
+    {
+        var (result, error) = await _clubs.SetByAdminAsync(id, request.ClubId, request.Locked, ct);
+        switch (error)
+        {
+            case SwimmerClubSetError.SwimmerNotFound: return NotFound(new { error = "Пловец не найден" });
+            case SwimmerClubSetError.ClubNotFound: return BadRequest(new { error = $"Клуба #{request.ClubId} нет" });
+            case SwimmerClubSetError.PseudoClub: return BadRequest(new { error = "Это псевдоклуб (страна/сборная) — не клуб пловца" });
+        }
+
+        var r = result!;
+        var summary = (r.FromClubId != r.ToClubId
+                ? $"Клуб пловца: #{r.FromClubId?.ToString() ?? "—"} → #{r.ToClubId?.ToString() ?? "—"}"
+                : $"Клуб пловца не менялся (#{r.ToClubId?.ToString() ?? "—"})")
+            + (r.WasLocked != r.Locked ? (r.Locked ? ", закреплён" : ", закрепление снято") : "");
+        await _audit.LogAsync("swimmer.club-set", "Swimmer", id.ToString(), summary, r, ct);
+        return Ok(r);
+    }
+
+    /// <summary>Журнал смен клуба за <paramref name="days"/> дней (по умолчанию 30), новые сверху.</summary>
+    [HttpGet("club-changes")]
+    public async Task<IActionResult> ClubChanges([FromQuery] int days = 30, CancellationToken ct = default)
+        => Ok(await _clubs.RecentChangesAsync(Math.Clamp(days, 1, 365), 200, ct));
 
     public sealed record DeleteOrphansRequest(List<int>? Ids);
 

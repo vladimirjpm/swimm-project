@@ -133,6 +133,9 @@ public class SwimmDbContext : DbContext
     /* === Аудит ручных мутаций админки (фаза 7.4, Sys_) === */
     public DbSet<AdminAudit> AdminAudits => Set<AdminAudit>();
 
+    /* === Журнал смен клуба в карточке пловца (Р94, Sys_) === */
+    public DbSet<SwimmerClubChange> SwimmerClubChanges => Set<SwimmerClubChange>();
+
     /* === Тренировки (приватные, Sys_) === */
     public DbSet<TrainingSession> TrainingSessions => Set<TrainingSession>();
     public DbSet<TrainingResult> TrainingResults => Set<TrainingResult>();

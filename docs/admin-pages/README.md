@@ -12,7 +12,7 @@
 |---|---|---|
 | /Admin | [index.md](index.md) | Дашборд: пользователи, роли, статистика, «требует внимания» |
 | /Admin/Health | [health.md](health.md) | **Здоровье данных**: единый реестр проверок целостности, находки со статусами, история прогонов |
-| /Admin/Swimmers | [swimmers.md](swimmers.md) | Дубли пловцов: кандидаты, dry-run, склейка, сироты |
+| /Admin/Swimmers | [swimmers.md](swimmers.md) | Дубли пловцов: кандидаты, dry-run, склейка, сироты; клуб пловца (правка, закрепление, журнал смен) |
 | /Admin/Swimmers/Loglig | [swimmers-loglig.md](swimmers-loglig.md) | Привязка пловцов к loglig.com |
 | /Admin/Clubs | [clubs.md](clubs.md) | Дубли клубов: кандидаты, dry-run, склейка |
 | /Admin/Competitions | [competitions.md](competitions.md) | Соревнования: справочник БД + входящие isr.org.il одним списком (CRUD + импорт) |

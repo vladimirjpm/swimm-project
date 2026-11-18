@@ -77,6 +77,14 @@ public class Swimmer
     [ForeignKey(nameof(ClubId))]
     public Club? Club { get; set; }
 
+    /// <summary>
+    /// Клуб закреплён админом (решение К3, docs/plans/swimmer-club-change-plan.md; Р94): импорт и
+    /// <c>--refresh-swimmer-clubs</c> его не меняют. Без флага <see cref="ClubId"/> — клуб последнего
+    /// соревнования (<c>SwimmerCurrentClubRule</c>) и сам следует за пловцом при смене клуба.
+    /// Ставится на /Admin/Swimmers, блок «Клуб пловца».
+    /// </summary>
+    public bool ClubLocked { get; set; }
+
     /// <summary>Ссылка на страну (опционально)</summary>
     public int? CountryId { get; set; }
 

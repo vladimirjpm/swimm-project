@@ -28,6 +28,7 @@ public class JsonImportService : IImportService
     private readonly ISuspectResultService? _suspects;
     private readonly IRelayLegCleanupService? _legCleanup;
     private readonly ISeriesBinder? _seriesBinder;
+    private readonly ISwimmerClubRefreshService? _clubRefresh;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -57,6 +58,10 @@ public class JsonImportService : IImportService
     /// в обход доклейки, и перезалив #1482 10.10.2026 вернул обнулённый этап 00:00.69.
     /// Необязателен по той же причине, что и <paramref name="recalc"/>.
     /// </param>
+    /// <param name="clubRefresh">
+    /// Пересчёт текущего клуба у затронутых пловцов (Р94). Необязателен по той же причине, что и
+    /// <paramref name="recalc"/>.
+    /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null,
         IDataCheckRunner? checks = null,
@@ -64,7 +69,8 @@ public class JsonImportService : IImportService
         IHubGroupClubSubscriptionService? clubSync = null,
         ISuspectResultService? suspects = null,
         IRelayLegCleanupService? legCleanup = null,
-        ISeriesBinder? seriesBinder = null)
+        ISeriesBinder? seriesBinder = null,
+        ISwimmerClubRefreshService? clubRefresh = null)
     {
         _db    = db;
         _cache = cache;
@@ -75,6 +81,7 @@ public class JsonImportService : IImportService
         _suspects = suspects;
         _legCleanup = legCleanup;
         _seriesBinder = seriesBinder;
+        _clubRefresh = clubRefresh;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -144,6 +151,7 @@ public class JsonImportService : IImportService
         private readonly ISuspectResultService? _suspects;
         private readonly IRelayLegCleanupService? _legCleanup;
         private readonly ISeriesBinder? _seriesBinder;
+        private readonly ISwimmerClubRefreshService? _clubRefresh;
 
         // Аргументы ImportAsync.
         private readonly Stream jsonStream;
@@ -222,6 +230,7 @@ public class JsonImportService : IImportService
             _suspects = svc._suspects;
             _legCleanup = svc._legCleanup;
             _seriesBinder = svc._seriesBinder;
+            _clubRefresh = svc._clubRefresh;
             this.jsonStream = jsonStream;
             this.fileName = fileName;
             this.categoryKeys = categoryKeys;
@@ -276,6 +285,7 @@ public class JsonImportService : IImportService
                 await BindSeriesAsync();
                 await ReconcileWithFileAsync();
                 await AlignGendersAsync();
+                await RefreshSwimmerClubsAsync();
                 await RerankOpenWaterAsync();
                 await SyncClubGroupsAsync();
                 await RunDataChecksAsync();
@@ -1369,6 +1379,43 @@ public class JsonImportService : IImportService
             }
         }
 
+        // Текущий клуб в карточке пловца (Р94): клуб последнего соревнования, у ЗАТРОНУТЫХ импортом
+        // пловцов — со строками в днях импорта и с удалёнными строками (переимпорт с deleteMissing
+        // мог снять последний старт). Раньше клуб писался только в пустое поле и не менялся
+        // никогда: 538 карточек на проде 18.11.2026 держали старый клуб. Смены — в журнал
+        // Sys_SwimmerClubChanges; закреплённых (ClubLocked) не трогает. Как и соседи — после
+        // коммита и в try/catch.
+        private async Task RefreshSwimmerClubsAsync()
+        {
+            if (_clubRefresh is null || touchedCompetitionKeys.Count == 0) return;
+            try
+            {
+                _db.ChangeTracker.Clear();
+                var touchedIds = touchedCompetitionKeys
+                    .Select(k => competitionCache[k].Id).Distinct().ToList();
+                var swimmerIds = await _db.Results.AsNoTracking()
+                    .Where(r => touchedIds.Contains(r.CompetitionId) && r.RelayId == null)
+                    .Select(r => r.SwimmerId)
+                    .Distinct()
+                    .ToListAsync();
+                swimmerIds.AddRange(orphanCandidateSwimmerIds);
+
+                var report = await _clubRefresh.RefreshAsync(swimmerIds, SwimmerClubChangeSources.Import, apply: true);
+                if (report.Changes.Count > 0)
+                    diagnosticLog.Add(
+                        $"Клуб пловца сменился у {report.Changes.Count}: "
+                        + string.Join(", ", report.Changes.Take(10).Select(c =>
+                            $"#{c.SwimmerId} «{c.FromClubName ?? "—"}» → «{c.ToClubName}»"))
+                        + (report.Changes.Count > 10 ? " …" : ""));
+            }
+            catch (Exception ex)
+            {
+                diagnosticLog.Add(
+                    $"Пересчёт клуба пловцов не выполнен ({ex.GetType().Name}: {ex.Message}). " +
+                    "Импорт сохранён; догнать — `dotnet run -- --refresh-swimmer-clubs`.");
+            }
+        }
+
         // Общая категория открытой воды — места внутри пола (Р78). Строго ПОСЛЕ согласования
         // пола: пола в блоке «כללי» протокол не печатает, его только что дописал шаг выше.
         private async Task RerankOpenWaterAsync()
@@ -1723,6 +1770,8 @@ public class JsonImportService : IImportService
     /// Дополняет данные спортсмена полями из результатов:
     /// Gender (из event_style_gender), ClubId (FK на клуб) и CountryId (FK на страну).
     /// Обновляет только пустые поля — не перезаписывает уже заполненные.
+    /// Клуб здесь — лишь первое заполнение новой карточки: смену клуба делает шаг импорта
+    /// <c>RefreshSwimmerClubsAsync</c> после коммита (правило <c>SwimmerCurrentClubRule</c>, Р94).
     /// </summary>
     private static void EnrichSwimmerFromResult(Swimmer swimmer, string? gender, Club? club, Country? country)
     {
