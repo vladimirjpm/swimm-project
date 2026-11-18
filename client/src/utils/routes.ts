@@ -19,7 +19,8 @@
 //   /about                  → about.html
 //   /season-best            → season-best.html (списки лучших в сезоне; всё в query)
 //   /records                → records.html (рейтинг рекордов стран; дисциплина в query)
-//   /records/compare        → records-compare.html (две страны по рекордам; пара в query)
+//   /records/compare        → records-compare.html — только переадресация на /records?tab=h2h
+//                             (сравнение стран стало табом H2H, 18.11.2026)
 //   /help/{key}             → help.html (справка из src/content/help/{key}/{en,ru,he}.md)
 //   /privacy                → help.html (политика приватности = справка с ключом privacy)
 //   /terms                  → help.html (условия пользования = справка с ключом terms)
@@ -153,6 +154,12 @@ export const routes = {
     /** Возрастная группа мастерсов («35-39»), только для таба `masters`. */
     ageGroup?: string | null;
     /**
+     * Стороны таба `h2h` — сравнения двух стран (alpha-3). У этого таба `gender` и
+     * `poolType` значат разрез сравнения, и пусто там — «все» (Both pools / All).
+     */
+    a?: string | null;
+    b?: string | null;
+    /**
      * Регион таба `world` (9.9): alpha-3 страны — её национальные рекорды против мировых;
      * пусто — сами мировые рекорды.
      */
@@ -167,29 +174,24 @@ export const routes = {
     if (q.highlight) params.set('country', q.highlight);
     if (q.ageGroup) params.set('age', q.ageGroup);
     if (q.region) params.set('region', q.region);
+    if (q.a) params.set('a', q.a);
+    if (q.b) params.set('b', q.b);
     const query = params.toString();
     return query ? `/records?${query}` : '/records';
   },
 
   /**
-   * Страница `/records/compare` — сравнение ДВУХ СТРАН по рекордам (этап 11.3.2).
+   * Сравнение ДВУХ СТРАН по рекордам (этап 11.3.2) — таб H2H страницы `/records`
+   * (`?tab=h2h`, просьба Влада 18.11.2026). Раньше это была отдельная страница
+   * `/records/compare`; тот адрес остался и только переадресует сюда, чтобы старые ссылки
+   * не сломались.
    *
-   * Сегмент в пути, а пара в query — и это не противоречие правилу «в путь только
-   * идентичность»: `compare` тут не идентификатор ресурса, а другой ЭКРАН тех же данных
-   * (как `/groups/{slug}/results` рядом с `/groups/{slug}`). Сама пара стран идентичностью
-   * не является по той же причине, что пара пловцов в `/h2h`: «ещё никто не выбран» —
-   * законное состояние, и в пути оно потребовало бы второго формата.
+   * Пара стран — в query по той же причине, что пара пловцов в `/h2h`: «ещё никто не
+   * выбран» — законное состояние, и в пути оно потребовало бы второго формата.
    */
   recordsCompare: (q: { a?: string | null; b?: string | null;
-    poolType?: string | null; gender?: string | null } = {}) => {
-    const params = new URLSearchParams();
-    if (q.a) params.set('a', q.a);
-    if (q.b) params.set('b', q.b);
-    if (q.poolType) params.set('pool', q.poolType);
-    if (q.gender) params.set('gender', q.gender);
-    const query = params.toString();
-    return query ? `/records/compare?${query}` : '/records/compare';
-  },
+    poolType?: string | null; gender?: string | null } = {}): string =>
+    routes.records({ tab: 'h2h', a: q.a, b: q.b, poolType: q.poolType, gender: q.gender }),
 
   /**
    * Страница head-to-head: сравнение ДВУХ пловцов бок о бок (`docs/plans/h2h-page-plan.md`).
@@ -355,10 +357,13 @@ export function parseSeasonBestQuery(search: string = window.location.search): S
  * Иначе «пользователь выбрал 50 вольным» и «мы подставили 50 вольным» стали бы одним и тем
  * же состоянием, и первое же изменение дефолта переписало бы чужие ссылки.
  */
-/** Табы страницы `/records`. `countries` — рейтинг стран, он же вид по умолчанию. */
-export type RecordsTab = 'countries' | 'world' | 'masters' | 'junior';
+/**
+ * Табы страницы `/records`. `countries` — рейтинг стран, он же вид по умолчанию; `h2h` —
+ * сравнение двух стран (бывшая страница `/records/compare`).
+ */
+export type RecordsTab = 'countries' | 'world' | 'masters' | 'junior' | 'h2h';
 
-const RECORDS_TABS: readonly RecordsTab[] = ['countries', 'world', 'masters', 'junior'];
+const RECORDS_TABS: readonly RecordsTab[] = ['countries', 'world', 'masters', 'junior', 'h2h'];
 
 /** Пол дисциплины справочника рекордов: mixed — смешанная эстафета (Э2, records-relays-plan). */
 export type RecordGender = 'male' | 'female' | 'mixed';
@@ -405,7 +410,7 @@ export function parseRecordsQuery(search: string = window.location.search): Reco
 }
 
 /**
- * Пара стран и разрез страницы `/records/compare`, разобранные из query. Живёт рядом с
+ * Пара стран и разрез таба H2H страницы `/records` (`?tab=h2h`), разобранные из query. Живёт рядом с
  * генератором по тому же правилу, что остальные разборы.
  *
  * `a === b` даёт null во втором слоте — сравнение страны с самой собой не значит ничего

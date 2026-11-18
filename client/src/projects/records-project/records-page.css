@@ -527,6 +527,9 @@
   margin-inline: -8px; padding: 8px 8px 6px;
   transition: padding 140ms ease;
 }
+/* Сравнение живёт в панели таба H2H (18.11.2026), а не на фоне страницы: прилипшая полоса
+   красится фоном панели, иначе поверх карточек ехала бы чужая цветная лента. */
+.deep-tabs-panel .rc-sticky { background: var(--deep-panel-bg); }
 /* Метка прилипания: нулевой высоты, видимой роли нет. */
 .rc-sticky__sentinel { height: 0; }
 
