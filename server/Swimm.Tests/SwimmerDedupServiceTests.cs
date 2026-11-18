@@ -28,6 +28,25 @@ public class SwimmerDedupServiceTests
         Assert.Equal(SwimmerDedupService.Normalize("O'Brien"), SwimmerDedupService.Normalize("O’Brien"));
     }
 
+    [Theory]
+    // Гереш всеми символами, что встречались в протоколах и на сайтах (18.11.2026: «‘» у Эйлата).
+    [InlineData("ברדיצ‘בסקי דניאלה")]   // U+2018
+    [InlineData("ברדיצ’בסקי דניאלה")]   // U+2019
+    [InlineData("ברדיצ'בסקי דניאלה")]   // ASCII
+    [InlineData("ברדיצ`בסקי דניאלה")]   // обратный штрих
+    [InlineData("ברדיצ´בסקי דניאלה")]   // акут
+    [InlineData("ברדיצʼבסקי דניאלה")]   // U+02BC
+    public void Normalize_AnyGeresh_EqualsHebrewGeresh(string variant) =>
+        Assert.Equal(SwimmerDedupService.Normalize("ברדיצ׳בסקי דניאלה"), SwimmerDedupService.Normalize(variant));
+
+    [Theory]
+    [InlineData("איל“ן")]
+    [InlineData("איל”ן")]
+    [InlineData("איל„ן")]
+    [InlineData("איל\"ן")]
+    public void Normalize_AnyGershayim_EqualsHebrewGershayim(string variant) =>
+        Assert.Equal(SwimmerDedupService.Normalize("איל״ן"), SwimmerDedupService.Normalize(variant));
+
     [Fact]
     public void Normalize_DifferentLettersNotEqual()
     {

@@ -5,7 +5,13 @@ namespace Swimm.Application.Mapping;
 /// <summary>
 /// Ключ сравнения имён: trim/lower, финальные ивритские буквы, гереш ׳/гершаим ״ → ASCII,
 /// схлопнуть пробелы. Одно правило с поиском дублей пловцов и клубов
-/// (<c>SwimmerDedupService.Normalize</c> зовёт сюда) и с dedup-report.sql.
+/// (<c>SwimmerDedupService.Normalize</c> зовёт сюда), с сопоставлением пловца на импорте
+/// (<c>ImportSwimmerResolver</c>) и с dedup-report.sql.
+///
+/// Гереш пишут кто чем: U+05F3, ASCII-апостроф, типографские ’ и ‘, обратный штрих, акут,
+/// U+02BC. 18.11.2026 на проде 8 из 16 «уверенных дублей» пловцов были одной природы —
+/// протокол Эйлата написал «ברדיצ‘בסקי» (U+2018), карточка — «ברדיצ׳בסקי» (U+05F3), и импорт
+/// завёл двойника. Гершаим так же: ״, ASCII-кавычка, типографские “ ” „.
 /// </summary>
 public static class NameKey
 {
@@ -15,7 +21,8 @@ public static class NameKey
         var chars = name.Trim().ToLowerInvariant().Select(c => c switch
         {
             'ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ',
-            '׳' => '\'', '״' => '"', '’' => '\'',
+            '׳' or '’' or '‘' or '`' or '´' or 'ʼ' => '\'',
+            '״' or '“' or '”' or '„' => '"',
             _ => c
         });
         return string.Join(' ',

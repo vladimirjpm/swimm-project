@@ -105,6 +105,26 @@ public class SwimmerSpellingVariantImportTests
     }
 
     [Fact]
+    public async Task TypographicGeresh_GoesToExistingCard()
+    {
+        // 18.11.2026: протокол Эйлата писал гереш левой типографской кавычкой «‘» (U+2018),
+        // карточки — «׳» (U+05F3); импорт не узнавал пловца и заводил двойника (8 из 16
+        // «уверенных дублей» на проде). Это то же имя, а не другое написание: клуб не важен.
+        var (db, _) = await SeedAsync(nameof(TypographicGeresh_GoesToExistingCard));
+        await using var __ = db;
+        var card = new Swimmer { LastName = "ברדיצ׳בסקי", FirstName = "דניאלה", BirthYear = 2011, Gender = "female" };
+        db.Add(card);
+        await db.SaveChangesAsync();
+
+        var result = await new JsonImportService(db, new NullCache())
+            .ImportAsync(ToStream(new[] { Item("ברדיצ‘בסקי", "דניאלה", "מכבי חיפה") }));
+
+        Assert.Empty(result.ErrorMessages);
+        Assert.Equal(2, await db.Swimmers.CountAsync());
+        Assert.Equal(card.Id, (await db.Results.SingleAsync()).SwimmerId);
+    }
+
+    [Fact]
     public async Task Variant_OtherClub_IsNewCard()
     {
         // Другой клуб — уже не уверенность: возможно, другой человек. Решает человек в Health.

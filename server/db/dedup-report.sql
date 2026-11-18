@@ -4,10 +4,11 @@
 CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
 
 -- Нормализация имени: trim + lower + ивритские финальные буквы → обычные
--- (ך→כ, ם→מ, ן→נ, ף→פ, ץ→צ), гереш ׳ и гершаим ״ → ASCII '/", двойные пробелы схлопнуть.
+-- (ך→כ, ם→מ, ן→נ, ף→פ, ץ→צ), гереш ׳ ’ ‘ ` ´ ʼ → ', гершаим ״ “ ” „ → ", двойные пробелы схлопнуть
+-- (зеркало NameKey.Normalize).
 CREATE OR REPLACE FUNCTION pg_temp.norm(t text) RETURNS text
 LANGUAGE sql IMMUTABLE AS $$
-  SELECT regexp_replace(translate(lower(trim(coalesce(t, ''))), 'ךםןףץ׳״', 'כמנפצ''"'), '\s+', ' ', 'g')
+  SELECT regexp_replace(translate(lower(trim(coalesce(t, ''))), 'ךםןףץ׳’‘`´ʼ״“”„', 'כמנפצ''''''''''''""""'), '\s+', ' ', 'g')
 $$;
 
 -- Реальные пловцы: синтетика (SYNTH-%) исключена.
