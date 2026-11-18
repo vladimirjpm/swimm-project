@@ -104,7 +104,32 @@ const signedDelta = (row: RecordCompareRow): number | null => {
   return row.outcome === 'a' ? -row.delta_ms : row.delta_ms;
 };
 
-const Card: React.FC<{ group: EventGroup; showGender: boolean }> = ({ group, showGender }) => (
+const SAME_HOLDER_TITLE =
+  'A national record belongs to the country the swimmer represented on the day of the swim. '
+  + 'This swimmer set records for both countries — before and after changing sporting nationality.';
+
+const normName = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+
+/**
+ * Имена, которые стоят с ОБЕИХ сторон карточки: один пловец держит рекорд обеих стран
+ * (Кирпичникова — RUS 2020–21 и FRA 2023–24). Данные верны — рекорд остаётся за страной,
+ * за которую плыли в тот день, — но одно имя слева и справа без подписи выглядит сбоем.
+ * Пересечение берём по всей карточке, а не по полосе: рекорд одной страны может быть на
+ * 50м, а другой — на 25м.
+ */
+function sameHolders(rows: RecordCompareRow[]): string[] {
+  const left = new Set(rows.map((r) => normName(r.a?.holder_name)).filter(Boolean));
+  const names = new Map<string, string>();
+  for (const r of rows) {
+    const n = normName(r.b?.holder_name);
+    if (n && left.has(n) && !names.has(n)) names.set(n, r.b!.holder_name!.trim());
+  }
+  return [...names.values()];
+}
+
+const Card: React.FC<{ group: EventGroup; showGender: boolean }> = ({ group, showGender }) => {
+  const shared = sameHolders(group.rows);
+  return (
   <UI_H2HEventCard
     stroke={group.stroke}
     distance={group.distance}
@@ -136,8 +161,14 @@ const Card: React.FC<{ group: EventGroup; showGender: boolean }> = ({ group, sho
         deltaMs={signedDelta(row)}
       />
     ))}
+    {shared.length > 0 && (
+      <div className="rc-event__same-holder" title={SAME_HOLDER_TITLE}>
+        {shared.join(', ')} holds the record for both countries
+      </div>
+    )}
   </UI_H2HEventCard>
-);
+  );
+};
 
 const RcH2HEvents: React.FC<Props> = ({ rows, genderFixed }) => {
   const groups = React.useMemo(() => groupRows(rows), [rows]);

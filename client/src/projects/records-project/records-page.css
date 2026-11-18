@@ -597,6 +597,13 @@
   color: var(--deep-text-faint);
 }
 
+/* Один и тот же пловец держит рекорд обеих стран (сменил спортивное гражданство):
+   подпись внизу карточки, чтобы одно имя с двух сторон не читалось как сбой. */
+.rc-event__same-holder {
+  margin-top: 2px; text-align: center; line-height: 1.4;
+  font-size: 11px; font-weight: 700; color: var(--deep-text-mute);
+}
+
 @media (max-width: 720px) {
   .rc-picker { min-width: 0; }
 
