@@ -185,7 +185,8 @@ function DeskBody() {
       <div hidden={workoutOpen}>
       <div className="flex flex-col gap-3.5">
         {header}
-        <div className="grid items-start gap-3.5" style={{ gridTemplateColumns: 'minmax(0, 320px) minmax(0, 1fr)' }}>
+        {/* 360px: строке переклички нужно место под сегмент Going / Maybe / Out и имя (18.11.2026). */}
+        <div className="grid items-start gap-3.5" style={{ gridTemplateColumns: 'minmax(0, 360px) minmax(0, 1fr)' }}>
           <section className="deep-card mb-0 min-w-0">{people}</section>
           <section className="deep-card mb-0 min-w-0">{pool}</section>
         </div>
