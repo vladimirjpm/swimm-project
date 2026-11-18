@@ -39,6 +39,7 @@ import UI_CompetitionName from '../components/mix/competition-name/competition-n
 import {
   hpCardCls, STATUS_COLORS, type CardStatus,
 } from './components/status-styles';
+import { defaultSwimmerSelection, swimmerSelectionLabel } from './swimmer-selection';
 
 // Страница «My media» v3 (swim-centric) — README design_handoff_my_swims_v3,1.
 // Палитра — тема deep (light + dark), как у страниц пловца, клуба и /season-best: вёрстка
@@ -112,8 +113,15 @@ function MyMediaContent({ deep }: { deep: string }) {
   });
 
   // ── Фильтры ────────────────────────────────────────────────────────────────
+  // Пловцы с заплывами в сезоне и начальный выбор фильтра «Swimmers» — Me + семья (18.11.2026).
+  const swimmerIds = useMemo(() => data.swimmers.map((s) => s.id), [data.swimmers]);
+  const defaultSwimmers = useMemo(
+    () => (favorites.loading || loading ? null
+      : defaultSwimmerSelection(swimmerIds, favorites.primarySwimmerId, favorites.familySwimmerIds)),
+    [favorites.loading, loading, swimmerIds, favorites.primarySwimmerId, favorites.familySwimmerIds],
+  );
   const {
-    swimmerFilter, setSwimmerFilter,
+    swimmerFilter, toggleSwimmerFilter, clearSwimmerFilter,
     seg, setSeg,
     statusFilter, setStatusFilter,
     groupFilter, setGroupFilter,
@@ -125,7 +133,7 @@ function MyMediaContent({ deep }: { deep: string }) {
     bySwimmer, segCount, filtered,
     visibleCompetitionMedia, visibleUnlinkedMedia,
     activeFilterCount, clearAll,
-  } = useSwimFilters({ swims, competitionMedia, unlinkedMedia, publicationsByMedia });
+  } = useSwimFilters({ swims, competitionMedia, unlinkedMedia, publicationsByMedia, swimmerIds, defaultSwimmers });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [unlinkedOpen, setUnlinkedOpen] = useState(false);
 
@@ -179,7 +187,10 @@ function MyMediaContent({ deep }: { deep: string }) {
   const pendingModCount = moderation.rows.filter((r) => r.status === 'pending').length;
   // Выбран чип пловца — имя должно быть видно и вне чипа: в строках оно скрыто (фильтр же
   // один на всех), и экран переставал отвечать на вопрос «чьи это заплывы».
-  const selectedSwimmerName = swimmerFilter === 'all' ? null : swimmerNames.get(swimmerFilter) ?? null;
+  const selectedSwimmerName = swimmerFilter.length === 0 ? null
+    : swimmerSelectionLabel(swimmerFilter.map((id) => swimmerNames.get(id) ?? ''));
+  // Один выбранный пловец — строки показывают его заплыв первым и без имени (как было при одиночном выборе).
+  const singleSwimmerId = swimmerFilter.length === 1 ? swimmerFilter[0] : null;
 
   // Через общий шов идут только стиль и дистанция — единственные фильтры кабинета, для
   // которых в общей модели есть поля (см. `my-media-filter-host.ts`).
@@ -252,7 +263,7 @@ function MyMediaContent({ deep }: { deep: string }) {
     {
       key: 'swimmer',
       label: 'Swimmer',
-      active: swimmerFilter !== 'all',
+      active: swimmerFilter.length > 0,
       value: <span dir="auto">{selectedSwimmerName}</span>,
       onClick: () => revealCard('swimmers'),
     },
@@ -332,7 +343,8 @@ function MyMediaContent({ deep }: { deep: string }) {
         count: swims.filter((x) => swimBelongsTo(x, sw.id)).length,
       }))}
       swimmerFilter={swimmerFilter}
-      onSwimmer={setSwimmerFilter}
+      onToggleSwimmer={toggleSwimmerFilter}
+      onAllSwimmers={clearSwimmerFilter}
       totalSwims={swims.length}
       openCards={openCards}
       onCardOpenChange={setCardOpen}
@@ -555,9 +567,9 @@ function MyMediaContent({ deep }: { deep: string }) {
                   <SwimList
                     swims={filtered}
                     competitionMedia={visibleCompetitionMedia}
-                    showSwimmerName={swimmerFilter === 'all' && data.swimmers.length > 1}
+                    showSwimmerName={singleSwimmerId == null && data.swimmers.length > 1}
                     swimmerNames={swimmerNames}
-                    preferredSwimmerId={swimmerFilter === 'all' ? null : swimmerFilter}
+                    preferredSwimmerId={singleSwimmerId}
                     {...swimListCallbacks}
                   />
                 )}
@@ -659,7 +671,7 @@ function MyMediaContent({ deep }: { deep: string }) {
       {addCompTarget && (
         <AddLinkModal
           swimmers={addLinkSwimmers}
-          initialSwimmerId={swimmerFilter !== 'all' ? swimmerFilter : data.swimmers[0]?.id}
+          initialSwimmerId={swimmerFilter[0] ?? data.swimmers[0]?.id}
           fixedCompetitionId={addCompTarget.id}
           contextLabel={
             <span>

@@ -41,6 +41,13 @@ public sealed class CompetitionSourceDto
     [JsonPropertyName("is_championship")]
     public bool IsChampionship { get; init; }
 
+    /// <summary>
+    /// Адрес значка серии турнира (<c>/api/series-emblems/{id}/{sha256}</c>); null — у соревнования нет
+    /// серии или у серии нет значка. Плитка шапки (CompetitionTile) тогда рисует значок сезона.
+    /// </summary>
+    [JsonPropertyName("emblem_url")]
+    public string? EmblemUrl { get; init; }
+
     [JsonPropertyName("show_combine_all_results")]
     public bool ShowCombineAllResults { get; init; }
 

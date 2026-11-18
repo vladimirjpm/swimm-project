@@ -35,7 +35,10 @@ client/media.html → client/src/pages/media-page.tsx → MyMedia (my-media.tsx)
   группы «Shared with» — всё, что не зависит от фильтров), `use-swim-filters.ts` (состояние
   фильтров и что после них видно; там же `swimBelongsTo`), `use-share-dialog.ts`
   (share/withdraw, `publishTo`; разметка модала — `components/share-dialog.tsx`),
-  `use-profile-swimmers.ts` (пловцы панели и пикера Add link).
+  `use-profile-swimmers.ts` (пловцы панели и пикера Add link). Фильтр «Swimmers» — мультиселект
+  (18.11.2026, `swimmer-selection.ts` + тест): пустой выбор — All; при загрузке отмечены «Me» и
+  семья (если у них есть заплывы в сезоне); отмеченных нет в сезоне — показывается All. Один
+  отмеченный — строки как раньше (его заплыв первым, без имени); больше одного — с именами.
 - `client/src/projects/my-media-project/components/add-link-modal.tsx` — попап добавления
   ссылки (3 шага/single-step, см. §5).
 - `client/src/projects/my-media-project/components/swim-list.tsx` — список заплывов,

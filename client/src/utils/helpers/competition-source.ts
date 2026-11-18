@@ -4,7 +4,7 @@
 import CategoryHelper from './category-helper';
 
 // Правило «плитка содержательна» живёт в модуле без исполняемых импортов (ради юнит-теста).
-export { hasTileContent } from './competition-tile-content';
+export { competitionTileKind, hasTileContent, type CompetitionTileKind } from './competition-tile-content';
 
 // Элемент /api/competitions: событие (свёрнуто в одну запись) или однодневное соревнование.
 export type CompetitionSource = {
@@ -28,6 +28,11 @@ export type CompetitionSource = {
   day_ids?: number[];
   /** Чемпионат Израиля — ручной флаг из админки (Competition.IsChampionship). */
   is_championship?: boolean;
+  /**
+   * Адрес значка серии турнира (`/api/series-emblems/{id}/{sha256}`); нет — у соревнования нет
+   * серии или у серии нет значка. Плитка шапки рисует его вместо значка сезона.
+   */
+  emblem_url?: string | null;
 };
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -83,6 +88,11 @@ export type CompetitionTileData = {
   season: 'winter' | 'summer' | null;
   /** Тип соревнования = чемпионат → кубок в полосе. */
   isChampionship: boolean;
+  /**
+   * Значок серии турнира (docs/plans/series-emblem-plan.md); есть — плитка рисует его, а сезон,
+   * кубок и букву — уменьшенной полосой сверху (`competitionTileKind`). Нет — обычная плитка.
+   */
+  emblemUrl?: string | null;
 };
 
 /** Возрастная лента по канонической категории: только детские ступени. */
@@ -127,7 +137,7 @@ export const isChampionshipName = (name: string | null | undefined): boolean => 
  * `status`, `day_dates` — значит потерять смысл проверки типов.
  */
 export type CompetitionTileSource = Pick<CompetitionSource, 'name' | 'date' | 'category'>
-  & { is_championship?: boolean };
+  & { is_championship?: boolean; emblem_url?: string | null };
 
 export function competitionTileData(src: CompetitionTileSource | undefined | null): CompetitionTileData {
   const name = src?.name ?? '';
@@ -149,6 +159,7 @@ export function competitionTileData(src: CompetitionTileSource | undefined | nul
     ageGroup: category ? AGE_GROUP_BY_CATEGORY[category] ?? null : null,
     season,
     isChampionship: isChampionshipSource(src),
+    emblemUrl: src?.emblem_url || null,
   };
 }
 

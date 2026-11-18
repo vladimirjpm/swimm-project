@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { UserMediaPublicationDto } from '../../hooks/useUserMedia';
 import HelperSwimmer from '../../utils/helpers/helper-swimmer';
 import { MySwimDto, SwimMediaDto } from './use-my-swims';
 import { derivedCardStatus } from './components/status-styles';
 import type { Seg, StatusFilter, GroupFilter } from './components/my-media-filter-panel';
+import { effectiveSwimmerSelection, toggleSwimmer } from './swimmer-selection';
 
 // Принадлежность заплыва пловцу — ТОЛЬКО через канон-хелпер (docs/relays.md: «новый
 // фильтр/счётчик по пловцу — зови это, не сравнивай swimmer_id сам»): у эстафеты
@@ -14,16 +15,39 @@ export const swimBelongsTo = (s: MySwimDto, id: number) => HelperSwimmer.resultB
  * Фильтры страницы и что после них видно: заплывы, медиа соревнований, Unlinked. Пловец и
  * сезон — тоже фильтры, но «наверху страницы»: сброс их не трогает (сезон живёт в
  * use-my-swims-season).
+ *
+ * Пловцы — мультиселект (решение Влада 18.11.2026, `swimmer-selection.ts`): `swimmerFilter` —
+ * действующий выбор (пустой — All). При загрузке отмечены «Me» и семья (`defaultSwimmers`; null —
+ * ещё не готово: избранное или заплывы грузятся); дальше выбор ведёт пользователь.
  */
 export function useSwimFilters(params: {
   swims: MySwimDto[];
   competitionMedia: SwimMediaDto[];
   unlinkedMedia: SwimMediaDto[];
   publicationsByMedia: Map<number, UserMediaPublicationDto[]>;
+  /** Пловцы с заплывами в сезоне, в порядке списка панели. */
+  swimmerIds: number[];
+  /** Начальный выбор (Me + семья); null — данные ещё грузятся. Применяется один раз. */
+  defaultSwimmers: number[] | null;
 }) {
-  const { swims, competitionMedia, unlinkedMedia, publicationsByMedia } = params;
+  const { swims, competitionMedia, unlinkedMedia, publicationsByMedia, swimmerIds, defaultSwimmers } = params;
 
-  const [swimmerFilter, setSwimmerFilter] = useState<number | 'all'>('all');
+  const [selectedSwimmers, setSelectedSwimmers] = useState<number[]>([]);
+  const swimmersInitialized = useRef(false);
+  useEffect(() => {
+    if (swimmersInitialized.current || defaultSwimmers == null) return;
+    swimmersInitialized.current = true;
+    setSelectedSwimmers(defaultSwimmers);
+  }, [defaultSwimmers]);
+  const swimmerFilter = effectiveSwimmerSelection(selectedSwimmers, swimmerIds);
+  const toggleSwimmerFilter = (id: number) => {
+    swimmersInitialized.current = true;
+    setSelectedSwimmers((prev) => toggleSwimmer(effectiveSwimmerSelection(prev, swimmerIds), id, swimmerIds));
+  };
+  const clearSwimmerFilter = () => {
+    swimmersInitialized.current = true;
+    setSelectedSwimmers([]);
+  };
   const [seg, setSeg] = useState<Seg>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all');
@@ -52,7 +76,9 @@ export function useSwimFilters(params: {
     || derivedCardStatus(publicationsByMedia.get(mediaId) ?? []) === statusFilter;
 
   // ── Фильтрация ────────────────────────────────────────────────────────────
-  const bySwimmer = swimmerFilter === 'all' ? swims : swims.filter((s) => swimBelongsTo(s, swimmerFilter));
+  const bySwimmer = swimmerFilter.length === 0
+    ? swims
+    : swims.filter((s) => swimmerFilter.some((id) => swimBelongsTo(s, id)));
 
   const segCount = (k: Seg) =>
     bySwimmer.filter((s) => {
@@ -103,7 +129,7 @@ export function useSwimFilters(params: {
   };
 
   return {
-    swimmerFilter, setSwimmerFilter,
+    swimmerFilter, toggleSwimmerFilter, clearSwimmerFilter,
     seg, setSeg,
     statusFilter, setStatusFilter,
     groupFilter, setGroupFilter,

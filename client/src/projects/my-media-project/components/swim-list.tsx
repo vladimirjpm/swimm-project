@@ -964,6 +964,8 @@ function CompetitionGroup({ swims, compMedia, showSwimmerName, swimmerNames, pre
     date: first.competition_date,
     category: first.category,
     is_championship: first.is_championship,
+    // Значок серии турнира — переключатель CompetitionTile рисует его вместо значка сезона (18.11.2026).
+    emblem_url: first.emblem_url,
   });
   // Логотип клуба рядом с именем — клуб строки результата (на момент заплыва). Сперва личный
   // заплыв выбранного пловца; эстафета годится запасной — у неё клуб команды, тот же.
