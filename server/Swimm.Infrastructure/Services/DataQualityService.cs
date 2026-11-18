@@ -111,11 +111,16 @@ public class DataQualityService(SwimmDbContext db) : IDataQualityService
         // (найдено 2026-08-03: 5 строк, инцидент И-7). Повтор дисциплины с РАЗНЫМ временем —
         // законен (предварительные/финал, перезаплыв) и сюда не попадает; его отдельно метит
         // правило duplicate_swim в проверке качества.
+        // Раунд (HeatType/Round) — тоже часть ключа: утро и вечер одного дня — разные заплывы,
+        // и пловец может попасть в одинаковые заплыв/дорожку (посев) с тем же временем до сотой.
+        // 18.11.2026: רוזנברג נתאי, comp 1867, 50 батт. — prelim и final, оба 2/1 и 25.78
+        // (loglig 58492 и 60512, И-58) — ложная находка; удаление стёрло бы настоящий заплыв.
         var dupGroups = db.Results.AsNoTracking()
             .GroupBy(r => new
             {
                 r.CompetitionId, r.SwimmerId, r.StyleId, r.Distance,
-                r.Heat, r.Lane, r.TimeOriginal, IsRelay = r.RelayId != null
+                r.Heat, r.Lane, r.TimeOriginal, IsRelay = r.RelayId != null,
+                r.HeatType, r.Round
             })
             .Where(g => g.Count() > 1);
 
