@@ -24,7 +24,7 @@
 
 | Вид | Службы | Откуда состояние |
 |---|---|---|
-| **Расписания** — сами ходят наружу по таймеру | `discovery`, `start-list` (`CompetitionDiscoveryBackgroundService`), `loglig-verify`, `loglig-batch`, `records-check` (`RecordsCheckBackgroundService`, 16.11.2026: проверка источников рекордов — дифф и журнал `Sys_RecordSourceChecks`, Apply НЕ делает) | журнал `Sys_JobRuns` (пора ли) + история `Sys_JobRunLog` (что сделали) |
+| **Расписания** — сами ходят наружу по таймеру | `discovery`, `start-list` (`CompetitionDiscoveryBackgroundService`), `loglig-verify`, `loglig-batch`, `records-check` (`RecordsCheckBackgroundService`, 16.11.2026: проверка источников рекордов — дифф и журнал `Sys_RecordSourceChecks`, Apply НЕ делает), `swimmer-club-check` (`SwimmerClubCheckBackgroundService`, 18.11.2026, Р98: сверка кандидатов на смену клуба пловца с loglig — см. ниже) | журнал `Sys_JobRuns` (пора ли) + история `Sys_JobRunLog` (что сделали) |
 | **Прод-расписание** — идёт с ПРОДА круглосуточно | `training-reminders` (`TrainingReminderBackgroundService`, напоминания о тренировках через Web Push, [web-push-reminders-plan.md](../plans/web-push-reminders-plan.md)) | тот же журнал; флаг свой — `PushReminders:Enabled` (true только на проде). Тик 5 мин: каждый сдвигает «последний тик» (`IJobRunStore.RecordStateAsync`), строку истории пишет только тик, который что-то отправил или упал. В ProdAdmin карточка «следит» за прод-джобом: тик старше 35 мин — «молчит» (жёлтая) |
 | **Очереди** — исполняют то, что поставила админка | импорт (`ImportBackgroundService`), рекорды по странам (`RecordCountryRunBackgroundService`) | снимок очереди в памяти + их собственные таблицы: `Sys_ImportHistory`, журнал свежести рекордов `Sys_RecordSourceChecks` (`worldrecords-countries`) |
 | **Служебные** | пинг БД (`DbPingBackgroundService`), отставание от прода (`DataSyncCheckBackgroundService`, только Development), мост кэша (`CacheBridgeListener`) | память процесса: `DbStatusService.LastPing`, `IDataSyncStatus.Current`, `ICacheBridgeStatus.State()` |
@@ -90,6 +90,8 @@ warning — есть что применить или пора проверит�
   кнопка «🔎 Проверить все источники» на `/Admin/Import` (`RecordsImportController.CheckAll`,
   `RecordAsync` задачи `records-check`: после ручной проверки ночная сутки не повторяет).
   CLI `--records-check` в историю Jobs не пишет — только журнал `Sys_RecordSourceChecks`.
+  Проход `swimmer-club-check` **после импорта** (`AppendLogAsync`, триггер `import` — «после импорта»
+  в истории): суточное расписание не сдвигает.
 - Итог — одна строка из `JobRunSummaries` (один текст на задачу, кто бы ни запустил).
 - **Подробности — `Details` (jsonb, миграция `AddJobRunLogDetails`, 16.11.2026).** Пока пишет только
   discovery (фон, кнопка, CLI): список самих изменений прогона — `DiscoverySyncResult.Changes`
@@ -121,6 +123,24 @@ warning — есть что применить или пора проверит�
 - `Trigger` ограничен CHECK `CK_Sys_JobRunLog_Trigger`: `schedule` / `manual` / `cli`.
 - Sys_, приватная: без гранта `swimm_ro`, **не** в `server/db/seed-tables.txt` — у каждой базы
   свой журнал (миграция `AddJobRunLog`).
+
+## Смена клуба пловца ↔ loglig (`swimmer-club-check`, Р98)
+
+С 18.11.2026 импорт клуб в карточке пловца сам не меняет — заводит кандидата
+(`Sys_SwimmerClubCandidates`), а эта задача сверяет его с карточкой loglig.com и меняет клуб, только
+если loglig показывает новый клуб (решение — [data-integrity.md](../data-integrity.md) Р98).
+
+- **Суточный прогон** — по расписанию (`SwimmerClubCheckEnabled`, дефолт **вкл**;
+  `SwimmerClubCheckIntervalHours`, 24): все ждущие кандидаты; ответ loglig моложе суток берётся из
+  кэша кандидата (`LogligClubName`, `CheckedAt`) без сети.
+- **После импорта** — импорт дёргает сигнал (`ISwimmerClubCheckSignal`), служба просыпается (после
+  30 с тишины — дни многодневки собираются в один проход) и сверяет только **новых** кандидатов (без
+  вердикта). В истории — триггер «после импорта», расписание не сдвигается. Нечего сверять — строки нет.
+- Сеть последовательно, ~1 запрос в секунду (`SwimmerClubLogligCheckService.DefaultRequestGap`):
+  ~330 кандидатов ≈ 6 минут. Бесплатно — карточка loglig публичная.
+- Итог строкой: «сверено 12: confirmed 9 · archive 2 · old 1; запросов 10, из кэша 2, применено 9».
+- Работает там же, где остальные расписания (ProdAdmin) — там же идёт и импорт. В разработке
+  кандидаты ждут: сверить — CLI `--refresh-swimmer-clubs` или «Проверить сейчас» на `/Admin/Swimmers`.
 
 ## Грабли
 

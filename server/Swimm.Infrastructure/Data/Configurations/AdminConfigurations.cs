@@ -35,8 +35,24 @@ internal sealed class SwimmerClubChangeConfiguration : IEntityTypeConfiguration<
     {
         entity.ToTable("Sys_SwimmerClubChanges", t => t.HasCheckConstraint(
             "CK_Sys_SwimmerClubChanges_Source",
-            @"""Source"" IN ('import', 'cli', 'admin')"));
+            @"""Source"" IN ('import', 'cli', 'admin', 'loglig')"));
         entity.HasIndex(e => e.ChangedAt);                    // карточка дашборда «за 7 дней»
         entity.HasIndex(e => new { e.SwimmerId, e.ChangedAt }); // история пловца
+    }
+}
+
+// Кандидаты на смену клуба, ждущие подтверждения loglig (Р98, §6 swimmer-club-change-plan) —
+// Sys_-таблица, БЕЗ grant swimm_ro. Один кандидат на пловца (ключ SwimmerId), FK нет.
+internal sealed class SwimmerClubCandidateConfiguration : IEntityTypeConfiguration<SwimmerClubCandidate>
+{
+    public void Configure(EntityTypeBuilder<SwimmerClubCandidate> entity)
+    {
+        entity.ToTable("Sys_SwimmerClubCandidates", t =>
+        {
+            t.HasCheckConstraint("CK_Sys_SwimmerClubCandidates_Source", @"""Source"" IN ('import', 'cli')");
+            t.HasCheckConstraint("CK_Sys_SwimmerClubCandidates_Verdict",
+                @"""Verdict"" IS NULL OR ""Verdict"" IN ('confirmed', 'old', 'archive', 'other', 'no-loglig-id', 'unavailable')");
+        });
+        entity.HasIndex(e => e.Verdict); // дашборд: ждущие по причинам
     }
 }

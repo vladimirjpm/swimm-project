@@ -104,7 +104,7 @@ internal sealed class JobRunLogEntryConfiguration : IEntityTypeConfiguration<Job
     {
         entity.ToTable("Sys_JobRunLog", t => t.HasCheckConstraint(
             "CK_Sys_JobRunLog_Trigger",
-            @"""Trigger"" IN ('schedule', 'manual', 'cli')"));
+            @"""Trigger"" IN ('schedule', 'manual', 'cli', 'import')"));
         entity.Property(e => e.Name).HasMaxLength(100);
         entity.Property(e => e.Trigger).HasMaxLength(20);
         entity.Property(e => e.Summary).HasMaxLength(1000);

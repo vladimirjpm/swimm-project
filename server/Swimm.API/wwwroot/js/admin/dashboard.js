@@ -81,9 +81,10 @@
                     { v: sw.noOrgId, label: 'Без SwimmerOrgId', sub: 'isr без ID федерации', tone: 'warn', href: '/Admin/Swimmers?filter=no-org-id' },
                     { v: sw.noResults, label: 'Без результатов', sub: 'ни одного заплыва', tone: 'warn', href: '/Admin/Swimmers?filter=no-results' },
                     { v: sw.loglig.unlinked, label: 'Loglig не привязано', sub: `на проверке ${fmtN(sw.loglig.suggested)} · отклонено ${fmtN(sw.loglig.rejected)}`, tone: 'info', href: '/Admin/Swimmers/Loglig?filter=loglig-unlinked' },
-                    { v: sw.clubChanges7d || 0, label: 'Club changes, 7 days', sub: 'клуб в карточке сменился сам (импорт) или руками', tone: 'info', href: '/Admin/Swimmers?filter=club-changes' },
+                    { v: sw.clubChanges7d || 0, label: 'Club changes, 7 days', sub: 'клуб в карточке сменился: подтвердил loglig или руками', tone: 'info', href: '/Admin/Swimmers?filter=club-changes' },
+                    { v: sw.clubCandidates?.total || 0, label: 'Club changes pending', sub: clubPendingSub(sw.clubCandidates), tone: 'warn', href: '/Admin/Swimmers?filter=club-changes' },
                 ],
-                extraDetailHtml: renderClubChanges(sw.recentClubChanges || []),
+                extraDetailHtml: renderClubChanges(sw.recentClubChanges || []) + renderClubCandidates(sw.clubCandidates),
             },
             {
                 key: 'clubs', title: 'Клубы', href: '/Admin/Clubs',
@@ -695,7 +696,7 @@
     // меняет клуб сама при импорте — здесь её видно, а откатить можно на /Admin/Swimmers.
     function renderClubChanges(list) {
         if (!list.length) return '';
-        const src = { import: 'импорт', cli: 'догон', admin: 'руками' };
+        const src = { import: 'импорт', cli: 'догон', admin: 'руками', loglig: 'loglig' };
         const rows = list.map(c => `
             <div class="flex items-baseline gap-2 py-1 px-2 text-[12px]">
                 <a href="/swimmers/${c.swimmerId}" target="_blank" rel="noopener" dir="rtl" class="text-admin-text hover:underline">${esc(c.swimmerName)}</a>
@@ -705,6 +706,40 @@
             </div>`).join('');
         return `<div class="mt-3 text-admin-text-muted/70 text-[11px] uppercase tracking-wide px-2">Club changes, 7 days</div>${rows}
             <a href="/Admin/Swimmers?filter=club-changes" class="block px-2 mt-1 text-admin-accent text-[11px] no-underline hover:underline">весь журнал →</a>`;
+    }
+
+    // Ждущие кандидаты на смену клуба (Р98): правило дало новый клуб, но loglig его не подтвердил.
+    // Порядок причин — от «решает человек» к «подождать».
+    const CLUB_VERDICTS = [
+        ['archive', 'loglig: archive', 'ארכיון איגוד — пловец снят с регистрации; решает человек (руками + закрепление)'],
+        ['other', 'loglig: другой клуб', 'на loglig третий клуб или незнакомое название — часто дубль клуба'],
+        ['no-loglig-id', 'нет loglig-id', 'сверять не с чем — привязать loglig-id или решить руками'],
+        ['old', 'loglig = старый клуб', 'федерация ещё не перевела — перепроверка раз в сутки'],
+        ['unavailable', 'loglig не открылся', 'повтор при следующем прогоне'],
+        ['unchecked', 'ещё не сверяли', 'ждут фоновой сверки (/Admin/Jobs)'],
+    ];
+
+    function clubPendingSub(p) {
+        if (!p || !p.total) return 'смена клуба ждёт подтверждения loglig';
+        return CLUB_VERDICTS.filter(([k]) => p.byVerdict[k]).map(([k, label]) => `${label} ${p.byVerdict[k]}`).join(' · ');
+    }
+
+    function renderClubCandidates(p) {
+        if (!p || !p.total) return '';
+        const groups = CLUB_VERDICTS.filter(([k]) => p.byVerdict[k]).map(([k, label, hint]) => {
+            const items = p.items.filter(c => (c.verdict ?? 'unchecked') === k);
+            const rows = items.map(c => `
+                <div class="flex items-baseline gap-2 py-0.5 px-2 text-[12px]">
+                    <a href="/Admin/Swimmers?club=${c.swimmerId}" dir="rtl" class="text-admin-text hover:underline">${esc(c.swimmerName)}</a>
+                    <span class="text-admin-text-muted">#${c.swimmerId}</span>
+                    <span class="flex-1 min-w-0 truncate text-admin-text-muted" dir="auto">${esc(c.fromClubName ?? '—')} → <span class="text-admin-text">${esc(c.toClubName)}</span>${c.logligClubName ? ` · loglig: ${esc(c.logligClubName)}` : ''}</span>
+                    <span class="text-admin-text-muted/70 text-[11px] whitespace-nowrap">${esc(c.lastSwimDate)}</span>
+                </div>`).join('');
+            const more = p.byVerdict[k] > items.length ? `<div class="px-2 text-[11px] text-admin-text-muted/70">… ещё ${fmtN(p.byVerdict[k] - items.length)}</div>` : '';
+            return `<div class="mt-2 px-2 text-[12px] text-admin-text">${esc(label)} <span class="text-admin-text-muted">${fmtN(p.byVerdict[k])} — ${esc(hint)}</span></div>${rows}${more}`;
+        }).join('');
+        return `<div class="mt-3 text-admin-text-muted/70 text-[11px] uppercase tracking-wide px-2">Club changes pending — ждут loglig</div>${groups}
+            <a href="/Admin/Swimmers?filter=club-changes" class="block px-2 mt-1 text-admin-accent text-[11px] no-underline hover:underline">все ждущие →</a>`;
     }
 
     function renderDetailRow(m) {

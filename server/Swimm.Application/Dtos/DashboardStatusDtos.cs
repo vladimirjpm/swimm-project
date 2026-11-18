@@ -86,7 +86,12 @@ public sealed record DashboardSwimmerStatus(
     /// <summary>Смен клуба в карточках за 7 дней (журнал Sys_SwimmerClubChanges, Р95).</summary>
     int ClubChanges7d = 0,
     /// <summary>Последние смены клуба за 7 дней (до 20) — список в панели деталей.</summary>
-    IReadOnlyList<SwimmerClubChangeDto>? RecentClubChanges = null);
+    IReadOnlyList<SwimmerClubChangeDto>? RecentClubChanges = null,
+    /// <summary>
+    /// Кандидаты на смену клуба, ждущие loglig (Р98): счёт по причинам (old / archive / other /
+    /// no-loglig-id / unavailable / unchecked) и до 10 строк каждой.
+    /// </summary>
+    SwimmerClubPendingSummary? ClubCandidates = null);
 
 /// <summary>Блок «Клубы»: дедуп-кандидаты, клубы без пловцов/страны, заявки на официальный статус.</summary>
 public sealed record DashboardClubStatus(

@@ -171,6 +171,15 @@ public class AdminSettingsService : ISettingsService, IReloadableSettings
                 "только там, где включены фоновые расписания (ProdAdmin)"),
             new("RecordsCheckIntervalHours", "24", "int", "admin",
                 "Интервал проверки источников рекордов в часах (минимум 1)"),
+            // Сверка смены клуба пловца с loglig (Р98, §6 swimmer-club-change-plan, 18.11.2026).
+            new("SwimmerClubCheckEnabled", "true", "bool", "admin",
+                "Сверка кандидатов на смену клуба пловца с карточкой loglig: true — фоновый джоб " +
+                "раз в SwimmerClubCheckIntervalHours (и сразу после импорта — только новых) открывает " +
+                "карточки loglig (~1 в секунду, ответ кэшируется на сутки) и применяет смену, только " +
+                "если loglig показывает новый клуб. Без джоба кандидаты ждут вечно. Работает только " +
+                "там, где включены фоновые расписания (ProdAdmin)"),
+            new("SwimmerClubCheckIntervalHours", "24", "int", "admin",
+                "Интервал сверки смены клуба с loglig в часах (минимум 1)"),
             new("DebugDetails", "false", "bool", "both",
                 "Общий тумблер отладочных подробностей на витринах. Пока выключен, ни одна " +
                 "опция из Sys_DebugOptions не действует — одним движением гасится всё. " +

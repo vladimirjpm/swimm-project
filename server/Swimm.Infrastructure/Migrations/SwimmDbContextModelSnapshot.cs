@@ -2237,7 +2237,7 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.ToTable("Sys_JobRunLog", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Sys_JobRunLog_Trigger", "\"Trigger\" IN ('schedule', 'manual', 'cli')");
+                            t.HasCheckConstraint("CK_Sys_JobRunLog_Trigger", "\"Trigger\" IN ('schedule', 'manual', 'cli', 'import')");
                         });
                 });
 
@@ -3955,6 +3955,60 @@ namespace Swimm.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.SwimmerClubCandidate", b =>
+                {
+                    b.Property<int>("SwimmerId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("FromClubId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("LastSwimDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("LogligClubName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("LogligId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Overlap")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("ToClubId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Verdict")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("SwimmerId");
+
+                    b.HasIndex("Verdict");
+
+                    b.ToTable("Sys_SwimmerClubCandidates", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Sys_SwimmerClubCandidates_Source", "\"Source\" IN ('import', 'cli')");
+
+                            t.HasCheckConstraint("CK_Sys_SwimmerClubCandidates_Verdict", "\"Verdict\" IS NULL OR \"Verdict\" IN ('confirmed', 'old', 'archive', 'other', 'no-loglig-id', 'unavailable')");
+                        });
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.SwimmerClubChange", b =>
                 {
                     b.Property<long>("Id")
@@ -3991,7 +4045,7 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.ToTable("Sys_SwimmerClubChanges", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Sys_SwimmerClubChanges_Source", "\"Source\" IN ('import', 'cli', 'admin')");
+                            t.HasCheckConstraint("CK_Sys_SwimmerClubChanges_Source", "\"Source\" IN ('import', 'cli', 'admin', 'loglig')");
                         });
                 });
 

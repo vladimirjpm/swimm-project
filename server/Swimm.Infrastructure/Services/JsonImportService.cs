@@ -1420,9 +1420,10 @@ public class JsonImportService : IImportService
         // Текущий клуб в карточке пловца (Р95): клуб последнего соревнования, у ЗАТРОНУТЫХ импортом
         // пловцов — со строками в днях импорта и с удалёнными строками (переимпорт с deleteMissing
         // мог снять последний старт). Раньше клуб писался только в пустое поле и не менялся
-        // никогда: 538 карточек на проде 18.11.2026 держали старый клуб. Смены — в журнал
-        // Sys_SwimmerClubChanges; закреплённых (ClubLocked) не трогает. Как и соседи — после
-        // коммита и в try/catch.
+        // никогда: 538 карточек на проде 18.11.2026 держали старый клуб. С Р98 карточку здесь НЕ
+        // меняем: пишем кандидата (Sys_SwimmerClubCandidates), а сверку с loglig делает фоновая
+        // служба — сеть не внутри импорта. Закреплённых (ClubLocked) не трогает. Как и соседи —
+        // после коммита и в try/catch.
         private async Task RefreshSwimmerClubsAsync()
         {
             if (_clubRefresh is null || touchedCompetitionKeys.Count == 0) return;
@@ -1441,10 +1442,12 @@ public class JsonImportService : IImportService
                 var report = await _clubRefresh.RefreshAsync(swimmerIds, SwimmerClubChangeSources.Import, apply: true);
                 if (report.Changes.Count > 0)
                     diagnosticLog.Add(
-                        $"Клуб пловца сменился у {report.Changes.Count}: "
+                        $"Кандидатов на смену клуба: {report.Changes.Count} (ждут сверки с loglig): "
                         + string.Join(", ", report.Changes.Take(10).Select(c =>
                             $"#{c.SwimmerId} «{c.FromClubName ?? "—"}» → «{c.ToClubName}»"))
                         + (report.Changes.Count > 10 ? " …" : ""));
+                if (report.Withdrawn > 0)
+                    diagnosticLog.Add($"Снято ждущих кандидатов на смену клуба: {report.Withdrawn} (клуб снова как в карточке).");
             }
             catch (Exception ex)
             {
@@ -1809,8 +1812,9 @@ public class JsonImportService : IImportService
     /// Дополняет данные спортсмена полями из результатов:
     /// Gender (из event_style_gender), ClubId (FK на клуб) и CountryId (FK на страну).
     /// Обновляет только пустые поля — не перезаписывает уже заполненные.
-    /// Клуб здесь — лишь первое заполнение новой карточки: смену клуба делает шаг импорта
-    /// <c>RefreshSwimmerClubsAsync</c> после коммита (правило <c>SwimmerCurrentClubRule</c>, Р95).
+    /// Клуб здесь — лишь первое заполнение новой карточки: смену клуба предлагает шаг импорта
+    /// <c>RefreshSwimmerClubsAsync</c> после коммита (правило <c>SwimmerCurrentClubRule</c>, Р95),
+    /// а применяет только сверка с loglig (Р98).
     /// </summary>
     private static void EnrichSwimmerFromResult(Swimmer swimmer, string? gender, Club? club, Country? country)
     {

@@ -136,6 +136,7 @@ public class SwimmDbContext : DbContext
 
     /* === Журнал смен клуба в карточке пловца (Р95, Sys_) === */
     public DbSet<SwimmerClubChange> SwimmerClubChanges => Set<SwimmerClubChange>();
+    public DbSet<SwimmerClubCandidate> SwimmerClubCandidates => Set<SwimmerClubCandidate>();
 
     /* === Тренировки (приватные, Sys_) === */
     public DbSet<TrainingSession> TrainingSessions => Set<TrainingSession>();

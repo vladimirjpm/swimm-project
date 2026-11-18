@@ -27,6 +27,13 @@ public static class JobNames
     public const string RecordsCheck = "records-check";
 
     /// <summary>
+    /// Сверка кандидатов на смену клуба пловца с loglig (Р98, §6 docs/plans/swimmer-club-change-plan.md):
+    /// подтверждённую смену применяет, остальные ждут. Суточный прогон — по расписанию; после
+    /// импорта служба просыпается по сигналу и сверяет только новых (история — триггер «import»).
+    /// </summary>
+    public const string SwimmerClubCheck = "swimmer-club-check";
+
+    /// <summary>
     /// Напоминания о тренировках через Web Push (docs/plans/web-push-reminders-plan.md). НЕ в
     /// <see cref="All"/>: тик — минуты, а не часы из Admin/Settings, и работает она на ПРОДЕ под
     /// своим флагом (<c>PushReminders:Enabled</c>), а не под фоновыми расписаниями ProdAdmin.
@@ -47,6 +54,9 @@ public static class JobNames
         // Включена по умолчанию: пять скачиваний в сутки, ничего не применяет (решение Влада
         // 16.11.2026 — расписание, отложенное «до Azure», records-freshness-plan §7-2).
         new(RecordsCheck, "RecordsCheckEnabled", true, "RecordsCheckIntervalHours", 24),
+        // Включена по умолчанию: без неё смена клуба не применилась бы никогда (Р98). Бесплатно —
+        // карточка loglig публичная; ~1 запрос в секунду, ответ кэшируется на сутки.
+        new(SwimmerClubCheck, "SwimmerClubCheckEnabled", true, "SwimmerClubCheckIntervalHours", 24),
     ];
 
     public static JobDefinition Get(string name) => All.First(j => j.Name == name);
@@ -66,6 +76,9 @@ public static class JobTriggers
 
     /// <summary>Консольная команда (<c>--discovery-sync</c>).</summary>
     public const string Cli = "cli";
+
+    /// <summary>Проход сразу после импорта (сверка новых кандидатов на смену клуба, Р98).</summary>
+    public const string Import = "import";
 }
 
 /// <summary>
@@ -121,6 +134,13 @@ public static class JobRunSummaries
     public static string TrainingReminders(TrainingReminderReport r) =>
         $"групп {r.Groups}: к отправке {r.Planned}, отправлено {r.Sent}, уже было {r.Skipped}, " +
         $"не доставлено {r.Failed}, умерших устройств удалено {r.RemovedDevices}";
+
+    /// <summary>«сверено 12: confirmed 9 · archive 2 · old 1; запросов 10, из кэша 2, применено 9».</summary>
+    public static string SwimmerClubCheck(SwimmerClubCheckReport r) =>
+        r.Checked == 0
+            ? "кандидатов нет"
+            : $"сверено {r.Checked}: " + string.Join(" · ", r.ByVerdict.OrderByDescending(v => v.Value).Select(v => $"{v.Key} {v.Value}"))
+              + $"; запросов {r.Requests}, из кэша {r.FromCache}, применено {r.Applied}";
 
     public static string LogligBatch(LogligBatchReport r, int perRun) =>
         $"лимит {perRun}: обработано {r.Processed}, привязано {r.Linked}, с кандидатами {r.WithCandidates}, впустую {r.NothingFound}";

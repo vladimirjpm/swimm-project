@@ -39,7 +39,8 @@ public class AdminSettingsServiceTests
         //   расписанию, records-freshness-plan §4, 2026-11-16)
         // + ContentDefaultCanAddPhotos/CanAddVideos/CanPublish (политика прав на контент,
         //   content-permissions-plan, 2026-11-18)
-        Assert.Equal(36, all.Count);
+        // + SwimmerClubCheckEnabled/SwimmerClubCheckIntervalHours (сверка смены клуба с loglig, Р98, 2026-11-18)
+        Assert.Equal(38, all.Count);
     }
 
     [Fact]

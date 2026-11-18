@@ -9,7 +9,13 @@ namespace Swimm.Infrastructure.Services;
 
 /// <summary>
 /// Текущий клуб в карточке пловца (Р95, Ф1 docs/plans/swimmer-club-change-plan.md). Правило —
-/// <see cref="SwimmerCurrentClubRule"/>; здесь только чтение строк, запись карточек и журнала.
+/// <see cref="SwimmerCurrentClubRule"/>; здесь только чтение строк, запись кандидатов, ручная
+/// правка карточки и журнал.
+///
+/// С Р98 (§6 плана, 18.11.2026) пересчёт карточку сам НЕ меняет: правило даёт кандидата
+/// (<c>Sys_SwimmerClubCandidates</c>), а применяет его сверка с loglig —
+/// <see cref="SwimmerClubLogligCheckService"/>. Сеть — не здесь: импорт зовёт этот сервис после
+/// коммита, а дальше будит фоновую службу сигналом.
 ///
 /// Строки читаются уже сгруппированными (пловец × клуб × день → число строк, последняя дата):
 /// догон по всем пловцам не тянет в память каждую строку Results. Только личные строки
@@ -18,10 +24,11 @@ namespace Swimm.Infrastructure.Services;
 /// Запись — обычным SaveChanges по отслеживаемым карточкам: перехватчик кэша сам сбросит
 /// <c>row:Swimmers:{id}</c> и оба клуба (старый и новый FK), а с ними страницу и профиль пловца.
 /// </summary>
-public sealed class SwimmerClubRefreshService(SwimmDbContext db) : ISwimmerClubRefreshService
+public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubCheckSignal? signal = null)
+    : ISwimmerClubRefreshService
 {
     private sealed record Card(int Id, int? ClubId, bool ClubLocked, string FirstName, string LastName, string FirstNameEn, string LastNameEn);
-    private sealed record ClubInfo(int Id, string Name, string NameEn, bool IsPseudo, int? MergedIntoId);
+    internal sealed record ClubInfo(int Id, string Name, string NameEn, bool IsPseudo, int? MergedIntoId);
 
     public async Task<SwimmerClubRefreshReport> RefreshAsync(
         IReadOnlyCollection<int>? swimmerIds, string source, bool apply, CancellationToken ct = default)
@@ -60,8 +67,67 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db) : ISwimmerClubR
                 SwimmerCurrentClubRule.HasOverlap(periods)));
         }
 
-        if (apply && changes.Count > 0) await ApplyAsync(changes, source, ct);
-        return new SwimmerClubRefreshReport(checkedCount, locked, ties, changes, apply);
+        // Ждущие кандидаты в охвате прогона, которых правило больше не даёт: следующий старт снова
+        // за клуб карточки, пловца закрепили, ничья или строк не осталось — снимаем.
+        var wantedIds = changes.Select(c => c.SwimmerId).ToHashSet();
+        var scope = db.SwimmerClubCandidates.AsQueryable();
+        if (ids is not null) scope = scope.Where(c => ids.Contains(c.SwimmerId));
+        var existing = await scope.ToListAsync(ct);
+        var withdrawn = existing.Where(c => !wantedIds.Contains(c.SwimmerId)).ToList();
+
+        if (apply)
+        {
+            var fresh = UpsertCandidates(existing, changes, source);
+            db.SwimmerClubCandidates.RemoveRange(withdrawn);
+            await db.SaveChangesAsync(ct);
+            if (fresh > 0 && source == SwimmerClubChangeSources.Import) signal?.Notify();
+        }
+        return new SwimmerClubRefreshReport(checkedCount, locked, ties, changes, apply, withdrawn.Count);
+    }
+
+    /// <summary>
+    /// Завести новых кандидатов и обновить ждущих. Сменился клуб «было» или «стало» — вердикт
+    /// сбрасывается (сверять заново), но ответ loglig остаётся кэшем: клуб на карточке от нашего
+    /// кандидата не зависит. Возвращает, сколько кандидатов ждут сверки впервые или заново.
+    /// </summary>
+    private int UpsertCandidates(List<SwimmerClubCandidate> existing, List<SwimmerClubChangePlan> changes, string source)
+    {
+        var byId = existing.ToDictionary(c => c.SwimmerId);
+        var now = DateTime.UtcNow;
+        var fresh = 0;
+        foreach (var plan in changes)
+        {
+            if (!byId.TryGetValue(plan.SwimmerId, out var c))
+            {
+                db.SwimmerClubCandidates.Add(new SwimmerClubCandidate
+                {
+                    SwimmerId = plan.SwimmerId, FromClubId = plan.FromClubId, ToClubId = plan.ToClubId,
+                    LastSwimDate = plan.LastSwimDate, Overlap = plan.Overlap, Source = source,
+                    CreatedAt = now, UpdatedAt = now,
+                });
+                fresh++;
+                continue;
+            }
+
+            var touched = false;
+            if (c.FromClubId != plan.FromClubId || c.ToClubId != plan.ToClubId)
+            {
+                c.FromClubId = plan.FromClubId;
+                c.ToClubId = plan.ToClubId;
+                c.Verdict = null;
+                c.Source = source;
+                fresh++;
+                touched = true;
+            }
+            if (c.LastSwimDate != plan.LastSwimDate || c.Overlap != plan.Overlap)
+            {
+                c.LastSwimDate = plan.LastSwimDate;
+                c.Overlap = plan.Overlap;
+                touched = true;
+            }
+            if (touched) c.UpdatedAt = now;
+        }
+        return fresh;
     }
 
     public async Task<SwimmerClubAdminDto?> GetForAdminAsync(int swimmerId, CancellationToken ct = default)
@@ -83,12 +149,19 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db) : ISwimmerClubR
             .ToList();
 
         var history = await QueryChanges(db.SwimmerClubChanges.Where(c => c.SwimmerId == swimmerId), 20, clubs, ct);
+        var name = SwimmerName(card.FirstName, card.LastName, card.FirstNameEn, card.LastNameEn);
+        var candidate = await db.SwimmerClubCandidates.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.SwimmerId == swimmerId, ct);
+        var logligId = await VerifiedLogligIds(db.Swimmers.AsNoTracking().Where(s => s.Id == swimmerId))
+            .Select(s => s.LogligId).FirstOrDefaultAsync(ct);
 
         return new SwimmerClubAdminDto(
-            card.Id, SwimmerName(card.FirstName, card.LastName, card.FirstNameEn, card.LastNameEn),
+            card.Id, name,
             card.ClubId, card.ClubId is int c ? ClubName(clubs, c) : null, card.ClubLocked,
             rule, rule is int r ? ClubName(clubs, r) : null,
-            periods, history);
+            periods, history,
+            candidate is null ? null : ToDto(candidate, name, clubs),
+            logligId);
     }
 
     public async Task<(SwimmerClubSetResult? Result, SwimmerClubSetError Error)> SetByAdminAsync(
@@ -108,6 +181,10 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db) : ISwimmerClubR
         }
 
         var result = new SwimmerClubSetResult(swimmerId, swimmer.ClubId, target, swimmer.ClubLocked, locked);
+        // Человек решил сам — ждущий кандидат снимается. Без закрепления следующий импорт может
+        // завести его снова, если правило по-прежнему даёт другой клуб.
+        if (await db.SwimmerClubCandidates.FirstOrDefaultAsync(c => c.SwimmerId == swimmerId, ct) is { } pending)
+            db.SwimmerClubCandidates.Remove(pending);
         if (swimmer.ClubId != target)
         {
             db.SwimmerClubChanges.Add(new SwimmerClubChange
@@ -129,28 +206,49 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db) : ISwimmerClubR
         return await QueryChanges(db.SwimmerClubChanges.Where(c => c.ChangedAt >= since), take, clubs, ct);
     }
 
+    public async Task<SwimmerClubPendingSummary> PendingAsync(int takePerVerdict, CancellationToken ct = default)
+    {
+        var all = await db.SwimmerClubCandidates.AsNoTracking()
+            .OrderByDescending(c => c.LastSwimDate).ThenBy(c => c.SwimmerId)
+            .ToListAsync(ct);
+        var groups = all.GroupBy(c => c.Verdict ?? PendingUnchecked).ToList();
+        var byVerdict = groups.ToDictionary(g => g.Key, g => g.Count());
+        var shown = groups.SelectMany(g => g.Take(takePerVerdict)).ToList();
+        if (shown.Count == 0) return new SwimmerClubPendingSummary(all.Count, byVerdict, []);
+
+        var clubs = await LoadClubsAsync(db, ct);
+        var names = await SwimmerNamesAsync(db, shown.Select(c => c.SwimmerId), ct);
+        return new SwimmerClubPendingSummary(all.Count, byVerdict,
+            shown.Select(c => ToDto(c, names.GetValueOrDefault(c.SwimmerId) ?? $"#{c.SwimmerId}", clubs)).ToList());
+    }
+
+    /// <summary>Ключ «ещё не сверяли» в счёте ждущих по вердиктам (у кандидата <c>Verdict</c> = null).</summary>
+    public const string PendingUnchecked = "unchecked";
+
     /// <summary>Число смен за <paramref name="days"/> дней — для карточки дашборда.</summary>
     internal static Task<int> CountRecentAsync(SwimmDbContext db, int days, CancellationToken ct) =>
         db.SwimmerClubChanges.AsNoTracking().CountAsync(c => c.ChangedAt >= DateTime.UtcNow.AddDays(-days), ct);
 
-    private async Task ApplyAsync(List<SwimmerClubChangePlan> changes, string source, CancellationToken ct)
+    /// <summary>
+    /// Подтверждённый loglig-id (статус Verified): предложенный пользователем, но не проверенный
+    /// (Suggested), и отклонённый с карточкой пловца не сверяем — карточка может быть чужой.
+    /// </summary>
+    internal static IQueryable<Swimmer> VerifiedLogligIds(IQueryable<Swimmer> swimmers) =>
+        swimmers.Where(s => s.LogligId != null && s.LogligIdStatus == "Verified");
+
+    internal static SwimmerClubCandidateDto ToDto(SwimmerClubCandidate c, string swimmerName, Dictionary<int, ClubInfo> clubs) =>
+        new(c.SwimmerId, swimmerName,
+            c.FromClubId, c.FromClubId is int f ? ClubName(clubs, f) : null,
+            c.ToClubId, ClubName(clubs, c.ToClubId),
+            c.LastSwimDate, c.Overlap, c.Source,
+            c.Verdict, c.LogligId, c.LogligClubName, c.CheckedAt, c.CreatedAt);
+
+    internal static async Task<Dictionary<int, string>> SwimmerNamesAsync(SwimmDbContext db, IEnumerable<int> ids, CancellationToken ct)
     {
-        var byId = changes.ToDictionary(c => c.SwimmerId);
-        var ids = byId.Keys.ToArray();
-        var swimmers = await db.Swimmers.Where(s => ids.Contains(s.Id)).ToListAsync(ct);
-        foreach (var swimmer in swimmers)
-        {
-            var plan = byId[swimmer.Id];
-            // Между чтением и записью карточку могли закрепить или поправить — тогда не трогаем.
-            if (swimmer.ClubLocked || swimmer.ClubId != plan.FromClubId) continue;
-            swimmer.ClubId = plan.ToClubId;
-            db.SwimmerClubChanges.Add(new SwimmerClubChange
-            {
-                SwimmerId = swimmer.Id, FromClubId = plan.FromClubId, ToClubId = plan.ToClubId,
-                Source = source, LastSwimDate = plan.LastSwimDate,
-            });
-        }
-        await db.SaveChangesAsync(ct);
+        var arr = ids.Distinct().ToArray();
+        return await db.Swimmers.AsNoTracking().Where(s => arr.Contains(s.Id))
+            .Select(s => new { s.Id, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn })
+            .ToDictionaryAsync(s => s.Id, s => SwimmerName(s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn), ct);
     }
 
     private async Task<Dictionary<int, List<SwimmerClubRow>>> LoadRowsAsync(int[]? ids, CancellationToken ct)
@@ -171,7 +269,9 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db) : ISwimmerClubR
                 .ToList());
     }
 
-    private async Task<Dictionary<int, ClubInfo>> LoadClubsAsync(CancellationToken ct) =>
+    private Task<Dictionary<int, ClubInfo>> LoadClubsAsync(CancellationToken ct) => LoadClubsAsync(db, ct);
+
+    internal static async Task<Dictionary<int, ClubInfo>> LoadClubsAsync(SwimmDbContext db, CancellationToken ct) =>
         await db.Clubs.AsNoTracking()
             .Select(c => new ClubInfo(c.Id, c.Name, c.NameEn, c.IsPseudo, c.MergedIntoId))
             .ToDictionaryAsync(c => c.Id, ct);
@@ -183,10 +283,7 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db) : ISwimmerClubR
             .OrderByDescending(c => c.ChangedAt).ThenByDescending(c => c.Id)
             .Take(take)
             .ToListAsync(ct);
-        var swimmerIds = rows.Select(r => r.SwimmerId).Distinct().ToArray();
-        var names = await db.Swimmers.AsNoTracking().Where(s => swimmerIds.Contains(s.Id))
-            .Select(s => new { s.Id, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn })
-            .ToDictionaryAsync(s => s.Id, s => SwimmerName(s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn), ct);
+        var names = await SwimmerNamesAsync(db, rows.Select(r => r.SwimmerId), ct);
 
         return rows.Select(r => new SwimmerClubChangeDto(
                 r.Id, r.SwimmerId, names.GetValueOrDefault(r.SwimmerId) ?? $"#{r.SwimmerId}",
@@ -197,13 +294,13 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db) : ISwimmerClubR
     }
 
     /// <summary>Имя на иврите по умолчанию, английское — фоллбек (правило витрины 28.08.2026).</summary>
-    private static string SwimmerName(string first, string last, string firstEn, string lastEn)
+    internal static string SwimmerName(string first, string last, string firstEn, string lastEn)
     {
         var he = $"{first} {last}".Trim();
         return he.Length > 0 ? he : $"{firstEn} {lastEn}".Trim();
     }
 
-    private static string ClubName(Dictionary<int, ClubInfo> clubs, int id) =>
+    internal static string ClubName(Dictionary<int, ClubInfo> clubs, int id) =>
         clubs.TryGetValue(id, out var c)
             ? (string.IsNullOrWhiteSpace(c.Name) ? c.NameEn : c.Name)
             : $"#{id}";
