@@ -52,6 +52,14 @@ interface Props {
    * возрастная полоса («25-29»). Не задано — печатается метка бассейна, как было.
    */
   midLabel?: React.ReactNode;
+  /**
+   * Где стоит метка бассейна: `mid` — **по умолчанию**, между временами («-----50m-----»),
+   * как было; `above` — подписью-разделителем НАД полосой («50m POOL», `UI_PoolIcon`
+   * `styleType="divider"`), а в середине остаётся один разрыв. Включено на сравнении стран
+   * (выбор Влада 18.11.2026): метка в центре терялась и путалась с дистанцией на иконке.
+   * При заданном `midLabel` не действует — там строку различает уже не бассейн.
+   */
+  poolLabel?: 'mid' | 'above';
 }
 
 /**
@@ -63,6 +71,7 @@ const deltaLabel = (ms: number): string =>
 
 const UI_H2HPoolRow: React.FC<Props> = ({
   poolType, left, right, deltaMs = null, deltaTone = 'win', midLabel, emptyLabel,
+  poolLabel = 'mid',
 }) => {
   const leftWins = deltaMs != null && deltaMs < 0;
   const rightWins = deltaMs != null && deltaMs > 0;
@@ -72,7 +81,9 @@ const UI_H2HPoolRow: React.FC<Props> = ({
     ? ' h2h-pool__delta--behind'
     : (leftWins ? ' h2h-pool__delta--win' : '');
 
-  return (
+  const labelAbove = poolLabel === 'above' && midLabel == null;
+
+  const row = (
     <div className="h2h-pool">
       <UI_H2HTimeCell
         time={left?.time}
@@ -92,9 +103,9 @@ const UI_H2HPoolRow: React.FC<Props> = ({
       <div className="h2h-pool__mid">
         {/* Метка бассейна — тот же компонент, что в строке заплыва всего продукта:
             «--25m--» / «-----50m-----». */}
-        {midLabel ?? (
+        {midLabel ?? (labelAbove ? null : (
           <UI_PoolIcon styleType="icon-text-center" label={poolType} labelClassName="h2h-pool__label" />
-        )}
+        ))}
         {deltaMs != null && (
           <span className={`h2h-pool__delta${deltaClass}`}>
             {deltaLabel(deltaMs)}
@@ -117,6 +128,17 @@ const UI_H2HPoolRow: React.FC<Props> = ({
         side="right"
       />
     </div>
+  );
+
+  if (!labelAbove) return row;
+
+  // Фрагмент, а не обёртка: карточка (`.h2h-event`) — flex-столбик с общим `gap`, и подпись
+  // с полосой должны остаться её прямыми детьми, иначе отступы между ними разойдутся.
+  return (
+    <>
+      <UI_PoolIcon styleType="divider" label={poolType} />
+      {row}
+    </>
   );
 };
 
