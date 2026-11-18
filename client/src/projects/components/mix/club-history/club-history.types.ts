@@ -20,7 +20,18 @@ export interface ClubSeason {
   lastDate: string;
   /** Части сезона, где он плыл за клуб: winter — 25м, summer — 50м. */
   courses?: string[];
+  /**
+   * Прежнее название клуба, под которым он выступал в этой строке: клуб с тех пор
+   * переименован (план swimmer-club-change §5, Н8). Строка подписана текущим, окно мелко
+   * добавляет «then: …». null — заплывы под текущим названием.
+   */
+  thenName?: string | null;
+  thenNameEn?: string | null;
 }
+
+/** Прежнее название строки для витрины: иврит по умолчанию, английский — фоллбек. null — его нет. */
+export const clubSeasonThenName = (club: ClubSeason): string | null =>
+  club.thenName || club.thenNameEn || null;
 
 /** Настоящих клубов за карьеру — значок «несколько клубов» стоит при двух и больше (К4). */
 export const clubHistoryCount = (history?: ClubSeason[] | null): number =>

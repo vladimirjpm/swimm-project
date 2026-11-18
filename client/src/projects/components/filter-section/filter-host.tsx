@@ -70,6 +70,8 @@ export interface FilterClubOption {
   label: string;
   /** Короткая приписка справа в строке (напр. число заплывов). Только для строк без `stats`. */
   note?: string;
+  /** Прежние названия клуба — поиск в карточке находит строку и по ним (Н7, `filter-club-match.ts`). */
+  aliases?: string[];
   /** Метрики для строки клуба на results (`UI_ClubDetails`). Нет — рисуется простая строка. */
   stats?: {
     points: number;
@@ -354,6 +356,7 @@ export function useReduxFilterHost(active = true): FilterHost {
       items: list.map((c) => ({
         value: c.club,
         label: c.club,
+        aliases: c.formerNames,
         stats: {
           points: c.points,
           swimmerCount: c.swimmerCount,

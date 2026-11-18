@@ -86,11 +86,13 @@ public class ImportClubMatchingTests
     }
 
     [Fact]
-    public async Task MergedClub_NotReused_NewClubCreated()
+    public async Task MergedClubName_GoesToCanonical_NoNewClub()
     {
         // Склеенный клуб — надгробие: вешать на него новые результаты нельзя, иначе merge
-        // молча откатится. Матч по имени обязан его игнорировать.
-        await using var db = CreateDb(nameof(MergedClub_NotReused_NewClubCreated));
+        // молча откатится. До 18.11.2026 импорт по названию надгробия заводил НОВЫЙ клуб (и
+        // склейка всё равно откатывалась — уже дублем); теперь название склеенного дубля ведёт
+        // в его канон (план swimmer-club-change §5, Н5).
+        await using var db = CreateDb(nameof(MergedClubName_GoesToCanonical_NoNewClub));
         var canon = new Club { Name = "Канон", NameEn = "Canon" };
         db.Clubs.Add(canon);
         await db.SaveChangesAsync();
@@ -100,9 +102,78 @@ public class ImportClubMatchingTests
         await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(new[] { Item("בני הרצליה") }));
 
         var result = await db.Results.SingleAsync();
-        var used = await db.Clubs.FirstAsync(c => c.Id == result.ClubId);
-        Assert.Null(used.MergedIntoId);
-        Assert.NotEqual("Канон", used.Name);
+        Assert.Equal(canon.Id, result.ClubId);
+        Assert.Null(result.ClubNameId); // дубль — не переименование: прежнего названия нет
+        Assert.Equal(2, await db.Clubs.CountAsync());
+    }
+
+    [Fact]
+    public async Task FormerName_ProtocolGoesToRenamedClub_RemembersPrintedName()
+    {
+        // Н5: протокол 2024/25 напечатан под «הפועל עירוני הוד השרון», клуб с тех пор Aluma
+        // (склейка-переименование: Hapoel — надгробие, его название в ClubNames). Перезалив
+        // попадает в Aluma, новый Hapoel не рождается, строка помнит напечатанное название.
+        await using var db = CreateDb(nameof(FormerName_ProtocolGoesToRenamedClub_RemembersPrintedName));
+        var aluma = new Club { Name = "אלומה עירוני הוד השרון", NameEn = "" };
+        db.Clubs.Add(aluma);
+        await db.SaveChangesAsync();
+        var hapoel = new Club { Name = "הפועל עירוני הוד השרון", NameEn = "", MergedIntoId = aluma.Id };
+        db.Clubs.Add(hapoel);
+        await db.SaveChangesAsync();
+        var former = new ClubName
+        {
+            ClubId = aluma.Id, Name = hapoel.Name, Kind = ClubNameKinds.Former, MergedClubId = hapoel.Id,
+        };
+        db.ClubNames.Add(former);
+        await db.SaveChangesAsync();
+
+        await new JsonImportService(db, new NullCache())
+            .ImportAsync(ToStream(new[] { Item("הפועל עירוני הוד השרון") }));
+
+        var result = await db.Results.SingleAsync();
+        Assert.Equal(aluma.Id, result.ClubId);
+        Assert.Equal(former.Id, result.ClubNameId);
+        Assert.Equal(2, await db.Clubs.CountAsync());
+    }
+
+    [Fact]
+    public async Task FormerName_ThroughChain_GoesToFinalCanonical()
+    {
+        // Цепочка, которую ещё не догнал --flatten-club-merges: 605 → 1372 → 1454. Название
+        // 605 ведёт в живой конец, а не в промежуточное надгробие.
+        await using var db = CreateDb(nameof(FormerName_ThroughChain_GoesToFinalCanonical));
+        var live = new Club { Name = "אלומה עירוני הוד השרון" };
+        db.Clubs.Add(live);
+        await db.SaveChangesAsync();
+        var middle = new Club { Name = "הפועל עירוני הוד השרון", MergedIntoId = live.Id };
+        db.Clubs.Add(middle);
+        await db.SaveChangesAsync();
+        db.Clubs.Add(new Club { Name = "הפועל הוד השרון", MergedIntoId = middle.Id });
+        await db.SaveChangesAsync();
+
+        await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(new[] { Item("הפועל הוד השרון") }));
+
+        Assert.Equal(live.Id, (await db.Results.SingleAsync()).ClubId);
+        Assert.Equal(3, await db.Clubs.CountAsync());
+    }
+
+    [Fact]
+    public async Task LiveClubWithSameName_WinsOverFormerName()
+    {
+        // Живой клуб с этим названием важнее прежнего названия другого клуба.
+        await using var db = CreateDb(nameof(LiveClubWithSameName_WinsOverFormerName));
+        var aluma = new Club { Name = "אלומה" };
+        var namesake = new Club { Name = "הפועל" };
+        db.Clubs.AddRange(aluma, namesake);
+        await db.SaveChangesAsync();
+        db.ClubNames.Add(new ClubName { ClubId = aluma.Id, Name = "הפועל", Kind = ClubNameKinds.Former });
+        await db.SaveChangesAsync();
+
+        await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(new[] { Item("הפועל") }));
+
+        var result = await db.Results.SingleAsync();
+        Assert.Equal(namesake.Id, result.ClubId);
+        Assert.Null(result.ClubNameId);
     }
 
     [Fact]

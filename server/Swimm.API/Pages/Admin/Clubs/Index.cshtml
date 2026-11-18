@@ -11,7 +11,12 @@
     порядке (<code>word-order</code>), общие пловцы между клубами (<code>swimmers</code>),
     опечатка в названии (<code>levenshtein</code>).
     Отметь пары → <b>Dry-run</b> покажет план без изменений; <b>Merge выбранные</b> —
-    необратимо: связи дубля перевешиваются на канонический клуб.
+    необратимо: связи дубля перевешиваются на канонический клуб, дубль остаётся надгробием.
+    У каждой пары — <b>вид</b>: <b>Дубль</b> (один клуб записан двумя названиями) или
+    <b>Переименование</b> (клуб сменил название: дубль — старое название, канон — новое).
+    При переименовании старое название с годами уходит в историю клуба
+    (<code>ClubNames</code>, «Formerly: …» на странице клуба), а импорт старых протоколов
+    попадёт в канон. Пару, которой нет среди кандидатов, добавь руками по Id.
 </div>
 
 <div class="mb-4 flex flex-wrap items-center gap-3">
@@ -30,8 +35,9 @@
             <tr>
                 <th></th>
                 <th>Канонический (остаётся)</th>
-                <th>Дубль (удаляется)</th>
+                <th>Дубль (станет надгробием)</th>
                 <th>Эвристика</th>
+                <th>Вид</th>
                 <th>Общих пловцов</th>
                 <th></th>
             </tr>
@@ -39,6 +45,18 @@
         <tbody id="cand-body"></tbody>
     </table>
 </div>
+<div class="mt-3 flex flex-wrap items-center gap-2 text-[12.5px] text-admin-text-muted">
+    <span>Пара руками:</span>
+    <input id="manual-canon" type="number" min="1" class="admin-input w-32" placeholder="Канон Id" autocomplete="off" />
+    <span>←</span>
+    <input id="manual-dup" type="number" min="1" class="admin-input w-32" placeholder="Дубль Id" autocomplete="off" />
+    <select id="manual-kind" class="admin-input w-48">
+        <option value="duplicate">Дубль</option>
+        <option value="rename">Переименование</option>
+    </select>
+    <button id="btn-manual-add" class="admin-btn admin-btn-ghost">Добавить пару</button>
+</div>
+
 <div id="empty-msg" class="hidden text-center text-admin-text-muted italic py-10">Кандидатов на склейку нет.</div>
 
 <details id="ignored-wrap" class="mt-3 hidden text-[12.5px] text-admin-text-muted">

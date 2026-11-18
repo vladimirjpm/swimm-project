@@ -3,7 +3,7 @@ import './club-history.css';
 import UI_ClubIcon from '../club-icon/club-icon';
 import UI_SeasonIcon, { isSeason } from '../season-icon/season-icon';
 import { routes } from '../../../../utils/routes';
-import { clubHistoryDate, clubSeasonName, type ClubSeason } from './club-history.types';
+import { clubHistoryDate, clubSeasonName, clubSeasonThenName, type ClubSeason } from './club-history.types';
 
 /** Подпись значка части сезона: зима — короткая вода, лето — длинная. */
 const COURSE_LABEL: Record<string, string> = {
@@ -24,6 +24,7 @@ const UI_ClubHistoryList: React.FC<{ history: ClubSeason[] }> = ({ history }) =>
       // как продолжение, а не как ещё один год.
       const first = i === 0 || history[i - 1].season !== row.season;
       const name = clubSeasonName(row);
+      const then = clubSeasonThenName(row);
       const range = row.firstDate === row.lastDate
         ? clubHistoryDate(row.lastDate)
         : `${clubHistoryDate(row.firstDate)} – ${clubHistoryDate(row.lastDate)}`;
@@ -48,6 +49,12 @@ const UI_ClubHistoryList: React.FC<{ history: ClubSeason[] }> = ({ history }) =>
             <span className="club-history__meta">
               {row.swims} {row.swims === 1 ? 'swim' : 'swims'} · {range}
             </span>
+            {/* Клуб с тех пор сменил название (Н8): строка подписана текущим, мелко — прежнее. */}
+            {then && (
+              <span className="club-history__then" title={`The club was then called ${then}`}>
+                then: <bdi>{then}</bdi>
+              </span>
+            )}
           </span>
         </li>
       );

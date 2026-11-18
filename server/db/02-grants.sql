@@ -31,6 +31,7 @@ GRANT SELECT ON
     "Categories",
     "CategoryCompetitions",
     "ClubCompetitionStandings",
+    "ClubNames",
     "Clubs",
     "CompetitionEntries",
     "CompetitionEvents",

@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 
@@ -15,6 +16,9 @@ namespace Swimm.Infrastructure.Services;
 /// Guard 1: у ОБОИХ клубов официальная hub-группа (partial unique index
 /// HubGroups.ClubId WHERE IsOfficial) — пара блокируется. Guard 2: дубль-строки
 /// Sys_UserFavorites (клуб дважды в избранном одного юзера) схлопываются в одну.
+/// Вид склейки (Н2, docs/plans/swimmer-club-change-plan.md §5): «Дубль» или «Переименование» —
+/// у второго старое название уходит в ClubNames, а перенесённые строки помнят его (ClubNameId).
+/// Цепочек не бывает (Н4): склеенные в дубль клубы перевешиваются на канон вместе с ним.
 /// Все изменения — одним SaveChanges; dry-run не пишет ничего. Tracked-сущности
 /// (InMemory-совместимо): одноразовая админ-операция, худший случай — тысячи строк.
 /// После реального merge кэш сбрасывает само сохранение — метки всех таблиц, которые оно
@@ -76,8 +80,20 @@ public class ClubMergeService(
 
         foreach (var pair in pairs)
         {
-            var res = new ClubMergePairResult { CanonicalId = pair.CanonicalId, DuplicateId = pair.DuplicateId };
+            var res = new ClubMergePairResult
+            {
+                CanonicalId = pair.CanonicalId,
+                DuplicateId = pair.DuplicateId,
+                Kind = pair.IsRename ? ClubMergeKinds.Rename : ClubMergeKinds.Duplicate,
+            };
             report.Pairs.Add(res);
+
+            if (!ClubMergeKinds.IsKnown(pair.Kind))
+            {
+                res.Status = "error";
+                res.Conflicts.Add($"неизвестный вид склейки «{pair.Kind}» (duplicate | rename)");
+                continue;
+            }
 
             if (pair.CanonicalId == pair.DuplicateId)
             {
@@ -128,6 +144,10 @@ public class ClubMergeService(
 
             // --- Перенос связей ---
 
+            // Первой строкой — кто в кого: пару, добавленную руками по Id, админ видит по именам.
+            res.Actions.Add($"«{duplicate.Name}» #{duplicate.Id} → «{canonical.Name}» #{canonical.Id}"
+                + (pair.IsRename ? " — переименование" : " — дубль"));
+
             foreach (var unitId in await db.ClubCompetitionStandings.AsNoTracking()
                          .Where(s => s.ClubId == duplicate.Id)
                          .Select(s => s.CompetitionId)
@@ -135,6 +155,39 @@ public class ClubMergeService(
                 standingUnits.Add(unitId);
 
             var results = await db.Results.Where(r => r.ClubId == duplicate.Id).ToListAsync(ct);
+
+            // Переименование (Н2, Н3): старое название — в историю канона, с годами, когда под
+            // ним выступали. Даты — по строкам дубля ДО переноса: после него строки уже не
+            // отличить от строк канона. Строки, напечатанные под этим названием, его помнят;
+            // строка, уже помнящая ещё более старое название (дубль сам был переименован),
+            // остаётся при своём — оно точнее.
+            if (pair.IsRename)
+            {
+                var formerName = new ClubName
+                {
+                    Club = canonical,
+                    ClubId = canonical.Id,
+                    Name = duplicate.Name,
+                    NameEn = duplicate.NameEn,
+                    UsedFrom = results.Count > 0 ? results.Min(r => r.CompetitionDate) : null,
+                    UsedTo = results.Count > 0 ? results.Max(r => r.CompetitionDate) : null,
+                    Kind = ClubNameKinds.Former,
+                    MergedClubId = duplicate.Id,
+                };
+                db.ClubNames.Add(formerName);
+                var marked = 0;
+                foreach (var r in results.Where(r => r.ClubNameId == null))
+                {
+                    r.ClubName = formerName;
+                    marked++;
+                }
+                res.Actions.Add(
+                    $"ClubNames: прежнее название «{duplicate.Name}»" +
+                    (formerName.UsedFrom is DateTime from && formerName.UsedTo is DateTime to
+                        ? $" ({from:dd.MM.yyyy} – {to:dd.MM.yyyy})" : " (стартов нет)"));
+                if (marked > 0) res.Actions.Add($"Results.ClubNameId: {marked} строк помнят прежнее название");
+            }
+
             foreach (var r in results) r.ClubId = canonical.Id;
             Note(res, "Results", results.Count);
 
@@ -177,9 +230,23 @@ public class ClubMergeService(
             }
             Note(res, "Sys_UserFavorites", favs.Count);
 
+            // Без цепочек (Н4): клубы, склеенные в дубль раньше, теперь смотрят прямо на канон.
+            // Иначе /clubs/{старый id}, импорт и все выборки «MergedIntoId ?? Id» упирались бы
+            // в пустое надгробие (1329 → 605 → 1372 открывал пустой 605).
+            var tombstones = await db.Clubs.Where(c => c.MergedIntoId == duplicate.Id).ToListAsync(ct);
+            foreach (var t in tombstones) t.MergedIntoId = canonical.Id;
+            if (tombstones.Count > 0)
+                res.Actions.Add($"Clubs.MergedIntoId: {tombstones.Count} склеенных в дубль → canonical ({string.Join(", ", tombstones.Select(t => $"#{t.Id}"))})");
+
+            // Прежние названия дубля переезжают к канону вместе с его строками.
+            var names = await db.ClubNames.Where(n => n.ClubId == duplicate.Id).ToListAsync(ct);
+            foreach (var n in names) n.ClubId = canonical.Id;
+            Note(res, "ClubNames", names.Count);
+
             // Дозаполнение пустых полей канонического из дубля. Кросс-скриптовая пара:
             // канон — ивритская запись, латинское название дубля уходит в NameEn.
-            if (string.IsNullOrEmpty(canonical.NameEn))
+            // При переименовании — нет: английское название дубля это СТАРОЕ название.
+            if (!pair.IsRename && string.IsNullOrEmpty(canonical.NameEn))
             {
                 if (!string.IsNullOrEmpty(duplicate.NameEn))
                 { canonical.NameEn = duplicate.NameEn; res.Actions.Add("Club.NameEn ← дубль (NameEn)"); }
@@ -242,6 +309,38 @@ public class ClubMergeService(
             }
         }
 
+        return report;
+    }
+
+    public async Task<ClubChainFlattenReport> FlattenChainsAsync(bool dryRun = true, CancellationToken ct = default)
+    {
+        var report = new ClubChainFlattenReport { DryRun = dryRun };
+
+        var mergedInto = await db.Clubs.AsNoTracking()
+            .Select(c => new { c.Id, c.MergedIntoId })
+            .ToDictionaryAsync(c => c.Id, c => c.MergedIntoId, ct);
+        var plan = ClubMergeChains.Plan(mergedInto);
+        report.Broken.AddRange(plan.Broken);
+
+        var moveIds = plan.Moves.Select(m => m.ClubId).ToList();
+        var tracked = await db.Clubs.Where(c => moveIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, ct);
+        foreach (var move in plan.Moves)
+        {
+            tracked[move.ClubId].MergedIntoId = move.To;
+            report.Moves.Add($"#{move.ClubId}: {move.From} → {move.To}");
+        }
+
+        // Прежние названия, чей хозяин — надгробие (заведены до склейки хозяина), — к живому клубу.
+        var tombstoneIds = mergedInto.Where(kv => kv.Value != null).Select(kv => kv.Key).ToList();
+        foreach (var n in await db.ClubNames.Where(n => tombstoneIds.Contains(n.ClubId)).ToListAsync(ct))
+        {
+            if (ClubMergeChains.FinalOf(n.ClubId, mergedInto) is not int live) continue;
+            report.NameMoves.Add($"ClubNames #{n.Id} «{n.Name}»: {n.ClubId} → {live}");
+            n.ClubId = live;
+        }
+
+        if (dryRun) db.ChangeTracker.Clear();
+        else await db.SaveChangesAsync(ct);
         return report;
     }
 

@@ -31,6 +31,13 @@ internal sealed class ResultRecordConfiguration : IEntityTypeConfiguration<Resul
             .HasForeignKey(r => r.ClubId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Прежнее название клуба, под которым строка напечатана (Н3). Удалили название —
+        // строка просто «под текущим»: SetNull, а не запрет.
+        entity.HasOne(r => r.ClubName)
+            .WithMany()
+            .HasForeignKey(r => r.ClubNameId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         entity.HasOne(r => r.Style)
             .WithMany()
             .HasForeignKey(r => r.StyleId)

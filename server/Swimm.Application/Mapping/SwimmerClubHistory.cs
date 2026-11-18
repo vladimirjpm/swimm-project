@@ -8,7 +8,14 @@ namespace Swimm.Application.Mapping;
 /// Клуб из справочника — как лежит в базе. <paramref name="MergedIntoId"/> — клуб склеен в
 /// другой (приёмник); <paramref name="IsPseudo"/> — в графе клуба стояла страна/сборная.
 /// </summary>
-public sealed record SwimmerClubRef(int Id, string Name, string NameEn, bool IsPseudo, int? MergedIntoId = null);
+public sealed record SwimmerClubRef(int Id, string Name, string NameEn, bool IsPseudo, int? MergedIntoId = null)
+{
+    /// <summary>
+    /// Прежние названия клуба (<c>ClubNames</c>, план swimmer-club-change §5, Н8) — по ним строка
+    /// сезона пишет «then: …». Нужны только живому клубу: у надгробия их нет, они у приёмника.
+    /// </summary>
+    public IReadOnlyList<ClubFormerNameRow> FormerNames { get; init; } = [];
+}
 
 /// <summary>
 /// История клубов пловца по сезонам (docs/plans/swimmer-club-change-plan.md, Ф2–Ф3).
@@ -65,6 +72,7 @@ public static class SwimmerClubHistory
                 var club = g.First().Club!;
                 var first = g.Min(x => x.Row.CompetitionDate);
                 var last = g.Max(x => x.Row.CompetitionDate);
+                var then = ThenName(g.Select(x => x.Row.ClubNameId), club);
                 return new SwimmerClubSeasonDto
                 {
                     Season = g.Key.Season,
@@ -76,6 +84,9 @@ public static class SwimmerClubHistory
                     FirstDate = first.ToString("yyyy-MM-dd"),
                     LastDate = last.ToString("yyyy-MM-dd"),
                     Courses = CoursesOf(g.Select(x => x.Row.PoolType)),
+                    ThenName = then?.Name,
+                    ThenNameEn = then is null || string.IsNullOrWhiteSpace(then.NameEn) || then.NameEn == then.Name
+                        ? null : then.NameEn,
                 };
             })
             .OrderByDescending(h => h.Season)
@@ -104,6 +115,28 @@ public static class SwimmerClubHistory
     /// <summary>Имя для витрины: иврит по умолчанию, английское — фоллбек.</summary>
     public static string DisplayName(SwimmerClubSeasonDto club) =>
         string.IsNullOrWhiteSpace(club.Name) ? club.NameEn ?? string.Empty : club.Name;
+
+    /// <summary>
+    /// Прежнее название клуба в строке сезона (Н8): если под ним напечатано больше заплывов этой
+    /// строки, чем под текущим (<c>Results.ClubNameId</c>). Не по датам: старое и новое
+    /// название живут в протоколах внахлёст (Aluma уже с 24.10.2025, Hapoel — до 16.02.2026).
+    /// null — все заплывы под текущим названием или название не переименование (дубль).
+    /// </summary>
+    private static ClubFormerNameRow? ThenName(IEnumerable<int?> clubNameIds, SwimmerClubRef club)
+    {
+        // Текущее название (null) голосует наравне с прежними; при равенстве — прежнее: строка
+        // сезона и так подписана текущим, подсказка о старом важнее.
+        var top = clubNameIds
+            .GroupBy(id => id ?? 0)
+            .OrderByDescending(g => g.Count())
+            .ThenByDescending(g => g.Key != 0)
+            .ThenBy(g => g.Key)
+            .Select(g => g.Key)
+            .FirstOrDefault();
+        return top != 0
+            ? club.FormerNames.FirstOrDefault(n => n.Id == top && n.Kind == Domain.Entities.ClubNameKinds.Former)
+            : null;
+    }
 
     /// <summary>25м — зимняя (короткая) вода, 50м — летняя; порядок «зима, лето».</summary>
     private static List<string> CoursesOf(IEnumerable<string> poolTypes)

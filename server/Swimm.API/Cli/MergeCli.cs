@@ -38,6 +38,29 @@ internal static class MergeCli
         return;
     }
 
+    // Разовый догон цепочек склеек клубов (план swimmer-club-change §5, Н4):
+    //   dotnet run -- --flatten-club-merges --dry-run   план: какое надгробие куда перевесить
+    //   dotnet run -- --flatten-club-merges             записать
+    // До 18.11.2026 склейка не трогала клубы, склеенные в дубль раньше, и на проде остались
+    // цепочки 1329 → 605 → 1372, 1361/1408 → 447 → 1372. Новые склейки цепочек не дают.
+    internal static async Task FlattenClubMergesAsync(WebApplication app, string[] args)
+    {
+        using var scope = app.Services.CreateScope();
+        var merge = scope.ServiceProvider.GetRequiredService<IClubMergeService>();
+        var dryRun = args.Contains("--dry-run");
+        var report = await merge.FlattenChainsAsync(dryRun);
+
+        Console.WriteLine(dryRun ? "=== DRY-RUN: БД не изменена ===" : "=== ПРИМЕНЕНО ===");
+        Console.WriteLine($"Надгробий перевешено: {report.Moves.Count}");
+        foreach (var m in report.Moves) Console.WriteLine($"  {m}");
+        Console.WriteLine($"Прежних названий перевешено: {report.NameMoves.Count}");
+        foreach (var m in report.NameMoves) Console.WriteLine($"  {m}");
+        if (report.Broken.Count > 0)
+            Console.WriteLine($"!! Без живого конца (петля/обрыв), чинить руками: {string.Join(", ", report.Broken)}");
+        if (dryRun && report.Moves.Count + report.NameMoves.Count > 0)
+            Console.WriteLine("Повтори без --dry-run, чтобы применить.");
+    }
+
     // Чистка пустых клубов из консоли (то же, что кнопка «Удалить все пустые» на /Admin/Clubs):
     //   dotnet run -- --delete-empty-clubs
     // Зовёт тот же сервис, что и кнопка, — предикат «пустого клуба» живёт в одном месте

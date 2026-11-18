@@ -26,6 +26,7 @@ public class SwimmDbContext : DbContext
     public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
     public DbSet<CompetitionResultUrl> CompetitionResultUrls => Set<CompetitionResultUrl>();
     public DbSet<Club> Clubs => Set<Club>();
+    public DbSet<ClubName> ClubNames => Set<ClubName>();
     public DbSet<Swimmer> Swimmers => Set<Swimmer>();
     public DbSet<Relay> Relays => Set<Relay>();
     public DbSet<RelayMember> RelayMembers => Set<RelayMember>();

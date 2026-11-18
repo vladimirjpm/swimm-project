@@ -65,9 +65,15 @@ public static class SeoText
     public static SeoHead Club(SeoClubFacts c)
     {
         var name = ClubName(c.Name, c.NameEn);
+        // Прежнее название — сразу после имени, до общего хвоста: описание режется по длине,
+        // а по старому названию клуб ищут чаще, чем по словам «roster, medals».
+        var formerly = ClubFormerNames.FormerlySentence(c.FormerNames ?? []);
+        var lead = formerly.Length > 0 ? $" {formerly}" : "";
         var description = c.Swimmers > 0
-            ? $"{name}: {Count(c.Swimmers, "swimmer")}. Club roster, medals, records and season bests."
-            : $"{name}: club roster, results, medals and records.";
+            ? $"{name}: {Count(c.Swimmers, "swimmer")}.{lead} Club roster, medals, records and season bests."
+            : formerly.Length > 0
+                ? $"{name}.{lead} Club roster, results, medals and records."
+                : $"{name}: club roster, results, medals and records.";
         return new SeoHead(
             Title: $"{name} — swimming club · {SiteName}",
             Description: Clip(description),

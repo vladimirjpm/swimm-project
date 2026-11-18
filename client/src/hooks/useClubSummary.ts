@@ -11,6 +11,8 @@ export interface ClubSummary {
   gold: number;
   silver: number;
   bronze: number;
+  /** Прежние названия клуба (переименования, план swimmer-club-change §5, Н7): по ним ищет фильтр. */
+  formerNames?: string[];
 }
 
 /**

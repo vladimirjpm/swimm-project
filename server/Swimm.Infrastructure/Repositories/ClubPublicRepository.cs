@@ -38,18 +38,22 @@ public class ClubPublicRepository : IClubPublicRepository
             .FirstOrDefaultAsync();
         if (club == null) return null;
 
-        if (club.MergedIntoId != null)
+        // Склеенный клуб → данные приёмника, редиректа нет (решение Влада). Идём по цепочке
+        // ДО КОНЦА (план swimmer-club-change §5, Н4): склейка цепочек больше не даёт, но старые
+        // (1329 → 605 → 1372) живут, пока их не догнал --flatten-club-merges, а один шаг
+        // открывал пустое надгробие. Петлю обрывает предел звеньев.
+        var current = club;
+        for (var hop = 0; current.MergedIntoId is int next; hop++)
         {
-            // Один переход по мягкому merge — редиректа нет (решение Влада), отдаём данные
-            // приёмника. Дальше разматывать не нужно: merge второго уровня запрещён guard-ом.
-            var target = await _read.Clubs.AsNoTracking()
-                .Where(c => c.Id == club.MergedIntoId.Value)
-                .Select(c => new { c.Id, c.IsPseudo })
+            if (hop >= ClubMergeChains.MaxHops) return null;
+            current = await _read.Clubs.AsNoTracking()
+                .Where(c => c.Id == next)
+                .Select(c => new { c.Id, c.IsPseudo, c.MergedIntoId })
                 .FirstOrDefaultAsync();
-            return target == null || target.IsPseudo ? null : target.Id;
+            if (current == null) return null;
         }
 
-        return club.IsPseudo ? null : club.Id;
+        return current.IsPseudo ? null : current.Id;
     }
 
     public async Task<ClubRosterPageDto> GetRosterAsync(
@@ -411,6 +415,12 @@ public class ClubPublicRepository : IClubPublicRepository
             .Where(c => c.Id == resolvedClubId || c.MergedIntoId == resolvedClubId)
             .Select(c => new { c.Name, c.NameEn })
             .ToListAsync();
+        // …и прежние названия (ClubNames, план swimmer-club-change §5): рекорд, поставленный
+        // до переименования, записан в справочнике под старым названием клуба.
+        nameRows.AddRange(await _read.ClubNames.AsNoTracking()
+            .Where(n => n.ClubId == resolvedClubId)
+            .Select(n => new { n.Name, n.NameEn })
+            .ToListAsync());
 
         var names = nameRows
             .SelectMany(c => new[] { c.Name, c.NameEn })

@@ -87,6 +87,35 @@ internal sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
     }
 }
 
+/// <summary>Прежние названия клубов (план swimmer-club-change §5, Н1).</summary>
+internal sealed class ClubNameConfiguration : IEntityTypeConfiguration<ClubName>
+{
+    public void Configure(EntityTypeBuilder<ClubName> entity)
+    {
+        entity.ToTable("ClubNames");
+
+        // Даты старта — календарные, как Results.CompetitionDate (Kind=Unspecified).
+        entity.Property(e => e.UsedFrom).HasColumnType("timestamp without time zone");
+        entity.Property(e => e.UsedTo).HasColumnType("timestamp without time zone");
+
+        // Хозяин названия — живой клуб. Restrict: клуб с прежними названиями не удаляется
+        // молча (удаляют только пустые клубы, а у переименованного есть результаты).
+        entity.HasOne(e => e.Club)
+            .WithMany()
+            .HasForeignKey(e => e.ClubId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne(e => e.MergedClub)
+            .WithMany()
+            .HasForeignKey(e => e.MergedClubId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        entity.HasIndex(e => e.ClubId);
+        // Импорт ищет клуб по прежнему названию.
+        entity.HasIndex(e => e.Name);
+    }
+}
+
 internal sealed class SwimmerConfiguration : IEntityTypeConfiguration<Swimmer>
 {
     public void Configure(EntityTypeBuilder<Swimmer> entity)

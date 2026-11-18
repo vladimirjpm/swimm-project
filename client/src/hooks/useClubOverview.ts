@@ -1,3 +1,4 @@
+import type { ClubFormerName } from '../projects/club-project/components/club-former-names-model';
 import { useEffect, useState } from 'react';
 import type { ShowcaseSeasonNotice } from '../utils/helpers/season-helper';
 
@@ -34,6 +35,8 @@ export interface ClubProfile {
   swimmer_count: number;
   first_season: number | null;
   last_season: number | null;
+  /** Прежние названия (переименования, план swimmer-club-change §5, Н6), последние сверху. */
+  former_names?: ClubFormerName[];
 }
 
 export interface ClubKpi {

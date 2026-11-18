@@ -71,3 +71,9 @@
 }
 .club-history__name:hover { color: var(--t-accent-text); text-decoration: underline; }
 .club-history__meta { font-size: 11px; color: var(--t-text-3); font-variant-numeric: tabular-nums; }
+
+/* «then: הפועל …» — клуб с тех пор переименован (план swimmer-club-change §5, Н8). */
+.club-history__then {
+  font-size: 11px; color: var(--t-text-3); font-style: italic;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
