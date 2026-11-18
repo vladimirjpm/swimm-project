@@ -2,6 +2,7 @@
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Services.DataChecks;
@@ -174,42 +175,80 @@ public sealed class CompetitionWithoutClubPointRuleCheck(SwimmDbContext db) : ID
 
 /// <summary>
 /// Сверка импорта не сошлась (фаза Д1): в БД не то число строк, что в файле-протоколе.
-/// Берётся ПОСЛЕДНЯЯ сверка по каждому соревнованию — предыдущие уже неактуальны.
+/// Решает ПОСЛЕДНЯЯ сверка по каждому соревнованию — предыдущие уже неактуальны. Исключение —
+/// добавки к уже загруженному дню (вечерняя сессия, эстафеты): файл-добавка не обязан совпадать
+/// со всем днём, поэтому вердикт выносит последняя сверка ДО добавок
+/// (<see cref="ImportReconciler.Verdict"/>; ложная ошибка по Эйлату 05.11.2026, comp 1874).
 /// </summary>
 public sealed class ReconciliationMismatchCheck(SwimmDbContext db) : IDataCheck
 {
     public string Id => "import.reconciliation-mismatch";
     public string Title => "Импорт разошёлся с протоколом";
     public string Description =>
-        "Последняя сверка соревнования показала другое число строк, чем в файле. " +
+        "Последняя сверка соревнования показала другое число строк, чем в файле (добавки к уже " +
+        "загруженному дню не в счёт, если легли целиком). " +
         "Лечится переимпортом с «удалять лишние»; если расходится дата — сперва разберись с ней (И-8).";
     public DataCheckSeverity Severity => DataCheckSeverity.Error;
 
     public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
     {
-        // Последний прогон сверки по каждому соревнованию: сравниваем итоговые строки
-        // (EventKey = "") — по ним видно масштаб, не складывая десятки заплывов.
+        // Кандидаты — соревнования, у которых последняя итоговая строка (EventKey = "")
+        // разошлась: по ней видно масштаб, не складывая десятки заплывов.
         var latest = await db.ImportReconciliations.AsNoTracking()
             .Where(r => r.EventKey == "")
             .GroupBy(r => r.CompetitionId)
             .Select(g => g.OrderByDescending(x => x.ImportedAt).ThenByDescending(x => x.Id).First())
             .ToListAsync(ct);
+        var candidates = latest.Where(r => r.Status == "mismatch").Select(r => r.CompetitionId).ToList();
+        if (candidates.Count == 0) return DataCheckOutcome.Empty;
 
-        var bad = latest.Where(r => r.Status == "mismatch").ToList();
+        // Вся история сверок кандидатов — чтобы отличить добавку от настоящего расхождения.
+        var history = await db.ImportReconciliations.AsNoTracking()
+            .Where(r => candidates.Contains(r.CompetitionId))
+            .Select(r => new { r.Id, r.CompetitionId, r.ImportedAt, r.ImportFileName, r.EventKey, r.ExpectedRows, r.ActualRows })
+            .ToListAsync(ct);
+
+        var bad = new List<(ReconciliationImport Decisive, int AdditionsAfter)>();
+        foreach (var comp in history.GroupBy(r => r.CompetitionId))
+        {
+            var imports = comp
+                .GroupBy(r => (r.ImportedAt, r.ImportFileName))
+                .Select(g =>
+                {
+                    var total = g.Where(r => r.EventKey == "").OrderByDescending(r => r.Id).FirstOrDefault();
+                    return total is null ? null : new ReconciliationImport(
+                        g.Key.ImportedAt, g.Key.ImportFileName,
+                        new ReconciliationRow(comp.Key, "", total.ExpectedRows, total.ActualRows),
+                        g.Where(r => r.EventKey != "")
+                            .Select(r => new ReconciliationRow(comp.Key, r.EventKey, r.ExpectedRows, r.ActualRows))
+                            .ToList());
+                })
+                .OfType<ReconciliationImport>()
+                .OrderBy(i => i.ImportedAt)
+                .ToList();
+
+            if (ImportReconciler.Verdict(imports) is { } verdict && verdict.Decisive.Total.IsMismatch)
+                bad.Add(verdict);
+        }
         if (bad.Count == 0) return DataCheckOutcome.Empty;
 
         var names = await db.Competitions.AsNoTracking()
-            .Where(c => bad.Select(b => b.CompetitionId).Contains(c.Id))
+            .Where(c => bad.Select(b => b.Decisive.Total.CompetitionId).Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => c.Name + " · " + c.Date, ct);
 
         return new DataCheckOutcome(bad.Count, bad
-            .OrderBy(r => r.CompetitionId)
-            .Select(r => new DataCheckItem(
-                "Competition", r.CompetitionId,
-                $"{names.GetValueOrDefault(r.CompetitionId, $"#{r.CompetitionId}")}: файл {r.ExpectedRows}, БД {r.ActualRows}",
-                $"сверка от {r.ImportedAt:dd.MM.yyyy HH:mm}, файл {r.ImportFileName}",
-                $"/Admin/Competitions?q={r.CompetitionId}",
-                PublicRoutes.Competition(r.CompetitionId)))
+            .OrderBy(b => b.Decisive.Total.CompetitionId)
+            .Select(b =>
+            {
+                var t = b.Decisive.Total;
+                var after = b.AdditionsAfter > 0 ? $"; после неё добавок, легших целиком: {b.AdditionsAfter}" : "";
+                return new DataCheckItem(
+                    "Competition", t.CompetitionId,
+                    $"{names.GetValueOrDefault(t.CompetitionId, $"#{t.CompetitionId}")}: файл {t.Expected}, БД {t.Actual}",
+                    $"сверка от {b.Decisive.ImportedAt:dd.MM.yyyy HH:mm}, файл {b.Decisive.FileName}{after}",
+                    $"/Admin/Competitions?q={t.CompetitionId}",
+                    PublicRoutes.Competition(t.CompetitionId));
+            })
             .ToList());
     }
 }

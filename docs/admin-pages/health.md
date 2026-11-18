@@ -46,7 +46,7 @@ severity — 20 битых строк и 3 клуба без страны выг
 | `results.exact-duplicate` | Error | полное совпадение строк (И10) |
 | `results.relay-distance-without-relay` | Error | дистанция `4X50` без эстафеты (И4, инцидент И-1) |
 | `results.fk-anomaly` | Error | ссылка на несуществующего пловца/клуб |
-| `import.reconciliation-mismatch` | Error | последняя сверка Д1 не сошлась |
+| `import.reconciliation-mismatch` | Error | последняя сверка Д1 не сошлась; добавки к уже загруженному дню, легшие целиком, пропускаются — вердикт у последнего полного файла (Р99) |
 | `results.upsert-key-collision` | Warning | две строки одного пловца неразличимы для переимпорта (И8) |
 | `relays.gender-conflict` | Warning | заплыв помечен полом, а у кого-то из состава пол в карточке противоположный — смешанный состав или вся команда другого пола; `M`/`F` учитываются (И3, И-32) |
 | `competitions.duplicate-day` | Warning | два дня одного события на одну дату (след И-3) |

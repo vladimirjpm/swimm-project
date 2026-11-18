@@ -1377,6 +1377,26 @@ public class JsonImportService : IImportService
                     var rows = ImportReconciler.Build(expectedByEvent, actualByEvent);
                     var stamp = DateTime.UtcNow;
 
+                    // Добавка к уже загруженному дню (вечер, эстафеты — затягивание по частям):
+                    // сравниваем с предыдущей сверкой дня, ImportReconciler.IsAddition.
+                    var previousTotals = await _db.ImportReconciliations.AsNoTracking()
+                        .Where(r => competitionIds.Contains(r.CompetitionId) && r.EventKey == "")
+                        .GroupBy(r => r.CompetitionId)
+                        .Select(g => new
+                        {
+                            CompetitionId = g.Key,
+                            Actual = g.OrderByDescending(x => x.ImportedAt).ThenByDescending(x => x.Id)
+                                .Select(x => x.ActualRows).First()
+                        })
+                        .ToDictionaryAsync(x => x.CompetitionId, x => x.Actual);
+                    var additions = rows
+                        .Where(r => r.EventKey.Length == 0)
+                        .Where(t => ImportReconciler.IsAddition(
+                            previousTotals.TryGetValue(t.CompetitionId, out var prev) ? prev : (int?)null,
+                            t, rows.Where(r => r.CompetitionId == t.CompetitionId)))
+                        .Select(t => t.CompetitionId)
+                        .ToHashSet();
+
                     _db.ImportReconciliations.AddRange(rows.Select(r => new ImportReconciliation
                     {
                         CompetitionId = r.CompetitionId,
@@ -1389,8 +1409,9 @@ public class JsonImportService : IImportService
                     }));
                     await _db.SaveChangesAsync();
 
-                    reconciliationMismatches = rows.Count(r => r.EventKey.Length > 0 && r.IsMismatch);
-                    reconciliationSummary = ImportReconciler.Describe(rows);
+                    reconciliationMismatches = rows.Count(r => r.EventKey.Length > 0 && r.IsMismatch
+                                                              && !additions.Contains(r.CompetitionId));
+                    reconciliationSummary = ImportReconciler.Describe(rows, additions);
                     diagnosticLog.Add(reconciliationSummary);
                 }
             }

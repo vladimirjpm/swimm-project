@@ -112,8 +112,8 @@ loglig в PDF есть события, где **ни у одной строки 
    // form.append('eventId', '<id события>');   // ДНИ 2+: то же событие
    // form.append('overwriteExisting', 'true'); // ДОБАВКА в уже загруженный день (вечерние события,
    //   эстафеты): без неё импорт откажет «Дубль: соревнование … уже содержит результаты». Это
-   //   upsert, чужие строки дня не удаляются (deleteMissing не ставить). Сверка покажет
-   //   «расхождение» — в файле только добавка, это ожидаемо.
+   //   upsert, чужие строки дня не удаляются (deleteMissing не ставить). Сверка покажет «Добавка
+   //   к дню: +N строк легли» (Р99); «РАСХОЖДЕНИЕ» здесь — значит, строки файла легли не все.
    const q = await (await fetch('/api/admin/import', { method: 'POST', headers: { 'X-XSRF-TOKEN': _csrfToken }, body: form })).json();
    // статус: GET /api/admin/import/status/{q.jobId} до state=completed; смотреть result.reconciliation
    ```

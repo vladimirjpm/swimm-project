@@ -6,6 +6,7 @@ using Swimm.Application.Abstractions;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
 using Swimm.Infrastructure.Services;
+using Swimm.Infrastructure.Services.DataChecks;
 using Xunit;
 
 namespace Swimm.Tests;
@@ -109,6 +110,61 @@ public class ImportReconciliationIntegrationTests
         Assert.True(result.ReconciliationMismatches > 0);
         Assert.Contains("РАСХОЖДЕНИЕ", result.Reconciliation);
         Assert.Contains(result.DiagnosticLog, l => l.Contains("РАСХОЖДЕНИЕ"));
+    }
+
+    private static Swimm.Application.Dtos.ImportEventOptions Upsert() =>
+        new(null, null, OverwriteExisting: true, DeleteMissing: false);
+
+    [Fact]
+    public async Task Import_AdditionToLoadedDay_NotAMismatch_AndCheckStaysQuiet()
+    {
+        // Эйлат 05.11.2026 (comp 1874): день затягивали частями — дневная сессия 657, эстафеты
+        // +10, вечер +99. Сверка последнего файла против всего дня давала «файл 99, БД 766» —
+        // ложную ошибку import.reconciliation-mismatch. Добавка, легшая целиком, — не расхождение.
+        await using var db = CreateDb(nameof(Import_AdditionToLoadedDay_NotAMismatch_AndCheckStaysQuiet));
+        var service = new JsonImportService(db, new NullCache());
+
+        await service.ImportAsync(ToStream(new[] { Item("A", 1), Item("B", 2) }), "day1.json");
+        var addition = await service.ImportAsync(
+            ToStream(new[] { Item("C", 1, "Backstroke"), Item("D", 2, "Backstroke"), Item("E", 3, "Backstroke") }),
+            "day1-evening.json", eventOptions: Upsert());
+
+        Assert.Equal(0, addition.ReconciliationMismatches);
+        Assert.Contains("Добавка к дню", addition.Reconciliation);
+        Assert.DoesNotContain("РАСХОЖДЕНИЕ", addition.Reconciliation);
+
+        var outcome = await new ReconciliationMismatchCheck(db).RunAsync();
+        Assert.Equal(0, outcome.Total);
+    }
+
+    [Fact]
+    public async Task Import_FullReimportWithLeftovers_StillAMismatch()
+    {
+        // Лига 5 (comp 1580): тот же протокол затянут повторно, а в дне остались лишние строки
+        // (501 в файле, 515 в БД). День вырос НЕ на размер файла — это не добавка, а то самое
+        // расхождение, ради которого сверка существует.
+        await using var db = CreateDb(nameof(Import_FullReimportWithLeftovers_StillAMismatch));
+        var service = new JsonImportService(db, new NullCache());
+
+        await service.ImportAsync(ToStream(new[] { Item("A", 1), Item("B", 2) }), "meet.json");
+
+        var comp = await db.Competitions.SingleAsync();
+        var row = await db.Results.FirstAsync();
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = row.SwimmerId, ClubId = row.ClubId, StyleId = row.StyleId,
+            Distance = "100", Gender = "male", CompetitionDate = row.CompetitionDate
+        });
+        await db.SaveChangesAsync();
+
+        var again = await service.ImportAsync(ToStream(new[] { Item("A", 1), Item("B", 2) }), "meet.json",
+            eventOptions: Upsert());
+
+        Assert.True(again.ReconciliationMismatches > 0);
+        Assert.DoesNotContain("Добавка", again.Reconciliation);
+
+        var outcome = await new ReconciliationMismatchCheck(db).RunAsync();
+        Assert.Equal(1, outcome.Total);
     }
 
     [Fact]
