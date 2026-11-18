@@ -112,6 +112,12 @@ public sealed class BackgroundJobsStatusService(
             "Sys_RecordSourceChecks. Apply НЕ делает — «ждёт Apply» видно на дашборде и в /Admin/Import. " +
             "Прогон по странам сюда не входит.",
             "15 мин", null),
+        [JobNames.SwimmerClubCheck] = ("Смена клуба пловца ↔ loglig", "SwimmerClubCheckBackgroundService",
+            "Импорт клуб в карточке пловца сам не меняет (Р98): заводит кандидата (Sys_SwimmerClubCandidates). " +
+            "Эта задача открывает карточку loglig (~1 в секунду, ответ кэшируется на сутки) и меняет клуб, " +
+            "только если loglig показывает новый; остальные ждут с причиной на дашборде («Club changes»). " +
+            "Сразу после импорта сверяет новых кандидатов (в истории — «после импорта»), раз в сутки — всех ждущих.",
+            "15 мин или сигнал импорта", null),
     };
 
     private async Task<IReadOnlyList<JobCard>> BuildSchedulesAsync(

@@ -242,18 +242,10 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
     }
 
     /// <summary>Нормализация как в dedup-report.sql: trim/lower, финальные ивритские буквы,
-    /// гереш ׳/гершаим ״ → ASCII, схлопнуть пробелы.</summary>
-    public static string Normalize(string name)
-    {
-        var chars = name.Trim().ToLowerInvariant().Select(c => c switch
-        {
-            'ך' => 'כ', 'ם' => 'מ', 'ן' => 'נ', 'ף' => 'פ', 'ץ' => 'צ',
-            '׳' => '\'', '״' => '"', '’' => '\'',
-            _ => c
-        });
-        return string.Join(' ',
-            new string(chars.ToArray()).Split(' ', StringSplitOptions.RemoveEmptyEntries));
-    }
+    /// гереш ׳/гершаим ״ → ASCII, схлопнуть пробелы.
+    /// Тело — в Application (<see cref="Swimm.Application.Mapping.NameKey"/>): им же сверка клуба с
+    /// loglig сравнивает названия (Р98).</summary>
+    public static string Normalize(string name) => Swimm.Application.Mapping.NameKey.Normalize(name);
 
     /// <summary>Левенштейн с отсечкой: возвращает max+1, если расстояние больше max.</summary>
     public static int Levenshtein(string a, string b, int max)

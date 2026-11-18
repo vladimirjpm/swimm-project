@@ -66,6 +66,18 @@ public class JobScheduleTests
         Assert.Equal("loglig-verify", JobNames.LogligVerify);
         Assert.Equal("loglig-batch", JobNames.LogligBatch);
         Assert.Equal("records-check", JobNames.RecordsCheck);
+        Assert.Equal("swimmer-club-check", JobNames.SwimmerClubCheck);
+    }
+
+    [Fact]
+    public void Swimmer_club_check_summary_lists_verdicts()
+    {
+        var report = new Swimm.Application.Dtos.SwimmerClubCheckReport(5, 4, 1, 3,
+            new Dictionary<string, int> { ["confirmed"] = 3, ["archive"] = 2 }, []);
+        Assert.Equal("сверено 5: confirmed 3 · archive 2; запросов 4, из кэша 1, применено 3",
+            JobRunSummaries.SwimmerClubCheck(report));
+        Assert.Equal("кандидатов нет", JobRunSummaries.SwimmerClubCheck(
+            new Swimm.Application.Dtos.SwimmerClubCheckReport(0, 0, 0, 0, new Dictionary<string, int>(), [])));
     }
 
     [Fact]
@@ -288,11 +300,13 @@ public class JobScheduleTests
     public void Every_job_has_definition_with_stable_defaults()
     {
         Assert.Equal(
-            [JobNames.Discovery, JobNames.StartList, JobNames.LogligVerify, JobNames.LogligBatch, JobNames.RecordsCheck],
+            [JobNames.Discovery, JobNames.StartList, JobNames.LogligVerify, JobNames.LogligBatch, JobNames.RecordsCheck,
+             JobNames.SwimmerClubCheck],
             JobNames.All.Select(j => j.Name));
-        // По умолчанию включены сверка loglig-id (без неё предложения висели бы вечно) и проверка
-        // источников рекордов (только дифф и журнал, ничего не применяет).
-        Assert.Equal([JobNames.LogligVerify, JobNames.RecordsCheck],
+        // По умолчанию включены сверка loglig-id (без неё предложения висели бы вечно), проверка
+        // источников рекордов (только дифф и журнал, ничего не применяет) и сверка смены клуба с
+        // loglig (без неё смена клуба не применилась бы никогда, Р98).
+        Assert.Equal([JobNames.LogligVerify, JobNames.RecordsCheck, JobNames.SwimmerClubCheck],
             JobNames.All.Where(j => j.EnabledDefault).Select(j => j.Name));
         // Стартовый протокол живёт на интервале discovery (С10, решение 5).
         Assert.Equal(JobNames.Get(JobNames.Discovery).IntervalKey, JobNames.Get(JobNames.StartList).IntervalKey);

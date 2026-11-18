@@ -291,13 +291,25 @@
         loadHidden();
     })();
 
-    // ── Клуб пловца (Р95): клуб карточки ставит импорт сам; здесь — поправить и закрепить. ──
+    // ── Клуб пловца (Р95 + Р98): импорт заводит кандидата, применяет его сверка с loglig;
+    //    здесь — вердикт loglig, «проверить сейчас», поправить руками и закрепить. ──
     (function () {
         const wrap = document.getElementById('club-wrap');
         const card = document.getElementById('club-card');
         const input = document.getElementById('club-swimmer-id');
         const journal = document.getElementById('club-changes-body');
-        const SRC = { import: 'импорт', cli: 'догон', admin: 'руками' };
+        const pending = document.getElementById('club-pending-body');
+        const SRC = { import: 'импорт', cli: 'догон', admin: 'руками', loglig: 'loglig' };
+        // Вердикты сверки с loglig (SwimmerClubLogligVerdicts) — порядок показа в списке ждущих.
+        const VERDICT = {
+            confirmed: ['loglig = новый клуб', 'смена применяется', 'text-admin-success'],
+            archive: ['loglig: archive', '«ארכיון איגוד» — пловец снят с регистрации; решает человек (руками + закрепление)', 'text-admin-warning'],
+            other: ['loglig: другой клуб', 'на loglig третий клуб или незнакомое название — часто дубль клуба', 'text-admin-warning'],
+            'no-loglig-id': ['нет loglig-id', 'сверять не с чем — привязать loglig-id или решить руками', 'text-admin-warning'],
+            old: ['loglig = старый клуб', 'федерация ещё не перевела — перепроверка раз в сутки', 'text-admin-text-muted'],
+            unavailable: ['loglig не открылся', 'повтор при следующем прогоне', 'text-admin-text-muted'],
+            unchecked: ['ещё не сверяли', 'ждёт фоновой сверки (/Admin/Jobs)', 'text-admin-text-muted'],
+        };
         const club = (id, name) => id == null ? '—'
             : `<a href="/clubs/${id}" target="_blank" rel="noopener" dir="auto" class="text-admin-text hover:underline">${esc(name ?? '')}</a> <span class="text-[#546e7a]">#${id}</span>`;
         const dt = s => s ? new Date(s).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '';
@@ -313,6 +325,7 @@
                     <div class="mb-1">В карточке: ${club(d.clubId, d.clubName)} ${d.clubLocked ? '<span class="ml-1 rounded bg-admin-accent/15 px-1.5 py-0.5 text-[11px] text-admin-accent">🔒 закреплён</span>' : ''}</div>
                     <div class="mb-3 text-admin-text-muted">По правилу (последнее соревнование): ${d.ruleClubId == null ? 'не определить — ничья или нет строк с настоящим клубом' : club(d.ruleClubId, d.ruleClubName)}
                         ${differs ? '<span class="ml-1 text-admin-warning">≠ карточке</span>' : ''}</div>
+                    ${renderLoglig(d)}
                     <div class="mb-1 text-[12px] uppercase tracking-wide text-admin-text-muted">Клубы по протоколам</div>
                     <div class="mb-3">${d.periods.length === 0 ? '<span class="italic text-admin-text-muted">личных стартов нет</span>' : d.periods.map(p => `
                         <div class="flex flex-wrap items-baseline gap-2 py-0.5">
@@ -331,6 +344,18 @@
 
                 card.querySelectorAll('.club-pick').forEach(b =>
                     b.addEventListener('click', () => { document.getElementById('club-new-id').value = b.dataset.club; }));
+                document.getElementById('btn-club-check')?.addEventListener('click', async ev => {
+                    const btn = ev.currentTarget;
+                    btn.disabled = true;
+                    try {
+                        const v = await apiJson(`${API}/${d.swimmerId}/club/check`, { method: 'POST' });
+                        toast(v.applied ? `loglig подтвердил: клуб сменён (${v.logligClubName})`
+                            : `loglig: ${(VERDICT[v.verdict] ?? [v.verdict])[0]}${v.logligClubName ? ` — ${v.logligClubName}` : ''}`, 5000);
+                        await loadSwimmer(d.swimmerId);
+                        await loadJournal();
+                        await loadPending();
+                    } catch (e) { toast('Ошибка: ' + e.message, 5000); btn.disabled = false; }
+                });
                 document.getElementById('btn-club-save').addEventListener('click', async () => {
                     const raw = document.getElementById('club-new-id').value.trim();
                     const clubId = raw === '' ? null : parseInt(raw, 10);
@@ -343,9 +368,63 @@
                         toast('Клуб пловца сохранён', 3000);
                         await loadSwimmer(d.swimmerId);
                         await loadJournal();
+                        await loadPending();
                     } catch (e) { toast('Ошибка: ' + e.message, 5000); }
                 });
             } catch (e) { card.classList.remove('hidden'); card.textContent = 'Ошибка: ' + e.message; }
+        }
+
+        // Блок «loglig» в карточке пловца: ждущий кандидат и что о нём сказал loglig.
+        function renderLoglig(d) {
+            const id = d.logligId != null
+                ? `loglig-id <a href="https://loglig.com:2053/Players/Details/${d.logligId}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">${d.logligId}</a>`
+                : '<span class="text-admin-warning">подтверждённого loglig-id нет</span>';
+            const c = d.candidate;
+            if (!c) return `<div class="mb-3 text-admin-text-muted">Смена клуба не ждёт: кандидата нет · ${id}</div>`;
+            const [label, hint, tone] = VERDICT[c.verdict ?? 'unchecked'] ?? [c.verdict, '', ''];
+            return `<div class="mb-3 rounded-md border border-admin-border p-2.5">
+                    <div class="mb-1">Кандидат на смену: <span dir="auto">${esc(c.fromClubName ?? '—')}</span> → ${club(c.toClubId, c.toClubName)}
+                        <span class="text-admin-text-muted text-[12px]">· последний старт ${esc(c.lastSwimDate)}${c.overlap ? ' · ⇄ периоды пересекаются' : ''}</span></div>
+                    <div class="mb-1">Вердикт loglig: <span class="${tone} font-semibold">${esc(label)}</span>
+                        <span class="text-admin-text-muted text-[12px]">— ${esc(hint)}</span></div>
+                    <div class="mb-2 text-admin-text-muted text-[12px]">${id}${c.logligClubName ? ` · на loglig: <span dir="auto" class="text-admin-text">${esc(c.logligClubName)}</span>` : ''}${c.checkedAt ? ` · открывали ${dt(c.checkedAt)}` : ''}</div>
+                    <button id="btn-club-check" class="admin-btn admin-btn-ghost cursor-pointer rounded-md px-3 py-1 text-[12.5px]">Проверить сейчас</button>
+                </div>`;
+        }
+
+        // Ждущие кандидаты по причинам (Р98): то, что правило поменяло бы, а loglig не подтвердил.
+        async function loadPending() {
+            try {
+                const p = await apiJson(`${API}/club-candidates`);
+                document.getElementById('club-pending-summary').textContent = `Ждут подтверждения loglig: ${p.total}`;
+                pending.innerHTML = p.total === 0
+                    ? '<div class="italic py-1">Ждущих нет.</div>'
+                    : Object.keys(VERDICT).filter(k => p.byVerdict[k]).map(k => {
+                        const [label, hint, tone] = VERDICT[k];
+                        const items = p.items.filter(c => (c.verdict ?? 'unchecked') === k);
+                        const more = p.byVerdict[k] > items.length ? `<div class="text-[12px] italic">… ещё ${p.byVerdict[k] - items.length}</div>` : '';
+                        return `<div class="mt-2 mb-1"><span class="${tone} font-semibold">${esc(label)}</span> ${p.byVerdict[k]}
+                                <span class="text-[12px]">— ${esc(hint)}</span></div>
+                            ${items.map(c => `
+                                <div class="mb-0.5 text-[12.5px]">
+                                    <a href="/swimmers/${c.swimmerId}" target="_blank" rel="noopener" dir="rtl" class="text-admin-text hover:underline">${esc(c.swimmerName)}</a>
+                                    <span class="text-[#546e7a]">#${c.swimmerId}</span>:
+                                    <span dir="auto">${esc(c.fromClubName ?? '—')}</span> → <span dir="auto" class="text-admin-text">${esc(c.toClubName)}</span>
+                                    ${c.logligClubName ? `<span class="text-[12px]">· loglig: <span dir="auto">${esc(c.logligClubName)}</span></span>` : ''}
+                                    <span class="text-[12px]">· ${esc(c.lastSwimDate)}</span>
+                                    <button class="club-open cursor-pointer ml-1 text-admin-accent text-[12px] hover:underline" data-id="${c.swimmerId}">открыть</button>
+                                </div>`).join('')}${more}`;
+                    }).join('');
+                bindOpen(pending);
+            } catch (e) { pending.textContent = 'Ошибка: ' + e.message; }
+        }
+
+        function bindOpen(root) {
+            root.querySelectorAll('.club-open').forEach(b => b.addEventListener('click', () => {
+                input.value = b.dataset.id;
+                loadSwimmer(+b.dataset.id);
+                card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }));
         }
 
         async function loadJournal() {
@@ -362,11 +441,7 @@
                             <span class="text-[12px]">· ${esc(SRC[c.source] ?? c.source)} · ${dt(c.changedAt)}</span>
                             <button class="club-open cursor-pointer ml-1 text-admin-accent text-[12px] hover:underline" data-id="${c.swimmerId}">править</button>
                         </div>`).join('');
-                journal.querySelectorAll('.club-open').forEach(b => b.addEventListener('click', () => {
-                    input.value = b.dataset.id;
-                    loadSwimmer(+b.dataset.id);
-                    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }));
+                bindOpen(journal);
             } catch (e) { journal.textContent = 'Ошибка: ' + e.message; }
         }
 
@@ -376,12 +451,15 @@
             loadSwimmer(id);
         });
 
-        // Deep-link с дашборда: ?filter=club-changes — раскрыть журнал.
-        if (qsFilter === 'club-changes') {
+        // Deep-link с дашборда: ?filter=club-changes — раскрыть журнал; ?club=<id> — сразу пловец.
+        const qsClub = parseInt(new URLSearchParams(location.search).get('club'), 10);
+        if (qsFilter === 'club-changes' || qsClub > 0) {
             wrap.open = true;
+            if (qsClub > 0) { input.value = qsClub; loadSwimmer(qsClub); }
             setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
         }
         loadJournal();
+        loadPending();
     })();
 
     load();

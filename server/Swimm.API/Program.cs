@@ -144,6 +144,8 @@ if (backgroundJobsEnabled)
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligBatchBackgroundService>();
     // Проверка источников рекордов (records-freshness-plan §4): только дифф и журнал, Apply — руками.
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.RecordsCheckBackgroundService>();
+    // Сверка смены клуба пловца с loglig (Р98): суточно + сразу после импорта (по сигналу).
+    builder.Services.AddHostedService<Swimm.API.BackgroundServices.SwimmerClubCheckBackgroundService>();
 }
 
 // ПРОД-РАСПИСАНИЕ — третий сорт (docs/plans/web-push-reminders-plan.md §4): напоминания о

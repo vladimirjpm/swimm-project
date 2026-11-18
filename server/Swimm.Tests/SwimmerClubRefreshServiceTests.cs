@@ -14,7 +14,9 @@ namespace Swimm.Tests;
 /// <summary>
 /// Текущий клуб в карточке пловца (Р95, Ф1 docs/plans/swimmer-club-change-plan.md): догон и
 /// dry-run, закрепление, ручная правка с журналом, пересчёт после импорта. Само правило —
-/// <see cref="SwimmerCurrentClubRuleTests"/>; здесь — запись карточек и журнала.
+/// <see cref="SwimmerCurrentClubRuleTests"/>; здесь — запись кандидатов, карточек и журнала.
+/// С Р98 пересчёт карточку не меняет — только заводит кандидата; сверку с loglig проверяет
+/// <see cref="SwimmerClubLogligCheckServiceTests"/>.
 /// </summary>
 public class SwimmerClubRefreshServiceTests
 {
@@ -78,22 +80,77 @@ public class SwimmerClubRefreshServiceTests
         Assert.False(report.Applied);
         Assert.Equal(Dolphin, (await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == 6073)).ClubId);
         Assert.Empty(db.SwimmerClubChanges);
+        Assert.Empty(db.SwimmerClubCandidates);
     }
 
     [Fact]
-    public async Task Apply_ChangesCard_WritesJournal_SecondRunIsNoop()
+    public async Task Apply_WritesCandidate_NotCard_SecondRunKeepsOneCandidate()
     {
-        await using var db = CreateDb(nameof(Apply_ChangesCard_WritesJournal_SecondRunIsNoop));
+        await using var db = CreateDb(nameof(Apply_WritesCandidate_NotCard_SecondRunKeepsOneCandidate));
         await SeedAsync(db);
-        var svc = new SwimmerClubRefreshService(db);
+        var signal = new CountingSignal();
+        var svc = new SwimmerClubRefreshService(db, signal);
 
         await svc.RefreshAsync(null, SwimmerClubChangeSources.Cli, apply: true);
         var again = await svc.RefreshAsync(null, SwimmerClubChangeSources.Cli, apply: true);
 
-        Assert.Equal(Raanana, (await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == 6073)).ClubId);
-        var log = Assert.Single(db.SwimmerClubChanges);
-        Assert.Equal((6073, (int?)Dolphin, (int?)Raanana, "cli"), (log.SwimmerId, log.FromClubId, log.ToClubId, log.Source));
-        Assert.Empty(again.Changes);
+        // Р98: карточку меняет только подтверждение loglig.
+        Assert.Equal(Dolphin, (await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == 6073)).ClubId);
+        Assert.Empty(db.SwimmerClubChanges);
+        var c = Assert.Single(db.SwimmerClubCandidates);
+        Assert.Equal((6073, (int?)Dolphin, Raanana, "cli", (string?)null),
+            (c.SwimmerId, c.FromClubId, c.ToClubId, c.Source, c.Verdict));
+        Assert.Equal(new DateOnly(2026, 11, 5), c.LastSwimDate);
+        Assert.Single(again.Changes);         // кандидат всё ещё в плане, но не задвоился
+        Assert.Equal(0, signal.Count);        // догон CLI фон не будит — сверяет сам
+    }
+
+    [Fact]
+    public async Task PendingCandidate_IsWithdrawn_WhenNextStartIsForCardClub()
+    {
+        await using var db = CreateDb(nameof(PendingCandidate_IsWithdrawn_WhenNextStartIsForCardClub));
+        await SeedAsync(db);
+        var svc = new SwimmerClubRefreshService(db);
+        await svc.RefreshAsync(null, SwimmerClubChangeSources.Cli, apply: true);
+        Assert.Single(db.SwimmerClubCandidates);
+
+        // Следующий старт — снова за Дельфин (клуб из карточки): кандидат снимается сам.
+        db.Competitions.Add(new Competition { Id = 1950, Name = "Winter", Date = "2026-12-01" });
+        db.Results.Add(Row(10, 6073, Dolphin, 1950, "2026-12-01"));
+        await db.SaveChangesAsync();
+        var report = await svc.RefreshAsync([6073], SwimmerClubChangeSources.Import, apply: true);
+
+        Assert.Empty(report.Changes);
+        Assert.Equal(1, report.Withdrawn);
+        Assert.Empty(db.SwimmerClubCandidates);
+    }
+
+    [Fact]
+    public async Task CandidateToClubChanges_ResetsVerdict_KeepsLogligCache()
+    {
+        await using var db = CreateDb(nameof(CandidateToClubChanges_ResetsVerdict_KeepsLogligCache));
+        await SeedAsync(db);
+        db.SwimmerClubCandidates.Add(new SwimmerClubCandidate
+        {
+            SwimmerId = 6073, FromClubId = Dolphin, ToClubId = 777, Source = "import", Verdict = "other",
+            LogligId = 55, LogligClubName = "ע.ל.ה עצמה רעננה", CheckedAt = DateTime.UtcNow,
+            LastSwimDate = new DateOnly(2026, 10, 1),
+        });
+        await db.SaveChangesAsync();
+        var signal = new CountingSignal();
+
+        await new SwimmerClubRefreshService(db, signal).RefreshAsync([6073], SwimmerClubChangeSources.Import, apply: true);
+
+        var c = await db.SwimmerClubCandidates.AsNoTracking().SingleAsync();
+        Assert.Equal((Raanana, (string?)null, "ע.ל.ה עצמה רעננה"), (c.ToClubId, c.Verdict, c.LogligClubName));
+        Assert.Equal(1, signal.Count); // импорт будит фоновую сверку
+    }
+
+    private sealed class CountingSignal : ISwimmerClubCheckSignal
+    {
+        public int Count { get; private set; }
+        public void Notify() => Count++;
+        public Task<bool> WaitAsync(TimeSpan timeout, CancellationToken ct) => Task.FromResult(false);
     }
 
     [Fact]
@@ -107,6 +164,7 @@ public class SwimmerClubRefreshServiceTests
         Assert.Empty(report.Changes);
         Assert.Equal(1, report.Locked);
         Assert.Equal(Dolphin, (await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == 6073)).ClubId);
+        Assert.Empty(db.SwimmerClubCandidates);
     }
 
     [Fact]
@@ -119,6 +177,7 @@ public class SwimmerClubRefreshServiceTests
 
         Assert.Empty(report.Changes);
         Assert.Equal(Dolphin, (await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == 6073)).ClubId);
+        Assert.Empty(db.SwimmerClubCandidates);
     }
 
     [Fact]
@@ -128,7 +187,12 @@ public class SwimmerClubRefreshServiceTests
         await SeedAsync(db);
         var svc = new SwimmerClubRefreshService(db);
 
+        db.SwimmerClubCandidates.Add(new SwimmerClubCandidate
+            { SwimmerId = 7000, FromClubId = Dolphin, ToClubId = Raanana, Source = "import" });
+        await db.SaveChangesAsync();
+
         var (result, error) = await svc.SetByAdminAsync(7000, Raanana, locked: true);
+        Assert.Empty(db.SwimmerClubCandidates); // человек решил сам — кандидат снят
         Assert.Equal(SwimmerClubSetError.None, error);
         Assert.Equal((Dolphin, Raanana), (result!.FromClubId!.Value, result.ToClubId!.Value));
 
@@ -137,6 +201,7 @@ public class SwimmerClubRefreshServiceTests
         var card = await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == 7000);
         Assert.Equal((Raanana, true), (card.ClubId!.Value, card.ClubLocked));
         Assert.Contains(db.SwimmerClubChanges, c => c.SwimmerId == 7000 && c.Source == "admin" && c.ToClubId == Raanana);
+        Assert.DoesNotContain(db.SwimmerClubCandidates, c => c.SwimmerId == 7000); // закреплённому кандидата не заводят
 
         var admin = await svc.GetForAdminAsync(7000);
         Assert.Equal(Dolphin, admin!.RuleClubId);
@@ -203,27 +268,37 @@ public class SwimmerClubRefreshServiceTests
         })));
 
     [Fact]
-    public async Task Import_MovesSwimmerToNewClub_ReimportAndOlderMeetDoNotTwitch()
+    public async Task Import_WritesCandidate_CardWaitsForLoglig_ReimportAndOlderMeetDoNotTwitch()
     {
-        await using var db = CreateDb(nameof(Import_MovesSwimmerToNewClub_ReimportAndOlderMeetDoNotTwitch));
-        JsonImportService Import() => new(db, new NullCache(), clubRefresh: new SwimmerClubRefreshService(db));
+        await using var db = CreateDb(nameof(Import_WritesCandidate_CardWaitsForLoglig_ReimportAndOlderMeetDoNotTwitch));
+        var signal = new CountingSignal();
+        JsonImportService Import() => new(db, new NullCache(), clubRefresh: new SwimmerClubRefreshService(db, signal));
 
         await Import().ImportAsync(Json("Summer meet", "20/07/2026", "Dolphin Netanya"));
         var swimmer = await db.Swimmers.AsNoTracking().SingleAsync();
         var dolphin = (await db.Clubs.AsNoTracking().SingleAsync(c => c.Name == "Dolphin Netanya")).Id;
         Assert.Equal(dolphin, swimmer.ClubId);
 
+        // Р98: импорт карточку не меняет — заводит кандидата и будит сверку с loglig.
         var eilat = await Import().ImportAsync(Json("Eilat", "05/11/2026", "Raanana"));
         var raanana = (await db.Clubs.AsNoTracking().SingleAsync(c => c.Name == "Raanana")).Id;
-        Assert.Equal(raanana, (await db.Swimmers.AsNoTracking().SingleAsync()).ClubId);
-        Assert.Contains(eilat.DiagnosticLog, l => l.StartsWith("Клуб пловца сменился у 1"));
-        var log = Assert.Single(db.SwimmerClubChanges);
-        Assert.Equal(("import", (int?)dolphin, (int?)raanana), (log.Source, log.FromClubId, log.ToClubId));
+        Assert.Equal(dolphin, (await db.Swimmers.AsNoTracking().SingleAsync()).ClubId);
+        Assert.Contains(eilat.DiagnosticLog, l => l.StartsWith("Кандидатов на смену клуба: 1"));
+        Assert.Empty(db.SwimmerClubChanges);
+        var c = Assert.Single(db.SwimmerClubCandidates);
+        Assert.Equal(("import", (int?)dolphin, raanana), (c.Source, c.FromClubId, c.ToClubId));
+        Assert.Equal(1, signal.Count);
 
-        // Повторный импорт Эйлата и запоздалый импорт старого старта клуб не дёргают.
+        // Повторный импорт Эйлата и запоздалый импорт старого старта кандидата не дёргают.
         await Import().ImportAsync(Json("Eilat", "05/11/2026", "Raanana"));
         await Import().ImportAsync(Json("Spring meet", "10/03/2026", "Dolphin Netanya"));
-        Assert.Equal(raanana, (await db.Swimmers.AsNoTracking().SingleAsync()).ClubId);
-        Assert.Single(db.SwimmerClubChanges);
+        Assert.Equal(dolphin, (await db.Swimmers.AsNoTracking().SingleAsync()).ClubId);
+        Assert.Equal(raanana, (await db.SwimmerClubCandidates.AsNoTracking().SingleAsync()).ToClubId);
+        Assert.Equal(1, signal.Count);
+
+        // Следующий старт снова за Дельфин — кандидат снимается.
+        var winter = await Import().ImportAsync(Json("Winter", "01/12/2026", "Dolphin Netanya"));
+        Assert.Empty(db.SwimmerClubCandidates);
+        Assert.Contains(winter.DiagnosticLog, l => l.StartsWith("Снято ждущих кандидатов на смену клуба: 1"));
     }
 }

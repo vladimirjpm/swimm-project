@@ -157,6 +157,7 @@ public static class JobTimeText
         JobTriggers.Schedule => "фон",
         JobTriggers.Manual => "кнопка",
         JobTriggers.Cli => "CLI",
+        JobTriggers.Import => "после импорта",
         _ => trigger,
     };
 }

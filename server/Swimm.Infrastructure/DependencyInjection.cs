@@ -219,6 +219,10 @@ public static class DependencyInjection
         services.AddScoped<IHubGroupClubSubscriptionService, HubGroupClubSubscriptionService>();
         // Текущий клуб в карточке пловца (Р95): пересчёт после импорта, CLI, ручная правка.
         services.AddScoped<ISwimmerClubRefreshService, SwimmerClubRefreshService>();
+        // Р98: пересчёт только заводит кандидата; применяет его сверка с loglig (фон, CLI, кнопка).
+        // Сигнал «импорт завёл кандидатов» — синглтон процесса, его ждёт фоновая служба.
+        services.AddScoped<ISwimmerClubLogligCheckService, SwimmerClubLogligCheckService>();
+        services.AddSingleton<ISwimmerClubCheckSignal, SwimmerClubCheckSignal>();
         // Уровни пловцов группы (docs/plans/lane-plans-plan.md) — приватные, без кэша.
         services.AddScoped<IHubGroupLevelService, HubGroupLevelService>();
         services.AddScoped<ILanePlanService, LanePlanService>();

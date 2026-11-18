@@ -12,12 +12,13 @@
 LogligVerifyEnabled/LogligVerifyIntervalHours (дефолт вкл/24ч),
 LogligBatchEnabled/LogligBatchPerRun/LogligBatchIntervalHours (дефолт ВЫКЛ/50/24ч),
 RecordsCheckEnabled/RecordsCheckIntervalHours (проверка источников рекордов, дефолт вкл/24ч — 16.11.2026),
+SwimmerClubCheckEnabled/SwimmerClubCheckIntervalHours (сверка смены клуба пловца с loglig, дефолт вкл/24ч — 18.11.2026, Р98),
 **RecordAgeAxis** (дефолт `calendar`, значения `calendar`/`season`),
 **CacheRowPrecision** / **CacheColumnPrecision** / **CacheHitVerifyPercent** (кэш, раздел ниже).
 Scope: admin / livesite / both.
 
-**Фоновые расписания (часть В, 19.10.2026).** Discovery (+ StartList), LogligVerify, LogligBatch и
-RecordsCheck работают только там, где включены фоновые расписания — `HostingMode.BackgroundJobsEnabled`: явный
+**Фоновые расписания (часть В, 19.10.2026).** Discovery (+ StartList), LogligVerify, LogligBatch,
+RecordsCheck и SwimmerClubCheck работают только там, где включены фоновые расписания — `HostingMode.BackgroundJobsEnabled`: явный
 `BackgroundJobs:Enabled` важнее, без него — выкл в Development и вкл в остальных; на проде false,
 в ProdAdmin true. То есть тумблеры этих ключей действуют в **ProdAdmin**; в локальной разработке
 таймеров нет вовсе (В10). Интервал считается от последнего успеха в журнале `Sys_JobRuns`

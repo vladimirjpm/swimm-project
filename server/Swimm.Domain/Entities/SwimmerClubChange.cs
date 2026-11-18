@@ -12,11 +12,17 @@ public static class SwimmerClubChangeSources
     public const string Cli = "cli";
     /// <summary>Ручная правка на /Admin/Swimmers (заодно пишется и <see cref="AdminAudit"/>).</summary>
     public const string Admin = "admin";
+    /// <summary>
+    /// Смена подтверждена карточкой loglig (Р98): с 18.11.2026 импорт и догон клуб сами не меняют,
+    /// а заводят <see cref="SwimmerClubCandidate"/>; применяет его только сверка с loglig.
+    /// </summary>
+    public const string Loglig = "loglig";
 }
 
 /// <summary>
 /// Журнал смен клуба в карточке пловца (<c>Swimmers.ClubId</c>), Р95 / Ф1
-/// docs/plans/swimmer-club-change-plan.md. Клуб теперь меняется сам при импорте — журнал делает
+/// docs/plans/swimmer-club-change-plan.md. Клуб меняется сам — с 18.11.2026 только после
+/// подтверждения loglig (Р98, кандидаты — <see cref="SwimmerClubCandidate"/>); журнал делает
 /// автоматику видимой (карточка дашборда «Club changes, 7 days») и даёт откатить ошибку руками.
 ///
 /// Sys_-таблица, БЕЗ grant swimm_ro и не в seed-tables.txt: у прода свой журнал, у локальной свой.
@@ -37,7 +43,7 @@ public class SwimmerClubChange
     /// <summary>Клуб после смены; null — админ очистил поле.</summary>
     public int? ToClubId { get; set; }
 
-    /// <summary>import | cli | admin (<see cref="SwimmerClubChangeSources"/>).</summary>
+    /// <summary>import | cli | admin | loglig (<see cref="SwimmerClubChangeSources"/>).</summary>
     [Required, MaxLength(20)]
     public string Source { get; set; } = string.Empty;
 

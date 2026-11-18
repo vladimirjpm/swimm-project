@@ -24,6 +24,7 @@ public class SwimmersAdminController : ControllerBase
     private readonly IDataCheckRunner _checks;
     private readonly ISearchVisibilityService _visibility;
     private readonly ISwimmerClubRefreshService _clubs;
+    private readonly ISwimmerClubLogligCheckService _clubCheck;
     private readonly ILogger<SwimmersAdminController> _logger;
 
     public SwimmersAdminController(
@@ -35,6 +36,7 @@ public class SwimmersAdminController : ControllerBase
         IDataCheckRunner checks,
         ISearchVisibilityService visibility,
         ISwimmerClubRefreshService clubs,
+        ISwimmerClubLogligCheckService clubCheck,
         ILogger<SwimmersAdminController> logger)
     {
         _dedup = dedup;
@@ -45,6 +47,7 @@ public class SwimmersAdminController : ControllerBase
         _checks = checks;
         _visibility = visibility;
         _clubs = clubs;
+        _clubCheck = clubCheck;
         _logger = logger;
     }
 
@@ -197,6 +200,27 @@ public class SwimmersAdminController : ControllerBase
         await _audit.LogAsync("swimmer.club-set", "Swimmer", id.ToString(), summary, r, ct);
         return Ok(r);
     }
+
+    /// <summary>
+    /// «Проверить сейчас» (Р98): открыть карточку loglig заново (суточный кэш мимо) и сверить ждущего
+    /// кандидата пловца. Подтверждённая смена сразу записывается (журнал source=loglig + аудит).
+    /// 404 — у пловца нет ждущего кандидата.
+    /// </summary>
+    [HttpPost("{id:int}/club/check")]
+    public async Task<IActionResult> CheckClub(int id, CancellationToken ct)
+    {
+        var verdict = await _clubCheck.CheckSwimmerAsync(id, ct);
+        if (verdict is null) return NotFound(new { error = "У пловца нет ждущего кандидата на смену клуба" });
+        if (verdict.Applied)
+            await _audit.LogAsync("swimmer.club-loglig", "Swimmer", id.ToString(),
+                $"Клуб пловца сменён по loglig («{verdict.LogligClubName}»), кнопка «проверить сейчас»", verdict, ct);
+        return Ok(verdict);
+    }
+
+    /// <summary>Ждущие кандидаты на смену клуба: счёт по вердиктам loglig и до 100 строк каждого.</summary>
+    [HttpGet("club-candidates")]
+    public async Task<IActionResult> ClubCandidates(CancellationToken ct)
+        => Ok(await _clubs.PendingAsync(100, ct));
 
     /// <summary>Журнал смен клуба за <paramref name="days"/> дней (по умолчанию 30), новые сверху.</summary>
     [HttpGet("club-changes")]
