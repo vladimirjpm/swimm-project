@@ -141,32 +141,48 @@ const Card: React.FC<{ group: EventGroup; showGender: boolean; a: string; b: str
   group, showGender, a, b,
 }) => {
   const shared = sameHolders(group.rows);
+  // Пол красит плитку (выбор Влада 18.11.2026, макет «Пол B+C»): фон — мягкий тон пола, на
+  // плите иконки — лента с подписью. Тон стоит ВСЕГДА, и при выбранном фильтром поле тоже:
+  // цвет пола не должен пропадать от фильтра. Смешанная эстафета цвета не имеет.
+  const tone = group.gender === 'male' || group.gender === 'female' ? group.gender : null;
+  const icon = (
+    <UI_SwimmStyleIcon
+      styleName={group.stroke}
+      styleLen={group.distance}
+      styleType="icon-len"
+      lenPlacement="below"
+      lenSize={30}
+      className="src-rc-h2h-events"
+    />
+  );
   return (
   <UI_H2HEventCard
+    className={tone ? `rc-event--${tone}` : undefined}
     stroke={group.stroke}
     distance={group.distance}
     oneSided={group.oneSided}
     // Пол печатается на карточке ТОЛЬКО когда он не выбран фильтром: иначе одна и та же
     // подпись повторялась бы над каждой карточкой, уже сказанная в полосе фильтров
     // (тот же довод, по которому у таба masters шапки карточек нет вовсе).
-    head={showGender ? (
+    head={showGender ? (tone ? (
+      <div className="rc-event__plate">
+        <div className="h2h-event__icon">{icon}</div>
+        <span className="rc-event__band">{genderLabel(group.gender)}</span>
+      </div>
+    ) : (
       <div className="h2h-event__icon">
-        <UI_SwimmStyleIcon
-          styleName={group.stroke}
-          styleLen={group.distance}
-          styleType="icon-len"
-          lenPlacement="below"
-          lenSize={30}
-          className="src-rc-h2h-events"
-        />
+        {icon}
         <span className="rc-event__gender">{genderLabel(group.gender)}</span>
       </div>
-    ) : undefined}
+    )) : undefined}
   >
     {group.rows.map((row) => (
       <UI_H2HPoolRow
         key={row.pool_type}
         poolType={row.pool_type}
+        // Бассейн — подписью НАД полосой («50m POOL»), а не между временами: в центре он
+        // терялся и читался как дистанция с иконки стиля (выбор Влада 18.11.2026).
+        poolLabel="above"
         emptyLabel="no record"
         left={poolSide(row.a, row.outcome === 'a', row.distance, a)}
         right={poolSide(row.b, row.outcome === 'b', row.distance, b)}

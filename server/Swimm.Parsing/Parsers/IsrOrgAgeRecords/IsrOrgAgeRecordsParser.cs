@@ -1053,6 +1053,16 @@ public class IsrOrgAgeRecordsParser : IFormatParser
         if (allWords.Count == 0)
             return ("", "");
 
+        // Колонка имени ПУСТА — делить нечего, всё оставшееся — клуб. Эстафеты без состава
+        // («מכבי קרית ביאליק», 1995/2005/2012) печатаются одним клубом; пересплит ниже искал
+        // «самый широкий зазор» уже ВНУТРИ названия клуба и отрезал «מכבי» в имя держателя —
+        // 8 возрастных рекордов Израиля с держателем «מכבי» (Р94, 18.11.2026).
+        if (nameWords.Count == 0)
+        {
+            var clubOnly = JoinRtlWords(allWords);
+            return ("", Regex.Replace(clubOnly, @"\s+\d{2}\s*$", "").Trim());
+        }
+
         // Calculate boundary X between name and club columns.
         // In RTL: name column is to the RIGHT of club column.
         double boundary;

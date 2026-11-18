@@ -49,12 +49,21 @@
   --deep-live-border: rgba(56,239,143,.40);
   --deep-male: #60a5fa;  --deep-male-soft: rgba(59,130,246,.14);  --deep-male-border: rgba(59,130,246,.3);
   --deep-female: #f472b6; --deep-female-soft: rgba(236,72,153,.14); --deep-female-border: rgba(236,72,153,.3);
+  /* Пол в рекордах — набор таблиц ISR Age / Masters Records (`UI_GenderAgeTable`, там он задан
+     классами в коде), здесь те же значения токенами: ими красится плитка сравнения стран
+     (`/records/compare`, выбор Влада 18.11.2026). Таблица значений — docs/design-colors.md §11.1. */
+  --deep-rec-male: #5aa2f5;   --deep-rec-male-soft: rgba(90,162,245,.16);
+  --deep-rec-female: #f072a6; --deep-rec-female-soft: rgba(240,114,166,.16);
   /* Бассейн вида по дорожкам (Ш3, хендофф group-club-changes §6, 3b): «вода», её рамка,
      подпись дорожки и пунктир «каната» между дорожками. */
   --deep-pool-water: linear-gradient(180deg, rgba(56,189,248,.10), rgba(56,189,248,.04));
   --deep-pool-border: rgba(125,211,252,.28);
   --deep-pool-label: #7dd3fc;
   --deep-pool-rope: rgba(248,113,113,.35);
+  /* Длина бассейна в подписи-разделителе `UI_PoolIcon` (`styleType="divider"`): цвета самой
+     иконки бассейна — волна в тёмной теме, «канат» в светлой (выбор Влада 18.11.2026).
+     Не акцент: cyan/синий на экране H2H значит «быстрее». */
+  --deep-pool-len: #32B1CC;
   --deep-seg-track: rgba(255,255,255,.08);         /* фон сегмент-контролов (25m/50m) */
   --deep-seg-active-bg: #fff;
   --deep-seg-active-fg: #04182b;
@@ -146,12 +155,15 @@
   --deep-live-border: rgba(15,122,82,.35);
   --deep-male: #1d4ed8;  --deep-male-soft: rgba(29,78,216,.05);  --deep-male-border: rgba(29,78,216,.2);
   --deep-female: #be185d; --deep-female-soft: rgba(190,24,93,.04); --deep-female-border: rgba(190,24,93,.18);
+  --deep-rec-male: #1e6fd6;   --deep-rec-male-soft: #eaf2fd;
+  --deep-rec-female: #d6417f; --deep-rec-female-soft: #fdeff5;
   /* Вода доски дорожек на тон темнее карточки (предложение хендоффа): бледная #e3f3fa на
      голубом фоне страницы терялась. */
   --deep-pool-water: linear-gradient(180deg, #d6e8fb, #c3d8f2);
   --deep-pool-border: #7fa4d4;
   --deep-pool-label: #2b4f85;
   --deep-pool-rope: rgba(178,59,59,.35);
+  --deep-pool-len: #216492;
   --deep-seg-track: #e8f1ff;
   --deep-seg-active-bg: #003f9e;
   --deep-seg-active-fg: #fff;

@@ -5,7 +5,7 @@ import { useAppDispatch } from '../../../../store/store';
 interface UI_PoolIconProps {
   className?: string;
   iconWidth?: string;
-  styleType?: 'icon-notext' | 'icon-text-bottom' | 'icon-text-top' | 'icon-text-center';
+  styleType?: 'icon-notext' | 'icon-text-bottom' | 'icon-text-top' | 'icon-text-center' | 'divider';
   label?: string;
   labelClassName?: string;
 }
@@ -91,6 +91,28 @@ const UI_PoolIcon: React.FC<UI_PoolIconProps> = ({
     return (
       <div className="dv-PoolIcon-icon flex flex-col items-center text-[var(--theme-mode-text)] text-base">
         <div className={labelClassName}>{decoratedLabel}</div>
+      </div>
+    );
+  }
+
+  /**
+   * Подпись-разделитель над строкой бассейна: линия · «50m POOL» · линия (выбор Влада
+   * 18.11.2026, вариант 1 макета «H2H: длина бассейна»). Заведена потому, что подпись
+   * `-----50m-----` в центре полосы H2H терялась рядом с разрывом и читалась как дистанция:
+   * «50m» стоит и на иконке стиля. Слово «pool» обязательно — без него число снова спорит
+   * с дистанцией. Цвет числа — парный токен `--deep-pool-len`, кегль — `--pool-len-size`
+   * (стили в pool-icon.css). `className` здесь ложится на корень, а не на svg.
+   */
+  if (styleType === 'divider') {
+    const len = /^\d+$/.test(label) ? `${label}m` : label;
+    return (
+      <div className={`dv-PoolIcon-divider ${className}`.trim()}>
+        <span className="dv-PoolIcon-divider__line" />
+        <span className="dv-PoolIcon-divider__text">
+          <span className="dv-PoolIcon-divider__len">{len}</span>
+          <span className="dv-PoolIcon-divider__cap">pool</span>
+        </span>
+        <span className="dv-PoolIcon-divider__line" />
       </div>
     );
   }
