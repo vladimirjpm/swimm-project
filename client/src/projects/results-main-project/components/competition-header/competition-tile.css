@@ -150,3 +150,39 @@
 .comp-tile--bare .comp-tile__mark-cup { font-size: 34cqw; line-height: 1; }
 /* С кубком значок сезона меньше — оба помещаются в габарит плитки. */
 .comp-tile--bare .comp-tile__mark:not(:last-child) { font-size: calc(46cqw * var(--comp-tile-mark-scale, 1)); }
+
+/* Значок серии турнира (вариант `CompetitionTileEmblem`, решение Влада 18.11.2026): тот же габарит
+   и рамка, что у плитки; сверху — уменьшенная полоса (сезон, кубок, буква категории), посередине —
+   картинка значка, снизу — возрастная лента, если есть. Размеры — в долях высоты плитки (cqh):
+   один набор правил годится каждой ступени размера (sm, xs, mini, обложки, плакаты). */
+.comp-tile--emblem { container-type: size; }
+.comp-tile--emblem .comp-tile__strip {
+  height: 21cqh;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4cqh;
+  line-height: 1;
+  font-size: 13cqh;
+  background: var(--theme-comp-tile-strip-bg);
+}
+.comp-tile--emblem .comp-tile__strip-letter {
+  color: var(--theme-comp-tile-letter);
+  font-weight: 900;
+}
+.comp-tile--emblem .comp-tile__emblem {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5cqh;
+}
+.comp-tile--emblem .comp-tile__emblem img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.comp-tile--emblem .comp-tile__age { height: 19cqh; font-size: 13cqh; }

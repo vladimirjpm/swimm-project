@@ -494,6 +494,19 @@ public partial class ResultRepository : IResultRepository
             })
             .ToListAsync();
 
+        // Значок серии турнира (docs/plans/series-emblem-plan.md) — плитка шапки соревнования
+        // показывает его вместо значка сезона (переключатель CompetitionTile). Проекция без байтов
+        // картинки: только то, из чего собирается публичный адрес. Событию — значок серии первого
+        // дня (по Id), у которого он есть.
+        var emblemRows = await _db.Competitions.AsNoTracking()
+            .Where(c => c.SeriesPart != null && c.SeriesPart.Series.Emblem != null)
+            .Select(c => new { c.Id, c.EventId, EmblemId = c.SeriesPart!.Series.EmblemId!.Value, c.SeriesPart.Series.Emblem!.Sha256 })
+            .ToListAsync();
+        var emblemByCompetition = emblemRows.ToDictionary(r => r.Id, r => SeriesEmblemDto.PublicUrl(r.EmblemId, r.Sha256));
+        var emblemByEvent = emblemRows.Where(r => r.EventId != null)
+            .GroupBy(r => r.EventId!.Value)
+            .ToDictionary(g => g.Key, g => { var r = g.OrderBy(x => x.Id).First(); return SeriesEmblemDto.PublicUrl(r.EmblemId, r.Sha256); });
+
         // Категория для селектора — из РЕАЛЬНОГО членства (CategoryCompetitions, те же
         // чекбоксы, что в админке), а не эвристики по возрасту: соревнование может быть
         // в нескольких категориях сразу, поэтому приоритет от младшей ступени к старшей:
@@ -578,6 +591,7 @@ public partial class ResultRepository : IResultRepository
                 IsMasters = e.IsMasters,
                 IsAward = e.IsAward,
                 IsChampionship = e.IsChampionship,
+                EmblemUrl = emblemByEvent.GetValueOrDefault(e.Id),
                 ShowCombineAllResults = e.ShowCombine,
                 Category = CategoryFor(e.IsMasters, categoryKeysByEvent.GetValueOrDefault(e.Id)),
                 Categories = CategoriesFor(categoryKeysByEvent.GetValueOrDefault(e.Id)),
@@ -603,6 +617,7 @@ public partial class ResultRepository : IResultRepository
                 IsMasters = c.IsMasters,
                 IsAward = c.IsAward,
                 IsChampionship = c.IsChampionship,
+                EmblemUrl = emblemByCompetition.GetValueOrDefault(c.Id),
                 ShowCombineAllResults = c.ShowCombineAllResults,
                 Category = CategoryFor(c.IsMasters, categoryKeysMap.GetValueOrDefault(c.Id)),
                 Categories = CategoriesFor(categoryKeysMap.GetValueOrDefault(c.Id)),

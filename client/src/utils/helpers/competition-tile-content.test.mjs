@@ -18,3 +18,14 @@ test('только значок сезона и/или кубок — плитк
   assert.equal(hasTileContent(tile({ isChampionship: true })), false);
   assert.equal(hasTileContent(tile({ season: 'summer', isChampionship: true })), false);
 });
+
+test('переключатель: значок серии побеждает, иначе плитка, иначе значок сезона', async () => {
+  const { competitionTileKind } = await import('./competition-tile-content.ts');
+  assert.equal(competitionTileKind(tile({ emblemUrl: '/api/series-emblems/1/ab', season: 'winter' })), 'emblem');
+  assert.equal(competitionTileKind(tile({ emblemUrl: '/api/series-emblems/1/ab', letter: 'Y', ageGroup: '11-14' })), 'emblem');
+  assert.equal(competitionTileKind(tile({ letter: 'Y', ageGroup: '11-14' })), 'tile');
+  assert.equal(competitionTileKind(tile({ season: 'winter' })), 'mark');
+  assert.equal(competitionTileKind(tile({ isChampionship: true })), 'mark');
+  assert.equal(competitionTileKind(tile()), 'none');
+  assert.equal(competitionTileKind(tile({ emblemUrl: '' })), 'none');
+});

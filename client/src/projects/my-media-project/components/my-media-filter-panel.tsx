@@ -8,6 +8,7 @@ import FilterSwimmingStyle from '../../components/filter-section/filter-swimming
 import DeepSeasonCarousel from '../../components/deep/season-carousel';
 import type { CardStatus } from './status-styles';
 import UI_CompetitionName from '../../components/mix/competition-name/competition-name';
+import { swimmerSelectionLabel } from '../swimmer-selection';
 
 /** Есть ли у заплыва видео. */
 export type Seg = 'all' | 'with' | 'without';
@@ -53,8 +54,10 @@ interface Props {
   season: number | null;
   onSeason: (v: number | null) => void;
   swimmers: { id: number; name: string; count: number }[];
-  swimmerFilter: number | 'all';
-  onSwimmer: (v: number | 'all') => void;
+  /** Отмеченные пловцы (мультиселект, 18.11.2026); пусто — All. */
+  swimmerFilter: number[];
+  onToggleSwimmer: (id: number) => void;
+  onAllSwimmers: () => void;
   /** Всего заплывов до фильтра по пловцу — счётчик строки «All». */
   totalSwims: number;
   seg: Seg;
@@ -95,7 +98,8 @@ function MyMediaFilterPanel({
   onSeason,
   swimmers,
   swimmerFilter,
-  onSwimmer,
+  onToggleSwimmer,
+  onAllSwimmers,
   totalSwims,
   seg: segValue,
   onSeg,
@@ -121,7 +125,9 @@ function MyMediaFilterPanel({
     groupFilter === 'none'
       ? 'Not shared'
       : groupOptions.groups.find((g) => g.id === groupFilter)?.name;
-  const swimmer = swimmers.find((s) => s.id === swimmerFilter);
+  const swimmerLabel = swimmerSelectionLabel(
+    swimmers.filter((s) => swimmerFilter.includes(s.id)).map((s) => s.name),
+  );
 
   const dateSummary =
     dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All';
@@ -152,15 +158,16 @@ function MyMediaFilterPanel({
 
         <FilterCard
           title="Swimmers"
-          summary={swimmer ? swimmer.name : 'All'}
-          isActive={swimmerFilter !== 'all'}
+          summary={swimmerLabel}
+          isActive={swimmerFilter.length > 0}
           {...card('swimmers')}
         >
           <div className="mmf__list flex flex-col gap-2">
             <button
               type="button"
-              className={seg(swimmerFilter === 'all')}
-              onClick={() => onSwimmer('all')}
+              className={seg(swimmerFilter.length === 0)}
+              aria-pressed={swimmerFilter.length === 0}
+              onClick={onAllSwimmers}
             >
               All · {totalSwims}
             </button>
@@ -168,8 +175,10 @@ function MyMediaFilterPanel({
               <button
                 key={s.id}
                 type="button"
-                className={`${seg(swimmerFilter === s.id)} mmf__swimmer`}
-                onClick={() => onSwimmer(s.id)}
+                className={`${seg(swimmerFilter.includes(s.id))} mmf__swimmer`}
+                // Мультиселект: клик отмечает / снимает, остальные отмеченные остаются.
+                aria-pressed={swimmerFilter.includes(s.id)}
+                onClick={() => onToggleSwimmer(s.id)}
               >
                 <span className="mmf__initial" aria-hidden="true">
                   {s.name.trim().charAt(0).toUpperCase()}
