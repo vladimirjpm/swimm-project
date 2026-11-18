@@ -1,18 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { HubGroupBreak, TrainingRsvp, TrainingRsvpPerson } from '../../../types';
+import type { HubGroupBreak, RsvpAnswer, TrainingRsvp, TrainingRsvpPerson } from '../../../types';
 import { rsvpPersonKey, type TrainingRsvpState } from '../../../use-training-rsvp';
 import { useTrainingsTab, type RollChange } from '../trainings-context';
 import { CancelReason } from '../next/session-tag';
 import RollToast, { type RollToastData } from './roll-toast';
+import RollAnswerSegment from './roll-answer-segment';
 import {
-  avatarBackground, findBreak, groupOf, laneToastText, nextAnswer, personMeta, pillStyle, sortRoll, statusLabel, statusSpoken,
+  avatarBackground, findBreak, groupOf, laneToastText, personMeta, sortRoll, toggledAnswer,
   type RollGroup,
 } from './roll-format';
 
 /**
  * Перекличка вида тренера (Т6, хендофф Trainings Tab, 2a / 3b): сводка и полоса ответов,
- * фильтр-чипы, строки людей с ОДНОЙ кнопкой статуса по циклу (— → ✓ → ? → ✕ → —) и ⋮, тост
- * «Undo». Данные — ответы выбранного занятия (`roll`/`r` от секции), перерывы — `breaks` контекста.
+ * фильтр-чипы, строки людей с сегментом Going / Maybe / Out (макет F2 потока тренера; до
+ * 18.11.2026 была одна кнопка по циклу) и ⋮, тост «Undo». Данные — ответы выбранного занятия (`roll`/`r` от секции), перерывы — `breaks` контекста.
  * Изменение ответа даёт тост; шторка человека сообщает о своих изменениях через `onRollChange`
  * контекста — этот компонент его слушает.
  */
@@ -109,7 +110,7 @@ function RollRow({
   marked: boolean;
   canAnswer: boolean;
   desktop: boolean;
-  onPress: () => void;
+  onPress: (answer: RsvpAnswer) => void;
   onOpen: () => void;
 }) {
   const meta = personMeta(person, brk);
@@ -147,9 +148,9 @@ function RollRow({
     // Клик сразу следует за отпусканием; флаг не должен пережить его и проглотить клик с клавиатуры.
     if (fired.current) window.setTimeout(() => { fired.current = false; }, 100);
   };
-  const guarded = (action: () => void) => () => {
+  const guarded = <A extends unknown[]>(action: (...args: A) => void) => (...args: A) => {
     if (fired.current) { fired.current = false; return; }
-    action();
+    action(...args);
   };
 
   const name = person.name;
@@ -200,23 +201,13 @@ function RollRow({
           </div>
         )}
       </div>
-      <button
-        type="button"
+      <RollAnswerSegment
+        name={name}
+        answer={person.answer ?? null}
         disabled={!canAnswer}
-        onClick={guarded(onPress)}
-        aria-label={`${name}: ${statusSpoken(person)}. Change`}
-        className="flex flex-none cursor-pointer items-center justify-center whitespace-nowrap border font-extrabold disabled:cursor-default disabled:opacity-50"
-        style={{
-          minWidth: desktop ? 88 : 100,
-          height: desktop ? 32 : 40,
-          borderRadius: desktop ? 8 : 10,
-          padding: desktop ? '0 8px' : '0 10px',
-          fontSize: desktop ? 11.5 : 12,
-          ...pillStyle(person),
-        }}
-      >
-        {statusLabel(person)}
-      </button>
+        desktop={desktop}
+        onPick={guarded(onPress)}
+      />
       <button
         type="button"
         onClick={guarded(onOpen)}
@@ -286,9 +277,9 @@ function RollCall({ roll, r, narrow = false }: {
     return () => setRollChangeListener(null);
   }, [setRollChangeListener, showToast]);
 
-  const press = async (p: TrainingRsvpPerson) => {
+  const press = async (p: TrainingRsvpPerson, picked: RsvpAnswer) => {
     if (!r.can_answer) return;
-    const next = nextAnswer(p);
+    const next = toggledAnswer(p, picked);
     const prevNote = p.note ?? null;
     const { error, laneChange } = await roll.answerFor(p, next, prevNote);
     if (error) return; // текст ошибки — в `roll.error`, строкой под списком
@@ -336,7 +327,7 @@ function RollCall({ roll, r, narrow = false }: {
       marked={toast?.key === rsvpPersonKey(p)}
       canAnswer={r.can_answer}
       desktop={isDesktop}
-      onPress={() => { void press(p); }}
+      onPress={(a) => { void press(p, a); }}
       onOpen={() => openSheet({ kind: 'person', person: p })}
     />
   ));
@@ -373,7 +364,7 @@ function RollCall({ roll, r, narrow = false }: {
         <>
           <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${narrow ? 1 : 2}, minmax(0, 1fr))` }}>{list}</div>
           <div className="text-[10.5px] font-bold" style={{ color: 'var(--t-text-3)' }}>
-            Click status: — → ✓ → ? → ✕ · ⋮ for status, break, note
+            Click again to clear · ⋮ for status, break, note
           </div>
         </>
       ) : (

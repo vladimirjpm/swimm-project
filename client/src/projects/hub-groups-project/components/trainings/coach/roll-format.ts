@@ -32,34 +32,12 @@ export function sortRoll(people: TrainingRsvpPerson[]): TrainingRsvpPerson[] {
   return [...people].sort((a, b) => rank(a) - rank(b));
 }
 
-/** Цикл кнопки статуса: — → ✓ → ? → ✕ → —; у «⏸ Break» и «Not training» (ответа нет) следующий — ✓. */
-export function nextAnswer(p: TrainingRsvpPerson): RsvpAnswer | null {
-  if (p.answer === 'yes') return 'maybe';
-  if (p.answer === 'maybe') return 'no';
-  if (p.answer === 'no') return null;
-  return 'yes';
-}
-
-/** Текст кнопки статуса. */
-export function statusLabel(p: TrainingRsvpPerson): string {
-  const g = groupOf(p);
-  if (g === 'yes') return '✓ Going';
-  if (g === 'maybe') return '? Not sure';
-  if (g === 'no') return '✕ Can’t';
-  if (g === 'break') return '⏸ Break';
-  if (g === 'not_training') return 'Not training';
-  return '— Answer';
-}
-
-/** Статус словами — для `aria-label` кнопки. */
-export function statusSpoken(p: TrainingRsvpPerson): string {
-  const g = groupOf(p);
-  if (g === 'yes') return 'Going';
-  if (g === 'maybe') return 'Not sure';
-  if (g === 'no') return 'Can’t come';
-  if (g === 'break') return 'On break';
-  if (g === 'not_training') return 'Not training';
-  return 'No answer';
+/**
+ * Ответ после нажатия в сегменте строки (Going / Maybe / Out, 18.11.2026 вместо цикла):
+ * нажали выбранный — ответ снимается, иначе — нажатый.
+ */
+export function toggledAnswer(p: TrainingRsvpPerson, picked: RsvpAnswer): RsvpAnswer | null {
+  return p.answer === picked ? null : picked;
 }
 
 /** Ответ для тоста: «✓ Going» / «— No answer». */
@@ -83,28 +61,14 @@ export function laneToastText(answer: RsvpAnswer | null, lane: LaneChange | null
 }
 
 /**
- * Цвета кнопки статуса и выбранной кнопки сегмента шторки (`PILL` прототипа, на ролях):
- * ✓ — сплошной `--deep-live`, ? — золото, ✕ — красное; без ответа — пунктир, перерыв — сплошная рамка.
+ * Цвета выбранного ответа — в сегменте строки переклички и в сегменте шторки (`PILL` прототипа,
+ * на ролях): Going — сплошной `--deep-live`, Maybe — золото, Out — красное.
  */
 export const ANSWER_PILL: Record<RsvpAnswer, React.CSSProperties> = {
   yes: { background: 'var(--deep-live)', color: 'var(--deep-accent-ink)', borderColor: 'var(--deep-live)' },
   maybe: { background: 'var(--deep-gold-chip)', color: 'var(--deep-gold)', borderColor: 'var(--deep-gold-border)' },
   no: { background: 'var(--deep-danger-soft)', color: 'var(--deep-danger)', borderColor: 'var(--deep-danger)' },
 };
-
-export const PILL_NONE: React.CSSProperties = {
-  background: 'transparent', color: 'var(--t-text-3)', borderColor: 'var(--deep-card-border)', borderStyle: 'dashed',
-};
-
-export const PILL_OFF: React.CSSProperties = {
-  background: 'transparent', color: 'var(--t-text-3)', borderColor: 'var(--deep-card-border)', borderStyle: 'solid',
-};
-
-export function pillStyle(p: TrainingRsvpPerson): React.CSSProperties {
-  const g = groupOf(p);
-  if (g === 'yes' || g === 'maybe' || g === 'no') return { ...ANSWER_PILL[g], borderStyle: 'solid' };
-  return g === 'none' ? PILL_NONE : PILL_OFF;
-}
 
 /** Фон аватара по полу привязанного пловца; без пола — приглушённый. */
 export function avatarBackground(p: TrainingRsvpPerson): string {
