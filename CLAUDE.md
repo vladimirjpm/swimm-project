@@ -51,7 +51,10 @@ plus repo-specific footguns.
 `/smoke-test-api` (build → run → poll → curl → stop, handles the build-lock),
 `/db-sync-from-prod` (локальная копия бизнес-данных с прода, слиянием),
 `/pull-to-prod` (затянуть соревнование в прод через ProdAdmin, в том числе идущее — по дням;
-инструкция [`docs/pull-to-prod.md`](docs/pull-to-prod.md)).
+инструкция [`docs/pull-to-prod.md`](docs/pull-to-prod.md)),
+`/myswimm-dashboard-check` (пройтись по дашборду прода: свежий прогон проверок, сам чинит
+штатными командами то, что не требует решения, остальное — Владу списком; ранбук
+[`docs/dashboard-check.md`](docs/dashboard-check.md)).
 
 ---
 
