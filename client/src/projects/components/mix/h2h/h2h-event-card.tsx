@@ -29,13 +29,15 @@ interface Props {
    * (решение Влада 20.09.2026). Свой узел заменяет иконку, оставляя hairline на месте.
    */
   head?: React.ReactNode | false;
+  /** Свой класс на корень карточки — модификатор вызывающего (тон пола на сравнении стран). */
+  className?: string;
   children: React.ReactNode;
 }
 
 const UI_H2HEventCard: React.FC<Props> = ({
-  stroke, distance, oneSided = false, variant = 'h2h', head, children,
+  stroke, distance, oneSided = false, variant = 'h2h', head, className, children,
 }) => (
-  <div className={`h2h-event${oneSided ? ' h2h-event--one-sided' : ''}${variant === 'record' ? ' h2h-event--record' : ''}`}>
+  <div className={`h2h-event${oneSided ? ' h2h-event--one-sided' : ''}${variant === 'record' ? ' h2h-event--record' : ''}${className ? ` ${className}` : ''}`}>
     {head !== false && (
     <div className="h2h-event__head">
       <div className="h2h-event__hairline" />

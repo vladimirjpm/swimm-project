@@ -6,3 +6,30 @@
 .dv-paddles-icon:hover svg {
   transform: scale(1.05);
 }
+
+/* ── Подпись-разделитель (`styleType="divider"`): линия · «50m POOL» · линия ─────────── */
+
+/* Число — шрифтом крупных чисел продукта и цветом самой иконки бассейна (`--deep-pool-len`,
+   парный токен в deep-theme.css). Запасные значения нужны только вне темы Deep: там токенов
+   `--deep-*` нет, и подпись не должна пропасть. Кегль числа вызывающий меняет переменной
+   `--pool-len-size` (H2H на телефоне ставит меньше). */
+.dv-PoolIcon-divider { display: flex; align-items: center; gap: 12px; }
+.dv-PoolIcon-divider__line {
+  height: 1px; flex: 1; min-width: 0;
+  background: var(--deep-pool-border, currentColor);
+}
+.dv-PoolIcon-divider__text {
+  display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap;
+}
+.dv-PoolIcon-divider__len {
+  /* Вес обязателен: файл `Archivo Black` на сайте не подключён, `--deep-font-display` даёт
+     запасной гротеск, и без веса число выходит тонким (замер на dev-странице 18.11.2026).
+     800 — как у кода страны в шапке сравнения (`rc-nation__code`). */
+  font-family: var(--deep-font-display, inherit); font-weight: 800;
+  font-size: var(--pool-len-size, 24px); line-height: 1;
+  color: var(--deep-pool-len, #216492);
+}
+.dv-PoolIcon-divider__cap {
+  font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--deep-text-mute, var(--theme-mode-text));
+}

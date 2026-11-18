@@ -597,6 +597,31 @@
   color: var(--deep-text-faint);
 }
 
+/* Пол красит плитку сравнения (выбор Влада 18.11.2026, макет «Пол B+C»): фон плитки — мягкий
+   тон пола, на плите иконки — сплошная лента с подписью. Цвета — набор таблиц рекордов
+   (`--deep-rec-*`, тот же, что у ISR Age Records; docs/design-colors.md §11.1).
+   Смешанная эстафета цвета не имеет: класса нет, плитка и подпись остаются нейтральными. */
+.rc-event--male { --rc-gender: var(--deep-rec-male); --rc-gender-soft: var(--deep-rec-male-soft); }
+.rc-event--female { --rc-gender: var(--deep-rec-female); --rc-gender-soft: var(--deep-rec-female-soft); }
+.h2h-event.rc-event--male,
+.h2h-event.rc-event--female { background: var(--rc-gender-soft); }
+/* Рамку гасим ЦВЕТОМ (геометрия та же). У односторонней карточки пунктир остаётся: он
+   говорит «сравнивать нечего», и тон пола этого не отменяет. */
+.h2h-event.rc-event--male:not(.h2h-event--one-sided),
+.h2h-event.rc-event--female:not(.h2h-event--one-sided) { border-color: transparent; }
+/* Плита иконки с лентой: белая подложка общая, скругление держит обёртка. Размеры плиты
+   (в том числе телефонные) по-прежнему задаёт `.h2h-event__icon` внутри. */
+.rc-event__plate {
+  display: flex; flex-direction: column; flex: none;
+  border-radius: 10px; overflow: hidden; background: #fff;
+}
+.rc-event__plate .h2h-event__icon { border-radius: 0; }
+.rc-event__band {
+  display: flex; align-items: center; justify-content: center; height: 22px;
+  background: var(--rc-gender); color: var(--deep-accent-ink);
+  font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+}
+
 /* Один и тот же пловец держит рекорд обеих стран (сменил спортивное гражданство):
    подпись внизу карточки, чтобы одно имя с двух сторон не читалось как сбой. */
 .rc-event__same-holder {
