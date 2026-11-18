@@ -346,6 +346,20 @@ public class SeasonBestRepository : ISeasonBestRepository
             })
             .ToList();
 
+        // Лучший заплыв пловца ЗА КАЖДЫЙ КЛУБ (план swimmer-club-change, Ф3): пловец, который
+        // за сезон плыл за два клуба, обязан найтись под фильтром каждого. Схлопывание до
+        // «лучшего вообще» прятало его в клубе, где лучший заплыв не случился. Список упорядочен
+        // по времени, поэтому первый в группе — лучший.
+        var bestPerClub = withAttempt
+            .GroupBy(x => (x.Row.SwimmerId, x.Row.ClubId))
+            .Select(g => g.First())
+            .ToList();
+
+        // Строки под фильтр клуба в режиме «лучший раз» — до схлопывания: лучший раз ЗА ЭТОТ клуб.
+        var clubBest = query.BestPerSwimmer && query.ClubId is int bestClubId
+            ? bestPerClub.Where(x => x.Row.ClubId == bestClubId).ToList()
+            : null;
+
         if (query.BestPerSwimmer)
             withAttempt = withAttempt.Where(x => x.Attempt == 1).ToList();
 
@@ -366,13 +380,18 @@ public class SeasonBestRepository : ISeasonBestRepository
 
         // Опции фильтра «Club» — по срезу ДО фильтра по клубу: иначе, выбрав клуб,
         // пользователь терял бы возможность выбрать любой другой.
-        var clubs = placed
-            .GroupBy(x => x.Row.ClubId)
+        // В режиме «лучший раз» — по лучшему разу за КАЖДЫЙ клуб: пловец двух клубов считается
+        // в обоих, иначе клуб, где не случился его лучший заплыв, пропадал бы из опций.
+        var optionRows = query.BestPerSwimmer
+            ? bestPerClub.Select(x => x.Row).ToList()
+            : placed.Select(x => x.Row).ToList();
+        var clubs = optionRows
+            .GroupBy(x => x.ClubId)
             .Select(g => new SeasonBestClubOptionDto
             {
                 ClubId = g.Key,
-                Name = g.First().Row.Club ?? "",
-                NameEn = ClubEnOrNull(g.First().Row.Club, g.First().Row.ClubEn),
+                Name = g.First().Club ?? "",
+                NameEn = ClubEnOrNull(g.First().Club, g.First().ClubEn),
                 Swims = g.Count(),
             })
             .OrderByDescending(c => c.Swims)
@@ -382,9 +401,21 @@ public class SeasonBestRepository : ISeasonBestRepository
         // Клуб фильтрует ПОКАЗ, но не пересчитывает места: пользователь видит своих пловцов
         // с их местами в общем рейтинге (#1, #7, #23). Пересчёт мест внутри клуба — это уже
         // другой продукт («лучшие в клубе»), он живёт в /api/clubs/{id}/season-best.
-        var visible = query.ClubId is int clubId
-            ? placed.Where(x => x.Row.ClubId == clubId).ToList()
-            : placed;
+        //
+        // В режиме «лучший раз» под фильтром клуба — лучший раз ЗА ЭТОТ клуб (Ф3). Если он не
+        // лучший у пловца вообще, в общем рейтинге его нет; место — то, которое это время
+        // заняло бы в нём: сколько лучших разов строго быстрее, плюс один (равные делят место).
+        // Его собственный лучший раз (за другой клуб) тоже быстрее и тоже считается: так места
+        // идут по возрастанию вместе со временем, без «двух вторых» при разных временах. У
+        // лучшего раза формула даёт его же место из рейтинга.
+        var visible = clubBest is not null
+            ? clubBest
+                .Select(x => (x.Row, Gender: x.Gender!, x.Attempt,
+                    Place: 1 + placed.Count(p => p.Row.TimeMs < x.Row.TimeMs)))
+                .ToList()
+            : query.ClubId is int clubId
+                ? placed.Where(x => x.Row.ClubId == clubId).ToList()
+                : placed;
 
         var limit = Math.Clamp(query.Limit, 1, 200);
         var offset = Math.Max(query.Offset, 0);

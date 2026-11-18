@@ -3,6 +3,7 @@ import './h2h.css';
 import { routes } from '../../../../utils/routes';
 import UI_SwimmerAvatar from '../swimmer-avatar/swimmer-avatar';
 import UI_H2HSideCard from './h2h-side-card';
+import UI_ClubHistoryBadge from '../club-history/club-history-badge';
 import type { H2HSwimmer } from './h2h.types';
 
 /**
@@ -82,7 +83,15 @@ const UI_H2HMiniCard: React.FC<Props> = ({
       align={align}
       media={avatar}
       name={swimmer.name}
-      sub={swimmer.club}
+      // Клуб + ⇄, если клубов за карьеру больше одного (значок сам решает, рисоваться ли).
+      sub={swimmer.club ? (
+        // Имя клуба режется многоточием, значок — нет: длинное ивритское название иначе
+        // унесло бы его за край карточки.
+        <span className="club-history-sub">
+          <span dir="auto" className="club-history-sub__name">{swimmer.club}</span>
+          <UI_ClubHistoryBadge history={swimmer.clubHistory} swimmerName={swimmer.name} size="sm" />
+        </span>
+      ) : null}
       chip={swimmer.ageLabel}
       corner={heart}
       onSelect={onSelect}

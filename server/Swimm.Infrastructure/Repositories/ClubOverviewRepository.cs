@@ -99,8 +99,7 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 NameEn = club.NameEn,
                 CountryCode = club.CountryCode,
                 CountryName = club.CountryName,
-                SwimmerCount = await _read.Swimmers.AsNoTracking()
-                    .CountAsync(s => s.ClubId == resolvedClubId && s.PrivateHubGroupId == null),
+                SwimmerCount = await SwimmerCountAsync(resolvedClubId, season),
                 FirstSeason = rows.Count > 0 ? rows.Min(r => r.Season) : null,
                 LastSeason = rows.Count > 0 ? rows.Max(r => r.Season) : null,
                 // Указатель на картинку разрешает СЕРВЕР — наружу уходит один готовый URL.
@@ -172,6 +171,30 @@ public class ClubOverviewRepository : IClubOverviewRepository
         dto.TopSwimmers = await BuildTopSwimmersAsync(resolvedClubId, scoped, season);
 
         return dto;
+    }
+
+    /// <summary>
+    /// Число пловцов клуба — тем же правилом, что состав (<c>ClubPublicRepository.GetRosterAsync</c>,
+    /// план swimmer-club-change К7): при выбранном сезоне — кто стартовал за клуб в нём (по строкам
+    /// результатов, индивидуальные заплывы), без сезона — у кого это текущий клуб карточки.
+    /// Пловцы группы (Р71) не считаются.
+    /// </summary>
+    private async Task<int> SwimmerCountAsync(int clubId, int? season)
+    {
+        if (season is not int year)
+        {
+            return await _read.Swimmers.AsNoTracking()
+                .CountAsync(s => s.ClubId == clubId && s.PrivateHubGroupId == null);
+        }
+
+        var (from, until) = SeasonMath.RangeOf(year);
+        return await _read.Results.AsNoTracking()
+            .Where(r => r.ClubId == clubId && r.RelayId == null
+                        && r.CompetitionDate >= from && r.CompetitionDate < until
+                        && r.Swimmer.PrivateHubGroupId == null)
+            .Select(r => r.SwimmerId)
+            .Distinct()
+            .CountAsync();
     }
 
     /// <summary>Зачёты клуба + контекст соревнования (роль ❄/☀ и зачётная группа).</summary>

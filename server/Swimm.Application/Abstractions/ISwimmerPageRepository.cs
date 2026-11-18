@@ -76,6 +76,13 @@ public interface ISwimmerPageRepository
     Task<IReadOnlyDictionary<string, int>> GetClubBestMsAsync(int clubId, int age);
 
     /// <summary>
+    /// Клубы из справочника под историю клубов пловца (<see cref="SwimmerClubHistory"/>):
+    /// запрошенные id плюс приёмники склеенных (по цепочке) — без них склейку не свести.
+    /// Неизвестные id в ответ не попадают.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, SwimmerClubRef>> GetClubRefsAsync(IEnumerable<int> clubIds);
+
+    /// <summary>
     /// Лучшие времена ВСЕЙ ВОЗРАСТНОЙ КОГОРТЫ за сезон — вход для фильтра «Season best»:
     /// по строке на пару (сверстник × дисциплина). Когорта — все пловцы с тем же
     /// <paramref name="birthYear"/>, а с 18 лет в сезоне — все взрослые разом

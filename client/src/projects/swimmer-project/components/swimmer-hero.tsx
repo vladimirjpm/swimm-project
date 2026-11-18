@@ -172,6 +172,7 @@ function SwimmerHero({ profile, summary, level, achievements }: Props) {
         ageInSeason: profile.ageInSeason,
         clubName: profile.clubName,
         clubId: profile.clubId,
+        clubHistory: profile.clubHistory,
         countryCode: profile.countryCode,
         avatarUrl: profile.avatarUrl,
         gender: profile.gender,

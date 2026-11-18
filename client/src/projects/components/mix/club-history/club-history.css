@@ -1,0 +1,73 @@
+/* История клубов пловца: значок у клуба + окно (план swimmer-club-change, Ф2).
+   Красится ролями --t-* (deep-theme.css): значок стоит на deep-страницах, окно — порталом
+   с классом темы из useDeepThemeClass. */
+
+/* ── Значок ⇄ «несколько клубов» ─────────────────────────────────────────── */
+
+.club-history-badge {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  min-height: 24px; padding: 2px 9px; border-radius: 999px; cursor: pointer;
+  font-size: 11px; font-weight: 800; line-height: 1; letter-spacing: .02em;
+  color: var(--t-accent-text); background: var(--t-accent-soft);
+  border: 1px solid var(--t-accent-border);
+  /* Значок стоит ВНУТРИ карточки-кнопки H2H: свой слой, иначе аватар перекроет клик. */
+  position: relative; z-index: 2;
+}
+.club-history-badge:hover { border-color: var(--t-accent); }
+.club-history-badge:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.club-history-badge__arrow { font-size: 13px; }
+
+/* Мелкий вариант — под подписью клуба в мини-карточке H2H. */
+.club-history-badge--sm { min-height: 20px; padding: 1px 7px; font-size: 10px; }
+
+/* Телефонная раскладка H2H (столбик, тот же порог `@container h2h`, что в h2h.css): карточка
+   узкая, и подпись «2 clubs» съедала имя клуба до двух букв — остаётся одна ⇄, число в title. */
+@container h2h (max-width: 560px) {
+  .club-history-badge--sm .club-history-badge__label { display: none; }
+}
+
+/* Подпись клуба с значком в карточке H2H: имя режется, значок остаётся целым. */
+.club-history-sub { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; vertical-align: middle; }
+.club-history-sub__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Тач-цель ≥ 44px на телефоне — правило хендоффа шапки. */
+@media (max-width: 900px) {
+  .club-history-badge:not(.club-history-badge--sm) { min-height: 32px; padding: 4px 11px; }
+}
+
+/* ── Окно истории ────────────────────────────────────────────────────────── */
+
+.club-history-intro { margin: 0; font-size: 12px; color: var(--t-text-2); }
+
+.club-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+
+.club-history__row {
+  display: grid; grid-template-columns: 78px 30px minmax(0, 1fr); align-items: center; gap: 10px;
+  padding: 10px 0; border-top: 1px solid var(--t-divider);
+}
+.club-history__row:first-child { border-top: 0; }
+/* Второй клуб того же сезона — продолжение строки сезона, без разделителя. */
+.club-history__row--same { border-top: 0; padding-top: 0; }
+
+.club-history__season {
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: 13px; font-weight: 900; color: var(--t-text); font-variant-numeric: tabular-nums;
+}
+.club-history__courses { display: inline-flex; gap: 3px; min-height: 13px; }
+
+/* Белый круг под эмблему — тот же физический объект, что в чипе клуба шапки. */
+.club-history__logo {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 999px; background: #fff;
+  border: 1px solid var(--t-border);
+}
+
+.club-history__club { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.club-history__name {
+  font-size: 14px; font-weight: 800; color: var(--t-text); text-decoration: none;
+  /* dir="auto" прижал бы ивритское название вправо, а подпись под ним — влево. */
+  text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.club-history__name:hover { color: var(--t-accent-text); text-decoration: underline; }
+.club-history__meta { font-size: 11px; color: var(--t-text-3); font-variant-numeric: tabular-nums; }

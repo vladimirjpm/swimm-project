@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ClubSeason } from '../components/mix/club-history/club-history.types';
 
 /** Зачётная группа возрастной лестницы (Kids/Young/Juniors/Adults/Masters). */
 export interface SwimmerAgeGroup {
@@ -109,6 +110,8 @@ export interface SwimmerProfile {
   /** Витринный сезон (год начала): за него — места среди ровесников и SB, пока новый сезон не
    *  открыт зимним чемпионатом. На карусель не влияет. */
   showcaseSeason?: number | null;
+  /** История клубов по сезонам, новые сверху (план swimmer-club-change, Ф2). */
+  clubHistory?: ClubSeason[];
 }
 
 type State =

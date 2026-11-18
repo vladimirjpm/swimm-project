@@ -17,7 +17,9 @@ import { sortByFavoriteRank } from '../../utils/helpers/favorites-order';
 import {
   useSwimmerProfile, type SwimmerProfile, type SwimmerSeasonOption,
 } from '../swimmer-project/use-swimmer-profile';
-import { useSwimmerCompare, useSwimmerSearch } from '../swimmer-project/use-swimmer-page';
+import {
+  useSwimmerCompare, useSwimmerSearch, type SwimmerCompareSide,
+} from '../swimmer-project/use-swimmer-page';
 import { H2H_DEFAULT_LEFT } from './h2h-settings';
 
 /**
@@ -58,12 +60,17 @@ function mergeSeasons(a?: SwimmerSeasonOption[], b?: SwimmerSeasonOption[]): Swi
   return [...byYear.values()].sort((x, y) => y.season - x.season);
 }
 
-/** Профиль → занятый слот шапки. Возраст без года рождения не показываем — его нечем проверить. */
-function slotSwimmer(profile: SwimmerProfile) {
+/**
+ * Профиль → занятый слот шапки. Возраст без года рождения не показываем — его нечем проверить.
+ * Клуб — со стороны сравнения, когда она приехала: там он за выбранный сезон (Ф3); до неё —
+ * текущий клуб профиля.
+ */
+function slotSwimmer(profile: SwimmerProfile, side: SwimmerCompareSide | null) {
   return {
     id: profile.id,
     name: profile.fullName,
-    club: profile.clubName,
+    club: side ? side.clubName : profile.clubName,
+    clubHistory: profile.clubHistory,
     ageLabel: profile.ageInSeason != null && profile.birthYear > 0
       ? `${profile.ageInSeason} y · ${profile.birthYear}`
       : profile.birthYear > 0 ? `b. ${profile.birthYear}` : null,
@@ -218,6 +225,18 @@ function H2HProject() {
     favoriteBlockedHint: favoriteSwimmerIds.has(id) ? null : fullHint('swimmer'),
   });
 
+  /**
+   * Сторона сравнения из ответа `/compare` — источник клуба ЗА ВЫБРАННЫЙ СЕЗОН (Ф3 плана
+   * swimmer-club-change): профиль знает только текущий клуб. Берём её, только если она про
+   * того же пловца — после смены стороны старый ответ ещё может висеть.
+   */
+  const compareSide = (side: ActiveSide, id: number): SwimmerCompareSide | null => {
+    const data = compare.data;
+    if (!data) return null;
+    const candidate = side === 'a' ? data.mine : data.rival;
+    return candidate.id === id ? candidate : null;
+  };
+
   const slotOf = (side: ActiveSide, profile: SwimmerProfile | null, id: number | null): H2HSlot => {
     // Подсвечиваем сторону, которую заполнит следующий выбор: пикер тут ОДИН на два
     // слота, и подпись «choosing the left swimmer» стоит от них отдельно — без рамки
@@ -233,7 +252,7 @@ function H2HProject() {
     return {
       kind: 'swimmer',
       // Профиль ещё едет — показываем слот с номером, чтобы шапка не прыгала при загрузке.
-      swimmer: profile ? slotSwimmer(profile) : { id, name: `#${id}` },
+      swimmer: profile ? slotSwimmer(profile, compareSide(side, id)) : { id, name: `#${id}` },
       ...favProps(id),
       // Клик по карточке — «выбрать другого»: сторона становится активной и курсор уходит
       // в поиск, но стоящий здесь пловец ОСТАЁТСЯ, пока не выбран новый. Иначе один клик

@@ -1,3 +1,5 @@
+import type { ClubSeason } from '../club-history/club-history.types';
+
 /**
  * Общий вход семейства `UI_SwimmerIdentity*` — «кто этот пловец», без единой цифры о том,
  * как он плывёт. Статистика (KPI, медали, разряд, достижения) остаётся за вызывающим
@@ -30,6 +32,11 @@ export interface SwimmerIdentity {
   ageLabel?: string | null;
   clubName?: string | null;
   clubId?: number | null;
+  /**
+   * История клубов по сезонам (сервер, `clubHistory`): больше одного клуба — у чипа клуба
+   * значок ⇄ с окном истории (план swimmer-club-change, Ф2). Сам чип — ТЕКУЩИЙ клуб (К6).
+   */
+  clubHistory?: ClubSeason[] | null;
   /** alpha-3 или alpha-2 — конвертирует сам `UI_FlagEmoji`. */
   countryCode?: string | null;
   avatarUrl?: string | null;

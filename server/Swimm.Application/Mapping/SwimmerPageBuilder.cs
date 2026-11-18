@@ -262,7 +262,7 @@ public static class SwimmerPageBuilder
     public static List<SwimmerPersonalBestDto> PersonalBests(
         IReadOnlyList<SeasonSwimRow> allRows,
         string? poolType,
-        IReadOnlyDictionary<string, int> clubBestMs,
+        IReadOnlyDictionary<int, IReadOnlyDictionary<string, int>> clubBestByClub,
         IReadOnlyDictionary<RecordStep, IReadOnlyDictionary<string, NationalAgeRecordRow>> nationalRecords,
         int birthYear = 0,
         RecordAgeAxis axis = RecordAgeAxis.Calendar)
@@ -294,7 +294,8 @@ public static class SwimmerPageBuilder
                     ResultId = r.ResultId,
                 };
 
-                if (clubBestMs.TryGetValue(key, out var club))
+                // Клуб СТРОКИ рекорда, не карточки: рекорд за прежний клуб меряется тем клубом (Ф3).
+                if (clubBestByClub.TryGetValue(r.ClubId, out var clubBestMs) && clubBestMs.TryGetValue(key, out var club))
                 {
                     dto.HoldsClubBest = ms <= club;
                     dto.DeltaToClubBestMs = ms - club;
@@ -571,8 +572,8 @@ public static class SwimmerPageBuilder
         {
             Season = season,
             Label = season is null ? "career" : SeasonMath.Label(season.Value),
-            Mine = Side(mineInput.Profile, season, mineSeason, mineFlags, mineInput.Held),
-            Rival = Side(rivalInput.Profile, season, rivalSeason, rivalFlags, rivalInput.Held),
+            Mine = Side(mineInput.Profile, season, mineSeason, mineFlags, mineInput.Held, mineInput.ClubHistory),
+            Rival = Side(rivalInput.Profile, season, rivalSeason, rivalFlags, rivalInput.Held, rivalInput.ClubHistory),
             SeasonBestSeason = sbSeason,
             SeasonBestLabel = sbSeason is int y ? SeasonMath.Label(y) : null,
         };
@@ -647,28 +648,39 @@ public static class SwimmerPageBuilder
     private static SwimmerCompareSideDto Side(
         SwimmerProfileDto? profile, int? season,
         IReadOnlyList<SeasonSwimRow> rows, CompareFlags flags,
-        IReadOnlyList<HeldRecordRow> held) => new()
+        IReadOnlyList<HeldRecordRow> held, IReadOnlyList<SwimmerClubSeasonDto>? clubHistory)
     {
-        Id = profile?.Id ?? 0,
-        Name = profile?.FullName ?? string.Empty,
-        BirthYear = profile is { BirthYear: > 0 } ? profile.BirthYear : null,
-        Gender = profile?.Gender,
-        ClubName = profile?.ClubName,
-        AvatarUrl = profile?.AvatarUrl,
-        CountryCode = profile?.CountryCode,
-        AgeInSeason = season is int s && profile is { BirthYear: > 0 }
-            ? SeasonMath.AgeInSeason(s, profile.BirthYear)
-            : null,
-        SeasonBests = flags.SeasonBests,
-        // Рекорды считает справочник (матч по имени держателя), а не наши заплывы, — и это
-        // единственные цифры шапки, которые НЕ зависят от периода.
-        Records = RecordCounts(held),
-        Medals = Medals(rows),
-        BestPoints = rows.Where(SeasonAggregator.IsCountable)
-            .Select(r => r.InternationalPoints)
-            .DefaultIfEmpty(0)
-            .Max(),
-    };
+        // Клуб стороны: при выбранном сезоне — клуб последнего старта в нём (Ф3); за карьеру
+        // и в сезоне без стартов — текущий клуб карточки, как в шапке страницы (К6).
+        var seasonClub = season is int year && clubHistory is not null
+            ? SwimmerClubHistory.ClubOfSeason(clubHistory, year)
+            : null;
+
+        return new()
+        {
+            Id = profile?.Id ?? 0,
+            Name = profile?.FullName ?? string.Empty,
+            BirthYear = profile is { BirthYear: > 0 } ? profile.BirthYear : null,
+            Gender = profile?.Gender,
+            ClubId = seasonClub?.ClubId ?? profile?.ClubId,
+            ClubName = seasonClub is not null ? SwimmerClubHistory.DisplayName(seasonClub) : profile?.ClubName,
+            ClubHistory = clubHistory is null ? [] : [.. clubHistory],
+            AvatarUrl = profile?.AvatarUrl,
+            CountryCode = profile?.CountryCode,
+            AgeInSeason = season is int s && profile is { BirthYear: > 0 }
+                ? SeasonMath.AgeInSeason(s, profile.BirthYear)
+                : null,
+            SeasonBests = flags.SeasonBests,
+            // Рекорды считает справочник (матч по имени держателя), а не наши заплывы, — и это
+            // единственные цифры шапки, которые НЕ зависят от периода.
+            Records = RecordCounts(held),
+            Medals = Medals(rows),
+            BestPoints = rows.Where(SeasonAggregator.IsCountable)
+                .Select(r => r.InternationalPoints)
+                .DefaultIfEmpty(0)
+                .Max(),
+        };
+    }
 
     private static SwimmerCompareSwimDto? Swim(SeasonSwimRow? row, CompareFlags flags)
     {
@@ -713,7 +725,13 @@ public static class SwimmerPageBuilder
         /// считаются счётчики шапки. Это другой вопрос, чем «бьёт ли это время рекорд»:
         /// рекордный заплыв может быть поставлен до периода импорта.
         /// </summary>
-        IReadOnlyList<HeldRecordRow> Held);
+        IReadOnlyList<HeldRecordRow> Held,
+        /// <summary>
+        /// История клубов по сезонам (<see cref="SwimmerClubHistory"/>): при выбранном сезоне
+        /// сторона показывает клуб последнего старта В НЁМ, а не текущий (план swimmer-club-change,
+        /// Ф3). null — истории нет, сторона показывает клуб карточки.
+        /// </summary>
+        IReadOnlyList<SwimmerClubSeasonDto>? ClubHistory = null);
 
     /// <summary>Ступень справочника рекордов: пара «категория × возрастной ключ».</summary>
     public readonly record struct RecordStep(string Category, string AgeKey);

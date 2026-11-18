@@ -2,6 +2,7 @@ import React from 'react';
 import './swimmer-identity.css';
 import UI_ClubIcon from '../club-icon/club-icon';
 import UI_SwimmerAvatar from '../swimmer-avatar/swimmer-avatar';
+import UI_ClubHistoryBadge from '../club-history/club-history-badge';
 import { useIdentityFavorites } from './swimmer-identity-favorites';
 import { identityAgeLabel, type SwimmerIdentity } from './swimmer-identity.types';
 import { routes } from '../../../../utils/routes';
@@ -115,6 +116,8 @@ const UI_SwimmerIdentityHero: React.FC<Props> = ({ identity, chips, aside }) => 
             </span>
           )
         )}
+        {/* ⇄ «несколько клубов» — только когда их больше одного; клик открывает историю. */}
+        <UI_ClubHistoryBadge history={identity.clubHistory} swimmerName={identity.name} />
         {chips}
       </div>
     </div>

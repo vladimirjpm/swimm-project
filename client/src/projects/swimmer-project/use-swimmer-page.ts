@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ShowcaseSeasonNotice } from '../../utils/helpers/season-helper';
 import { H2H_PARAM } from '../../utils/routes';
+import type { ClubSeason } from '../components/mix/club-history/club-history.types';
 
 /**
  * Данные табов страницы спортсмена (docs/plans/athlete-page-plan.md §3).
@@ -225,7 +226,11 @@ export interface SwimmerCompareSide {
   name: string;
   birthYear?: number | null;
   gender?: string | null;
+  /** Клуб стороны: при выбранном сезоне — клуб последнего старта в нём, за карьеру — текущий (Ф3). */
+  clubId?: number | null;
   clubName?: string | null;
+  /** История клубов — для значка ⇄ у карточки (у соперника на табе профиль не грузится). */
+  clubHistory?: ClubSeason[];
   /** Фото и страна — для портрета с флагом в мини-карточке шапки. */
   avatarUrl?: string | null;
   countryCode?: string | null;

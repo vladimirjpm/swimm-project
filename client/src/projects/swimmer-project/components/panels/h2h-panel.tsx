@@ -105,7 +105,9 @@ export function H2HPanel({
       ? {
         id: compare.mine.id,
         name: compare.mine.name || profileName,
+        // Клуб стороны — сервер: при выбранном сезоне клуб последнего старта в нём (Ф3).
         club: compare.mine.clubName,
+        clubHistory: compare.mine.clubHistory,
         ageLabel: ageLabel(compare.mine),
         avatarUrl: compare.mine.avatarUrl,
         gender: compare.mine.gender,
@@ -132,6 +134,7 @@ export function H2HPanel({
           id: compare.rival.id,
           name: compare.rival.name || `#${rivalId}`,
           club: compare.rival.clubName,
+          clubHistory: compare.rival.clubHistory,
           ageLabel: ageLabel(compare.rival),
           avatarUrl: compare.rival.avatarUrl,
           gender: compare.rival.gender,
