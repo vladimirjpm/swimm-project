@@ -58,8 +58,11 @@ public static class ResultMapping
         FirstNameEn = r.Swimmer.FirstNameEn,
         BirthYear = r.Swimmer.BirthYear,
         ClubId = r.ClubId,
-        ClubName = r.Club.Name,
-        ClubNameEn = r.Club.NameEn,
+        // Клуб как напечатан в протоколе (Р97): строка помнит прежнее название клуба — его и
+        // показываем, текущее — подсказкой «now: …». EF переводит в LEFT JOIN на ClubNames.
+        ClubName = r.ClubName != null ? r.ClubName.Name : r.Club.Name,
+        ClubNameEn = r.ClubName != null ? r.ClubName.NameEn : r.Club.NameEn,
+        ClubNameNow = r.ClubName != null ? r.Club.Name : null,
         TimeMillisecond = r.TimeMillisecond,
         TimeOriginal = r.TimeOriginal,
         TimeSplit = r.TimeSplit,

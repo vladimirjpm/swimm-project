@@ -116,6 +116,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
                 firstName={res.first_name}
                 lastName={res.last_name}
                 club={res.club}
+                clubNow={res.club_now}
                 clubId={res.club_id}
                 isRelay={res.is_relay}
                 relaySwimmersList={res.relay_swimmers}
@@ -139,7 +140,7 @@ const ResultsTableMobile: React.FC<ResultsTableRowProps> = ({
             {showClub && (
               <div className="flex shrink-0 items-start justify-center px-1 pt-0.5">
                 <div style={{ width: 28, height: 28 }}>
-                  <UI_ClubIcon clubName={res.club} clubId={res.club_id} iconWidth="full" styleType="icon-notext" />
+                  <UI_ClubIcon clubName={res.club_now ?? res.club} clubId={res.club_id} iconWidth="full" styleType="icon-notext" />
                 </div>
               </div>
             )}

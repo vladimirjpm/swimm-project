@@ -169,7 +169,10 @@ public partial class ResultRepository : IResultRepository
                 r.Swimmer.FirstNameEn.StartsWith(filter.Name));
 
         if (!string.IsNullOrWhiteSpace(filter.Club))
-            query = query.Where(r => r.Club.Name.StartsWith(filter.Club) || r.Club.NameEn.StartsWith(filter.Club));
+            // Клуб — и текущим, и напечатанным названием (Р97): строка протокола показывает
+            // прежнее название, сводка клубов соревнования ключуется им же.
+            query = query.Where(r => r.Club.Name.StartsWith(filter.Club) || r.Club.NameEn.StartsWith(filter.Club)
+                || (r.ClubName != null && (r.ClubName.Name.StartsWith(filter.Club) || r.ClubName.NameEn.StartsWith(filter.Club))));
 
         if (filter.SwimmerIds is { Count: > 0 })
             query = query.Where(r => filter.SwimmerIds.Contains(r.SwimmerId));
@@ -250,8 +253,10 @@ public partial class ResultRepository : IResultRepository
                 r.Id,
                 r.CompetitionId,
                 r.ClubId,
-                ClubName = r.Club.Name,
-                ClubNameEn = r.Club.NameEn,
+                // Как напечатано (Р97): зачёт соревнования — экран протокола.
+                ClubName = r.ClubName != null ? r.ClubName.Name : r.Club.Name,
+                ClubNameEn = r.ClubName != null ? r.ClubName.NameEn : r.Club.NameEn,
+                ClubNow = r.ClubName != null ? r.Club.Name : null,
                 RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
                 r.SwimmerId,
                 // Место prelim-заплыва — ранжир сессии, не награда: медали и клубные очки
@@ -331,6 +336,34 @@ public partial class ResultRepository : IResultRepository
             })
             .ToList();
 
+        // Текущее название у строки, напечатанной под прежним (Р97): «now: …» в зачёте и подпись
+        // фильтра клуба. Ключ — то же имя, что у ClubStandingCalculator (club → команда → EN).
+        var nowByKey = rows
+            .Where(r => r.ClubNow != null)
+            .GroupBy(r => FirstNonEmpty(r.ClubName, r.RelayTeamName, r.ClubNameEn) ?? "")
+            .ToDictionary(g => g.Key, g => g.First().ClubNow);
+        foreach (var s in summary)
+            if (nowByKey.TryGetValue(s.Club, out var now) && now != s.Club) s.ClubNow = now;
+
+        // Прежние названия (Н7): поиск в фильтре клуба находит клуб и по старому названию —
+        // протокол 2024/25 напечатан под «הפועל …», а строка фильтра уже под текущим именем.
+        var clubIds = summary.Select(s => s.ClubId).Where(id => id > 0).Distinct().ToList();
+        if (clubIds.Count > 0)
+        {
+            var former = (await _db.ClubNames.AsNoTracking()
+                    .Where(n => clubIds.Contains(n.ClubId) && n.Kind == ClubNameKinds.Former)
+                    .Select(n => new { n.ClubId, n.Name, n.NameEn })
+                    .ToListAsync())
+                .GroupBy(n => n.ClubId)
+                .ToDictionary(g => g.Key, g => g
+                    .SelectMany(n => new[] { n.Name, n.NameEn })
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct()
+                    .ToList());
+            foreach (var s in summary)
+                if (former.TryGetValue(s.ClubId, out var names)) s.FormerNames = names;
+        }
+
         return summary;
     }
 
@@ -390,7 +423,10 @@ public partial class ResultRepository : IResultRepository
 
                 "club" => await _db.Clubs
                     .Where(c => c.MergedIntoId == null)   // склеенные в подсказки фильтра не идут
-                    .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix) || c.NameEn.StartsWith(prefix))
+                    // …а прежнее название клуба (ClubNames, план swimmer-club-change §5, Н7) подсказывает
+                    // его ТЕКУЩЕЕ имя: ищут «הפועל עירוני הוד השרון» — находят Aluma.
+                    .Where(c => prefix.Length == 0 || c.Name.StartsWith(prefix) || c.NameEn.StartsWith(prefix)
+                        || _db.ClubNames.Any(n => n.ClubId == c.Id && (n.Name.StartsWith(prefix) || n.NameEn.StartsWith(prefix))))
                     .Select(c => c.Name)
                     .Where(n => n.Length > 0)
                     .Distinct()

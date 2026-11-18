@@ -28,7 +28,9 @@ public sealed record SeoClubFacts(
     string NameEn,
     bool IsPseudo,
     int? MergedIntoId,
-    int Swimmers);
+    int Swimmers,
+    // Прежние названия (переименования, план swimmer-club-change §5, Н6): поиск находит клуб и по ним.
+    IReadOnlyList<ClubFormerNameDto>? FormerNames = null);
 
 /// <summary>Соревнование для заголовка страницы /competitions/{id}.</summary>
 public sealed record SeoCompetitionFacts(

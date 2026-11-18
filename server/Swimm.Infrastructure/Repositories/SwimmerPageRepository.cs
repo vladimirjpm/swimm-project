@@ -331,6 +331,20 @@ public class SwimmerPageRepository : ISwimmerPageRepository
                 .ToList();
         }
 
+        // Прежние названия (ClubNames, Н8) — у живых клубов: «then: …» в окне истории.
+        var liveIds = result.Values.Where(c => c.MergedIntoId is null).Select(c => c.Id).ToList();
+        if (liveIds.Count > 0)
+        {
+            var names = (await _read.ClubNames.AsNoTracking()
+                    .Where(n => liveIds.Contains(n.ClubId))
+                    .Select(n => new { n.ClubId, Row = new ClubFormerNameRow(n.Id, n.Name, n.NameEn, n.UsedFrom, n.UsedTo, n.Kind) })
+                    .ToListAsync())
+                .GroupBy(n => n.ClubId)
+                .ToDictionary(g => g.Key, g => (IReadOnlyList<ClubFormerNameRow>)g.Select(x => x.Row).ToList());
+            foreach (var (clubId, rows) in names)
+                result[clubId] = result[clubId] with { FormerNames = rows };
+        }
+
         return result;
     }
 
@@ -748,6 +762,7 @@ public class SwimmerPageRepository : ISwimmerPageRepository
             IsMasters = r.Competition.IsMasters,
             StyleName = r.Style.Name,
             ClubId = r.ClubId,
+            ClubNameId = r.ClubNameId,
             AgeGroup = r.AgeGroup,
             EventStyleAge = r.EventStyleAge,
             TimeFailNote = r.TimeFailNote,

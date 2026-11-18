@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import UI_ClubDetails from '../mix/club-details/club-details';
 import { useFilterHost } from './filter-host';
 import FilterCard from './filter-card';
+import { matchesClubQuery } from './filter-club-match';
 import UI_ClubPointsUnofficialChip from '../mix/club-points-unofficial-chip/club-points-unofficial-chip';
 
 /**
@@ -23,10 +24,11 @@ const FilterClub: React.FC = () => {
   // Сводка — ПОДПИСЬ выбранного клуба, а не его значение: у страницы с идентификаторами
   // значение это club_id, и в шапке карточки стояло бы «417».
   const clubLabel = clubs.items.find((c) => c.value === club)?.label ?? club;
-  const query = clubQuery.trim().toLowerCase();
+  const query = clubQuery.trim();
+  // Ищет и по прежним названиям клуба (Н7): протокол напечатан под старым, строка — под текущим.
   const shown =
     clubs.searchable && query
-      ? clubs.items.filter((c) => c.label.toLowerCase().includes(query))
+      ? clubs.items.filter((c) => matchesClubQuery(c, query))
       : clubs.items;
   const hasStats = clubs.items.some((c) => c.stats);
   const isActive = club !== 'all';

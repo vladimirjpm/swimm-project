@@ -5,6 +5,14 @@
     const API = '/api/admin/clubs';
     let data = null;
     let dryRunOkPairs = null; // пары, прошедшие dry-run без конфликтов/ошибок — только их можно merge'ить
+    // Пары, добавленные руками по Id (переименование обычно не кандидат: названия разные).
+    // Живут до перезагрузки страницы, «Обновить кандидатов» их не стирает.
+    const manualPairs = [];
+    // Вид склейки пары (план swimmer-club-change §5, Н2): «canon-dup» → duplicate | rename.
+    // Отдельно от строк, чтобы выбор пережил перерисовку списка.
+    const pairKinds = new Map();
+    const kindOf = (c) => pairKinds.get(`${c.canonicalId}-${c.duplicateId}`) ?? 'duplicate';
+    const allRows = () => [...manualPairs, ...(data?.candidates ?? [])];
 
     // Deep-link фильтр из дашборда: ?filter=dedup-unsure|dedup-sure
     const qsFilter = new URLSearchParams(location.search).get('filter');
@@ -26,6 +34,7 @@
             case 'word-order': return 'Другой порядок слов';
             case 'swimmers': return `Общие пловцы (${c.sharedSwimmers})`;
             case 'levenshtein': return 'Опечатка';
+            case 'manual': return 'Руками';
             default: return c.heuristic;
         }
     }
@@ -39,9 +48,10 @@
     function render() {
         const tbody = document.getElementById('cand-body');
         const allCands = data.candidates;
-        const cands = dedupFilter === 'sure' ? allCands.filter(c => c.sure)
+        const rows = allRows();
+        const cands = manualPairs.concat(dedupFilter === 'sure' ? allCands.filter(c => c.sure)
             : dedupFilter === 'unsure' ? allCands.filter(c => !c.sure)
-            : allCands;
+            : allCands);
         document.getElementById('empty-msg').classList.toggle('hidden', cands.length > 0);
         document.getElementById('info').innerHTML =
             `Реальных клубов: ${data.realClubs}; кандидатов: ${cands.length}${dedupFilter ? ` из ${allCands.length}` : ''} (уверенных ${allCands.filter(c => c.sure).length})`
@@ -54,7 +64,8 @@
         }
 
         tbody.innerHTML = cands.map((c) => {
-            const i = allCands.indexOf(c);
+            const i = rows.indexOf(c);
+            const kind = kindOf(c);
             return `
             <tr class="border-b border-white/[.04] hover:bg-white/[.03]">
                 <td class="py-2 px-3"><input type="checkbox" class="pair-cb cursor-pointer" data-i="${i}"></td>
@@ -67,8 +78,14 @@
                     <span class="text-[#546e7a]">#${c.duplicateId}</span> · <span class="text-[#90a4ae]">рез. ${c.duplicateResults}</span>
                 </td>
                 <td class="py-2 px-3 text-[#90a4ae]">${esc(heuristicLabel(c))}</td>
-                <td class="py-2 px-3">${sureBadge(c.sure)}</td>
-                <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${i}" title="Не дубли — скрыть пару навсегда">✕</button></td>
+                <td class="py-2 px-3">
+                    <select class="pair-kind admin-input" data-i="${i}" title="Дубль — один клуб двумя названиями; Переименование — клуб сменил название (старое уйдёт в историю клуба)">
+                        <option value="duplicate"${kind === 'duplicate' ? ' selected' : ''}>Дубль</option>
+                        <option value="rename"${kind === 'rename' ? ' selected' : ''}>Переименование</option>
+                    </select>
+                </td>
+                <td class="py-2 px-3">${c.manual ? '' : sureBadge(c.sure)}</td>
+                <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${i}" title="${c.manual ? 'Убрать пару из списка' : 'Не дубли — скрыть пару навсегда'}">✕</button></td>
             </tr>`;
         }).join('');
 
@@ -76,10 +93,27 @@
         [...document.querySelectorAll('.pair-cb')].forEach(cb =>
             cb.addEventListener('change', () => { dryRunOkPairs = null; document.getElementById('btn-merge').disabled = true; }));
 
+        // Вид склейки — часть пары: смена вида тоже инвалидирует dry-run.
+        [...document.querySelectorAll('.pair-kind')].forEach(sel =>
+            sel.addEventListener('change', () => {
+                const c = rows[+sel.dataset.i];
+                pairKinds.set(`${c.canonicalId}-${c.duplicateId}`, sel.value);
+                dryRunOkPairs = null;
+                document.getElementById('btn-merge').disabled = true;
+            }));
+
         // «Не дубли»: пара уходит в Sys_DedupIgnoredPairs и больше не всплывает.
+        // Пара, добавленная руками, просто убирается из списка.
         [...document.querySelectorAll('.pair-hide')].forEach(btn =>
             btn.addEventListener('click', async () => {
-                const c = data.candidates[+btn.dataset.i];
+                const c = rows[+btn.dataset.i];
+                if (c.manual) {
+                    manualPairs.splice(manualPairs.indexOf(c), 1);
+                    dryRunOkPairs = null;
+                    document.getElementById('btn-merge').disabled = true;
+                    render();
+                    return;
+                }
                 const ok = await adminConfirm({
                     title: 'Скрыть пару как «не дубли»?',
                     message: `«${c.canonicalName}» ↔ «${c.duplicateName}» больше не будет предлагаться. Вернуть можно из блока «Скрытые пары».`,
@@ -135,9 +169,10 @@
     }
 
     function selectedPairs() {
+        const rows = allRows();
         return [...document.querySelectorAll('.pair-cb:checked')].map(cb => {
-            const c = data.candidates[+cb.dataset.i];
-            return { canonicalId: c.canonicalId, duplicateId: c.duplicateId };
+            const c = rows[+cb.dataset.i];
+            return { canonicalId: c.canonicalId, duplicateId: c.duplicateId, kind: kindOf(c) };
         });
     }
 
@@ -160,7 +195,7 @@
 
         document.getElementById('status-body').innerHTML = report.pairs.map(p => `
             <details class="mb-2">
-                <summary class="cursor-pointer"><b>[${esc(p.status)}]</b> canonical #${p.canonicalId} ← duplicate #${p.duplicateId}</summary>
+                <summary class="cursor-pointer"><b>[${esc(p.status)}]</b> canonical #${p.canonicalId} ← duplicate #${p.duplicateId} · ${p.kind === 'rename' ? 'переименование' : 'дубль'}</summary>
                 <ul class="list-disc pl-5 text-admin-text-muted">
                     ${p.actions.map(a => `<li>${esc(a)}</li>`).join('')}
                     ${p.conflicts.map(c => `<li class="text-[#ef9a9a]">!! ${esc(c)}</li>`).join('')}
@@ -171,9 +206,42 @@
 
     document.getElementById('btn-reload').addEventListener('click', () => load());
 
-    document.getElementById('btn-check-sure').addEventListener('click', () => {
+    // Пара руками по Id: переименование (Hapoel → Aluma) среди кандидатов обычно не всплывает —
+    // названия разные. Имена клубов покажет dry-run первой строкой отчёта.
+    document.getElementById('btn-manual-add').addEventListener('click', () => {
+        const canon = +document.getElementById('manual-canon').value;
+        const dup = +document.getElementById('manual-dup').value;
+        const kind = document.getElementById('manual-kind').value;
+        if (!canon || !dup || canon === dup) { toast('Нужны два разных Id: канон и дубль'); return; }
+        // Пара уже среди кандидатов (у Hapoel/Aluma — «общие пловцы») — не дублируем строку, а
+        // ставим ей выбранный вид и отмечаем её.
+        const existing = allRows().find(c => c.canonicalId === canon && c.duplicateId === dup);
+        if (!existing) {
+            manualPairs.push({
+                canonicalId: canon, canonicalName: `#${canon}`, canonicalResults: '?',
+                duplicateId: dup, duplicateName: `#${dup}`, duplicateResults: '?',
+                heuristic: 'manual', sure: false, manual: true,
+            });
+        }
+        pairKinds.set(`${canon}-${dup}`, kind);
+        dryRunOkPairs = null;
+        document.getElementById('btn-merge').disabled = true;
+        const checked = new Set(selectedPairs().map(p => `${p.canonicalId}-${p.duplicateId}`));
+        checked.add(`${canon}-${dup}`);
+        if (existing && dedupFilter && !(dedupFilter === 'sure' ? existing.sure : !existing.sure)) dedupFilter = null;
+        render();
+        const rows = allRows();
         [...document.querySelectorAll('.pair-cb')].forEach(cb => {
-            cb.checked = data.candidates[+cb.dataset.i].sure;
+            const c = rows[+cb.dataset.i];
+            cb.checked = checked.has(`${c.canonicalId}-${c.duplicateId}`);
+        });
+        if (existing) toast('Пара уже среди кандидатов — отмечена, вид выставлен', 3000);
+    });
+
+    document.getElementById('btn-check-sure').addEventListener('click', () => {
+        const rows = allRows();
+        [...document.querySelectorAll('.pair-cb')].forEach(cb => {
+            cb.checked = !!rows[+cb.dataset.i].sure;
         });
         dryRunOkPairs = null;
         document.getElementById('btn-merge').disabled = true;
@@ -199,7 +267,8 @@
         if (!dryRunOkPairs) return;
         const ok = await adminConfirm({
             title: 'Применить склейку клубов?',
-            message: `Будет применена склейка ${dryRunOkPairs.length} пар(ы). Дубли будут удалены НЕОБРАТИМО.`,
+            message: `Будет применена склейка ${dryRunOkPairs.length} пар(ы) — НЕОБРАТИМО: связи дублей переедут на канон, дубли станут надгробиями.`
+                + (dryRunOkPairs.some(p => p.kind === 'rename') ? ' У переименований старое название уйдёт в историю клуба.' : ''),
             confirmText: 'Merge',
             danger: true,
         });

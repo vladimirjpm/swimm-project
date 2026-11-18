@@ -29,4 +29,19 @@ public sealed class ClubSummaryDto
     [JsonPropertyName("gold")] public int Gold { get; init; }
     [JsonPropertyName("silver")] public int Silver { get; init; }
     [JsonPropertyName("bronze")] public int Bronze { get; init; }
+    /// <summary>
+    /// Прежние названия клуба (переименования, план swimmer-club-change §5, Н7) — поиск в
+    /// фильтре клуба находит строку и по ним. Не пишется, когда пусто.
+    /// </summary>
+    /// <summary>
+    /// Текущее название клуба, когда <see cref="Club"/> — напечатанное в протоколе прежнее
+    /// (Р97): зачёт пишет «now: …», фильтр клуба подписывает строку текущим. null — совпадают.
+    /// </summary>
+    [JsonPropertyName("clubNow")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ClubNow { get; set; }
+
+    [JsonPropertyName("formerNames")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? FormerNames { get; set; }
 }

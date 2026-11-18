@@ -174,6 +174,10 @@ public class JsonImportService : IImportService
         private Dictionary<string, Competition> competitionCache = null!;
         private Dictionary<string, Competition> linkedDaysByDate = null!;
         private Dictionary<string, Club> clubCache = null!;
+        // Прежнее название (ClubNames), под которым клуб узнан по ключу clubCache, — Results.ClubNameId (Н3/Н5).
+        private Dictionary<string, int?> clubNameIdCache = null!;
+        // Старые названия: прежние (ClubNames) и надгробий склеенных — строится при первом промахе.
+        private ClubAliasIndex? clubAliases;
         private ImportSwimmerResolver swimmers = null!;
         private Dictionary<string, Category> categoryCache = null!;
         private Dictionary<int, int> categoryNextOrder = null!;
@@ -200,6 +204,7 @@ public class JsonImportService : IImportService
         private Country? country;
         [System.Diagnostics.CodeAnalysis.NotNull] private Competition? competition = null!;
         [System.Diagnostics.CodeAnalysis.NotNull] private Club? club = null!;
+        private int? clubNameId;
         private Swimmer swimmer = null!;
         private string? swimmerKeyEn;
         private Relay? relay;
@@ -422,6 +427,8 @@ public class JsonImportService : IImportService
             clubCache = new Dictionary<string, Club>();
             foreach (var c in await _db.Clubs.AsNoTracking().Where(c => c.MergedIntoId == null).ToListAsync())
                 clubCache.TryAdd($"{c.Name}|{c.NameEn}", c);
+            clubNameIdCache = new Dictionary<string, int?>();
+            clubAliases = null;
 
             // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.
             // Пловцы: строка протокола → карточка (точный ключ, фоллбеки, страж тёзок И-11) —
@@ -736,6 +743,7 @@ public class JsonImportService : IImportService
                 clubNameEn = NoClubName;
             }
             var clubKey = $"{clubName}|{clubNameEn}";
+            clubNameId = clubNameIdCache.GetValueOrDefault(clubKey);
             if (!clubCache.TryGetValue(clubKey, out club))
             {
                 // Склеенные исключены и ЗДЕСЬ, а не только в фоллбеке ниже: у надгробия
@@ -767,6 +775,22 @@ public class JsonImportService : IImportService
                     club = tracked;
                 }
 
+                // Старое название (план swimmer-club-change §5, Н5): прежнее название живого
+                // клуба или название склеенного дубля → итоговый канон. Без этого перезалив
+                // протокола со старым названием заводил клуб заново, и склейка молча откатывалась.
+                // Живые клубы выше важнее: тёзка-живой клуб выигрывает у старого названия.
+                if (club == null)
+                {
+                    clubAliases ??= await LoadClubAliasesAsync();
+                    if (clubAliases.Find(clubName, clubNameEn) is { } alias)
+                    {
+                        club = await _db.Clubs.AsNoTracking().FirstAsync(c => c.Id == alias.ClubId);
+                        clubNameId = alias.ClubNameId;
+                        clubNameIdCache[clubKey] = alias.ClubNameId;
+                        diagnosticLog.Add($"Club by former name: '{clubName}' → #{club.Id} '{club.Name}'");
+                    }
+                }
+
                 if (club == null)
                 {
                     club = new Club { Name = clubName, NameEn = clubNameEn, CountryId = country?.Id };
@@ -790,6 +814,19 @@ public class JsonImportService : IImportService
                 }
                 clubCache[clubKey] = club;
             }
+        }
+
+        // Индекс старых названий клубов (Н5): прежние названия из ClubNames + названия надгробий,
+        // цепочки склеек — до живого клуба. Справочник клубов — сотни строк, названий — единицы.
+        private async Task<ClubAliasIndex> LoadClubAliasesAsync()
+        {
+            var clubs = await _db.Clubs.AsNoTracking()
+                .Select(c => new ClubAliasClub(c.Id, c.Name, c.NameEn, c.MergedIntoId, c.IsPseudo))
+                .ToListAsync();
+            var names = await _db.ClubNames.AsNoTracking()
+                .Select(n => new ClubAliasName(n.Id, n.ClubId, n.Name, n.NameEn, n.Kind))
+                .ToListAsync();
+            return new ClubAliasIndex(clubs, names);
         }
 
         // 5. Swimmer — ImportSwimmerResolver: поиск карточки, новая карточка, страж тёзок.
@@ -858,6 +895,7 @@ public class JsonImportService : IImportService
                 CompetitionId = competition.Id,
                 SwimmerId = swimmer.Id,
                 ClubId = club.Id,
+                ClubNameId = clubNameId,
                 StyleId = style.Id,
                 // Страна результата: явная из протокола, иначе — от псевдоклуба-сборной.
                 CountryId = country?.Id ?? (club.IsPseudo ? club.CountryId : null),
@@ -1601,6 +1639,7 @@ public class JsonImportService : IImportService
         old.Gender = incoming.Gender;
         old.SwimmerId = incoming.SwimmerId;
         old.ClubId = incoming.ClubId;
+        old.ClubNameId = incoming.ClubNameId;
         old.CountryId = incoming.CountryId;
         old.CompetitionDate = incoming.CompetitionDate;
         old.AgeGroup = incoming.AgeGroup;

@@ -140,7 +140,7 @@ public partial class ResultRepository
                 LastName = r.Swimmer.LastName,
                 FirstNameEn = r.Swimmer.FirstNameEn,
                 LastNameEn = r.Swimmer.LastNameEn,
-                Club = r.Club.Name,
+                Club = r.ClubName != null ? r.ClubName.Name : r.Club.Name,   // как напечатано (Р97)
                 ClubId = r.ClubId,
                 Gender = r.Gender,
                 BirthYear = r.Swimmer.BirthYear,

@@ -41,7 +41,8 @@ public class DataVersionPgTests
         // Снимок DataVersionForSync не правится — таблицы следующих миграций добавляются сюда.
         var withTrigger = DataVersionForSync.Tables
             .Concat(AddCompetitionSeries.SyncTables)
-            .Concat(AddSeriesEmblems.SyncTables);
+            .Concat(AddSeriesEmblems.SyncTables)
+            .Concat(AddClubNames.SyncTables);
         Assert.Equal(SeedTables(), withTrigger.Order(StringComparer.Ordinal).ToList());
     }
 

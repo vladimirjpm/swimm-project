@@ -72,6 +72,9 @@ public sealed record SeasonSwimRow(
     /// <summary>Клуб НА МОМЕНТ заплыва: пловец переходит между клубами, и история это помнит.</summary>
     public int ClubId { get; init; }
 
+    /// <summary>Прежнее название клуба, под которым строка напечатана (<c>Results.ClubNameId</c>); null — текущее.</summary>
+    public int? ClubNameId { get; init; }
+
     /// <summary>Возрастная полоса протокола («9-10»).</summary>
     public string? AgeGroup { get; init; }
 

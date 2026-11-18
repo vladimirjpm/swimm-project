@@ -216,4 +216,28 @@ public class OverviewOfficialAwardsTests
         Assert.False((await kit.OverviewAsync(unchecked_)).OfficialAwards.Single().Regulation.Checked);
         Assert.True((await kit.OverviewAsync(checked_)).OfficialAwards.Single().Regulation.Checked);
     }
+
+    /// <summary>
+    /// Клуб, с тех пор переименованный (Р97): награда дня пишет клуб как в протоколе — прежнее
+    /// название, а ссылка ведёт на живой клуб.
+    /// </summary>
+    [Fact]
+    public async Task Place_ShowsClubAsPrinted()
+    {
+        await using var kit = await OverviewTestKit.CreateAsync(nameof(Place_ShowsClubAsPrinted));
+        var s = await SeriesAsync(kit, new DateOnly(2026, 9, 1));
+        var day = await DayAsync(kit, s.Youth, "24/10/2026");
+        var former = new ClubName { ClubId = kit.Club.Id, Name = "הפועל עירוני הוד השרון", Kind = ClubNameKinds.Former };
+        kit.Db.Add(former);
+        await kit.Db.SaveChangesAsync();
+        var young = await kit.AddSwimmerAsync("Young", "female", birthYear: 2017);
+        var row = kit.Row(day, young, points: 300);
+        row.ClubNameId = former.Id;
+        await kit.AddRowsAsync(row);
+
+        var place = (await kit.OverviewAsync(day)).OfficialAwards.Single().Awards.Single().Groups.Single().Places.Single();
+
+        Assert.Equal("הפועל עירוני הוד השרון", place.Club);
+        Assert.Equal(kit.Club.Id, place.ClubId);
+    }
 }

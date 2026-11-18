@@ -11,6 +11,7 @@
 Categories
 CategoryCompetitions
 ClubCompetitionStandings
+ClubNames
 Clubs
 CompetitionEntries
 CompetitionEvents

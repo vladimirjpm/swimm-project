@@ -10,6 +10,7 @@ import { DeepKpi, DeepKpiLink, DeepKpiRow } from '../../components/deep/kpi';
 import { DeepCtaChip, DeepHeroSubline, DeepHeroTitle, DeepMenuChip } from '../../components/deep/hero-identity';
 import { routes } from '../../../utils/routes';
 import { showcaseNoticeText } from '../../../utils/helpers/season-helper';
+import { formerName, formerNameLabel, formerYears, type ClubFormerName } from './club-former-names-model';
 
 /**
  * Hero страницы клуба — ОДИН ИЗ вариантов шапки сущности (второй — группа). Корпус полосы и
@@ -18,7 +19,8 @@ import { showcaseNoticeText } from '../../../utils/helpers/season-helper';
  *
  * Слева колонка логотипа, под логотипом — «✓ Following» (тап → меню с Unfollow; гостю
  * «+ Follow» → вход): колонка под логотипом всё равно пустая, и шапка не растёт. Справа имя
- * (иврит, до двух строк), подзаголовок `{name_en} · {флаг} {страна} · since {год}` и ссылка
+ * (иврит, до двух строк), подзаголовок `{name_en} · {флаг} {страна} · since {год}`, под ним —
+ * «Formerly: …», если клуб переименовывался (Н6), и ссылка
  * «Official group →» — ТОЛЬКО если у клуба есть официальная группа: нет группы — нет ни
  * ссылки, ни заглушки, ни отступа.
  *
@@ -67,6 +69,7 @@ function ClubHero({ club, kpi, competitions, scopeLabel, onCompetitions }: Props
               club.first_season != null ? `since ${club.first_season}` : null,
             ]}
           />
+          <ClubFormerNames names={club.former_names} />
           {club.official_group_slug && (
             <a
               href={routes.group(club.official_group_slug)}
@@ -130,6 +133,38 @@ function ClubHero({ club, kpi, competitions, scopeLabel, onCompetitions }: Props
         )}
       </DeepKpiRow>
     </DeepHeroBand>
+  );
+}
+
+/**
+ * «Formerly: הפועל עירוני הוד השרון (2024–2026)» — клуб сменил название (план swimmer-club-change
+ * §5, Н6). Строка под подзаголовком, тем же мелким шрифтом; нет прежних названий — нет строки.
+ * Строка `dir="ltr"`, название в `<bdi>`: ивритский текст внутри английской фразы не
+ * переворачивает скобки с годами.
+ */
+function ClubFormerNames({ names }: { names?: ClubFormerName[] }) {
+  if (!names?.length) return null;
+  return (
+    <span
+      // Фраза английская, а колонка шапки наследует RTL от ивритского имени: без dir="ltr"
+      // годы «(2024–2026)» уезжали влево от названия.
+      dir="ltr"
+      className="text-left text-[11.5px] font-semibold min-[960px]:text-[12.5px]"
+      style={{ color: 'var(--deep-text-mute)' }}
+      title={names.map(formerNameLabel).join(', ')}
+    >
+      Formerly:{' '}
+      {names.map((n, i) => {
+        const years = formerYears(n.from_year, n.to_year);
+        return (
+          <React.Fragment key={`${n.name}-${i}`}>
+            {i > 0 && ', '}
+            <bdi>{formerName(n)}</bdi>
+            {years && ` (${years})`}
+          </React.Fragment>
+        );
+      })}
+    </span>
   );
 }
 

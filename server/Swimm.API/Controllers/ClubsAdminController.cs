@@ -130,7 +130,11 @@ public class ClubsAdminController : ControllerBase
 
     public sealed record MergeRequest(List<ClubMergePair> Pairs, bool Apply);
 
-    /// <summary>Merge выбранных пар. apply=false — dry-run (план, БД не меняется).</summary>
+    /// <summary>
+    /// Merge выбранных пар. apply=false — dry-run (план, БД не меняется). У пары есть вид
+    /// (<c>kind</c>): <c>duplicate</c> (по умолчанию) или <c>rename</c> — клуб сменил название,
+    /// старое уходит в историю клуба (ClubNames).
+    /// </summary>
     [HttpPost("merge")]
     public async Task<IActionResult> Merge([FromBody] MergeRequest request, CancellationToken ct)
     {
@@ -149,7 +153,7 @@ public class ClubsAdminController : ControllerBase
 
         if (request.Apply)
         {
-            var pairsText = string.Join("; ", report.Pairs.Select(p => $"{p.CanonicalId}←{p.DuplicateId}:{p.Status}"));
+            var pairsText = string.Join("; ", report.Pairs.Select(p => $"{p.CanonicalId}←{p.DuplicateId}:{p.Kind}:{p.Status}"));
             _logger.LogWarning("Admin {User} применил merge клубов: {Pairs}", User.Identity?.Name ?? "?", pairsText);
             await _audit.LogAsync("club.merge", "Club", null,
                 $"Склейка клубов ({report.Pairs.Count} пар): {pairsText}",

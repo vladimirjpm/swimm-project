@@ -72,6 +72,15 @@ public partial class ResultRepository
 
         var newRecords = await DetectNewRecordsAsync(query);
 
+        // Клубы, напечатанные в протоколе под прежним названием (Р97): карточки показывают
+        // напечатанное, «now: …» — по этой карте.
+        var clubNow = (await query
+                .Where(r => r.ClubNameId != null)
+                .Select(r => new { r.ClubId, r.Club.Name })
+                .Distinct()
+                .ToListAsync())
+            .ToDictionary(c => c.ClubId, c => c.Name);
+
         var overview = new CompetitionOverviewDto
         {
             OrgCompId = orgCompId,
@@ -100,7 +109,8 @@ public partial class ResultRepository
             TopMedalistsFemale = topMedalistsFemale,
             HighPointAwards = highPointAwards,
             OfficialAwards = officialAwards,
-            Records = newRecords
+            Records = newRecords,
+            ClubNow = clubNow,
         };
 
         return overview;
@@ -268,7 +278,7 @@ public partial class ResultRepository
              LastName = r.Swimmer.LastName,
              FirstNameEn = r.Swimmer.FirstNameEn,
              LastNameEn = r.Swimmer.LastNameEn,
-             Club = r.Club.Name,
+             Club = r.ClubName != null ? r.ClubName.Name : r.Club.Name,   // как напечатано (Р97)
              ClubId = r.ClubId,
              StyleName = r.Style.Name,
              Distance = r.Distance,
@@ -321,7 +331,7 @@ public partial class ResultRepository
                 r.Swimmer.LastName,
                 r.Swimmer.FirstNameEn,
                 r.Swimmer.LastNameEn,
-                Club = r.Club.Name,
+                Club = r.ClubName != null ? r.ClubName.Name : r.Club.Name,   // как напечатано (Р97)
                 r.ClubId,
                 r.Gender,
                 // Prelim: протокольное место не медаль (ранжир сессии); объединённое место,
@@ -359,7 +369,7 @@ public partial class ResultRepository
             .Select(r => new
             {
                 r.RelayId,
-                Club = r.Club.Name,
+                Club = r.ClubName != null ? r.ClubName.Name : r.Club.Name,   // как напечатано (Р97)
                 r.ClubId,
                 Position = filter.Combined && r.Competition.ShowCombineAllResults
                     ? (r.CombinedPlace ?? (r.HeatType == "prelim" || r.HeatType == "extra" ? null : r.Position))
@@ -530,7 +540,7 @@ public partial class ResultRepository
                 LastName = r.Swimmer.LastName,
                 FirstNameEn = r.Swimmer.FirstNameEn,
                 LastNameEn = r.Swimmer.LastNameEn,
-                Club = r.Club.Name,
+                Club = r.ClubName != null ? r.ClubName.Name : r.Club.Name,   // как напечатано (Р97)
                 ClubId = r.ClubId,
                 Gender = r.Gender,
                 BirthYear = r.Swimmer.BirthYear,
@@ -921,7 +931,7 @@ public partial class ResultRepository
             // пол «none» детектор сам пропустит.
             .Where(r => !r.TimeFail && r.TimeMillisecond != null)
             .Select(r => new RecordCandidateRow(
-                r.Id, r.SwimmerId, r.Swimmer.FirstName, r.Swimmer.LastName, r.Club.Name,
+                r.Id, r.SwimmerId, r.Swimmer.FirstName, r.Swimmer.LastName, r.ClubName != null ? r.ClubName.Name : r.Club.Name,
                 r.Style.Name, r.Distance, r.Gender, r.Competition.PoolType,
                 r.Swimmer.BirthYear, r.CompetitionDate, r.TimeMillisecond!.Value,
                 r.TimeOriginal, r.Competition.DayNumber, r.Competition.IsMasters, r.AgeGroup,

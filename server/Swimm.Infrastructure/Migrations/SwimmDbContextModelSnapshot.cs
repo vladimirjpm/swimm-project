@@ -480,6 +480,55 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("ClubCompetitionStandings", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.ClubName", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClubId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int?>("MergedClubId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UsedFrom")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("UsedTo")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClubId");
+
+                    b.HasIndex("MergedClubId");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("ClubNames", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.Competition", b =>
                 {
                     b.Property<int>("Id")
@@ -3362,6 +3411,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("ClubId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ClubNameId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("CombinedPlace")
                         .HasColumnType("integer");
 
@@ -3475,6 +3527,8 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClubId");
+
+                    b.HasIndex("ClubNameId");
 
                     b.HasIndex("CompetitionDate");
 
@@ -4680,6 +4734,24 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("Competition");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.ClubName", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.Club", "Club")
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Swimm.Domain.Entities.Club", "MergedClub")
+                        .WithMany()
+                        .HasForeignKey("MergedClubId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Club");
+
+                    b.Navigation("MergedClub");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.Competition", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.Country", "Country")
@@ -5415,6 +5487,11 @@ namespace Swimm.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Swimm.Domain.Entities.ClubName", "ClubName")
+                        .WithMany()
+                        .HasForeignKey("ClubNameId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Swimm.Domain.Entities.Competition", "Competition")
                         .WithMany()
                         .HasForeignKey("CompetitionId")
@@ -5449,6 +5526,8 @@ namespace Swimm.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Club");
+
+                    b.Navigation("ClubName");
 
                     b.Navigation("Competition");
 

@@ -11,6 +11,10 @@ export interface ClubSummary {
   gold: number;
   silver: number;
   bronze: number;
+  /** Текущее название, когда `club` — напечатанное в протоколе прежнее (Р97): «now: …», подпись фильтра. */
+  clubNow?: string | null;
+  /** Прежние названия клуба (переименования, план swimmer-club-change §5, Н7): по ним ищет фильтр. */
+  formerNames?: string[];
 }
 
 /**

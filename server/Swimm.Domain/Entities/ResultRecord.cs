@@ -43,6 +43,17 @@ public class ResultRecord
     [ForeignKey(nameof(ClubId))]
     public Club Club { get; set; } = null!;
 
+    /// <summary>
+    /// Под каким ПРЕЖНИМ названием клуба строка была напечатана (план swimmer-club-change §5, Н3).
+    /// null — под текущим названием клуба <see cref="ClubId"/>. Ставит склейка видом
+    /// «Переименование» перенесённым строкам и импорт, узнавший клуб по старому названию:
+    /// после переноса на канон иначе уже не узнать, что в протоколе стояло «הפועל …».
+    /// </summary>
+    public int? ClubNameId { get; set; }
+
+    [ForeignKey(nameof(ClubNameId))]
+    public ClubName? ClubName { get; set; }
+
     public int StyleId { get; set; }
 
     [ForeignKey(nameof(StyleId))]

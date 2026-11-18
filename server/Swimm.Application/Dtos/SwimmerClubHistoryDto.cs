@@ -51,4 +51,16 @@ public sealed class SwimmerClubSeasonDto
     /// </summary>
     [JsonPropertyName("courses")]
     public List<string> Courses { get; set; } = [];
+
+    /// <summary>
+    /// Прежнее название клуба, под которым он выступал в этой строке (план swimmer-club-change
+    /// §5, Н8): клуб с тех пор переименован, строка подписана текущим названием, а окно мелко
+    /// добавляет «then: …». null — заплывы под текущим названием.
+    /// </summary>
+    [JsonPropertyName("thenName")]
+    public string? ThenName { get; set; }
+
+    /// <summary>Английское прежнее название, если было и отличается. null — нет.</summary>
+    [JsonPropertyName("thenNameEn")]
+    public string? ThenNameEn { get; set; }
 }

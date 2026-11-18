@@ -63,7 +63,12 @@ public class SeoRepository : ISeoRepository
             var swimmers = await _db.Swimmers.AsNoTracking()
                 .CountAsync(x => x.ClubId == id && x.PrivateHubGroupId == null, ct);
 
-            return new SeoClubFacts(c.Id, c.Name, c.NameEn, c.IsPseudo, c.MergedIntoId, swimmers);
+            var formerNames = ClubFormerNames.ToDtos(await _db.ClubNames.AsNoTracking()
+                .Where(n => n.ClubId == id)
+                .Select(n => new ClubFormerNameRow(n.Id, n.Name, n.NameEn, n.UsedFrom, n.UsedTo, n.Kind))
+                .ToListAsync(ct));
+
+            return new SeoClubFacts(c.Id, c.Name, c.NameEn, c.IsPseudo, c.MergedIntoId, swimmers, formerNames);
         }, CacheTtl);
 
     public Task<SeoCompetitionFacts?> GetCompetitionAsync(int id, CancellationToken ct = default) =>

@@ -107,6 +107,33 @@ public sealed class ClubProfileDto
 
     [JsonPropertyName("last_season")]
     public int? LastSeason { get; set; }
+
+    /// <summary>
+    /// Прежние названия клуба (переименования, план swimmer-club-change §5, Н6), последние
+    /// сверху. Шапка пишет «Formerly: … (2024–2026)». Пусто — клуб не переименовывался.
+    /// </summary>
+    [JsonPropertyName("former_names")]
+    public List<ClubFormerNameDto> FormerNames { get; set; } = [];
+}
+
+/// <summary>Прежнее название клуба для витрины.</summary>
+public sealed class ClubFormerNameDto
+{
+    /// <summary>Название как было (иврит) — витрина показывает его по умолчанию.</summary>
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    /// <summary>Английское, если было и отличается. null — нет.</summary>
+    [JsonPropertyName("name_en")]
+    public string? NameEn { get; set; }
+
+    /// <summary>Год первого старта под этим названием. null — стартов не было.</summary>
+    [JsonPropertyName("from_year")]
+    public int? FromYear { get; set; }
+
+    /// <summary>Год последнего старта под этим названием.</summary>
+    [JsonPropertyName("to_year")]
+    public int? ToYear { get; set; }
 }
 
 /// <summary>KPI-ряд Hero в границах выбранного скоупа.</summary>

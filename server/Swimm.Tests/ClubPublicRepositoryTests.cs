@@ -716,4 +716,24 @@ public class ClubPublicRepositoryTests
 
         Assert.Equal("2020/21", card.SeasonNotice?.PendingLabel);
     }
+
+    [Fact]
+    public async Task Resolve_WalksMergeChainToTheEnd()
+    {
+        // План swimmer-club-change §5, Н4: /clubs/1329 при цепочке 1329 → 605 → 1372 открывал пустой 605.
+        using var db = CreateDb(nameof(Resolve_WalksMergeChainToTheEnd));
+        var live = new Club { Id = 1372, Name = "הפועל עירוני הוד השרון" };
+        var middle = new Club { Id = 605, Name = "605", MergedIntoId = 1372 };
+        var head = new Club { Id = 1329, Name = "1329", MergedIntoId = 605 };
+        var loopA = new Club { Id = 1, Name = "a", MergedIntoId = 2 };
+        var loopB = new Club { Id = 2, Name = "b", MergedIntoId = 1 };
+        db.Clubs.AddRange(live, middle, head, loopA, loopB);
+        await db.SaveChangesAsync();
+
+        var repo = Repo(db);
+        Assert.Equal(1372, await repo.ResolveClubIdAsync(1329));
+        Assert.Equal(1372, await repo.ResolveClubIdAsync(605));
+        Assert.Equal(1372, await repo.ResolveClubIdAsync(1372));
+        Assert.Null(await repo.ResolveClubIdAsync(1)); // петля — не страница
+    }
 }

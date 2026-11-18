@@ -2,6 +2,7 @@ import React from 'react';
 import type { CompetitionOverview, OverviewClub } from '../types';
 import { GENDER_CIRCLE } from '../overview-shared';
 import UI_ClubIcon from '../../../../components/mix/club-icon/club-icon';
+import UI_ClubNowHint from '../../../../components/mix/club-now/club-now';
 import UI_ClubPointsUnofficialChip from '../../../../components/mix/club-points-unofficial-chip/club-points-unofficial-chip';
 import { rootActions, useAppDispatch } from '../../../../../store/store';
 import { Enums } from '../../../../../utils/interfaces/enums';
@@ -42,7 +43,11 @@ function ClubRow({ club, rank, big, showMedals = true, onOpenClub }: {
       style={{ borderColor: 'var(--theme-mode-border)', color: 'var(--theme-mode-text)' }}
     >
       <span className={`flex-none ${big ? 'w-4' : 'w-3'}`} style={{ color: 'var(--theme-mode-text-muted)' }}>{rank}</span>
-      <span dir="auto" className="min-w-0 flex-1 truncate">{club.club}</span>
+      <span className="min-w-0 flex-1 truncate">
+        <span dir="auto">{club.club}</span>{' '}
+        {/* Клуб напечатан под прежним названием (Р97) — мелко текущее. */}
+        <UI_ClubNowHint printed={club.club} clubId={club.clubId} now={club.clubNow} />
+      </span>
       {big && showMedals && (
         <span className="flex-none whitespace-nowrap font-semibold">
           🥇{club.gold} 🥈{club.silver} 🥉{club.bronze}
@@ -178,6 +183,7 @@ export default function ModuleCardClubs({
             </span>
           </span>
           <span dir="auto" className="text-[17px] font-black leading-[1.25] text-wrap-pretty">{leader.club}</span>
+          <UI_ClubNowHint printed={leader.club} clubId={leader.clubId} now={leader.clubNow} className="text-[12px]" />
           <span className="flex items-baseline justify-center gap-1.5">
             <span className="ov2-card__value text-[30px] leading-none">{leader.points}</span>
             <span className="text-[11px] font-extrabold tracking-[0.06em] opacity-70" style={{ color: 'var(--m-solid)' }}>

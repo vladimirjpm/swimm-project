@@ -20,11 +20,14 @@ export default class HelperClub {
     gold: number;
     silver: number;
     bronze: number;
+    /** Текущее название, когда `club` — напечатанное в протоколе прежнее (Р97, `club_now` строк). */
+    clubNow?: string | null;
   }[]> {
     const map = new Map<
       string,
       {
         clubId: number;
+        clubNow?: string | null;
         points: number;
         swimmerSet: Set<string>;
         successfulCount: number;
@@ -68,6 +71,7 @@ export default class HelperClub {
         };
 
       if (!entry.clubId && item.club_id) entry.clubId = item.club_id;
+      if (!entry.clubNow && item.club_now) entry.clubNow = item.club_now;
 
       // Используем вычисленные очки из системы начисления
       entry.points += clubPoints;
@@ -101,6 +105,7 @@ export default class HelperClub {
       .map(([club, data]) => ({
         club,
         clubId: data.clubId,
+        clubNow: data.clubNow ?? null,
         points: data.points,
         swimmerCount: data.swimmerSet.size,
         successfulCount: data.successfulCount,

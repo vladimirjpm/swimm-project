@@ -2,6 +2,7 @@
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Domain;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -110,6 +111,11 @@ public class ClubOverviewRepository : IClubOverviewRepository
                 CoverImageMobileUrl = club.CoverImageMobileUrl,
                 HeroImageMobileUrl = club.CoverImageMobileUrl,
                 ShowHeroImage = EntityDisplaySettings.Parse(club.DisplaySettings).Hero.Show,
+                // «Formerly: …» в шапке (Н6) — прежние названия после склейки-переименования.
+                FormerNames = ClubFormerNames.ToDtos(await _read.ClubNames.AsNoTracking()
+                    .Where(n => n.ClubId == resolvedClubId)
+                    .Select(n => new ClubFormerNameRow(n.Id, n.Name, n.NameEn, n.UsedFrom, n.UsedTo, n.Kind))
+                    .ToListAsync()),
             },
             Seasons = rows
                 .Select(r => r.Season).Distinct().OrderByDescending(s => s)
