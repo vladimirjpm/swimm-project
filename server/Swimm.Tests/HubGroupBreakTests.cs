@@ -338,17 +338,22 @@ public class HubGroupBreakTests
         await using var db = CreateDb(nameof(LanePlan_DefaultPresentSkipsOnBreak_NamedStays));
         var s = await SeedAsync(db);
         await new HubGroupBreakService(db).SetAsync(s.GroupId, s.Coach, true, Break(true, swimmerId: s.Gil), DateTime.UtcNow);
+        // Auto-arrange нужен хоть один пришедший с уровнем.
+        var level = new HubGroupLevel { HubGroupId = s.GroupId, Rank = 1, Name = "Fast" };
+        db.HubGroupLevels.Add(level);
+        await db.SaveChangesAsync();
+        db.HubGroupSwimmerLevels.AddRange(
+            new HubGroupSwimmerLevel { HubGroupId = s.GroupId, SwimmerId = s.AnnaSwimmer, LevelId = level.Id },
+            new HubGroupSwimmerLevel { HubGroupId = s.GroupId, SwimmerId = s.Gil, LevelId = level.Id });
+        await db.SaveChangesAsync();
         var plans = new LanePlanService(db);
-        LanePlanDistributeInputDto Input(List<int>? ids) => new()
-        {
-            LaneCount = 1, Lanes = [new LanePlanLaneInputDto { LaneNo = 1 }], SwimmerIds = ids,
-        };
+        LanePlanAutoLanesInputDto Input(List<int>? ids) => new() { LaneCount = 1, ReservedLanes = 0, SwimmerIds = ids };
 
-        var byDefault = (await plans.DistributeAsync(s.GroupId, Input(null))).Result!;
+        var byDefault = (await plans.AutoLanesAsync(s.GroupId, Input(null))).Result!;
         Assert.Equal([s.AnnaSwimmer, s.BorisSwimmer], byDefault.Swimmers.Select(w => w.SwimmerId).Order());
 
         // Тренер назвал руками — его решение, не фильтруем.
-        var named = (await plans.DistributeAsync(s.GroupId, Input([s.Gil]))).Result!;
+        var named = (await plans.AutoLanesAsync(s.GroupId, Input([s.Gil]))).Result!;
         Assert.Equal([s.Gil], named.Swimmers.Select(w => w.SwimmerId));
     }
 

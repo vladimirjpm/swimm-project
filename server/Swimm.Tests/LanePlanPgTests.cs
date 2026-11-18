@@ -78,10 +78,10 @@ public class LanePlanPgTests
                     new() { LaneNo = 2, LevelId = slow },
                     new() { LaneNo = 3, LevelId = slow },
                 };
-                var (dist, error) = await plans.DistributeAsync(group.Id, new LanePlanDistributeInputDto { LaneCount = 3, Lanes = lanes });
-                Assert.Null(error);
+                List<LanePlanSwimmerInputDto> placed =
+                    [new() { SwimmerId = canon.Id, LaneNo = 1 }, new() { SwimmerId = dup.Id, LaneNo = 2 }];
                 var save = await plans.SaveAsync(group.Id, At(day),
-                    new LanePlanInputDto { LaneCount = 3, Lanes = lanes, Swimmers = dist!.Swimmers }, ownerId.Value);
+                    new LanePlanInputDto { LaneCount = 3, Lanes = lanes, Swimmers = placed }, ownerId.Value);
                 Assert.True(save.Success, save.Error);
 
                 // Сокращение 3 → 1: удаление строк дорожек и перенос людей одним SaveChanges.
@@ -172,13 +172,12 @@ public class LanePlanPgTests
                 {
                     new() { LaneNo = 1, LevelId = advanced }, new() { LaneNo = 2, LevelId = seeded[1].Id },
                 };
-                var (dist, error) = await plans.DistributeAsync(group.Id,
-                    new LanePlanDistributeInputDto { LaneCount = 2, MaxPerLane = 1, Lanes = lanes });
-                Assert.Null(error);
-                // Advanced 1 ведёт; Advanced 2 при лимите 1 уходит на дорожку Intermediate.
-                Assert.Equal([(second.Id, (int?)1), (first.Id, 2)], dist!.Swimmers.Select(s => (s.SwimmerId, s.LaneNo)));
+                // Advanced 1 ведёт; Advanced 2 при лимите 1 — на дорожке Intermediate (правило перелива —
+                // LaneOverflowTests; здесь — что подуровни и лимит переживают Postgres).
+                List<LanePlanSwimmerInputDto> placed =
+                    [new() { SwimmerId = second.Id, LaneNo = 1 }, new() { SwimmerId = first.Id, LaneNo = 2 }];
                 var save = await plans.SaveAsync(group.Id, At(day),
-                    new LanePlanInputDto { LaneCount = 2, MaxPerLane = 1, Lanes = lanes, Swimmers = dist.Swimmers }, ownerId.Value);
+                    new LanePlanInputDto { LaneCount = 2, MaxPerLane = 1, Lanes = lanes, Swimmers = placed }, ownerId.Value);
                 Assert.True(save.Success, save.Error);
             }
 

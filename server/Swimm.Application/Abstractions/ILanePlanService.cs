@@ -6,7 +6,7 @@ namespace Swimm.Application.Abstractions;
 /// <summary>
 /// План дорожек занятия группы (docs/plans/lane-plans-plan.md, L2; ключ — занятие с CF5 плана
 /// trainings-coach-flow, <see cref="LanePlanKey"/>). Правила формы — <c>LanePlanRules</c>, раскладка —
-/// <c>LaneDistribution</c>. Запись — только по ключу занятия (<see cref="LanePlanKey.IsSession"/>):
+/// <c>LaneAllocation</c>. Запись — только по ключу занятия (<see cref="LanePlanKey.IsSession"/>):
 /// план дня без занятия — архив только для чтения; проверяет контроллер.
 ///
 /// Права здесь НЕ проверяются: контроллер уже решил, управляющий ли зритель (CanEdit) или
@@ -49,9 +49,6 @@ public interface ILanePlanService
     /// </summary>
     Task<(bool Found, string? Error)> SaveWorkoutAsync(int hubGroupId, LanePlanKey key, WorkoutDto? workout);
 
-    /// <summary>Раскладка «Distribute» по текущим уровням и порядку состава. Ничего не пишет.</summary>
-    Task<(LanePlanDistributionDto? Result, string? Error)> DistributeAsync(int hubGroupId, LanePlanDistributeInputDto input);
-
     /// <summary>
     /// «Auto lanes»: поделить дорожки между уровнями по числу пришедших и разложить людей
     /// (<c>LaneAllocation</c>). Ничего не пишет. Ошибка — ни у кого из пришедших нет уровня.
@@ -69,16 +66,25 @@ public interface ILanePlanService
     /// trainings-coach-flow, CF4) — после того, как тренер задал ему уровень в карточке человека.
     /// Уже на дорожке — не двигает. null — плана нет или сдвига нет.
     /// </summary>
-    Task<LaneChangeDto?> PlaceAsync(int hubGroupId, LanePlanKey key, int swimmerId);
+    Task<LaneChangeDto?> PlaceAsync(int hubGroupId, LanePlanKey key, int swimmerId, int actorUserId);
 
-    /// <summary>Опубликовать с проверкой решения 10 (<see cref="GetPublishCheckAsync"/>).</summary>
-    Task<LanePlanPublishResult> PublishAsync(int hubGroupId, LanePlanKey key);
+    /// <summary>
+    /// Опубликовать с проверкой решения 10 (<see cref="GetPublishCheckAsync"/>). Лента «Since
+    /// publishing» (CF8) начинается заново — первая строка «<paramref name="actorUserId"/> опубликовал».
+    /// </summary>
+    Task<LanePlanPublishResult> PublishAsync(int hubGroupId, LanePlanKey key, int actorUserId);
 
     /// <summary>
     /// Сменить статус без проверок: вернуть в черновик (Unpublish). Публикацию из интерфейса ведёт
-    /// <see cref="PublishAsync"/>. false — плана нет.
+    /// <see cref="PublishAsync"/>. false — плана нет. Возврат в черновик стирает ленту «Since publishing».
     /// </summary>
-    Task<bool> SetStatusAsync(int hubGroupId, LanePlanKey key, string status);
+    Task<bool> SetStatusAsync(int hubGroupId, LanePlanKey key, string status, int? actorUserId = null);
+
+    /// <summary>
+    /// Лента «Since publishing» плана занятия (CF8), новые сверху; только управляющему. Пусто — план
+    /// черновик (ленты нет) или ничего не менялось; null — у занятия плана нет.
+    /// </summary>
+    Task<List<LanePlanEventDto>?> GetEventsAsync(int hubGroupId, LanePlanKey key, int viewerUserId);
 
     /// <summary>Удалить план. false — плана нет.</summary>
     Task<bool> DeleteAsync(int hubGroupId, LanePlanKey key);

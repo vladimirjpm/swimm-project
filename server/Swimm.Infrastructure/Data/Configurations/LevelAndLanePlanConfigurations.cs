@@ -159,3 +159,37 @@ internal sealed class LanePlanSwimmerConfiguration : IEntityTypeConfiguration<La
         entity.HasCheckConstraint("CK_LanePlanSwimmers_LaneNo", @"""LaneNo"" IS NULL OR ""LaneNo"" >= 1");
     }
 }
+
+// Лента «Since publishing» опубликованного плана (CF8 плана trainings-coach-flow) — Sys_, БЕЗ grant
+// swimm_ro. Удаление плана уносит ленту; удаление пловца — его строки (склейка пловцов переносит их
+// на канонического, SwimmerMergeService); удаление аккаунта только стирает автора.
+internal sealed class LanePlanEventConfiguration : IEntityTypeConfiguration<LanePlanEvent>
+{
+    public void Configure(EntityTypeBuilder<LanePlanEvent> entity)
+    {
+        entity.ToTable("Sys_LanePlanEvents");
+        entity.HasIndex(e => new { e.PlanId, e.At });
+        entity.HasIndex(e => e.SwimmerId);
+        entity.HasIndex(e => e.ActorUserId);
+
+        entity.HasOne(e => e.Plan)
+            .WithMany(p => p.Events)
+            .HasForeignKey(e => e.PlanId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        entity.HasOne(e => e.Swimmer)
+            .WithMany()
+            .HasForeignKey(e => e.SwimmerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        entity.HasOne(e => e.Actor)
+            .WithMany()
+            .HasForeignKey(e => e.ActorUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        entity.HasCheckConstraint("CK_LanePlanEvents_Kind",
+            @"""Kind"" IN ('published', 'going', 'cant_come', 'moved')");
+        entity.HasCheckConstraint("CK_LanePlanEvents_Lanes",
+            @"(""FromLane"" IS NULL OR ""FromLane"" >= 0) AND (""ToLane"" IS NULL OR ""ToLane"" >= 0)");
+    }
+}

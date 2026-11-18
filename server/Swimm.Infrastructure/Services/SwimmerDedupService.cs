@@ -186,6 +186,7 @@ public class SwimmerDedupService(SwimmDbContext db) : ISwimmerDedupService
                 && !db.AppUsers.Any(u => u.SwimmerId == s.Id)
                 && !db.HubGroupSwimmerLevels.Any(l => l.SwimmerId == s.Id)
                 && !db.LanePlanSwimmers.Any(p => p.SwimmerId == s.Id)
+                && !db.LanePlanEvents.Any(e => e.SwimmerId == s.Id)
                 && !db.HubGroupBreaks.Any(b => b.SwimmerId == s.Id)
                 && !db.HubGroupTrainingRsvps.Any(r => r.SwimmerId == s.Id));
 

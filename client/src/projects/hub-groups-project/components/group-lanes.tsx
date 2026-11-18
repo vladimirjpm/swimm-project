@@ -6,18 +6,18 @@ import GroupLaneBoard from './group-lane-board';
 import GroupLaneEditor from './group-lane-editor';
 import LanePlanStatusBar from './lane-plan-status';
 import { lanePlansApi, todayInIsrael } from './lane-plans-api';
-import { formatPlanKey, isSessionKey, keyDate, pickDefaultKey, planKey } from './lane-plan-key';
+import { formatPlanKey, isSessionKey, pickDefaultKey, planKey } from './lane-plan-key';
 
 /**
  * Вид `Lanes` таба Trainings группы (docs/plans/lane-plans-plan.md, L3; Т7 — хендофф Trainings Tab,
  * 1e / 6b, решения Р6): план дорожек ЗАНЯТИЯ (с CF5 потока тренера ключ плана — занятие
  * `yyyy-MM-dd-HHmm`, `lane-plan-key.ts`; у двух занятий одного дня планы разные).
  *
- * Шапка — навигация по планам: стрелки ходят по существующим планам занятий (участнику — только
- * опубликованные, сервер черновики не отдаёт), управляющий открывает любой день полем даты
- * (прозрачный `<input type="date">` поверх даты; по голой дате сервер отдаёт первый план дня).
- * Пришли с занятия («✎ Edit lanes», «Lanes ›») — его ключ (`initialKey`); иначе ближайший план с
- * сегодняшнего дня (по Израилю), иначе последний.
+ * Два режима. Отдельный вид Lanes — только участнику (тренера `?view=lanes` уводит на список занятий,
+ * CF1): шапка ходит стрелками по опубликованным планам занятий (черновики сервер участнику не отдаёт);
+ * пришли с занятия («Lanes ›») — его ключ (`initialKey`), иначе ближайший план с сегодняшнего дня
+ * (по Израилю), иначе последний. Рабочий стол тренера (`embedded`) — план одного занятия без своей
+ * навигации. Поле «открыть любой день» у тренера убрано в CF8 вместе с его видом Lanes.
  *
  * Завести и править план можно только у занятия: по голой дате (план дня без занятия — архив после
  * миграции CF5) — только доска, без «Create plan».
@@ -112,7 +112,6 @@ function GroupLanes({
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   /** Узел шапки (десктоп), куда редактор выносит тулбар. */
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
-  const dateInput = useRef<HTMLInputElement>(null);
   /** План удаляют — редактор при размонтировании не досылает несохранённое (иначе план вернулся бы). */
   const abandon = useRef(false);
 
@@ -293,20 +292,7 @@ function GroupLanes({
 
   const dateLabel = formatPlanKey(shownKey);
   const dateButton = (extraClass: string, children: React.ReactNode) => (
-    <div className={`relative ${extraClass}`}>
-      {children}
-      {manages && (
-        <input
-          ref={dateInput}
-          type="date"
-          value={keyDate(shownKey)}
-          onChange={(e) => { if (e.target.value) goTo(e.target.value); }}
-          onClick={() => { try { dateInput.current?.showPicker?.(); } catch { /* браузер без showPicker — откроется сам */ } }}
-          aria-label="Open any day"
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        />
-      )}
-    </div>
+    <div className={extraClass}>{children}</div>
   );
 
   const arrows = (size: number) => (
@@ -317,7 +303,7 @@ function GroupLanes({
   );
 
   /**
-   * Шапка десктопа (6b): ‹ ›, «Lanes · дата ▾», пилюля статуса, справа тулбар. «← Back to Next»
+   * Шапка десктопа (6b): ‹ ›, «Lanes · дата», пилюля статуса, справа тулбар. «← Back to Next»
    * рисует каркас таба строкой выше, поэтому разделителя из прототипа перед стрелками нет.
    */
   const header = (
@@ -330,7 +316,6 @@ function GroupLanes({
           {dateButton('flex-none', (
             <div className="flex items-center gap-1.5 text-[18px]" style={{ fontFamily: 'var(--deep-font-display)', color: 'var(--deep-text)' }}>
               <span>Lanes · {dateLabel}</span>
-              {manages && <span aria-hidden="true" className="text-[11px]" style={{ color: 'var(--deep-ow)' }}>▾</span>}
             </div>
           ))}
         </>
@@ -364,7 +349,6 @@ function GroupLanes({
             <>
               <div className="flex items-center justify-center gap-1 text-[15px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
                 <span>{dateLabel}</span>
-                {manages && <span aria-hidden="true" className="text-[11px]" style={{ color: 'var(--deep-ow)' }}>▾</span>}
               </div>
               <div className="text-[10.5px] font-extrabold" style={{ color: status.color }}>{status.text}</div>
             </>

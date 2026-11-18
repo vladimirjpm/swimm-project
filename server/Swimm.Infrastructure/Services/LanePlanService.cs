@@ -317,6 +317,9 @@ public class LanePlanService : ILanePlanService
             }
 
             var swimmers = plan.Swimmers.ToDictionary(s => s.SwimmerId);
+            // Места до правки — для ленты «Since publishing» (CF8): у опубликованного плана каждый
+            // перенос тренера — строка (частые переносы одного человека склеиваются).
+            var placeBefore = swimmers.Values.ToDictionary(s => s.SwimmerId, s => LanePlanEventRules.Place(true, s.LaneNo));
             var keep = normalized.Swimmers.Select(s => s.SwimmerId).ToHashSet();
             foreach (var gone in swimmers.Values.Where(s => !keep.Contains(s.SwimmerId)).ToList())
                 plan.Swimmers.Remove(gone);
@@ -332,6 +335,15 @@ public class LanePlanService : ILanePlanService
                 row.LaneNo = n.LaneNo;
                 row.OrderNo = n.OrderNo;
                 row.Pinned = n.Pinned;
+            }
+
+            if (plan.Status == LanePlanStatus.Published)
+            {
+                var placeAfter = normalized.Swimmers.ToDictionary(n => n.SwimmerId, n => LanePlanEventRules.Place(true, n.LaneNo));
+                var moved = new LanePlanEventLog.Source(LanePlanEventKind.Moved, userId);
+                foreach (var swimmerId in placeBefore.Keys.Union(placeAfter.Keys))
+                    await LanePlanEventLog.RecordAsync(_db, plan, swimmerId,
+                        placeBefore.GetValueOrDefault(swimmerId), placeAfter.GetValueOrDefault(swimmerId), moved, now);
             }
 
             await _db.SaveChangesAsync();
@@ -388,39 +400,6 @@ public class LanePlanService : ILanePlanService
         row.MovedAt = now;
     }
 
-    public async Task<(LanePlanDistributionDto? Result, string? Error)> DistributeAsync(
-        int hubGroupId, LanePlanDistributeInputDto input)
-    {
-        var (lanes, error) = LanePlanRules.NormalizeLanes(input.LaneCount, input.Lanes);
-        if (lanes == null) return (null, error);
-        var perLaneError = LanePlanRules.CheckMaxPerLane(input.MaxPerLane);
-        if (perLaneError != null) return (null, perLaneError);
-
-        var levelError = await CheckLevelsAsync(hubGroupId, lanes);
-        if (levelError != null) return (null, levelError);
-
-        var roster = await LoadRosterAsync(hubGroupId);
-        var levels = await LoadSwimmerLevelsAsync(hubGroupId);
-
-        // Кто пришёл: весь состав или названные. Названный не из состава — ушедший, но стоявший
-        // в плане: раскладываем и его (в конец порядка), выкидывать молча нельзя.
-        var sortKeys = roster.ToDictionary(r => r.SwimmerId, r => r.SortKey);
-        var present = input.SwimmerIds == null
-            ? await PresentByDefaultAsync(hubGroupId, roster)
-            : input.SwimmerIds.Distinct().ToList();
-
-        var placements = LaneDistribution.Distribute(
-            lanes.Select(l => new LaneDistribution.Lane(l.LaneNo, l.LevelId)),
-            present.Select(id => ToSwimmer(id, levels, sortKeys)),
-            await LoadGroupLevelsAsync(hubGroupId),
-            input.MaxPerLane);
-
-        return (new LanePlanDistributionDto
-        {
-            Swimmers = placements.Select(p => new LanePlanSwimmerInputDto { SwimmerId = p.SwimmerId, LaneNo = p.LaneNo }).ToList(),
-        }, null);
-    }
-
     public async Task<(LanePlanAutoLanesDto? Result, string? Error)> AutoLanesAsync(
         int hubGroupId, LanePlanAutoLanesInputDto input)
     {
@@ -435,7 +414,8 @@ public class LanePlanService : ILanePlanService
         var levels = await LoadSwimmerLevelsAsync(hubGroupId);
         var groupLevels = await LoadGroupLevelsAsync(hubGroupId);
 
-        // Кто пришёл — как в Distribute: весь состав или названные (ушедший, но стоявший в плане, — в конец).
+        // Кто пришёл: весь состав или названные. Названный не из состава — ушедший, но стоявший
+        // в плане: раскладываем и его (в конец порядка), выкидывать молча нельзя.
         var sortKeys = roster.ToDictionary(r => r.SwimmerId, r => r.SortKey);
         var present = input.SwimmerIds == null
             ? await PresentByDefaultAsync(hubGroupId, roster)
@@ -497,11 +477,12 @@ public class LanePlanService : ILanePlanService
             .ToList();
     }
 
-    public async Task<LaneChangeDto?> PlaceAsync(int hubGroupId, LanePlanKey key, int swimmerId) =>
+    public async Task<LaneChangeDto?> PlaceAsync(int hubGroupId, LanePlanKey key, int swimmerId, int actorUserId) =>
         !key.IsSession ? null
-            : await LanePlanPlacementStore.ApplyAsync(_db, hubGroupId, key, swimmerId, LanePlanPlacementStore.Intent.Going);
+            : await LanePlanPlacementStore.ApplyAsync(_db, hubGroupId, key, swimmerId, LanePlanPlacementStore.Intent.Going,
+                new LanePlanEventLog.Source(LanePlanEventKind.Moved, actorUserId));
 
-    public async Task<LanePlanPublishResult> PublishAsync(int hubGroupId, LanePlanKey key)
+    public async Task<LanePlanPublishResult> PublishAsync(int hubGroupId, LanePlanKey key, int actorUserId)
     {
         var plan = await FindWritableAsync(hubGroupId, key, withSwimmers: true);
         if (plan == null) return new LanePlanPublishResult(false, null, false);
@@ -512,22 +493,66 @@ public class LanePlanService : ILanePlanService
             return new LanePlanPublishResult(true, LanePlanRules.PublishBlockedMessage(
                 blockers.Select(b => string.IsNullOrWhiteSpace(b.Name) ? b.NameEn : b.Name).ToList()), false);
 
-        plan.Status = LanePlanStatus.Published;
-        plan.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        await ChangeStatusAsync(plan, LanePlanStatus.Published, actorUserId);
         return new LanePlanPublishResult(true, null, true);
     }
 
-    public async Task<bool> SetStatusAsync(int hubGroupId, LanePlanKey key, string status)
+    public async Task<bool> SetStatusAsync(int hubGroupId, LanePlanKey key, string status, int? actorUserId = null)
     {
-        var plan = await FindWritableAsync(hubGroupId, key);
+        var plan = await FindWritableAsync(hubGroupId, key, withSwimmers: true);
         if (plan == null) return false;
         if (plan.Status == status) return true;
 
-        plan.Status = status;
-        plan.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        await ChangeStatusAsync(plan, status, actorUserId);
         return true;
+    }
+
+    /// <summary>
+    /// Сменить статус. Лента «Since publishing» (CF8): публикация начинает её заново («опубликован,
+    /// N на дорожках»), возврат в черновик стирает — участникам больше ничего не сообщено.
+    /// </summary>
+    private async Task ChangeStatusAsync(LanePlan plan, string status, int? actorUserId)
+    {
+        var now = DateTime.UtcNow;
+        plan.Status = status;
+        plan.UpdatedAt = now;
+        if (status == LanePlanStatus.Published) await LanePlanEventLog.StartAsync(_db, plan, actorUserId, now);
+        else await LanePlanEventLog.ClearAsync(_db, plan.Id);
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task<List<LanePlanEventDto>?> GetEventsAsync(int hubGroupId, LanePlanKey key, int viewerUserId)
+    {
+        var plan = await FindWritableAsync(hubGroupId, key, tracking: false);
+        if (plan == null) return null;
+
+        var rows = await _db.LanePlanEvents.AsNoTracking()
+            .Where(e => e.PlanId == plan.Id)
+            .OrderByDescending(e => e.At).ThenByDescending(e => e.Id)
+            .Select(e => new
+            {
+                e.Id, e.At, e.Kind, e.SwimmerId, e.FromLane, e.ToLane, e.OnLanes, e.ActorUserId, e.ByCoach,
+                Name = e.Swimmer == null ? null : (e.Swimmer.LastName + " " + e.Swimmer.FirstName).Trim(),
+                NameEn = e.Swimmer == null ? null : (e.Swimmer.LastNameEn + " " + e.Swimmer.FirstNameEn).Trim(),
+                ActorName = e.Actor == null ? null : e.Actor.DisplayName,
+            })
+            .ToListAsync();
+
+        return rows.Select(e => new LanePlanEventDto
+        {
+            Id = e.Id,
+            At = DateTime.SpecifyKind(e.At, DateTimeKind.Utc),
+            Kind = e.Kind,
+            SwimmerId = e.SwimmerId,
+            Name = e.Name ?? "",
+            NameEn = e.NameEn ?? "",
+            FromLane = e.FromLane,
+            ToLane = e.ToLane,
+            OnLanes = e.OnLanes,
+            ByCoach = e.ByCoach,
+            ActorName = e.ActorName,
+            ByMe = e.ActorUserId == viewerUserId,
+        }).ToList();
     }
 
     public async Task<bool> DeleteAsync(int hubGroupId, LanePlanKey key)

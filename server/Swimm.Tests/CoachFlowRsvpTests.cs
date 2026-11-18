@@ -142,7 +142,7 @@ public class CoachFlowRsvpTests
 
         db.HubGroupSwimmerLevels.Add(new HubGroupSwimmerLevel { HubGroupId = s.GroupId, SwimmerId = s.Dan, LevelId = s.Fast });
         await db.SaveChangesAsync();
-        var placed = await new LanePlanService(db).PlaceAsync(s.GroupId, At(Tue), s.Dan);
+        var placed = await new LanePlanService(db).PlaceAsync(s.GroupId, At(Tue), s.Dan, s.Coach);
         Assert.Equal(1, placed!.After.LaneNo);
 
         var after = (await new TrainingRsvpService(db).GetAsync(s.GroupId, TueKey, s.Coach, true, MondayNoon))!;

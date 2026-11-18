@@ -188,10 +188,10 @@ public sealed class LanePlanDto
 }
 
 /// <summary>
-/// Кто из видимого состава в день плана «не в воде» — On break или Doesn't train (Р74; «Going» на
-/// эту дату их возвращает), либо ответил «Can't come» на все свои занятия этой даты. Редактор
-/// кладёт их в «Not today» нового плана и копии, а не в Unassigned: иначе «Auto lanes» и
-/// «Distribute» ставят их на дорожки. Сохранённый план не трогается — там решил тренер.
+/// Кто из видимого состава на занятии плана «не в воде» — On break или Doesn't train (Р74; «Going» на
+/// это занятие их возвращает), либо ответил на него «Can't come». Редактор кладёт их в «Not today»
+/// нового плана и копии, а не в Unassigned: иначе «Auto-arrange» поставил бы их на дорожки.
+/// Сохранённый план не трогается — там решил тренер.
 /// </summary>
 public sealed class LanePlanAwayDto
 {
@@ -325,26 +325,6 @@ public sealed class LanePlanInputDto
 }
 
 /// <summary>
-/// «Distribute»: дорожки с уровнями и кто сегодня пришёл. <c>swimmer_ids</c> null — весь
-/// видимый состав. Ничего не сохраняет: раскладку сохраняет следующий PUT плана.
-/// </summary>
-public sealed class LanePlanDistributeInputDto
-{
-    [JsonPropertyName("lane_count")]
-    public int LaneCount { get; set; }
-
-    /// <summary>Лимит людей на дорожку (перелив по подуровням); null — без лимита.</summary>
-    [JsonPropertyName("max_per_lane")]
-    public int? MaxPerLane { get; set; }
-
-    [JsonPropertyName("lanes")]
-    public List<LanePlanLaneInputDto> Lanes { get; set; } = [];
-
-    [JsonPropertyName("swimmer_ids")]
-    public List<int>? SwimmerIds { get; set; }
-}
-
-/// <summary>
 /// «Auto lanes»: сколько дорожек и кто сегодня пришёл (<c>swimmer_ids</c> null — весь видимый
 /// состав). Сервер сам делит дорожки между уровнями (<c>LaneAllocation</c>); <c>reserved_lanes</c>
 /// последних дорожек оставляет пустыми всегда. Ничего не сохраняет.
@@ -388,9 +368,52 @@ public sealed class LanePlanAutoLanesDto
     public List<LanePlanSwimmerInputDto> Swimmers { get; set; } = [];
 }
 
-/// <summary>Раскладка «Distribute» — в том же виде, что <c>swimmers</c> входа плана.</summary>
-public sealed class LanePlanDistributionDto
+/// <summary>
+/// Строка ленты «Since publishing» опубликованного плана (CF8 плана trainings-coach-flow) — только
+/// управляющему. Место: <c>null</c> — не в плане («Not today»), <c>0</c> — Unassigned, N — дорожка N.
+/// </summary>
+public sealed class LanePlanEventDto
 {
-    [JsonPropertyName("swimmers")]
-    public List<LanePlanSwimmerInputDto> Swimmers { get; set; } = [];
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
+
+    /// <summary>Когда (UTC).</summary>
+    [JsonPropertyName("at")]
+    public DateTime At { get; set; }
+
+    /// <summary><c>published</c> | <c>going</c> | <c>cant_come</c> | <c>moved</c>.</summary>
+    [JsonPropertyName("kind")]
+    public string Kind { get; set; } = "";
+
+    [JsonPropertyName("swimmer_id")]
+    public int? SwimmerId { get; set; }
+
+    /// <summary>Имя пловца на иврите (правило имён), EN — фоллбек.</summary>
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("name_en")]
+    public string NameEn { get; set; } = "";
+
+    [JsonPropertyName("from_lane")]
+    public int? FromLane { get; set; }
+
+    [JsonPropertyName("to_lane")]
+    public int? ToLane { get; set; }
+
+    /// <summary>У <c>published</c>: сколько людей стояло на дорожках.</summary>
+    [JsonPropertyName("on_lanes")]
+    public int? OnLanes { get; set; }
+
+    /// <summary>Ответ поставил тренер за человека.</summary>
+    [JsonPropertyName("by_coach")]
+    public bool ByCoach { get; set; }
+
+    /// <summary>Кто сделал (имя аккаунта); null — аккаунт удалён.</summary>
+    [JsonPropertyName("actor_name")]
+    public string? ActorName { get; set; }
+
+    /// <summary>Сделал сам смотрящий — «You published», «You moved …».</summary>
+    [JsonPropertyName("by_me")]
+    public bool ByMe { get; set; }
 }
