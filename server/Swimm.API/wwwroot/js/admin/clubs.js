@@ -23,6 +23,7 @@
         switch (c.heuristic) {
             case 'same-name': return 'Одинаковое имя';
             case 'suffix': return 'Мусорный хвост';
+            case 'word-order': return 'Другой порядок слов';
             case 'swimmers': return `Общие пловцы (${c.sharedSwimmers})`;
             case 'levenshtein': return 'Опечатка';
             default: return c.heuristic;

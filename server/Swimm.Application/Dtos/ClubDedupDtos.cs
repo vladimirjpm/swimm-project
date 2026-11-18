@@ -10,7 +10,8 @@ public sealed record ClubDedupCandidate(
     string DuplicateName,
     string? DuplicateNameEn,
     int DuplicateResults,
-    /// <summary>same-name (одно имя у разных Id) | suffix (мусорный хвост парсера) |
+    /// <summary>same-name (одно имя у разных Id, после Normalize) | suffix (мусорный хвост
+    /// парсера) | word-order (те же слова в другом порядке) |
     /// swimmers (пересечение пловцов) | levenshtein.</summary>
     string Heuristic,
     /// <summary>Общих пловцов (для эвристики swimmers; иначе 0).</summary>
