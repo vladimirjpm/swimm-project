@@ -22,6 +22,7 @@ namespace Swimm.Infrastructure.Services;
 ///   <item>имя латиницей в ивритском протоколе — по английским именам карточек;</item>
 ///   <item>точное совпадение в базе (карточка вне кэша);</item>
 ///   <item>другое написание при том же клубе (<see cref="SwimmerSpellingKey"/>, Р79);</item>
+///   <item>год со сдвигом на сто лет при том же имени и клубе (<see cref="FindByCenturyShift"/>, Р104);</item>
 ///   <item>новая карточка.</item>
 /// </list>
 /// После поиска — страж тёзок (И-11): тот же пловец за другой клуб в том же соревновании —
@@ -165,6 +166,15 @@ internal sealed class ImportSwimmerResolver
                     club, _diagnosticLog);
                 swimmer ??= FindBySwappedHalves(_bySpelling, item.LastName, item.FirstName, item.BirthYear,
                     club, _diagnosticLog);
+                if (swimmer is null && FindByCenturyShift(item.LastName, item.FirstName, item.BirthYear, club)
+                        is ({ } byCentury, var shift))
+                {
+                    swimmer = byCentury;
+                    // Возраст в строке посчитан из неверного года (2025 − 2046 = −21) — тем же
+                    // сдвигом на сто лет. Группу и место не трогаем: они напечатаны (Р76).
+                    if (int.TryParse(item.EventStyleAge, out var age))
+                        item.EventStyleAge = (age + shift).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                }
             }
 
             if (swimmer == null)
@@ -300,6 +310,7 @@ internal sealed class ImportSwimmerResolver
                     club, _diagnosticLog);
                 swimmer ??= FindBySwappedHalves(_bySpelling, leg.LastName, leg.FirstName, leg.BirthYear,
                     club, _diagnosticLog);
+                swimmer ??= FindByCenturyShift(leg.LastName, leg.FirstName, leg.BirthYear, club)?.Swimmer;
 
                 if (swimmer == null)
                 {
@@ -464,6 +475,35 @@ internal sealed class ImportSwimmerResolver
             $"Другое написание: '{last} {first}' ({year}) узнан как #{found.Id} '{found.LastName} {found.FirstName}' "
             + $"(тот же год и клуб «{club.Name}»)");
         return found;
+    }
+
+    /// <summary>
+    /// Карточка того же человека, которому протокол напечатал год рождения со сдвигом на СТО лет
+    /// (реестр федерации: «לאה ברנשטיין» loglig 112959 — 2046 вместо 1946; протоколы 2025 года
+    /// печатают 2046, и импорт заводил двойника #64764, склеен 18.11.2026 — Р104).
+    ///
+    /// Срабатывает только на невозможный год — в будущем или старше ста лет — и только если
+    /// карточка с тем же точным именем и годом ±100 одна и стоит в ТОМ ЖЕ клубе (канон после
+    /// склейки тоже). Иначе null — вызывающий заводит новую карточку, решает человек.
+    /// </summary>
+    /// <returns>Карточка и сдвиг года (строка − карточка, ±100); null — не узнан.</returns>
+    private (Swimmer Swimmer, int Shift)? FindByCenturyShift(string? last, string? first, int? year, Club? club)
+    {
+        if (club is null || year is not > 0) return null;
+        var thisYear = DateTime.UtcNow.Year;
+        int shift;
+        if (year > thisYear) shift = 100;
+        else if (year < thisYear - 100) shift = -100;
+        else return null;
+
+        if (!_byKey.TryGetValue(SwimmerMatchKey(last, first, year - shift), out var found)) return null;
+        var clubIds = new[] { club.Id, club.MergedIntoId ?? club.Id };
+        if (found.ClubId is not int c || !clubIds.Contains(c)) return null;
+
+        _diagnosticLog.Add(
+            $"Год со сдвигом на сто лет: '{last} {first}' ({year}) узнан как #{found.Id} ({found.BirthYear}), "
+            + $"тот же клуб «{club.Name}» — ошибка года в протоколе");
+        return (found, shift);
     }
 
     /// <summary>
