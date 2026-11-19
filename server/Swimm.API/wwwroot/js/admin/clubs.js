@@ -11,7 +11,10 @@
     // Вид склейки пары (план swimmer-club-change §5, Н2): «canon-dup» → duplicate | rename.
     // Отдельно от строк, чтобы выбор пережил перерисовку списка.
     const pairKinds = new Map();
-    const kindOf = (c) => pairKinds.get(`${c.canonicalId}-${c.duplicateId}`) ?? 'duplicate';
+    const kindOf = (c) => pairKinds.get(`${c.canonicalId}-${c.duplicateId}`)
+        ?? (c.recommendation?.verdict === 'rename' ? 'rename' : 'duplicate');
+    // Р113: вывод по паре «скорее разные клубы» — склеивать нельзя без проверки руками.
+    const twoClubs = (c) => c.recommendation?.verdict === 'two';
     const allRows = () => [...manualPairs, ...(data?.candidates ?? [])];
 
     // Deep-link фильтр из дашборда: ?filter=dedup-unsure|dedup-sure
@@ -38,6 +41,29 @@
             case 'manual': return 'Руками';
             default: return c.heuristic;
         }
+    }
+
+    // ── Протоколы и вывод по паре (Р113) ──
+    const VERDICT = {
+        one: { label: 'скорее один клуб', cls: 'border-admin-success/30 bg-admin-success/15 text-[#81c784]' },
+        rename: { label: 'скорее переименование', cls: 'border-admin-accent/30 bg-admin-accent/15 text-[#4fc3f7]' },
+        two: { label: 'скорее разные — не склеивать', cls: 'border-admin-danger/40 bg-admin-danger/15 text-[#ef9a9a]' },
+        unclear: { label: 'не ясно', cls: 'border-admin-border bg-admin-surface-hover text-admin-text-muted' },
+    };
+
+    function protocolsCell(c) {
+        if (c.manual) return '';
+        const p = c.protocols;
+        const r = c.recommendation;
+        const span = (s) => s ? `${s.from.slice(5, 7)}.${s.from.slice(0, 4)}–${s.to.slice(5, 7)}.${s.to.slice(0, 4)}` : '—';
+        const facts = !p ? '' : p.meets > 0
+            ? `вместе в ${p.meets} соревн.${p.separateStandings ? ` · свой зачёт в ${p.separateStandings}` : ''}${p.sameSwimmerMeets ? ` · пловец за оба в ${p.sameSwimmerMeets}` : ''}`
+            : `вместе не встречаются · ${span(p.spanA)} / ${span(p.spanB)}`;
+        const examples = p?.examples?.length ? p.examples.map(e => `#${e.competitionId} ${e.name} ${e.date}`).join('\n') : '';
+        const v = r ? (VERDICT[r.verdict] ?? VERDICT.unclear) : null;
+        return `<div class="text-[12px] text-[#90a4ae]"${examples ? ` title="${esc(examples)}"` : ''}>${facts}</div>`
+            + (v ? `<div class="mt-1"><span class="admin-badge whitespace-nowrap ${v.cls}" title="${esc(r.reason)}">${v.label}</span></div>
+                <div class="mt-0.5 max-w-[260px] text-[11.5px] leading-snug text-admin-text-muted">${esc(r.reason)}</div>` : '');
     }
 
     function sureBadge(sure) {
@@ -103,7 +129,7 @@
                 <td class="py-1 px-2">${s.logligUrl ? `<a href="${esc(s.logligUrl)}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">профиль #${s.logligId}</a>` : ''}</td>
             </tr>`;
         }).join('');
-        return `<tr class="pair-loglig-detail"><td></td><td colspan="7" class="pb-3 px-3 text-[12.5px] text-admin-text-muted">
+        return `<tr class="pair-loglig-detail"><td></td><td colspan="8" class="pb-3 px-3 text-[12.5px] text-admin-text-muted">
             <div class="mb-1">Канон: <span dir="rtl">${esc(r.clubAName)}</span> #${r.clubAId} · дубль: <span dir="rtl">${esc(r.clubBName)}</span> #${r.clubBId} · общих пловцов: ${r.swimmers.length}</div>
             <table class="admin-table"><thead><tr><th>Пловец</th><th>Клуб в карточке</th><th>Клуб на loglig</th><th>loglig</th></tr></thead>
             <tbody>${rows}</tbody></table></td></tr>`;
@@ -207,12 +233,25 @@
         }
         updateLogligButtons();
         if (!st.active) {
+            if (wasActive) refreshCandidates();
             clearInterval(logligPoll); logligPoll = null;
             if (!fresh.length) rerender();
             if (wasActive) toast(st.state === 'failed' ? `Проверка loglig упала: ${st.error}`
                 : !st.swimmersTotal ? 'Все ответы loglig свежие (моложе суток)'
                 : `loglig: пар ${st.pairsDone}, открыто карточек ${st.swimmersDone}${st.failed ? `, не открылось ${st.failed}` : ''}`, 5000);
         }
+    }
+
+    // Свежие кандидаты с сервера (вывод по паре зависит от loglig) — отметки пар сохраняются.
+    async function refreshCandidates() {
+        try {
+            const old = allRows();
+            const checked = new Set([...document.querySelectorAll('.pair-cb:checked')].map(cb => pairKey(old[+cb.dataset.i])));
+            data = await apiJson(`${API}/dedup-candidates`);
+            render();
+            const rows = allRows();
+            document.querySelectorAll('.pair-cb').forEach(cb => { cb.checked = checked.has(pairKey(rows[+cb.dataset.i])); });
+        } catch { }
     }
 
     // После загрузки страницы — подхватить идущий прогон (страницу могли перезагрузить посреди).
@@ -272,6 +311,7 @@
                     </select>
                 </td>
                 <td class="py-2 px-3">${c.manual ? '' : sureBadge(c.sure)}</td>
+                <td class="py-2 px-3 min-w-[240px]">${protocolsCell(c)}</td>
                 <td class="py-2 px-3">${logligCell(c, i)}</td>
                 <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${i}" title="${c.manual ? 'Убрать пару из списка' : 'Не дубли — скрыть пару навсегда'}">✕</button></td>
             </tr>${logligDetailRow(c)}`;
@@ -390,7 +430,7 @@
             <details class="mb-2">
                 <summary class="cursor-pointer"><b>[${esc(p.status)}]</b> canonical #${p.canonicalId} ← duplicate #${p.duplicateId} · ${p.kind === 'rename' ? 'переименование' : 'дубль'}</summary>
                 <ul class="list-disc pl-5 text-admin-text-muted">
-                    ${p.actions.map(a => `<li>${esc(a)}</li>`).join('')}
+                    ${p.actions.map(a => `<li${a.startsWith('⚠') ? ' class="text-[#ffb74d]"' : ''}>${esc(a)}</li>`).join('')}
                     ${p.conflicts.map(c => `<li class="text-[#ef9a9a]">!! ${esc(c)}</li>`).join('')}
                 </ul>
             </details>`).join('');
@@ -433,9 +473,15 @@
 
     document.getElementById('btn-check-sure').addEventListener('click', () => {
         const rows = allRows();
+        let skipped = 0;
         [...document.querySelectorAll('.pair-cb')].forEach(cb => {
-            cb.checked = !!rows[+cb.dataset.i].sure;
+            const c = rows[+cb.dataset.i];
+            // Р113: «уверенную» пару, которую протоколы печатают рядом как две команды, пачкой не берём.
+            const two = twoClubs(c);
+            if (c.sure && two) skipped++;
+            cb.checked = !!c.sure && !two;
         });
+        if (skipped) toast(`Пропущено уверенных: ${skipped} — вывод «скорее разные клубы», проверь руками`, 6000);
         dryRunOkPairs = null;
         document.getElementById('btn-merge').disabled = true;
     });
@@ -458,10 +504,16 @@
 
     document.getElementById('btn-merge').addEventListener('click', async () => {
         if (!dryRunOkPairs) return;
+        // Р113: пары с выводом «скорее разные клубы» — отдельное предупреждение и ввод слова.
+        const risky = dryRunOkPairs
+            .filter(p => { const c = allRows().find(x => x.canonicalId === p.canonicalId && x.duplicateId === p.duplicateId); return c && twoClubs(c); })
+            .map(p => `#${p.canonicalId} ← #${p.duplicateId}`);
         const ok = await adminConfirm({
             title: 'Применить склейку клубов?',
+            ...(risky.length ? { requireText: 'склеить' } : {}),
             message: `Будет применена склейка ${dryRunOkPairs.length} пар(ы) — НЕОБРАТИМО: связи дублей переедут на канон, дубли станут надгробиями.`
-                + (dryRunOkPairs.some(p => p.kind === 'rename') ? ' У переименований старое название уйдёт в историю клуба.' : ''),
+                + (dryRunOkPairs.some(p => p.kind === 'rename') ? ' У переименований старое название уйдёт в историю клуба.' : '')
+                + (risky.length ? ` ВНИМАНИЕ: по протоколам это скорее РАЗНЫЕ клубы — ${risky.join(', ')}: оба стоят в одних протоколах отдельными командами, склейка сольёт их зачёты.` : ''),
             confirmText: 'Merge',
             danger: true,
         });
