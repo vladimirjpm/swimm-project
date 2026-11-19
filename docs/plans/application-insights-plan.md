@@ -35,6 +35,11 @@ PG_STAT_STATEMENTS`, `pg_stat_statements.track = top`, `track_utility = off` (б
 на прод через ProdAdmin `--migrate` (docs/deploy.md п. 2). Смотреть топ:
 `node server/db/prod-sql.mjs read -c "SELECT calls, round(total_exec_time) AS total_ms, round(mean_exec_time::numeric,1) AS mean_ms, rows, shared_blks_read, left(regexp_replace(query, '\s+', ' ', 'g'), 120) AS q FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20"`
 (по частоте — `ORDER BY calls DESC`; много `shared_blks_read` — чтение с диска, кандидат на индекс).
+(5) Тёплый пул (`NpgsqlPoolDefaults`, оба контекста EF): `Minimum Pool Size=2` и `Keepalive=30`, если
+строка их не задала. 18.11 — 635 открытий соединения в сутки (rw 443, ro 192; p95 1,2 с и 4,8 с),
+первое после старта — 7,7 с. Проверить через сутки: `CONNECT` в `AppDependencies` (уходят только
+≥ 400 мс) должно стать заметно меньше. `Maximum Pool Size` (rw 10, ro 20) — в настройках App
+Service; поднимать по данным, когда появятся ожидания свободного соединения.
 
 **Что дальше, по порядку:**
 1. ✅ **А3.4** — память «после» снята 18.11: среднее 222 МБ (+7 % к 207), пик 334 МБ — рост в шуме, действий не нужно (см. «Ход А3»).

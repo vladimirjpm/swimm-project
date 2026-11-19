@@ -41,13 +41,13 @@ public static class DependencyInjection
         services.AddDbContext<SwimmDbContext>((sp, options) => options
             .UseNpgsql(adminCs, npgsql => npgsql
                 .EnableRetryOnFailure(maxRetryCount: 3)
-                .ConfigureDataSource(NpgsqlTracingDefaults.Apply))
+                .ConfigureDataSource(ConfigureDataSource))
             .AddInterceptors(cacheDependencies, sp.GetRequiredService<CacheInvalidationInterceptor>()));
 
         services.AddDbContext<SwimmReadDbContext>(options => options
             .UseNpgsql(readCs, npgsql => npgsql
                 .EnableRetryOnFailure(maxRetryCount: 3)
-                .ConfigureDataSource(NpgsqlTracingDefaults.Apply))
+                .ConfigureDataSource(ConfigureDataSource))
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .AddInterceptors(cacheDependencies));
 
@@ -437,6 +437,16 @@ public static class DependencyInjection
         services.AddScoped<ISuspectResultService, SuspectResultService>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Общие настройки источника соединений обоих контекстов EF: спаны телеметрии без лишнего события
+    /// (<see cref="NpgsqlTracingDefaults"/>) и тёплый пул (<see cref="NpgsqlPoolDefaults"/>).
+    /// </summary>
+    private static void ConfigureDataSource(Npgsql.NpgsqlDataSourceBuilder dataSource)
+    {
+        NpgsqlTracingDefaults.Apply(dataSource);
+        NpgsqlPoolDefaults.Apply(dataSource);
     }
 
     /// <summary>
