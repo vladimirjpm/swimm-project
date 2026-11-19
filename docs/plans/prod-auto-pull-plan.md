@@ -222,6 +222,20 @@ now() - @stale) RETURNING`; не вернул строку — работает 
 - **Порядок выката:** влить → миграция на прод → деплой (код читает строку `Sys_JobRuns` целиком).
   Подробности — [../admin-pages/jobs.md](../admin-pages/jobs.md) «Замок прогона».
 
+### П5-подготовка — ход
+
+Гейт «Соревнование закончено» (§4.4) вынесен из `server/db/day-json.mjs` в чистую функцию:
+`Swimm.Application.Mapping.CompetitionProgress` (`Evaluate(IEnumerable<ProgressRow>)`,
+`EvaluateJson(string resultsJson)` → `CompetitionProgressSummary { Events, IsFinished, Pending }`).
+Правило прежнее: событие проплыто, если в его ПОСЛЕДНЕМ заплыве есть хоть одно время. Тесты —
+`CompetitionProgressTests`. Нигде не вызывается — П5 подключит. Расхождения со скриптом:
+- тип `Result` живёт в `Swimm.Parsing`, а Application на него ссылаться не может (зависимость
+  обратная), поэтому вход — проекция `ProgressRow` или JSON `ParsedCompetition.ResultsJson`;
+- режим `--relays-timed-only` в `IsFinished` не участвует: в скрипте он влияет лишь на отбор
+  строк, а не на «проплыто ли»; проверка эстафет по стартовому протоколу (сколько команд в
+  полосе) остаётся за П5;
+- пустой разбор здесь — «не закончено» (в скрипте такого случая не было).
+
 ## 6. Риски и что с ними делать
 
 | Риск | Что делаем |
