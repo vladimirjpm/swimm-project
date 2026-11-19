@@ -46,7 +46,8 @@ public enum BulkPullVerdict
 /// <param name="HasClubStanding">Регламент говорит про командный зачёт → клубные очки ведутся.</param>
 /// <param name="IsChampionship">Чемпионат Израиля (по имени или регламенту).</param>
 /// <param name="PointRuleClubsId">Правило клубных очков, подобранное по фактической шкале loglig.</param>
-/// <param name="PoolType">Длина бассейна, распознанная парсером («25m»/«50m»).</param>
+/// <param name="PoolType">Длина бассейна: регламент → справочник по месту (П4) → умолчание 25 м у
+/// не-чемпионата; null — импортировать по одной, выбрав 25/50 (чемпионат, двусмысленное место).</param>
 /// <param name="Queued">Строка уже отправлена в импорт из этой пачки: разбор отдан очереди
 /// и удалён, повторно импортировать её нечем. Без признака панель после перезагрузки рисовала
 /// такие строки отмеченными — и пачка выглядела новым предложением (06.10.2026).</param>
@@ -55,6 +56,7 @@ public enum BulkPullVerdict
 /// помнит (перезапуск API). Без него «в очередь ушло» было последним, что знала панель (08.10.2026).</param>
 /// <param name="ImportCreated">Сколько строк результатов создал завершённый импорт.</param>
 /// <param name="ImportError">Почему импорт упал (или ошибки строк у завершённого).</param>
+/// <param name="PoolTypeSource">Откуда длина: <c>regulation</c> | <c>venue</c> | <c>default</c> (см. <c>PoolTypeSources</c>).</param>
 public sealed record BulkPullRowDto(
     int DiscoveredId,
     int OrgCompId,
@@ -77,7 +79,8 @@ public sealed record BulkPullRowDto(
     bool Queued = false,
     string? ImportState = null,
     int? ImportCreated = null,
-    string? ImportError = null);
+    string? ImportError = null,
+    string? PoolTypeSource = null);
 
 /// <summary>Состояние пачки: сколько сделано и что получилось.</summary>
 /// <param name="BatchId">Ключ пачки; переживает перезагрузку страницы (sessionStorage).</param>

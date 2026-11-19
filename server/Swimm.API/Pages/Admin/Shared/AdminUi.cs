@@ -21,6 +21,7 @@ public static class AdminNav
         new("Results", "award", "/Admin/Results", "Data"),
         new("Categories", "tag", "/Admin/Categories", "Data"),
         new("Styles", "waves", "/Admin/Styles", "Data"),
+        new("Venue pools", "waves", "/Admin/VenuePools", "Data"),
         new("Records", "award", "/Admin/Records", "Data"),
         new("Points rules", "calculator", "/Admin/PointsRules", "Data"),
         // Повторяющиеся турниры и их регламент официального награждения (карточка «Official awards»).

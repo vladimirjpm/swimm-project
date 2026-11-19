@@ -1,0 +1,113 @@
+@page
+@model Swimm.API.Pages.Admin.VenuePools.IndexModel
+@{
+    ViewData["Title"] = "Venue pools";
+    ViewData["PageSubtitle"] = "Справочник «место проведения → длина бассейна» (превью «Затянуть», results-auto)";
+
+    var flash = TempData["Flash"] as string;
+}
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+<div class="admin-card mb-4 text-xs text-admin-text-muted leading-relaxed">
+    Протокол loglig длину бассейна не печатает — «25m» в разборе только умолчание парсера.
+    Здесь длина известна по месту проведения: превью «Затянуть» подставляет её с пометкой
+    «справочник бассейнов», если в регламенте длины нет. <strong class="text-admin-text">Двусмысленное</strong>
+    место (в нём бывает и 25, и 50 — מכון וינגייט) длину не подставляет: её выбирает человек.
+    Место ищется по написаниям; одно написание — одно место.
+</div>
+
+<div class="mb-4 flex items-center justify-end">
+    <a href="@Url.Page("Edit")" class="admin-btn admin-btn-primary">+ Новое место</a>
+</div>
+
+<div class="overflow-x-auto mb-6">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Место</th>
+                <th>Длина</th>
+                <th>Другие написания</th>
+                <th class="text-right" title="Строк «Входящих» (плавание), которые это место закрывает">Во «Входящих»</th>
+                <th>Подтвердил</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Pools.Count == 0)
+            {
+                <tr><td colspan="6" class="text-admin-text-muted">Справочник пуст.</td></tr>
+            }
+            @foreach (var p in Model.Pools)
+            {
+                <tr>
+                    <td dir="rtl" class="text-left">
+                        <a href="@Url.Page("Edit", new { id = p.Id })" class="text-admin-accent hover:underline font-medium">@p.Name</a>
+                        @if (!string.IsNullOrEmpty(p.Note))
+                        {
+                            <div class="text-xs text-admin-text-muted" dir="auto">@p.Note</div>
+                        }
+                    </td>
+                    <td class="whitespace-nowrap">
+                        @if (p.IsAmbiguous)
+                        {
+                            <span class="admin-badge border-admin-warning/30 bg-admin-warning/15 text-admin-warning" title="Бывает и 25, и 50 — длину выбирает человек">двусмысленное</span>
+                        }
+                        else
+                        {
+                            <span class="admin-badge border-admin-success/30 bg-admin-success/15 text-admin-success">@p.PoolType</span>
+                        }
+                    </td>
+                    <td dir="rtl" class="text-left text-xs text-admin-text-muted">
+                        @(p.Aliases.Count == 0 ? "—" : string.Join(" · ", p.Aliases))
+                    </td>
+                    <td class="text-right tabular-nums">@p.InboxCount</td>
+                    <td class="whitespace-nowrap text-xs text-admin-text-muted">@p.ConfirmedBy, @p.ConfirmedAt.ToString("dd.MM.yyyy")</td>
+                    <td class="text-right whitespace-nowrap">
+                        <a href="@Url.Page("Edit", new { id = p.Id })" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<h2 class="text-sm font-semibold mb-1">Места из «Входящих», которых нет в справочнике</h2>
+<p class="text-xs text-admin-text-muted mb-2">
+    По ним длину решает человек. Новое место — «Добавить»; другое написание известного места —
+    допишите его в «Другие написания» того места.
+</p>
+<div class="overflow-x-auto">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Написание на isr.org.il</th>
+                <th class="text-right">Стартов</th>
+                <th>Последний старт</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Unknown.Count == 0)
+            {
+                <tr><td colspan="4" class="text-admin-text-muted">Все места «Входящих» есть в справочнике.</td></tr>
+            }
+            @foreach (var u in Model.Unknown)
+            {
+                <tr>
+                    <td dir="rtl" class="text-left">@u.Venue</td>
+                    <td class="text-right tabular-nums">@u.Count</td>
+                    <td class="whitespace-nowrap text-admin-text-muted">@u.LastDate.ToString("dd.MM.yyyy")</td>
+                    <td class="text-right whitespace-nowrap">
+                        <a href="@Url.Page("Edit", new { venue = u.Venue })" class="admin-btn admin-btn-ghost py-1 px-2.5">Добавить</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
