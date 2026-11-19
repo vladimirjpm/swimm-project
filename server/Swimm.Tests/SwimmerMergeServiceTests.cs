@@ -463,6 +463,9 @@ public class SwimmerMergeServiceTests
             new SwimmerClubCandidate { SwimmerId = dup.Id, FromClubId = 2, ToClubId = 3 },
             new SwimmerClubCandidate { SwimmerId = canon.Id, FromClubId = 5, ToClubId = 6 });
         db.RecordVerifications.Add(new RecordVerification { RecordId = 1, Found = true, SwimmerId = dup.Id });
+        db.SwimmerLogligClubs.AddRange(
+            new SwimmerLogligClub { SwimmerId = dup.Id, LogligId = 7, ClubName = "X", CheckedAt = DateTime.UtcNow },
+            new SwimmerLogligClub { SwimmerId = canon.Id, LogligId = 8, ClubName = "Y", CheckedAt = DateTime.UtcNow });
         await db.SaveChangesAsync();
 
         var report = await new SwimmerMergeService(db)
@@ -473,6 +476,8 @@ public class SwimmerMergeServiceTests
         var candidate = await db.SwimmerClubCandidates.AsNoTracking().SingleAsync();
         Assert.Equal((canon.Id, 6), (candidate.SwimmerId, candidate.ToClubId));
         Assert.Equal(canon.Id, (await db.RecordVerifications.AsNoTracking().SingleAsync()).SwimmerId);
+        // Ответ loglig дубля (Р112) — кэш его карточки: удаляется, у канона свой.
+        Assert.Equal((canon.Id, 8), await db.SwimmerLogligClubs.AsNoTracking().Select(x => ValueTuple.Create(x.SwimmerId, x.LogligId)).SingleAsync());
     }
 
     /// <summary>
@@ -492,6 +497,7 @@ public class SwimmerMergeServiceTests
             typeof(CompetitionEntry), typeof(AppUser), typeof(HubGroupSwimmerLevel), typeof(LanePlanSwimmer),
             typeof(HubGroupBreak), typeof(HubGroupTrainingRsvp), typeof(LanePlanEvent),
             typeof(SwimmerClubChange), typeof(SwimmerClubCandidate), typeof(RecordVerification),
+            typeof(SwimmerLogligClub),
         ];
 
         var withSwimmerId = db.Model.GetEntityTypes()

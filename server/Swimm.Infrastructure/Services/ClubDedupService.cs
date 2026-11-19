@@ -14,7 +14,9 @@ namespace Swimm.Infrastructure.Services;
 ///    ловит кросс-скриптовые пары без транслитерации; 3) Левенштейн ≤ 1 внутри одного
 ///    скрипта (опечатки/приставки). Синтетика (SYNTH%) и псевдоклубы Maccabiah исключены.
 /// </summary>
-public class ClubDedupService(SwimmDbContext db) : IClubDedupService
+/// Пары эвристики «общие пловцы» несут сводку «что знает loglig» про общих пловцов (Р112) — из
+/// сохранённых ответов, без сети (<see cref="IClubPairLogligService"/>; в тестах может не быть).
+public class ClubDedupService(SwimmDbContext db, IClubPairLogligService? loglig = null) : IClubDedupService
 {
     // Хвост заметки дисквалификации, прилипший к названию клуба в старых импортах
     // (до фикса парсера в фазе A): "DNS", "DNF", "NS", "DQ", "SW", "/", "4.4" и их
@@ -211,6 +213,7 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
         foreach (var p in fromResults) AddSwimmer(p.ClubId, p.SwimmerId);
 
         var withSwimmers = real.Where(c => swimmersByClub.ContainsKey(c.Id)).ToList();
+        var sharedByPair = new Dictionary<(int, int), List<int>>();
         for (var i = 0; i < withSwimmers.Count; i++)
         for (var j = i + 1; j < withSwimmers.Count; j++)
         {
@@ -233,6 +236,7 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
                 : a.ResultCount != b.ResultCount
                     ? (a.ResultCount > b.ResultCount ? (a, b) : (b, a))
                     : a.Id < b.Id ? (a, b) : (b, a);
+            sharedByPair[(canon.Id, dup.Id)] = setA.Where(setB.Contains).ToList();
             Add(canon, dup, "swimmers", shared, sure: false);
         }
 
@@ -253,6 +257,23 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
                 ? (a.ResultCount > b.ResultCount ? (a, b) : (b, a))
                 : a.Id < b.Id ? (a, b) : (b, a);
             Add(canon, dup, "levenshtein", 0, sure: false);
+        }
+
+        // Сводка loglig по общим пловцам (Р112) — только у пар «общие пловцы», из сохранённых
+        // ответов: страница кандидатов в сеть не ходит, проверка — кнопкой у пары.
+        if (loglig is not null)
+        {
+            var swimmerPairs = report.Candidates
+                .Where(c => c.Heuristic == "swimmers" && sharedByPair.ContainsKey((c.CanonicalId, c.DuplicateId)))
+                .Select(c => (c.CanonicalId, c.DuplicateId, (IReadOnlyCollection<int>)sharedByPair[(c.CanonicalId, c.DuplicateId)]))
+                .ToList();
+            var summaries = await loglig.SummarizeAsync(swimmerPairs, ct);
+            for (var k = 0; k < report.Candidates.Count; k++)
+            {
+                var c = report.Candidates[k];
+                if (c.Heuristic == "swimmers" && summaries.TryGetValue((c.CanonicalId, c.DuplicateId), out var s))
+                    report.Candidates[k] = c with { Loglig = s };
+            }
         }
 
         // Уверенные сверху, затем по эвристике и имени.

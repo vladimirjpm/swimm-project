@@ -19,6 +19,7 @@ namespace Swimm.API.Controllers;
 public class ClubsAdminController : ControllerBase
 {
     private readonly IClubDedupService _dedup;
+    private readonly IClubPairLogligService _pairLoglig;
     private readonly IClubMergeService _merge;
     private readonly IDedupIgnoreService _ignore;
     private readonly IAdminAuditService _audit;
@@ -30,6 +31,7 @@ public class ClubsAdminController : ControllerBase
 
     public ClubsAdminController(
         IClubDedupService dedup,
+        IClubPairLogligService pairLoglig,
         IClubMergeService merge,
         IDedupIgnoreService ignore,
         IAdminAuditService audit,
@@ -43,6 +45,7 @@ public class ClubsAdminController : ControllerBase
         _publicClubs = publicClubs;
         _cache = cache;
         _dedup = dedup;
+        _pairLoglig = pairLoglig;
         _merge = merge;
         _ignore = ignore;
         _audit = audit;
@@ -127,6 +130,32 @@ public class ClubsAdminController : ControllerBase
     [HttpGet("dedup-candidates")]
     public async Task<IActionResult> GetCandidates(CancellationToken ct)
         => Ok(await _dedup.FindCandidatesAsync(ct));
+
+    /// <summary>Сколько карточек loglig открывает одно нажатие «Проверить в loglig» (~1/с → до 2 минут).</summary>
+    internal const int PairLogligMaxRequests = 120;
+
+    /// <summary>
+    /// Общие пловцы пары и их клуб на loglig (Р112) — из сохранённых ответов, без сети.
+    /// Колонка «loglig» таблицы кандидатов, раскрытие по клику.
+    /// </summary>
+    [HttpGet("dedup-candidates/loglig")]
+    public async Task<IActionResult> GetPairLoglig([FromQuery] int a, [FromQuery] int b, CancellationToken ct)
+        => await _pairLoglig.GetAsync(a, b, ct) is { } report ? Ok(report) : NotFound(new { error = "Клуб не найден" });
+
+    /// <summary>
+    /// «Проверить в loglig» (Р112): открыть карточки loglig общих пловцов пары с несвежим ответом
+    /// (нет / старше суток), ~1 запрос в секунду, не больше <see cref="PairLogligMaxRequests"/> за
+    /// нажатие, и сохранить ответы. Данных клуба и пловцов не меняет — пишет только кэш ответа.
+    /// </summary>
+    [HttpPost("dedup-candidates/loglig/check")]
+    public async Task<IActionResult> CheckPairLoglig([FromBody] IgnorePairRequest request, CancellationToken ct)
+    {
+        var report = await _pairLoglig.CheckAsync(request.IdA, request.IdB, PairLogligMaxRequests, ct);
+        if (report is null) return NotFound(new { error = "Клуб не найден" });
+        _logger.LogInformation("Admin {User}: пара клубов #{A}/#{B} проверена в loglig — карточек {Requests}, не открылось {Failed}",
+            User.Identity?.Name ?? "?", request.IdA, request.IdB, report.Requests, report.Failed);
+        return Ok(report);
+    }
 
     public sealed record MergeRequest(List<ClubMergePair> Pairs, bool Apply);
 

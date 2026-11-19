@@ -287,6 +287,12 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
                 db.SwimmerClubCandidates.Remove(dupCandidate);
                 res.Actions.Add("Sys_SwimmerClubCandidates: кандидат дубля удалён");
             }
+            // Ответ loglig по карточке дубля (Р112) — кэш, у канона свой loglig-id и свой ответ.
+            if (await db.SwimmerLogligClubs.FirstOrDefaultAsync(x => x.SwimmerId == duplicate.Id, ct) is { } dupLoglig)
+            {
+                db.SwimmerLogligClubs.Remove(dupLoglig);
+                res.Actions.Add("Sys_SwimmerLogligClubs: ответ loglig дубля удалён");
+            }
 
             // Сверка рекордов (RecordVerifications) помнит пловца найденного заплыва — тоже без FK.
             // Заплыв переехал к канону выше, ссылка на пловца идёт за ним (до следующей «Сверить»).

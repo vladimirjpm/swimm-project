@@ -56,3 +56,11 @@ internal sealed class SwimmerClubCandidateConfiguration : IEntityTypeConfigurati
         entity.HasIndex(e => e.Verdict); // дашборд: ждущие по причинам
     }
 }
+
+// Последний ответ карточки loglig про клуб пловца (Р112) — Sys_-таблица, БЕЗ grant swimm_ro,
+// ключ SwimmerId, FK нет. Читается пачкой по id пловцов — индекс не нужен.
+internal sealed class SwimmerLogligClubConfiguration : IEntityTypeConfiguration<SwimmerLogligClub>
+{
+    public void Configure(EntityTypeBuilder<SwimmerLogligClub> entity) =>
+        entity.ToTable("Sys_SwimmerLogligClubs");
+}

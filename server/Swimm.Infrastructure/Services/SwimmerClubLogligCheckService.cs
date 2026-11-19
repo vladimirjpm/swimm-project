@@ -16,6 +16,9 @@ namespace Swimm.Infrastructure.Services;
 ///   loglig — сайт федерации, долбить его параллельно незачем; ~330 кандидатов ≈ 6 минут.
 /// • Кэш ответа на сутки — в самом кандидате (<c>LogligClubName</c>, <c>CheckedAt</c>): суточный
 ///   прогон и повторный импорт в те же сутки в loglig не ходят, только пересчитывают вердикт.
+///   Кроме того, каждый удачный ответ пишется в общее место <c>Sys_SwimmerLogligClubs</c> (Р112),
+///   и оттуда же берётся как кэш: кнопка «Проверить в loglig» на /Admin/Clubs и эта сверка не
+///   открывают одну карточку дважды за сутки. Dry-run общее место только читает.
 /// • Подтверждённая смена (<c>confirmed</c>) → <c>Swimmers.ClubId</c> + журнал (источник
 ///   <c>loglig</c>), кандидат удаляется. Перед записью карточка перечитывается: закреплённую
 ///   (<c>ClubLocked</c>) или поправленную за это время не трогаем.
@@ -75,11 +78,14 @@ public sealed class SwimmerClubLogligCheckService(
         if (items.Count == 0)
             return new SwimmerClubCheckReport(0, 0, 0, 0, new Dictionary<string, int>(), []);
 
-        var matcher = await LoadMatcherAsync(ct);
+        var matcher = await LoadMatcherAsync(db, ct);
         var ids = items.Select(i => i.SwimmerId).ToArray();
         var logligIds = await SwimmerClubRefreshService.VerifiedLogligIds(db.Swimmers.AsNoTracking())
             .Where(s => ids.Contains(s.Id))
             .ToDictionaryAsync(s => s.Id, s => s.LogligId, ct);
+        // Общий ответ loglig по пловцу (Р112): его могла записать и кнопка «Проверить в loglig»
+        // на /Admin/Clubs — тогда в сеть второй раз за сутки не идём.
+        var shared = await SwimmerLogligClubStore.LoadAsync(db, ids, ct);
 
         var verdicts = new List<SwimmerClubVerdictDto>(items.Count);
         int requests = 0, fromCache = 0, applied = 0, done = 0;
@@ -89,17 +95,28 @@ public sealed class SwimmerClubLogligCheckService(
             var logligId = logligIds.GetValueOrDefault(item.SwimmerId);
             LogligClubAnswer? answer = null;
             var cached = false;
+            DateTime? answeredAt = null; // когда loglig дал ответ, взятый из общего места (Р112)
 
             // Хвост склейки (карточка на надгробии нового клуба) — правило решит без loglig.
             var sameClub = item.FromClubId is int from && matcher.Live(from) is int f && f == matcher.Live(item.ToClubId);
             if (logligId is int lid && !sameClub)
             {
                 var s = item.Stored;
+                var common = shared.GetValueOrDefault(item.SwimmerId);
                 if (!ignoreCache && s is not null
                     && SwimmerClubLogligRule.CacheValid(DateTime.UtcNow, s.CheckedAt, s.LogligId, lid, s.LogligClubName))
                 {
                     answer = new LogligClubAnswer(true, s.LogligClubName);
                     cached = true;
+                    fromCache++;
+                }
+                else if (!ignoreCache && common is not null
+                    && SwimmerClubLogligRule.CacheValid(DateTime.UtcNow, common.CheckedAt, common.LogligId, lid, common.ClubName))
+                {
+                    // Ответ свежий, но записан не этим кандидатом — переносим в кандидата как новый
+                    // (cached = false): дашборд читает клуб loglig из кандидата.
+                    answer = new LogligClubAnswer(true, common.ClubName);
+                    answeredAt = common.CheckedAt;
                     fromCache++;
                 }
                 else
@@ -108,6 +125,8 @@ public sealed class SwimmerClubLogligCheckService(
                     var card = await loglig.GetPlayerCardAsync(lid, ct: ct);
                     requests++;
                     answer = card is null ? new LogligClubAnswer(false, null) : new LogligClubAnswer(true, card.ClubName?.Trim());
+                    if (apply && card is not null)
+                        await SwimmerLogligClubStore.UpsertAsync(db, item.SwimmerId, lid, Clip(answer.ClubName), DateTime.UtcNow, ct);
                 }
             }
 
@@ -120,7 +139,7 @@ public sealed class SwimmerClubLogligCheckService(
                 if (answer is { Fetched: true } && !cached)
                 {
                     stored.LogligClubName = Clip(answer.ClubName);
-                    stored.CheckedAt = DateTime.UtcNow;
+                    stored.CheckedAt = answeredAt ?? DateTime.UtcNow;
                 }
                 stored.UpdatedAt = DateTime.UtcNow;
                 if (SwimmerClubLogligRule.Applies(verdict))
@@ -172,7 +191,8 @@ public sealed class SwimmerClubLogligCheckService(
         _lastRequestAt = DateTime.UtcNow;
     }
 
-    private async Task<ClubNameMatcher> LoadMatcherAsync(CancellationToken ct)
+    /// <summary>Все клубы, прежние названия и надгробия — для сравнения названий loglig (общий с Р112).</summary>
+    internal static async Task<ClubNameMatcher> LoadMatcherAsync(SwimmDbContext db, CancellationToken ct)
     {
         var clubs = await db.Clubs.AsNoTracking()
             .Select(c => new ClubAliasClub(c.Id, c.Name, c.NameEn, c.MergedIntoId, c.IsPseudo))

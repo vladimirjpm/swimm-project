@@ -342,6 +342,8 @@ public static class DependencyInjection
         // Склейка клубов-дублей (docs/tasks/club-merge-plan.md, фаза B)
         services.AddScoped<IClubMergeService, ClubMergeService>();
         services.AddScoped<IClubDedupService, ClubDedupService>();
+        // Что знает loglig про общих пловцов пары-кандидата (Р112)
+        services.AddScoped<IClubPairLogligService, ClubPairLogligService>();
 
         // «Развязка» пар дедупа (пловцы/клубы): пара помечена «не дубли» — не всплывает
         services.AddScoped<IDedupIgnoreService, DedupIgnoreService>();

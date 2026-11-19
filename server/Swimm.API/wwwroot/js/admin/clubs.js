@@ -46,6 +46,107 @@
             : '<span class="admin-badge border-admin-border bg-admin-surface-hover text-admin-text-muted">спорная</span>';
     }
 
+    // ── loglig по общим пловцам (Р112): сводка в колонке, список по клику, кнопка проверки ──
+    // Открытые списки: «canon-dup» → отчёт сервера (общие пловцы + их клуб на loglig).
+    const logligOpen = new Map();
+    const logligBusy = new Set();
+    const pairKey = (c) => `${c.canonicalId}-${c.duplicateId}`;
+
+    const LOGLIG_VERDICT = {
+        a: { label: 'канон', cls: 'text-[#81c784]' },
+        b: { label: 'дубль', cls: 'text-[#4fc3f7]' },
+        both: { label: 'оба', cls: 'text-[#81c784]' },
+        other: { label: 'другой', cls: 'text-[#ffb74d]' },
+        archive: { label: 'архив', cls: 'text-[#ffb74d]' },
+        'no-loglig-id': { label: 'без ID', cls: 'text-[#546e7a]' },
+        unchecked: { label: 'не проверено', cls: 'text-[#546e7a]' },
+    };
+
+    function logligSummaryHtml(s) {
+        const parts = [
+            ['a', s.clubA], ['b', s.clubB], ['both', s.both], ['other', s.other],
+            ['archive', s.archive], ['no-loglig-id', s.noLogligId], ['unchecked', s.unchecked],
+        ].filter(([, n]) => n > 0)
+            .map(([v, n]) => `<span class="${LOGLIG_VERDICT[v].cls}">${LOGLIG_VERDICT[v].label} ${n}</span>`);
+        // Общие пловцы у loglig стоят в ОБОИХ клубах пары — это два живых клуба, а не дубль.
+        const warn = s.clubA > 0 && s.clubB > 0
+            ? '<div class="text-[11.5px] text-[#ef9a9a]">loglig видит оба клуба — похоже на два клуба</div>' : '';
+        return `<span class="text-[12px]">${parts.join(' · ') || '—'}</span>${warn}`;
+    }
+
+    function logligCell(c, i) {
+        if (c.heuristic !== 'swimmers' || !c.loglig) return '<span class="text-[#546e7a]">—</span>';
+        const busy = logligBusy.has(pairKey(c));
+        return `
+            <button class="pair-loglig-open cursor-pointer text-left hover:underline" data-i="${i}" title="Список общих пловцов и их клуб на loglig">${logligSummaryHtml(c.loglig)}</button>
+            <div><button class="pair-loglig-check admin-btn admin-btn-ghost mt-1 py-0.5 px-2 text-[11.5px] disabled:opacity-40" data-i="${i}"${busy ? ' disabled' : ''}
+                title="Открыть карточки loglig общих пловцов, которым больше суток (~1 в секунду)">${busy ? 'Проверяю…' : 'Проверить в loglig'}</button></div>`;
+    }
+
+    function fmtDate(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+    }
+
+    function logligDetailRow(c) {
+        const r = logligOpen.get(pairKey(c));
+        if (!r) return '';
+        const rows = r.swimmers.map(s => {
+            const v = LOGLIG_VERDICT[s.verdict] ?? { label: s.verdict, cls: '' };
+            const loglig = s.logligClubName
+                ? `<span dir="rtl">${esc(s.logligClubName)}</span> <span class="${v.cls}">(${v.label})</span> <span class="text-[#546e7a]">${fmtDate(s.checkedAt)}</span>`
+                : `<span class="${v.cls}">${v.label}</span>`;
+            return `<tr class="border-b border-white/[.04]">
+                <td class="py-1 px-2" dir="rtl" style="text-align:left"><a href="/Admin/Swimmers?club=${s.swimmerId}" target="_blank" class="text-admin-accent hover:underline" title="Клуб пловца в админке">${esc(s.name)}</a>
+                    <span class="text-[#546e7a]">#${s.swimmerId}${s.birthYear ? ' · ' + s.birthYear : ''}</span></td>
+                <td class="py-1 px-2" dir="rtl" style="text-align:left">${s.cardClubName ? esc(s.cardClubName) + ` <span class="text-[#546e7a]">#${s.cardClubId}</span>` : '<span class="text-[#546e7a]">—</span>'}</td>
+                <td class="py-1 px-2" style="text-align:left">${loglig}</td>
+                <td class="py-1 px-2">${s.logligUrl ? `<a href="${esc(s.logligUrl)}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">профиль #${s.logligId}</a>` : ''}</td>
+            </tr>`;
+        }).join('');
+        const net = r.requests
+            ? `<div class="mb-1">Открыто карточек: ${r.requests}${r.failed ? `, не открылось: ${r.failed}` : ''}${r.remaining ? `; осталось ${r.remaining} — нажми ещё раз` : ''}</div>` : '';
+        return `<tr class="pair-loglig-detail"><td></td><td colspan="7" class="pb-3 px-3 text-[12.5px] text-admin-text-muted">
+            ${net}
+            <div class="mb-1">Канон: <span dir="rtl">${esc(r.clubAName)}</span> #${r.clubAId} · дубль: <span dir="rtl">${esc(r.clubBName)}</span> #${r.clubBId} · общих пловцов: ${r.swimmers.length}</div>
+            <table class="admin-table"><thead><tr><th>Пловец</th><th>Клуб в карточке</th><th>Клуб на loglig</th><th>loglig</th></tr></thead>
+            <tbody>${rows}</tbody></table></td></tr>`;
+    }
+
+    // Перерисовка из-за loglig не должна сбрасывать отмеченные пары (и прошедший dry-run).
+    function rerender() {
+        const rows = allRows();
+        const checked = new Set([...document.querySelectorAll('.pair-cb:checked')].map(cb => pairKey(rows[+cb.dataset.i])));
+        render();
+        [...document.querySelectorAll('.pair-cb')].forEach(cb => { cb.checked = checked.has(pairKey(rows[+cb.dataset.i])); });
+    }
+
+    async function toggleLoglig(c) {
+        const key = pairKey(c);
+        if (logligOpen.has(key)) { logligOpen.delete(key); rerender(); return; }
+        try {
+            logligOpen.set(key, await apiJson(`${API}/dedup-candidates/loglig?a=${c.canonicalId}&b=${c.duplicateId}`));
+            rerender();
+        } catch (e) { toast('Ошибка: ' + e.message, 5000); }
+    }
+
+    async function checkLoglig(c) {
+        const key = pairKey(c);
+        logligBusy.add(key);
+        rerender();
+        try {
+            const r = await apiJson(`${API}/dedup-candidates/loglig/check`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idA: c.canonicalId, idB: c.duplicateId })
+            });
+            c.loglig = r.summary;
+            logligOpen.set(key, r);
+            toast(r.requests ? `loglig: открыто карточек ${r.requests}${r.failed ? `, не открылось ${r.failed}` : ''}` : 'Все ответы loglig свежие (моложе суток)', 4000);
+        } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+        finally { logligBusy.delete(key); rerender(); }
+    }
+
     function render() {
         const tbody = document.getElementById('cand-body');
         const allCands = data.candidates;
@@ -86,9 +187,15 @@
                     </select>
                 </td>
                 <td class="py-2 px-3">${c.manual ? '' : sureBadge(c.sure)}</td>
+                <td class="py-2 px-3">${logligCell(c, i)}</td>
                 <td class="py-2 px-3"><button class="pair-hide cursor-pointer text-[#546e7a] hover:text-[#ef9a9a]" data-i="${i}" title="${c.manual ? 'Убрать пару из списка' : 'Не дубли — скрыть пару навсегда'}">✕</button></td>
-            </tr>`;
+            </tr>${logligDetailRow(c)}`;
         }).join('');
+
+        [...document.querySelectorAll('.pair-loglig-open')].forEach(btn =>
+            btn.addEventListener('click', () => toggleLoglig(rows[+btn.dataset.i])));
+        [...document.querySelectorAll('.pair-loglig-check')].forEach(btn =>
+            btn.addEventListener('click', () => checkLoglig(rows[+btn.dataset.i])));
 
         // Любое изменение выбора инвалидирует прошлый dry-run
         [...document.querySelectorAll('.pair-cb')].forEach(cb =>
