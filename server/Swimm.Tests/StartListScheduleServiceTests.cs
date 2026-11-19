@@ -26,7 +26,8 @@ namespace Swimm.Tests;
 /// </summary>
 public class StartListScheduleServiceTests
 {
-    private static readonly DateTime Today = DateTime.UtcNow.Date;
+    // «Сегодня» по Израилю, как у самого обхода (П3): с 22:00 до 24:00 UTC это уже завтра.
+    private static readonly DateTime Today = Swimm.Application.Mapping.StartListSweepRules.IsraelToday(DateTime.UtcNow);
 
     private sealed class Harness : IAsyncDisposable
     {
@@ -44,7 +45,8 @@ public class StartListScheduleServiceTests
     private static Harness Build(
         string dbName,
         IEnumerable<DiscoveredCompetition> rows,
-        Action<Mock<IStartListPullService>>? setupPull = null)
+        Action<Mock<IStartListPullService>>? setupPull = null,
+        Action<SwimmDbContext>? seed = null)
     {
         var pull = new Mock<IStartListPullService>();
         pull.Setup(p => p.PullAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -65,6 +67,7 @@ public class StartListScheduleServiceTests
         {
             var db = scope.ServiceProvider.GetRequiredService<SwimmDbContext>();
             db.DiscoveredCompetitions.AddRange(rows);
+            seed?.Invoke(db);
             db.SaveChanges();
         }
 
@@ -163,5 +166,81 @@ public class StartListScheduleServiceTests
         Assert.Equal(0, report.Total);
         Assert.Equal(0, report.Pulled);
         h.Pull.VerifyNoOtherCalls();
+    }
+
+    // ── П3: частота по близости старта (StartListSweepRules) ─────────────
+
+    private static StartListPull PullRow(int orgCompId, TimeSpan ago, string status = StartListPullStatus.Ok, int entries = 50) =>
+        new() { OrgCompId = orgCompId, PulledAt = DateTime.UtcNow - ago, Status = status, Events = 10, Entries = entries };
+
+    [Fact]
+    public async Task Run_SkipsRecentlyPulled_AndCountsThemAsTooEarly()
+    {
+        await using var h = Build(nameof(Run_SkipsRecentlyPulled_AndCountsThemAsTooEarly),
+            [Comp(1, 100, 5), Comp(2, 200, 5), Comp(3, 300, 1)],
+            seed: db => db.StartListPulls.AddRange(
+                PullRow(1, TimeSpan.FromHours(2)),                                    // дальний, смотрели 2 ч назад — рано
+                PullRow(2, TimeSpan.FromHours(30)),                                   // дальний, вчера — пора
+                PullRow(3, TimeSpan.FromHours(2.5), StartListPullStatus.Empty, 0))); // ближайший без посева — пора
+
+        var report = await h.Service.RunAsync(daysAhead: 14);
+
+        Assert.Equal(3, report.Total);
+        Assert.Equal(2, report.Due);
+        Assert.Equal(1, report.TooEarly);
+        Assert.Equal(2, report.Pulled);
+        h.Pull.Verify(p => p.PullAsync(2, It.IsAny<CancellationToken>()), Times.Once);
+        h.Pull.Verify(p => p.PullAsync(3, It.IsAny<CancellationToken>()), Times.Once);
+        h.Pull.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Run_NearStartWithoutLogligId_IsPulled_FarOneWaitsForDetails()
+    {
+        // Ближайшему без loglig-id забор сам дочитает comp.asp (И-54); дальнему — только
+        // суточная догрузка деталей, в Total он не входит.
+        await using var h = Build(nameof(Run_NearStartWithoutLogligId_IsPulled_FarOneWaitsForDetails),
+            [Comp(1, logligId: null, daysFromToday: 1), Comp(2, logligId: null, daysFromToday: 6)]);
+
+        var report = await h.Service.RunAsync(daysAhead: 14);
+
+        Assert.Equal(1, report.Total);
+        h.Pull.Verify(p => p.PullAsync(1, It.IsAny<CancellationToken>()), Times.Once);
+        h.Pull.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Run_StartDayAfterFirstHeat_IsLeftAlone()
+    {
+        await using var h = Build(nameof(Run_StartDayAfterFirstHeat_IsLeftAlone),
+            [Comp(1, 100, 0)],
+            seed: db => db.CompetitionEntries.Add(new CompetitionEntry
+            {
+                OrgCompId = 1,
+                HeatStartAt = Swimm.Application.Constants.IsraelTime.ToUtc(Today.AddMinutes(1)), // 00:01 по Израилю
+            }));
+
+        var report = await h.Service.RunAsync(daysAhead: 14);
+
+        Assert.Equal(1, report.Started);
+        Assert.Equal(0, report.Due);
+        h.Pull.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Run_DetailsOnlyOnFirstTickOfTheDay()
+    {
+        await using var h = Build(nameof(Run_DetailsOnlyOnFirstTickOfTheDay), [Comp(1, 100, 3)]);
+
+        // Прошлый успешный прогон — минуту назад (тот же день по Израилю): догрузки нет.
+        var report = await h.Service.RunAsync(daysAhead: 14, previousRunAt: DateTime.UtcNow.AddMinutes(-1));
+        Assert.False(report.DetailsRan);
+        Assert.Equal(0, report.DetailsChecked);
+        h.Discovery.Verify(d => d.RefreshUpcomingDetailsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        // Прошлый — двое суток назад: первый тик дня, догрузка идёт.
+        report = await h.Service.RunAsync(daysAhead: 14, previousRunAt: DateTime.UtcNow.AddDays(-2));
+        Assert.True(report.DetailsRan);
+        h.Discovery.Verify(d => d.RefreshUpcomingDetailsAsync(14, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

@@ -40,7 +40,8 @@ public class AdminSettingsServiceTests
         // + ContentDefaultCanAddPhotos/CanAddVideos/CanPublish (политика прав на контент,
         //   content-permissions-plan, 2026-11-18)
         // + SwimmerClubCheckEnabled/SwimmerClubCheckIntervalHours (сверка смены клуба с loglig, Р98, 2026-11-18)
-        Assert.Equal(38, all.Count);
+        // + StartListIntervalHours (свой шаг обхода стартовых протоколов, П3, 2026-11-20)
+        Assert.Equal(39, all.Count);
     }
 
     [Fact]
@@ -142,6 +143,7 @@ public class AdminSettingsServiceTests
     [InlineData("HubGroupVisibility")]
     [InlineData("DiscoveryEnabled")]
     [InlineData("DiscoveryIntervalHours")]
+    [InlineData("StartListIntervalHours")]
     public void Get_ExistingKey_ReturnsNonNull(string key)
     {
         var svc = Build();
