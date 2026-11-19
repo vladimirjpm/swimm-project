@@ -149,6 +149,13 @@ public class ClubMergeService(
             res.Actions.Add($"«{duplicate.Name}» #{duplicate.Id} → «{canonical.Name}» #{canonical.Id}"
                 + (pair.IsRename ? " — переименование" : " — дубль"));
 
+            // Р113: оба клуба в одних протоколах — предупреждение второй строкой (не конфликт:
+            // решает человек, бывает и один клуб двумя написаниями в одном протоколе).
+            var overlap = (await ClubProtocolOverlapQuery.LoadAsync(db, [(canonical.Id, duplicate.Id)], ct))
+                [(canonical.Id, duplicate.Id)];
+            if (overlap.Meets > 0)
+                res.Actions.Add(ClubPairOverlapRule.Warning(overlap));
+
             foreach (var unitId in await db.ClubCompetitionStandings.AsNoTracking()
                          .Where(s => s.ClubId == duplicate.Id)
                          .Select(s => s.CompetitionId)

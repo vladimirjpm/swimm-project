@@ -20,7 +20,12 @@ public sealed record ClubDedupCandidate(
     bool Sure,
     /// <summary>Что знает loglig про общих пловцов (Р112) — только у эвристики swimmers, из
     /// сохранённых ответов, без сети; null у остальных эвристик.</summary>
-    ClubPairLogligSummary? Loglig = null);
+    ClubPairLogligSummary? Loglig = null,
+    /// <summary>Оба клуба в одних протоколах (Р113) — у всех эвристик; <see cref="ClubPairOverlap.TwoClubsLikely"/>
+    /// — «скорее два клуба, не склеивать».</summary>
+    ClubPairOverlap? Protocols = null,
+    /// <summary>Вывод по паре (Р113): скорее один клуб / переименование / разные / не ясно.</summary>
+    ClubPairRecommendation? Recommendation = null);
 
 public sealed class ClubDedupReport
 {

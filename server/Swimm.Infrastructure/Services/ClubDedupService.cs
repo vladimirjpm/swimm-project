@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Services;
@@ -274,6 +275,18 @@ public class ClubDedupService(SwimmDbContext db, IClubPairLogligService? loglig 
                 if (c.Heuristic == "swimmers" && summaries.TryGetValue((c.CanonicalId, c.DuplicateId), out var s))
                     report.Candidates[k] = c with { Loglig = s };
             }
+        }
+
+        // Оба клуба в одних протоколах (Р113) — у всех пар: протокол, напечатавший их рядом как
+        // разные команды, — главный довод против склейки. «Уверенность» эвристики не трогаем —
+        // страница предупреждает и «Выбрать все уверенные» такие пары пропускает.
+        var overlaps = await ClubProtocolOverlapQuery.LoadAsync(db,
+            report.Candidates.Select(c => (c.CanonicalId, c.DuplicateId)).ToList(), ct);
+        for (var k = 0; k < report.Candidates.Count; k++)
+        {
+            var c = report.Candidates[k];
+            var withProtocols = c with { Protocols = overlaps.GetValueOrDefault((c.CanonicalId, c.DuplicateId)) };
+            report.Candidates[k] = withProtocols with { Recommendation = ClubPairRecommendationRule.Decide(withProtocols) };
         }
 
         // Уверенные сверху, затем по эвристике и имени.
