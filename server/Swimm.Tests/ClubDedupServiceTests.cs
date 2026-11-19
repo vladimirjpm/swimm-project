@@ -114,6 +114,54 @@ public class ClubDedupServiceTests
         Assert.Equal(apostrophe.Id, cand.DuplicateId);
     }
 
+    // ── Эвристика name-en: латинское Name = NameEn ивритского клуба ──────────
+
+    [Fact]
+    public async Task NameEnHeuristic_LatinNameMatchesHebrewClubNameEn_Sure()
+    {
+        // Р108, реальный случай 18.11.2026: «Bnei Herzeliya» (1262) — дубль «בני הרצליה»
+        // (439, NameEn = «Bnei Herzeliya»); same-name сравнивал Name с Name и пару не видел.
+        // Канон — ивритская запись, даже если у латинского дубля результатов больше.
+        await using var db = CreateDb(nameof(NameEnHeuristic_LatinNameMatchesHebrewClubNameEn_Sure));
+        var hebrew = new Club { Name = "בני הרצליה", NameEn = "Bnei Herzeliya" };
+        var latin = new Club { Name = "BNEI  herzeliya" };   // регистр и пробелы — через Normalize
+        var comp = NewCompetition();
+        var style = new Style { Name = "Freestyle" };
+        var s = new Swimmer { LastName = "A", FirstName = "A", BirthYear = 2010 };
+        db.AddRange(hebrew, latin, comp, style, s);
+        db.Results.AddRange(
+            NewResult(s, hebrew, comp, style),
+            NewResult(s, latin, comp, style, "100"),
+            NewResult(s, latin, comp, style, "200"));
+        await db.SaveChangesAsync();
+
+        var report = await new ClubDedupService(db).FindCandidatesAsync();
+
+        var cand = Assert.Single(report.Candidates);
+        Assert.Equal("name-en", cand.Heuristic);
+        Assert.True(cand.Sure);
+        Assert.Equal(hebrew.Id, cand.CanonicalId);
+        Assert.Equal(latin.Id, cand.DuplicateId);
+    }
+
+    [Fact]
+    public async Task NameEnHeuristic_AmbiguousNameEn_NotProposed()
+    {
+        // Тот же NameEn у двух ивритских клубов — неясно, к кому клеить латинский: не предлагаем.
+        await using var db = CreateDb(nameof(NameEnHeuristic_AmbiguousNameEn_NotProposed));
+        db.AddRange(
+            new Club { Name = "מכבי חיפה", NameEn = "Maccabi Haifa" },
+            new Club { Name = "מכבי חיפה שחייה", NameEn = "Maccabi Haifa" },
+            new Club { Name = "Maccabi Haifa" },
+            new Club { Name = "Hapoel Haifa" },                         // NameEn-соответствия нет
+            new Club { Name = "Bnei Herzeliya", NameEn = "Bnei Herzeliya" }); // канон не ивритский
+        await db.SaveChangesAsync();
+
+        var report = await new ClubDedupService(db).FindCandidatesAsync();
+
+        Assert.DoesNotContain(report.Candidates, c => c.Heuristic == "name-en");
+    }
+
     // ── Эвристика word-order: те же слова в другом порядке ───────────────────
 
     [Theory]

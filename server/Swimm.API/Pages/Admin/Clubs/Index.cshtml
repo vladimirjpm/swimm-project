@@ -6,8 +6,9 @@
 }
 
 <div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-6 text-[0.85rem] text-admin-text-muted leading-relaxed">
-    Кандидаты ищутся по пяти эвристикам: совпадающее имя у разных Id, с учётом гереша/апострофа
-    (<code>same-name</code>), мусорный хвост парсера (<code>suffix</code>), те же слова в другом
+    Кандидаты ищутся по шести эвристикам: совпадающее имя у разных Id, с учётом гереша/апострофа
+    (<code>same-name</code>), латинское имя клуба совпадает с английским именем ивритского
+    (<code>name-en</code>), мусорный хвост парсера (<code>suffix</code>), те же слова в другом
     порядке (<code>word-order</code>), общие пловцы между клубами (<code>swimmers</code>),
     опечатка в названии (<code>levenshtein</code>).
     Отметь пары → <b>Dry-run</b> покажет план без изменений; <b>Merge выбранные</b> —

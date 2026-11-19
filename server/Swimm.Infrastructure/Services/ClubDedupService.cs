@@ -8,7 +8,7 @@ namespace Swimm.Infrastructure.Services;
 
 /// <summary>
 /// Кандидаты на склейку клубов (docs/tasks/club-merge-plan.md, фаза B). Реальных клубов
-/// сотни — попарное сравнение в памяти дешёвое. Эвристики по убыванию уверенности (same-name по Normalize и word-order — см. ниже):
+/// сотни — попарное сравнение в памяти дешёвое. Эвристики по убыванию уверенности (same-name по Normalize, name-en и word-order — см. ниже):
 /// 1) мусорный хвост парсера («… DNS», «… 4.4 SW /») при существующем «чистом» клубе —
 ///    sure, можно лить пачкой; 2) пересечение пловцов (≥3 общих и ≥30% меньшего клуба) —
 ///    ловит кросс-скриптовые пары без транслитерации; 3) Левенштейн ≤ 1 внутри одного
@@ -130,6 +130,24 @@ public class ClubDedupService(SwimmDbContext db) : IClubDedupService
             var canon = ordered[0];
             foreach (var dup in ordered.Skip(1))
                 Add(canon, dup, "same-name", 0, sure: true);
+        }
+
+        // ── 0а. Латинское Name = NameEn ивритского клуба → sure ───────────
+        // Р108 (19.11.2026): «Bnei Herzeliya» (1262, латиница в Name) — дубль «בני הרצליה»
+        // (439, NameEn = «Bnei Herzeliya»). same-name сравнивает Name с Name и пару не видел,
+        // склеили руками 18.11. Это то же имя клуба, только в другом поле: импорт EN-протокола
+        // завёл клуб с английским названием в Name. Канон — ивритская запись (как у swimmers).
+        // Берём только однозначные: тот же NameEn у двух ивритских клубов — пропуск.
+        var hebrewByNameEn = real
+            .Where(c => HasHebrew(c.Name) && !string.IsNullOrWhiteSpace(c.NameEn))
+            .GroupBy(c => SwimmerDedupService.Normalize(c.NameEn!))
+            .Where(g => g.Key.Length > 0 && g.Count() == 1)
+            .ToDictionary(g => g.Key, g => g.Single());
+        foreach (var dup in real.Where(c => !HasHebrew(c.Name)))
+        {
+            if (!hebrewByNameEn.TryGetValue(SwimmerDedupService.Normalize(dup.Name), out var canon)) continue;
+            if (dupUsed.Contains(canon.Id) || canonUsed.Contains(dup.Id)) continue;
+            Add(canon, dup, "name-en", 0, sure: true);
         }
 
         // ── 0б. ТОТ ЖЕ НАБОР СЛОВ в другом порядке → unsure ───────────────
