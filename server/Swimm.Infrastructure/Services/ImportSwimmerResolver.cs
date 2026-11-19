@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Swimm.Application.Abstractions;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
@@ -53,19 +54,26 @@ internal sealed class ImportSwimmerResolver
     private readonly Dictionary<(int CompetitionId, int SwimmerId), int> _seenClubInCompetition = new();
     private readonly Dictionary<(int CompetitionId, string NameKey, int ClubId), Swimmer> _namesakeByClub = new();
 
-    private ImportSwimmerResolver(SwimmDbContext db, List<string> diagnosticLog)
+    // «Тот же клуб» запасных путей: карточка, история за 2 сезона, карточка loglig (Р110).
+    private readonly ImportClubEvidence _clubEvidence;
+
+    private ImportSwimmerResolver(SwimmDbContext db, List<string> diagnosticLog, ImportClubEvidence clubEvidence)
     {
         _db = db;
         _diagnosticLog = diagnosticLog;
+        _clubEvidence = clubEvidence;
     }
 
     /// <summary>
     /// Индексы по всем карточкам. Карточки ОТСЛЕЖИВАЮТСЯ: импорт дописывает в них пол, клуб,
     /// страну и EN-имя, изменения уходят общим сохранением.
     /// </summary>
-    public static async Task<ImportSwimmerResolver> LoadAsync(SwimmDbContext db, List<string> diagnosticLog)
+    /// <param name="loglig">Карточка loglig — третье доказательство «того же клуба» (Р110); null — в loglig не ходим.</param>
+    /// <param name="logligGap">Пауза между запросами к loglig (тесты — ноль); null — ~1 с, как у сверки Р98.</param>
+    public static async Task<ImportSwimmerResolver> LoadAsync(
+        SwimmDbContext db, List<string> diagnosticLog, ILogligClient? loglig = null, TimeSpan? logligGap = null)
     {
-        var resolver = new ImportSwimmerResolver(db, diagnosticLog);
+        var resolver = new ImportSwimmerResolver(db, diagnosticLog, new ImportClubEvidence(db, loglig, logligGap));
         foreach (var s in await db.Swimmers.ToListAsync())
         {
             resolver._byKey.TryAdd(SwimmerMatchKey(s.LastName, s.FirstName, s.BirthYear), s);
@@ -162,11 +170,9 @@ internal sealed class ImportSwimmerResolver
                     s.FirstName == (item.FirstName ?? "") &&
                     s.BirthYear == (item.BirthYear ?? 0));
 
-                swimmer ??= FindBySpelling(_bySpelling, item.LastName, item.FirstName, item.BirthYear,
-                    club, _diagnosticLog);
-                swimmer ??= FindBySwappedHalves(_bySpelling, item.LastName, item.FirstName, item.BirthYear,
-                    club, _diagnosticLog);
-                if (swimmer is null && FindByCenturyShift(item.LastName, item.FirstName, item.BirthYear, club)
+                swimmer ??= await FindBySpellingAsync(item.LastName, item.FirstName, item.BirthYear, club);
+                swimmer ??= await FindBySwappedHalvesAsync(item.LastName, item.FirstName, item.BirthYear, club);
+                if (swimmer is null && await FindByCenturyShiftAsync(item.LastName, item.FirstName, item.BirthYear, club)
                         is ({ } byCentury, var shift))
                 {
                     swimmer = byCentury;
@@ -306,11 +312,9 @@ internal sealed class ImportSwimmerResolver
                 swimmer ??= await FindLegByFullNameAsync(leg);
                 swimmer ??= await FindLegByEnglishNameAsync(leg);
                 // Нога плывёт за клуб команды — тот же фоллбек написания, что у личной строки.
-                swimmer ??= FindBySpelling(_bySpelling, leg.LastName, leg.FirstName, leg.BirthYear,
-                    club, _diagnosticLog);
-                swimmer ??= FindBySwappedHalves(_bySpelling, leg.LastName, leg.FirstName, leg.BirthYear,
-                    club, _diagnosticLog);
-                swimmer ??= FindByCenturyShift(leg.LastName, leg.FirstName, leg.BirthYear, club)?.Swimmer;
+                swimmer ??= await FindBySpellingAsync(leg.LastName, leg.FirstName, leg.BirthYear, club);
+                swimmer ??= await FindBySwappedHalvesAsync(leg.LastName, leg.FirstName, leg.BirthYear, club);
+                swimmer ??= (await FindByCenturyShiftAsync(leg.LastName, leg.FirstName, leg.BirthYear, club))?.Swimmer;
 
                 if (swimmer == null)
                 {
@@ -453,27 +457,22 @@ internal sealed class ImportSwimmerResolver
 
     /// <summary>
     /// Карточка того же человека, записанного другим написанием (<see cref="SwimmerSpellingKey"/>):
-    /// тот же год, ТОТ ЖЕ КЛУБ (клуб строки или его канон после склейки против <c>Swimmer.ClubId</c>)
-    /// и ровно один такой кандидат. ⚠ <c>Swimmer.ClubId</c> — клуб последнего соревнования ДО этого
-    /// импорта (Р95: пересчёт идёт после коммита), а закреплённый админом — как закреплён. Пловец,
-    /// сменивший клуб именно в этом протоколе, здесь не узнаётся. Иначе null — вызывающий заводит новую
+    /// тот же год, ТОТ ЖЕ КЛУБ и ровно один такой кандидат. «Тот же клуб» (Р110,
+    /// <see cref="ImportClubEvidence"/>) — клуб карточки, или любой клуб пловца за 2 последних сезона, или
+    /// клуб на его карточке loglig: после Р98 карточка меняет клуб лишь с подтверждения loglig, и
+    /// перешедший ребёнок с другим написанием иначе получал дубль. Иначе null — вызывающий заводит новую
     /// карточку, а сомнительную пару покажет проверка дублей в Health, решать будет человек.
     /// </summary>
-    private static Swimmer? FindBySpelling(
-        Dictionary<string, List<Swimmer>> index, string? last, string? first, int? year,
-        Club? club, List<string> diagnosticLog)
+    private async Task<Swimmer?> FindBySpellingAsync(string? last, string? first, int? year, Club? club)
     {
         if (club is null || SwimmerSpellingKey(last, first, year) is not { } key) return null;
-        if (!index.TryGetValue(key, out var candidates)) return null;
+        if (!_bySpelling.TryGetValue(key, out var candidates)) return null;
+        if (await _clubEvidence.PickAsync(candidates, club) is not { } match) return null;
 
-        var clubIds = new[] { club.Id, club.MergedIntoId ?? club.Id };
-        var sameClub = candidates.Where(s => s.ClubId is int c && clubIds.Contains(c)).Take(2).ToList();
-        if (sameClub.Count != 1) return null;
-
-        var found = sameClub[0];
-        diagnosticLog.Add(
+        var found = match.Swimmer;
+        _diagnosticLog.Add(
             $"Другое написание: '{last} {first}' ({year}) узнан как #{found.Id} '{found.LastName} {found.FirstName}' "
-            + $"(тот же год и клуб «{club.Name}»)");
+            + $"(тот же год и клуб «{club.Name}» — {match.Evidence})");
         return found;
     }
 
@@ -483,11 +482,12 @@ internal sealed class ImportSwimmerResolver
     /// печатают 2046, и импорт заводил двойника #64764, склеен 18.11.2026 — Р104).
     ///
     /// Срабатывает только на невозможный год — в будущем или старше ста лет — и только если
-    /// карточка с тем же точным именем и годом ±100 одна и стоит в ТОМ ЖЕ клубе (канон после
-    /// склейки тоже). Иначе null — вызывающий заводит новую карточку, решает человек.
+    /// карточка с тем же точным именем и годом ±100 одна и стоит в ТОМ ЖЕ клубе (Р110: клуб карточки,
+    /// история за 2 сезона или карточка loglig — <see cref="ImportClubEvidence"/>). Иначе null —
+    /// вызывающий заводит новую карточку, решает человек.
     /// </summary>
     /// <returns>Карточка и сдвиг года (строка − карточка, ±100); null — не узнан.</returns>
-    private (Swimmer Swimmer, int Shift)? FindByCenturyShift(string? last, string? first, int? year, Club? club)
+    private async Task<(Swimmer Swimmer, int Shift)?> FindByCenturyShiftAsync(string? last, string? first, int? year, Club? club)
     {
         if (club is null || year is not > 0) return null;
         var thisYear = DateTime.UtcNow.Year;
@@ -497,12 +497,11 @@ internal sealed class ImportSwimmerResolver
         else return null;
 
         if (!_byKey.TryGetValue(SwimmerMatchKey(last, first, year - shift), out var found)) return null;
-        var clubIds = new[] { club.Id, club.MergedIntoId ?? club.Id };
-        if (found.ClubId is not int c || !clubIds.Contains(c)) return null;
+        if (await _clubEvidence.PickAsync([found], club) is not { } match) return null;
 
         _diagnosticLog.Add(
             $"Год со сдвигом на сто лет: '{last} {first}' ({year}) узнан как #{found.Id} ({found.BirthYear}), "
-            + $"тот же клуб «{club.Name}» — ошибка года в протоколе");
+            + $"тот же клуб «{club.Name}» ({match.Evidence}) — ошибка года в протоколе");
         return (found, shift);
     }
 
@@ -517,22 +516,18 @@ internal sealed class ImportSwimmerResolver
     /// «עידו שני» бывают разными детьми (<c>Import_NameSurnameSwap_NotMerged</c>, карточка без клуба).
     /// Ключ — тот же «написания» (<see cref="SwimmerSpellingKey"/>) с половинами в обратном порядке.
     /// </summary>
-    private static Swimmer? FindBySwappedHalves(
-        Dictionary<string, List<Swimmer>> index, string? last, string? first, int? year,
-        Club? club, List<string> diagnosticLog)
+    private async Task<Swimmer?> FindBySwappedHalvesAsync(string? last, string? first, int? year, Club? club)
     {
         if (club is null || SwimmerSpellingKey(first, last, year) is not { } swapped) return null;
         if (swapped == SwimmerSpellingKey(last, first, year)) return null;   // перестановка ничего не меняет
-        if (!index.TryGetValue(swapped, out var candidates)) return null;
+        if (!_bySpelling.TryGetValue(swapped, out var candidates)) return null;
+        // «Тот же клуб» — как у другого написания (Р110): карточка, история за 2 сезона, loglig.
+        if (await _clubEvidence.PickAsync(candidates, club) is not { } match) return null;
 
-        var clubIds = new[] { club.Id, club.MergedIntoId ?? club.Id };
-        var sameClub = candidates.Where(s => s.ClubId is int c && clubIds.Contains(c)).Take(2).ToList();
-        if (sameClub.Count != 1) return null;
-
-        var found = sameClub[0];
-        diagnosticLog.Add(
+        var found = match.Swimmer;
+        _diagnosticLog.Add(
             $"Переставленные имя и фамилия: '{last} {first}' ({year}) узнан как #{found.Id} '{found.LastName} {found.FirstName}' "
-            + $"(тот же год и клуб «{club.Name}», Р83)");
+            + $"(тот же год и клуб «{club.Name}» — {match.Evidence}, Р83)");
         return found;
     }
 

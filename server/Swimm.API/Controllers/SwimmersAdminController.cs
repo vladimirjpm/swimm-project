@@ -174,7 +174,8 @@ public class SwimmersAdminController : ControllerBase
     public async Task<IActionResult> GetClub(int id, CancellationToken ct)
         => await _clubs.GetForAdminAsync(id, ct) is { } dto ? Ok(dto) : NotFound(new { error = "Пловец не найден" });
 
-    public sealed record SetClubRequest(int? ClubId, bool Locked);
+    /// <param name="ClubFromMasters">Флаг «клуб по мастерс-стартам» (Р109); null — не трогать.</param>
+    public sealed record SetClubRequest(int? ClubId, bool Locked, bool? ClubFromMasters = null);
 
     /// <summary>
     /// Ручная правка клуба и закрепление (К3). Закреплённый клуб импорт не меняет; без
@@ -184,7 +185,7 @@ public class SwimmersAdminController : ControllerBase
     [HttpPost("{id:int}/club")]
     public async Task<IActionResult> SetClub(int id, [FromBody] SetClubRequest request, CancellationToken ct)
     {
-        var (result, error) = await _clubs.SetByAdminAsync(id, request.ClubId, request.Locked, ct);
+        var (result, error) = await _clubs.SetByAdminAsync(id, request.ClubId, request.Locked, request.ClubFromMasters, ct);
         switch (error)
         {
             case SwimmerClubSetError.SwimmerNotFound: return NotFound(new { error = "Пловец не найден" });
@@ -196,7 +197,8 @@ public class SwimmersAdminController : ControllerBase
         var summary = (r.FromClubId != r.ToClubId
                 ? $"Клуб пловца: #{r.FromClubId?.ToString() ?? "—"} → #{r.ToClubId?.ToString() ?? "—"}"
                 : $"Клуб пловца не менялся (#{r.ToClubId?.ToString() ?? "—"})")
-            + (r.WasLocked != r.Locked ? (r.Locked ? ", закреплён" : ", закрепление снято") : "");
+            + (r.WasLocked != r.Locked ? (r.Locked ? ", закреплён" : ", закрепление снято") : "")
+            + (r.WasFromMasters != r.FromMasters ? (r.FromMasters == true ? ", клуб по мастерс-стартам" : ", флаг «по мастерс-стартам» снят") : "");
         await _audit.LogAsync("swimmer.club-set", "Swimmer", id.ToString(), summary, r, ct);
         return Ok(r);
     }

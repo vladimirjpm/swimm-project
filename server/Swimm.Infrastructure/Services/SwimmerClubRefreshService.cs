@@ -27,7 +27,8 @@ namespace Swimm.Infrastructure.Services;
 public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubCheckSignal? signal = null)
     : ISwimmerClubRefreshService
 {
-    private sealed record Card(int Id, int? ClubId, bool ClubLocked, string FirstName, string LastName, string FirstNameEn, string LastNameEn);
+    private sealed record Card(int Id, int? ClubId, bool ClubLocked, bool? ClubFromMasters,
+        string FirstName, string LastName, string FirstNameEn, string LastNameEn);
     internal sealed record ClubInfo(int Id, string Name, string NameEn, bool IsPseudo, int? MergedIntoId);
 
     public async Task<SwimmerClubRefreshReport> RefreshAsync(
@@ -39,7 +40,7 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
         var cardsQuery = db.Swimmers.AsNoTracking();
         if (ids is not null) cardsQuery = cardsQuery.Where(s => ids.Contains(s.Id));
         var cards = await cardsQuery
-            .Select(s => new Card(s.Id, s.ClubId, s.ClubLocked, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn))
+            .Select(s => new Card(s.Id, s.ClubId, s.ClubLocked, s.ClubFromMasters, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn))
             .ToListAsync(ct);
 
         var rowsBySwimmer = await LoadRowsAsync(ids, ct);
@@ -47,15 +48,25 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
         var facts = clubs.ToDictionary(c => c.Key, c => new ClubFacts(c.Value.IsPseudo, c.Value.MergedIntoId));
 
         var changes = new List<SwimmerClubChangePlan>();
-        int locked = 0, ties = 0, checkedCount = 0;
+        var toFlag = new List<int>();
+        int locked = 0, ties = 0, checkedCount = 0, fromMastersCount = 0;
         foreach (var card in cards)
         {
-            if (!rowsBySwimmer.TryGetValue(card.Id, out var rows)) continue; // без личных строк — нечего решать
+            if (!rowsBySwimmer.TryGetValue(card.Id, out var allRows)) continue; // без личных строк — нечего решать
             checkedCount++;
+
+            // Р109: есть мастерс-старты, а флаг не решён — ставим (и у закреплённого: снимут замок —
+            // правило уже будет знать, что клуб мастерс). Снятый админом (false) не трогаем.
+            var fromMasters = SwimmerCurrentClubRule.FromMasters(card.ClubFromMasters, allRows);
+            if (fromMasters) fromMastersCount++;
+            if (card.ClubFromMasters is null && fromMasters) toFlag.Add(card.Id);
             if (card.ClubLocked) { locked++; continue; }
 
+            // С флагом и периоды, и дата последнего старта — по мастерс-строкам: обычные старты
+            // карточку не двигают и кандидата не датируют.
+            var rows = fromMasters ? allRows.Where(r => r.IsMasters).ToList() : allRows;
             var periods = SwimmerCurrentClubRule.Periods(rows, facts);
-            if (periods.Count == 0) continue;                       // только псевдоклубы
+            if (periods.Count == 0) continue;                       // только псевдоклубы (или мастерс-строк нет)
             if (SwimmerCurrentClubRule.CurrentClub(rows, facts) is not int wanted) { ties++; continue; }
             if (wanted == card.ClubId) continue;
 
@@ -64,7 +75,8 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
                 card.ClubId, card.ClubId is int from ? ClubName(clubs, from) : null,
                 wanted, ClubName(clubs, wanted),
                 DateOnly.FromDateTime(periods.Max(p => p.Last)),
-                SwimmerCurrentClubRule.HasOverlap(periods)));
+                SwimmerCurrentClubRule.HasOverlap(periods),
+                fromMasters));
         }
 
         // Ждущие кандидаты в охвате прогона, которых правило больше не даёт: следующий старт снова
@@ -79,10 +91,17 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
         {
             var fresh = UpsertCandidates(existing, changes, source);
             db.SwimmerClubCandidates.RemoveRange(withdrawn);
+            if (toFlag.Count > 0)
+            {
+                // Отслеживаемые карточки и обычный SaveChanges — перехватчик кэша сбросит их строки.
+                foreach (var swimmer in await db.Swimmers.Where(s => toFlag.Contains(s.Id) && s.ClubFromMasters == null).ToListAsync(ct))
+                    swimmer.ClubFromMasters = true;
+            }
             await db.SaveChangesAsync(ct);
             if (fresh > 0 && source == SwimmerClubChangeSources.Import) signal?.Notify();
         }
-        return new SwimmerClubRefreshReport(checkedCount, locked, ties, changes, apply, withdrawn.Count);
+        return new SwimmerClubRefreshReport(checkedCount, locked, ties, changes, apply, withdrawn.Count,
+            toFlag.Count, fromMastersCount);
     }
 
     /// <summary>
@@ -133,14 +152,15 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
     public async Task<SwimmerClubAdminDto?> GetForAdminAsync(int swimmerId, CancellationToken ct = default)
     {
         var card = await db.Swimmers.AsNoTracking().Where(s => s.Id == swimmerId)
-            .Select(s => new Card(s.Id, s.ClubId, s.ClubLocked, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn))
+            .Select(s => new Card(s.Id, s.ClubId, s.ClubLocked, s.ClubFromMasters, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn))
             .FirstOrDefaultAsync(ct);
         if (card is null) return null;
 
         var clubs = await LoadClubsAsync(ct);
         var facts = clubs.ToDictionary(c => c.Key, c => new ClubFacts(c.Value.IsPseudo, c.Value.MergedIntoId));
         var rows = (await LoadRowsAsync([swimmerId], ct)).GetValueOrDefault(swimmerId) ?? [];
-        var rule = SwimmerCurrentClubRule.CurrentClub(rows, facts);
+        var fromMasters = SwimmerCurrentClubRule.FromMasters(card.ClubFromMasters, rows);
+        var rule = SwimmerCurrentClubRule.CurrentClub(rows, facts, fromMasters);
 
         var periods = SwimmerCurrentClubRule.Periods(rows, facts)
             .OrderByDescending(p => p.Last)
@@ -160,12 +180,12 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
             card.ClubId, card.ClubId is int c ? ClubName(clubs, c) : null, card.ClubLocked,
             rule, rule is int r ? ClubName(clubs, r) : null,
             periods, history,
-            candidate is null ? null : ToDto(candidate, name, clubs),
-            logligId);
+            candidate is null ? null : ToDto(candidate, name, clubs, fromMasters),
+            logligId, card.ClubFromMasters, fromMasters);
     }
 
     public async Task<(SwimmerClubSetResult? Result, SwimmerClubSetError Error)> SetByAdminAsync(
-        int swimmerId, int? clubId, bool locked, CancellationToken ct = default)
+        int swimmerId, int? clubId, bool locked, bool? clubFromMasters = null, CancellationToken ct = default)
     {
         var swimmer = await db.Swimmers.FirstOrDefaultAsync(s => s.Id == swimmerId, ct);
         if (swimmer is null) return (null, SwimmerClubSetError.SwimmerNotFound);
@@ -180,7 +200,8 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
             if (target is null) return (null, SwimmerClubSetError.PseudoClub);
         }
 
-        var result = new SwimmerClubSetResult(swimmerId, swimmer.ClubId, target, swimmer.ClubLocked, locked);
+        var result = new SwimmerClubSetResult(swimmerId, swimmer.ClubId, target, swimmer.ClubLocked, locked,
+            swimmer.ClubFromMasters, clubFromMasters ?? swimmer.ClubFromMasters);
         // Человек решил сам — ждущий кандидат снимается. Без закрепления следующий импорт может
         // завести его снова, если правило по-прежнему даёт другой клуб.
         if (await db.SwimmerClubCandidates.FirstOrDefaultAsync(c => c.SwimmerId == swimmerId, ct) is { } pending)
@@ -195,6 +216,9 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
             swimmer.ClubId = target;
         }
         swimmer.ClubLocked = locked;
+        // Р109: флаг ставит человек явно (true / false); null в запросе — не трогать. Снятый (false)
+        // автоматика больше не ставит.
+        if (clubFromMasters is bool masters) swimmer.ClubFromMasters = masters;
         await db.SaveChangesAsync(ct);
         return (result, SwimmerClubSetError.None);
     }
@@ -218,8 +242,46 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
 
         var clubs = await LoadClubsAsync(db, ct);
         var names = await SwimmerNamesAsync(db, shown.Select(c => c.SwimmerId), ct);
+        var shownIds = shown.Select(c => c.SwimmerId).ToArray();
+        var masters = (await db.Swimmers.AsNoTracking()
+            .Where(s => shownIds.Contains(s.Id) && s.ClubFromMasters == true)
+            .Select(s => s.Id).ToListAsync(ct)).ToHashSet();
         return new SwimmerClubPendingSummary(all.Count, byVerdict,
-            shown.Select(c => ToDto(c, names.GetValueOrDefault(c.SwimmerId) ?? $"#{c.SwimmerId}", clubs)).ToList());
+            shown.Select(c => ToDto(c, names.GetValueOrDefault(c.SwimmerId) ?? $"#{c.SwimmerId}", clubs,
+                masters.Contains(c.SwimmerId))).ToList());
+    }
+
+    public async Task<SwimmerClubMastersSummary> MastersAsync(int take, CancellationToken ct = default)
+    {
+        var flagged = await db.Swimmers.AsNoTracking().CountAsync(s => s.ClubFromMasters == true, ct);
+        if (flagged == 0) return new SwimmerClubMastersSummary(0, 0, []);
+
+        // Обычные (не мастерс) личные старты флагнутых пловцов за настоящий клуб, отличный от карточки.
+        // Склеенный клуб — приёмником (один шаг, как в стороже тёзок импорта).
+        var other = await db.Results.AsNoTracking()
+            .Where(r => r.RelayId == null && !r.Competition.IsMasters && r.Swimmer.ClubFromMasters == true
+                        && !r.Club.IsPseudo)
+            .Select(r => new { r.SwimmerId, Club = r.Club.MergedIntoId ?? r.ClubId, Card = r.Swimmer.ClubId })
+            .Where(x => x.Card == null || x.Club != x.Card)
+            .Select(x => new { x.SwimmerId, x.Club })
+            .Distinct()
+            .ToListAsync(ct);
+        var bySwimmer = other.GroupBy(x => x.SwimmerId).ToList();
+        if (bySwimmer.Count == 0) return new SwimmerClubMastersSummary(flagged, 0, []);
+
+        var shownIds = bySwimmer.Select(g => g.Key).OrderBy(id => id).Take(take).ToArray();
+        var cards = await db.Swimmers.AsNoTracking().Where(s => shownIds.Contains(s.Id))
+            .Select(s => new { s.Id, s.ClubId, s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn })
+            .ToDictionaryAsync(s => s.Id, ct);
+        var clubs = await LoadClubsAsync(ct);
+        var items = shownIds.Where(cards.ContainsKey).Select(id =>
+        {
+            var s = cards[id];
+            var others = bySwimmer.First(g => g.Key == id).Select(x => ClubName(clubs, x.Club)).Distinct().ToList();
+            return new SwimmerClubMastersItem(id, SwimmerName(s.FirstName, s.LastName, s.FirstNameEn, s.LastNameEn),
+                s.ClubId, s.ClubId is int c ? ClubName(clubs, c) : null, others);
+        }).ToList();
+        return new SwimmerClubMastersSummary(flagged, bySwimmer.Count, items);
     }
 
     /// <summary>Ключ «ещё не сверяли» в счёте ждущих по вердиктам (у кандидата <c>Verdict</c> = null).</summary>
@@ -236,12 +298,13 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
     internal static IQueryable<Swimmer> VerifiedLogligIds(IQueryable<Swimmer> swimmers) =>
         swimmers.Where(s => s.LogligId != null && s.LogligIdStatus == "Verified");
 
-    internal static SwimmerClubCandidateDto ToDto(SwimmerClubCandidate c, string swimmerName, Dictionary<int, ClubInfo> clubs) =>
+    internal static SwimmerClubCandidateDto ToDto(SwimmerClubCandidate c, string swimmerName, Dictionary<int, ClubInfo> clubs,
+        bool fromMasters = false) =>
         new(c.SwimmerId, swimmerName,
             c.FromClubId, c.FromClubId is int f ? ClubName(clubs, f) : null,
             c.ToClubId, ClubName(clubs, c.ToClubId),
             c.LastSwimDate, c.Overlap, c.Source,
-            c.Verdict, c.LogligId, c.LogligClubName, c.CheckedAt, c.CreatedAt);
+            c.Verdict, c.LogligId, c.LogligClubName, c.CheckedAt, c.CreatedAt, fromMasters);
 
     internal static async Task<Dictionary<int, string>> SwimmerNamesAsync(SwimmDbContext db, IEnumerable<int> ids, CancellationToken ct)
     {
@@ -257,15 +320,15 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
         if (ids is not null) results = results.Where(r => ids.Contains(r.SwimmerId));
 
         var grouped = await results
-            .GroupBy(r => new { r.SwimmerId, r.ClubId, r.CompetitionId, r.Competition.EventId })
-            .Select(g => new { g.Key.SwimmerId, g.Key.ClubId, g.Key.CompetitionId, g.Key.EventId,
+            .GroupBy(r => new { r.SwimmerId, r.ClubId, r.CompetitionId, r.Competition.EventId, r.Competition.IsMasters })
+            .Select(g => new { g.Key.SwimmerId, g.Key.ClubId, g.Key.CompetitionId, g.Key.EventId, g.Key.IsMasters,
                                Date = g.Max(r => r.CompetitionDate), Count = g.Count() })
             .ToListAsync(ct);
 
         return grouped
             .GroupBy(g => g.SwimmerId)
             .ToDictionary(g => g.Key, g => g
-                .Select(x => new SwimmerClubRow(x.ClubId, x.CompetitionId, x.EventId, x.Date, x.Count))
+                .Select(x => new SwimmerClubRow(x.ClubId, x.CompetitionId, x.EventId, x.Date, x.Count, x.IsMasters))
                 .ToList());
     }
 
