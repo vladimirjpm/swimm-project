@@ -16,8 +16,13 @@ namespace Swimm.Application.Abstractions;
 public interface IStartListScheduleService
 {
     /// <summary>
-    /// Один проход по окну <paramref name="daysAhead"/> дней вперёд.
-    /// Ошибка на одном соревновании не роняет обход.
+    /// Один тик по окну <paramref name="daysAhead"/> дней вперёд: тянет только тех, кому по
+    /// правилу частоты (<c>StartListSweepRules</c>, П3) пора. Ошибка на одном соревновании не
+    /// роняет обход.
     /// </summary>
-    Task<StartListSweepReport> RunAsync(int daysAhead, CancellationToken ct = default);
+    /// <param name="previousRunAt">
+    /// Начало прошлого успешного прогона задачи (<c>Sys_JobRuns</c>): по нему решается, нужна ли в
+    /// этот тик суточная догрузка loglig-id. null — нужна.
+    /// </param>
+    Task<StartListSweepReport> RunAsync(int daysAhead, DateTime? previousRunAt = null, CancellationToken ct = default);
 }

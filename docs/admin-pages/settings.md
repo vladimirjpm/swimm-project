@@ -8,6 +8,9 @@
 
 **Блок «Почта»** — карточка вверху страницы, раздел [ниже](#почта-блок-статуса-и-тестовое-письмо-2026-10-14).
 
+`StartListIntervalHours` (с 20.11.2026, П3, дефолт **3**) — шаг обхода стартовых протоколов, раньше
+был общий с `DiscoveryIntervalHours`; частоту одного старта решает правило по близости старта
+([jobs.md](jobs.md) «Частота стартовых протоколов»).
 Ключевые ключи: DiscoveryEnabled/DiscoveryIntervalHours (дефолт ВЫКЛ/**24ч** — с 19.10.2026, было 12),
 LogligVerifyEnabled/LogligVerifyIntervalHours (дефолт вкл/24ч),
 LogligBatchEnabled/LogligBatchPerRun/LogligBatchIntervalHours (дефолт ВЫКЛ/50/24ч),

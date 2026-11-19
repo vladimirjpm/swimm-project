@@ -16,8 +16,8 @@ namespace Swimm.API.BackgroundServices;
 /// ProdAdmin — да, прод и локальная разработка — нет).
 ///
 /// С10 (docs/plans/start-list-plan.md): второй проход в том же цикле, отдельного сервиса
-/// не заводим. Управляется StartListEnabled / StartListDaysAhead, тоже выключен по
-/// умолчанию. Забор одного соревнования — под две сотни запросов с паузой (минуты), это
+/// не заводим. Управляется StartListEnabled / StartListDaysAhead / StartListIntervalHours (П3),
+/// тоже выключен по умолчанию. Забор одного соревнования — под две сотни запросов с паузой (минуты), это
 /// фон — торопиться некуда, но каждая итерация берёт свой DbContext-скоуп, не держит его
 /// на всё окно, и уважает stoppingToken.
 /// </summary>
@@ -59,20 +59,27 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
                     }, _logger, stoppingToken);
                 }
 
-                // С10: второй проход, стартовый протокол будущих стартов. Своя настройка
-                // «включено», интервал — тот же DiscoveryIntervalHours (отдельного не заводим,
-                // решение 5: меньше движущихся частей). Забор одного соревнования занимает
-                // минуты, поэтому идёт следом, а не параллельно с discovery.SyncAsync выше.
-                // Своя строка журнала: упавший забор списка не откладывает протоколы и наоборот.
+                // С10: второй проход, стартовый протокол будущих стартов. Забор одного
+                // соревнования занимает минуты, поэтому идёт следом, а не параллельно с
+                // discovery.SyncAsync выше. Своя строка журнала: упавший забор списка не
+                // откладывает протоколы и наоборот.
+                // П3 (prod-auto-pull-plan §4.3): интервал свой (StartListIntervalHours, 3 ч) —
+                // это шаг тика, а кого смотреть в тик, решает StartListSweepRules по близости
+                // старта и журналу заборов. ScheduledJob по-прежнему решает только «пора ли тик»
+                // и держит заявку (П1) на весь тик.
                 var startListJob = JobNames.Get(JobNames.StartList);
                 if (startListJob.IsEnabled(settings))
                 {
                     await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.StartList, startListJob.Interval(settings), async ct =>
                     {
                         await using var jobScope = _scopeFactory.CreateAsyncScope();
-                        var daysAhead = Math.Max(1, settings.GetValue("StartListDaysAhead", 14));
+                        var daysAhead = Math.Max(1, settings.GetValue(JobNames.StartListDaysAheadKey, 14));
+                        // Итог этого тика ещё не записан — в журнале прошлый успех: по нему
+                        // решается, нужна ли суточная догрузка loglig-id.
+                        var previous = await jobScope.ServiceProvider.GetRequiredService<IJobRunStore>()
+                            .GetAsync(JobNames.StartList, ct);
                         var sweep = jobScope.ServiceProvider.GetRequiredService<IStartListScheduleService>();
-                        var sweepReport = await sweep.RunAsync(daysAhead, ct);
+                        var sweepReport = await sweep.RunAsync(daysAhead, previous.LastSuccessAt, ct);
                         var summary = JobRunSummaries.StartList(sweepReport, daysAhead);
                         _logger.LogInformation("Стартовый протокол (фон): {Summary}", summary);
                         return summary;

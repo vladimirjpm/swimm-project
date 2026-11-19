@@ -39,14 +39,23 @@ public sealed record StartListPullReport(
     DateTime PulledAt);
 
 /// <summary>
-/// Итог одного планового обхода стартовых протоколов (шаг С10).
+/// Итог одного планового обхода стартовых протоколов (шаг С10; частота по близости старта —
+/// П3, <c>StartListSweepRules</c>).
 /// </summary>
-/// <param name="DetailsChecked">Будущих стартов без <c>logligId</c> проверено.</param>
+/// <param name="DetailsChecked">Стартов без <c>logligId</c> проверено суточной догрузкой (0, если её в этот тик не было).</param>
 /// <param name="DetailsResolved">Из них <c>logligId</c> добыт.</param>
-/// <param name="Total">Будущих стартов с <c>logligId</c> — кандидатов на забор.</param>
-/// <param name="Pulled">Из них забор прошёл без исключения.</param>
+/// <param name="Total">Стартов окна, которые обход рассматривал (с loglig-id или ближайшие два дня).</param>
+/// <param name="Pulled">Из взятых в этот тик забор прошёл без исключения.</param>
+/// <param name="Due">Взято в этот тик — по правилу частоты пора.</param>
+/// <param name="TooEarly">Пропущено: смотрели недавно, по правилу ещё рано.</param>
+/// <param name="Started">Пропущено: день старта, первый заплыв уже начался.</param>
+/// <param name="DetailsRan">В этот тик шла суточная догрузка loglig-id.</param>
 public sealed record StartListSweepReport(
     int DetailsChecked,
     int DetailsResolved,
     int Total,
-    int Pulled);
+    int Pulled,
+    int Due,
+    int TooEarly,
+    int Started,
+    bool DetailsRan);
