@@ -1,0 +1,88 @@
+using System.Text.Json;
+
+namespace Swimm.Application.Mapping;
+
+/// <summary>Минимальная проекция строки разбора протокола — только то, что нужно для «проплыто ли».</summary>
+/// <param name="Event">Заголовок события протокола (дисциплина × секция пола/возраста).</param>
+/// <param name="Heat">Номер заплыва; 0 — не указан.</param>
+/// <param name="Printed">Время как напечатано; пусто/«0:00.00» — времени нет.</param>
+/// <param name="TimeFail">Признак парсера time_fail (NS/DNS/DQ… или строка без времени).</param>
+public sealed record ProgressRow(string Event, bool IsRelay, int Heat, string? Printed, bool TimeFail)
+{
+    /// <summary>Есть настоящее время: не time_fail и в строке есть ненулевая цифра (как в day-json.mjs).</summary>
+    public bool HasTime => !TimeFail && Printed is not null && Printed.Any(c => c is >= '1' and <= '9');
+}
+
+/// <summary>Сводка по одному событию протокола.</summary>
+public sealed record EventProgress(string Event, bool IsRelay, int Rows, int Timed, bool Finished)
+{
+    /// <summary>Причина «ждёт» для человека; null — событие проплыто.</summary>
+    public string? PendingReason => Finished ? null
+        : Timed == 0 ? $"{Event}: ещё не плыли (0 из {Rows} со временем)"
+        : IsRelay ? $"{Event}: идёт — в последнем заплыве эстафеты времён нет ({Timed} из {Rows} команд со временем)"
+        : $"{Event}: идёт — в последнем заплыве времён нет ({Timed} из {Rows} со временем)";
+}
+
+/// <summary>Итог: закончено ли соревнование и что ещё ждёт.</summary>
+public sealed record CompetitionProgressSummary(IReadOnlyList<EventProgress> Events)
+{
+    /// <summary>Хотя бы одно событие есть и все проплыты. Пустой разбор — не закончено.</summary>
+    public bool IsFinished => Events.Count > 0 && Events.All(e => e.Finished);
+
+    public IReadOnlyList<string> Pending => Events.Where(e => !e.Finished).Select(e => e.PendingReason!).ToList();
+}
+
+/// <summary>
+/// «Какие события уже проплыты / закончено ли соревнование» — чистая функция без I/O.
+/// Перенос логики из server/db/day-json.mjs (docs/plans/prod-auto-pull-plan.md §4.4, гейт
+/// «Соревнование закончено» задачи results-auto). PDF loglig у идущего старта печатает ВСЕ
+/// события, непроплытые — строками без времени.
+///
+/// Правило: событие проплыто, если в его ПОСЛЕДНЕМ заплыве (максимальный Heat) есть хоть одно
+/// время — эстафета с проплытым только первым заплывом проплытой не считается.
+/// </summary>
+public static class CompetitionProgress
+{
+    public static CompetitionProgressSummary Evaluate(IEnumerable<ProgressRow> rows)
+    {
+        var events = rows
+            .GroupBy(r => r.Event)
+            .Select(g =>
+            {
+                var list = g.ToList();
+                var lastHeat = list.Max(r => r.Heat);
+                return new EventProgress(
+                    g.Key,
+                    list.Any(r => r.IsRelay),
+                    list.Count,
+                    list.Count(r => r.HasTime),
+                    list.Any(r => r.Heat == lastHeat && r.HasTime));
+            })
+            .ToList();
+        return new CompetitionProgressSummary(events);
+    }
+
+    /// <summary>
+    /// Та же оценка прямо по JSON разбора (<see cref="Dtos.ParsedCompetition.ResultsJson"/>:
+    /// массив объектов snake_case). Нужна, потому что типа Result из Swimm.Parsing слой
+    /// Application видеть не может (зависимость обратная).
+    /// </summary>
+    public static CompetitionProgressSummary EvaluateJson(string resultsJson)
+    {
+        using var doc = JsonDocument.Parse(resultsJson);
+        var rows = new List<ProgressRow>();
+        foreach (var o in doc.RootElement.EnumerateArray())
+        {
+            rows.Add(new ProgressRow(
+                Str(o, "event") ?? "",
+                o.TryGetProperty("is_relay", out var r) && r.ValueKind == JsonValueKind.True,
+                o.TryGetProperty("heat", out var h) && h.ValueKind == JsonValueKind.Number ? h.GetInt32() : 0,
+                Str(o, "time"),
+                o.TryGetProperty("time_fail", out var f) && f.ValueKind == JsonValueKind.True));
+        }
+        return Evaluate(rows);
+    }
+
+    private static string? Str(JsonElement o, string name) =>
+        o.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+}
