@@ -240,6 +240,45 @@ public class InvariantDataChecksTests
         Assert.Contains("строк с расхождением 2", item.Message);
     }
 
+    /// <summary>
+    /// Р106: у организатора нет клубного зачёта (Unofficial, Р80) — построчные очки loglig есть,
+    /// но сверять наш расчёт не с чем. Ручное правило признак снимает — тогда сверяем.
+    /// </summary>
+    [Theory]
+    [InlineData(false, false, false, 0)]  // loglig проверен, зачёта нет
+    [InlineData(null, true, false, 0)]    // не проверялся, «зачёт не ведётся»
+    [InlineData(false, true, true, 1)]    // правило привязано вручную — шкала регламента, сверяем
+    [InlineData(true, true, false, 1)]    // официальный зачёт есть — сверяем, пометка не главнее
+    [InlineData(null, false, false, 1)]   // ничего не известно — сверяем, как раньше
+    public async Task OfficialClubPoints_UnofficialStanding_IsSkipped(
+        bool? hasOfficial, bool disabled, bool manualRule, int expected)
+    {
+        await using var db = CreateDb($"{nameof(OfficialClubPoints_UnofficialStanding_IsSkipped)}-{hasOfficial}-{disabled}-{manualRule}");
+        var (comp, style, club, swimmer) = await SeedAsync(db);
+        var rule = new PointRuleClubs
+        {
+            Version = "test", EffectiveFrom = new DateOnly(2026, 1, 1), Scope = "all",
+            DefaultPoints = 0, MaxScoringPlace = 1, RelayMultiplier = 2,
+            Entries = [new PointRuleClubsEntry { Place = 1, Points = 25 }]
+        };
+        db.PointRulesClubs.Add(rule);
+        await db.SaveChangesAsync();
+        comp.HasOfficialClubStanding = hasOfficial;
+        comp.ClubPointsDisabled = disabled;
+        comp.PointRuleClubsId = manualRule ? rule.Id : null;  // без привязки — автоподбор по дате
+        db.Results.Add(new ResultRecord
+        {
+            CompetitionId = comp.Id, SwimmerId = swimmer.Id, ClubId = club.Id, StyleId = style.Id,
+            Distance = "50", Gender = "male", EventStyleAge = "14", Position = 1,
+            TimeOriginal = "00:26.62", TimeMillisecond = 26620, HeatType = "final",
+            Heat = 1, Lane = 4, CompetitionDate = new DateTime(2026, 6, 1),
+            OfficialClubPoints = 7                                  // у нас 25 — расхождение
+        });
+        await db.SaveChangesAsync();
+
+        Assert.Equal(expected, (await new OfficialClubPointsMismatchCheck(db).RunAsync()).Total);
+    }
+
     /// <summary>Нет эталона — нет и проверки: PDF-импорты официальных очков не несут.</summary>
     [Fact]
     public async Task OfficialClubPoints_WithoutReference_IsSilent()
