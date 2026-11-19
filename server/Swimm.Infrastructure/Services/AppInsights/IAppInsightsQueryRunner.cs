@@ -10,7 +10,7 @@ internal sealed record AppInsightsRows(IReadOnlyList<IReadOnlyDictionary<string,
 /// </summary>
 internal interface IAppInsightsQueryRunner
 {
-    /// <summary>Выполнить запросы пакетом; ключ ответа — <see cref="AppInsightsQuery.Name"/>.</summary>
+    /// <summary>Выполнить запросы (параллельно, по одному); ключ ответа — <see cref="AppInsightsQuery.Name"/>.</summary>
     Task<IReadOnlyDictionary<string, AppInsightsRows>> RunAsync(
         string workspaceId, IReadOnlyList<AppInsightsQuery> queries, CancellationToken ct);
 }

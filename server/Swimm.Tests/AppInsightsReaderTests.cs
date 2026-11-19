@@ -5,6 +5,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Services.AppInsights;
 using Xunit;
 
@@ -191,8 +192,9 @@ public class AppInsightsReaderTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reader.GetSummaryAsync(cts.Token));
     }
 
-    // Живьём 17.11: SDK трижды подряд не разобрал ответ пакета («requires an element of type 'Object',
-    // but the target element has type 'String'»), потом само прошло. Один повтор это закрывает.
+    // Живьём 17.11 и 19.11: SDK не разобрал ответ $batch («requires an element of type 'Object',
+    // but the target element has type 'String'»). С 19.11 пакета нет (AzureLogsQueryRunner), повтор
+    // оставлен как страховка на такой же ответ одиночного /query.
     private static readonly InvalidOperationException Unreadable =
         new("The requested operation requires an element of type 'Object', but the target element has type 'String'.");
 
@@ -313,6 +315,81 @@ public class AppInsightsReaderTests
         Assert.Equal(DateTimeKind.Utc, at.Value.Kind);
         Assert.Equal(0, AppInsightsRowMapper.Long(row, "NoSuchColumn"));
         Assert.Equal("", AppInsightsRowMapper.Text(row, "NoSuchColumn"));
+    }
+
+    /// <summary>
+    /// Ответ запроса итогов в форме прода (живой /query 19.11.2026 08:00 UTC, после меток PR #225):
+    /// 18 колонок, значения — JsonElement. Колонки сходятся с маппером, карточка дашборда — с цифрами.
+    /// </summary>
+    [Fact]
+    public void Prod_shaped_totals_row_19_11_fills_dashboard_card()
+    {
+        const string table = """
+            {"columns":[{"name":"Requests"},{"name":"Errors5xx"},{"name":"P50Ms"},{"name":"P95Ms"},{"name":"SlowOperations"},
+              {"name":"DbCalls"},{"name":"DbP95Ms"},{"name":"DbFailed"},{"name":"Exceptions"},{"name":"BackgroundFailures"},
+              {"name":"AdminFailures"},{"name":"LastTelemetryAt"},{"name":"IngestedTodayMb"},{"name":"Visitors"},{"name":"Bots"},
+              {"name":"Internal"},{"name":"Cold"},{"name":"Starts"}],
+             "rows":[[1318,0,18.922792486145404,2258.34065,42,10194,111.90793948412698,0,0,0,11,"2026-11-19T07:57:22.9698135Z",16.855593,1272,15,31,0,15]]}
+            """;
+        var doc = JsonDocument.Parse(table).RootElement;
+        var names = doc.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString()!).ToList();
+        var rows = doc.GetProperty("rows").EnumerateArray()
+            .Select(r => (IReadOnlyDictionary<string, object?>)names.Zip(r.EnumerateArray(), (n, v) => (n, v))
+                .ToDictionary(x => x.n, x => (object?)x.v))
+            .ToList();
+
+        var t = AppInsightsRowMapper.Totals(new AppInsightsRows(rows));
+        Assert.Equal(1318, t.Requests);
+        Assert.Equal(2258.34065, t.P95Ms);
+        Assert.Equal(42, t.SlowOperations);
+        Assert.Equal(11, t.AdminFailures);
+        Assert.Equal((1272L, 15L, 31L, 0L, 15L), (t.Visitors, t.Bots, t.Internal, t.Cold, t.Starts));
+        Assert.Equal(new DateTime(2026, 11, 19, 7, 57, 22, DateTimeKind.Utc), t.LastTelemetryAt!.Value.AddTicks(-(t.LastTelemetryAt.Value.Ticks % TimeSpan.TicksPerSecond)));
+
+        var s = AppInsightsOverviewBuilder.Summary(
+            AppInsightsConnections.Ok(), t, 50, new DateTime(2026, 11, 19, 7, 58, 42, DateTimeKind.Utc));
+        Assert.Equal(AppInsightsStates.Ok, s.Connection.State);
+        Assert.NotEqual("—", s.Value);
+        Assert.Equal(1318, s.Requests);
+        Assert.Contains("1318 запросов", s.Caption);
+        Assert.NotEmpty(s.Metrics);
+    }
+
+    // ── Параллельные запросы вместо $batch ─────────────────────────────────
+
+    [Fact]
+    public async Task RunEach_returns_every_query_by_name()
+    {
+        var queries = AppInsightsQueries.Overview(AppInsightsRoles.WebRoleName, TimeSpan.FromHours(24), 0);
+        var rows = await AzureLogsQueryRunner.RunEachAsync(queries, async (q, ct) =>
+        {
+            await Task.Delay(5, ct);
+            return new AppInsightsRows([new Dictionary<string, object?> { ["Name"] = q.Name }]);
+        }, CancellationToken.None);
+
+        Assert.Equal(queries.Select(q => q.Name).Order(), rows.Keys.Order());
+        Assert.All(rows, kv => Assert.Equal(kv.Key, kv.Value.Rows[0]["Name"]));
+    }
+
+    [Fact]
+    public async Task RunEach_rethrows_the_real_failure_and_cancels_the_rest()
+    {
+        var queries = AppInsightsQueries.Overview(AppInsightsRoles.WebRoleName, TimeSpan.FromHours(24), 0);
+        var cancelled = 0;
+        var ex = await Assert.ThrowsAsync<RequestFailedException>(() => AzureLogsQueryRunner.RunEachAsync(queries, async (q, ct) =>
+        {
+            if (q.Name == AppInsightsQueries.ErrorsName)
+            {
+                await Task.Delay(10, CancellationToken.None);
+                throw new RequestFailedException(504, "Gateway timeout");
+            }
+            try { await Task.Delay(TimeSpan.FromSeconds(30), ct); }
+            catch (OperationCanceledException) { Interlocked.Increment(ref cancelled); throw; }
+            return new AppInsightsRows([]);
+        }, CancellationToken.None));
+
+        Assert.Equal(504, ex.Status);   // не AggregateException и не отмена соседей
+        Assert.Equal(queries.Count - 1, cancelled);
     }
 
     [Fact]

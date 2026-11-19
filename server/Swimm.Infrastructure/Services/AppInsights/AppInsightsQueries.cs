@@ -4,7 +4,7 @@ using Swimm.Application.Mapping;
 
 namespace Swimm.Infrastructure.Services.AppInsights;
 
-/// <summary>Один запрос KQL пакета: имя (ключ результата) и текст.</summary>
+/// <summary>Один запрос KQL страницы: имя (ключ результата) и текст.</summary>
 internal sealed record AppInsightsQuery(string Name, string Kql);
 
 /// <summary>
@@ -54,7 +54,7 @@ internal static class AppInsightsQueries
     /// <summary>Окно запроса для API (timespan): самый длинный период — 7 дней «последней телеметрии» с запасом.</summary>
     public static readonly TimeSpan QueryWindow = TimeSpan.FromDays(8);
 
-    /// <summary>Пять запросов страницы — одним пакетом (один HTTP-вызов, лимит частоты не тратится).</summary>
+    /// <summary>Пять запросов страницы — уходят параллельно, по одному (не <c>$batch</c>: см. <see cref="AzureLogsQueryRunner"/>).</summary>
     public static IReadOnlyList<AppInsightsQuery> Overview(string roleName, TimeSpan range, int capResetHourUtc) =>
     [
         new(TotalsName, Totals(roleName, range, capResetHourUtc)),
