@@ -42,7 +42,8 @@ public class DataVersionPgTests
         var withTrigger = DataVersionForSync.Tables
             .Concat(AddCompetitionSeries.SyncTables)
             .Concat(AddSeriesEmblems.SyncTables)
-            .Concat(AddClubNames.SyncTables);
+            .Concat(AddClubNames.SyncTables)
+            .Concat(AddVenuePools.SyncTables);
         Assert.Equal(SeedTables(), withTrigger.Order(StringComparer.Ordinal).ToList());
     }
 

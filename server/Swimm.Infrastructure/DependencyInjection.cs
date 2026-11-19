@@ -172,6 +172,9 @@ public static class DependencyInjection
         services.AddScoped<ICompetitionAdminRepository, CompetitionAdminRepository>();
         services.AddScoped<ICategoryAdminRepository, CategoryAdminRepository>();
         services.AddScoped<IStyleAdminRepository, StyleAdminRepository>();
+        // Справочник «место → длина бассейна» (П4): поиск для превью/results-auto + CRUD админки
+        services.AddScoped<IVenuePoolService, VenuePoolService>();
+        services.AddScoped<IVenuePoolAdminRepository, VenuePoolAdminRepository>();
         services.AddScoped<IPointRulesAdminRepository, PointRulesAdminRepository>();
         services.AddScoped<ISeriesAdminRepository, SeriesAdminRepository>();
         services.AddScoped<ISeriesBinder, SeriesBinder>();
