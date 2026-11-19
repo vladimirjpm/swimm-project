@@ -91,7 +91,12 @@ public sealed record DashboardSwimmerStatus(
     /// Кандидаты на смену клуба, ждущие loglig (Р98): счёт по причинам (old / archive / other /
     /// no-loglig-id / unavailable / unchecked) и до 10 строк каждой.
     /// </summary>
-    SwimmerClubPendingSummary? ClubCandidates = null);
+    SwimmerClubPendingSummary? ClubCandidates = null,
+    /// <summary>
+    /// Флаг «клуб по мастерс-стартам» (Р108): сколько стоит, у скольких есть обычные старты за другой
+    /// клуб, и до 20 таких пловцов списком.
+    /// </summary>
+    SwimmerClubMastersSummary? ClubFromMasters = null);
 
 /// <summary>Блок «Клубы»: дедуп-кандидаты, клубы без пловцов/страны, заявки на официальный статус.</summary>
 public sealed record DashboardClubStatus(

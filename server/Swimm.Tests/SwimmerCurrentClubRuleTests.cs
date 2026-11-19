@@ -184,4 +184,58 @@ public class SwimmerCurrentClubRuleTests
         Assert.False(SwimmerCurrentClubRule.HasOverlap(clean));
         Assert.Equal([Dolphin, Raanana], clean.Select(p => p.ClubId));
     }
+
+    // --- Р108: клуб по мастерс-стартам (Влад 19.11.2026) ---
+
+    private static SwimmerClubRow MastersRow(int club, int competition, string date) =>
+        new(club, competition, null, DateTime.Parse(date), IsMasters: true);
+
+    [Fact]
+    public void FromMasters_LatestRegularStartDoesNotMoveCard()
+    {
+        // Мастерс за Дельфин, а последний обычный старт — за Раанану: карточка держит мастерс-клуб.
+        var rows = new[] { MastersRow(Dolphin, 1, "2026-06-01"), Row(Raanana, 2, "2026-11-05") };
+
+        Assert.Null(SwimmerCurrentClubRule.Decide(Dolphin, false, rows, Clubs, fromMasters: true));
+        Assert.Equal(Raanana, SwimmerCurrentClubRule.Decide(Dolphin, false, rows, Clubs));   // без флага — как раньше
+    }
+
+    [Fact]
+    public void FromMasters_CandidateIsLastMastersClub()
+    {
+        // Карточка на клубе обычных стартов (7165-подобный случай) — кандидат на мастерс-клуб.
+        var rows = new[]
+        {
+            MastersRow(Other, 1, "2025-12-01"), MastersRow(Dolphin, 2, "2026-06-01"),
+            Row(Raanana, 3, "2026-11-05"),
+        };
+
+        Assert.Equal(Dolphin, SwimmerCurrentClubRule.Decide(Raanana, false, rows, Clubs, fromMasters: true));
+    }
+
+    [Fact]
+    public void FromMasters_NoMastersRows_NoChange()
+    {
+        // Флаг поставили руками, а мастерс-стартов нет — не определить, карточку не трогаем.
+        var rows = new[] { Row(Raanana, 1, "2026-11-05") };
+        Assert.Null(SwimmerCurrentClubRule.Decide(Dolphin, false, rows, Clubs, fromMasters: true));
+    }
+
+    [Fact]
+    public void FromMasters_LockedStillWins()
+    {
+        var rows = new[] { MastersRow(Raanana, 1, "2026-06-01") };
+        Assert.Null(SwimmerCurrentClubRule.Decide(Dolphin, true, rows, Clubs, fromMasters: true));
+    }
+
+    [Theory]
+    [InlineData(null, true, true)]     // не решено + мастерс-старты → флаг действует
+    [InlineData(null, false, false)]   // не решено, мастерс нет
+    [InlineData(false, true, false)]   // снят админом — не действует, хоть мастерс и есть
+    [InlineData(true, false, true)]    // поставлен руками
+    public void FromMasters_FlagResolution(bool? flag, bool hasMasters, bool expected)
+    {
+        var rows = new[] { hasMasters ? MastersRow(Dolphin, 1, "2026-06-01") : Row(Dolphin, 1, "2026-06-01") };
+        Assert.Equal(expected, SwimmerCurrentClubRule.FromMasters(flag, rows));
+    }
 }

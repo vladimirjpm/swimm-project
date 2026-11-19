@@ -10,7 +10,10 @@ namespace Swimm.Application.Mapping;
 /// <param name="EventId">Событие многодневки (<c>Competitions.EventId</c>); null — однодневка.</param>
 /// <param name="Date">Дата строки (<c>Results.CompetitionDate</c>).</param>
 /// <param name="Count">Сколько таких строк (запрос может отдать их уже сгруппированными).</param>
-public sealed record SwimmerClubRow(int ClubId, int CompetitionId, int? EventId, DateTime Date, int Count = 1);
+/// <param name="IsMasters">Строка мастерс-соревнования (<c>Competitions.IsMasters</c>) — для флага
+/// <c>Swimmers.ClubFromMasters</c> (Р108).</param>
+public sealed record SwimmerClubRow(
+    int ClubId, int CompetitionId, int? EventId, DateTime Date, int Count = 1, bool IsMasters = false);
 
 /// <summary>Что правилу нужно знать о клубе: псевдо ли он и куда склеен.</summary>
 public sealed record ClubFacts(bool IsPseudo, int? MergedIntoId);
@@ -30,6 +33,9 @@ public sealed record SwimmerClubPeriod(int ClubId, DateTime First, DateTime Last
 /// • В последнем соревновании два клуба — берём тот, где строк больше. Поровну — не меняем:
 ///   правды в данных нет, а прыгать туда-сюда при каждом импорте хуже, чем оставить как есть.
 /// • Закреплённый клуб (<c>Swimmers.ClubLocked</c>, решение К3) правило не трогает.
+/// • Флаг «клуб по мастерс-стартам» (<c>Swimmers.ClubFromMasters</c>, Р108, Влад 19.11.2026): в счёт
+///   идут только строки мастерс-соревнований, обычные старты клуб карточки не двигают. Мастерс-строк
+///   нет — не определить (null), карточку не трогаем.
 ///
 /// Строки — только ЛИЧНЫЕ: строка эстафеты принадлежит первой ноге (<c>Results.SwimmerId</c>), у
 /// остальных ног её нет, и счёт «где строк больше» поехал бы у одного пловца из четырёх.
@@ -47,17 +53,21 @@ public static class SwimmerCurrentClubRule
     /// </summary>
     public static int? Decide(
         int? currentClubId, bool locked,
-        IEnumerable<SwimmerClubRow> rows, IReadOnlyDictionary<int, ClubFacts> clubs)
+        IEnumerable<SwimmerClubRow> rows, IReadOnlyDictionary<int, ClubFacts> clubs, bool fromMasters = false)
     {
         if (locked) return null;
-        var wanted = CurrentClub(rows, clubs);
+        var wanted = CurrentClub(rows, clubs, fromMasters);
         return wanted is int club && club != currentClubId ? club : null;
     }
 
-    /// <summary>Клуб последнего соревнования без учёта карточки; null — не определить.</summary>
-    public static int? CurrentClub(IEnumerable<SwimmerClubRow> rows, IReadOnlyDictionary<int, ClubFacts> clubs)
+    /// <summary>
+    /// Клуб последнего соревнования без учёта карточки; null — не определить.
+    /// <paramref name="fromMasters"/> — в счёт только мастерс-соревнования (Р108).
+    /// </summary>
+    public static int? CurrentClub(
+        IEnumerable<SwimmerClubRow> rows, IReadOnlyDictionary<int, ClubFacts> clubs, bool fromMasters = false)
     {
-        var real = RealRows(rows, clubs).ToList();
+        var real = RealRows(fromMasters ? rows.Where(r => r.IsMasters) : rows, clubs).ToList();
         if (real.Count == 0) return null;
 
         var competitions = real
@@ -99,6 +109,14 @@ public static class SwimmerCurrentClubRule
                     return true;
         return false;
     }
+
+    /// <summary>
+    /// Действует ли флаг «клуб по мастерс-стартам» (Р108): true — да; false — снят админом, нет;
+    /// null — не решено, и тогда да, если у пловца есть хоть одна мастерс-строка (так его и ставит
+    /// пересчёт клуба). Псевдоклуб тут не важен: решает сам факт мастерс-старта.
+    /// </summary>
+    public static bool FromMasters(bool? flag, IEnumerable<SwimmerClubRow> rows) =>
+        flag ?? rows.Any(r => r.IsMasters);
 
     /// <summary>Клуб с приёмником склейки вместо склеенного; null — псевдоклуб или клуба нет.</summary>
     public static int? Resolve(int clubId, IReadOnlyDictionary<int, ClubFacts> clubs)

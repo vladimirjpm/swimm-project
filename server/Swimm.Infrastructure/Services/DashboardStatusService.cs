@@ -320,7 +320,8 @@ public class DashboardStatusService(
             Loglig: loglig,
             ClubChanges7d: await SwimmerClubRefreshService.CountRecentAsync(db, ClubChangeDays, ct),
             RecentClubChanges: await new SwimmerClubRefreshService(db).RecentChangesAsync(ClubChangeDays, 20, ct),
-            ClubCandidates: await new SwimmerClubRefreshService(db).PendingAsync(10, ct));
+            ClubCandidates: await new SwimmerClubRefreshService(db).PendingAsync(10, ct),
+            ClubFromMasters: await new SwimmerClubRefreshService(db).MastersAsync(20, ct));
     }
 
     private async Task<DashboardClubStatus> BuildClubsAsync(CancellationToken ct)

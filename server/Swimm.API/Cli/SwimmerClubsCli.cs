@@ -21,6 +21,8 @@ internal static class SwimmerClubsCli
     //   … [--limit <N>]                                          сколько строк плана печатать (по умолчанию все)
     // Закреплённых (Swimmers.ClubLocked) не трогает. «⇄» — периоды двух клубов пересекаются (часто дубль
     // клуба, Ф0). Идемпотентно: ответ loglig моложе суток берётся из кэша кандидата.
+    // Р108: пловцам с мастерс-стартами ставит Swimmers.ClubFromMasters (в dry-run — только считает); у них
+    // кандидат — клуб последнего МАСТЕРС-соревнования, колонка «M» в плане.
     internal static async Task RefreshSwimmerClubsAsync(WebApplication app, string[] args)
     {
         var dryRun = args.Contains("--dry-run");
@@ -41,6 +43,8 @@ internal static class SwimmerClubsCli
         Console.WriteLine(
             $"Кандидатов на смену клуба: {report.Changes.Count} (из них с пересекающимися периодами двух клубов, ⇄: {overlap}); "
             + $"{(dryRun ? "снялось бы" : "снято")} ждущих: {report.Withdrawn}");
+        Console.WriteLine(
+            $"Клуб по мастерс-стартам (Р108): у {report.FromMasters}; флаг {(dryRun ? "поставился бы" : "поставлен")} сейчас: {report.MastersFlagged}");
 
         var plan = report.Changes.OrderByDescending(c => c.LastSwimDate).ThenBy(c => c.SwimmerId).ToList();
         SwimmerClubCheckReport loglig;
@@ -61,13 +65,13 @@ internal static class SwimmerClubsCli
 
         var verdicts = loglig.Verdicts.ToDictionary(v => v.SwimmerId);
         Console.WriteLine();
-        Console.WriteLine("swimmer\tname\tfrom\tto\tlast swim\toverlap\tloglig\tloglig club");
+        Console.WriteLine("swimmer\tname\tfrom\tto\tlast swim\toverlap\tM\tloglig\tloglig club");
         foreach (var c in plan.Take(limit))
         {
             var v = verdicts.GetValueOrDefault(c.SwimmerId);
             Console.WriteLine(
                 $"{c.SwimmerId}\t{c.SwimmerName}\t{c.FromClubId?.ToString() ?? "—"} {c.FromClubName ?? ""}\t"
-                + $"{c.ToClubId} {c.ToClubName}\t{c.LastSwimDate:yyyy-MM-dd}\t{(c.Overlap ? "⇄" : "")}\t"
+                + $"{c.ToClubId} {c.ToClubName}\t{c.LastSwimDate:yyyy-MM-dd}\t{(c.Overlap ? "⇄" : "")}\t{(c.FromMasters ? "M" : "")}\t"
                 + $"{v?.Verdict ?? "—"}{(v?.Applied == true ? " ✓" : "")}\t{v?.LogligClubName ?? ""}");
         }
 

@@ -3862,6 +3862,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("BirthYear")
                         .HasColumnType("integer");
 
+                    b.Property<bool?>("ClubFromMasters")
+                        .HasColumnType("boolean");
+
                     b.Property<int?>("ClubId")
                         .HasColumnType("integer");
 

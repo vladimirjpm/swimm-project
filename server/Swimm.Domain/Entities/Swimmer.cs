@@ -85,6 +85,20 @@ public class Swimmer
     /// </summary>
     public bool ClubLocked { get; set; }
 
+    /// <summary>
+    /// Клуб карточки — по МАСТЕРС-стартам (решение Влада 19.11.2026, §7.1 плана
+    /// docs/plans/swimmer-club-change-plan.md, Р108): кто плывёт мастерс за один клуб, а обычные
+    /// старты за другой, держит мастерс-клуб — «мастерс более рейтинговое». С флагом кандидат на
+    /// смену клуба (<c>SwimmerCurrentClubRule</c>) — клуб последнего мастерс-соревнования
+    /// (<c>Competitions.IsMasters</c>); обычные старты карточку не двигают.
+    /// • null — не решено: пересчёт клуба (импорт, <c>--refresh-swimmer-clubs</c>) сам ставит true,
+    ///   как только у пловца есть мастерс-старты;
+    /// • true — по мастерс-стартам (сам или админ);
+    /// • false — снято админом на /Admin/Swimmers: клуб по всем стартам, автоматика флаг больше не ставит.
+    /// Сверка с loglig (Р98) — как у всех.
+    /// </summary>
+    public bool? ClubFromMasters { get; set; }
+
     /// <summary>Ссылка на страну (опционально)</summary>
     public int? CountryId { get; set; }
 

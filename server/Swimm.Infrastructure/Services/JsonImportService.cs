@@ -29,6 +29,7 @@ public class JsonImportService : IImportService
     private readonly IRelayLegCleanupService? _legCleanup;
     private readonly ISeriesBinder? _seriesBinder;
     private readonly ISwimmerClubRefreshService? _clubRefresh;
+    private readonly ILogligClient? _loglig;
 
     private static readonly string[] ClearableTables =
         ["Results", "GalleryItems", "Galleries", "Relays", "Swimmers", "Clubs", "Sys_ImportHistory", "Competitions", "CompetitionEvents", "Countries"];
@@ -62,6 +63,10 @@ public class JsonImportService : IImportService
     /// Пересчёт текущего клуба у затронутых пловцов (Р95). Необязателен по той же причине, что и
     /// <paramref name="recalc"/>.
     /// </param>
+    /// <param name="loglig">
+    /// Карточка loglig для узнавания перешедшего пловца с другим написанием (Р109): сеть только в редких
+    /// запасных случаях и только с подтверждённым loglig-id. null — без этого доказательства.
+    /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
         ICompetitionRecalculationService? recalc = null,
         IDataCheckRunner? checks = null,
@@ -70,7 +75,8 @@ public class JsonImportService : IImportService
         ISuspectResultService? suspects = null,
         IRelayLegCleanupService? legCleanup = null,
         ISeriesBinder? seriesBinder = null,
-        ISwimmerClubRefreshService? clubRefresh = null)
+        ISwimmerClubRefreshService? clubRefresh = null,
+        ILogligClient? loglig = null)
     {
         _db    = db;
         _cache = cache;
@@ -82,6 +88,7 @@ public class JsonImportService : IImportService
         _legCleanup = legCleanup;
         _seriesBinder = seriesBinder;
         _clubRefresh = clubRefresh;
+        _loglig = loglig;
     }
 
     public string[] GetClearableTables() => ClearableTables;
@@ -152,6 +159,7 @@ public class JsonImportService : IImportService
         private readonly IRelayLegCleanupService? _legCleanup;
         private readonly ISeriesBinder? _seriesBinder;
         private readonly ISwimmerClubRefreshService? _clubRefresh;
+        private readonly ILogligClient? _loglig;
 
         // Аргументы ImportAsync.
         private readonly Stream jsonStream;
@@ -237,6 +245,7 @@ public class JsonImportService : IImportService
             _legCleanup = svc._legCleanup;
             _seriesBinder = svc._seriesBinder;
             _clubRefresh = svc._clubRefresh;
+            _loglig = svc._loglig;
             this.jsonStream = jsonStream;
             this.fileName = fileName;
             this.categoryKeys = categoryKeys;
@@ -434,7 +443,8 @@ public class JsonImportService : IImportService
             // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.
             // Пловцы: строка протокола → карточка (точный ключ, фоллбеки, страж тёзок И-11) —
             // ImportSwimmerResolver, один на импорт.
-            swimmers = await ImportSwimmerResolver.LoadAsync(_db, diagnosticLog);
+            // loglig — третье доказательство «того же клуба» на запасных путях (Р109), сеть только там.
+            swimmers = await ImportSwimmerResolver.LoadAsync(_db, diagnosticLog, _loglig);
 
             // Categories: Key → Category (для привязки соревнований к категориям на импорте).
             categoryCache = new Dictionary<string, Category>(StringComparer.OrdinalIgnoreCase);
@@ -1475,6 +1485,10 @@ public class JsonImportService : IImportService
                         + (report.Changes.Count > 10 ? " …" : ""));
                 if (report.Withdrawn > 0)
                     diagnosticLog.Add($"Снято ждущих кандидатов на смену клуба: {report.Withdrawn} (клуб снова как в карточке).");
+                if (report.MastersFlagged > 0)
+                    diagnosticLog.Add(
+                        $"Клуб по мастерс-стартам (Р108): флаг поставлен {report.MastersFlagged} пловцам — их клуб карточки "
+                        + "теперь следует только мастерс-соревнованиям.");
             }
             catch (Exception ex)
             {

@@ -322,8 +322,8 @@
                 card.innerHTML = `
                     <div class="mb-2"><a href="/swimmers/${d.swimmerId}" target="_blank" rel="noopener" dir="rtl" class="text-admin-text font-semibold hover:underline">${esc(d.swimmerName)}</a>
                         <span class="text-[#546e7a]">#${d.swimmerId}</span></div>
-                    <div class="mb-1">В карточке: ${club(d.clubId, d.clubName)} ${d.clubLocked ? '<span class="ml-1 rounded bg-admin-accent/15 px-1.5 py-0.5 text-[11px] text-admin-accent">🔒 закреплён</span>' : ''}</div>
-                    <div class="mb-3 text-admin-text-muted">По правилу (последнее соревнование): ${d.ruleClubId == null ? 'не определить — ничья или нет строк с настоящим клубом' : club(d.ruleClubId, d.ruleClubName)}
+                    <div class="mb-1">В карточке: ${club(d.clubId, d.clubName)} ${d.clubLocked ? '<span class="ml-1 rounded bg-admin-accent/15 px-1.5 py-0.5 text-[11px] text-admin-accent">🔒 закреплён</span>' : ''} ${d.ruleFromMasters ? '<span class="ml-1 rounded bg-admin-accent/15 px-1.5 py-0.5 text-[11px] text-admin-accent">Ⓜ клуб по мастерс-стартам</span>' : ''}</div>
+                    <div class="mb-3 text-admin-text-muted">По правилу (последнее ${d.ruleFromMasters ? 'МАСТЕРС-' : ''}соревнование): ${d.ruleClubId == null ? 'не определить — ничья или нет строк с настоящим клубом' : club(d.ruleClubId, d.ruleClubName)}
                         ${differs ? '<span class="ml-1 text-admin-warning">≠ карточке</span>' : ''}</div>
                     ${renderLoglig(d)}
                     <div class="mb-1 text-[12px] uppercase tracking-wide text-admin-text-muted">Клубы по протоколам</div>
@@ -337,6 +337,7 @@
                         <input id="club-new-id" type="number" min="1" value="${d.clubId ?? ''}" placeholder="Id клуба"
                                class="w-28 rounded-md border border-admin-border bg-transparent px-2 py-1.5 text-admin-text" />
                         <label class="flex items-center gap-1.5 text-admin-text-muted"><input id="club-locked" type="checkbox" ${d.clubLocked ? 'checked' : ''} /> закрепить</label>
+                        <label class="flex items-center gap-1.5 text-admin-text-muted" title="Р108: клуб карточки — по мастерс-стартам, обычные старты его не двигают. Ставится сам, если есть мастерс-старты; снятый автоматика не вернёт"><input id="club-masters" type="checkbox" ${d.ruleFromMasters ? 'checked' : ''} /> клуб по мастерс-стартам${d.clubFromMasters == null ? ' (авто)' : ''}</label>
                         <button id="btn-club-save" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[13px] font-semibold">Сохранить</button>
                     </div>
                     ${d.history.length ? `<div class="mt-3 mb-1 text-[12px] uppercase tracking-wide text-admin-text-muted">История смен</div>${d.history.map(h => `
@@ -360,10 +361,13 @@
                     const raw = document.getElementById('club-new-id').value.trim();
                     const clubId = raw === '' ? null : parseInt(raw, 10);
                     const locked = document.getElementById('club-locked').checked;
+                    // Флаг мастерс шлём, только если его тронули: иначе «авто» (null) осталось бы как было.
+                    const mastersBox = document.getElementById('club-masters').checked;
+                    const clubFromMasters = mastersBox !== d.ruleFromMasters ? mastersBox : null;
                     try {
                         await apiJson(`${API}/${d.swimmerId}/club`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ clubId, locked })
+                            body: JSON.stringify({ clubId, locked, clubFromMasters })
                         });
                         toast('Клуб пловца сохранён', 3000);
                         await loadSwimmer(d.swimmerId);
@@ -410,6 +414,7 @@
                                     <a href="/swimmers/${c.swimmerId}" target="_blank" rel="noopener" dir="rtl" class="text-admin-text hover:underline">${esc(c.swimmerName)}</a>
                                     <span class="text-[#546e7a]">#${c.swimmerId}</span>:
                                     <span dir="auto">${esc(c.fromClubName ?? '—')}</span> → <span dir="auto" class="text-admin-text">${esc(c.toClubName)}</span>
+                                    ${c.fromMasters ? '<span class="text-[12px] text-admin-accent">Ⓜ мастерс</span>' : ''}
                                     ${c.logligClubName ? `<span class="text-[12px]">· loglig: <span dir="auto">${esc(c.logligClubName)}</span></span>` : ''}
                                     <span class="text-[12px]">· ${esc(c.lastSwimDate)}</span>
                                     <button class="club-open cursor-pointer ml-1 text-admin-accent text-[12px] hover:underline" data-id="${c.swimmerId}">открыть</button>

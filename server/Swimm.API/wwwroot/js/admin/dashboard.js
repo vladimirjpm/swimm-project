@@ -83,8 +83,9 @@
                     { v: sw.loglig.unlinked, label: 'Loglig не привязано', sub: `на проверке ${fmtN(sw.loglig.suggested)} · отклонено ${fmtN(sw.loglig.rejected)}`, tone: 'info', href: '/Admin/Swimmers/Loglig?filter=loglig-unlinked' },
                     { v: sw.clubChanges7d || 0, label: 'Club changes, 7 days', sub: 'клуб в карточке сменился: подтвердил loglig или руками', tone: 'info', href: '/Admin/Swimmers?filter=club-changes' },
                     { v: sw.clubCandidates?.total || 0, label: 'Club changes pending', sub: clubPendingSub(sw.clubCandidates), tone: 'warn', href: '/Admin/Swimmers?filter=club-changes' },
+                    { v: sw.clubFromMasters?.mixed || 0, label: 'Club from masters', sub: `мастерс-клуб в карточке, обычные старты за другой; флаг у ${fmtN(sw.clubFromMasters?.flagged || 0)}`, tone: 'info', href: '/Admin/Swimmers?filter=club-changes' },
                 ],
-                extraDetailHtml: renderClubChanges(sw.recentClubChanges || []) + renderClubCandidates(sw.clubCandidates),
+                extraDetailHtml: renderClubChanges(sw.recentClubChanges || []) + renderClubCandidates(sw.clubCandidates) + renderClubFromMasters(sw.clubFromMasters),
             },
             {
                 key: 'clubs', title: 'Клубы', href: '/Admin/Clubs',
@@ -740,6 +741,20 @@
         }).join('');
         return `<div class="mt-3 text-admin-text-muted/70 text-[11px] uppercase tracking-wide px-2">Club changes pending — ждут loglig</div>${groups}
             <a href="/Admin/Swimmers?filter=club-changes" class="block px-2 mt-1 text-admin-accent text-[11px] no-underline hover:underline">все ждущие →</a>`;
+    }
+
+    // Пловцы с флагом «клуб по мастерс-стартам» (Р108), у которых есть обычные старты за другой клуб:
+    // карточка держит мастерс-клуб, обычные старты её не двигают. Снять флаг — /Admin/Swimmers.
+    function renderClubFromMasters(m) {
+        if (!m || !m.mixed) return '';
+        const rows = m.items.map(c => `
+            <div class="flex items-baseline gap-2 py-0.5 px-2 text-[12px]">
+                <a href="/Admin/Swimmers?club=${c.swimmerId}" dir="rtl" class="text-admin-text hover:underline">${esc(c.swimmerName)}</a>
+                <span class="text-admin-text-muted">#${c.swimmerId}</span>
+                <span class="flex-1 min-w-0 truncate text-admin-text-muted" dir="auto"><span class="text-admin-text">${esc(c.clubName ?? '—')}</span> · обычные старты: ${esc(c.otherClubs.join(', '))}</span>
+            </div>`).join('');
+        const more = m.mixed > m.items.length ? `<div class="px-2 text-[11px] text-admin-text-muted/70">… ещё ${fmtN(m.mixed - m.items.length)}</div>` : '';
+        return `<div class="mt-3 text-admin-text-muted/70 text-[11px] uppercase tracking-wide px-2">Club from masters — мастерс-клуб в карточке, обычные старты за другой (${fmtN(m.mixed)} из ${fmtN(m.flagged)})</div>${rows}${more}`;
     }
 
     function renderDetailRow(m) {
