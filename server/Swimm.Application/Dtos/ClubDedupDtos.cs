@@ -17,7 +17,10 @@ public sealed record ClubDedupCandidate(
     /// <summary>Общих пловцов (для эвристики swimmers; иначе 0).</summary>
     int SharedSwimmers,
     /// <summary>true — «уверенная» (мусорный хвост): можно лить пачкой.</summary>
-    bool Sure);
+    bool Sure,
+    /// <summary>Что знает loglig про общих пловцов (Р112) — только у эвристики swimmers, из
+    /// сохранённых ответов, без сети; null у остальных эвристик.</summary>
+    ClubPairLogligSummary? Loglig = null);
 
 public sealed class ClubDedupReport
 {

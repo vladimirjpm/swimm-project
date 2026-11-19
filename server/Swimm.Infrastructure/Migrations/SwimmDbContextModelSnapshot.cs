@@ -4052,6 +4052,26 @@ namespace Swimm.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.SwimmerLogligClub", b =>
+                {
+                    b.Property<int>("SwimmerId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ClubName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("LogligId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("SwimmerId");
+
+                    b.ToTable("Sys_SwimmerLogligClubs", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.TrainingResult", b =>
                 {
                     b.Property<int>("Id")

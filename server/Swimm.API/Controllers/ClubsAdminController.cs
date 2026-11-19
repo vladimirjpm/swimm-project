@@ -19,6 +19,8 @@ namespace Swimm.API.Controllers;
 public class ClubsAdminController : ControllerBase
 {
     private readonly IClubDedupService _dedup;
+    private readonly IClubPairLogligService _pairLoglig;
+    private readonly IClubPairLogligCheckQueue _logligQueue;
     private readonly IClubMergeService _merge;
     private readonly IDedupIgnoreService _ignore;
     private readonly IAdminAuditService _audit;
@@ -30,6 +32,8 @@ public class ClubsAdminController : ControllerBase
 
     public ClubsAdminController(
         IClubDedupService dedup,
+        IClubPairLogligService pairLoglig,
+        IClubPairLogligCheckQueue logligQueue,
         IClubMergeService merge,
         IDedupIgnoreService ignore,
         IAdminAuditService audit,
@@ -43,6 +47,8 @@ public class ClubsAdminController : ControllerBase
         _publicClubs = publicClubs;
         _cache = cache;
         _dedup = dedup;
+        _pairLoglig = pairLoglig;
+        _logligQueue = logligQueue;
         _merge = merge;
         _ignore = ignore;
         _audit = audit;
@@ -127,6 +133,53 @@ public class ClubsAdminController : ControllerBase
     [HttpGet("dedup-candidates")]
     public async Task<IActionResult> GetCandidates(CancellationToken ct)
         => Ok(await _dedup.FindCandidatesAsync(ct));
+
+    /// <summary>
+    /// Общие пловцы пары и их клуб на loglig (Р112) — из сохранённых ответов, без сети.
+    /// Колонка «loglig» таблицы кандидатов, раскрытие по клику.
+    /// </summary>
+    [HttpGet("dedup-candidates/loglig")]
+    public async Task<IActionResult> GetPairLoglig([FromQuery] int a, [FromQuery] int b, CancellationToken ct)
+        => await _pairLoglig.GetAsync(a, b, ct) is { } report ? Ok(report) : NotFound(new { error = "Клуб не найден" });
+
+    /// <summary>
+    /// «Проверить в loglig» у пары (Р112) — ставит фоновый прогон: карточки loglig общих пловцов
+    /// с ответом старше суток, ~1 запрос в секунду. Ответ сразу — статус прогона; страница
+    /// опрашивает <c>runs/{id}</c>. Идёт другой прогон — 409 с его статусом (активный один).
+    /// Данных клуба и пловцов не меняет — пишет только ответ loglig.
+    /// </summary>
+    [HttpPost("dedup-candidates/loglig/check")]
+    public async Task<IActionResult> CheckPairLoglig([FromBody] IgnorePairRequest request, CancellationToken ct)
+    {
+        if (request.IdA <= 0 || request.IdB <= 0 || request.IdA == request.IdB)
+            return BadRequest(new { error = "Нужны два разных Id клубов" });
+        if (await _pairLoglig.GetAsync(request.IdA, request.IdB, ct) is null)
+            return NotFound(new { error = "Клуб не найден" });
+        return StartLogligRun(request.IdA, request.IdB);
+    }
+
+    /// <summary>«Проверить в loglig все пары» (Р112): то же по всем парам «Общие пловцы».</summary>
+    [HttpPost("dedup-candidates/loglig/check-all")]
+    public IActionResult CheckAllPairsLoglig() => StartLogligRun(null, null);
+
+    /// <summary>Статус прогона «Проверить в loglig».</summary>
+    [HttpGet("dedup-candidates/loglig/runs/{runId:guid}")]
+    public IActionResult GetLogligRun(Guid runId)
+        => _logligQueue.GetStatus(runId) is { } status ? Ok(status) : NotFound(new { error = "Прогон не найден (сервер перезапускался?)" });
+
+    /// <summary>Активный прогон, иначе последний (страница после перезагрузки подхватывает идущий); 204 — не было.</summary>
+    [HttpGet("dedup-candidates/loglig/runs/current")]
+    public IActionResult GetCurrentLogligRun()
+        => _logligQueue.Current() is { } status ? Ok(status) : NoContent();
+
+    private IActionResult StartLogligRun(int? a, int? b)
+    {
+        var (status, started) = _logligQueue.Enqueue(a, b);
+        if (!started) return Conflict(status);
+        _logger.LogInformation("Admin {User}: проверка в loglig {Scope} поставлена ({RunId})",
+            User.Identity?.Name ?? "?", a is null ? "всех пар" : $"пары #{a}/#{b}", status.RunId);
+        return Accepted(status);
+    }
 
     public sealed record MergeRequest(List<ClubMergePair> Pairs, bool Apply);
 

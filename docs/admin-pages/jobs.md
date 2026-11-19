@@ -26,7 +26,7 @@
 |---|---|---|
 | **Расписания** — сами ходят наружу по таймеру | `discovery`, `start-list` (`CompetitionDiscoveryBackgroundService`), `loglig-verify`, `loglig-batch`, `records-check` (`RecordsCheckBackgroundService`, 16.11.2026: проверка источников рекордов — дифф и журнал `Sys_RecordSourceChecks`, Apply НЕ делает), `swimmer-club-check` (`SwimmerClubCheckBackgroundService`, 18.11.2026, Р98: сверка кандидатов на смену клуба пловца с loglig — см. ниже) | журнал `Sys_JobRuns` (пора ли) + история `Sys_JobRunLog` (что сделали) |
 | **Прод-расписание** — идёт с ПРОДА круглосуточно | `training-reminders` (`TrainingReminderBackgroundService`, напоминания о тренировках через Web Push, [web-push-reminders-plan.md](../plans/web-push-reminders-plan.md)) | тот же журнал; флаг свой — `PushReminders:Enabled` (true только на проде). Тик 5 мин: каждый сдвигает «последний тик» (`IJobRunStore.RecordStateAsync`), строку истории пишет только тик, который что-то отправил или упал. В ProdAdmin карточка «следит» за прод-джобом: тик старше 35 мин — «молчит» (жёлтая) |
-| **Очереди** — исполняют то, что поставила админка | импорт (`ImportBackgroundService`), рекорды по странам (`RecordCountryRunBackgroundService`) | снимок очереди в памяти + их собственные таблицы: `Sys_ImportHistory`, журнал свежести рекордов `Sys_RecordSourceChecks` (`worldrecords-countries`) |
+| **Очереди** — исполняют то, что поставила админка | импорт (`ImportBackgroundService`), рекорды по странам (`RecordCountryRunBackgroundService`), проверка пар клубов в loglig (`ClubPairLogligCheckBackgroundService`, 19.11.2026, Р112 — см. ниже) | снимок очереди в памяти + их собственные таблицы: `Sys_ImportHistory`, журнал свежести рекордов `Sys_RecordSourceChecks` (`worldrecords-countries`); у проверки пар — только память процесса (ответы loglig — в `Sys_SwimmerLogligClubs`) |
 | **Служебные** | пинг БД (`DbPingBackgroundService`), отставание от прода (`DataSyncCheckBackgroundService`, только Development), мост кэша (`CacheBridgeListener`) | память процесса: `DbStatusService.LastPing`, `IDataSyncStatus.Current`, `ICacheBridgeStatus.State()` |
 
 Вне карточек намеренно — **прогрев после старта** (`StartupWarmupService`, 19.11.2026): разовый шаг
@@ -76,7 +76,7 @@ warning — есть что применить или пора проверит�
 | Просрочены | работающие расписания, которым пора уже дольше `JobsOverviewBuilder.OverdueAfter` (30 мин; фон смотрит журнал раз в 5–15 мин) | жёлтая при > 0 |
 | Следующий запуск | ближайший `NextDueAt` среди работающих | — |
 | Прогонов за 24 ч / 7 дней | `IJobRunStore.GetStatsAsync` — один запрос по `Sys_JobRunLog` за неделю, все задачи и все запускавшие | 24 ч — красная, 7 дн — жёлтая при ошибках |
-| Очереди | в очереди · идёт сейчас (импорт + рекорды по странам, память процесса) | — |
+| Очереди | в очереди · идёт сейчас (импорт + рекорды по странам + проверка пар клубов в loglig, память процесса) | — |
 | База | последний пинг | красная, если не отвечает |
 | Локальная vs прод | `IDataSyncStatus.Current` (только Development) | жёлтая, если отстаёт или прод недоступен |
 | Мост кэша | слушает ли канал | красная, если включён и не слушает |
@@ -146,6 +146,18 @@ warning — есть что применить или пора проверит�
 - Итог строкой: «сверено 12: confirmed 9 · archive 2 · old 1; запросов 10, из кэша 2, применено 9».
 - Работает там же, где остальные расписания (ProdAdmin) — там же идёт и импорт. В разработке
   кандидаты ждут: сверить — CLI `--refresh-swimmer-clubs` или «Проверить сейчас» на `/Admin/Swimmers`.
+
+## Пары клубов ↔ loglig (`club-pair-loglig`, Р112)
+
+Очередь кнопок «Проверить в loglig» на /Admin/Clubs ([clubs.md](clubs.md)): у пары «Общие пловцы» или
+у всех пар сразу открывает карточки loglig общих пловцов с ответом старше суток, последовательно ~1 в
+секунду, общего для нескольких пар — один раз, и пишет клуб в `Sys_SwimmerLogligClubs`. Очередь в
+памяти (`ClubPairLogligCheckQueue`, singleton), служба `ClubPairLogligCheckBackgroundService`, живёт под
+`adminEnabled`, как рекорды по странам. **Активный прогон один**: вторая кнопка, пока идёт первый,
+получает 409 со статусом идущего, и страница просто показывает его ход. Статус —
+`GET /api/admin/clubs/dedup-candidates/loglig/runs/{id}` (и `runs/current` — страница после перезагрузки
+подхватывает идущий). Перезапуск процесса прогон обрывает; сделанное уже сохранено, повтор откроет только
+оставшееся. Карточка показывает идущий и последний прогон с запуска процесса.
 
 ## Грабли
 

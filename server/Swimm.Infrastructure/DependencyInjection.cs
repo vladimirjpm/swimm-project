@@ -131,6 +131,9 @@ public static class DependencyInjection
         // (дифф ходит в БД). Пауза между странами по умолчанию, тесты подставляют свою.
         services.AddSingleton<RecordCountryRunQueue>();
         services.AddSingleton<IRecordCountryRunQueue>(sp => sp.GetRequiredService<RecordCountryRunQueue>());
+        // Очередь «Проверить в loglig» пар клубов-кандидатов (Р112): статусы в памяти процесса
+        services.AddSingleton<ClubPairLogligCheckQueue>();
+        services.AddSingleton<IClubPairLogligCheckQueue>(sp => sp.GetRequiredService<ClubPairLogligCheckQueue>());
         // Архив источников: боевой прогон сам кладёт выгрузку разобранных строк в
         // !records-sources/ (правило 11 pre-push). Путь из конфига, относительный считается от
         // ContentRoot; пустой — архив выключен. Вне Development относительный путь тоже
@@ -342,6 +345,8 @@ public static class DependencyInjection
         // Склейка клубов-дублей (docs/tasks/club-merge-plan.md, фаза B)
         services.AddScoped<IClubMergeService, ClubMergeService>();
         services.AddScoped<IClubDedupService, ClubDedupService>();
+        // Что знает loglig про общих пловцов пары-кандидата (Р112)
+        services.AddScoped<IClubPairLogligService, ClubPairLogligService>();
 
         // «Развязка» пар дедупа (пловцы/клубы): пара помечена «не дубли» — не всплывает
         services.AddScoped<IDedupIgnoreService, DedupIgnoreService>();
