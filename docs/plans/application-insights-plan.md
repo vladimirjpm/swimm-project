@@ -391,6 +391,9 @@ ProdAdmin, лишь бы был `az login` и ключи в `appsettings.*.Local
   Итоговый `Azure.Core` в API — 1.60 (от OpenTelemetry), как и был.
 - **Запросы — одним пакетом** (`QueryBatch`, один HTTP): страница — 5 запросов, блок — 1. Ответ
   живьём 1,3–1,5 с (первый после старта — до 4 с: `az account get-access-token`). Токен кэширует клиент.
+  ⚠ **С 19.11 — не пакетом, а по одному параллельно** (`QueryWorkspaceAsync`): `$batch` плавающе отдавал
+  `body` строкой, SDK не разбирал ответ — разбор в `docs/admin-pages/appinsights.md` («Грабли»).
+  Живьём после правки: страница 2,9 с, блок 1,3 с.
 - **Пороги** (`AppInsightsThresholds`, согласованы с А4): 5xx > 0 — жёлтое, доля > 5 % — красное;
   тишина сайта > 15 мин — жёлтое, > 30 мин или нет за 7 дней — красное (у ProdAdmin тишина — норма,
   серое); приём ≥ 80 % лимита — жёлтое (как письмо «Объём», 120 МБ), ≥ 100 % — красное; исключения,
@@ -469,7 +472,9 @@ Definition of done: `docs/admin-pages/appinsights.md` + строка в README; 
   (`InvalidOperationException` «requires an element of type 'Object', but … 'String'»), потом прошло само;
   сырые REST-пакеты, 30 одновременных и повтор на одном клиенте — не воспроизвели. Сделано: один
   повтор в пределах 15 с, стек — в журнал, карточка «ответ не удалось разобрать» вместо текста SDK
-  (`AppInsightsErrorClassifier.IsUnreadableResponse`, три теста);
+  (`AppInsightsErrorClassifier.IsUnreadableResponse`, три теста). ⚠ 19.11 повторилось (07:50 UTC) и
+  повтор не помог (Log Analytics кэширует ответ на тот же текст) — `$batch` убран, запросы по одному
+  (разбор — `docs/admin-pages/appinsights.md`, «Грабли»);
 - ⚠ ответы 5xx на проде видны как `GET /error`: обработчик ошибок перезапускает запрос на `/error`,
   и исходный маршрут в `Name` теряется — для разбора 5xx это вопрос телеметрии А2, а не страницы;
 - на проде 17.11 ~12:40 UTC фоновые `System.TimeoutException` и `Npgsql.NpgsqlException` («The operation
