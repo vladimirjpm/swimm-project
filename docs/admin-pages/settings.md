@@ -11,6 +11,10 @@
 `StartListIntervalHours` (с 20.11.2026, П3, дефолт **3**) — шаг обхода стартовых протоколов, раньше
 был общий с `DiscoveryIntervalHours`; частоту одного старта решает правило по близости старта
 ([jobs.md](jobs.md) «Частота стартовых протоколов»).
+`ResultsAutoMode` (с 20.11.2026, П5, дефолт **off**) — задача `results-auto`: `off` / `report` (разбирает
+прошедшие старты и пишет вердикт «взяла бы сама» / «ждёт тебя», НЕ импортирует) / `import` (пока как
+report, импорт — П6); незнакомое значение = off. `ResultsAutoEnabled` (true) — аварийный выключатель,
+`ResultsAutoIntervalHours` (1) — шаг тика ([jobs.md](jobs.md) «Результаты прошедших стартов»).
 Ключевые ключи: DiscoveryEnabled/DiscoveryIntervalHours (дефолт ВЫКЛ/**24ч** — с 19.10.2026, было 12),
 LogligVerifyEnabled/LogligVerifyIntervalHours (дефолт вкл/24ч),
 LogligBatchEnabled/LogligBatchPerRun/LogligBatchIntervalHours (дефолт ВЫКЛ/50/24ч),

@@ -107,4 +107,28 @@ public class DiscoveredCompetition
     /// предстоящий старт со статусом cancelled. Правило — <c>DiscoverySyncRules.FindMissing</c>.
     /// </summary>
     public DateTime? MissingSince { get; set; }
+
+    /// <summary>
+    /// Вердикт фоновой задачи results-auto (П5, docs/plans/prod-auto-pull-plan.md §4.5) при
+    /// последней проверке: would-take | blocked | not-finished | failed | empty
+    /// (<c>ResultsAutoVerdicts</c> в Application, CHECK в базе). null — задача строку не смотрела.
+    /// После импорта руками не стирается: по нему отчёт П5 сравнивает «что взяла бы сама» с
+    /// тем, что затянуто на самом деле.
+    /// </summary>
+    [MaxLength(20)]
+    public string? AutoPullVerdict { get; set; }
+
+    /// <summary>Почему задача строку не взяла (или что ещё ждёт) — одной строкой для чипа и отчёта.</summary>
+    [MaxLength(1000)]
+    public string? AutoPullBlockedReason { get; set; }
+
+    /// <summary>Когда results-auto последний раз смотрела строку (UTC). По нему — шаг повторной проверки.</summary>
+    public DateTime? AutoPullCheckedAt { get; set; }
+
+    /// <summary>
+    /// Длина бассейна, с которой задача импортировала бы старт (у would-take; иначе null): отчёт
+    /// П5 сверяет её с <c>Competitions.PoolType</c> того, что затянул человек.
+    /// </summary>
+    [MaxLength(10)]
+    public string? AutoPullPoolType { get; set; }
 }

@@ -9,7 +9,11 @@ internal sealed class DiscoveredCompetitionConfiguration : IEntityTypeConfigurat
 {
     public void Configure(EntityTypeBuilder<DiscoveredCompetition> entity)
     {
-        entity.ToTable("Sys_DiscoveredCompetitions");
+        // Вердикт results-auto (П5) — закрытым списком, как у кандидатов смены клуба: опечатка в
+        // коде не должна молча завести «новый» вердикт, который не видят фильтр и отчёт.
+        entity.ToTable("Sys_DiscoveredCompetitions", t => t.HasCheckConstraint(
+            "CK_Sys_DiscoveredCompetitions_AutoPullVerdict",
+            @"""AutoPullVerdict"" IS NULL OR ""AutoPullVerdict"" IN ('would-take', 'blocked', 'not-finished', 'failed', 'empty')"));
     }
 }
 

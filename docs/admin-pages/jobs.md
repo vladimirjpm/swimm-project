@@ -24,8 +24,8 @@
 
 | Вид | Службы | Откуда состояние |
 |---|---|---|
-| **Расписания** — сами ходят наружу по таймеру | `discovery`, `start-list` (`CompetitionDiscoveryBackgroundService`), `loglig-verify`, `loglig-batch`, `records-check` (`RecordsCheckBackgroundService`, 16.11.2026: проверка источников рекордов — дифф и журнал `Sys_RecordSourceChecks`, Apply НЕ делает), `swimmer-club-check` (`SwimmerClubCheckBackgroundService`, 18.11.2026, Р98: сверка кандидатов на смену клуба пловца с loglig — см. ниже) | журнал `Sys_JobRuns` (пора ли) + история `Sys_JobRunLog` (что сделали) |
-| **Прод-расписание забора** (П2, 20.11.2026) — `discovery` и `start-list` под `AutoPull:Enabled` | те же карточки, что в строке «Расписания» | флаг ВЫКЛ, пока не пройдена проба сети П0 — задачи идут из ProdAdmin, как раньше. Включён в `appsettings.Production.json` → служба на проде, а ProdAdmin (читает тот же файл) свою не заводит и карточка «следит» за прод-журналом: факт «работает на ПРОДЕ», статус «на проде (AutoPull:Enabled): …», просрочка и сбой видны. См. «Прод-расписание забора» ниже |
+| **Расписания** — сами ходят наружу по таймеру | `discovery`, `start-list`, `results-auto` (П5, режим `ResultsAutoMode`, см. ниже) (`CompetitionDiscoveryBackgroundService`), `loglig-verify`, `loglig-batch`, `records-check` (`RecordsCheckBackgroundService`, 16.11.2026: проверка источников рекордов — дифф и журнал `Sys_RecordSourceChecks`, Apply НЕ делает), `swimmer-club-check` (`SwimmerClubCheckBackgroundService`, 18.11.2026, Р98: сверка кандидатов на смену клуба пловца с loglig — см. ниже) | журнал `Sys_JobRuns` (пора ли) + история `Sys_JobRunLog` (что сделали) |
+| **Прод-расписание забора** (П2, 20.11.2026) — `discovery`, `start-list` и `results-auto` (П5) под `AutoPull:Enabled` | те же карточки, что в строке «Расписания» | флаг ВЫКЛ, пока не пройдена проба сети П0 — задачи идут из ProdAdmin, как раньше. Включён в `appsettings.Production.json` → служба на проде, а ProdAdmin (читает тот же файл) свою не заводит и карточка «следит» за прод-журналом: факт «работает на ПРОДЕ», статус «на проде (AutoPull:Enabled): …», просрочка и сбой видны. См. «Прод-расписание забора» ниже |
 | **Прод-расписание** — идёт с ПРОДА круглосуточно | `training-reminders` (`TrainingReminderBackgroundService`, напоминания о тренировках через Web Push, [web-push-reminders-plan.md](../plans/web-push-reminders-plan.md)) | тот же журнал; флаг свой — `PushReminders:Enabled` (true только на проде). Тик 5 мин: каждый сдвигает «последний тик» (`IJobRunStore.RecordStateAsync`), строку истории пишет только тик, который что-то отправил или упал. В ProdAdmin карточка «следит» за прод-джобом: тик старше 35 мин — «молчит» (жёлтая) |
 | **Очереди** — исполняют то, что поставила админка | импорт (`ImportBackgroundService`), рекорды по странам (`RecordCountryRunBackgroundService`), проверка пар клубов в loglig (`ClubPairLogligCheckBackgroundService`, 19.11.2026, Р112 — см. ниже) | снимок очереди в памяти + их собственные таблицы: `Sys_ImportHistory`, журнал свежести рекордов `Sys_RecordSourceChecks` (`worldrecords-countries`); у проверки пар — только память процесса (ответы loglig — в `Sys_SwimmerLogligClubs`) |
 | **Служебные** | пинг БД (`DbPingBackgroundService`), отставание от прода (`DataSyncCheckBackgroundService`, только Development), мост кэша (`CacheBridgeListener`) | память процесса: `DbStatusService.LastPing`, `IDataSyncStatus.Current`, `ICacheBridgeStatus.State()` |
@@ -183,6 +183,44 @@ warning — есть что применить или пора проверит�
   процессор ставит теги на старте спана; заголовков наружу не добавляет).
 - В логе старта — строка «Забор «Входящих» и стартовых протоколов по расписанию: ВКЛ/выкл в этом
   процессе; AutoPull:Enabled …», у ProdAdmin при снятом расписании — пояснение, что идёт с прода.
+
+## Результаты прошедших стартов (`results-auto`, П5, 20.11.2026)
+
+План — [prod-auto-pull-plan.md](../plans/prod-auto-pull-plan.md) §4.4–4.5, «П5 — ход» (решение Р-2).
+**Ничего не импортирует** — только вердикт и причина у строки «Входящих».
+
+- **Где идёт:** третий проход `CompetitionDiscoveryBackgroundService` после `discovery` и `start-list` —
+  то же правило `HostingMode.DiscoveryScheduleEnabled` (сейчас ProdAdmin, после включения
+  `AutoPull:Enabled` — прод). Своей службы нет: так результаты строго последовательны с забором
+  старт-листов (loglig не получает два потока, процесс сайта — два разбора PDF сразу).
+- **Режим** `ResultsAutoMode` (Admin/Settings): `off` (умолчание) — тик даже не заводится, в журнал
+  ничего не пишется; `report` — проверяет; `import` — пока то же, что report, с пометкой в итоге
+  «импорт ещё не реализован — П6». `ResultsAutoEnabled` (умолчание true) — аварийный выключатель;
+  `ResultsAutoIntervalHours` (1 ч) — шаг тика. Карточка при `off` — «выключена» с причиной в факте
+  «Настройка».
+- **Кого за тик** — чистая `ResultsAutoRules.Pick` (тесты `ResultsAutoRulesTests`): одна строка `new`,
+  плавание, с loglig-id, не связанная с базой, без ручной пометки «протокола нет», с полудня дня
+  окончания по Израилю и не старше 7 дней. Сначала ни разу не смотренные (свежий старт первым), потом
+  дольше всех не перепроверявшиеся. Перепроверка: «ещё идёт» — 2 ч, сбой — 3 ч, «протокола нет» —
+  6 ч, «ждёт тебя» и «взяла бы сама» — сутки.
+- **Что со строкой:** чемпионат по имени и многодневка по датам — сразу «ждёт тебя», без сети. Иначе —
+  `IBulkPullService.PullOneAsync` (превью «Затянуть» + регламент + `BulkPullClassifier`, ровно путь
+  пакетной кнопки) → гейты `ResultsAutoRules.Decide`: 🟢 классификатора (🟠 «без регламента» — тоже
+  «ждёт»), не чемпионат, один день в файле, закончено (`CompetitionProgress`), бассейн из регламента или
+  справочника (`IVenuePoolService.LoadAsync` → `Resolve`). Превью снимается из кэша сразу.
+- **Вердикт** — в строку: `AutoPullVerdict` (`would-take` / `blocked` / `not-finished` / `failed` /
+  `empty`, CHECK `CK_Sys_DiscoveredCompetitions_AutoPullVerdict`), `AutoPullBlockedReason`,
+  `AutoPullCheckedAt`, `AutoPullPoolType` (у would-take). Чип и фильтр — `/Admin/Competitions`
+  ([competitions.md](competitions.md)), блок — дашборд.
+- **Итог строкой:** «report: в окне 3, пора 1 — «ליגה …» #1234: взяла бы сама, 25m (venue)» / «…: ждёт
+  тебя — бассейн не задан: …». Подробности (`Details`, JSON `ResultsAutoTickReport`) — только у тика,
+  который смотрел строку; попапа у карточки нет (читает SQL отчёта П5).
+- **CLI:** `--results-auto-tick [--id <discoveredId>]` — один тик в report (всегда, без импорта),
+  `--id` минует окно и шаг перепроверки; в истории — триггер «CLI», расписание не сдвигается.
+- **Безопасность публичного процесса (§6):** потолок строки 10 мин (`ResultsAutoService.RowTimeout`,
+  связан с `stoppingToken`), предел ответа 32 МБ на клиентах забора (`OutboundLimits.MaxResponseBytes`:
+  `IsrOrgDiscoveryProvider`, именованные `loglig`), таймауты 60 с / 100 с; сбой строки — вердикт
+  `failed`, сбой тика — запись в журнал `ScheduledJob`, сайт не падает.
 
 ## Смена клуба пловца ↔ loglig (`swimmer-club-check`, Р98)
 

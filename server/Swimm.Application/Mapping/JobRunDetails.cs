@@ -33,6 +33,13 @@ public static class JobRunDetails
     }
 
     /// <summary>
+    /// JSON тика results-auto (П5): строка, вердикт, причины, длина бассейна, счётчики разбора. null —
+    /// строку не смотрели (окно пусто, режим off). Читает их SQL отчёта П5, а не страница.
+    /// </summary>
+    public static string? ResultsAuto(ResultsAutoTickReport report) =>
+        report.Row is null ? null : JsonSerializer.Serialize(report, Json);
+
+    /// <summary>
     /// Разобрать подробности прогона discovery. null — подробностей нет, они пустые или не
     /// разбираются (строку журнала писала старая версия или другая задача) — тогда дата прогона
     /// просто не кликается.

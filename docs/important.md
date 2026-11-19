@@ -380,6 +380,9 @@
   `AutoPull.Enabled: true` в `server/Swimm.API/appsettings.Production.json` (не переменной App Service:
   ProdAdmin читает этот файл и тогда своё расписание этих двух задач снимает сам — Р-6).
   → [plans/prod-auto-pull-plan.md](plans/prod-auto-pull-plan.md) §7, «П2 — ход».
+  Код П5 (20.11.2026): задача `results-auto`, режим `ResultsAutoMode` (умолчание `off`). В `report` пишет
+  строке «Входящих» вердикт «взяла бы сама» / «ждёт тебя» с причиной и **ничего не импортирует**; `import`
+  до П6 работает как `report`. Две недели `report` → отчёт (SQL в «П5 — ход») → отдельное «да» Влада на П6.
 - **Перед каждым push — [pre-push-rules.md](pre-push-rules.md)**: «поменял X → обнови Y».
 - **Не коммитить и не пушить без просьбы.** Ветка по умолчанию — `master`.
 - **Не предлагать push / PR в конце ответа** (решение Влада 21.09.2026): после коммита — только

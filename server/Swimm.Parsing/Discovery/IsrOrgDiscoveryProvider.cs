@@ -319,6 +319,8 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
 
         var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(60);
+        // §6 prod-auto-pull-plan: ответ разбирает публичный процесс — предел размера.
+        client.MaxResponseContentBufferSize = Swimm.Application.Constants.OutboundLimits.MaxResponseBytes;
         client.DefaultRequestHeaders.UserAgent.ParseAdd("SwimmBot/1.0 (+swimm-project discovery)");
         if (cookie != null)
             client.DefaultRequestHeaders.Add("Cookie", cookie);
@@ -343,6 +345,8 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
 
         var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(60);
+        // §6 prod-auto-pull-plan: ответ разбирает публичный процесс — предел размера.
+        client.MaxResponseContentBufferSize = Swimm.Application.Constants.OutboundLimits.MaxResponseBytes;
         client.DefaultRequestHeaders.UserAgent.ParseAdd("SwimmBot/1.0 (+swimm-project discovery)");
 
         using var content = new FormUrlEncodedContent(form);

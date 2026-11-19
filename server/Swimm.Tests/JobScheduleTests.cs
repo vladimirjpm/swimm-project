@@ -337,17 +337,29 @@ public class JobScheduleTests
     public void Every_job_has_definition_with_stable_defaults()
     {
         Assert.Equal(
-            [JobNames.Discovery, JobNames.StartList, JobNames.LogligVerify, JobNames.LogligBatch, JobNames.RecordsCheck,
+            [JobNames.Discovery, JobNames.StartList, JobNames.ResultsAuto, JobNames.LogligVerify, JobNames.LogligBatch, JobNames.RecordsCheck,
              JobNames.SwimmerClubCheck],
             JobNames.All.Select(j => j.Name));
         // По умолчанию включены сверка loglig-id (без неё предложения висели бы вечно), проверка
         // источников рекордов (только дифф и журнал, ничего не применяет) и сверка смены клуба с
         // loglig (без неё смена клуба не применилась бы никогда, Р98).
-        Assert.Equal([JobNames.LogligVerify, JobNames.RecordsCheck, JobNames.SwimmerClubCheck],
+        // results-auto (П5) включена ключом, а главный выключатель — ResultsAutoMode (умолчание off).
+        Assert.Equal([JobNames.ResultsAuto, JobNames.LogligVerify, JobNames.RecordsCheck, JobNames.SwimmerClubCheck],
             JobNames.All.Where(j => j.EnabledDefault).Select(j => j.Name));
         // П3: у стартового протокола свой шаг тика (3 ч), а не общий с discovery (С10, решение 5).
         Assert.Equal("StartListIntervalHours", JobNames.Get(JobNames.StartList).IntervalKey);
         Assert.Equal(3, JobNames.Get(JobNames.StartList).DefaultIntervalHours);
+        // П5: тик раз в час, одна строка за тик.
+        Assert.Equal("ResultsAutoIntervalHours", JobNames.Get(JobNames.ResultsAuto).IntervalKey);
+        Assert.Equal(1, JobNames.Get(JobNames.ResultsAuto).DefaultIntervalHours);
+    }
+
+    [Fact]
+    public void ResultsAuto_mode_defaults_to_off_in_settings_registry()
+    {
+        var settings = new AdminSettingsService(new MemoryCache(new MemoryCacheOptions()));
+        Assert.Equal(ResultsAutoModes.Off, ResultsAutoModes.Parse(settings.Get(ResultsAutoModes.SettingKey)?.Value));
+        Assert.NotNull(settings.Get(ResultsAutoModes.SettingKey));
     }
 
     [Fact]

@@ -23,6 +23,13 @@ public interface IBulkPullService
     Task<BulkPullBatchDto> StartAsync(
         IReadOnlyList<int> discoveredIds, bool includeChampionships, CancellationToken ct = default);
 
+    /// <summary>
+    /// Одна строка тем же путём, что строка пачки: превью «Затянуть» → регламент → классификатор.
+    /// Без состояния пачки и без импорта — так её зовёт results-auto (П5). Превью остаётся в кэше
+    /// (<c>IDiscoveryPreviewService.GetEntry</c>); кому импорт не нужен — снимает его сам.
+    /// </summary>
+    Task<BulkPullRowPull> PullOneAsync(DiscoveredCompetitionDto row, CancellationToken ct = default);
+
     /// <summary>Состояние пачки; null — такой пачки нет (перезапуск приложения, чужой id).</summary>
     BulkPullBatchDto? GetStatus(Guid batchId);
 

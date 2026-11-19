@@ -115,7 +115,7 @@ public sealed class BulkPullService : IBulkPullService
                 BulkPullRowDto result;
                 try
                 {
-                    result = await PullOneAsync(row);
+                    result = (await PullOneAsync(row, CancellationToken.None)).Row;
                 }
                 catch (Exception ex)
                 {
@@ -137,14 +137,15 @@ public sealed class BulkPullService : IBulkPullService
     /// <summary>
     /// Одна строка: то же самое «Затянуть», что и в одиночной кнопке (общий шов
     /// <see cref="IDiscoveryPreviewService"/>), плюс регламент — и вердикт классификатора.
+    /// Пачка зовёт без отмены (она переживает HTTP-запрос), results-auto (П5) — со своим токеном.
     /// </summary>
-    private async Task<BulkPullRowDto> PullOneAsync(DiscoveredCompetitionDto row)
+    public async Task<BulkPullRowPull> PullOneAsync(DiscoveredCompetitionDto row, CancellationToken ct = default)
     {
         using var scope = _scopes.CreateScope();
         var previews = scope.ServiceProvider.GetRequiredService<IDiscoveryPreviewService>();
         var regulations = scope.ServiceProvider.GetRequiredService<IRegulationFetchService>();
 
-        var preview = await previews.PreviewAsync(row.Id, CancellationToken.None);
+        var preview = await previews.PreviewAsync(row.Id, ct);
 
         // Регламент нужен только тем, кого вообще можно импортировать: у упавшего разбора
         // читать его незачем — строку всё равно разбирать руками.
@@ -153,17 +154,19 @@ public sealed class BulkPullService : IBulkPullService
         {
             var logligId = row.LogligId
                 ?? (await scope.ServiceProvider.GetRequiredService<ICompetitionDiscoveryService>()
-                        .GetAllAsync(CancellationToken.None))
+                        .GetAllAsync(ct))
                     .FirstOrDefault(d => d.Id == row.Id)?.LogligId;
 
             if (logligId is int id)
-                regulation = await regulations.FetchAsync(id, CancellationToken.None);
+                regulation = await regulations.FetchAsync(id, ct);
         }
 
         var (verdict, reasons) = BulkPullClassifier.Classify(
             preview, regulation, CompetitionAdminRepository.IsChampionship(row.Name));
 
-        return Row(row, verdict, reasons, preview, regulation, preview.PreviewId == Guid.Empty ? null : preview.PreviewId);
+        return new BulkPullRowPull(
+            Row(row, verdict, reasons, preview, regulation, preview.PreviewId == Guid.Empty ? null : preview.PreviewId),
+            preview, regulation);
     }
 
     private static BulkPullRowDto Row(

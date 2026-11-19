@@ -20,6 +20,9 @@ namespace Swimm.API.BackgroundServices;
 /// тоже выключен по умолчанию. Забор одного соревнования — под две сотни запросов с паузой (минуты), это
 /// фон — торопиться некуда, но каждая итерация берёт свой DbContext-скоуп, не держит его
 /// на всё окно, и уважает stoppingToken.
+///
+/// П5 (docs/plans/prod-auto-pull-plan.md §4.4): третий проход — results-auto, режим
+/// ResultsAutoMode (off / report / import), шаг ResultsAutoIntervalHours; одна строка за тик.
 /// </summary>
 public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
 {
@@ -83,6 +86,26 @@ public sealed class CompetitionDiscoveryBackgroundService : BackgroundService
                         var summary = JobRunSummaries.StartList(sweepReport, daysAhead);
                         _logger.LogInformation("Стартовый протокол (фон): {Summary}", summary);
                         return summary;
+                    }, _logger, stoppingToken);
+                }
+
+                // П5 (prod-auto-pull-plan §4.4): третий проход — результаты прошедших стартов,
+                // одна строка «Входящих» за тик. Здесь, а не своей службой: так он строго
+                // последователен с забором старт-листов (loglig не получает два потока сразу,
+                // процесс сайта — два разбора PDF сразу) и идёт ровно там, где discovery
+                // (HostingMode.DiscoveryScheduleEnabled), без второго правила регистрации.
+                // Режим off (умолчание) — тик даже не заводится: журнал не копит пустых строк.
+                var resultsJob = JobNames.Get(JobNames.ResultsAuto);
+                if (resultsJob.IsEnabled(settings)
+                    && ResultsAutoModes.Parse(settings.Get(ResultsAutoModes.SettingKey)?.Value) != ResultsAutoModes.Off)
+                {
+                    await ScheduledJob.RunIfDueAsync(_scopeFactory, JobNames.ResultsAuto, resultsJob.Interval(settings), async ct =>
+                    {
+                        await using var jobScope = _scopeFactory.CreateAsyncScope();
+                        var report = await jobScope.ServiceProvider.GetRequiredService<IResultsAutoService>().RunTickAsync(ct);
+                        var summary = JobRunSummaries.ResultsAuto(report);
+                        _logger.LogInformation("Результаты (фон): {Summary}", summary);
+                        return new JobRunOutcome(summary, JobRunDetails.ResultsAuto(report));
                     }, _logger, stoppingToken);
                 }
             }

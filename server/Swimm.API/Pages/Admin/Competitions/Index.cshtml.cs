@@ -149,6 +149,8 @@ public class IndexModel : PageModel
         QualityFilter = FilterAlias switch
         {
             "discovery-error" or "no-org-comp-id" or "no-results" => FilterAlias,
+            // results-auto (П5): ссылка с дашборда «ждут тебя / взяла бы сама».
+            Swimm.Application.Mapping.AutoPullFilters.Blocked or Swimm.Application.Mapping.AutoPullFilters.WouldTake => FilterAlias,
             _ => null
         };
         var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter, Kind, Discipline);

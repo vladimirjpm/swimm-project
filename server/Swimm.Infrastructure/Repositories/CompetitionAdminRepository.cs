@@ -118,7 +118,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 DiscoveredId = d.Id, OrgCompId = d.OrgCompId, Name = d.Name,
                 DateStart = d.DateStart, DateEnd = d.DateEnd, Venue = d.Venue,
                 Status = d.Status, Languages = d.Languages, LastError = d.LastError, LogligId = d.LogligId,
-                EmptySourceAt = d.EmptySourceAt, Discipline = d.Discipline
+                EmptySourceAt = d.EmptySourceAt, Discipline = d.Discipline,
+                AutoPullVerdict = d.AutoPullVerdict, AutoPullBlockedReason = d.AutoPullBlockedReason,
+                AutoPullCheckedAt = d.AutoPullCheckedAt, AutoPullPoolType = d.AutoPullPoolType
             };
 
             // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.
@@ -204,6 +206,11 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 u.Db.Single != null ? u.Db.Single.OrgCompId == null : u.Db.Days.Any(d => d.OrgCompId == null))).ToList(),
             "no-results" => unified.Where(u => u.Db != null && (
                 u.Db.Single != null ? u.Db.Single.ResultCount == 0 : u.Db.TotalResultCount == 0)).ToList(),
+            // results-auto (П5): «ждут тебя» — незатянутые строки, которые задача не взяла; «взяла бы
+            // сама» — с любой стадией: после ручного затягивания строка остаётся видна для сверки.
+            AutoPullFilters.Blocked => unified.Where(u => u.Db == null
+                && u.Site?.AutoPullVerdict == ResultsAutoVerdicts.Blocked).ToList(),
+            AutoPullFilters.WouldTake => unified.Where(u => u.Site?.AutoPullVerdict == ResultsAutoVerdicts.WouldTake).ToList(),
             _ => unified
         };
 

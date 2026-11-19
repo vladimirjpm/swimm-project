@@ -13,6 +13,13 @@ public static class JobNames
     /// <summary>Проход стартового протокола будущих стартов (тот же сервис, второй проход).</summary>
     public const string StartList = "start-list";
 
+    /// <summary>
+    /// Результаты прошедших стартов (П5, docs/plans/prod-auto-pull-plan.md §4.4): третий проход
+    /// того же сервиса, одна строка «Входящих» за тик. Режим — настройка <see cref="ResultsAutoModes.SettingKey"/>
+    /// (off / report / import); импорт — этап П6, пока только вердикт и причина у строки.
+    /// </summary>
+    public const string ResultsAuto = "results-auto";
+
     /// <summary>Ночная сверка предложенных loglig-id.</summary>
     public const string LogligVerify = "loglig-verify";
 
@@ -55,6 +62,10 @@ public static class JobNames
         // старта. Кого смотреть в тик, решает StartListSweepRules по близости старта (раз в
         // сутки … каждые 3 ч), поэтому шаг 3 ч; был общим с discovery (С10, решение 5) — сутки.
         new(StartList, "StartListEnabled", false, StartListIntervalKey, 3),
+        // П5: включена по умолчанию, а главный выключатель — ResultsAutoMode (умолчание off): иначе
+        // включать пришлось бы двумя ключами. ResultsAutoEnabled = false — аварийный рычаг.
+        // Шаг 1 ч: за тик одна строка, а перепроверку каждой решает ResultsAutoRules.RecheckAfter.
+        new(ResultsAuto, "ResultsAutoEnabled", true, "ResultsAutoIntervalHours", 1),
         // Включена по умолчанию: без неё предложения пользователей зависали бы в Suggested навсегда.
         new(LogligVerify, "LogligVerifyEnabled", true, "LogligVerifyIntervalHours", 24),
         // Выключена по умолчанию: каждый пловец — 1–3 платных запроса Serper.
@@ -140,6 +151,25 @@ public static class JobRunSummaries
         (r.DetailsRan
             ? $"loglig-id добыт у {r.DetailsResolved} из {r.DetailsChecked}"
             : "loglig-id — в суточном тике");
+
+    /// <summary>
+    /// «report: в окне 3, пора 1 — «ליגה …» #1234: взяла бы сама, 25m (venue)» или «…: ждёт тебя —
+    /// бассейн не задан: …». Режим import пока с пометкой «импорт не реализован (П6)».
+    /// </summary>
+    public static string ResultsAuto(ResultsAutoTickReport r)
+    {
+        var mode = r.ImportNotImplemented ? "import (импорт ещё не реализован — П6; работает как report)" : r.Mode;
+        if (r.Mode == ResultsAutoModes.Off) return "режим off — ничего не делала";
+        var head = $"{mode}: в окне {r.InWindow}, пора {r.Due}";
+        if (r.Row is not { } row)
+            return r.InWindow == 0 ? $"{head} — прошедших стартов без результатов нет" : $"{head} — все проверены недавно";
+
+        var verdict = ResultsAutoVerdicts.Label(row.Verdict);
+        var tail = row.Verdict == ResultsAutoVerdicts.WouldTake
+            ? $"{verdict}, {row.PoolType} ({row.PoolTypeSource})"
+            : $"{verdict} — {ResultsAutoRules.JoinReasons(row.Reasons)}";
+        return $"{head} — «{row.Name}» #{row.OrgCompId}: {tail}";
+    }
 
     public static string LogligVerify(LogligSuggestionVerifyReport r) =>
         r.Checked == 0

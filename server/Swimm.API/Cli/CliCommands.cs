@@ -56,6 +56,7 @@ internal static class CliCommands
         (args => args.Contains("--backfill-relay-members"), RecalcCli.BackfillRelayMembersAsync),
         (args => args.Contains("--backfill-discovery-orgcompid"), RecalcCli.BackfillDiscoveryOrgcompidAsync),
         (args => args.Contains("--refresh-swimmer-clubs"), SwimmerClubsCli.RefreshSwimmerClubsAsync),
+        (args => args.Contains("--results-auto-tick"), DiscoveryCli.ResultsAutoTickAsync),
     ];
 
     /// <summary>Выполнить консольную команду из <paramref name="args"/>; false — команды нет, поднимаем веб.</summary>
