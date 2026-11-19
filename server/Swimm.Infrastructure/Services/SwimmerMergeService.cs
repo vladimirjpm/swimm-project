@@ -10,7 +10,8 @@ namespace Swimm.Infrastructure.Services;
 /// <summary>
 /// Склейка пловцов-дублей. Перевешивает на канонического: Results, Sys_UserFavorites,
 /// HubGroupMembers, Sys_HubGroupUserMembers, Sys_UserMedia, Sys_HubGroupMedia,
-/// Sys_TrainingResults, Sys_HubGroupSwimmerLevels, Sys_HubGroupBreaks, Sys_LanePlanSwimmers, Sys_LanePlanEvents, Sys_AppUsers.SwimmerId;
+/// Sys_TrainingResults, Sys_HubGroupSwimmerLevels, Sys_HubGroupBreaks, Sys_LanePlanSwimmers, Sys_LanePlanEvents,
+/// Sys_SwimmerClubChanges, RecordVerifications.SwimmerId, Sys_AppUsers.SwimmerId (кандидат смены клуба дубля — удаляется);
 /// пустые поля канонического дозаполняет
 /// из дубля (и привязку к loglig — <see cref="MoveLoglig"/>); дубль удаляет. Конфликты (общий заплыв, membership/favorite уже есть у
 /// канонического — последние решаются удалением строки дубля) — см. по месту.
@@ -271,6 +272,27 @@ public class SwimmerMergeService(SwimmDbContext db) : ISwimmerMergeService
             var dupEvents = await db.LanePlanEvents.Where(e => e.SwimmerId == duplicate.Id).ToListAsync(ct);
             foreach (var e in dupEvents) e.SwimmerId = canonical.Id;
             Note(res, "Sys_LanePlanEvents", dupEvents.Count);
+
+            // Клуб пловца (Р95/Р98): FK у этих таблиц нет, поэтому без явного шага склейка
+            // оставляла бы сирот (18.11.2026: кандидат #64566 висел на дашборде без пловца).
+            // Журнал смен — история, переезжает к канону, как и результаты. Кандидат — состояние,
+            // посчитанное по карточке ДУБЛЯ: у канона карточка своя, кандидата для него заведёт
+            // следующий импорт или --refresh-swimmer-clubs, — строку дубля просто удаляем.
+            var clubChanges = await db.SwimmerClubChanges.Where(c => c.SwimmerId == duplicate.Id).ToListAsync(ct);
+            foreach (var c in clubChanges) c.SwimmerId = canonical.Id;
+            Note(res, "Sys_SwimmerClubChanges", clubChanges.Count);
+
+            if (await db.SwimmerClubCandidates.FirstOrDefaultAsync(c => c.SwimmerId == duplicate.Id, ct) is { } dupCandidate)
+            {
+                db.SwimmerClubCandidates.Remove(dupCandidate);
+                res.Actions.Add("Sys_SwimmerClubCandidates: кандидат дубля удалён");
+            }
+
+            // Сверка рекордов (RecordVerifications) помнит пловца найденного заплыва — тоже без FK.
+            // Заплыв переехал к канону выше, ссылка на пловца идёт за ним (до следующей «Сверить»).
+            var verifications = await db.RecordVerifications.Where(v => v.SwimmerId == duplicate.Id).ToListAsync(ct);
+            foreach (var v in verifications) v.SwimmerId = canonical.Id;
+            Note(res, "RecordVerifications", verifications.Count);
 
             var appUsers = await db.AppUsers.Where(u => u.SwimmerId == duplicate.Id).ToListAsync(ct);
             foreach (var u in appUsers) u.SwimmerId = canonical.Id;

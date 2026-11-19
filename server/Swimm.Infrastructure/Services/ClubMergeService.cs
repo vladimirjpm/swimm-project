@@ -9,7 +9,8 @@ namespace Swimm.Infrastructure.Services;
 
 /// <summary>
 /// Склейка клубов-дублей (docs/tasks/club-merge-plan.md, фаза B). Перевешивает на
-/// канонический: Results, Swimmers, HubGroups, Sys_HubGroupClubRequests, Sys_UserFavorites;
+/// канонический: Results, Swimmers, HubGroups, Sys_HubGroupClubRequests, Sys_UserFavorites,
+/// Sys_SwimmerClubCandidates (кандидат, у которого «было» = «стало» после склейки, снимается);
 /// пустые NameEn/CountryId канонического дозаполняет из дубля; дубль помечает
 /// <see cref="Club.MergedIntoId"/> (мягкое слияние — строка остаётся, чтобы ссылки на
 /// старый Id не гнили; из публичных выборок и дедупа склеенные исключаются).
@@ -242,6 +243,30 @@ public class ClubMergeService(
             var names = await db.ClubNames.Where(n => n.ClubId == duplicate.Id).ToListAsync(ct);
             foreach (var n in names) n.ClubId = canonical.Id;
             Note(res, "ClubNames", names.Count);
+
+            // Кандидаты смены клуба (Р98) смотрят на клуб по Id без FK. «Было» и «стало» на дубле
+            // переписываем на канон; совпали — смены больше нет (карточка уже на каноне), кандидат
+            // снимается. 19.11.2026: после склейки 1246→441 у ג׳ואי לווי висел кандидат
+            // «Maccabi Rishon Seals → מכבי ראשון לציון SEALS» при карточке уже на 441.
+            // Журнал Sys_SwimmerClubChanges не трогаем: это история, надгробие хранит название (Р101).
+            var candidates = await db.SwimmerClubCandidates
+                .Where(c => c.FromClubId == duplicate.Id || c.ToClubId == duplicate.Id).ToListAsync(ct);
+            int movedCandidates = 0, droppedCandidates = 0;
+            foreach (var c in candidates)
+            {
+                if (db.Entry(c).State == EntityState.Deleted) continue; // снят предыдущей парой этого вызова
+                if (c.FromClubId == duplicate.Id) c.FromClubId = canonical.Id;
+                if (c.ToClubId == duplicate.Id) c.ToClubId = canonical.Id;
+                if (c.FromClubId == c.ToClubId)
+                {
+                    db.SwimmerClubCandidates.Remove(c);
+                    droppedCandidates++;
+                }
+                else movedCandidates++;
+            }
+            Note(res, "Sys_SwimmerClubCandidates", movedCandidates);
+            if (droppedCandidates > 0)
+                res.Actions.Add($"Sys_SwimmerClubCandidates: {droppedCandidates} снято (было = стало после склейки)");
 
             // Дозаполнение пустых полей канонического из дубля. Кросс-скриптовая пара:
             // канон — ивритская запись, латинское название дубля уходит в NameEn.

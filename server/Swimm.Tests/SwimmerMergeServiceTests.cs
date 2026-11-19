@@ -446,4 +446,59 @@ public class SwimmerMergeServiceTests
         Assert.Null((await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == canon.Id)).LogligId);
         Assert.Equal(277224, (await db.Swimmers.AsNoTracking().SingleAsync(s => s.Id == dup.Id)).LogligId);
     }
+
+    // ── Клуб пловца (Р95/Р98): таблицы без FK, склейка обязана их перенести ─────
+
+    [Fact]
+    public async Task Merge_NoFkSwimmerRefs_JournalAndVerificationMoved_DuplicateCandidateDeleted()
+    {
+        // 18.11.2026: после склеек на проде кандидат #64566 остался без пловца.
+        await using var db = CreateDb(nameof(Merge_NoFkSwimmerRefs_JournalAndVerificationMoved_DuplicateCandidateDeleted));
+        var canon = NewSwimmer("A", "X");
+        var dup = NewSwimmer("A", "X");
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+        db.SwimmerClubChanges.Add(new SwimmerClubChange { SwimmerId = dup.Id, FromClubId = 1, ToClubId = 2, Source = "loglig" });
+        db.SwimmerClubCandidates.AddRange(
+            new SwimmerClubCandidate { SwimmerId = dup.Id, FromClubId = 2, ToClubId = 3 },
+            new SwimmerClubCandidate { SwimmerId = canon.Id, FromClubId = 5, ToClubId = 6 });
+        db.RecordVerifications.Add(new RecordVerification { RecordId = 1, Found = true, SwimmerId = dup.Id });
+        await db.SaveChangesAsync();
+
+        var report = await new SwimmerMergeService(db)
+            .MergeAsync([new SwimmerMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("merged", report.Pairs.Single().Status);
+        Assert.Equal(canon.Id, (await db.SwimmerClubChanges.AsNoTracking().SingleAsync()).SwimmerId);
+        var candidate = await db.SwimmerClubCandidates.AsNoTracking().SingleAsync();
+        Assert.Equal((canon.Id, 6), (candidate.SwimmerId, candidate.ToClubId));
+        Assert.Equal(canon.Id, (await db.RecordVerifications.AsNoTracking().SingleAsync()).SwimmerId);
+    }
+
+    /// <summary>
+    /// Сторож без FK. <c>OrphanQuery_CoversEveryTableReferencingSwimmer</c> видит только таблицы с
+    /// внешним ключом на Swimmers, а журнал и кандидаты смены клуба FK не имеют намеренно — и
+    /// склейка их пропускала. Новая сущность со свойством SwimmerId должна попасть сюда, а в
+    /// SwimmerMergeService — получить свой шаг переноса.
+    /// </summary>
+    [Fact]
+    public void Merge_CoversEveryEntityWithSwimmerIdProperty()
+    {
+        using var db = CreateDb(nameof(Merge_CoversEveryEntityWithSwimmerIdProperty));
+        Type[] covered =
+        [
+            typeof(ResultRecord), typeof(RelayMember), typeof(HubGroupMember), typeof(HubGroupUserMember),
+            typeof(UserFavorite), typeof(UserMedia), typeof(HubGroupMedia), typeof(TrainingResult),
+            typeof(CompetitionEntry), typeof(AppUser), typeof(HubGroupSwimmerLevel), typeof(LanePlanSwimmer),
+            typeof(HubGroupBreak), typeof(HubGroupTrainingRsvp), typeof(LanePlanEvent),
+            typeof(SwimmerClubChange), typeof(SwimmerClubCandidate), typeof(RecordVerification),
+        ];
+
+        var withSwimmerId = db.Model.GetEntityTypes()
+            .Where(t => t.FindProperty("SwimmerId") is not null)
+            .Select(t => t.ClrType)
+            .ToList();
+
+        Assert.Empty(withSwimmerId.Except(covered).Select(t => t.Name));
+    }
 }
