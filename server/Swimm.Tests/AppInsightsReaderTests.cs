@@ -212,17 +212,54 @@ public class AppInsightsReaderTests
     }
 
     [Fact]
-    public async Task Unreadable_response_twice_is_human_failed_card()
+    public async Task Unreadable_response_twice_is_no_data_yet_not_error()
     {
         var (reader, runner, _) = Make();
         runner.Throw = Unreadable;
 
         var o = await reader.GetOverviewAsync(TimeSpan.FromHours(1), "web");
 
-        Assert.Equal(AppInsightsStates.Failed, o.Connection.State);
-        Assert.Contains("не удалось разобрать", o.Connection.Text);
+        Assert.Equal(AppInsightsStates.NoData, o.Connection.State);
+        Assert.Equal("No data yet", o.Connection.Title);
         Assert.DoesNotContain("target element", o.Connection.Text);
         Assert.Equal(2, runner.Calls.Count);
+
+        runner.Throw = null;   // «данных пока нет» не кэшируется — следующая загрузка читает заново
+        Assert.Equal(AppInsightsStates.Ok, (await reader.GetOverviewAsync(TimeSpan.FromHours(1), "web")).Connection.State);
+    }
+
+    // Решение Влада 19.11: пустой ответ (первые минуты после выкатки / перезапуска ProdAdmin) — «No data yet»,
+    // а не «Не удалось прочитать». На дашборде — «—» и нейтральный тон, без причин.
+    [Fact]
+    public async Task Empty_totals_answer_is_no_data_yet_on_card_and_page()
+    {
+        var (reader, runner, _) = Make();
+        runner.Answer = q => q.ToDictionary(x => x.Name, _ => new AppInsightsRows([]));
+
+        var s = await reader.GetSummaryAsync();
+        Assert.Equal(AppInsightsStates.NoData, s.Connection.State);
+        Assert.Equal("—", s.Value);
+        Assert.Equal("neutral", s.Tone);
+        Assert.Empty(s.Reasons);
+        Assert.Equal("No data yet", s.Caption);
+
+        var o = await reader.GetOverviewAsync(TimeSpan.FromHours(24), "web");
+        Assert.Equal(AppInsightsStates.NoData, o.Connection.State);
+
+        runner.Answer = null;
+        Assert.Equal(AppInsightsStates.Ok, (await reader.GetSummaryAsync()).Connection.State);
+    }
+
+    [Fact]
+    public async Task Real_azure_error_stays_failed_not_no_data()
+    {
+        var (reader, runner, _) = Make();
+        runner.Throw = new RequestFailedException(400, "Query could not be parsed", "BadArgumentError", null);
+
+        var s = await reader.GetSummaryAsync();
+
+        Assert.Equal(AppInsightsStates.Failed, s.Connection.State);
+        Assert.Single(runner.Calls);
     }
 
     [Fact]
@@ -235,16 +272,15 @@ public class AppInsightsReaderTests
     }
 
     [Fact]
-    public async Task Missing_result_in_batch_is_failed_card()
+    public async Task Missing_result_in_answer_is_no_data_yet()
     {
         var (reader, runner, _) = Make();
-        runner.Answer = q => q.Where(x => x.Name != AppInsightsQueries.ErrorsName)
-            .ToDictionary(x => x.Name, _ => new AppInsightsRows([]));
+        runner.Answer = q => DefaultAnswer(q).Where(x => x.Key != AppInsightsQueries.ErrorsName)
+            .ToDictionary(x => x.Key, x => x.Value);
 
         var o = await reader.GetOverviewAsync(TimeSpan.FromHours(24), "web");
 
-        Assert.Equal(AppInsightsStates.Failed, o.Connection.State);
-        Assert.Contains("errors", o.Connection.Text);
+        Assert.Equal(AppInsightsStates.NoData, o.Connection.State);
     }
 
     // ── Кэш ─────────────────────────────────────────────────────────────────

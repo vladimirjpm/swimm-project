@@ -101,10 +101,14 @@ internal sealed class AppInsightsReader(
             try
             {
                 var rows = await runner.RunAsync(workspaceId.Trim(), queries, cts.Token);
+                // Неполный ответ (нет таблицы запроса или пустые итоги — summarize без by всегда даёт строку)
+                // — «данных пока нет», не сбой (решение Влада 19.11.2026).
                 var lost = queries.Select(q => q.Name).Where(n => !rows.ContainsKey(n)).ToList();
-                return lost.Count == 0
-                    ? (rows, null)
-                    : (null, AppInsightsConnections.Failed($"В ответе Log Analytics нет результатов: {string.Join(", ", lost)}."));
+                if (rows.TryGetValue(AppInsightsQueries.TotalsName, out var totals) && totals.Rows.Count == 0)
+                    lost.Add(AppInsightsQueries.TotalsName + " (пусто)");
+                if (lost.Count == 0) return (rows, null);
+                logger.LogWarning("App Insights: неполный ответ Log Analytics ({Lost}) — показываю «No data yet»", string.Join(", ", lost));
+                return (null, AppInsightsConnections.NoData());
             }
             catch (Exception ex) when (attempt == 1 && !cts.IsCancellationRequested && AppInsightsErrorClassifier.IsUnreadableResponse(ex))
             {

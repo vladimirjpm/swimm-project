@@ -32,6 +32,15 @@ public static class AppInsightsConnections
     public static AppInsightsConnection Failed(string detail) =>
         new(AppInsightsStates.Failed, "Не удалось прочитать", Clip(detail, 400), null);
 
+    /// <summary>
+    /// Пустой / неполный / неразобранный ответ — не сбой (<see cref="AppInsightsStates.NoData"/>). Видимый
+    /// текст по-английски (решение Влада 19.11.2026).
+    /// </summary>
+    public static AppInsightsConnection NoData() =>
+        new(AppInsightsStates.NoData, "No data yet",
+            "Log Analytics returned no data for this view yet. This is normal for the first minutes after a site "
+            + "deploy or a ProdAdmin restart — refresh in a minute.", null);
+
     private static string Detail(string? detail) =>
         string.IsNullOrWhiteSpace(detail) ? "" : $" Ответ az: {Clip(detail.Trim(), 300)}";
 
