@@ -24,6 +24,9 @@ public sealed record LogligImportContext(
     bool IsAward,
     bool EventDays = false);
 
+/// <summary>Нога эстафеты, сопоставленная с нашим пловцом: поля, по которым импорт найдёт его в ростере.</summary>
+public sealed record LogligResolvedLeg(string LastName, string FirstName, int BirthYear);
+
 /// <summary>
 /// Сборка JSON импорта (легаси-контракт <c>IImportService</c>) из результатов пособытийного
 /// источника loglig. Живёт в слое парсинга: там модель строки импорта и правила возрастных
@@ -39,4 +42,15 @@ public interface ILogligImportBuilder
         IReadOnlyList<LogligEventResultsDto> events,
         LogligImportContext context,
         Func<LogligResultRowDto, (string LastName, string FirstName)> resolveName);
+
+    /// <summary>
+    /// Только ЭСТАФЕТНЫЕ строки — по составу, который печатает страница события (с 2026/27).
+    /// Команда без напечатанного состава или с несопоставленной ногой пропускается: без ног
+    /// импорт не свяжет участников, а угаданный состав хуже отсутствующего.
+    /// </summary>
+    /// <param name="resolveLeg">Нога → наш пловец; null — сопоставить не удалось.</param>
+    string BuildRelayResultsJson(
+        IReadOnlyList<LogligEventResultsDto> events,
+        LogligImportContext context,
+        Func<LogligRelayLegDto, LogligResolvedLeg?> resolveLeg);
 }

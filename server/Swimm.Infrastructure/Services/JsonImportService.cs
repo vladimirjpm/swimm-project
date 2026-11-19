@@ -189,6 +189,7 @@ public class JsonImportService : IImportService
         private bool overwriteExisting;
         private bool deleteMissing;
         private bool preserveRelays;
+        private bool preserveIndividuals;
         private int created, skipped, errors;
         private int suspectFlagged;
         private Dictionary<(int CompetitionId, string EventKey), int> expectedByEvent = null!;
@@ -465,6 +466,7 @@ public class JsonImportService : IImportService
             // DeleteMissing). Без него upsert только обновляет/вставляет и НИКОГДА не удаляет.
             deleteMissing = overwriteExisting && (eventOptions?.DeleteMissing ?? false);
             preserveRelays = eventOptions?.PreserveRelays ?? false;
+            preserveIndividuals = eventOptions?.PreserveIndividuals ?? false;
 
             created = 0; skipped = 0; errors = 0;
             // Строк, легших сразу с ручной пометкой «недостоверно» (галочка в превью).
@@ -1038,6 +1040,9 @@ public class JsonImportService : IImportService
                             diagnosticLog.Add($"Upsert: эстафета {old.Id} (comp {competitionId}) сохранена — источник эстафет не несёт (PreserveRelays)");
                             continue;
                         }
+                        // Файл одних эстафет (Р107) не вправе объявлять исчезнувшими личные строки.
+                        if (preserveIndividuals && old.RelayId == null)
+                            continue;
 
                         var hasMedia = await _db.UserMedia.AnyAsync(m => m.ResultId == old.Id)
                             || await _db.HubGroupMedia.AnyAsync(m => m.ResultId == old.Id);
@@ -1359,6 +1364,7 @@ public class JsonImportService : IImportService
                     var actualRaw = await _db.Results.AsNoTracking()
                         .Where(r => competitionIds.Contains(r.CompetitionId))
                         .Where(r => !preserveRelays || r.RelayId == null)
+                        .Where(r => !preserveIndividuals || r.RelayId != null)
                         .Select(r => new
                         {
                             r.CompetitionId,

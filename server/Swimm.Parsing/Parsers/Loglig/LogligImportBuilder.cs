@@ -16,9 +16,11 @@ namespace Swimm.Parsing.Parsers.Loglig;
 ///
 /// Главное отличие от PDF-ветки: у каждой строки известен <c>Round</c>, и он едет в ключ
 /// upsert — утренний зачёт возрастных групп и вечерний финал перестают схлопываться.
-/// Эстафетные события СОЗНАТЕЛЬНО пропускаются: страница печатает команду, но не её состав,
-/// и эстафеты остаются от PDF-импорта (решение Влада; в импорт идёт флаг PreserveRelays,
-/// иначе «удалить лишнее» их снесло бы).
+/// В <see cref="BuildResultsJson"/> эстафетные события пропускаются: до 2026/27 страница
+/// печатала команду без состава, и эстафеты остаются от PDF-импорта (решение Влада; в импорт
+/// идёт флаг PreserveRelays, иначе «удалить лишнее» их снесло бы). Эстафеты с напечатанным
+/// составом собирает отдельный <see cref="BuildRelayResultsJson"/> — по явной просьбе
+/// (Р107: PDF склеил команды одного клуба, 1776).
 /// </summary>
 public sealed class LogligImportBuilder : ILogligImportBuilder
 {
@@ -102,6 +104,78 @@ public sealed class LogligImportBuilder : ILogligImportBuilder
                     // «организатор за этот заплыв не заплатил», а НЕ «данных нет»: колонка
                     // в таблице есть всегда. Пишем 0, иначе сверка не увидит самый частый
                     // случай расхождения — мы платим, а официально ноль (секция «כללי»).
+                    OfficialClubPoints: r.ClubPoints ?? 0));
+            }
+        }
+
+        return JsonSerializer.Serialize(rows);
+    }
+
+    public string BuildRelayResultsJson(
+        IReadOnlyList<LogligEventResultsDto> events,
+        LogligImportContext context,
+        Func<LogligRelayLegDto, LogligResolvedLeg?> resolveLeg)
+    {
+        var eventYear = AgeGroupHelper.SeasonEndYearFromDateString(context.Date);
+        var rows = new List<Result>();
+
+        foreach (var ev in events)
+        {
+            if (!ev.IsRelay) continue;
+
+            foreach (var r in ev.Rows)
+            {
+                if (r.RelayLegs is not { Count: >= 2 } legs) continue;
+
+                var resolved = legs.Select(resolveLeg).ToList();
+                if (resolved.Any(l => l is null)) continue;
+
+                var swimmers = resolved
+                    .Select((l, i) => new RelaySwimmer(i + 1, l!.LastName, l.FirstName, l.BirthYear, r.Club, null))
+                    .ToList();
+                var first = swimmers[0];
+                var firstAge = first.BirthYear is int y and > 0 ? eventYear - y : 0;
+
+                var (sectionGender, _) = ParseCategory(r.Category);
+                var gender = sectionGender != "none" ? sectionGender : ev.Gender;
+
+                rows.Add(new Result(
+                    Country: context.Country,
+                    Competition: context.CompetitionName,
+                    IsMasters: "false",
+                    IsAward: context.IsAward,
+                    AgeGroup: firstAge > 0 ? AgeGroupHelper.GetAgeGroup(firstAge) : string.Empty,
+                    Date: context.EventDays && ev.Date.Length > 0 ? ev.Date : context.Date,
+                    Event: $"{ev.Distance} {ev.StyleName} - {r.Category}".Trim(),
+                    EventStyleName: ev.StyleName,
+                    EventStyleLen: ev.Distance,
+                    EventStyleGender: gender,
+                    // Полоса из шапки события (у эстафет подзаголовок секции врёт — 1581),
+                    // детская — строкой «8-15», иначе возраст первой ноги, как у PDF-разбора.
+                    EventStyleAge: IsrOrg.IsrOrgParser.RelayEventAge(ev.AgeBand, firstAge),
+                    PoolType: context.PoolType,
+                    Position: r.Position,
+                    Heat: r.Heat,
+                    Lane: r.Lane,
+                    LastName: first.LastName,
+                    FirstName: first.FirstName,
+                    LastNameEn: string.Empty,
+                    FirstNameEn: string.Empty,
+                    BirthYear: first.BirthYear ?? 0,
+                    Club: r.Club,
+                    ClubEn: string.Empty,
+                    Time: r.Time ?? string.Empty,
+                    TimeFail: r.Time is null,
+                    TimeFailNote: r.FailNote,
+                    InternationalPoints: r.InternationalPoints,
+                    Note: null,
+                    IsRelay: true,
+                    RelayTeamName: r.Club,
+                    RelaySwimmersName: string.Join(", ", swimmers.Select(s => $"{s.FirstName} {s.LastName}".Trim())),
+                    RelaySwimmers: swimmers,
+                    EventCategory: null,
+                    HeatType: r.Round == LogligRounds.Prelim ? "prelim" : null,
+                    Round: r.Round,
                     OfficialClubPoints: r.ClubPoints ?? 0));
             }
         }

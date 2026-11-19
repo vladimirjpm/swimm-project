@@ -334,6 +334,36 @@ public class ImportUpsertIntegrationTests
         Assert.Equal(2, await db.Results.CountAsync());
     }
 
+    /// <summary>
+    /// Р107: файл одних эстафет (страницы событий loglig, --relays-only) с DeleteMissing заменяет
+    /// эстафеты, а личные строки соревнования, которых в файле нет, остаются (PreserveIndividuals).
+    /// </summary>
+    [Fact]
+    public async Task RelaysOnlyReimport_PreserveIndividuals_ReplacesRelays_KeepsIndividuals()
+    {
+        await using var db = CreateDb(nameof(RelaysOnlyReimport_PreserveIndividuals_ReplacesRelays_KeepsIndividuals));
+        var svc = new JsonImportService(db, new NullCacheService());
+
+        await svc.ImportAsync(ToStream(new object[]
+        {
+            Item("Cohen", "Tal", 2005, lane: 1),
+            Item("Levi", "Dan", 2006, lane: 2),
+            AnonymousRelayItem(lane: 3)
+        }));
+        Assert.Equal(3, await db.Results.CountAsync());
+
+        var reimport = await svc.ImportAsync(
+            ToStream(new object[] { AnonymousRelayItem(lane: 5) }),
+            eventOptions: new ImportEventOptions(EventId: null, NewEventName: null,
+                OverwriteExisting: true, DeleteMissing: true, PreserveIndividuals: true));
+
+        Assert.Empty(reimport.ErrorMessages);
+        Assert.Equal(1, reimport.Deleted);                      // старая эстафета на дорожке 3
+        Assert.Equal(2, await db.Results.CountAsync(r => r.RelayId == null));
+        var relay = await db.Results.SingleAsync(r => r.RelayId != null);
+        Assert.Equal(5, relay.Lane);
+    }
+
     [Fact]
     public async Task PartialReimport_OverwriteWithoutDeleteMissing_KeepsMissingRows_ZeroDeleted()
     {

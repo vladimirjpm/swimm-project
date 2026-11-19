@@ -46,6 +46,13 @@ public sealed record ImportEventOptions(
     /// </summary>
     bool PreserveRelays = false,
 
+    /// <summary>
+    /// Зеркало <see cref="PreserveRelays"/>: при <c>DeleteMissing</c> НЕ удалять ЛИЧНЫЕ строки.
+    /// Файл несёт одни эстафеты (пособытийные страницы loglig с составом, <c>--pull-events
+    /// --relays-only</c>, Р107) — их и заменяем, а личные строки соревнования остаются как есть.
+    /// </summary>
+    bool PreserveIndividuals = false,
+
     // ── Флаги соревнования из превью затягивания ──────────────────────────────
     // Все nullable: null = «не трогать» (парсер/существующая запись решают сами),
     // значение = решение человека в превью, оно главнее. Раньше их проставляли РУКАМИ
