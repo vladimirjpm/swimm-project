@@ -18,6 +18,24 @@ Sonnet через `/delegate`, таск-документ пишешь ты по�
 страницу (PR #202, `fad34070`). Из §8 отвечено всё. Мерж и деплой делает агент сам
 (`gh pr merge --merge` после зелёного CI → `gh workflow run azure-deploy.yml --ref master`).
 
+**После плана — 19.11 (решения Влада в чате).** (1) Быстрые SQL (< 400 мс, `Telemetry:SqlSpanMinMs`)
+в Azure не уходят: 18.11 SQL — ~40 % объёма (10 465 строк на 1 336 запросов), при паре тысяч человек
+в день лимит 0,15 ГБ кончался бы к утру. Счёт всех SQL сохранён тегами на запросе
+(`swimm.db.query_count`/`query_ms`). (2) Метки запросов: `swimm.source` (visitor/bot/warmup/uptime),
+`swimm.cold` (первые 10 мин после старта), версия сборки → `AppVersion`; p50/p95 и «Медленные
+операции» на странице — по посетителям и роботам без холодных. Причина: 18.11 из 125 запросов > 3 с
+82 — в первые 10 мин после старта (21 старт за двое суток). (3) Прогрев после старта на проде
+(`StartupWarmupService`, `WarmupPaths`). Находки 18.11 для будущего: 72 % SQL — фоновые службы
+(пинг БД ~4 100/сутки, напоминания ~2 400), а не люди; 635 открытий соединения в сутки (p95 2,3 с);
+`competition-overview` ~31 SQL за вызов, `records/freshness` ~23, `rsvp` ~29. (4) `pg_stat_statements`
+(«да» Влада 19.11): параметры сервера заданы 19.11 ~07:00 UTC без перезапуска — `azure.extensions =
+PG_STAT_STATEMENTS`, `pg_stat_statements.track = top`, `track_utility = off` (библиотека в
+`shared_preload_libraries` по умолчанию); сбор идёт с этой минуты. Представление создаёт миграция
+`AddPgStatStatements` (+ `pg_read_all_stats` роли `swimm_rw`, чтобы видеть текст запросов `swimm_ro`) —
+на прод через ProdAdmin `--migrate` (docs/deploy.md п. 2). Смотреть топ:
+`node server/db/prod-sql.mjs read -c "SELECT calls, round(total_exec_time) AS total_ms, round(mean_exec_time::numeric,1) AS mean_ms, rows, shared_blks_read, left(regexp_replace(query, '\s+', ' ', 'g'), 120) AS q FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20"`
+(по частоте — `ORDER BY calls DESC`; много `shared_blks_read` — чтение с диска, кандидат на индекс).
+
 **Что дальше, по порядку:**
 1. ✅ **А3.4** — память «после» снята 18.11: среднее 222 МБ (+7 % к 207), пик 334 МБ — рост в шуме, действий не нужно (см. «Ход А3»).
 2. ✅ **А4** — оповещения созданы 17.11 (см. «Сделано 17.11» в А4).

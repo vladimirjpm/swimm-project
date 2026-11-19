@@ -29,6 +29,11 @@
 | **Очереди** — исполняют то, что поставила админка | импорт (`ImportBackgroundService`), рекорды по странам (`RecordCountryRunBackgroundService`) | снимок очереди в памяти + их собственные таблицы: `Sys_ImportHistory`, журнал свежести рекордов `Sys_RecordSourceChecks` (`worldrecords-countries`) |
 | **Служебные** | пинг БД (`DbPingBackgroundService`), отставание от прода (`DataSyncCheckBackgroundService`, только Development), мост кэша (`CacheBridgeListener`) | память процесса: `DbStatusService.LastPing`, `IDataSyncStatus.Current`, `ICacheBridgeStatus.State()` |
 
+Вне карточек намеренно — **прогрев после старта** (`StartupWarmupService`, 19.11.2026): разовый шаг
+старта только на проде (`Warmup:Enabled` в `appsettings.Production.json`), а прод админки не имеет.
+Итог — строка журнала «Прогрев после старта…» (Warning, если адрес не прошёл — тогда видно в
+App Insights); его запросы в телеметрии помечены `swimm.source=warmup` ([appinsights.md](appinsights.md)).
+
 У расписания: запущено ли в ЭТОМ процессе, настройка «включено» и интервал (Admin/Settings;
 ключи и умолчания — `JobNames.All` в `Swimm.Application/Mapping/JobSchedule.cs`), последний
 запуск и успех, ошибка, когда следующий (`JobSchedule.NextDueAt` — то же правило, что

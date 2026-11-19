@@ -29,6 +29,7 @@ public static class SwimmTelemetryExtensions
     public static WebApplicationBuilder AddSwimmTelemetry(this WebApplicationBuilder builder)
     {
         if (!HostingMode.TelemetryEnabled(builder.Configuration)) return builder;
+        ColdStart.Touch();
 
         var roleName = TelemetryRoleName.Resolve(builder.Configuration, builder.Environment);
         var connectionString = builder.Configuration[HostingMode.TelemetryConnectionStringKey]!;
@@ -50,7 +51,8 @@ public static class SwimmTelemetryExtensions
             })
             // ПОСЛЕ UseAzureMonitor: детектор App Service ставит service.name = имя сайта,
             // а при слиянии ресурсов побеждает добавленный позже.
-            .ConfigureResource(r => r.AddService(serviceName: roleName))
+            // Версия сборки (коммит) — в Azure колонка AppVersion: видно, какая выкатка что сделала.
+            .ConfigureResource(r => r.AddService(serviceName: roleName, serviceVersion: TelemetryVersion.Current))
             // Postgres (А2.7): длительность и текст SQL с плейсхолдерами ($1), без значений параметров.
             .WithTracing(t => t.AddNpgsql());
 
@@ -65,7 +67,7 @@ public static class SwimmTelemetryExtensions
     /// Фильтр запросов и вычистка адресов — без экспортёра, чтобы тест собрал тот же конвейер со
     /// своим сборщиком спанов (TelemetryRedactionTests).
     /// </summary>
-    internal static IServiceCollection AddSwimmTelemetryGuards(this IServiceCollection services, IConfigurationBuilder configuration)
+    internal static IServiceCollection AddSwimmTelemetryGuards(this IServiceCollection services, ConfigurationManager configuration)
     {
         // UseAzureMonitor() выключает встроенную вычистку строки запроса (ставит эти ключи в True,
         // если они не заданы). Задаём false последним источником — его не перебьёт и переменная
@@ -76,13 +78,28 @@ public static class SwimmTelemetryExtensions
             [HttpClientRedactionOffKey] = "false",
         });
 
-        services.ConfigureOpenTelemetryTracerProvider(t => t.AddProcessor(new TelemetryRedactionProcessor()));
+        // SQL (решение Влада 19.11): сначала счётчик команд на запрос, потом фильтр быстрых — порядок важен.
+        var sqlMinMs = configuration.GetValue(SqlSpans.MinDurationMsKey, SqlSpans.DefaultMinDurationMs);
+        services.ConfigureOpenTelemetryTracerProvider(t => t
+            .AddProcessor(new SqlRequestStatsProcessor())
+            .AddProcessor(new FastSqlSpanFilter(TimeSpan.FromMilliseconds(sqlMinMs)))
+            .AddProcessor(new TelemetryRedactionProcessor()));
 
         services.Configure<AspNetCoreTraceInstrumentationOptions>(o =>
         {
             o.Filter = ctx => TelemetryRequestFilter.ShouldRecord(ctx.Request.Path);
             // Своя вычистка поверх встроенной: правило строже (/auth — целиком, см. QueryStringRedactor).
-            o.EnrichWithHttpRequest = (activity, _) => TelemetryRedactionProcessor.Redact(activity);
+            o.EnrichWithHttpRequest = (activity, request) =>
+            {
+                TelemetryRedactionProcessor.Redact(activity);
+                // Кто прислал и холодный ли старт (решение Влада 19.11) — страница считает p95 по людям.
+                // Адрес соединения здесь ещё ДО UseForwardedHeaders: заголовками его не подменить.
+                activity.SetTag(RequestSource.Tag, RequestSource.Classify(
+                    request.Headers.UserAgent.ToString(),
+                    request.Headers.ContainsKey(RequestSource.WarmupHeader),
+                    request.HttpContext.Connection.RemoteIpAddress));
+                if (ColdStart.IsCold()) activity.SetTag(ColdStart.Tag, true);
+            };
         });
 
         services.Configure<HttpClientTraceInstrumentationOptions>(o =>

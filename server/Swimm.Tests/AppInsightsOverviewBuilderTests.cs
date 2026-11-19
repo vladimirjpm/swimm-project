@@ -17,9 +17,10 @@ public class AppInsightsOverviewBuilderTests
     private static AppInsightsTotals Totals(
         long requests = 100, long errors = 0, double? p50 = 40, double? p95 = 300, long slow = 0,
         long dbCalls = 500, double? dbP95 = 30, long dbFailed = 0, long exceptions = 0, long background = 0,
-        long admin = 0, DateTime? last = null, double ingestedMb = 10, bool noLast = false) =>
+        long admin = 0, DateTime? last = null, double ingestedMb = 10, bool noLast = false,
+        long visitors = 70, long bots = 25, long internalReqs = 5, long cold = 0, long starts = 1) =>
         new(requests, errors, p50, p95, slow, dbCalls, dbP95, dbFailed, exceptions, background, admin,
-            noLast ? null : last ?? Now.AddMinutes(-2), ingestedMb);
+            noLast ? null : last ?? Now.AddMinutes(-2), ingestedMb, visitors, bots, internalReqs, cold, starts);
 
     private static readonly AppInsightsProcessInfo Process = new(false, "swimhub-dev");
 
@@ -134,7 +135,7 @@ public class AppInsightsOverviewBuilderTests
             TimeSpan.FromHours(24), true, CapMb, 10, Now);
 
         Assert.Equal("200", Tile(tiles, "requests").Value);
-        Assert.Equal("за 24 ч", Tile(tiles, "requests").Sub);
+        Assert.Equal("за 24 ч: посетители 70 · роботы 25 · наши 5", Tile(tiles, "requests").Sub);
         Assert.Equal("0,5 %", Tile(tiles, "errors").Value);
         Assert.Equal("1 из 200", Tile(tiles, "errors").Sub);
         Assert.Equal("warning", Tile(tiles, "errors").Tone);
@@ -170,7 +171,7 @@ public class AppInsightsOverviewBuilderTests
         Assert.Equal("4500 мс", Tile(tiles, "latency").Value);
         Assert.Equal("warning", Tile(tiles, "latency").Tone);
         Assert.Equal("warning", Tile(tiles, "db").Tone);
-        Assert.Equal("за 7 дней", Tile(tiles, "requests").Sub);
+        Assert.Equal("за 7 дней: посетители 70 · роботы 25 · наши 5", Tile(tiles, "requests").Sub);
     }
 
     [Fact]
@@ -302,5 +303,21 @@ public class AppInsightsOverviewBuilderTests
         Assert.Contains("appsettings.Local.json", c.Text);
         Assert.Contains("az monitor log-analytics workspace show", c.Hint);
         Assert.DoesNotContain("/subscriptions/", c.Hint);
+    }
+
+    // ── Холодные запросы и источники (решение Влада 19.11.2026) ──────────────
+
+    [Fact]
+    public void Tiles_latency_says_how_many_cold_requests_were_left_out()
+    {
+        var tiles = AppInsightsOverviewBuilder.Tiles(Totals(cold: 12, starts: 3), TimeSpan.FromHours(24), true, CapMb, 10, Now);
+        Assert.Equal("медиана 40 мс · без 12 холодных (стартов: 3)", Tile(tiles, "latency").Sub);
+    }
+
+    [Fact]
+    public void Tiles_latency_without_cold_has_no_note()
+    {
+        var tiles = AppInsightsOverviewBuilder.Tiles(Totals(), TimeSpan.FromHours(24), true, CapMb, 10, Now);
+        Assert.Equal("медиана 40 мс", Tile(tiles, "latency").Sub);
     }
 }
