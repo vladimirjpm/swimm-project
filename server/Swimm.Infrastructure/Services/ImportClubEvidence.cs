@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain;
 using Swimm.Domain.Entities;
@@ -20,7 +21,7 @@ namespace Swimm.Infrastructure.Services;
 ///   <item><b>любой клуб пловца за 2 последних сезона</b> по строкам протоколов (уже плыл за новый
 ///     клуб, а кандидат на смену ждёт loglig);</item>
 ///   <item><b>клуб на карточке loglig</b> кандидата — только с подтверждённым loglig-id. Сначала
-///     суточный кэш ответов из <c>Sys_SwimmerClubCandidates</c> (Р98), сеть — только если кэша нет,
+///     суточный ответ из общего места <c>Sys_SwimmerLogligClubs</c> (Р112), сеть — только если его нет,
 ///     не больше <see cref="MaxLogligRequests"/> карточек за импорт, ~1 запрос в секунду. Без
 ///     loglig-id в loglig не ходим.</item>
 /// </list>
@@ -96,26 +97,34 @@ internal sealed class ImportClubEvidence(SwimmDbContext db, ILogligClient? logli
             : null;
     }
 
-    /// <summary>Клуб на карточке loglig: кэш этого импорта → суточный кэш кандидата (Р98) → сеть в пределах лимита.</summary>
+    /// <summary>
+    /// Клуб на карточке loglig: кэш этого импорта → суточный ответ из общего места
+    /// <c>Sys_SwimmerLogligClubs</c> (Р112; его пишут и сверка кандидатов Р98, и кнопки /Admin/Clubs) →
+    /// сеть в пределах лимита. Удачный ответ сети кладётся в общее место — сохранит его SaveChanges
+    /// импорта (откат импорта откатит и его, это не страшно).
+    /// </summary>
     private async Task<string?> LogligClubAsync(int swimmerId, int logligId)
     {
         if (_logligAnswers.TryGetValue(logligId, out var known)) return known;
 
-        var cached = await db.SwimmerClubCandidates.AsNoTracking()
-            .Where(c => c.SwimmerId == swimmerId)
-            .Select(c => new { c.CheckedAt, c.LogligId, c.LogligClubName })
-            .FirstOrDefaultAsync();
-        if (cached is not null
-            && SwimmerClubLogligRule.CacheValid(DateTime.UtcNow, cached.CheckedAt, cached.LogligId, logligId, cached.LogligClubName))
-            return _logligAnswers[logligId] = cached.LogligClubName;
+        var stored = (await SwimmerLogligClubStore.LoadAsync(db, [swimmerId], CancellationToken.None))
+            .GetValueOrDefault(swimmerId);
+        if (stored is not null
+            && SwimmerClubLogligRule.CacheValid(DateTime.UtcNow, stored.CheckedAt, stored.LogligId, logligId, stored.ClubName))
+            return _logligAnswers[logligId] = stored.ClubName;
 
         if (_requests >= MaxLogligRequests) return null;   // лимит — не запоминаем: другой импорт сходит
         _requests++;
         await ThrottleAsync();
-        string? club;
-        try { club = (await loglig!.GetPlayerCardAsync(logligId))?.ClubName?.Trim(); }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) { club = null; }
-        return _logligAnswers[logligId] = string.IsNullOrWhiteSpace(club) ? null : club;
+        LogligPlayerCard? card;
+        try { card = await loglig!.GetPlayerCardAsync(logligId); }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) { card = null; }
+        var club = card?.ClubName?.Trim();
+        if (string.IsNullOrWhiteSpace(club)) club = null;
+        // Как у сверки кандидатов: пишется только открывшаяся карточка (в том числе без клуба).
+        if (card is not null)
+            await SwimmerLogligClubStore.UpsertAsync(db, swimmerId, logligId, club, DateTime.UtcNow, CancellationToken.None);
+        return _logligAnswers[logligId] = club;
     }
 
     private async Task ThrottleAsync()
