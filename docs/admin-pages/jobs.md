@@ -25,6 +25,7 @@
 | Вид | Службы | Откуда состояние |
 |---|---|---|
 | **Расписания** — сами ходят наружу по таймеру | `discovery`, `start-list` (`CompetitionDiscoveryBackgroundService`), `loglig-verify`, `loglig-batch`, `records-check` (`RecordsCheckBackgroundService`, 16.11.2026: проверка источников рекордов — дифф и журнал `Sys_RecordSourceChecks`, Apply НЕ делает), `swimmer-club-check` (`SwimmerClubCheckBackgroundService`, 18.11.2026, Р98: сверка кандидатов на смену клуба пловца с loglig — см. ниже) | журнал `Sys_JobRuns` (пора ли) + история `Sys_JobRunLog` (что сделали) |
+| **Прод-расписание забора** (П2, 20.11.2026) — `discovery` и `start-list` под `AutoPull:Enabled` | те же карточки, что в строке «Расписания» | флаг ВЫКЛ, пока не пройдена проба сети П0 — задачи идут из ProdAdmin, как раньше. Включён в `appsettings.Production.json` → служба на проде, а ProdAdmin (читает тот же файл) свою не заводит и карточка «следит» за прод-журналом: факт «работает на ПРОДЕ», статус «на проде (AutoPull:Enabled): …», просрочка и сбой видны. См. «Прод-расписание забора» ниже |
 | **Прод-расписание** — идёт с ПРОДА круглосуточно | `training-reminders` (`TrainingReminderBackgroundService`, напоминания о тренировках через Web Push, [web-push-reminders-plan.md](../plans/web-push-reminders-plan.md)) | тот же журнал; флаг свой — `PushReminders:Enabled` (true только на проде). Тик 5 мин: каждый сдвигает «последний тик» (`IJobRunStore.RecordStateAsync`), строку истории пишет только тик, который что-то отправил или упал. В ProdAdmin карточка «следит» за прод-джобом: тик старше 35 мин — «молчит» (жёлтая) |
 | **Очереди** — исполняют то, что поставила админка | импорт (`ImportBackgroundService`), рекорды по странам (`RecordCountryRunBackgroundService`), проверка пар клубов в loglig (`ClubPairLogligCheckBackgroundService`, 19.11.2026, Р112 — см. ниже) | снимок очереди в памяти + их собственные таблицы: `Sys_ImportHistory`, журнал свежести рекордов `Sys_RecordSourceChecks` (`worldrecords-countries`); у проверки пар — только память процесса (ответы loglig — в `Sys_SwimmerLogligClubs`) |
 | **Служебные** | пинг БД (`DbPingBackgroundService`), отставание от прода (`DataSyncCheckBackgroundService`, только Development), мост кэша (`CacheBridgeListener`) | память процесса: `DbStatusService.LastPing`, `IDataSyncStatus.Current`, `ICacheBridgeStatus.State()` |
@@ -157,6 +158,32 @@ warning — есть что применить или пора проверит�
 - Тесты: `StartListSweepRulesTests` (границы 2 дня / день старта / посев / старт прошёл / день по Израилю),
   `StartListScheduleServiceTests` (InMemory), `StartListSchedulePgTests` (настоящий Postgres, только чтение).
 
+## Прод-расписание забора (`AutoPull:Enabled`, П2, 20.11.2026)
+
+План — [prod-auto-pull-plan.md](../plans/prod-auto-pull-plan.md) §4.2, решения Р-1 и Р-6.
+
+- **Где идёт `CompetitionDiscoveryBackgroundService`** (`discovery` + `start-list`) — правило
+  `HostingMode.DiscoveryScheduleEnabled` (тесты `HostingModeTests`): свой `AutoPull:Enabled` — да; иначе
+  по `BackgroundJobs:Enabled`, но в ProdAdmin — только пока прод сам не забирает. «Прод забирает» ProdAdmin
+  узнаёт из закоммиченного `appsettings.Production.json` (`HostingMode.ProdAutoPullEnabled`): поэтому
+  включать надо **файлом**, а не переменной App Service — её ProdAdmin не видит.
+- **Сейчас** флаг `false` (П0 не пройдена): всё ровно как до П2 — забор идёт из ProdAdmin.
+- **Остальные расписания ProdAdmin** (`loglig-verify`, `loglig-batch`, `records-check`,
+  `swimmer-club-check`) — в своих службах под одним `BackgroundJobs:Enabled`, флаг их не трогает.
+- **Выключатели в базе главные:** `DiscoveryEnabled` / `StartListEnabled` гасятся в `/Admin/Settings` из
+  ProdAdmin, прод подхватывает на следующем тике (5 мин) без деплоя.
+- **Двойной запуск:** тики прода и ProdAdmin (старый код до перезапуска) разводит замок П1. Кнопка
+  «Проверить сейчас» (`DiscoveryAdminController.Sync`) и CLI (`--discovery-sync`, `--pull-start-list`)
+  заявку **не берут** (решение П2): это человек, которому нужен результат сейчас, а совпадение с прогоном
+  прода безвредно — «Входящие» держит UNIQUE `OrgCompId`, заявки — UNIQUE
+  (`OrgDisciplineId`, `Heat`, `Lane`, `SwimmerId`): второй писатель упадёт на ключе, а не задвоит строки,
+  и повторит на следующем тике/нажатии.
+- **Телеметрия:** исходящие запросы и SQL внутри прогона любого `ScheduledJob` помечены
+  `swimm.source=job` и `swimm.job=<задача>` (`Telemetry/JobTelemetry.cs`: имя задачи в `AsyncLocal`,
+  процессор ставит теги на старте спана; заголовков наружу не добавляет).
+- В логе старта — строка «Забор «Входящих» и стартовых протоколов по расписанию: ВКЛ/выкл в этом
+  процессе; AutoPull:Enabled …», у ProdAdmin при снятом расписании — пояснение, что идёт с прода.
+
 ## Смена клуба пловца ↔ loglig (`swimmer-club-check`, Р98)
 
 С 18.11.2026 импорт клуб в карточке пловца сам не меняет — заводит кандидата
@@ -223,7 +250,8 @@ warning — есть что применить или пора проверит�
   `--launch-profile ProdAdmin -- --migrate` → деплой. Накатить миграцию на прод ДО вливания нельзя:
   ProdAdminGuard сверяет миграции в обе стороны, и ProdAdmin со старого master не стартует.
 
-- **В ProdAdmin страница показывает журнал прод-базы** — расписания работают только там (В17).
+- **В ProdAdmin страница показывает журнал прод-базы** — расписания работают только там (В17; кроме
+  `discovery`/`start-list` после включения `AutoPull:Enabled` — они тогда идут с прода, см. выше).
   Локально (Development) расписания выключены: карточки «не в этом процессе», история там
   появляется только от кнопки и CLI.
 - Очереди и служебные живут в памяти: после перезапуска счётчики с нуля. Постоянная история

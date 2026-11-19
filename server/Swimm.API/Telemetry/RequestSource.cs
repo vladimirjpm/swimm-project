@@ -27,6 +27,12 @@ internal static partial class RequestSource
     internal const string Bot = "bot";
     internal const string Visitor = "visitor";
 
+    /// <summary>
+    /// Не запрос к сайту, а исходящее из фоновой задачи (HTTP к loglig/isr.org.il, SQL) — ставит
+    /// <see cref="JobTelemetryProcessor"/> (prod-auto-pull-plan §4.2).
+    /// </summary>
+    internal const string Job = "job";
+
     internal const string WarmupHeader = "X-Swimm-Warmup";
 
     /// <param name="remoteIp">Адрес соединения ДО <c>UseForwardedHeaders</c> (инструментарий видит запрос
