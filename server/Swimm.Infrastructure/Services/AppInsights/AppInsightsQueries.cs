@@ -40,6 +40,17 @@ internal static class AppInsightsQueries
     public const int TopErrors = 15;
     public const int TopBackground = 15;
 
+    /// <summary>
+    /// Теги сайта на строке запроса (<c>Swimm.API/Telemetry</c>: RequestSource, ColdStart): кто прислал
+    /// (visitor | bot | warmup | uptime) и «холодный» ли — первые 10 минут после старта процесса.
+    /// Строки до 19.11.2026 тегов не имеют — считаются посетителями и тёплыми.
+    /// </summary>
+    internal const string SourceTag = "swimm.source";
+    internal const string ColdTag = "swimm.cold";
+
+    /// <summary>Фильтр «внешний тёплый трафик» для перцентилей и медленных операций (нужны колонки Src, Cold).</summary>
+    internal const string ExternalWarm = "Src !in ('warmup', 'uptime') and not(Cold)";
+
     /// <summary>Окно запроса для API (timespan): самый длинный период — 7 дней «последней телеметрии» с запасом.</summary>
     public static readonly TimeSpan QueryWindow = TimeSpan.FromDays(8);
 
@@ -68,9 +79,14 @@ internal static class AppInsightsQueries
         let span = {{Span(range)}};
         let slowMs = {{AppInsightsThresholds.SlowOperationMs.ToString(CultureInfo.InvariantCulture)}};
         let capResetHour = {{Math.Clamp(capResetHourUtc, 0, 23)}}h;
-        let req = AppRequests | where TimeGenerated > ago(span) and AppRoleName == role;
-        let r = req | summarize Requests=count(), Errors5xx=countif(toint(ResultCode) >= 500), P50Ms=percentile(DurationMs, 50), P95Ms=percentile(DurationMs, 95) | extend k=1;
-        let so = req | extend Op=replace_regex(Name, @'/\d+', '/{id}') | summarize p95=percentile(DurationMs, 95) by Op | summarize SlowOperations=countif(p95 > slowMs) | extend k=1;
+        let req = AppRequests | where TimeGenerated > ago(span) and AppRoleName == role
+          | extend Src=tostring(Properties['{{SourceTag}}']), Cold=tostring(Properties['{{ColdTag}}']) == 'true';
+        let ext = req | where {{ExternalWarm}};
+        let r = req | summarize Requests=count(), Errors5xx=countif(toint(ResultCode) >= 500),
+            Visitors=countif(Src == 'visitor' or isempty(Src)), Bots=countif(Src == 'bot'),
+            Internal=countif(Src in ('warmup', 'uptime')), Cold=countif(Cold), Starts=dcount(AppRoleInstance) | extend k=1;
+        let pc = ext | summarize P50Ms=percentile(DurationMs, 50), P95Ms=percentile(DurationMs, 95) | extend k=1;
+        let so = ext | extend Op=replace_regex(Name, @'/\d+', '/{id}') | summarize p95=percentile(DurationMs, 95) by Op | summarize SlowOperations=countif(p95 > slowMs) | extend k=1;
         let d = AppDependencies | where TimeGenerated > ago(span) and AppRoleName == role and DependencyType == 'postgresql' | summarize DbCalls=count(), DbP95Ms=percentile(DurationMs, 95), DbFailed=countif(Success == false) | extend k=1;
         let e = AppExceptions | where TimeGenerated > ago(span) and AppRoleName == role | summarize Exceptions=count() | extend k=1;
         let bg = union AppExceptions, (AppTraces | where SeverityLevel >= 3) | where TimeGenerated > ago(span) and AppRoleName == role and isempty(OperationId) | summarize BackgroundFailures=count() | extend k=1;
@@ -78,9 +94,9 @@ internal static class AppInsightsQueries
         let l = union AppRequests, AppDependencies, AppExceptions, AppTraces, AppMetrics | where TimeGenerated > ago(7d) and AppRoleName == role | summarize LastTelemetryAt=max(TimeGenerated) | extend k=1;
         let resetAt = iff(now() >= startofday(now()) + capResetHour, startofday(now()) + capResetHour, startofday(now()) + capResetHour - 1d);
         let u = Usage | where TimeGenerated >= resetAt and IsBillable == true | summarize IngestedTodayMb=sum(Quantity) | extend k=1;
-        r | join kind=inner so on k | join kind=inner d on k | join kind=inner e on k | join kind=inner bg on k
+        r | join kind=inner pc on k | join kind=inner so on k | join kind=inner d on k | join kind=inner e on k | join kind=inner bg on k
           | join kind=inner adm on k | join kind=inner l on k | join kind=inner u on k
-        | project Requests, Errors5xx, P50Ms, P95Ms, SlowOperations, DbCalls, DbP95Ms, DbFailed, Exceptions, BackgroundFailures, AdminFailures, LastTelemetryAt, IngestedTodayMb
+        | project Requests, Errors5xx, P50Ms, P95Ms, SlowOperations, DbCalls, DbP95Ms, DbFailed, Exceptions, BackgroundFailures, AdminFailures, LastTelemetryAt, IngestedTodayMb, Visitors, Bots, Internal, Cold, Starts
         """;
 
     /// <summary>
@@ -99,11 +115,16 @@ internal static class AppInsightsQueries
         | project ExceptionType, Message=substring(OuterMessage, 0, 300), Count, LastAt=TimeGenerated, Operation=Op
         """;
 
-    /// <summary>Самые медленные операции по p95 (числа в пути — <c>{id}</c>).</summary>
+    /// <summary>
+    /// Самые медленные операции по p95 (числа в пути — <c>{id}</c>) — внешний тёплый трафик, как p95 в итогах
+    /// (<see cref="ExternalWarm"/>): без прогрева, мониторинга и первых 10 минут после старта.
+    /// </summary>
     public static string SlowOperations(string roleName, TimeSpan range) => $$"""
         let role = '{{Role(roleName)}}';
         let span = {{Span(range)}};
         AppRequests | where TimeGenerated > ago(span) and AppRoleName == role
+        | extend Src=tostring(Properties['{{SourceTag}}']), Cold=tostring(Properties['{{ColdTag}}']) == 'true'
+        | where {{ExternalWarm}}
         | extend Op = replace_regex(Name, @'/\d+', '/{id}')
         | summarize Count=count(), P50Ms=percentile(DurationMs, 50), P95Ms=percentile(DurationMs, 95), Errors5xx=countif(toint(ResultCode) >= 500) by Op
         | order by P95Ms desc | take {{TopSlow}}

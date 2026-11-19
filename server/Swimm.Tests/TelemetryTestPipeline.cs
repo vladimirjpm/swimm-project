@@ -64,11 +64,14 @@ internal sealed class TelemetryTestPipeline : IAsyncDisposable
     }
 
     /// <summary>Шлёт GET и ждёт, пока спан запроса закроется (он закрывается чуть позже ответа).</summary>
-    public async Task GetAsync(string pathAndQuery)
+    public async Task GetAsync(string pathAndQuery, IReadOnlyDictionary<string, string>? headers = null)
     {
         var before = _exporter.Spans.Count;
         using var client = _app.GetTestClient();
-        using var response = await client.GetAsync(pathAndQuery);
+        using var request = new HttpRequestMessage(HttpMethod.Get, pathAndQuery);
+        foreach (var (name, value) in headers ?? new Dictionary<string, string>())
+            request.Headers.TryAddWithoutValidation(name, value);
+        using var response = await client.SendAsync(request);
         response.EnsureSuccessStatusCode();
 
         // Отфильтрованный запрос спана не даёт вовсе — ждём недолго и не падаем.

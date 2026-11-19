@@ -92,11 +92,16 @@ public static class AppInsightsOverviewBuilder
 
         return
         [
-            new("requests", "Запросов", t.Requests.ToString(Ru), period, "neutral", "#slow"),
+            new("requests", "Запросов", t.Requests.ToString(Ru),
+                noRequests ? period : $"{period}: посетители {t.Visitors.ToString(Ru)} · роботы {t.Bots.ToString(Ru)} · наши {t.Internal.ToString(Ru)}",
+                "neutral", "#slow"),
             new("errors", "Ошибки 5xx", noRequests ? "—" : Percent(ErrorRate(t.Errors5xx, t.Requests)),
                 noRequests ? $"запросов {period} не было" : $"{t.Errors5xx} из {t.Requests}",
                 noRequests ? "neutral" : ErrorTone(t.Errors5xx, t.Requests), "#errors"),
-            new("latency", "Ответ p95", Ms(t.P95Ms), t.P50Ms is null ? "нет запросов" : $"медиана {Ms(t.P50Ms)}",
+            // p95 — без наших запросов и первых 10 минут после старта (решение Влада 19.11.2026).
+            new("latency", "Ответ p95", Ms(t.P95Ms),
+                (t.P50Ms is null ? "нет тёплых запросов" : $"медиана {Ms(t.P50Ms)}")
+                + (t.Cold > 0 ? $" · без {t.Cold.ToString(Ru)} холодных (стартов: {t.Starts.ToString(Ru)})" : ""),
                 t.P95Ms is not { } p95 ? "neutral" : p95 > AppInsightsThresholds.ResponseP95WarnMs ? "warning" : "ok", "#slow"),
             new("exceptions", "Исключения", t.Exceptions.ToString(Ru),
                 $"вне запроса (фон): {t.BackgroundFailures}",

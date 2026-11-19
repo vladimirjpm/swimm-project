@@ -19,7 +19,8 @@ internal static class AppInsightsRowMapper
             Long(r, "Requests"), Long(r, "Errors5xx"), Double(r, "P50Ms"), Double(r, "P95Ms"),
             Long(r, "SlowOperations"), Long(r, "DbCalls"), Double(r, "DbP95Ms"), Long(r, "DbFailed"),
             Long(r, "Exceptions"), Long(r, "BackgroundFailures"), Long(r, "AdminFailures"),
-            Date(r, "LastTelemetryAt"), Double(r, "IngestedTodayMb") ?? 0);
+            Date(r, "LastTelemetryAt"), Double(r, "IngestedTodayMb") ?? 0,
+            Long(r, "Visitors"), Long(r, "Bots"), Long(r, "Internal"), Long(r, "Cold"), Long(r, "Starts"));
     }
 
     public static IReadOnlyList<AppInsightsExceptionRow> Exceptions(AppInsightsRows rows) =>

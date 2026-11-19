@@ -107,6 +107,14 @@ public sealed record AppInsightsLinks(string Overview, string Failures, string P
 /// <param name="AdminFailures">Исключения и логи Error+ роли ProdAdmin — как правило оповещения <c>swimhub-bg-errors</c>.</param>
 /// <param name="LastTelemetryAt">Последняя запись роли за 7 дней (метрики идут раз в минуту и без трафика); null — нет.</param>
 /// <param name="IngestedTodayMb">Принято рабочей областью (все роли) с последнего сброса дневного лимита, МБ.</param>
+/// <param name="P50Ms">Перцентили и <paramref name="SlowOperations"/> — по ВНЕШНЕМУ тёплому трафику: посетители и
+///   роботы, без наших запросов (прогрев, мониторинг) и без первых 10 минут после старта процесса
+///   (решение Влада 19.11.2026). Тег <c>swimm.source</c>/<c>swimm.cold</c> пишет сайт.</param>
+/// <param name="Visitors">Запросов от посетителей (без тега источника — тоже сюда: строки до 19.11).</param>
+/// <param name="Bots">Запросов от роботов (User-Agent).</param>
+/// <param name="Internal">Наших служебных запросов: прогрев после старта, внешний мониторинг.</param>
+/// <param name="Cold">Запросов в первые 10 минут после старта процесса — в перцентили не входят.</param>
+/// <param name="Starts">Стартов процесса сайта за период (разных <c>AppRoleInstance</c>): деплои и перезапуски.</param>
 public sealed record AppInsightsTotals(
     long Requests,
     long Errors5xx,
@@ -120,7 +128,12 @@ public sealed record AppInsightsTotals(
     long BackgroundFailures,
     long AdminFailures,
     DateTime? LastTelemetryAt,
-    double IngestedTodayMb);
+    double IngestedTodayMb,
+    long Visitors = 0,
+    long Bots = 0,
+    long Internal = 0,
+    long Cold = 0,
+    long Starts = 0);
 
 /// <summary>Частое исключение: тип, начало сообщения (последнего), сколько, когда последний раз, операция («» — фон).</summary>
 public sealed record AppInsightsExceptionRow(string Type, string Message, long Count, DateTime LastAt, string Operation);

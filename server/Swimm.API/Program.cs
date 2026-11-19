@@ -148,6 +148,14 @@ if (backgroundJobsEnabled)
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.SwimmerClubCheckBackgroundService>();
 }
 
+// Прогрев после старта (решение Влада 19.11.2026) — разовый шаг старта, не расписание: только прод
+// (Warmup:Enabled в appsettings.Production.json). Подробности — StartupWarmupService.
+if (builder.Configuration.GetValue(Swimm.API.Hosting.Warmup.WarmupPaths.EnabledKey, false))
+{
+    builder.Services.AddHttpClient(Swimm.API.Hosting.Warmup.StartupWarmupService.HttpClientName);
+    builder.Services.AddHostedService<Swimm.API.Hosting.Warmup.StartupWarmupService>();
+}
+
 // ПРОД-РАСПИСАНИЕ — третий сорт (docs/plans/web-push-reminders-plan.md §4): напоминания о
 // тренировках должны идти с прода круглосуточно, а ProdAdmin запущен не всегда. Свой флаг
 // PushReminders:Enabled: прод — true (appsettings.Production.json), ProdAdmin и разработка — false.
