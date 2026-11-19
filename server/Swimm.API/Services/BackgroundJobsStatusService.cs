@@ -194,18 +194,45 @@ public sealed class BackgroundJobsStatusService(
         };
     }
 
+    /// <summary>Задачи <c>CompetitionDiscoveryBackgroundService</c> — прод-расписание под <c>AutoPull:Enabled</c> (П2).</summary>
+    private static bool IsAutoPullJob(string name) => name is JobNames.Discovery or JobNames.StartList;
+
+    /// <summary>
+    /// Где идёт задача и что видно отсюда. У discovery/start-list (П2, prod-auto-pull-plan §4.2) три
+    /// случая: здесь прод-расписание (AutoPull:Enabled), здесь по-старому (ProdAdmin, флаг на проде
+    /// выключен) или здесь не идёт, потому что забирает прод, — тогда ProdAdmin «следит» за журналом
+    /// прод-базы, как у напоминаний (<see cref="BuildTrainingReminders"/>): просрочка и сбой видны.
+    /// </summary>
+    private (bool ProcessOn, bool Watching, string Text) Placement(JobDefinition job)
+    {
+        if (!IsAutoPullJob(job.Name))
+            return BackgroundJobsEnabled
+                ? (true, false, "запущена")
+                : (false, false, "не запущена — фоновые расписания выключены (BackgroundJobs:Enabled)");
+
+        var here = HostingMode.DiscoveryScheduleEnabled(configuration, environment);
+        if (here && HostingMode.AutoPullEnabled(configuration))
+            return (true, false, "запущена — прод-расписание (AutoPull:Enabled)");
+        if (here)
+            return (true, false, "запущена — по расписанию ProdAdmin (на проде AutoPull:Enabled = false)");
+        if (environment.IsProdAdmin() && HostingMode.ProdAutoPullEnabled(environment.ContentRootPath))
+            return (false, true, "не запущена — работает на ПРОДЕ (AutoPull:Enabled в appsettings.Production.json); " +
+                                 "здесь журнал прод-базы, кнопка «Проверить сейчас» и CLI");
+        return (false, false, "не запущена — фоновые расписания выключены (BackgroundJobs:Enabled), AutoPull:Enabled = false");
+    }
+
     private JobCard BuildSchedule(JobDefinition job, JobRunStateRow? state, IReadOnlyList<JobRunLogRow> history, DateTime now)
     {
         var info = ScheduleInfo[job.Name];
-        var processOn = BackgroundJobsEnabled;
+        var (processOn, watching, placement) = Placement(job);
         var enabled = job.IsEnabled(settings);
         var interval = job.Interval(settings);
-        var s = JobsOverviewBuilder.Schedule(processOn, enabled, job.EnabledKey, state, interval, now);
+        // Следим за прод-джобом как за своим: просрочка и упавший прогон должны желтить/краснить и здесь.
+        var s = JobsOverviewBuilder.Schedule(processOn || watching, enabled, job.EnabledKey, state, interval, now);
 
         var facts = new List<JobFact>
         {
-            new("В этом процессе", processOn ? "запущена" : "не запущена — фоновые расписания выключены (BackgroundJobs:Enabled)",
-                processOn ? "success" : "neutral"),
+            new("В этом процессе", placement, processOn ? "success" : "neutral"),
             new("Настройка", $"{job.EnabledKey} = {(enabled ? "true" : "false")}" +
                              (settings.Get(job.EnabledKey) is null ? " (в Admin/Settings ключа нет — значение по умолчанию)" : ""),
                 enabled ? "success" : "neutral"),
@@ -229,14 +256,15 @@ public sealed class BackgroundJobsStatusService(
             facts.Add(new("Ошибка", error, "danger"));
         facts.Add(new("Следующий",
             s.Running ? "после текущего прогона"
-            : !processOn ? "здесь не запустится — расписания работают в ProdAdmin"
+            : !processOn && !watching ? "здесь не запустится — расписания работают в ProdAdmin"
             : !enabled ? "не запустится — выключена в настройках"
+            : watching && (s.NextDueAt is not { } due || due <= now) ? "пора — при ближайшей проверке журнала на ПРОДЕ"
             : s.NextDueAt is not { } next || next <= now ? "пора — при ближайшей проверке журнала"
             : $"{JobTimeText.Format(next)} ({JobTimeText.Until(next, now)})",
             s.Alert == "warning" ? "warning" : null));
 
         var badge = s.Running ? new JobBadge("идёт сейчас", "info")
-            : !processOn ? new JobBadge("не в этом процессе", "neutral")
+            : !processOn && !watching ? new JobBadge("не в этом процессе", "neutral")
             : !enabled ? new JobBadge("выключена", "neutral")
             : s.Failed ? new JobBadge("последний запуск упал", "danger")
             : s.Alert == "warning" ? new JobBadge("просрочена", "warning")
@@ -248,7 +276,7 @@ public sealed class BackgroundJobsStatusService(
             Active = s.Active,
             Failed = s.Failed,
             NextDueAt = s.NextDueAt,
-            Status = s.Status,
+            Status = watching ? $"на проде (AutoPull:Enabled): {s.Status}" : s.Status,
             Alert = s.Alert,
         };
     }

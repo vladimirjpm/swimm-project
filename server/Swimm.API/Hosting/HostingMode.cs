@@ -61,6 +61,66 @@ public static class HostingMode
     /// </summary>
     public static bool PushRemindersEnabled(IConfiguration config) => config.GetValue(PushRemindersEnabledKey, false);
 
+    public const string AutoPullEnabledKey = "AutoPull:Enabled";
+
+    /// <summary>Файл, из которого ProdAdmin узнаёт, забирает ли прод сам (<see cref="ProdAutoPullEnabled"/>).</summary>
+    public const string ProductionSettingsFile = "appsettings.Production.json";
+
+    /// <summary>
+    /// ПРОД-РАСПИСАНИЕ забора (docs/plans/prod-auto-pull-plan.md §4.2, решения Р-1, Р-6): задачи
+    /// <c>discovery</c> и <c>start-list</c> (<c>CompetitionDiscoveryBackgroundService</c>) идут с
+    /// прода круглосуточно, а не из ProdAdmin. По умолчанию ВЫКЛЮЧЕНО везде; включает строка в
+    /// <c>appsettings.Production.json</c> — после пробы сети П0 (с App Service до loglig.com:2053).
+    /// Выключатели задач в базе (<c>DiscoveryEnabled</c>, <c>StartListEnabled</c>) остаются главными.
+    /// </summary>
+    public static bool AutoPullEnabled(IConfiguration config) => config.GetValue(AutoPullEnabledKey, false);
+
+    /// <summary>
+    /// Забирает ли ПРОД сам — <c>AutoPull:Enabled</c> из закоммиченного <see cref="ProductionSettingsFile"/>
+    /// в корне контента. Нужен ProdAdmin (Р-6: одна точка запуска): включили забор на проде — у
+    /// ProdAdmin расписание этих двух задач пропадает само, той же одной строкой. Читается файл,
+    /// а не переменная окружения App Service: её ProdAdmin не видит, поэтому включать забор надо
+    /// именно файлом. Файла нет или он битый — false (ProdAdmin работает как раньше).
+    /// </summary>
+    public static bool ProdAutoPullEnabled(string contentRootPath)
+    {
+        try
+        {
+            var cfg = new ConfigurationBuilder()
+                .AddJsonFile(Path.Combine(contentRootPath, ProductionSettingsFile), optional: true, reloadOnChange: false)
+                .Build();
+            return AutoPullEnabled(cfg);
+        }
+        catch (Exception ex) when (ex is FormatException or InvalidDataException or IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Идёт ли в ЭТОМ процессе расписание <c>discovery</c> + <c>start-list</c>
+    /// (<c>CompetitionDiscoveryBackgroundService</c>). Чистое правило — тестируется без хоста:
+    /// <list type="bullet">
+    /// <item>свой <c>AutoPull:Enabled</c> — да (прод после П0);</item>
+    /// <item>иначе — по <c>BackgroundJobs:Enabled</c>, как остальные расписания, НО в ProdAdmin —
+    ///   только пока прод сам не забирает (<paramref name="prodAutoPull"/>, Р-6). Флаг выключен →
+    ///   ProdAdmin работает ровно как раньше.</item>
+    /// </list>
+    /// Остальных расписаний ProdAdmin (<c>loglig-verify</c>, <c>loglig-batch</c>, <c>records-check</c>,
+    /// <c>swimmer-club-check</c>) правило не касается: они живут в своих службах под одним
+    /// <see cref="BackgroundJobsEnabled"/>.
+    /// </summary>
+    public static bool DiscoveryScheduleEnabled(bool backgroundJobs, bool autoPull, bool isProdAdmin, bool prodAutoPull) =>
+        autoPull || (backgroundJobs && !(isProdAdmin && prodAutoPull));
+
+    /// <summary><see cref="DiscoveryScheduleEnabled(bool, bool, bool, bool)"/> по конфигурации процесса.</summary>
+    public static bool DiscoveryScheduleEnabled(IConfiguration config, IHostEnvironment env) =>
+        DiscoveryScheduleEnabled(
+            BackgroundJobsEnabled(config, env),
+            AutoPullEnabled(config),
+            env.IsProdAdmin(),
+            env.IsProdAdmin() && ProdAutoPullEnabled(env.ContentRootPath));
+
     /// <summary>Строка подключения Application Insights — то же имя, что ищет пакет Azure Monitor.</summary>
     public const string TelemetryConnectionStringKey = "APPLICATIONINSIGHTS_CONNECTION_STRING";
     public const string TelemetryEnabledKey = "Telemetry:Enabled";

@@ -73,7 +73,9 @@ internal static class ScheduledJob
             string? details = null;
             try
             {
-                (summary, details) = await work(ct);
+                // Исходящие запросы прогона — с меткой swimm.source=job (prod-auto-pull-plan §4.2).
+                using (Swimm.API.Telemetry.JobTelemetry.Begin(name))
+                    (summary, details) = await work(ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {

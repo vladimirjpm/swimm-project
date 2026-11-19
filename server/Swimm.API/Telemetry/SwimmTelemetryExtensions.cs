@@ -80,7 +80,9 @@ public static class SwimmTelemetryExtensions
 
         // SQL (решение Влада 19.11): сначала счётчик команд на запрос, потом фильтр быстрых — порядок важен.
         var sqlMinMs = configuration.GetValue(SqlSpans.MinDurationMsKey, SqlSpans.DefaultMinDurationMs);
+        // Метка фоновой задачи (swimm.source=job) — на старте спана, до фильтров.
         services.ConfigureOpenTelemetryTracerProvider(t => t
+            .AddProcessor(new JobTelemetryProcessor())
             .AddProcessor(new SqlRequestStatsProcessor())
             .AddProcessor(new FastSqlSpanFilter(TimeSpan.FromMilliseconds(sqlMinMs)))
             .AddProcessor(new TelemetryRedactionProcessor()));

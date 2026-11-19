@@ -138,9 +138,16 @@ if (adminEnabled)
 // ProdAdmin — да; прод и локальная разработка — нет. «Последний запуск» — в Sys_JobRuns (В12).
 // На проде из фоновых остаются пинг БД (ниже) и мост сброса кэша (AddInfrastructure): от флагов
 // они не зависят.
+// Исключение — discovery + start-list (prod-auto-pull-plan §4.2, Р-1/Р-6): это ПРОД-РАСПИСАНИЕ
+// под AutoPull:Enabled. Пока флаг выключен (П0 не пройдена) — всё как раньше, в ProdAdmin. Включён
+// в appsettings.Production.json — служба идёт на проде, а ProdAdmin (читает тот же файл) свою не
+// заводит: одна точка запуска. Кнопки «Проверить сейчас» и CLI остаются везде.
+var autoPullEnabled = HostingMode.AutoPullEnabled(builder.Configuration);
+var discoveryScheduleEnabled = HostingMode.DiscoveryScheduleEnabled(builder.Configuration, builder.Environment);
+if (discoveryScheduleEnabled)
+    builder.Services.AddHostedService<Swimm.API.BackgroundServices.CompetitionDiscoveryBackgroundService>();
 if (backgroundJobsEnabled)
 {
-    builder.Services.AddHostedService<Swimm.API.BackgroundServices.CompetitionDiscoveryBackgroundService>();
     // Публичная кнопка «предложить loglig-id» на проде остаётся: предложения копятся в БД
     // (Suggested) и проверяются этим джобом, когда запущена локальная админка (ProdAdmin).
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.LogligSuggestionVerificationBackgroundService>();
@@ -728,6 +735,13 @@ app.MapGet("/api/client-config",
         backgroundJobsEnabled ? "ВКЛ" : "выкл");
     modeLog.LogInformation("Напоминания о тренировках (Web Push, PushReminders:Enabled): {Reminders}.",
         pushRemindersEnabled ? "ВКЛ" : "выкл");
+    modeLog.LogInformation(
+        "Забор «Входящих» и стартовых протоколов по расписанию (discovery + start-list): {Here}; AutoPull:Enabled {AutoPull}.",
+        discoveryScheduleEnabled ? "ВКЛ в этом процессе" : "выкл в этом процессе",
+        autoPullEnabled ? "ВКЛ (прод-расписание)" : "выкл");
+    if (app.Environment.IsProdAdmin() && backgroundJobsEnabled && !discoveryScheduleEnabled)
+        modeLog.LogInformation(
+            "ProdAdmin: discovery и start-list по расписанию идут с ПРОДА (AutoPull:Enabled в appsettings.Production.json, Р-6) — здесь только кнопки и CLI.");
     // На проде без ключей VAPID напоминания включены, но слать нечем — молча.
     if (pushRemindersEnabled && string.IsNullOrWhiteSpace(app.Configuration["WebPush:PrivateKey"]))
         modeLog.LogCritical(

@@ -120,6 +120,82 @@ public class HostingModeTests
         Assert.False(HostingMode.BackgroundJobsEnabled(cfg, Production));
     }
 
+    // ── Прод-расписание забора (prod-auto-pull-plan §4.2, П2) ────────────────
+
+    [Fact]
+    public void AutoPull_DefaultOff_ExplicitKeyOn()
+    {
+        Assert.False(HostingMode.AutoPullEnabled(Config()));
+        Assert.True(HostingMode.AutoPullEnabled(Config(("AutoPull:Enabled", "true"))));
+        Assert.False(HostingMode.AutoPullEnabled(Config(("AutoPull:Enabled", "false"))));
+    }
+
+    [Fact]
+    public void ProductionConfig_ShipsWithAutoPullOff_UntilNetworkProbe()
+    {
+        // ⚠ П0 (проба сети с App Service до loglig.com:2053) не пройдена — флаг выключен. Включение
+        // после П0 — одна строка в этом файле; тест тогда меняется вместе с ней.
+        var path = Path.Combine(RepoRoot(), "server", "Swimm.API", "appsettings.Production.json");
+        var cfg = new ConfigurationBuilder().AddJsonFile(path).Build();
+
+        Assert.False(HostingMode.AutoPullEnabled(cfg));
+        Assert.False(HostingMode.DiscoveryScheduleEnabled(cfg, Production));
+        // ProdAdmin читает тот же файл: прод не забирает → своё расписание остаётся (как до П2).
+        Assert.False(HostingMode.ProdAutoPullEnabled(Path.Combine(RepoRoot(), "server", "Swimm.API")));
+    }
+
+    [Fact]
+    public void ProdAdminConfig_DoesNotTurnAutoPullOnItself()
+    {
+        var path = Path.Combine(RepoRoot(), "server", "Swimm.API", "appsettings.ProdAdmin.json");
+        var cfg = new ConfigurationBuilder().AddJsonFile(path).Build();
+        Assert.False(HostingMode.AutoPullEnabled(cfg));
+    }
+
+    [Theory]
+    // backgroundJobs, autoPull, isProdAdmin, prodAutoPull → расписание discovery+start-list здесь
+    [InlineData(false, false, false, false, false)] // прод сейчас (флаг выкл) — как до П2: нет
+    [InlineData(false, true, false, false, true)]   // прод после П0 (AutoPull:Enabled=true) — да
+    [InlineData(true, false, true, false, true)]    // ProdAdmin, прод не забирает — как до П2: да
+    [InlineData(true, false, true, true, false)]    // ProdAdmin, прод забирает (Р-6) — нет, одна точка запуска
+    [InlineData(false, false, true, true, false)]   // ProdAdmin без расписаний вообще — нет
+    [InlineData(false, false, false, true, false)]  // разработка: флаг прода сюда не относится
+    [InlineData(true, false, false, true, true)]    // разработка с BackgroundJobs:Enabled=true — как раньше
+    public void DiscoverySchedule_RunsInExactlyOnePlace(
+        bool backgroundJobs, bool autoPull, bool isProdAdmin, bool prodAutoPull, bool expected) =>
+        Assert.Equal(expected, HostingMode.DiscoveryScheduleEnabled(backgroundJobs, autoPull, isProdAdmin, prodAutoPull));
+
+    [Fact]
+    public void ProdAdmin_ReadsProdAutoPullFromProductionFile()
+    {
+        var dir = Directory.CreateTempSubdirectory("utest-autopull-");
+        try
+        {
+            var env = new Env(HostingMode.ProdAdminEnvironment) { ContentRootPath = dir.FullName };
+            var cfg = Config(("BackgroundJobs:Enabled", "true"));
+
+            // Файла нет — прод не забирает, ProdAdmin как раньше.
+            Assert.False(HostingMode.ProdAutoPullEnabled(dir.FullName));
+            Assert.True(HostingMode.DiscoveryScheduleEnabled(cfg, env));
+
+            // Прод включили одной строкой — ProdAdmin своё расписание снимает (Р-6)…
+            File.WriteAllText(Path.Combine(dir.FullName, HostingMode.ProductionSettingsFile),
+                """{ "AutoPull": { "Enabled": true } }""");
+            Assert.True(HostingMode.ProdAutoPullEnabled(dir.FullName));
+            Assert.False(HostingMode.DiscoveryScheduleEnabled(cfg, env));
+            // …а остальные его расписания живут под тем же BackgroundJobs:Enabled.
+            Assert.True(HostingMode.BackgroundJobsEnabled(cfg, env));
+
+            // Битый файл — не повод уронить старт: как будто флага нет.
+            File.WriteAllText(Path.Combine(dir.FullName, HostingMode.ProductionSettingsFile), "{ не json");
+            Assert.False(HostingMode.ProdAutoPullEnabled(dir.FullName));
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public void ProdAdminConfig_ShipsWithAdminAndJobsOn()
     {
