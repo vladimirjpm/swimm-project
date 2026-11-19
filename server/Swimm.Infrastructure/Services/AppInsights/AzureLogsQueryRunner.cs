@@ -7,9 +7,16 @@ namespace Swimm.Infrastructure.Services.AppInsights;
 /// <summary>
 /// Запросы в Log Analytics через <c>Azure.Monitor.Query.Logs</c> под входом Azure CLI
 /// (<see cref="AzureCliCredential"/>): ни ключей, ни секретов — админка живёт только на машине Влада (В17).
-/// Все запросы страницы — одним пакетом (<c>QueryBatch</c>): один HTTP-вызов на ответ.
 /// Клиент один на процесс — токен az кэшируется внутри него, <c>az account get-access-token</c>
 /// не запускается на каждый запрос.
+///
+/// ⚠ Запросы идут ПО ОДНОМУ и параллельно (<c>/query</c>), а не пакетом (<c>$batch</c>). Пакет был до
+/// 19.11.2026 и плавающе ломался: Log Analytics иногда отдаёт элемент пакета с <c>body</c> строкой вместо
+/// объекта, SDK падает в <c>LogsBatchQueryResult.DeserializeLogsBatchQueryResult</c>
+/// (<c>InvalidOperationException</c> «requires an element of type 'Object', but … 'String'»), а повтор
+/// того же пакета получает тот же ответ из кэша сервера — карточка App Insights пустела на минуту-две
+/// (17.11 12:51, 19.11 07:50). Одиночный запрос такую ошибку отдаёт обычным HTTP-ответом с кодом —
+/// SDK превращает её в <c>RequestFailedException</c>, и карточка показывает причину.
 /// </summary>
 internal sealed class AzureLogsQueryRunner : IAppInsightsQueryRunner
 {
@@ -28,25 +35,49 @@ internal sealed class AzureLogsQueryRunner : IAppInsightsQueryRunner
         _client = new LogsQueryClient(credential, options);
     }
 
-    public async Task<IReadOnlyDictionary<string, AppInsightsRows>> RunAsync(
+    public Task<IReadOnlyDictionary<string, AppInsightsRows>> RunAsync(
         string workspaceId, IReadOnlyList<AppInsightsQuery> queries, CancellationToken ct)
     {
-        var batch = new LogsBatchQuery();
         var range = new LogsQueryTimeRange(AppInsightsQueries.QueryWindow);
-        var ids = queries
-            .Select(q => (q.Name, Id: batch.AddWorkspaceQuery(workspaceId, q.Kql, range,
-                new LogsQueryOptions { ServerTimeout = ServerTimeout })))
-            .ToList();
-
-        var response = await _client.QueryBatchAsync(batch, ct);
-        var results = new Dictionary<string, AppInsightsRows>(ids.Count);
-        foreach (var (name, id) in ids)
+        var options = new LogsQueryOptions { ServerTimeout = ServerTimeout };
+        return RunEachAsync(queries, async (q, token) =>
         {
-            // GetResult бросает RequestFailedException, если этот запрос пакета упал (синтаксис, права).
-            var result = response.Value.GetResult(id);
-            results[name] = new AppInsightsRows(ToRows(result.Table));
+            // Ошибка запроса (синтаксис, права, сбой сервера) — RequestFailedException; её разбирает читатель.
+            var response = await _client.QueryWorkspaceAsync(workspaceId, q.Kql, range, options, token);
+            return new AppInsightsRows(ToRows(response.Value.Table));
+        }, ct);
+    }
+
+    /// <summary>
+    /// Все запросы параллельно; ответ — по имени запроса. Первый сбой отменяет остальные и
+    /// пробрасывается как есть (не <see cref="AggregateException"/>) — его классифицирует читатель.
+    /// </summary>
+    internal static async Task<IReadOnlyDictionary<string, AppInsightsRows>> RunEachAsync(
+        IReadOnlyList<AppInsightsQuery> queries,
+        Func<AppInsightsQuery, CancellationToken, Task<AppInsightsRows>> runOne,
+        CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var tasks = queries.Select(async q =>
+        {
+            try { return (q.Name, Rows: await runOne(q, cts.Token)); }
+            catch { await cts.CancelAsync(); throw; }
+        }).ToList();
+
+        try
+        {
+            await Task.WhenAll(tasks);
         }
-        return results;
+        catch
+        {
+            // Настоящая причина — первый сбой, не отмена, которую он вызвал у соседей.
+            var first = tasks.Where(t => t.IsFaulted).Select(t => t.Exception!.InnerException!)
+                .OrderBy(e => e is OperationCanceledException ? 1 : 0).FirstOrDefault();
+            if (first is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(first);
+            throw;
+        }
+
+        return tasks.ToDictionary(t => t.Result.Name, t => t.Result.Rows, StringComparer.Ordinal);
     }
 
     private static List<IReadOnlyDictionary<string, object?>> ToRows(LogsTable table)

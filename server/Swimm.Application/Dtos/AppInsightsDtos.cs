@@ -13,8 +13,15 @@ public static class AppInsightsStates
     /// <summary><c>az login</c> не сделан, просрочен или <c>az</c> не установлен.</summary>
     public const string NoLogin = "no-login";
 
-    /// <summary>Вход есть, но запрос не прошёл: таймаут, нет прав, неверный id, сбой Azure.</summary>
+    /// <summary>Вход есть, но запрос не прошёл: таймаут, нет прав, неверный id, ошибка HTTP/KQL от Azure.</summary>
     public const string Failed = "failed";
+
+    /// <summary>
+    /// Ответ пустой, неполный или не разбирается — так бывает первые минуты после выкатки сайта или
+    /// перезапуска ProdAdmin, пока данные не дошли (17.11, 19.11). Не ошибка: «No data yet», нейтрально
+    /// (решение Влада 19.11.2026).
+    /// </summary>
+    public const string NoData = "no-data";
 
     /// <summary>Данные прочитаны.</summary>
     public const string Ok = "ok";

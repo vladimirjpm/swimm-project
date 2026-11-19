@@ -37,9 +37,9 @@ internal static class AppInsightsErrorClassifier
         OperationCanceledException or TimeoutException => AppInsightsConnections.Failed(
             $"Log Analytics не ответил за {timeout.TotalSeconds:0} с — повтори позже."),
 
-        _ when IsUnreadableResponse(ex) => AppInsightsConnections.Failed(
-            "Log Analytics вернул ответ, который не удалось разобрать (повтор тоже не помог) — обнови через минуту. "
-            + $"Подробности — в журнале API ({ex.GetType().Name})."),
+        // Неразобранный ответ — не ошибка HTTP/KQL, а «данных пока нет» (решение Влада 19.11.2026: оба раза
+        // это было в первые минуты после выкатки сайта / перезапуска ProdAdmin). Стек — в журнале.
+        _ when IsUnreadableResponse(ex) => AppInsightsConnections.NoData(),
 
         _ => AppInsightsConnections.Failed($"{ex.GetType().Name}: {Reason(ex.Message)}"),
     };
