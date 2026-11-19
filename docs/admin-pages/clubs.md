@@ -1,7 +1,7 @@
 ﻿# /Admin/Clubs — дубли клубов
 
 Файлы: `Pages/Admin/Clubs/Index.cshtml`, скрипт `wwwroot/js/admin/clubs.js`; API `ClubsAdminController`
-(`/api/admin/clubs`): dedup-candidates (+`/loglig`, `/loglig/check` — Р112), merge, dedup-ignore(+remove/список),
+(`/api/admin/clubs`): dedup-candidates (+`/loglig`, `/loglig/check`, `/loglig/check-all`, `/loglig/runs/{id|current}` — Р112), merge, dedup-ignore(+remove/список),
 {id}/status. Сервисы: `ClubDedupService`, `ClubMergeService`, `ClubPairLogligService`.
 
 Аналог страницы Swimmers для клубов: кандидаты на склейку, dry-run → apply,
@@ -106,11 +106,16 @@ dotnet run --project server/Swimm.API -- --flatten-club-merges             # з�
   (панель клуба пловца), клуб в карточке, клуб на loglig с датой ответа, «профиль #id» →
   `https://loglig.com:2053/Players/Details/{LogligId}?seasonId=…` (сезон — как у
   `LogligClient`, `Loglig:SeasonId`).
-- **«Проверить в loglig»** — `POST /api/admin/clubs/dedup-candidates/loglig/check` `{idA, idB}`
-  (antiforgery). Открывает карточки общих пловцов, чей ответ старше суток (или его нет, или под
-  другим loglig-id), **последовательно, ~1 в секунду**, не больше 120 за нажатие (остаток —
-  «осталось N — нажми ещё раз»). 23 пловца ≈ 25 секунд, кнопка всё это время «Проверяю…».
-  Данных клуба и пловцов не меняет — пишет только ответ loglig.
+- **«Проверить в loglig»** у пары — `POST /api/admin/clubs/dedup-candidates/loglig/check` `{idA, idB}`;
+  **«Проверить в loglig все пары»** над таблицей — `POST …/loglig/check-all` (обе с antiforgery).
+  Обе ставят **фоновый прогон** (очередь `club-pair-loglig` на /Admin/Jobs, [jobs.md](jobs.md)) и сразу
+  отвечают его статусом: открываются карточки общих пловцов, чей ответ старше суток (или его нет, или
+  он под другим loglig-id), **последовательно, ~1 в секунду**; пловец, общий для нескольких пар, — один
+  раз. Страница опрашивает `GET …/loglig/runs/{id}` раз в 1,5 с: ход на кнопке («Проверяю 12 / 87» у
+  пары, «loglig: 12 / 87 · пар 3 / 9» над таблицей), после каждой пройденной пары её сводка в строке
+  обновляется, открытый список перечитывается. Активный прогон один: пока он идёт, кнопки неактивны,
+  а нажатие из другой вкладки получает 409 и показывает идущий. Перезагрузка страницы прогон не
+  теряет (`runs/current`). Данных клуба и пловцов не меняет — пишет только ответ loglig.
 - Открытие страницы и раскрытие списка (`GET …/dedup-candidates/loglig?a=&b=`) **в сеть не
   ходят** — только сохранённые ответы.
 
@@ -118,7 +123,7 @@ dotnet run --project server/Swimm.API -- --flatten-club-merges             # з�
 место с суточной сверкой кандидатов смены клуба (`swimmer-club-check`, Р98): что открыла кнопка,
 сверка второй раз за сутки не открывает, и наоборот. Название сравнивается тем же
 `ClubNameMatcher` (Normalize, прежние названия `ClubNames`, надгробия → канон). Правило —
-`ClubPairLogligRule`, сервис — `ClubPairLogligService`; тесты `ClubPairLogligRuleTests`,
+`ClubPairLogligRule`, сервис — `ClubPairLogligService`, очередь — `ClubPairLogligCheckQueue`; тесты `ClubPairLogligRuleTests`,
 `ClubPairLogligServiceTests`.
 
 ⚠ `levenshtein` совпадающие (после Normalize) имена **пропускает** (`na == nb → continue`) —

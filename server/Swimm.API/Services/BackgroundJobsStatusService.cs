@@ -28,6 +28,7 @@ public sealed class BackgroundJobsStatusService(
     ICacheBridgeStatus cacheBridge,
     IImportJobQueue importQueue,
     IRecordCountryRunQueue countryRunQueue,
+    IClubPairLogligCheckQueue clubLogligQueue,
     IAdminRepository adminRepository,
     IRecordSourceCheckService recordChecks,
     IPushSender pushSender) : IBackgroundJobsStatus
@@ -46,7 +47,7 @@ public sealed class BackgroundJobsStatusService(
 
         var countriesCheck = (await recordChecks.GetFreshnessAsync(ct))
             .FirstOrDefault(f => f.Source == RecordSources.WorldRecordsCountries);
-        IReadOnlyList<JobCard> queues = [BuildImportQueue(now), BuildCountryRunQueue(countriesCheck, now)];
+        IReadOnlyList<JobCard> queues = [BuildImportQueue(now), BuildCountryRunQueue(countriesCheck, now), BuildClubLogligQueue(now)];
         var services = BuildServices(now);
 
         var summary = JobsOverviewBuilder.Build([.. schedules, .. queues, .. services],
@@ -63,7 +64,7 @@ public sealed class BackgroundJobsStatusService(
         var now = DateTime.UtcNow;
         var schedules = await BuildSchedulesAsync(_ => [], now, ct);
         IReadOnlyList<JobCard> cards =
-            [.. schedules, BuildImportQueue(now), BuildCountryRunQueue(null, now), .. BuildServices(now)];
+            [.. schedules, BuildImportQueue(now), BuildCountryRunQueue(null, now), BuildClubLogligQueue(now), .. BuildServices(now)];
         return JobsOverviewBuilder.Build(cards, await jobRuns.GetStatsAsync(now, ct), Infra(), now);
     }
 
@@ -71,12 +72,15 @@ public sealed class BackgroundJobsStatusService(
     {
         var importJobs = importQueue.Snapshot();
         var countryRuns = countryRunQueue.Snapshot();
+        var clubLogligRuns = clubLogligQueue.Snapshot();
         var ping = dbStatus.LastPing;
         return new JobsInfraState(
             AdminEnabled,
             environment.IsDevelopment(),
-            importJobs.Count(j => j.State == ImportJobState.Queued) + countryRuns.Count(r => r.State == RecordCountryRunState.Queued),
-            importJobs.Count(j => j.State == ImportJobState.Running) + countryRuns.Count(r => r.State == RecordCountryRunState.Running),
+            importJobs.Count(j => j.State == ImportJobState.Queued) + countryRuns.Count(r => r.State == RecordCountryRunState.Queued)
+                + clubLogligRuns.Count(r => r.State == ClubPairLogligRunStates.Queued),
+            importJobs.Count(j => j.State == ImportJobState.Running) + countryRuns.Count(r => r.State == RecordCountryRunState.Running)
+                + clubLogligRuns.Count(r => r.State == ClubPairLogligRunStates.Running),
             ping?.Ok,
             ping?.At.UtcDateTime,
             dataSync.Current,
@@ -323,6 +327,44 @@ public sealed class BackgroundJobsStatusService(
                 : QueueStatus(runs.Count(r => r.State == RecordCountryRunState.Queued), 0, last is null ? null
                     : last.State == RecordCountryRunState.Failed ? $"последний упал {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"
                     : $"последний ок {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"),
+        };
+    }
+
+    private JobCard BuildClubLogligQueue(DateTime now)
+    {
+        var runs = clubLogligQueue.Snapshot();
+        var current = runs.FirstOrDefault(r => r.Active);
+        var last = runs.Where(r => r.CompletedAt is not null).MaxBy(r => r.CompletedAt);
+        static string Scope(ClubPairLogligRunStatus r) => r.AllPairs ? "все пары" : $"пара #{r.ClubAId}/#{r.ClubBId}";
+        var facts = new List<JobFact>
+        {
+            RegisteredFact(AdminEnabled, "вместе с админкой, Admin:Enabled"),
+        };
+        if (current is not null)
+            facts.Add(new("Идёт проверка", current.State == ClubPairLogligRunStates.Queued ? $"{Scope(current)}: в очереди"
+                : $"{Scope(current)}: карточек {current.SwimmersDone} из {current.SwimmersTotal}, пар {current.PairsDone} из {current.PairsTotal}", "info"));
+        if (last is not null)
+            facts.Add(new("Последняя с запуска процесса", $"{JobTimeText.When(last.CompletedAt!.Value.UtcDateTime, now)} — {Scope(last)}: " +
+                (last.State == ClubPairLogligRunStates.Failed ? $"ошибка: {last.Error}"
+                    : $"пар {last.PairsDone}, карточек {last.SwimmersDone}, не открылось {last.Failed}"),
+                last.State == ClubPairLogligRunStates.Failed ? "danger" : null));
+
+        var badge = !AdminEnabled ? new JobBadge("не в этом процессе", "neutral")
+            : current is not null ? new JobBadge("идёт проверка", "info")
+            : new JobBadge("ждёт задания", "success");
+
+        return new JobCard("club-pair-loglig", "Пары клубов: проверка в loglig", JobKinds.Queue, "ClubPairLogligCheckBackgroundService",
+            "«Проверить в loglig» на /Admin/Clubs (Р112): у пар «Общие пловцы» открывает карточки loglig общих " +
+            "пловцов с ответом старше суток (~1 в секунду) и сохраняет клуб в Sys_SwimmerLogligClubs. Одна пара " +
+            "или все сразу; активный прогон один. История — только с запуска процесса.",
+            badge, facts, [], new JobLink("/Admin/Clubs?filter=dedup-unsure", "Запуск и сводки — /Admin/Clubs"))
+        {
+            Active = AdminEnabled,
+            Status = current is not null && AdminEnabled
+                ? $"идёт проверка: {current.SwimmersDone} из {current.SwimmersTotal} карточек"
+                : QueueStatus(0, 0, last is null ? null
+                    : last.State == ClubPairLogligRunStates.Failed ? $"последняя упала {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"
+                    : $"последняя ок {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"),
         };
     }
 

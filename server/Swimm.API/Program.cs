@@ -127,6 +127,9 @@ if (adminEnabled)
     // Прогон рекордов по странам (11.1.2) — 470 файлов, час-два; в HTTP-запрос не пролезет.
     builder.Services.AddHostedService<Swimm.API.BackgroundServices.RecordCountryRunBackgroundService>();
 
+    // «Проверить в loglig» пар клубов-кандидатов в дубли (Р112): ~1 карточка в секунду, минуты.
+    builder.Services.AddHostedService<Swimm.API.BackgroundServices.ClubPairLogligCheckBackgroundService>();
+
     // Чтение Application Insights для /Admin/AppInsights и блока дашборда (план Б1) — только с админкой.
     builder.AddAppInsightsAdminReader();
 }

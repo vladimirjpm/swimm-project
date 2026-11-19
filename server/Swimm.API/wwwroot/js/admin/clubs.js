@@ -49,7 +49,6 @@
     // ── loglig по общим пловцам (Р112): сводка в колонке, список по клику, кнопка проверки ──
     // Открытые списки: «canon-dup» → отчёт сервера (общие пловцы + их клуб на loglig).
     const logligOpen = new Map();
-    const logligBusy = new Set();
     const pairKey = (c) => `${c.canonicalId}-${c.duplicateId}`;
 
     const LOGLIG_VERDICT = {
@@ -76,11 +75,10 @@
 
     function logligCell(c, i) {
         if (c.heuristic !== 'swimmers' || !c.loglig) return '<span class="text-[#546e7a]">—</span>';
-        const busy = logligBusy.has(pairKey(c));
         return `
             <button class="pair-loglig-open cursor-pointer text-left hover:underline" data-i="${i}" title="Список общих пловцов и их клуб на loglig">${logligSummaryHtml(c.loglig)}</button>
-            <div><button class="pair-loglig-check admin-btn admin-btn-ghost mt-1 py-0.5 px-2 text-[11.5px] disabled:opacity-40" data-i="${i}"${busy ? ' disabled' : ''}
-                title="Открыть карточки loglig общих пловцов, которым больше суток (~1 в секунду)">${busy ? 'Проверяю…' : 'Проверить в loglig'}</button></div>`;
+            <div><button class="pair-loglig-check admin-btn admin-btn-ghost mt-1 py-0.5 px-2 text-[11.5px] disabled:opacity-40" data-i="${i}"${logligRunActive() ? ' disabled' : ''}
+                title="Открыть карточки loglig общих пловцов, которым больше суток (~1 в секунду, в фоне)">${pairButtonText(c)}</button></div>`;
     }
 
     function fmtDate(iso) {
@@ -105,10 +103,7 @@
                 <td class="py-1 px-2">${s.logligUrl ? `<a href="${esc(s.logligUrl)}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">профиль #${s.logligId}</a>` : ''}</td>
             </tr>`;
         }).join('');
-        const net = r.requests
-            ? `<div class="mb-1">Открыто карточек: ${r.requests}${r.failed ? `, не открылось: ${r.failed}` : ''}${r.remaining ? `; осталось ${r.remaining} — нажми ещё раз` : ''}</div>` : '';
         return `<tr class="pair-loglig-detail"><td></td><td colspan="7" class="pb-3 px-3 text-[12.5px] text-admin-text-muted">
-            ${net}
             <div class="mb-1">Канон: <span dir="rtl">${esc(r.clubAName)}</span> #${r.clubAId} · дубль: <span dir="rtl">${esc(r.clubBName)}</span> #${r.clubBId} · общих пловцов: ${r.swimmers.length}</div>
             <table class="admin-table"><thead><tr><th>Пловец</th><th>Клуб в карточке</th><th>Клуб на loglig</th><th>loglig</th></tr></thead>
             <tbody>${rows}</tbody></table></td></tr>`;
@@ -131,20 +126,110 @@
         } catch (e) { toast('Ошибка: ' + e.message, 5000); }
     }
 
-    async function checkLoglig(c) {
-        const key = pairKey(c);
-        logligBusy.add(key);
-        rerender();
+    // ── Прогон «Проверить в loglig» (одна пара или все): фоновая задача, страница опрашивает статус ──
+    let logligRun = null;      // последний известный статус прогона
+    let logligPoll = null;     // таймер опроса
+    let logligApplied = 0;     // сколько пройденных пар прогона уже перенесено в строки
+
+    const logligRunActive = () => !!logligRun?.active;
+    const runProgress = (st) => st.state === 'queued' ? 'в очереди…'
+        : st.swimmersTotal ? `${st.swimmersDone} / ${st.swimmersTotal}` : 'считаю…';
+
+    function pairButtonText(c) {
+        const st = logligRun;
+        if (!st?.active) return 'Проверить в loglig';
+        const mine = st.allPairs
+            ? st.currentClubAId === c.canonicalId && st.currentClubBId === c.duplicateId
+            : st.clubAId === c.canonicalId && st.clubBId === c.duplicateId;
+        return mine ? `Проверяю ${runProgress(st)}` : 'Проверить в loglig';
+    }
+
+    // Подписи кнопок — на месте, без перерисовки таблицы (опрос раз в 1,5 с).
+    function updateLogligButtons() {
+        const rows = allRows();
+        document.querySelectorAll('.pair-loglig-check').forEach(btn => {
+            btn.textContent = pairButtonText(rows[+btn.dataset.i]);
+            btn.disabled = logligRunActive();
+        });
+        const all = document.getElementById('btn-loglig-all');
+        all.disabled = logligRunActive();
+        all.textContent = logligRunActive()
+            ? `loglig: ${runProgress(logligRun)}${logligRun.allPairs ? ` · пар ${logligRun.pairsDone} / ${logligRun.pairsTotal || '…'}` : ''}`
+            : 'Проверить в loglig все пары';
+    }
+
+    async function startLogligRun(url, body) {
         try {
-            const r = await apiJson(`${API}/dedup-candidates/loglig/check`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idA: c.canonicalId, idB: c.duplicateId })
+            const res = await fetch(url, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': _csrfToken },
+                body: body ? JSON.stringify(body) : null,
             });
-            c.loglig = r.summary;
-            logligOpen.set(key, r);
-            toast(r.requests ? `loglig: открыто карточек ${r.requests}${r.failed ? `, не открылось ${r.failed}` : ''}` : 'Все ответы loglig свежие (моложе суток)', 4000);
+            let st = null;
+            try { st = await res.json(); } catch { }
+            if (res.status === 409) toast('Проверка в loglig уже идёт — показываю её ход', 4000);
+            else if (!res.ok) throw new Error(st?.error ?? `${res.status} ${res.statusText}`);
+            attachLogligRun(st);
         } catch (e) { toast('Ошибка: ' + e.message, 6000); }
-        finally { logligBusy.delete(key); rerender(); }
+    }
+
+    function attachLogligRun(st) {
+        if (logligRun?.runId !== st.runId) logligApplied = 0;
+        applyLogligRun(st);
+        if (st.active && !logligPoll) logligPoll = setInterval(pollLogligRun, 1500);
+    }
+
+    async function pollLogligRun() {
+        try { applyLogligRun(await apiJson(`${API}/dedup-candidates/loglig/runs/${logligRun.runId}`)); }
+        catch (e) {
+            clearInterval(logligPoll); logligPoll = null;
+            logligRun = null; updateLogligButtons();
+            toast('Ошибка проверки loglig: ' + e.message, 6000);
+        }
+    }
+
+    // Пройденные пары → свежие сводки в строках (и открытые списки перечитываются).
+    async function applyLogligRun(st) {
+        const fresh = st.pairs.slice(logligApplied);
+        logligApplied = st.pairs.length;
+        const wasActive = logligRunActive();
+        logligRun = st;
+        if (fresh.length) {
+            for (const p of fresh) {
+                const c = data?.candidates.find(x => x.canonicalId === p.clubAId && x.duplicateId === p.clubBId);
+                if (c) c.loglig = p.summary;
+                const key = `${p.clubAId}-${p.clubBId}`;
+                if (logligOpen.has(key)) {
+                    try { logligOpen.set(key, await apiJson(`${API}/dedup-candidates/loglig?a=${p.clubAId}&b=${p.clubBId}`)); } catch { }
+                }
+            }
+            rerender();
+        }
+        updateLogligButtons();
+        if (!st.active) {
+            clearInterval(logligPoll); logligPoll = null;
+            if (!fresh.length) rerender();
+            if (wasActive) toast(st.state === 'failed' ? `Проверка loglig упала: ${st.error}`
+                : !st.swimmersTotal ? 'Все ответы loglig свежие (моложе суток)'
+                : `loglig: пар ${st.pairsDone}, открыто карточек ${st.swimmersDone}${st.failed ? `, не открылось ${st.failed}` : ''}`, 5000);
+        }
+    }
+
+    // После загрузки страницы — подхватить идущий прогон (страницу могли перезагрузить посреди).
+    async function resumeLogligRun() {
+        try {
+            const res = await fetch(`${API}/dedup-candidates/loglig/runs/current`, { credentials: 'same-origin' });
+            if (res.status !== 200) return;
+            const st = await res.json();
+            if (st.active) attachLogligRun(st);
+        } catch { }
+    }
+
+    document.getElementById('btn-loglig-all').addEventListener('click', () =>
+        startLogligRun(`${API}/dedup-candidates/loglig/check-all`, null));
+
+    function checkLoglig(c) {
+        return startLogligRun(`${API}/dedup-candidates/loglig/check`, { idA: c.canonicalId, idB: c.duplicateId });
     }
 
     function render() {
@@ -480,5 +565,5 @@
         }
     })();
 
-    load();
+    load().then(resumeLogligRun);
 })();

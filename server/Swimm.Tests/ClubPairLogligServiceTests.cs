@@ -117,39 +117,80 @@ public class ClubPairLogligServiceTests
     }
 
     [Fact]
-    public async Task Check_FetchesOnlyStale_SavesAnswers()
+    public async Task Run_FetchesOnlyStale_SavesAnswers_ReportsProgress()
     {
-        await using var db = CreateDb(nameof(Check_FetchesOnlyStale_SavesAnswers));
+        await using var db = CreateDb(nameof(Run_FetchesOnlyStale_SavesAnswers_ReportsProgress));
         await SeedAsync(db);
         var loglig = Loglig();
+        var status = new ClubPairLogligRunStatus();
 
-        var r = await Service(db, loglig).CheckAsync(A, B, maxRequests: 50);
+        await Service(db, loglig).RunAsync(status, [(A, B)]);
 
         // 3 — свежий ответ, 4 — без loglig-id: в сеть только за 1, 2, 5.
         Assert.Equal([101, 102, 105], loglig.Calls.Order());
-        Assert.Equal((3, 1, 0), (r!.Requests, r.Failed, r.Remaining));
-        Assert.Equal((1, 1, 1, 1, 1), (r.Summary.ClubA, r.Summary.ClubB, r.Summary.Archive, r.Summary.NoLogligId, r.Summary.Unchecked));
+        Assert.Equal((1, 1, 3, 3, 1), (status.PairsTotal, status.PairsDone, status.SwimmersTotal, status.SwimmersDone, status.Failed));
+        var pair = Assert.Single(status.Pairs);
+        Assert.Equal((A, B, 3, 1), (pair.ClubAId, pair.ClubBId, pair.Requests, pair.Failed));
+        var s = pair.Summary;
+        Assert.Equal((1, 1, 1, 1, 1), (s.ClubA, s.ClubB, s.Archive, s.NoLogligId, s.Unchecked));
         var saved = await db.SwimmerLogligClubs.AsNoTracking().OrderBy(x => x.SwimmerId).ToListAsync();
         Assert.Equal([1, 2, 3], saved.Select(x => x.SwimmerId));
         Assert.Equal("הפועל ירושלים אומנותית", saved[1].ClubName);
 
-        // Повторное нажатие в те же сутки: только та, что не открылась.
+        // Повторная проверка в те же сутки: только та, что не открылась.
         loglig.Calls.Clear();
-        await Service(db, loglig).CheckAsync(A, B, maxRequests: 50);
+        await Service(db, loglig).RunAsync(new ClubPairLogligRunStatus(), [(A, B)]);
         Assert.Equal([105], loglig.Calls);
     }
 
     [Fact]
-    public async Task Check_RespectsLimit_ReportsRemaining()
+    public async Task Run_AllPairs_SharedSwimmerFetchedOnce_EachPairSummarized()
     {
-        await using var db = CreateDb(nameof(Check_RespectsLimit_ReportsRemaining));
+        await using var db = CreateDb(nameof(Run_AllPairs_SharedSwimmerFetchedOnce_EachPairSummarized));
         await SeedAsync(db);
+        // Пловец 1 плыл ещё и за Раанану — общий и для пары A/Раанана.
+        db.Results.Add(new ResultRecord
+        {
+            SwimmerId = 1, CompetitionId = db.Competitions.Local.First().Id, StyleId = db.Styles.Local.First().Id,
+            Distance = "100", ClubId = Raanana, Gender = "female", CompetitionDate = new DateTime(2026, 7, 1),
+        });
+        await db.SaveChangesAsync();
         var loglig = Loglig();
+        var status = new ClubPairLogligRunStatus();
 
-        var r = await Service(db, loglig).CheckAsync(A, B, maxRequests: 1);
+        await Service(db, loglig).RunAsync(status, [(A, B), (A, Raanana)]);
 
-        Assert.Single(loglig.Calls);
-        Assert.Equal((1, 2), (r!.Requests, r.Remaining));
+        Assert.Equal([101, 102, 105], loglig.Calls.Order()); // 101 — один раз на две пары
+        Assert.Equal((2, 2, 3, 3), (status.PairsTotal, status.PairsDone, status.SwimmersTotal, status.SwimmersDone));
+        var second = status.Pairs[1];
+        Assert.Equal((A, Raanana, 0), (second.ClubAId, second.ClubBId, second.Requests));
+        Assert.Equal((1, 1), (second.Summary.ClubA, second.Summary.Total));
+    }
+
+    [Fact]
+    public void Queue_OneActiveRun_NextAfterFinish()
+    {
+        var queue = new ClubPairLogligCheckQueue();
+
+        var (first, started) = queue.Enqueue(null, null);
+        Assert.True(started);
+        Assert.True(first.AllPairs);
+
+        // Пока первый ждёт или идёт — второй не ставится, отдаётся текущий.
+        var (again, startedAgain) = queue.Enqueue(A, B);
+        Assert.False(startedAgain);
+        Assert.Equal(first.RunId, again.RunId);
+        Assert.Equal(first.RunId, queue.Current()!.RunId);
+
+        queue.SetRunning(first.RunId);
+        Assert.Equal(ClubPairLogligRunStates.Running, queue.GetStatus(first.RunId)!.State);
+        queue.SetCompleted(first.RunId);
+
+        var (pair, startedPair) = queue.Enqueue(A, B);
+        Assert.True(startedPair);
+        Assert.Equal((false, A, B), (pair.AllPairs, pair.ClubAId, pair.ClubBId));
+        Assert.Equal(pair.RunId, queue.Current()!.RunId);
+        Assert.Equal(2, queue.Snapshot().Count);
     }
 
     [Fact]

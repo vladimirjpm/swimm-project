@@ -491,7 +491,8 @@
   тут и только с подтверждённым loglig-id).
   → [data-integrity.md](data-integrity.md) Р110, [plans/swimmer-club-change-plan.md](plans/swimmer-club-change-plan.md) §7.2.
 - **Пару клубов «Общие пловцы» перед склейкой — сверить с loglig (Влад 19.11.2026, Р112).** На /Admin/Clubs у такой
-  пары колонка «loglig»: где федерация видит общих пловцов; кнопка «Проверить в loglig» обновляет ответы старше суток.
+  пары колонка «loglig»: где федерация видит общих пловцов; «Проверить в loglig» (у пары или все пары сразу, в фоне)
+  обновляет ответы старше суток.
   Общие пловцы у loglig и в каноне, и в дубле — это два клуба и переходы детей (Р98), не дубль. Ответ loglig по пловцу —
   одно место `Sys_SwimmerLogligClubs`, общее со сверкой кандидатов смены клуба.
   → [data-integrity.md](data-integrity.md) Р112, [admin-pages/clubs.md](admin-pages/clubs.md).

@@ -14,9 +14,11 @@ namespace Swimm.Infrastructure.Services;
 ///
 /// • Чтение (<see cref="GetAsync"/>, <see cref="SummarizeAsync"/>) — только сохранённые ответы
 ///   <c>Sys_SwimmerLogligClubs</c>, в сеть не ходит: страница кандидатов открывается без loglig.
-/// • Кнопка (<see cref="CheckAsync"/>) — карточки общих пловцов с несвежим ответом, по одной,
-///   ~1 запрос в секунду (как сверка кандидатов Р98), не больше лимита за нажатие; каждый удачный
-///   ответ сохраняется сразу — прерванная проверка не теряет сделанного.
+/// • Проверка (<see cref="RunAsync"/>) — из фоновой задачи «Проверить в loglig» (одна пара или все):
+///   карточки общих пловцов с несвежим ответом, по одной, ~1 запрос в секунду (как сверка
+///   кандидатов Р98), пловец, общий для нескольких пар, — один раз. Каждый удачный ответ
+///   сохраняется сразу — прерванная проверка не теряет сделанного; после каждой пары её сводка
+///   уходит в статус прогона, и страница перерисовывает строку.
 /// • Общие пловцы — как у эвристики (<see cref="ClubDedupService"/>): клуб карточки и клубы строк
 ///   результатов, по самим Id пары (склеенные в кандидаты не попадают).
 /// </summary>
@@ -30,10 +32,64 @@ public sealed class ClubPairLogligService(
     private DateTime? _lastRequestAt;
 
     public Task<ClubPairLogligReport?> GetAsync(int clubA, int clubB, CancellationToken ct = default) =>
-        BuildAsync(clubA, clubB, maxRequests: 0, ct);
+        BuildAsync(clubA, clubB, ct);
 
-    public Task<ClubPairLogligReport?> CheckAsync(int clubA, int clubB, int maxRequests, CancellationToken ct = default) =>
-        BuildAsync(clubA, clubB, Math.Max(0, maxRequests), ct);
+    public async Task RunAsync(ClubPairLogligRunStatus status, IReadOnlyList<(int A, int B)> pairs, CancellationToken ct = default)
+    {
+        // Сначала весь объём: общие пловцы каждой пары и кого из них открывать — ради прогресса «12 / 87».
+        var shared = new List<(int A, int B, List<int> Ids)>(pairs.Count);
+        foreach (var (a, b) in pairs)
+            if (a != b) shared.Add((a, b, await SharedSwimmerIdsAsync(db, a, b, ct)));
+        var allIds = shared.SelectMany(p => p.Ids).Distinct().ToArray();
+        var logligIds = await VerifiedLogligIdsAsync(allIds, ct);
+        var stored = await SwimmerLogligClubStore.LoadAsync(db, allIds, ct);
+        var now = DateTime.UtcNow;
+        var stale = allIds
+            .Where(id => ClubPairLogligRule.NeedsFetch(now, logligIds.GetValueOrDefault(id), stored.GetValueOrDefault(id)))
+            .ToHashSet();
+        status.PairsTotal = shared.Count;
+        status.SwimmersTotal = stale.Count;
+        var matcher = await SwimmerClubLogligCheckService.LoadMatcherAsync(db, ct);
+
+        foreach (var (a, b, ids) in shared)
+        {
+            status.CurrentClubAId = a;
+            status.CurrentClubBId = b;
+            int requests = 0, failed = 0;
+            foreach (var id in ids.Where(stale.Contains).ToList())
+            {
+                ct.ThrowIfCancellationRequested();
+                stale.Remove(id); // общий для нескольких пар — открываем один раз
+                var lid = logligIds[id]!.Value;
+                await ThrottleAsync(ct);
+                var card = await loglig.GetPlayerCardAsync(lid, ct: ct);
+                requests++;
+                if (card is null)
+                {
+                    failed++;
+                    status.Failed++;
+                }
+                else
+                {
+                    var at = DateTime.UtcNow;
+                    var club = card.ClubName?.Trim();
+                    await SwimmerLogligClubStore.UpsertAsync(db, id, lid, club, at, ct);
+                    await db.SaveChangesAsync(ct);
+                    stored[id] = new StoredLogligClub(lid, club, at);
+                }
+                status.SwimmersDone++;
+            }
+
+            var summary = ClubPairLogligRule.Summarize(ids.Select(id =>
+                ClubPairLogligRule.Classify(logligIds.GetValueOrDefault(id), stored.GetValueOrDefault(id), a, b, matcher)));
+            status.Pairs = [.. status.Pairs, new ClubPairLogligRunPair(a, b, summary, requests, failed)];
+            status.PairsDone++;
+            if (requests > 0)
+                logger.LogInformation(
+                    "Пара клубов #{A}/#{B} ↔ loglig: общих {Shared}, открыто карточек {Requests}, не открылось {Failed}",
+                    a, b, ids.Count, requests, failed);
+        }
+    }
 
     public async Task<Dictionary<(int A, int B), ClubPairLogligSummary>> SummarizeAsync(
         IReadOnlyList<(int A, int B, IReadOnlyCollection<int> SwimmerIds)> pairs, CancellationToken ct = default)
@@ -52,7 +108,7 @@ public sealed class ClubPairLogligService(
         return result;
     }
 
-    private async Task<ClubPairLogligReport?> BuildAsync(int clubA, int clubB, int maxRequests, CancellationToken ct)
+    private async Task<ClubPairLogligReport?> BuildAsync(int clubA, int clubB, CancellationToken ct)
     {
         var pairClubs = await db.Clubs.AsNoTracking()
             .Where(c => c.Id == clubA || c.Id == clubB)
@@ -63,33 +119,6 @@ public sealed class ClubPairLogligService(
         var logligIds = await VerifiedLogligIdsAsync(ids, ct);
         var stored = await SwimmerLogligClubStore.LoadAsync(db, ids, ct);
 
-        int requests = 0, failed = 0, remaining = 0;
-        if (maxRequests > 0)
-        {
-            var now = DateTime.UtcNow;
-            var stale = ids
-                .Where(id => ClubPairLogligRule.NeedsFetch(now, logligIds.GetValueOrDefault(id), stored.GetValueOrDefault(id)))
-                .ToList();
-            remaining = Math.Max(0, stale.Count - maxRequests);
-            foreach (var id in stale.Take(maxRequests))
-            {
-                ct.ThrowIfCancellationRequested();
-                var lid = logligIds[id]!.Value;
-                await ThrottleAsync(ct);
-                var card = await loglig.GetPlayerCardAsync(lid, ct: ct);
-                requests++;
-                if (card is null) { failed++; continue; }
-
-                var at = DateTime.UtcNow;
-                var club = card.ClubName?.Trim();
-                await SwimmerLogligClubStore.UpsertAsync(db, id, lid, club, at, ct);
-                await db.SaveChangesAsync(ct);
-                stored[id] = new StoredLogligClub(lid, club, at);
-            }
-            logger.LogInformation(
-                "Пара клубов #{A}/#{B} ↔ loglig: общих {Shared}, открыто карточек {Requests}, не открылось {Failed}, осталось {Remaining}",
-                clubA, clubB, ids.Count, requests, failed, remaining);
-        }
 
         var matcher = await SwimmerClubLogligCheckService.LoadMatcherAsync(db, ct);
         var names = await SwimmerClubRefreshService.SwimmerNamesAsync(db, ids, ct);
@@ -118,8 +147,7 @@ public sealed class ClubPairLogligService(
 
         return new ClubPairLogligReport(
             clubA, pairClubs[clubA], clubB, pairClubs[clubB],
-            ClubPairLogligRule.Summarize(swimmers.Select(s => s.Verdict)), swimmers,
-            requests, failed, remaining);
+            ClubPairLogligRule.Summarize(swimmers.Select(s => s.Verdict)), swimmers);
     }
 
     private static readonly string[] VerdictOrder =

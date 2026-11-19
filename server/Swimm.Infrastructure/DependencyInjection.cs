@@ -131,6 +131,9 @@ public static class DependencyInjection
         // (дифф ходит в БД). Пауза между странами по умолчанию, тесты подставляют свою.
         services.AddSingleton<RecordCountryRunQueue>();
         services.AddSingleton<IRecordCountryRunQueue>(sp => sp.GetRequiredService<RecordCountryRunQueue>());
+        // Очередь «Проверить в loglig» пар клубов-кандидатов (Р112): статусы в памяти процесса
+        services.AddSingleton<ClubPairLogligCheckQueue>();
+        services.AddSingleton<IClubPairLogligCheckQueue>(sp => sp.GetRequiredService<ClubPairLogligCheckQueue>());
         // Архив источников: боевой прогон сам кладёт выгрузку разобранных строк в
         // !records-sources/ (правило 11 pre-push). Путь из конфига, относительный считается от
         // ContentRoot; пустой — архив выключен. Вне Development относительный путь тоже
