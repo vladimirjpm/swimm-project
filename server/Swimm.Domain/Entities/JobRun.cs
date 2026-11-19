@@ -21,4 +21,15 @@ public class JobRun
 
     /// <summary>Текст ошибки последней попытки; null — последняя попытка удалась.</summary>
     public string? LastError { get; set; }
+
+    /// <summary>
+    /// Заявка на прогон (замок, П1 docs/plans/prod-auto-pull-plan.md §4.1): когда процесс начал
+    /// работу — по часам БАЗЫ (<c>now()</c>), чтобы два процесса с разными часами сравнивали одно
+    /// и то же. null — задача сейчас не идёт. Заявка старше <c>JobSchedule.ClaimStaleAfter</c>
+    /// считается брошенной (процесс убит) и перехватывается.
+    /// </summary>
+    public DateTime? ClaimedAt { get; set; }
+
+    /// <summary>Кто держит заявку: «среда@машина#pid» (<c>JobClaimOwner</c>); null — заявки нет.</summary>
+    public string? ClaimedBy { get; set; }
 }

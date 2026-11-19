@@ -53,6 +53,34 @@ public class JobsOverviewBuilderTests
         Assert.Equal("ошибка 20 мин назад: 502 Bad Gateway", s.Status);
     }
 
+    /// <summary>Заявка на прогон (замок П1) жива — «идёт сейчас», и видно это даже там, где расписания выключены.</summary>
+    [Fact]
+    public void Schedule_with_live_claim_is_running()
+    {
+        var state = State(Now.AddHours(-25), Now.AddHours(-25)) with { ClaimedAt = Now.AddMinutes(-3), ClaimedBy = "Production@swimhub#1" };
+
+        var s = JobsOverviewBuilder.Schedule(true, true, "DiscoveryEnabled", state, Day, Now);
+        Assert.True(s.Running);
+        Assert.Equal("идёт сейчас — 3 мин, запустил Production@swimhub#1; прошлый — ок 25 ч назад", s.Status);
+
+        var watching = JobsOverviewBuilder.Schedule(false, true, "DiscoveryEnabled", state, Day, Now);
+        Assert.True(watching.Running);
+        Assert.StartsWith("идёт сейчас", watching.Status);
+    }
+
+    /// <summary>Брошенная заявка (процесс убит) «идёт сейчас» не изображает.</summary>
+    [Fact]
+    public void Schedule_with_stale_claim_is_not_running()
+    {
+        var state = State(Now.AddHours(-3), Now.AddHours(-3)) with
+        {
+            ClaimedAt = Now - JobSchedule.ClaimStaleAfter - TimeSpan.FromMinutes(1), ClaimedBy = "Production@swimhub#1",
+        };
+        var s = JobsOverviewBuilder.Schedule(true, true, "DiscoveryEnabled", state, Day, Now);
+        Assert.False(s.Running);
+        Assert.Equal("ок 3 ч назад", s.Status);
+    }
+
     [Fact]
     public void Schedule_overdue_is_warning()
     {

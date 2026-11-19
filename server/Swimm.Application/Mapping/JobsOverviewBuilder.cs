@@ -43,14 +43,20 @@ public static class JobsOverviewBuilder
                 : $"ок {JobTimeText.Ago(last, now)}"
             : null;
 
-        var status = !processOn ? "выключена флагом процесса (BackgroundJobs:Enabled)" + (lastRun is null ? "" : $"; последний — {lastRun}")
+        // Заявка на прогон (замок П1) — в базе, поэтому «идёт сейчас» видно и из процесса, где
+        // расписания выключены (ProdAdmin смотрит на задачу, которую выполняет прод).
+        var running = JobSchedule.IsClaimLive(now, state?.ClaimedAt);
+
+        var status = running ? $"идёт сейчас — {JobTimeText.Human(now - state!.ClaimedAt!.Value)}, запустил {state.ClaimedBy ?? "?"}"
+                               + (lastRun is null ? "" : $"; прошлый — {lastRun}")
+            : !processOn ? "выключена флагом процесса (BackgroundJobs:Enabled)" + (lastRun is null ? "" : $"; последний — {lastRun}")
             : !enabled ? $"выключена настройкой ({enabledKey})" + (lastRun is null ? "" : $"; последний — {lastRun}")
             : overdue ? $"просрочена на {JobTimeText.Human(now - next!.Value)}" + (lastRun is null ? "" : $"; последний — {lastRun}")
             : lastRun ?? "ещё не запускалась";
 
         // Проблема — только у работающей задачи: старая ошибка выключенной ничего не ломает сейчас.
         var alert = active && failed ? "danger" : overdue ? "warning" : null;
-        return new ScheduleState(active, failed, next, status, alert);
+        return new ScheduleState(active, failed, next, status, alert, running);
     }
 
     /// <summary>Сводка: плитки /Admin/Jobs, проблемные службы и худший тон — для блока дашборда.</summary>
@@ -121,7 +127,7 @@ public static class JobsOverviewBuilder
 }
 
 /// <param name="Alert">danger — последняя попытка упала; warning — просрочена; null — в порядке.</param>
-public sealed record ScheduleState(bool Active, bool Failed, DateTime? NextDueAt, string Status, string? Alert);
+public sealed record ScheduleState(bool Active, bool Failed, DateTime? NextDueAt, string Status, string? Alert, bool Running = false);
 
 /// <summary>Время по-человечески для /Admin/Jobs: «3 ч назад», «через 20 мин», «20.10.2026 10:32».</summary>
 public static class JobTimeText
