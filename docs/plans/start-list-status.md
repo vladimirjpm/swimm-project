@@ -33,7 +33,7 @@
 | Способ | Где |
 |---|---|
 | **Кнопка** (основной) | `http://localhost:5078/Admin/Competitions` → «Стартовый протокол» в строке соревнования |
-| По расписанию | `/Admin/Settings` → `StartListEnabled = true`, окно — `StartListDaysAhead` (по умолчанию 14 дней). **Выключено по умолчанию** |
+| По расписанию | `/Admin/Settings` → `StartListEnabled = true`, окно — `StartListDaysAhead` (по умолчанию 14 дней), шаг — `StartListIntervalHours` (3 ч; частота по близости старта — П3, [../admin-pages/jobs.md](../admin-pages/jobs.md)). **Выключено по умолчанию** |
 | Из консоли | `dotnet run --project server/Swimm.API -- --pull-start-list <orgCompId>` |
 
 Повтор **идемпотентен** — жать можно сколько угодно; это штатный режим, посев меняется до

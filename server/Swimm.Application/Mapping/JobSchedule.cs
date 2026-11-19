@@ -41,12 +41,20 @@ public static class JobNames
     /// </summary>
     public const string TrainingReminders = "training-reminders";
 
+    /// <summary>Шаг обхода стартовых протоколов в часах (П3) — ключ Admin/Settings.</summary>
+    public const string StartListIntervalKey = "StartListIntervalHours";
+
+    /// <summary>Окно обхода стартовых протоколов вперёд, дней — ключ Admin/Settings.</summary>
+    public const string StartListDaysAheadKey = "StartListDaysAhead";
+
     /// <summary>Все задачи по расписанию в порядке показа на /Admin/Jobs.</summary>
     public static readonly IReadOnlyList<JobDefinition> All =
     [
         new(Discovery, "DiscoveryEnabled", false, "DiscoveryIntervalHours", 24),
-        // Интервал общий с discovery (С10, решение 5: отдельного не заводим).
-        new(StartList, "StartListEnabled", false, "DiscoveryIntervalHours", 24),
+        // П3 (prod-auto-pull-plan §4.3, Р-4): свой интервал — это ШАГ обхода, а не частота
+        // старта. Кого смотреть в тик, решает StartListSweepRules по близости старта (раз в
+        // сутки … каждые 3 ч), поэтому шаг 3 ч; был общим с discovery (С10, решение 5) — сутки.
+        new(StartList, "StartListEnabled", false, StartListIntervalKey, 3),
         // Включена по умолчанию: без неё предложения пользователей зависали бы в Suggested навсегда.
         new(LogligVerify, "LogligVerifyEnabled", true, "LogligVerifyIntervalHours", 24),
         // Выключена по умолчанию: каждый пловец — 1–3 платных запроса Serper.
@@ -122,9 +130,16 @@ public static class JobRunSummaries
     public static string Discovery(DiscoverySyncResult r) =>
         $"на сайте {r.TotalOnSite}, новых {r.Added}, обновлено {r.Updated}, перенесено {r.Postponed}, пропало {r.Missing}";
 
+    /// <summary>
+    /// «окно 14 дн.: посмотрели 3 из 20 (рано 16, уже начались 1), забрано 3 из 3; loglig-id добыт у 1 из 4».
+    /// Суточной догрузки loglig-id в тике не было — «loglig-id — в суточном тике».
+    /// </summary>
     public static string StartList(StartListSweepReport r, int daysAhead) =>
-        $"окно {daysAhead} дн.: loglig-id добыт у {r.DetailsResolved} из {r.DetailsChecked}, " +
-        $"протоколов забрано {r.Pulled} из {r.Total}";
+        $"окно {daysAhead} дн.: посмотрели {r.Due} из {r.Total} (рано {r.TooEarly}, уже начались {r.Started}), " +
+        $"забрано {r.Pulled} из {r.Due}; " +
+        (r.DetailsRan
+            ? $"loglig-id добыт у {r.DetailsResolved} из {r.DetailsChecked}"
+            : "loglig-id — в суточном тике");
 
     public static string LogligVerify(LogligSuggestionVerifyReport r) =>
         r.Checked == 0

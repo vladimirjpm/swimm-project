@@ -98,10 +98,13 @@ public sealed class BackgroundJobsStatusService(
             "«Проверить сейчас» в /Admin/Competitions и --discovery-sync пишут сюда же.",
             "5 мин", null),
         [JobNames.StartList] = ("Стартовые протоколы", "CompetitionDiscoveryBackgroundService (второй проход)",
-            "Для будущих стартов в окне StartListDaysAhead добывает loglig-id и забирает стартовый " +
-            "протокол (CompetitionEntries); loglig-id ищет и у прошедших за 30 дней со статусом new " +
-            "(iframe часто появляется после старта). Интервал общий с «Входящими».",
-            "5 мин", "StartListDaysAhead"),
+            "Забирает стартовый протокол (CompetitionEntries) будущих стартов в окне StartListDaysAhead. " +
+            "Интервал — шаг тика; кого смотреть в тик, решает правило по близости старта (П3): 3–14 дней " +
+            "раз в сутки, ближайшие два дня каждые 3 ч (посев уже забран — 6 ч), день старта каждые 3 ч до " +
+            "первого заплыва, потом не трогает. Раз в сутки (первый тик дня) дочитывает loglig-id, в том " +
+            "числе прошедшим за 30 дней со статусом new (iframe часто появляется после старта). Итог: " +
+            "сколько посмотрели, сколько «рано», сколько уже начались.",
+            "5 мин", JobNames.StartListDaysAheadKey),
         [JobNames.LogligVerify] = ("Сверка предложенных loglig-id", "LogligSuggestionVerificationBackgroundService",
             "Берёт loglig-id, предложенные пользователями (Suggested), сверяет карточку loglig " +
             "(имя + год рождения) и переводит в Verified или Rejected.",

@@ -345,8 +345,9 @@ public class JobScheduleTests
         // loglig (без неё смена клуба не применилась бы никогда, Р98).
         Assert.Equal([JobNames.LogligVerify, JobNames.RecordsCheck, JobNames.SwimmerClubCheck],
             JobNames.All.Where(j => j.EnabledDefault).Select(j => j.Name));
-        // Стартовый протокол живёт на интервале discovery (С10, решение 5).
-        Assert.Equal(JobNames.Get(JobNames.Discovery).IntervalKey, JobNames.Get(JobNames.StartList).IntervalKey);
+        // П3: у стартового протокола свой шаг тика (3 ч), а не общий с discovery (С10, решение 5).
+        Assert.Equal("StartListIntervalHours", JobNames.Get(JobNames.StartList).IntervalKey);
+        Assert.Equal(3, JobNames.Get(JobNames.StartList).DefaultIntervalHours);
     }
 
     [Fact]
@@ -370,8 +371,10 @@ public class JobScheduleTests
             { TotalOnSite = 41, Added = 2, Updated = 5, Postponed = 1, Missing = 0 });
         Assert.Equal("на сайте 41, новых 2, обновлено 5, перенесено 1, пропало 0", discovery);
 
-        Assert.Equal("окно 14 дн.: loglig-id добыт у 1 из 3, протоколов забрано 4 из 5",
-            JobRunSummaries.StartList(new StartListSweepReport(3, 1, 5, 4), 14));
+        Assert.Equal("окно 14 дн.: посмотрели 5 из 20 (рано 14, уже начались 1), забрано 4 из 5; loglig-id добыт у 1 из 3",
+            JobRunSummaries.StartList(new StartListSweepReport(3, 1, 20, 4, 5, 14, 1, DetailsRan: true), 14));
+        Assert.Equal("окно 14 дн.: посмотрели 2 из 20 (рано 18, уже начались 0), забрано 2 из 2; loglig-id — в суточном тике",
+            JobRunSummaries.StartList(new StartListSweepReport(0, 0, 20, 2, 2, 18, 0, DetailsRan: false), 14));
         Assert.Equal("предложений нет",
             JobRunSummaries.LogligVerify(new LogligSuggestionVerifyReport(0, 0, 0, 0)));
         Assert.Equal("проверено 4, подтверждено 2, отклонено 1, отложено 1",
