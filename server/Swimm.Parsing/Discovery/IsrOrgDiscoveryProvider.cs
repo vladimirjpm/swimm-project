@@ -153,7 +153,8 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
             ev.CompetitionName, ev.Date, ev.StyleName, ev.Distance, ev.Gender, ev.AgeBand, ev.IsRelay,
             ev.Rows.Select(r => new LogligResultRowDto(
                 r.Position, r.Round, r.Category, r.FullName, r.BirthYear, r.Club, r.Heat, r.Lane,
-                r.Time, r.FailNote, r.InternationalPoints, r.PersonalPoints, r.ClubPoints)).ToList());
+                r.Time, r.FailNote, r.InternationalPoints, r.PersonalPoints, r.ClubPoints,
+                r.Legs?.Select(l => new LogligRelayLegDto(l.LogligId, l.FullName)).ToList())).ToList());
     }
 
     public async Task<IReadOnlyList<LogligDisciplineGridRowDto>> FetchDisciplineGridAsync(

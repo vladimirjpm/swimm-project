@@ -11,6 +11,7 @@ namespace Swimm.Application.Dtos;
 /// <param name="FailNote">Статус вместо времени (DQ/NS/DNF) либо пометка рядом с ним (NMin).</param>
 /// <param name="PersonalPoints">Личные очки организатора (5/3/2/1 за медали).</param>
 /// <param name="ClubPoints">Клубные очки организатора — эталон для сверки нашего движка правил.</param>
+/// <param name="RelayLegs">Состав эстафетной команды по этапам; null — страница его не печатает или строка личная.</param>
 public sealed record LogligResultRowDto(
     int? Position,
     string Round,
@@ -24,7 +25,11 @@ public sealed record LogligResultRowDto(
     string? FailNote,
     int InternationalPoints,
     int? PersonalPoints,
-    int? ClubPoints);
+    int? ClubPoints,
+    IReadOnlyList<LogligRelayLegDto>? RelayLegs = null);
+
+/// <summary>Нога эстафеты: id карточки loglig и имя «имя фамилия». Года рождения у ноги нет.</summary>
+public sealed record LogligRelayLegDto(int? LogligId, string FullName);
 
 /// <summary>Событие loglig целиком: шапка дисциплины и строки всех её секций.</summary>
 public sealed record LogligEventResultsDto(

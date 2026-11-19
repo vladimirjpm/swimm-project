@@ -109,6 +109,9 @@ internal static class LogligCli
 
     // Разведка пособытийного источника loglig (шаг 3 «склеенных сессий», data-integrity §10):
     //   dotnet run -- --pull-events <discoveredId> [--import]
+    //   dotnet run -- --pull-events <discoveredId> --relays-only [--import]
+    // --relays-only (Р107): только эстафеты, по составу со страниц событий (с 2026/27 страница его
+    // печатает). С --import заменяет эстафеты соревнования, личные строки не трогает.
     // Только читает и отчитывается: сколько событий, строк, по каким раундам, какие имена не
     // сопоставились с пловцами в БД и сколько официальных клубных очков насчитал организатор.
     // Ходит в чужой прод с паузой 2 с между запросами — на большом чемпионате это минуты.
@@ -125,6 +128,30 @@ internal static class LogligCli
         using var scope = app.Services.CreateScope();
         var pull = scope.ServiceProvider.GetRequiredService<ILogligEventPullService>();
 
+        if (args.Contains("--relays-only"))
+        {
+            var relaysImport = args.Contains("--import");
+            var relaysSummary = string.Empty;
+            LogligRelayPullReport relays;
+            if (relaysImport)
+                (relays, relaysSummary) = await pull.ImportRelaysAsync(discoveredId);
+            else
+                relays = await pull.RelaysDryRunAsync(discoveredId);
+
+            Console.WriteLine($"«{relays.CompetitionName}»: эстафетных событий {relays.RelayEvents}, " +
+                              $"команд у источника {relays.Teams} (без состава {relays.TeamsWithoutLegs}), у нас эстафет {relays.OurRelays}");
+            Console.WriteLine($"  ног {relays.Legs}: по id карточки {relays.LegsByLogligId}, по имени {relays.LegsByName}, " +
+                              $"не узнано {relays.UnresolvedLegs.Count}");
+            foreach (var leg in relays.UnresolvedLegs.Take(20))
+                Console.WriteLine($"      {leg}");
+            Console.WriteLine(relaysImport
+                ? $"ИМПОРТ ЭСТАФЕТ: {relaysSummary}"
+                : relays.CanImport
+                    ? "Можно импортировать: повторите с --import (личные строки не тронутся)."
+                    : "Импорт невозможен — см. выше.");
+            return;
+        }
+
         // Без --import это чистая разведка. С ним — переимпорт поверх существующего:
         // upsert с удалением исчезнувших (ключ сменился из-за Round) и сохранением эстафет.
         var doImport = args.Contains("--import");
@@ -136,7 +163,7 @@ internal static class LogligCli
             report = await pull.DryRunAsync(discoveredId);
 
         Console.WriteLine($"«{report.CompetitionName}»: событий {report.Events}, личных строк {report.IndividualRows}");
-        Console.WriteLine($"  эстафетных событий пропущено: {report.RelayEvents} (состав команд страница не печатает)");
+        Console.WriteLine($"  эстафетных событий пропущено: {report.RelayEvents} (эстафеты по составу со страниц — --relays-only, Р107)");
         foreach (var (round, count) in report.RowsByRound.OrderByDescending(r => r.Value))
             Console.WriteLine($"  раунд {round}: {count}");
 

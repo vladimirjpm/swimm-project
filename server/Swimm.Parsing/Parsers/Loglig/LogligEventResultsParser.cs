@@ -22,7 +22,18 @@ public static class LogligRounds
     public const string Prelim = "prelim";
 }
 
+/// <summary>
+/// Нога эстафеты со страницы события: ссылка на карточку loglig и имя «имя фамилия».
+/// Года рождения страница у ноги не печатает — пловца узнаём по id карточки.
+/// </summary>
+public sealed record LogligRelayLeg(int? LogligId, string FullName);
+
 /// <summary>Строка результата одного события loglig.</summary>
+/// <param name="Legs">
+/// Состав эстафетной команды в порядке этапов. Страницы с 2026/27 печатают его ссылками на
+/// карточки в ячейке имени («אדם קלר, ירון בבאי, …»); у старых страниц (2025, 82438) там только
+/// клуб — тогда пусто. У личных строк всегда пусто.
+/// </param>
 public sealed record LogligResultRow(
     int? Position,
     string Round,
@@ -36,7 +47,8 @@ public sealed record LogligResultRow(
     string? FailNote,
     int InternationalPoints,
     int? PersonalPoints,
-    int? ClubPoints);
+    int? ClubPoints,
+    IReadOnlyList<LogligRelayLeg>? Legs = null);
 
 /// <summary>Одно событие loglig целиком: шапка дисциплины + строки всех его секций.</summary>
 public sealed record LogligEventResults(
@@ -76,7 +88,8 @@ public static partial class LogligEventResultsParser
 
         foreach (Match tr in RowRx().Matches(html))
         {
-            var cells = CellRx().Matches(tr.Groups[1].Value).Select(m => Clean(m.Groups[1].Value)).ToList();
+            var rawCells = CellRx().Matches(tr.Groups[1].Value).Select(m => m.Groups[1].Value).ToList();
+            var cells = rawCells.Select(Clean).ToList();
 
             // Подзаголовок секции — одна ячейка на всю ширину: «גמר ישיר - בנות 14».
             if (cells.Count == 1 && LooksLikeSection(cells[0]))
@@ -102,10 +115,27 @@ public static partial class LogligEventResultsParser
             var pointColumns = cells.Count - (hasBirthYear ? 8 : 7);
             var row = ParseRow(cells, round, category,
                 hasBirthYear: hasBirthYear, hasPersonalPoints: pointColumns >= 2);
-            if (row is not null) rows.Add(row);
+            if (row is null) continue;
+            if (isRelay) row = row with { Legs = ParseLegs(rawCells[1]) };
+            rows.Add(row);
         }
 
         return new LogligEventResults(competition, date, style, distance, gender, ageBand, isRelay, rows);
+    }
+
+    /// <summary>
+    /// Состав команды из ячейки имени: каждая нога — ссылка <c>/Players/Details/{id}</c> с именем,
+    /// между ними запятая. Ссылок нет (старые страницы) — пусто, без догадок по тексту.
+    /// </summary>
+    private static IReadOnlyList<LogligRelayLeg>? ParseLegs(string rawCell)
+    {
+        var legs = LegLinkRx().Matches(rawCell)
+            .Select(m => new LogligRelayLeg(
+                int.TryParse(m.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? id : null,
+                Clean(m.Groups["name"].Value).Trim(',', ' ')))
+            .Where(l => l.FullName.Length > 0)
+            .ToList();
+        return legs.Count > 0 ? legs : null;
     }
 
     private static bool IsBirthYear(string cell) =>
@@ -265,6 +295,9 @@ public static partial class LogligEventResultsParser
 
     [GeneratedRegex("""<[^>]+>""", RegexOptions.Singleline)]
     private static partial Regex TagRx();
+
+    [GeneratedRegex("""<a[^>]*href="/Players/Details/(?<id>\d+)[^"]*"[^>]*>(?<name>.*?)</a>""", RegexOptions.Singleline)]
+    private static partial Regex LegLinkRx();
 
     [GeneratedRegex("""\s+""")]
     private static partial Regex SpaceRx();

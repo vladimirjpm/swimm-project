@@ -25,6 +25,43 @@ public interface ILogligEventPullService
     /// <returns>Отчёт разведки и итог импорта одной строкой.</returns>
     Task<(LogligPullReport Report, string ImportSummary)> ImportAsync(
         int discoveredId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Разведка ЭСТАФЕТ по составам со страниц событий (Р107): сколько команд, сколько ног
+    /// узнано (по id карточки loglig, иначе по имени в ростере), что не узнано.
+    /// </summary>
+    Task<LogligRelayPullReport> RelaysDryRunAsync(int discoveredId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Заменить эстафеты соревнования эстафетами со страниц событий (Р107): upsert с удалением
+    /// исчезнувших ТОЛЬКО среди эстафет, личные строки не трогаются (PreserveIndividuals).
+    /// Отказывает, если хоть одна нога или команда не узнана — иначе часть эстафет пропала бы.
+    /// </summary>
+    Task<(LogligRelayPullReport Report, string ImportSummary)> ImportRelaysAsync(
+        int discoveredId, CancellationToken ct = default);
+}
+
+/// <summary>Итог разведки эстафет со страниц событий.</summary>
+/// <param name="Teams">Строк-команд у источника.</param>
+/// <param name="TeamsWithoutLegs">Команд, у которых страница не напечатала состав.</param>
+/// <param name="Legs">Ног всего.</param>
+/// <param name="LegsByLogligId">Узнано по id карточки loglig.</param>
+/// <param name="LegsByName">Узнано по имени (единственная пара в ростере соревнования).</param>
+/// <param name="UnresolvedLegs">Не узнанные ноги: «имя (id) · клуб».</param>
+/// <param name="OurRelays">Эстафетных строк у нас сейчас.</param>
+public sealed record LogligRelayPullReport(
+    string CompetitionName,
+    int RelayEvents,
+    int Teams,
+    int TeamsWithoutLegs,
+    int Legs,
+    int LegsByLogligId,
+    int LegsByName,
+    IReadOnlyList<string> UnresolvedLegs,
+    int OurRelays)
+{
+    /// <summary>Импорт возможен: все команды с составом и все ноги узнаны.</summary>
+    public bool CanImport => Teams > 0 && TeamsWithoutLegs == 0 && UnresolvedLegs.Count == 0;
 }
 
 /// <summary>Итог разведки: что нашлось у источника и что мешает импортировать.</summary>
