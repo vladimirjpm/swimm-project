@@ -375,4 +375,55 @@ public class ClubMergeServiceTests
 
         Assert.DoesNotContain(report.Candidates, c => c.DuplicateId == dup.Id || c.CanonicalId == dup.Id);
     }
+
+    // ── Кандидаты смены клуба (Р98) без FK: склейка переписывает их сама ─────────
+
+    [Fact]
+    public async Task Merge_ClubCandidates_RemappedToCanonical_SameFromToDropped()
+    {
+        // 19.11.2026: после склейки 1246 «Maccabi Rishon Seals» → 441 у пловца с карточкой на дубле
+        // висел кандидат «1246 → 441», хотя карточка уже переехала на 441.
+        await using var db = CreateDb(nameof(Merge_ClubCandidates_RemappedToCanonical_SameFromToDropped));
+        var canon = new Club { Name = "מכבי ראשון לציון SEALS" };
+        var dup = new Club { Name = "Maccabi Rishon Seals" };
+        var other = new Club { Name = "הפועל בת ים" };
+        db.AddRange(canon, dup, other);
+        await db.SaveChangesAsync();
+        db.SwimmerClubCandidates.AddRange(
+            new SwimmerClubCandidate { SwimmerId = 1, FromClubId = dup.Id, ToClubId = canon.Id },   // было = стало → снять
+            new SwimmerClubCandidate { SwimmerId = 2, FromClubId = other.Id, ToClubId = dup.Id },   // стало → канон
+            new SwimmerClubCandidate { SwimmerId = 3, FromClubId = dup.Id, ToClubId = other.Id },   // было → канон
+            new SwimmerClubCandidate { SwimmerId = 4, FromClubId = other.Id, ToClubId = canon.Id }); // не тронут
+        await db.SaveChangesAsync();
+
+        var report = await new ClubMergeService(db, new StandingSpy())
+            .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: false);
+
+        Assert.Equal("merged", report.Pairs.Single().Status);
+        var left = await db.SwimmerClubCandidates.AsNoTracking().OrderBy(c => c.SwimmerId).ToListAsync();
+        Assert.Equal([2, 3, 4], left.Select(c => c.SwimmerId));
+        Assert.Equal((other.Id, canon.Id), (left[0].FromClubId!.Value, left[0].ToClubId));
+        Assert.Equal((canon.Id, other.Id), (left[1].FromClubId!.Value, left[1].ToClubId));
+        Assert.Equal((other.Id, canon.Id), (left[2].FromClubId!.Value, left[2].ToClubId));
+        Assert.Contains(report.Pairs.Single().Actions, a => a.StartsWith("Sys_SwimmerClubCandidates: 1 снято"));
+    }
+
+    [Fact]
+    public async Task Merge_ClubCandidates_DryRun_NothingWritten()
+    {
+        await using var db = CreateDb(nameof(Merge_ClubCandidates_DryRun_NothingWritten));
+        var canon = new Club { Name = "A" };
+        var dup = new Club { Name = "B" };
+        db.AddRange(canon, dup);
+        await db.SaveChangesAsync();
+        db.SwimmerClubCandidates.Add(new SwimmerClubCandidate { SwimmerId = 1, FromClubId = dup.Id, ToClubId = canon.Id });
+        await db.SaveChangesAsync();
+
+        var report = await new ClubMergeService(db, new StandingSpy())
+            .MergeAsync([new ClubMergePair(canon.Id, dup.Id)], dryRun: true);
+
+        Assert.Contains(report.Pairs.Single().Actions, a => a.StartsWith("Sys_SwimmerClubCandidates: 1 снято"));
+        var row = await db.SwimmerClubCandidates.AsNoTracking().SingleAsync();
+        Assert.Equal(dup.Id, row.FromClubId);
+    }
 }
