@@ -21,6 +21,7 @@
 | /Admin/Competitions/AssignRules | [competitions.md](competitions.md#привязка-правил-очков-э4) | Массовая привязка правил очков к соревнованиям |
 | /Admin/Categories | [categories.md](categories.md) | Категории соревнований (бейджи) |
 | /Admin/Styles | [styles.md](styles.md) | Справочник стилей плавания (CRUD, посевные защищены) |
+| /Admin/VenuePools | [venuepools.md](venuepools.md) | Справочник «место → длина бассейна» (П4): места, написания, двусмысленные; неизвестные места «Входящих» |
 | /Admin/Records | [records.md](records.md) | Рекорды и нормативы уровней |
 | /Admin/PointsRules | [pointsrules.md](pointsrules.md) | Правила начисления очков: клубный зачёт и High Point (CRUD, шкалы, клонирование версий) |
 | /Admin/Series | [series.md](series.md) | **Серии турниров**: повторяющиеся соревнования, их части, версии регламента и награды («Official awards»), привязка выпусков; **значок серии** (загрузка, предпросмотр) |

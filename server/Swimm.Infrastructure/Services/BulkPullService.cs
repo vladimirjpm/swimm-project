@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Application.Validation;
 using Swimm.Infrastructure.Repositories;
 
@@ -174,6 +175,11 @@ public sealed class BulkPullService : IBulkPullService
         Guid? previewId)
     {
         var analysis = regulation?.Analysis;
+        var isChampionship = CompetitionAdminRepository.IsChampionship(row.Name, analysis?.IsChampionship ?? false);
+        // Бассейн: регламент → справочник бассейнов по месту (П4, ответ уже в превью) → у
+        // НЕ-чемпионата честное умолчание 25 м (лиги). Чемпионат и двусмысленное место — null:
+        // импорт пачкой такую строку пропустит (И-30, Р-3).
+        var pool = PoolTypeChooser.ChooseForBulk(analysis?.PoolType, null, preview?.Flags?.VenuePool, isChampionship);
         return new BulkPullRowDto(
             DiscoveredId: row.Id,
             OrgCompId: row.OrgCompId,
@@ -190,14 +196,10 @@ public sealed class BulkPullService : IBulkPullService
             RegulationFindings: analysis?.Findings ?? [],
             HasMedals: analysis?.HasMedals ?? false,
             HasClubStanding: analysis?.HasClubStanding ?? false,
-            IsChampionship: CompetitionAdminRepository.IsChampionship(
-                row.Name, analysis?.IsChampionship ?? false),
+            IsChampionship: isChampionship,
             PointRuleClubsId: preview?.ClubStanding?.MatchedRuleId,
-            // Бассейн — из регламента; без него у НЕ-чемпионата честное умолчание 25 м (лиги),
-            // у чемпионата — null: импорт пачкой такую строку пропустит (И-30).
-            PoolType: analysis?.PoolType
-                      ?? (CompetitionAdminRepository.IsChampionship(row.Name, analysis?.IsChampionship ?? false)
-                          ? null : "25m"));
+            PoolType: pool.PoolType,
+            PoolTypeSource: pool.Source);
     }
 
     public async Task<BulkImportResultDto> ImportAsync(

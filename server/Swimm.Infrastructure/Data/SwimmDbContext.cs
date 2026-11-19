@@ -128,6 +128,10 @@ public class SwimmDbContext : DbContext
     public DbSet<HubGroupClubRequest> HubGroupClubRequests => Set<HubGroupClubRequest>();
     public DbSet<HubGroupMedia> HubGroupMedia => Set<HubGroupMedia>();
 
+    /* === Справочник «место → длина бассейна» (П4, Sys_) === */
+    public DbSet<VenuePool> VenuePools => Set<VenuePool>();
+    public DbSet<VenuePoolAlias> VenuePoolAliases => Set<VenuePoolAlias>();
+
     /* === Дедуп: «развязанные» пары (Sys_) === */
     public DbSet<DedupIgnoredPair> DedupIgnoredPairs => Set<DedupIgnoredPair>();
 

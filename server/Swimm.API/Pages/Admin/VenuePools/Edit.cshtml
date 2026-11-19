@@ -1,0 +1,100 @@
+@page
+@model Swimm.API.Pages.Admin.VenuePools.EditModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Новое место" : "Место проведения";
+    ViewData["PageSubtitle"] = Model.IsNew ? "Справочник бассейнов" : $"#{Model.Id} · {Model.Existing?.Name}";
+    var flash = TempData["Flash"] as string;
+}
+
+<div class="max-w-[560px] mx-auto">
+
+    <div class="mb-4">
+        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">← К списку</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5 py-3 px-4 mb-4 text-sm text-admin-danger">
+            @Model.Error
+        </div>
+    }
+
+    @if (Model.Existing != null)
+    {
+        <div class="admin-card py-3 px-4 mb-4 text-xs text-admin-text-muted">
+            Подтвердил: <strong class="text-admin-text">@Model.Existing.ConfirmedBy</strong>,
+            @Model.Existing.ConfirmedAt.ToString("dd.MM.yyyy HH:mm") UTC. Сохранение — новое подтверждение от вас.
+        </div>
+    }
+
+    <form method="post" asp-page-handler="Save" class="admin-card mb-5 flex flex-col gap-4">
+        <input type="hidden" asp-for="Id" />
+
+        <label class="flex flex-col gap-1">
+            <span class="text-xs text-admin-text-muted">Название места <span class="text-admin-danger">*</span></span>
+            <input asp-for="Input.Name" class="admin-input" dir="rtl" autocomplete="off" required placeholder="בריכת וייסגל" />
+            <span class="text-xs text-admin-text-muted/70">Как показывать в админке. Оно же — первое написание.</span>
+        </label>
+
+        <fieldset class="flex flex-col gap-1">
+            <span class="text-xs text-admin-text-muted">Длина бассейна</span>
+            <div class="flex items-center gap-4 text-sm">
+                @foreach (var pt in Model.PoolTypeOptions)
+                {
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" asp-for="Input.PoolType" value="@pt" /> @pt
+                    </label>
+                }
+            </div>
+        </fieldset>
+
+        <label class="flex items-start gap-2 cursor-pointer text-sm">
+            <input type="checkbox" asp-for="Input.IsAmbiguous" class="mt-0.5" />
+            <span>
+                Двусмысленное — бывает и 25, и 50
+                <span class="block text-xs text-admin-text-muted">Длина тогда не хранится и не подставляется: её выбирает человек на каждый старт.</span>
+            </span>
+        </label>
+
+        <label class="flex flex-col gap-1">
+            <span class="text-xs text-admin-text-muted">Другие написания — по одному на строку</span>
+            <textarea asp-for="Input.Aliases" class="admin-input" dir="rtl" rows="5" placeholder="בריכת וויסגל רחובות"></textarea>
+            <span class="text-xs text-admin-text-muted/70">
+                Огласовки, кавычки, дефисы, «וו»/«יי» и слово «בריכת» в начале уже не важны —
+                их снимает нормализация. Город и опечатки — сюда.
+            </span>
+        </label>
+
+        <label class="flex flex-col gap-1">
+            <span class="text-xs text-admin-text-muted">Пояснение</span>
+            <textarea asp-for="Input.Note" class="admin-input" rows="2" placeholder="откуда известна длина"></textarea>
+        </label>
+
+        <div class="flex gap-3">
+            <button type="submit" class="admin-btn admin-btn-primary">@(Model.IsNew ? "Добавить" : "Сохранить")</button>
+            <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Отмена</a>
+        </div>
+    </form>
+
+    @if (!Model.IsNew && Model.Existing != null)
+    {
+        <div class="admin-card border-l-[3px] border-l-admin-danger bg-admin-danger/5">
+            <h2 class="text-sm font-semibold text-admin-danger mb-1">Опасная зона — удаление</h2>
+            <p class="text-xs text-admin-text-muted leading-relaxed mb-4">
+                Место и все его написания уйдут из справочника; уже затянутые старты не меняются.
+                <strong class="text-admin-danger">Действие необратимо.</strong>
+            </p>
+            <form method="post" asp-page-handler="Delete">
+                <input type="hidden" asp-for="Id" />
+                <button type="submit" class="admin-btn admin-btn-danger">Удалить безвозвратно</button>
+            </form>
+        </div>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}

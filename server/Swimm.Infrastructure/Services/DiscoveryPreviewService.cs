@@ -3,6 +3,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Application.Validation;
 using Swimm.Infrastructure.Repositories;
 using Swimm.Infrastructure.Data;
@@ -37,6 +38,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     private readonly ICategoryRepository _categories;
     private readonly IRelaySplitProvider _relaySplits;
     private readonly ICollapsedDaysFixer _collapsedDays;
+    private readonly IVenuePoolService _venuePools;
     private readonly SwimmDbContext _db;
     private readonly IMemoryCache _cache;
     private readonly ILogger<DiscoveryPreviewService> _logger;
@@ -52,6 +54,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         ICategoryRepository categories,
         IRelaySplitProvider relaySplits,
         ICollapsedDaysFixer collapsedDays,
+        IVenuePoolService venuePools,
         SwimmDbContext db,
         IMemoryCache cache,
         ILogger<DiscoveryPreviewService> logger)
@@ -66,6 +69,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         _categories = categories;
         _relaySplits = relaySplits;
         _collapsedDays = collapsedDays;
+        _venuePools = venuePools;
         _db = db;
         _cache = cache;
         _logger = logger;
@@ -223,7 +227,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     /// <summary>
     /// Что предложить проставить соревнованию: медали и чемпионат — из регламента (его мы
     /// теперь качаем сами), чемпионат ещё и по названию, мастерс — из разобранного файла,
-    /// «зачёт не ведётся» — из пробы loglig, бассейн — из регламента (И-30: протокол loglig длину
+    /// «зачёт не ведётся» — из пробы loglig, бассейн — из регламента, иначе из справочника по месту (П4; И-30: протокол loglig длину
     /// бассейна не пишет, а «25m» парсера — умолчание, а не распознавание).
     ///
     /// Раньше всё это ставилось руками ПОСЛЕ импорта, в панели строки, и про половину
@@ -275,10 +279,23 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         var clubPointsDisabled = standing is { HasStanding: false };
         if (clubPointsDisabled) reasons["clubPointsDisabled"] = "на loglig клубного зачёта нет";
 
-        var poolType = analysis?.PoolType;
-        reasons["poolType"] = poolType != null
-            ? Quote(analysis!, "pool", "из регламента")
-            : "протокол бассейна не указывает, в регламенте не нашлось — выбери вручную";
+        // Бассейн: регламент → справочник бассейнов по месту (П4) → «выбери вручную». Справочник
+        // спрашиваем всегда: его ответ (в т.ч. «двусмысленное») нужен и пачке, и results-auto.
+        VenuePoolLookup? venuePool = null;
+        try
+        {
+            venuePool = await _venuePools.LookupAsync(row?.Venue, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Discovery: справочник бассейнов для строки {Id} не прочитался", discoveredId);
+        }
+        var pool = PoolTypeChooser.Choose(
+            analysis?.PoolType,
+            analysis?.PoolType != null ? Quote(analysis, "pool", "из регламента") : null,
+            venuePool);
+        var poolType = pool.PoolType;
+        reasons["poolType"] = pool.Reason;
 
         // Категории — по названию соревнования словами из самой таблицы категорий.
         var categories = (await _categories.GetCategoriesAsync())
@@ -295,7 +312,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
 
         return new CompetitionFlagSuggestion(
             isAward, isChampionship, isMasters, clubPointsDisabled, poolType, regulation?.Url,
-            reasons, categoryKeys);
+            reasons, categoryKeys, pool.Source, venuePool);
     }
 
     /// <summary>Цитата регламента по флагу — основание, которое видит админ.</summary>

@@ -4734,6 +4734,83 @@ namespace Swimm.Infrastructure.Migrations
                     b.ToTable("Sys_UserStartListPlans", (string)null);
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.VenuePool", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConfirmedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsAmbiguous")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PoolType")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Sys_VenuePools", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Sys_VenuePools_PoolType", "(\"IsAmbiguous\" AND \"PoolType\" IS NULL) OR (NOT \"IsAmbiguous\" AND \"PoolType\" IS NOT NULL AND \"PoolType\" IN ('25m', '50m'))");
+                        });
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.VenuePoolAlias", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Alias")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("NormalizedAlias")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("VenuePoolId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedAlias")
+                        .IsUnique();
+
+                    b.HasIndex("VenuePoolId");
+
+                    b.ToTable("Sys_VenuePoolAliases", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.AppUser", b =>
                 {
                     b.HasOne("Swimm.Domain.Entities.Swimmer", "Swimmer")
@@ -5939,6 +6016,17 @@ namespace Swimm.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.VenuePoolAlias", b =>
+                {
+                    b.HasOne("Swimm.Domain.Entities.VenuePool", "VenuePool")
+                        .WithMany("Aliases")
+                        .HasForeignKey("VenuePoolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("VenuePool");
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.AppUser", b =>
                 {
                     b.Navigation("ExternalLogins");
@@ -6030,6 +6118,11 @@ namespace Swimm.Infrastructure.Migrations
             modelBuilder.Entity("Swimm.Domain.Entities.TrainingSession", b =>
                 {
                     b.Navigation("Results");
+                });
+
+            modelBuilder.Entity("Swimm.Domain.Entities.VenuePool", b =>
+                {
+                    b.Navigation("Aliases");
                 });
 #pragma warning restore 612, 618
         }

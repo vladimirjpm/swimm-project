@@ -51,9 +51,15 @@ public static class BulkPullClassifier
 
         // Бассейн: протокол его не пишет, «25m» парсера — умолчание (И-30: летний чемпионат лёг
         // 25-метровым). У чемпионата это вопрос к человеку; у лиг умолчание 25 м честно.
+        // Справочник бассейнов (П4) закрывает и чемпионат, если место однозначно; двусмысленное
+        // место (Вингейт) — вопрос к человеку у любого старта: умолчание 25 м там врёт почти в половине.
         var isChampionship = isChampionshipByName || regulation?.Analysis?.IsChampionship == true;
-        if (isChampionship && regulation?.Analysis?.PoolType is null)
-            reasons.Add("чемпионат, а длины бассейна в регламенте нет — выбери 25/50 вручную");
+        var venue = preview.Flags?.VenuePool;
+        var poolKnown = regulation?.Analysis?.PoolType is not null || venue is { IsFound: true };
+        if (!poolKnown && venue?.Status == VenuePoolLookupStatus.Ambiguous)
+            reasons.Add(venue.Describe());
+        else if (isChampionship && !poolKnown)
+            reasons.Add("чемпионат, а длины бассейна нет ни в регламенте, ни в справочнике бассейнов — выбери 25/50 вручную");
 
         var warnings = preview.Parsed?.Warnings ?? [];
         foreach (var w in warnings.Take(3))

@@ -394,6 +394,9 @@
             }
 
             // Импортировать из пачки больше нечего: всё затянутое уже ушло в очередь и доимпортировалось.
+            // Пометка источника длины бассейна в колонке «Из регламента» (PoolTypeSources в Application).
+            const POOL_SOURCE = { venue: ' (справочник бассейнов)', default: ' (умолчание лиг)' };
+
             const nothingLeft = batch => batch.finished && !batch.importsPending
                 && !(batch.rows || []).some(r => r.previewId && !r.queued);
 
@@ -417,7 +420,9 @@
                         r.hasMedals ? 'медали' : null,
                         r.hasClubStanding ? 'клубный зачёт' : null,
                         r.isChampionship ? '🏆' : null,
-                        r.pointRuleClubsId ? `правило #${r.pointRuleClubsId}` : null
+                        r.pointRuleClubsId ? `правило #${r.pointRuleClubsId}` : null,
+                        // Длина и откуда она (П4): справочник бассейнов / умолчание лиг; из регламента — без пометки
+                        r.poolType ? r.poolType + (POOL_SOURCE[r.poolTypeSource] ?? '') : 'бассейн: вручную'
                     ].filter(Boolean).map(esc).join(' · ');
                     return `<tr data-verdict="${esc(r.verdict)}">
                         <td class="align-top"><input type="checkbox" class="bulk-row cursor-pointer" value="${r.discoveredId}"
