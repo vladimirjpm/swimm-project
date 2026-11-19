@@ -30,6 +30,7 @@
     function heuristicLabel(c) {
         switch (c.heuristic) {
             case 'same-name': return 'Одинаковое имя';
+            case 'name-en': return 'Имя = английское имя клуба';
             case 'suffix': return 'Мусорный хвост';
             case 'word-order': return 'Другой порядок слов';
             case 'swimmers': return `Общие пловцы (${c.sharedSwimmers})`;
