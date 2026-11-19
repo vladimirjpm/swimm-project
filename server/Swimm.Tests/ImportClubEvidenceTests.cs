@@ -151,14 +151,14 @@ public class ImportClubEvidenceTests
     }
 
     [Fact]
-    public async Task Loglig_AnswerCachedInCandidate_NoNetwork()
+    public async Task Loglig_AnswerInSharedStore_NoNetwork()
     {
+        // Общее место ответов loglig (Р112): его могла записать сверка кандидатов (Р98) или кнопка
+        // «Проверить в loglig» на /Admin/Clubs — импорт второй раз за сутки в сеть не идёт.
         var (db, raanana, card) = await SeedAsync(logligId: 112233);
-        db.SwimmerClubCandidates.Add(new SwimmerClubCandidate
+        db.SwimmerLogligClubs.Add(new SwimmerLogligClub
         {
-            SwimmerId = card.Id, FromClubId = Dolphin, ToClubId = Raanana, LastSwimDate = new DateOnly(2026, 11, 5),
-            Source = SwimmerClubChangeSources.Import, LogligId = 112233, LogligClubName = "ע.ל.ה עצמה רעננה",
-            CheckedAt = DateTime.UtcNow.AddHours(-2), CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+            SwimmerId = card.Id, LogligId = 112233, ClubName = "ע.ל.ה עצמה רעננה", CheckedAt = DateTime.UtcNow.AddHours(-2),
         });
         await db.SaveChangesAsync();
         var loglig = new FakeLoglig([]);
@@ -168,6 +168,58 @@ public class ImportClubEvidenceTests
 
         Assert.Same(card, found);
         Assert.Empty(loglig.Calls);
+    }
+
+    [Theory]
+    [InlineData(112233, -25)]   // ответу больше суток
+    [InlineData(999999, -2)]    // свежий, но про другой loglig-id
+    public async Task Loglig_StaleOrForeignStoredAnswer_GoesToNetwork(int storedLogligId, int hoursAgo)
+    {
+        var (db, raanana, card) = await SeedAsync(logligId: 112233);
+        db.SwimmerLogligClubs.Add(new SwimmerLogligClub
+        {
+            SwimmerId = card.Id, LogligId = storedLogligId, ClubName = "הפועל דולפין נתניה",
+            CheckedAt = DateTime.UtcNow.AddHours(hoursAgo),
+        });
+        await db.SaveChangesAsync();
+        var loglig = new FakeLoglig(new() { [112233] = "ע.ל.ה עצמה רעננה" });
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, [], loglig, TimeSpan.Zero);
+
+        var (found, _) = await resolver.ResolveAsync(Row("יוקלס", "עמליה"), raanana, 1);
+
+        Assert.Same(card, found);
+        Assert.Equal([112233], loglig.Calls);
+    }
+
+    [Fact]
+    public async Task Loglig_NetworkAnswer_SavedToSharedStore()
+    {
+        // Ответ сети — в общее место: дашборд и /Admin/Clubs возьмут его, не открывая карточку снова.
+        var (db, raanana, card) = await SeedAsync(logligId: 112233);
+        var loglig = new FakeLoglig(new() { [112233] = " ע.ל.ה עצמה רעננה " });
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, [], loglig, TimeSpan.Zero);
+
+        await resolver.ResolveAsync(Row("יוקלס", "עמליה"), raanana, 1);
+        await db.SaveChangesAsync();   // сохраняет импорт — как и остальное, что он нашёл
+
+        var row = await db.SwimmerLogligClubs.AsNoTracking().SingleAsync();
+        Assert.Equal(card.Id, row.SwimmerId);
+        Assert.Equal(112233, row.LogligId);
+        Assert.Equal("ע.ל.ה עצמה רעננה", row.ClubName);
+        Assert.True(row.CheckedAt > DateTime.UtcNow.AddMinutes(-1));
+    }
+
+    [Fact]
+    public async Task Loglig_CardNotOpened_NothingSaved()
+    {
+        // Карточка не открылась — ответа нет, в общее место ничего не пишем (как у сверки кандидатов).
+        var (db, raanana, _) = await SeedAsync(logligId: 112233);
+        var resolver = await ImportSwimmerResolver.LoadAsync(db, [], new FakeLoglig([]), TimeSpan.Zero);
+
+        await resolver.ResolveAsync(Row("יוקלס", "עמליה"), raanana, 1);
+        await db.SaveChangesAsync();
+
+        Assert.Empty(await db.SwimmerLogligClubs.ToListAsync());
     }
 
     [Theory]

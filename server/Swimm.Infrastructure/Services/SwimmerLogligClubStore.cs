@@ -7,7 +7,8 @@ namespace Swimm.Infrastructure.Services;
 
 /// <summary>
 /// Общее место последнего ответа loglig про клуб пловца (<c>Sys_SwimmerLogligClubs</c>, Р112):
-/// читают и пишут сверка кандидатов на смену клуба (Р98) и проверка пары клубов на /Admin/Clubs.
+/// читают и пишут сверка кандидатов на смену клуба (Р98), проверка пары клубов на /Admin/Clubs и
+/// запасные пути узнавания пловца на импорте (<see cref="ImportClubEvidence"/>, Р110).
 /// Пишется только удачный ответ; сохранение — у вызывающего (SaveChanges).
 /// </summary>
 internal static class SwimmerLogligClubStore
