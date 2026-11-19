@@ -55,7 +55,7 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
             if (!rowsBySwimmer.TryGetValue(card.Id, out var allRows)) continue; // без личных строк — нечего решать
             checkedCount++;
 
-            // Р108: есть мастерс-старты, а флаг не решён — ставим (и у закреплённого: снимут замок —
+            // Р109: есть мастерс-старты, а флаг не решён — ставим (и у закреплённого: снимут замок —
             // правило уже будет знать, что клуб мастерс). Снятый админом (false) не трогаем.
             var fromMasters = SwimmerCurrentClubRule.FromMasters(card.ClubFromMasters, allRows);
             if (fromMasters) fromMastersCount++;
@@ -216,7 +216,7 @@ public sealed class SwimmerClubRefreshService(SwimmDbContext db, ISwimmerClubChe
             swimmer.ClubId = target;
         }
         swimmer.ClubLocked = locked;
-        // Р108: флаг ставит человек явно (true / false); null в запросе — не трогать. Снятый (false)
+        // Р109: флаг ставит человек явно (true / false); null в запросе — не трогать. Снятый (false)
         // автоматика больше не ставит.
         if (clubFromMasters is bool masters) swimmer.ClubFromMasters = masters;
         await db.SaveChangesAsync(ct);

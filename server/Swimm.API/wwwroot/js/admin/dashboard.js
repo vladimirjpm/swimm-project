@@ -743,7 +743,7 @@
             <a href="/Admin/Swimmers?filter=club-changes" class="block px-2 mt-1 text-admin-accent text-[11px] no-underline hover:underline">все ждущие →</a>`;
     }
 
-    // Пловцы с флагом «клуб по мастерс-стартам» (Р108), у которых есть обычные старты за другой клуб:
+    // Пловцы с флагом «клуб по мастерс-стартам» (Р109), у которых есть обычные старты за другой клуб:
     // карточка держит мастерс-клуб, обычные старты её не двигают. Снять флаг — /Admin/Swimmers.
     function renderClubFromMasters(m) {
         if (!m || !m.mixed) return '';

@@ -174,7 +174,7 @@ public class SwimmersAdminController : ControllerBase
     public async Task<IActionResult> GetClub(int id, CancellationToken ct)
         => await _clubs.GetForAdminAsync(id, ct) is { } dto ? Ok(dto) : NotFound(new { error = "Пловец не найден" });
 
-    /// <param name="ClubFromMasters">Флаг «клуб по мастерс-стартам» (Р108); null — не трогать.</param>
+    /// <param name="ClubFromMasters">Флаг «клуб по мастерс-стартам» (Р109); null — не трогать.</param>
     public sealed record SetClubRequest(int? ClubId, bool Locked, bool? ClubFromMasters = null);
 
     /// <summary>

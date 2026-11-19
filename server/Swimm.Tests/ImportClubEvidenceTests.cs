@@ -11,7 +11,7 @@ using Xunit;
 namespace Swimm.Tests;
 
 /// <summary>
-/// Ф4 (Р109, §7.2 docs/plans/swimmer-club-change-plan.md): «тот же клуб» на запасных путях узнавания
+/// Ф4 (Р110, §7.2 docs/plans/swimmer-club-change-plan.md): «тот же клуб» на запасных путях узнавания
 /// пловца — клуб карточки, ИЛИ любой клуб за 2 последних сезона, ИЛИ клуб на карточке loglig
 /// (<see cref="ImportClubEvidence"/>). Проверяется через <see cref="ImportSwimmerResolver"/> — все три
 /// пути (другое написание, переставленные половины, год со сдвигом на сто лет) и нога эстафеты.
@@ -250,7 +250,7 @@ public class ImportClubEvidenceTests
     [Fact]
     public async Task SwappedHalves_ClubFromHistory()
     {
-        // Р83 + Р109: «מזרחי | גבריאל שלמה» в карточке, протокол переставил половины, клуб новый.
+        // Р83 + Р110: «מזרחי | גבריאל שלמה» в карточке, протокол переставил половины, клуб новый.
         var (db, raanana, _) = await SeedAsync();
         var card = new Swimmer { Id = 59052, LastName = "מזרחי", FirstName = "גבריאל שלמה", BirthYear = 1975, ClubId = Dolphin };
         db.Swimmers.Add(card);
@@ -268,7 +268,7 @@ public class ImportClubEvidenceTests
     [Fact]
     public async Task CenturyShift_ClubFromLoglig()
     {
-        // Р104 + Р109: год 2046 вместо 1946, а пловчиха уже в другом клубе — loglig подтверждает.
+        // Р104 + Р110: год 2046 вместо 1946, а пловчиха уже в другом клубе — loglig подтверждает.
         var (db, raanana, _) = await SeedAsync();
         var card = new Swimmer
         {

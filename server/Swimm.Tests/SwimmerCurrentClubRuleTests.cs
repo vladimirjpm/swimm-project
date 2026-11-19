@@ -185,7 +185,7 @@ public class SwimmerCurrentClubRuleTests
         Assert.Equal([Dolphin, Raanana], clean.Select(p => p.ClubId));
     }
 
-    // --- Р108: клуб по мастерс-стартам (Влад 19.11.2026) ---
+    // --- Р109: клуб по мастерс-стартам (Влад 19.11.2026) ---
 
     private static SwimmerClubRow MastersRow(int club, int competition, string date) =>
         new(club, competition, null, DateTime.Parse(date), IsMasters: true);

@@ -337,7 +337,7 @@
                         <input id="club-new-id" type="number" min="1" value="${d.clubId ?? ''}" placeholder="Id клуба"
                                class="w-28 rounded-md border border-admin-border bg-transparent px-2 py-1.5 text-admin-text" />
                         <label class="flex items-center gap-1.5 text-admin-text-muted"><input id="club-locked" type="checkbox" ${d.clubLocked ? 'checked' : ''} /> закрепить</label>
-                        <label class="flex items-center gap-1.5 text-admin-text-muted" title="Р108: клуб карточки — по мастерс-стартам, обычные старты его не двигают. Ставится сам, если есть мастерс-старты; снятый автоматика не вернёт"><input id="club-masters" type="checkbox" ${d.ruleFromMasters ? 'checked' : ''} /> клуб по мастерс-стартам${d.clubFromMasters == null ? ' (авто)' : ''}</label>
+                        <label class="flex items-center gap-1.5 text-admin-text-muted" title="Р109: клуб карточки — по мастерс-стартам, обычные старты его не двигают. Ставится сам, если есть мастерс-старты; снятый автоматика не вернёт"><input id="club-masters" type="checkbox" ${d.ruleFromMasters ? 'checked' : ''} /> клуб по мастерс-стартам${d.clubFromMasters == null ? ' (авто)' : ''}</label>
                         <button id="btn-club-save" class="admin-btn admin-btn-primary cursor-pointer rounded-md px-3 py-1.5 text-[13px] font-semibold">Сохранить</button>
                     </div>
                     ${d.history.length ? `<div class="mt-3 mb-1 text-[12px] uppercase tracking-wide text-admin-text-muted">История смен</div>${d.history.map(h => `

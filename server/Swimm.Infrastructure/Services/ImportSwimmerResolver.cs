@@ -54,7 +54,7 @@ internal sealed class ImportSwimmerResolver
     private readonly Dictionary<(int CompetitionId, int SwimmerId), int> _seenClubInCompetition = new();
     private readonly Dictionary<(int CompetitionId, string NameKey, int ClubId), Swimmer> _namesakeByClub = new();
 
-    // «Тот же клуб» запасных путей: карточка, история за 2 сезона, карточка loglig (Р109).
+    // «Тот же клуб» запасных путей: карточка, история за 2 сезона, карточка loglig (Р110).
     private readonly ImportClubEvidence _clubEvidence;
 
     private ImportSwimmerResolver(SwimmDbContext db, List<string> diagnosticLog, ImportClubEvidence clubEvidence)
@@ -68,7 +68,7 @@ internal sealed class ImportSwimmerResolver
     /// Индексы по всем карточкам. Карточки ОТСЛЕЖИВАЮТСЯ: импорт дописывает в них пол, клуб,
     /// страну и EN-имя, изменения уходят общим сохранением.
     /// </summary>
-    /// <param name="loglig">Карточка loglig — третье доказательство «того же клуба» (Р109); null — в loglig не ходим.</param>
+    /// <param name="loglig">Карточка loglig — третье доказательство «того же клуба» (Р110); null — в loglig не ходим.</param>
     /// <param name="logligGap">Пауза между запросами к loglig (тесты — ноль); null — ~1 с, как у сверки Р98.</param>
     public static async Task<ImportSwimmerResolver> LoadAsync(
         SwimmDbContext db, List<string> diagnosticLog, ILogligClient? loglig = null, TimeSpan? logligGap = null)
@@ -457,7 +457,7 @@ internal sealed class ImportSwimmerResolver
 
     /// <summary>
     /// Карточка того же человека, записанного другим написанием (<see cref="SwimmerSpellingKey"/>):
-    /// тот же год, ТОТ ЖЕ КЛУБ и ровно один такой кандидат. «Тот же клуб» (Р109,
+    /// тот же год, ТОТ ЖЕ КЛУБ и ровно один такой кандидат. «Тот же клуб» (Р110,
     /// <see cref="ImportClubEvidence"/>) — клуб карточки, или любой клуб пловца за 2 последних сезона, или
     /// клуб на его карточке loglig: после Р98 карточка меняет клуб лишь с подтверждения loglig, и
     /// перешедший ребёнок с другим написанием иначе получал дубль. Иначе null — вызывающий заводит новую
@@ -482,7 +482,7 @@ internal sealed class ImportSwimmerResolver
     /// печатают 2046, и импорт заводил двойника #64764, склеен 18.11.2026 — Р104).
     ///
     /// Срабатывает только на невозможный год — в будущем или старше ста лет — и только если
-    /// карточка с тем же точным именем и годом ±100 одна и стоит в ТОМ ЖЕ клубе (Р109: клуб карточки,
+    /// карточка с тем же точным именем и годом ±100 одна и стоит в ТОМ ЖЕ клубе (Р110: клуб карточки,
     /// история за 2 сезона или карточка loglig — <see cref="ImportClubEvidence"/>). Иначе null —
     /// вызывающий заводит новую карточку, решает человек.
     /// </summary>
@@ -521,7 +521,7 @@ internal sealed class ImportSwimmerResolver
         if (club is null || SwimmerSpellingKey(first, last, year) is not { } swapped) return null;
         if (swapped == SwimmerSpellingKey(last, first, year)) return null;   // перестановка ничего не меняет
         if (!_bySpelling.TryGetValue(swapped, out var candidates)) return null;
-        // «Тот же клуб» — как у другого написания (Р109): карточка, история за 2 сезона, loglig.
+        // «Тот же клуб» — как у другого написания (Р110): карточка, история за 2 сезона, loglig.
         if (await _clubEvidence.PickAsync(candidates, club) is not { } match) return null;
 
         var found = match.Swimmer;

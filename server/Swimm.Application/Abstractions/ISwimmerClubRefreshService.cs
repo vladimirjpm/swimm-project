@@ -9,7 +9,7 @@ namespace Swimm.Application.Abstractions;
 /// (<c>Sys_SwimmerClubCandidates</c>), а применяет его только сверка с loglig
 /// (<see cref="ISwimmerClubLogligCheckService"/>). Каждая смена пишется в журнал
 /// <c>Sys_SwimmerClubChanges</c>; закреплённого (<c>Swimmers.ClubLocked</c>) пересчёт не трогает.
-/// Флаг <c>Swimmers.ClubFromMasters</c> (Р108): пересчёт сам ставит его пловцам с мастерс-стартами, и тогда
+/// Флаг <c>Swimmers.ClubFromMasters</c> (Р109): пересчёт сам ставит его пловцам с мастерс-стартами, и тогда
 /// кандидат — клуб последнего мастерс-соревнования.
 ///
 /// Права здесь не проверяются: вызывающий — импорт, CLI или админ-контроллер (Admin).
@@ -34,14 +34,14 @@ public interface ISwimmerClubRefreshService
     /// Ручная правка: клуб (null — очистить) и закрепление. Склеенный клуб подменяется приёмником,
     /// псевдоклуб отклоняется. Смена клуба пишет журнал с источником admin; аудит пишет контроллер.
     /// Ждущий кандидат пловца снимается: человек решил сам. <paramref name="clubFromMasters"/> — флаг
-    /// «клуб по мастерс-стартам» (Р108): true / false ставит его явно (снятый автоматика не вернёт),
+    /// «клуб по мастерс-стартам» (Р109): true / false ставит его явно (снятый автоматика не вернёт),
     /// null — не трогать.
     /// </summary>
     Task<(SwimmerClubSetResult? Result, SwimmerClubSetError Error)> SetByAdminAsync(
         int swimmerId, int? clubId, bool locked, bool? clubFromMasters = null, CancellationToken ct = default);
 
     /// <summary>
-    /// Флаг «клуб по мастерс-стартам» (Р108): у скольких стоит и первые <paramref name="take"/> пловцов,
+    /// Флаг «клуб по мастерс-стартам» (Р109): у скольких стоит и первые <paramref name="take"/> пловцов,
     /// у которых есть ещё и обычные старты за другой клуб. Для дашборда.
     /// </summary>
     Task<SwimmerClubMastersSummary> MastersAsync(int take, CancellationToken ct = default);

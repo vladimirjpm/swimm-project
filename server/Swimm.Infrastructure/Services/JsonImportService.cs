@@ -64,7 +64,7 @@ public class JsonImportService : IImportService
     /// <paramref name="recalc"/>.
     /// </param>
     /// <param name="loglig">
-    /// Карточка loglig для узнавания перешедшего пловца с другим написанием (Р109): сеть только в редких
+    /// Карточка loglig для узнавания перешедшего пловца с другим написанием (Р110): сеть только в редких
     /// запасных случаях и только с подтверждённым loglig-id. null — без этого доказательства.
     /// </param>
     public JsonImportService(SwimmDbContext db, ICacheService cache,
@@ -443,7 +443,7 @@ public class JsonImportService : IImportService
             // Swimmers: tracked — EnrichSwimmerFromResult modifies them, changes saved in batch.
             // Пловцы: строка протокола → карточка (точный ключ, фоллбеки, страж тёзок И-11) —
             // ImportSwimmerResolver, один на импорт.
-            // loglig — третье доказательство «того же клуба» на запасных путях (Р109), сеть только там.
+            // loglig — третье доказательство «того же клуба» на запасных путях (Р110), сеть только там.
             swimmers = await ImportSwimmerResolver.LoadAsync(_db, diagnosticLog, _loglig);
 
             // Categories: Key → Category (для привязки соревнований к категориям на импорте).
@@ -1487,7 +1487,7 @@ public class JsonImportService : IImportService
                     diagnosticLog.Add($"Снято ждущих кандидатов на смену клуба: {report.Withdrawn} (клуб снова как в карточке).");
                 if (report.MastersFlagged > 0)
                     diagnosticLog.Add(
-                        $"Клуб по мастерс-стартам (Р108): флаг поставлен {report.MastersFlagged} пловцам — их клуб карточки "
+                        $"Клуб по мастерс-стартам (Р109): флаг поставлен {report.MastersFlagged} пловцам — их клуб карточки "
                         + "теперь следует только мастерс-соревнованиям.");
             }
             catch (Exception ex)

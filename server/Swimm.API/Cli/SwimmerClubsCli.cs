@@ -21,7 +21,7 @@ internal static class SwimmerClubsCli
     //   … [--limit <N>]                                          сколько строк плана печатать (по умолчанию все)
     // Закреплённых (Swimmers.ClubLocked) не трогает. «⇄» — периоды двух клубов пересекаются (часто дубль
     // клуба, Ф0). Идемпотентно: ответ loglig моложе суток берётся из кэша кандидата.
-    // Р108: пловцам с мастерс-стартами ставит Swimmers.ClubFromMasters (в dry-run — только считает); у них
+    // Р109: пловцам с мастерс-стартами ставит Swimmers.ClubFromMasters (в dry-run — только считает); у них
     // кандидат — клуб последнего МАСТЕРС-соревнования, колонка «M» в плане.
     internal static async Task RefreshSwimmerClubsAsync(WebApplication app, string[] args)
     {
@@ -44,7 +44,7 @@ internal static class SwimmerClubsCli
             $"Кандидатов на смену клуба: {report.Changes.Count} (из них с пересекающимися периодами двух клубов, ⇄: {overlap}); "
             + $"{(dryRun ? "снялось бы" : "снято")} ждущих: {report.Withdrawn}");
         Console.WriteLine(
-            $"Клуб по мастерс-стартам (Р108): у {report.FromMasters}; флаг {(dryRun ? "поставился бы" : "поставлен")} сейчас: {report.MastersFlagged}");
+            $"Клуб по мастерс-стартам (Р109): у {report.FromMasters}; флаг {(dryRun ? "поставился бы" : "поставлен")} сейчас: {report.MastersFlagged}");
 
         var plan = report.Changes.OrderByDescending(c => c.LastSwimDate).ThenBy(c => c.SwimmerId).ToList();
         SwimmerClubCheckReport loglig;

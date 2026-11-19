@@ -10,7 +10,7 @@ using Xunit;
 namespace Swimm.Tests;
 
 /// <summary>
-/// Флаг «клуб по мастерс-стартам» (Р108, §7.1 docs/plans/swimmer-club-change-plan.md, Влад 19.11.2026):
+/// Флаг «клуб по мастерс-стартам» (Р109, §7.1 docs/plans/swimmer-club-change-plan.md, Влад 19.11.2026):
 /// пересчёт ставит его сам, кандидат — клуб последнего мастерс-соревнования, снятый админом флаг
 /// автоматика не возвращает, сверка с loglig — как у всех (Р98). Само правило — в
 /// <see cref="SwimmerCurrentClubRuleTests"/>.
@@ -101,7 +101,7 @@ public class SwimmerClubMastersTests
     [Fact]
     public async Task Flag_WithdrawsPendingRegularClubCandidate()
     {
-        // До Р108 мастерсу завели кандидата на клуб обычных стартов — флаг его снимает.
+        // До Р109 мастерсу завели кандидата на клуб обычных стартов — флаг его снимает.
         await using var db = await SeedAsync();
         db.SwimmerClubCandidates.Add(new SwimmerClubCandidate
         {

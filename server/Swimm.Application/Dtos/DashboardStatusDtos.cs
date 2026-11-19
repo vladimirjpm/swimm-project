@@ -93,7 +93,7 @@ public sealed record DashboardSwimmerStatus(
     /// </summary>
     SwimmerClubPendingSummary? ClubCandidates = null,
     /// <summary>
-    /// Флаг «клуб по мастерс-стартам» (Р108): сколько стоит, у скольких есть обычные старты за другой
+    /// Флаг «клуб по мастерс-стартам» (Р109): сколько стоит, у скольких есть обычные старты за другой
     /// клуб, и до 20 таких пловцов списком.
     /// </summary>
     SwimmerClubMastersSummary? ClubFromMasters = null);

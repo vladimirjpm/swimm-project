@@ -11,7 +11,7 @@ namespace Swimm.Application.Mapping;
 /// <param name="Date">Дата строки (<c>Results.CompetitionDate</c>).</param>
 /// <param name="Count">Сколько таких строк (запрос может отдать их уже сгруппированными).</param>
 /// <param name="IsMasters">Строка мастерс-соревнования (<c>Competitions.IsMasters</c>) — для флага
-/// <c>Swimmers.ClubFromMasters</c> (Р108).</param>
+/// <c>Swimmers.ClubFromMasters</c> (Р109).</param>
 public sealed record SwimmerClubRow(
     int ClubId, int CompetitionId, int? EventId, DateTime Date, int Count = 1, bool IsMasters = false);
 
@@ -33,7 +33,7 @@ public sealed record SwimmerClubPeriod(int ClubId, DateTime First, DateTime Last
 /// • В последнем соревновании два клуба — берём тот, где строк больше. Поровну — не меняем:
 ///   правды в данных нет, а прыгать туда-сюда при каждом импорте хуже, чем оставить как есть.
 /// • Закреплённый клуб (<c>Swimmers.ClubLocked</c>, решение К3) правило не трогает.
-/// • Флаг «клуб по мастерс-стартам» (<c>Swimmers.ClubFromMasters</c>, Р108, Влад 19.11.2026): в счёт
+/// • Флаг «клуб по мастерс-стартам» (<c>Swimmers.ClubFromMasters</c>, Р109, Влад 19.11.2026): в счёт
 ///   идут только строки мастерс-соревнований, обычные старты клуб карточки не двигают. Мастерс-строк
 ///   нет — не определить (null), карточку не трогаем.
 ///
@@ -62,7 +62,7 @@ public static class SwimmerCurrentClubRule
 
     /// <summary>
     /// Клуб последнего соревнования без учёта карточки; null — не определить.
-    /// <paramref name="fromMasters"/> — в счёт только мастерс-соревнования (Р108).
+    /// <paramref name="fromMasters"/> — в счёт только мастерс-соревнования (Р109).
     /// </summary>
     public static int? CurrentClub(
         IEnumerable<SwimmerClubRow> rows, IReadOnlyDictionary<int, ClubFacts> clubs, bool fromMasters = false)
@@ -111,7 +111,7 @@ public static class SwimmerCurrentClubRule
     }
 
     /// <summary>
-    /// Действует ли флаг «клуб по мастерс-стартам» (Р108): true — да; false — снят админом, нет;
+    /// Действует ли флаг «клуб по мастерс-стартам» (Р109): true — да; false — снят админом, нет;
     /// null — не решено, и тогда да, если у пловца есть хоть одна мастерс-строка (так его и ставит
     /// пересчёт клуба). Псевдоклуб тут не важен: решает сам факт мастерс-старта.
     /// </summary>
