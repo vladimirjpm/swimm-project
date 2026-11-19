@@ -182,6 +182,20 @@ public static class JobSchedule
     public static readonly TimeSpan RetryAfterFailure = TimeSpan.FromHours(1);
 
     /// <summary>
+    /// Через сколько заявка на прогон (<c>Sys_JobRuns.ClaimedAt</c>) считается брошенной: процесс
+    /// убит (деплой, перезагрузка) и снять её некому. Самый долгий прогон расписания — минуты,
+    /// так что два часа — с большим запасом; цена ошибки в обе стороны мала (задачи идемпотентны).
+    /// </summary>
+    public static readonly TimeSpan ClaimStaleAfter = TimeSpan.FromHours(2);
+
+    /// <summary>Длина колонки <c>ClaimedBy</c>.</summary>
+    public const int MaxClaimOwnerLength = 200;
+
+    /// <summary>Заявка есть и ещё не протухла — задача идёт прямо сейчас.</summary>
+    public static bool IsClaimLive(DateTime now, DateTime? claimedAt) =>
+        claimedAt is { } at && now - at < ClaimStaleAfter;
+
+    /// <summary>
     /// Никогда не запускалась → пора. Последняя попытка неудачна (позже последнего успеха или
     /// успеха не было) → пора, когда с неё прошло <paramref name="retryAfterFailure"/>. Иначе —
     /// когда с последнего успеха прошло <paramref name="interval"/>.

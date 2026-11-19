@@ -128,6 +128,43 @@ public class JobScheduleTests
         Assert.Equal(Now, row.LastSuccessAt);
     }
 
+    /// <summary>
+    /// Заявка на прогон (замок П1) обычным путём — как хранилище ведёт себя не на Postgres.
+    /// Атомарность проверяет <see cref="JobRunClaimPgTests"/> на настоящей базе.
+    /// </summary>
+    [Fact]
+    public async Task Store_claim_is_exclusive_until_released_or_stale()
+    {
+        await using var db = CreateDb(nameof(Store_claim_is_exclusive_until_released_or_stale));
+        var store = new JobRunStore(db);
+        var stale = TimeSpan.FromHours(2);
+
+        Assert.True((await store.TryClaimAsync(JobNames.Discovery, "prod", stale)).Taken);
+        var busy = await store.TryClaimAsync(JobNames.Discovery, "prodadmin", stale);
+        Assert.False(busy.Taken);
+        Assert.Equal("prod", busy.HeldBy);
+        Assert.NotNull(busy.HeldSince);
+
+        await store.ReleaseClaimAsync(JobNames.Discovery, "prodadmin"); // чужую не снимает
+        Assert.False((await store.TryClaimAsync(JobNames.Discovery, "prodadmin", stale)).Taken);
+
+        await store.ReleaseClaimAsync(JobNames.Discovery, "prod");
+        Assert.True((await store.TryClaimAsync(JobNames.Discovery, "prodadmin", stale)).Taken);
+
+        // Протухшая заявка перехватывается.
+        Assert.True((await store.TryClaimAsync(JobNames.Discovery, "next", TimeSpan.Zero)).Taken);
+        Assert.Equal("next", (await store.ListStatesAsync()).Single().ClaimedBy);
+    }
+
+    [Fact]
+    public void Claim_is_live_until_stale()
+    {
+        Assert.False(JobSchedule.IsClaimLive(Now, null));
+        Assert.True(JobSchedule.IsClaimLive(Now, Now.AddMinutes(-1)));
+        Assert.True(JobSchedule.IsClaimLive(Now, Now - JobSchedule.ClaimStaleAfter + TimeSpan.FromSeconds(1)));
+        Assert.False(JobSchedule.IsClaimLive(Now, Now - JobSchedule.ClaimStaleAfter));
+    }
+
     // ── История прогонов (Sys_JobRunLog, /Admin/Jobs) ──────────────────────────
 
     [Fact]

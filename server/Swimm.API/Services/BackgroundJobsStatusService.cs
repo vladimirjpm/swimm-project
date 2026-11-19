@@ -212,18 +212,28 @@ public sealed class BackgroundJobsStatusService(
         if (info.SettingsExtra is { } extraKey)
             facts.Add(new("Параметр", $"{extraKey} = {settings.Get(extraKey)?.Value ?? "по умолчанию"}"));
 
+        // Заявка на прогон (замок П1): идёт сейчас — кто и с какого времени; старше
+        // ClaimStaleAfter — процесс убили посреди работы, следующий прогон её перехватит.
+        if (s.Running)
+            facts.Add(new("Идёт сейчас", $"с {JobTimeText.When(state!.ClaimedAt, now)}, запустил {state.ClaimedBy ?? "?"}", "info"));
+        else if (state?.ClaimedAt is not null)
+            facts.Add(new("Брошенная заявка", $"{JobTimeText.When(state.ClaimedAt, now)}, {state.ClaimedBy ?? "?"} — процесс не снял её " +
+                "(убит посреди прогона); следующий прогон заберёт сам", "warning"));
+
         facts.Add(new("Последний запуск", JobTimeText.When(state?.LastAttemptAt, now)));
         facts.Add(new("Последний успех", JobTimeText.When(state?.LastSuccessAt, now)));
         if (s.Failed && state?.LastError is { } error)
             facts.Add(new("Ошибка", error, "danger"));
         facts.Add(new("Следующий",
-            !processOn ? "здесь не запустится — расписания работают в ProdAdmin"
+            s.Running ? "после текущего прогона"
+            : !processOn ? "здесь не запустится — расписания работают в ProdAdmin"
             : !enabled ? "не запустится — выключена в настройках"
             : s.NextDueAt is not { } next || next <= now ? "пора — при ближайшей проверке журнала"
             : $"{JobTimeText.Format(next)} ({JobTimeText.Until(next, now)})",
             s.Alert == "warning" ? "warning" : null));
 
-        var badge = !processOn ? new JobBadge("не в этом процессе", "neutral")
+        var badge = s.Running ? new JobBadge("идёт сейчас", "info")
+            : !processOn ? new JobBadge("не в этом процессе", "neutral")
             : !enabled ? new JobBadge("выключена", "neutral")
             : s.Failed ? new JobBadge("последний запуск упал", "danger")
             : s.Alert == "warning" ? new JobBadge("просрочена", "warning")

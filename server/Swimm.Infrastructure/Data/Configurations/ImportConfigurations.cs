@@ -93,6 +93,7 @@ internal sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
         entity.HasKey(e => e.Name);
         entity.Property(e => e.Name).HasMaxLength(100);
         entity.Property(e => e.LastError).HasMaxLength(1000);
+        entity.Property(e => e.ClaimedBy).HasMaxLength(Swimm.Application.Mapping.JobSchedule.MaxClaimOwnerLength);
     }
 }
 

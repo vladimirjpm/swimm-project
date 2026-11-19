@@ -69,10 +69,73 @@ public class JobRunStore(SwimmDbContext db) : IJobRunStore
         }
     }
 
+    public async Task<JobClaimResult> TryClaimAsync(
+        string name, string owner, TimeSpan staleAfter, CancellationToken ct = default)
+    {
+        owner = ClipOwner(owner);
+        bool taken;
+        if (db.Database.IsNpgsql())
+        {
+            // Один запрос — одна блокировка строки: из двух процессов заявку получит ровно один.
+            // Время — часы базы (now()), а не процесса: у прода и машины Влада они могут расходиться.
+            // Первый прогон задачи (строки ещё нет) закрывает INSERT — тоже атомарно, по ключу.
+            taken = await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO "Sys_JobRuns" ("Name", "ClaimedAt", "ClaimedBy")
+                VALUES ({name}, now(), {owner})
+                ON CONFLICT ("Name") DO UPDATE
+                    SET "ClaimedAt" = now(), "ClaimedBy" = EXCLUDED."ClaimedBy"
+                    WHERE "Sys_JobRuns"."ClaimedAt" IS NULL
+                       OR "Sys_JobRuns"."ClaimedAt" < now() - {staleAfter}
+                """, ct) > 0;
+        }
+        else
+        {
+            // Не Postgres (InMemory в тестах): то же правило обычным путём, без гарантии атомарности.
+            var row = await db.JobRuns.FirstOrDefaultAsync(j => j.Name == name, ct);
+            if (row is null) db.JobRuns.Add(row = new JobRun { Name = name });
+            var now = DateTime.UtcNow;
+            taken = row.ClaimedAt is not { } at || now - at >= staleAfter;
+            if (taken)
+            {
+                row.ClaimedAt = now;
+                row.ClaimedBy = owner;
+                await db.SaveChangesAsync(ct);
+            }
+            db.ChangeTracker.Clear();
+        }
+
+        if (taken) return new JobClaimResult(true);
+        var holder = await db.JobRuns.AsNoTracking()
+            .Where(j => j.Name == name)
+            .Select(j => new { j.ClaimedBy, j.ClaimedAt })
+            .FirstOrDefaultAsync(ct);
+        return new JobClaimResult(false, holder?.ClaimedBy, holder?.ClaimedAt);
+    }
+
+    public async Task ReleaseClaimAsync(string name, string owner, CancellationToken ct = default)
+    {
+        owner = ClipOwner(owner);
+        if (db.Database.IsNpgsql())
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE "Sys_JobRuns" SET "ClaimedAt" = NULL, "ClaimedBy" = NULL
+                WHERE "Name" = {name} AND "ClaimedBy" = {owner}
+                """, ct);
+            return;
+        }
+
+        var row = await db.JobRuns.FirstOrDefaultAsync(j => j.Name == name && j.ClaimedBy == owner, ct);
+        if (row is null) return;
+        row.ClaimedAt = null;
+        row.ClaimedBy = null;
+        await db.SaveChangesAsync(ct);
+        db.ChangeTracker.Clear();
+    }
+
     public async Task<IReadOnlyList<JobRunStateRow>> ListStatesAsync(CancellationToken ct = default) =>
         await db.JobRuns.AsNoTracking()
             .OrderBy(j => j.Name)
-            .Select(j => new JobRunStateRow(j.Name, j.LastAttemptAt, j.LastSuccessAt, j.LastError))
+            .Select(j => new JobRunStateRow(j.Name, j.LastAttemptAt, j.LastSuccessAt, j.LastError, j.ClaimedAt, j.ClaimedBy))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<JobRunLogRow>> ListLogAsync(int perJob, CancellationToken ct = default)
@@ -124,4 +187,7 @@ public class JobRunStore(SwimmDbContext db) : IJobRunStore
     }
 
     private static DateTime Utc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+    private static string ClipOwner(string owner) =>
+        owner.Length > JobSchedule.MaxClaimOwnerLength ? owner[..JobSchedule.MaxClaimOwnerLength] : owner;
 }

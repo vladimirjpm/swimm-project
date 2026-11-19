@@ -30,6 +30,20 @@ public interface IJobRunStore
     /// </summary>
     Task AppendLogAsync(JobRunRecord run, CancellationToken ct = default);
 
+    /// <summary>
+    /// Взять заявку на прогон задачи (замок, П1 docs/plans/prod-auto-pull-plan.md §4.1) — ОДНИМ
+    /// атомарным запросом: получает её ровно один из процессов, смотрящих в одну базу. Заявка
+    /// свободна, если её нет или она старше <paramref name="staleAfter"/> (процесс убили посреди
+    /// работы). Не взяли — в ответе, кто и с какого времени работает.
+    /// </summary>
+    Task<JobClaimResult> TryClaimAsync(string name, string owner, TimeSpan staleAfter, CancellationToken ct = default);
+
+    /// <summary>
+    /// Снять СВОЮ заявку. Чужую (нашу перехватили как протухшую) не трогает — поэтому сравнение
+    /// по <paramref name="owner"/>.
+    /// </summary>
+    Task ReleaseClaimAsync(string name, string owner, CancellationToken ct = default);
+
     /// <summary>Состояние всех задач, у которых есть строка журнала.</summary>
     Task<IReadOnlyList<JobRunStateRow>> ListStatesAsync(CancellationToken ct = default);
 
@@ -46,8 +60,21 @@ public sealed record JobRunStats(int Runs24h, int Failed24h, int Runs7d, int Fai
 /// <summary>Состояние задачи в журнале (UTC).</summary>
 public sealed record JobRunState(DateTime? LastAttemptAt, DateTime? LastSuccessAt);
 
-/// <summary>Строка <c>Sys_JobRuns</c> для страницы (UTC).</summary>
-public sealed record JobRunStateRow(string Name, DateTime? LastAttemptAt, DateTime? LastSuccessAt, string? LastError);
+/// <summary>
+/// Строка <c>Sys_JobRuns</c> для страницы (UTC). <paramref name="ClaimedAt"/> /
+/// <paramref name="ClaimedBy"/> — заявка на прогон: задача идёт прямо сейчас (или процесс убит и
+/// заявка протухает — <c>JobSchedule.IsClaimLive</c>).
+/// </summary>
+public sealed record JobRunStateRow(
+    string Name, DateTime? LastAttemptAt, DateTime? LastSuccessAt, string? LastError,
+    DateTime? ClaimedAt = null, string? ClaimedBy = null);
+
+/// <summary>
+/// Итог попытки взять заявку. <paramref name="Taken"/> = false — работает другой:
+/// <paramref name="HeldBy"/> с <paramref name="HeldSince"/> (оба null, если он успел закончить,
+/// пока мы читали строку).
+/// </summary>
+public sealed record JobClaimResult(bool Taken, string? HeldBy = null, DateTime? HeldSince = null);
 
 /// <summary>
 /// Один прогон задачи (UTC). <paramref name="Trigger"/> — <c>JobTriggers</c> (schedule/manual/cli),
