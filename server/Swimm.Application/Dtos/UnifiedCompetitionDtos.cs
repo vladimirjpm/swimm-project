@@ -75,6 +75,17 @@ public sealed class UnifiedSiteInfo
     /// (<c>StartListBadgeRules</c>). null — ни разу. Заполняется только у строк текущей страницы.
     /// </summary>
     public Mapping.StartListBadge? StartList { get; set; }
+
+    /// <summary>Вердикт results-auto (П5, <c>ResultsAutoVerdicts</c>); null — задача строку не смотрела.</summary>
+    public string? AutoPullVerdict { get; set; }
+
+    /// <summary>Причина «ждёт тебя» / что ещё ждёт — для чипа.</summary>
+    public string? AutoPullBlockedReason { get; set; }
+
+    public DateTime? AutoPullCheckedAt { get; set; }
+
+    /// <summary>Длина бассейна, с которой задача взяла бы старт (у would-take).</summary>
+    public string? AutoPullPoolType { get; set; }
 }
 
 /// <summary>

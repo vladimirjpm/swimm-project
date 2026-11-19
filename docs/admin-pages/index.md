@@ -32,7 +32,12 @@
    клубы обычных стартов; ссылка → `/Admin/Swimmers?club=<id>`, там флаг можно снять. Поле
    `swimmers.clubFromMasters`.
 2. Клубы → `/Admin/Clubs`
-3. Соревнования → `/Admin/Competitions`
+3. Соревнования → `/Admin/Competitions`. Метрики **«Results-auto: ждут тебя»** и **«Results-auto:
+   взяла бы сама»** (П5, 20.11.2026): строки «Входящих», которые задача `results-auto` проверила за
+   последние сутки (`AutoPullCheckedAt`), по вердикту; «ждут тебя» — только ещё не затянутые. Ссылки —
+   `?filter=autopull-blocked` / `?filter=autopull-would-take` ([competitions.md](competitions.md)).
+   Поля `competitions.autoPullBlocked24h` / `autoPullWouldTake24h` (`DashboardStatusService`). Режим
+   `report` — задача сама не импортирует; письмо и проверка «закончилось и не затянуто» — П6.
 3.5. **Клубные очки** → [`/Admin/PointsRules`](pointsrules.md) — итоги ручной
    сверки зачёта с официальным. Метрики: расхождения, из них **без
    пояснения** (бейдж «★ расхождение» на витрине без объяснения = утверждение

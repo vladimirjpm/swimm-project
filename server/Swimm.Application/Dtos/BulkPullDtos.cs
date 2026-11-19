@@ -108,3 +108,14 @@ public sealed record BulkPullBatchDto(
 public sealed record BulkImportResultDto(
     int Queued,
     IReadOnlyList<string> Skipped);
+
+/// <summary>
+/// Одна строка, затянутая путём пачки (превью + регламент + классификатор), со всем, что для этого
+/// скачали: results-auto (П5) по этому решает гейты сама, не повторяя забор.
+/// </summary>
+/// <param name="Preview">Итог превью.</param>
+/// <param name="Regulation">Регламент; null — не проверяли (разбор упал или нет loglig-id).</param>
+public sealed record BulkPullRowPull(
+    BulkPullRowDto Row,
+    DiscoveryPreviewResult Preview,
+    RegulationFetchDto? Regulation);

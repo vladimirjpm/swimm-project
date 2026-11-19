@@ -1281,6 +1281,21 @@ namespace Swimm.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AutoPullBlockedReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("AutoPullCheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AutoPullPoolType")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("AutoPullVerdict")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<DateTime?>("DateChangedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1350,7 +1365,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasIndex("OrgCompId")
                         .IsUnique();
 
-                    b.ToTable("Sys_DiscoveredCompetitions", (string)null);
+                    b.ToTable("Sys_DiscoveredCompetitions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Sys_DiscoveredCompetitions_AutoPullVerdict", "\"AutoPullVerdict\" IS NULL OR \"AutoPullVerdict\" IN ('would-take', 'blocked', 'not-finished', 'failed', 'empty')");
+                        });
                 });
 
             modelBuilder.Entity("Swimm.Domain.Entities.Gallery", b =>

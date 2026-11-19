@@ -122,7 +122,11 @@ public sealed record DashboardCompetitionStatus(
     /// зачёте, а во флагах самого соревнования (IsChampionship / PoolType).
     /// См. docs/plans/club-page-model.md §2.1.
     /// </summary>
-    int DuplicateStandings);
+    int DuplicateStandings,
+    /// <summary>results-auto (П5): строк, проверенных за сутки с вердиктом «взяла бы сама».</summary>
+    int AutoPullWouldTake24h = 0,
+    /// <summary>results-auto: проверенных за сутки, не затянутых и «ждут тебя».</summary>
+    int AutoPullBlocked24h = 0);
 
 /// <summary>Блок «Результаты»: провалы времени, FK-аномалии (сторож), эстафеты без состава.</summary>
 public sealed record DashboardResultStatus(

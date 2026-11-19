@@ -391,6 +391,15 @@ public class DashboardStatusService(
                 errors++;
         }
 
+        // results-auto (П5): за сутки — по времени проверки. «Ждут тебя» — только ещё не затянутые:
+        // строка, которую Влад уже затянул руками, его больше не ждёт (тот же предикат, что у
+        // фильтра autopull-blocked на /Admin/Competitions, кроме окна суток).
+        var since = DateTime.UtcNow.AddHours(-24);
+        var checkedRecently = discoveryRows.Where(r => r.AutoPullCheckedAt >= since).ToList();
+        var wouldTake = checkedRecently.Count(r => r.AutoPullVerdict == ResultsAutoVerdicts.WouldTake);
+        var blocked = checkedRecently.Count(r => r.AutoPullVerdict == ResultsAutoVerdicts.Blocked
+            && matches.GetValueOrDefault(r.Id) is null && r.Status == DiscoveredCompetitionStatus.New);
+
         return new DashboardCompetitionStatus(
             Total: total,
             WithResults: withResults,
@@ -399,7 +408,9 @@ public class DashboardStatusService(
             DiscoveryIgnored: ignored,
             DiscoveryErrors: errors,
             NoOrgCompId: noOrgCompId,
-            DuplicateStandings: await CountDuplicateStandingsAsync(ct));
+            DuplicateStandings: await CountDuplicateStandingsAsync(ct),
+            AutoPullWouldTake24h: wouldTake,
+            AutoPullBlocked24h: blocked);
     }
 
     /// <summary>

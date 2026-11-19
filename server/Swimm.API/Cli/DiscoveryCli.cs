@@ -201,6 +201,35 @@ internal static class DiscoveryCli
         return;
     }
 
+    // Один тик results-auto в режиме report (П5, docs/plans/prod-auto-pull-plan.md §4.4) и выход:
+    //   dotnet run -- --results-auto-tick [--id <discoveredId>]
+    // Режим — всегда report, что бы ни стояло в ResultsAutoMode: CLI не импортирует. --id —
+    // проверить эту строку, минуя окно 7 дней и шаг перепроверки (диагностика). Вердикт ложится в
+    // строку «Входящих», итог — в историю /Admin/Jobs (триггер cli; расписание не сдвигается).
+    internal static async Task ResultsAutoTickAsync(WebApplication app, string[] args)
+    {
+        var idIndex = Array.IndexOf(args, "--id") + 1;
+        int? id = idIndex > 0 && idIndex < args.Length && int.TryParse(args[idIndex], out var v) ? v : null;
+
+        using var scope = app.Services.CreateScope();
+        var startedAt = DateTime.UtcNow;
+        var report = await scope.ServiceProvider.GetRequiredService<IResultsAutoService>()
+            .RunOnceAsync(new ResultsAutoRunOptions(ResultsAutoModes.Report, id));
+        var summary = JobRunSummaries.ResultsAuto(report);
+        await scope.ServiceProvider.GetRequiredService<IJobRunStore>().AppendLogAsync(new JobRunRecord(
+            JobNames.ResultsAuto, JobTriggers.Cli, startedAt, DateTime.UtcNow,
+            Success: true, summary, Error: null, Details: JobRunDetails.ResultsAuto(report)));
+
+        Console.WriteLine($"results-auto: {summary}");
+        if (report.Row is { } row)
+            Console.WriteLine(
+                $"  #{row.DiscoveredId} compID {row.OrgCompId} «{row.Name}» ({row.DateEnd:dd.MM.yyyy}, место: {row.Venue ?? "—"})\n" +
+                $"  вердикт: {row.Verdict}; классификатор: {row.ClassifierVerdict ?? "не дошли"}; строк {row.ResultCount}, " +
+                $"дней {row.DaysInFile}, событий {row.Events} (ждут {row.PendingEvents}); бассейн: {row.PoolType ?? "—"} " +
+                $"({row.PoolTypeSource ?? "—"}); {row.ElapsedMs} мс\n" +
+                string.Concat(row.Reasons.Select(r => $"  · {r}\n")));
+    }
+
     // Разовая синхронизация «входящих» автозабора isr.org.il (фаза 6) и выход:
     //   dotnet run -- --discovery-sync
     internal static async Task DiscoverySyncAsync(WebApplication app, string[] args)

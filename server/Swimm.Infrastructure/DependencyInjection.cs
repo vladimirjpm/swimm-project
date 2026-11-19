@@ -370,6 +370,9 @@ public static class DependencyInjection
         // Пакетное затягивание: пачка живёт дольше HTTP-запроса, поэтому синглтон
         services.AddSingleton<IBulkPullService, BulkPullService>();
 
+        // results-auto (П5): тик фоновой задачи — тот же путь, что строка пачки, плюс гейты §4.4
+        services.AddScoped<IResultsAutoService, ResultsAutoService>();
+
         // Ленивая сверка подозрительных заплывов превью с карточками loglig
         services.AddScoped<IPreviewRecordCheckService, PreviewRecordCheckService>();
 
@@ -391,7 +394,9 @@ public static class DependencyInjection
         // Loglig ID (docs/loglig-id-plan.md, шаги 2-3): клиент карточки игрока + сверка результатов.
         // Карточка отдаётся после self-redirect с кукой DetailsPageVisited — нужны CookieContainer
         // и AllowAutoRedirect.
-        services.AddHttpClient("loglig")
+        // Предел ответа (§6 prod-auto-pull-plan): тот же клиент читает регламент и страницы
+        // results-auto в публичном процессе. Таймаут — умолчание HttpClient (100 с).
+        services.AddHttpClient("loglig", c => c.MaxResponseContentBufferSize = Swimm.Application.Constants.OutboundLimits.MaxResponseBytes)
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 UseCookies = true,
@@ -400,7 +405,7 @@ public static class DependencyInjection
             });
         // Английские карточки: куку языка шлём заголовком, контейнера нет — иначе она
         // переключила бы язык и у общего «loglig» (LogligClient.GetPlayerEnglishNameAsync).
-        services.AddHttpClient(LogligClient.EnglishClientName)
+        services.AddHttpClient(LogligClient.EnglishClientName, c => c.MaxResponseContentBufferSize = Swimm.Application.Constants.OutboundLimits.MaxResponseBytes)
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 UseCookies = false,

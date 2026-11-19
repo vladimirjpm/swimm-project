@@ -105,6 +105,9 @@
                 metrics: [
                     { v: co.discoveryNew, label: 'Входящие не загружено', sub: 'discovery: new', tone: 'warn', href: '/Admin/Competitions?filter=discovery-new' },
                     { v: co.discoveryErrors, label: 'Discovery с ошибкой', sub: 'LastError != null', tone: 'danger', href: '/Admin/Competitions?filter=discovery-error' },
+                    // results-auto (П5, режим report): за сутки — что задача взяла бы сама и что ждёт Влада.
+                    { v: co.autoPullBlocked24h || 0, label: 'Results-auto: ждут тебя', sub: `за сутки; взяла бы сама ${fmtN(co.autoPullWouldTake24h || 0)}`, tone: 'warn', href: '/Admin/Competitions?filter=autopull-blocked' },
+                    { v: co.autoPullWouldTake24h || 0, label: 'Results-auto: взяла бы сама', sub: 'за сутки; режим report — сама не импортирует', tone: 'info', href: '/Admin/Competitions?filter=autopull-would-take' },
                     { v: co.duplicateStandings, label: 'Дубль клубного зачёта', sub: 'два ❄ или ☀ у группы за сезон — ошибка в 🏆/бассейне', tone: 'danger', href: '/Admin/Competitions?kind=champ' },
                     { v: co.noOrgCompId, label: 'Без OrgCompId', sub: 'долг бэкфилла', tone: 'gray', href: '/Admin/Competitions?filter=no-org-comp-id' },
                     { v: co.total - co.withResults, label: 'Без результатов', sub: 'импорт упал/забыт', tone: 'warn', href: '/Admin/Competitions?filter=no-results' },

@@ -99,6 +99,27 @@
         return $"<span class=\"ml-1 inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold {cls}\" title=\"{title}\">{System.Net.WebUtility.HtmlEncode(text)}</span>";
     }
 
+    // Чип results-auto (П5, prod-auto-pull-plan §4.5): вердикт последней проверки задачи, в
+    // подсказке — причина и когда смотрела. Не смотрела — пусто.
+    string AutoPullChipHtml(Swimm.Application.Dtos.UnifiedSiteInfo? site)
+    {
+        if (site?.AutoPullVerdict is not { } verdict) return "";
+        var cls = verdict switch
+        {
+            Swimm.Application.Mapping.ResultsAutoVerdicts.WouldTake => "bg-admin-success/15 text-admin-success",
+            Swimm.Application.Mapping.ResultsAutoVerdicts.Blocked => "bg-admin-warning/15 text-admin-warning",
+            Swimm.Application.Mapping.ResultsAutoVerdicts.Failed => "bg-admin-danger/15 text-admin-danger",
+            _ => "bg-white/[.08] text-admin-text-muted",
+        };
+        var label = "auto: " + Swimm.Application.Mapping.ResultsAutoVerdicts.Label(verdict)
+            + (verdict == Swimm.Application.Mapping.ResultsAutoVerdicts.WouldTake && site.AutoPullPoolType is { } pool ? $" · {pool}" : "");
+        var when = site.AutoPullCheckedAt is { } at ? at.ToLocalTime().ToString("dd.MM HH:mm") : "?";
+        var title = System.Net.WebUtility.HtmlEncode(
+            $"results-auto (режим report — сама не импортирует), проверила {when}" +
+            (site.AutoPullBlockedReason is { } r ? $"\n{r}" : ""));
+        return $"<span class=\"ml-1 inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold {cls}\" title=\"{title}\">{System.Net.WebUtility.HtmlEncode(label)}</span>";
+    }
+
     // Диапазон дат: до 1920 — в две строки, дальше одной. Колонка дат иначе тянет таблицу
     // шире экрана, и горизонтальный скролл прячет колонку действий.
     string DateRangeHtml(string? range)
@@ -224,6 +245,8 @@
         "discovery-error" => "ошибка автозабора (discovery)",
         "no-org-comp-id" => "без OrgCompId",
         "no-results" => "без результатов",
+        Swimm.Application.Mapping.AutoPullFilters.Blocked => "results-auto: ждут тебя",
+        Swimm.Application.Mapping.AutoPullFilters.WouldTake => "results-auto: взяла бы сама",
         _ => Model.QualityFilter
     };
     <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 mb-4 flex items-center justify-between px-4 py-2 text-[13px]">
@@ -242,6 +265,15 @@
            href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, discipline = "all", synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, filter = Model.QualityFilter })">показать все ↗</a>
     </div>
 }
+
+@* Фильтр results-auto (П5): те же ссылки, что в блоке дашборда; сезон и месяц сбрасываются —
+   окно задачи (7 дней) короче любого из них. *@
+<div class="mb-3 text-[12px] text-admin-text-muted">
+    results-auto:
+    <a class="text-admin-accent hover:underline ml-1" href="@Url.Page("Index", new { filter = Swimm.Application.Mapping.AutoPullFilters.Blocked })">ждут тебя</a>
+    ·
+    <a class="text-admin-accent hover:underline" href="@Url.Page("Index", new { filter = Swimm.Application.Mapping.AutoPullFilters.WouldTake })">взяла бы сама</a>
+</div>
 
 @{ var flash = TempData["Flash"] as string; }
 @if (!string.IsNullOrEmpty(flash))
@@ -617,6 +649,7 @@ else
                                           title="Протокола нет: PDF пустой (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола</span>
                                 }
                                 @Html.Raw(StartListBadgeHtml(s))
+                                @Html.Raw(AutoPullChipHtml(s))
                             </td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td dir="rtl" style="text-align:left">
@@ -631,6 +664,11 @@ else
                                 @if (!string.IsNullOrEmpty(s.LastError))
                                 {
                                     <div class="text-[11px] text-[#ef9a9a]" dir="ltr">@s.LastError</div>
+                                }
+                                @* Причина results-auto (П5): «ждёт тебя» читается прямо в строке, а не только в подсказке чипа. *@
+                                @if (s.AutoPullVerdict == Swimm.Application.Mapping.ResultsAutoVerdicts.Blocked && !string.IsNullOrEmpty(s.AutoPullBlockedReason))
+                                {
+                                    <div class="text-[11px] text-admin-warning" dir="auto">auto: @s.AutoPullBlockedReason</div>
                                 }
                             </td>
                             <td class="whitespace-nowrap text-admin-text-muted">@Html.Raw(DateRangeHtml(s.DateStart == s.DateEnd ? s.DateStart.ToString("dd/MM/yyyy") : $"{s.DateStart:dd/MM/yyyy} – {s.DateEnd:dd/MM/yyyy}"))</td>

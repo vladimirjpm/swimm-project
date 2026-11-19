@@ -105,6 +105,13 @@ public sealed class BackgroundJobsStatusService(
             "числе прошедшим за 30 дней со статусом new (iframe часто появляется после старта). Итог: " +
             "сколько посмотрели, сколько «рано», сколько уже начались.",
             "5 мин", JobNames.StartListDaysAheadKey),
+        [JobNames.ResultsAuto] = ("Результаты прошедших стартов", "CompetitionDiscoveryBackgroundService (третий проход)",
+            "П5: за тик одна прошедшая строка «Входящих» (new, с loglig-id, с полудня дня окончания по Израилю " +
+            "и не старше 7 дней): разбор как у пакетной кнопки → гейты (🟢 классификатора, не чемпионат, один " +
+            "день, соревнование закончено, бассейн из регламента или справочника) → вердикт и причина у строки " +
+            "(чип и фильтр в /Admin/Competitions, блок дашборда). Режим ResultsAutoMode: off — не работает, " +
+            "report — только сообщает, import — пока как report (импорт — П6). НИЧЕГО НЕ ИМПОРТИРУЕТ.",
+            "5 мин", null), // режим показан в факте «Настройка»
         [JobNames.LogligVerify] = ("Сверка предложенных loglig-id", "LogligSuggestionVerificationBackgroundService",
             "Берёт loglig-id, предложенные пользователями (Suggested), сверяет карточку loglig " +
             "(имя + год рождения) и переводит в Verified или Rejected.",
@@ -195,7 +202,7 @@ public sealed class BackgroundJobsStatusService(
     }
 
     /// <summary>Задачи <c>CompetitionDiscoveryBackgroundService</c> — прод-расписание под <c>AutoPull:Enabled</c> (П2).</summary>
-    private static bool IsAutoPullJob(string name) => name is JobNames.Discovery or JobNames.StartList;
+    private static bool IsAutoPullJob(string name) => name is JobNames.Discovery or JobNames.StartList or JobNames.ResultsAuto;
 
     /// <summary>
     /// Где идёт задача и что видно отсюда. У discovery/start-list (П2, prod-auto-pull-plan §4.2) три
@@ -227,14 +234,23 @@ public sealed class BackgroundJobsStatusService(
         var (processOn, watching, placement) = Placement(job);
         var enabled = job.IsEnabled(settings);
         var interval = job.Interval(settings);
+        // results-auto (П5): главный выключатель — режим; off — задача выключена, как EnabledKey = false.
+        var modeOff = job.Name == JobNames.ResultsAuto
+            && ResultsAutoModes.Parse(settings.Get(ResultsAutoModes.SettingKey)?.Value) == ResultsAutoModes.Off;
+        var offKey = modeOff && enabled ? ResultsAutoModes.SettingKey : job.EnabledKey;
+        enabled &= !modeOff;
         // Следим за прод-джобом как за своим: просрочка и упавший прогон должны желтить/краснить и здесь.
-        var s = JobsOverviewBuilder.Schedule(processOn || watching, enabled, job.EnabledKey, state, interval, now);
+        var s = JobsOverviewBuilder.Schedule(processOn || watching, enabled, offKey, state, interval, now);
 
         var facts = new List<JobFact>
         {
             new("В этом процессе", placement, processOn ? "success" : "neutral"),
-            new("Настройка", $"{job.EnabledKey} = {(enabled ? "true" : "false")}" +
-                             (settings.Get(job.EnabledKey) is null ? " (в Admin/Settings ключа нет — значение по умолчанию)" : ""),
+            new("Настройка", $"{job.EnabledKey} = {(job.IsEnabled(settings) ? "true" : "false")}" +
+                             (settings.Get(job.EnabledKey) is null ? " (в Admin/Settings ключа нет — значение по умолчанию)" : "") +
+                             (job.Name == JobNames.ResultsAuto
+                                 ? $"; {ResultsAutoModes.SettingKey} = {ResultsAutoModes.Parse(settings.Get(ResultsAutoModes.SettingKey)?.Value)}" +
+                                   (modeOff ? " — задача выключена режимом" : "")
+                                 : ""),
                 enabled ? "success" : "neutral"),
             new("Интервал", $"{JobTimeText.Human(interval)} ({job.IntervalKey}); после неудачи — через " +
                             $"{JobTimeText.Human(JobSchedule.RetryAfterFailure)}; журнал смотрит раз в {info.Tick}"),
