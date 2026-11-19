@@ -342,13 +342,22 @@ public sealed class OfficialClubPointsMismatchCheck(SwimmDbContext db) : IDataCh
         "которую движок правил не выводит из места: какие секции протокола вообще оплачиваются. " +
         "Сравниваются только строки С эталоном: у эстафет он появляется после ремонта полос " +
         "(--pull-relays), у остальных — после пособытийного импорта. Лечится правкой правила, " +
-        "привязки — либо решением «расходится, принято как есть».";
+        "привязки — либо решением «расходится, принято как есть». Соревнования без официального " +
+        "зачёта (клубные очки «Unofficial», Р80) не сверяются — сверять не с чем (Р106).";
     public DataCheckSeverity Severity => DataCheckSeverity.Warning;
 
     public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
     {
         var rows = await db.Results.AsNoTracking()
             .Where(r => r.OfficialClubPoints != null)
+            // Клубные очки «Unofficial» (Р80, Competition.IsClubPointsUnofficial): зачёта у
+            // организатора нет — сверять наш расчёт не с чем, хотя построчные очки loglig есть
+            // (Р106, 19.11.2026: 12 ложных находок — чемпионаты зима-2024 и лето-2025, Эйлат-2026).
+            // Вручную привязанное правило признак снимает: это наша шкала из регламента, и
+            // построчные очки loglig её проверяют — такие соревнования проверка смотрит.
+            .Where(r => !(r.Competition!.PointRuleClubsId == null
+                          && (r.Competition.HasOfficialClubStanding == false
+                              || (r.Competition.HasOfficialClubStanding == null && r.Competition.ClubPointsDisabled))))
             .Select(r => new
             {
                 r.Id,
