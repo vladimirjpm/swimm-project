@@ -152,18 +152,31 @@ public class JobRunStore(SwimmDbContext db, JobRunOrigin? origin = null) : IJobR
         return rows.GroupBy(r => r.Name).SelectMany(g => g.Take(Math.Max(1, perJob))).ToList();
     }
 
+    public async Task<IReadOnlyList<JobRunLogRow>> ListLogLightAsync(CancellationToken ct = default) =>
+        // Details в проекции нет — только IS NOT NULL: jsonb не читается и не идёт по сети.
+        await db.JobRunLog.AsNoTracking()
+            .OrderByDescending(e => e.StartedAt).ThenByDescending(e => e.Id)
+            .Select(e => new JobRunLogRow(e.Id, e.Name, e.Trigger, e.StartedAt, e.FinishedAt, e.Success, e.Summary, e.Error, null, e.RunBy)
+            {
+                HasDetails = e.Details != null,
+            })
+            .ToListAsync(ct);
+
+    public async Task<JobRunLogRow?> GetLogAsync(long id, CancellationToken ct = default) =>
+        await db.JobRunLog.AsNoTracking()
+            .Where(e => e.Id == id)
+            .Select(e => new JobRunLogRow(e.Id, e.Name, e.Trigger, e.StartedAt, e.FinishedAt, e.Success, e.Summary, e.Error, e.Details, e.RunBy))
+            .FirstOrDefaultAsync(ct);
+
     public async Task<JobRunStats> GetStatsAsync(DateTime now, CancellationToken ct = default)
     {
         // Один запрос за неделю: строк там не больше KeepPerJob на задачу — считаем в памяти.
-        var day = Utc(now).AddDays(-1);
         var week = Utc(now).AddDays(-7);
         var runs = await db.JobRunLog.AsNoTracking()
             .Where(e => e.StartedAt >= week)
             .Select(e => new { e.StartedAt, e.Success })
             .ToListAsync(ct);
-        return new JobRunStats(
-            runs.Count(r => r.StartedAt >= day), runs.Count(r => r.StartedAt >= day && !r.Success),
-            runs.Count, runs.Count(r => !r.Success));
+        return JobRunStats.From(runs.Select(r => (r.StartedAt, r.Success)), Utc(now));
     }
 
     private async Task UpsertAsync(JobRunRecord run, CancellationToken ct)

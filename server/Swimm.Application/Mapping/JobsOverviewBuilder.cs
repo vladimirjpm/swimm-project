@@ -60,7 +60,8 @@ public static class JobsOverviewBuilder
     }
 
     /// <summary>Сводка: плитки /Admin/Jobs, проблемные службы и худший тон — для блока дашборда.</summary>
-    public static JobsSummary Build(IReadOnlyList<JobCard> cards, JobRunStats stats, JobsInfraState infra, DateTime now)
+    /// <param name="waiting">Строк results-auto «ждёт тебя» (<see cref="ResultsAutoWaiting"/>) — счётчик «ждёт тебя».</param>
+    public static JobsSummary Build(IReadOnlyList<JobCard> cards, JobRunStats stats, JobsInfraState infra, DateTime now, int waiting = 0)
     {
         var schedules = cards.Where(c => c.Kind == JobKinds.Schedule).ToList();
         var running = schedules.Where(c => c.Active).ToList();
@@ -120,7 +121,10 @@ public static class JobsOverviewBuilder
         ];
 
         return new JobsSummary(cards.Count, active, problems, failed.Count, overdue.Count, stats,
-            next?.Title, next?.NextDueAt, tone, tiles);
+            next?.Title, next?.NextDueAt, tone, tiles)
+        {
+            Counters = JobsMonitorBuilder.Counters(cards.Select(c => JobsMonitorBuilder.Status(c.Kind, c.Badge.Variant)), waiting),
+        };
     }
 
     private static string Clip(string text, int max) => text.Length > max ? text[..max] + "…" : text;

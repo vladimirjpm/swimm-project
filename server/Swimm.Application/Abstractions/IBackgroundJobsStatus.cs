@@ -14,4 +14,13 @@ public interface IBackgroundJobsStatus
 
     /// <summary>Только сводка — для дашборда: без истории прогонов и без журналов очередей.</summary>
     Task<JobsSummary> GetSummaryAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Мониторинг одним JSON (GET /api/admin/jobs/monitor): все службы структурными полями, зоны,
+    /// окно таймлайна, панели и та же сводка. Журнал читается БЕЗ подробностей (<c>Details</c>).
+    /// </summary>
+    Task<JobsMonitor> GetMonitorAsync(CancellationToken ct = default);
+
+    /// <summary>Один прогон с подробностями (окно «Что изменилось»); null — строки нет.</summary>
+    Task<JobRunDetailsView?> GetRunDetailsAsync(long id, CancellationToken ct = default);
 }

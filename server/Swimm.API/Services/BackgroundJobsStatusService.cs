@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Text.Json;
+
 using Swimm.API.Hosting;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Constants;
@@ -31,41 +34,151 @@ public sealed class BackgroundJobsStatusService(
     IClubPairLogligCheckQueue clubLogligQueue,
     IAdminRepository adminRepository,
     IRecordSourceCheckService recordChecks,
-    IPushSender pushSender) : IBackgroundJobsStatus
+    IPushSender pushSender,
+    IResultsAutoWaitingQuery waitingQuery,
+    ICompetitionDiscoveryService discovery,
+    JobRunOrigin origin) : IBackgroundJobsStatus
 {
     /// <summary>Сколько строк истории показывать на задачу (в базе держится <see cref="JobRunLog.KeepPerJob"/>).</summary>
     public const int HistoryRows = 15;
 
+    /// <summary>
+    /// Свежесть источников рекордов в мониторинге запоминается (своя память сервиса, НЕ кэш сайта):
+    /// <c>GetFreshnessAsync</c> — десятки запросов, а ручку опрашивают раз в 30 с. Ключ — последняя
+    /// попытка records-check и последний прогон по странам: после проверки запомненное
+    /// промахивается само; Apply и CLI <c>--records-check</c> видны не позже этого срока.
+    /// </summary>
+    private static readonly TimeSpan FreshnessMemoFor = TimeSpan.FromMinutes(10);
+
+    private static (string Key, DateTime At, IReadOnlyList<RecordSourceFreshnessDto> Value)? _freshnessMemo;
+
+    /// <summary>Когда запущен этот процесс (UTC) — «пульс» зоны local.</summary>
+    private static readonly Lazy<DateTime> ProcessStartedAt = new(() => Process.GetCurrentProcess().StartTime.ToUniversalTime());
+
     private bool AdminEnabled => HostingMode.AdminEnabled(configuration);
     private bool BackgroundJobsEnabled => HostingMode.BackgroundJobsEnabled(configuration, environment);
+
+    /// <summary>Мониторинг /Admin/Jobs: зона прод только вне Development (решение 20.11.2026).</summary>
+    private string ZoneOf(bool processOn, bool watchingProd) =>
+        JobsMonitorBuilder.Zone(processOn, watchingProd, environment.IsDevelopment());
 
     public async Task<BackgroundJobsReport> GetReportAsync(CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
         var log = (await jobRuns.ListLogAsync(HistoryRows, ct)).ToLookup(r => r.Name);
-        var schedules = await BuildSchedulesAsync(name => [.. log[name]], now, ct);
+        var schedules = BuildSchedules(await StatesAsync(ct), name => [.. log[name]], now);
 
         var countriesCheck = (await recordChecks.GetFreshnessAsync(ct))
             .FirstOrDefault(f => f.Source == RecordSources.WorldRecordsCountries);
         IReadOnlyList<JobCard> queues = [BuildImportQueue(now), BuildCountryRunQueue(countriesCheck, now), BuildClubLogligQueue(now)];
         var services = BuildServices(now);
 
+        var waiting = await waitingQuery.ListAsync(now, ct);
         var summary = JobsOverviewBuilder.Build([.. schedules, .. queues, .. services],
-            await jobRuns.GetStatsAsync(now, ct), Infra(), now);
-        var recentImports = (await adminRepository.GetImportHistoryAsync()).Take(5).ToList();
+            await jobRuns.GetStatsAsync(now, ct), Infra(), now, waiting.Count);
+        var recentImports = await adminRepository.GetImportHistoryAsync(RecentImportRows);
 
         return new BackgroundJobsReport(environment.EnvironmentName, AdminEnabled, BackgroundJobsEnabled,
             schedules, queues, services, summary, recentImports);
     }
 
+    private const int RecentImportRows = 5;
+
     public async Task<JobsSummary> GetSummaryAsync(CancellationToken ct = default)
     {
         // Дашборду не нужны история прогонов и журналы очередей — только состояние и счётчики.
         var now = DateTime.UtcNow;
-        var schedules = await BuildSchedulesAsync(_ => [], now, ct);
+        var schedules = BuildSchedules(await StatesAsync(ct), _ => [], now);
         IReadOnlyList<JobCard> cards =
             [.. schedules, BuildImportQueue(now), BuildCountryRunQueue(null, now), BuildClubLogligQueue(now), .. BuildServices(now)];
-        return JobsOverviewBuilder.Build(cards, await jobRuns.GetStatsAsync(now, ct), Infra(), now);
+        var waiting = await waitingQuery.ListAsync(now, ct);
+        return JobsOverviewBuilder.Build(cards, await jobRuns.GetStatsAsync(now, ct), Infra(), now, waiting.Count);
+    }
+
+    /// <summary>
+    /// Мониторинг одним JSON (GET /api/admin/jobs/monitor). Запросов к базе за опрос: состояние
+    /// задач, лёгкий журнал (без Details), «ждёт тебя» (+ соревнования, если кандидаты есть), пять
+    /// последних импортов; свежесть рекордов — запомненная (<see cref="FreshnessMemoFor"/>). Статистика
+    /// 24 ч / 7 дн считается по уже прочитанному журналу тем же <see cref="JobRunStats.From"/>.
+    /// </summary>
+    public async Task<JobsMonitor> GetMonitorAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var states = await StatesAsync(ct);
+        var log = await jobRuns.ListLogLightAsync(ct);
+        var byJob = log.ToLookup(r => r.Name);
+        var schedules = BuildSchedules(states, name => [.. byJob[name].Take(HistoryRows)], now);
+
+        var freshness = await FreshnessMemoAsync(states, now, ct);
+        var countriesCheck = freshness.FirstOrDefault(f => f.Source == RecordSources.WorldRecordsCountries);
+        var recordsTile = RecordsCheckTileBuilder.Build(freshness, now);
+        schedules = [.. schedules.Select(c => c.Key == JobNames.RecordsCheck
+            ? c with { Facts = [.. c.Facts, new JobFact("Источники", $"проверены {recordsTile.Value}; {recordsTile.Sub}",
+                recordsTile.Tone == "ok" ? null : recordsTile.Tone)] }
+            : c)];
+        IReadOnlyList<JobCard> cards =
+            [.. schedules, BuildImportQueue(now), BuildCountryRunQueue(countriesCheck, now), BuildClubLogligQueue(now), .. BuildServices(now)];
+
+        var waiting = await waitingQuery.ListAsync(now, ct);
+        var stats = JobRunStats.From(log.Select(r => (r.StartedAt, r.Success)), now);
+        var summary = JobsOverviewBuilder.Build(cards, stats, Infra(), now, waiting.Count);
+        var recentImports = await adminRepository.GetImportHistoryAsync(RecentImportRows);
+
+        return JobsMonitorBuilder.Build(new JobsMonitorInput(
+            now,
+            environment.EnvironmentName,
+            environment.IsProdAdmin() ? "prod" : "local",
+            cards,
+            log,
+            summary,
+            waiting,
+            origin.Value,
+            ProcessStartedAt.Value,
+            states.GetValueOrDefault(JobNames.TrainingReminders)?.LastAttemptAt,
+            recordsTile,
+            recentImports));
+    }
+
+    public async Task<JobRunDetailsView?> GetRunDetailsAsync(long id, CancellationToken ct = default)
+    {
+        var row = await jobRuns.GetLogAsync(id, ct);
+        if (row is null) return null;
+
+        JsonElement? details = null;
+        if (row.Details is { } json)
+        {
+            try { using var doc = JsonDocument.Parse(json); details = doc.RootElement.Clone(); }
+            catch (JsonException) { details = JsonSerializer.SerializeToElement(json); } // не JSON — отдаём строкой
+        }
+
+        DiscoveryRunChangesView? changes = null;
+        if (row.Name == JobNames.Discovery && JobRunDetails.ParseDiscovery(row.Details) is { } parsed)
+        {
+            // Какой старт уже есть в базе — так же, как страница (JobsModel.BuildRunChangesAsync).
+            var competitionIdByOrgCompId = (await discovery.GetAllAsync(ct))
+                .Where(d => d.MatchedCompetitionId is not null)
+                .GroupBy(d => d.OrgCompId)
+                .ToDictionary(g => g.Key, g => g.First().MatchedCompetitionId!.Value);
+            changes = DiscoveryRunChangesBuilder.Build(row.Id, row.StartedAt, parsed, competitionIdByOrgCompId);
+        }
+
+        return new JobRunDetailsView(row.Id, row.Name, row.Trigger, row.StartedAt, row.FinishedAt, row.Success,
+            row.RunBy, JobsMonitorBuilder.OriginCode(row.RunBy), row.Summary, row.Error, details, changes);
+    }
+
+    private async Task<IReadOnlyDictionary<string, JobRunStateRow>> StatesAsync(CancellationToken ct) =>
+        (await jobRuns.ListStatesAsync(ct)).ToDictionary(s => s.Name);
+
+    private async Task<IReadOnlyList<RecordSourceFreshnessDto>> FreshnessMemoAsync(
+        IReadOnlyDictionary<string, JobRunStateRow> states, DateTime now, CancellationToken ct)
+    {
+        var lastCountryRun = countryRunQueue.Snapshot().Max(r => r.CompletedAt);
+        var key = $"{states.GetValueOrDefault(JobNames.RecordsCheck)?.LastAttemptAt:O}|{lastCountryRun:O}";
+        if (_freshnessMemo is { } memo && memo.Key == key && now - memo.At < FreshnessMemoFor)
+            return memo.Value;
+        var fresh = await recordChecks.GetFreshnessAsync(ct);
+        _freshnessMemo = (key, now, fresh);
+        return fresh;
     }
 
     private JobsInfraState Infra()
@@ -134,16 +247,21 @@ public sealed class BackgroundJobsStatusService(
             "15 мин или сигнал импорта", null),
     };
 
-    private async Task<IReadOnlyList<JobCard>> BuildSchedulesAsync(
-        Func<string, IReadOnlyList<JobRunLogRow>> history, DateTime now, CancellationToken ct)
-    {
-        var states = (await jobRuns.ListStatesAsync(ct)).ToDictionary(s => s.Name);
-        return
-        [
-            .. JobNames.All.Select(j => BuildSchedule(j, states.GetValueOrDefault(j.Name), history(j.Name), now)),
-            BuildTrainingReminders(states.GetValueOrDefault(JobNames.TrainingReminders), history(JobNames.TrainingReminders), now),
-        ];
-    }
+    private IReadOnlyList<JobCard> BuildSchedules(
+        IReadOnlyDictionary<string, JobRunStateRow> states, Func<string, IReadOnlyList<JobRunLogRow>> history, DateTime now) =>
+    [
+        .. JobNames.All.Select(j => BuildSchedule(j, states.GetValueOrDefault(j.Name), history(j.Name), now)),
+        BuildTrainingReminders(states.GetValueOrDefault(JobNames.TrainingReminders), history(JobNames.TrainingReminders), now),
+    ];
+
+    /// <summary>Заявка на прогон для мониторинга: живая или брошенная (старше <see cref="JobSchedule.ClaimStaleAfter"/>).</summary>
+    private static JobClaimInfo? Claim(JobRunStateRow? state, DateTime now) =>
+        state?.ClaimedAt is { } at
+            ? new JobClaimInfo(at, state.ClaimedBy, JobSchedule.IsClaimLive(now, at), JobsMonitorBuilder.OriginCode(state.ClaimedBy))
+            : null;
+
+    private JobSettingValue SettingValue(string key) =>
+        settings.Get(key) is { } s ? new JobSettingValue(key, s.Value, false) : new JobSettingValue(key, null, true);
 
     /// <summary>
     /// Напоминания о тренировках (docs/plans/web-push-reminders-plan.md) — ПРОД-РАСПИСАНИЕ: работает
@@ -198,6 +316,19 @@ public sealed class BackgroundJobsStatusService(
             Status = !active ? "работает только на проде (PushReminders:Enabled)"
                 : silent ? $"молчит: {lastText}" : lastText,
             Alert = active && failed ? "danger" : silent ? "warning" : null,
+            // Честность (решение 20.11.2026): пустые тики в историю не пишутся — отдаём последний тик
+            // (LastRunAt) и непустые прогоны; сплошную ленту «тикает» клиент рисует сам (TimelineMode).
+            Monitor = new JobMonitorExtras
+            {
+                Zone = ZoneOf(processOn, watchingProd),
+                TimelineMode = JobTimelineModes.Ticker,
+                Interval = tick,
+                LastRunAt = state?.LastAttemptAt,
+                LastSuccessAt = state?.LastSuccessAt,
+                NextAt = active ? next : null,
+                LastError = failed ? state?.LastError : null,
+                Claim = Claim(state, now),
+            },
         };
     }
 
@@ -294,7 +425,57 @@ public sealed class BackgroundJobsStatusService(
             NextDueAt = s.NextDueAt,
             Status = watching ? $"на проде (AutoPull:Enabled): {s.Status}" : s.Status,
             Alert = s.Alert,
+            Monitor = new JobMonitorExtras
+            {
+                // Зона прод — ровно условие факта «не запущена — работает на ПРОДЕ…» (Placement.Watching).
+                Zone = ZoneOf(processOn, watching),
+                TimelineMode = JobTimelineModes.Runs,
+                Interval = interval,
+                IntervalKey = job.IntervalKey,
+                Toggle = new JobToggle(job.EnabledKey, job.IsEnabled(settings), settings.Get(job.EnabledKey) is null),
+                Settings =
+                [
+                    SettingValue(job.IntervalKey),
+                    .. job.Name == JobNames.ResultsAuto ? [SettingValue(ResultsAutoModes.SettingKey)] : Array.Empty<JobSettingValue>(),
+                    .. info.SettingsExtra is { } extra ? [SettingValue(extra)] : Array.Empty<JobSettingValue>(),
+                ],
+                LastRunAt = state?.LastAttemptAt,
+                LastSuccessAt = state?.LastSuccessAt,
+                NextAt = s.NextDueAt,
+                NextIsRetry = s.Failed,
+                // start-list (П3): шаг — только тик; забор конкретного старта решает правило близости.
+                NextApprox = job.Name == JobNames.StartList,
+                Claim = Claim(state, now),
+                LastError = s.Failed ? state?.LastError : null,
+                Actions = ScheduleActions(job.Name),
+            },
         };
+    }
+
+    /// <summary>Ссылки и кнопки панели деталей расписания — те, что есть на страницах сейчас.</summary>
+    private static IReadOnlyList<JobAction> ScheduleActions(string name)
+    {
+        var list = new List<JobAction>();
+        switch (name)
+        {
+            case JobNames.Discovery:
+            case JobNames.StartList:
+                list.Add(new(JobAction.Link, "Входящие и «Проверить сейчас» — /Admin/Competitions", "/Admin/Competitions"));
+                break;
+            case JobNames.ResultsAuto:
+                list.Add(new(JobAction.Link, "Ждут тебя — /Admin/Competitions", $"/Admin/Competitions?filter={AutoPullFilters.Blocked}"));
+                break;
+            case JobNames.RecordsCheck:
+                // Та же кнопка, что плитка «Рекорды · источники» и /Admin/Import: прогон ложится в журнал records-check.
+                list.Add(new(JobAction.Post, "Проверить сейчас", "/api/admin/records/check-all", "до 5 минут; после ответа — обновить"));
+                list.Add(new(JobAction.Link, "Дифф рекордов — /Admin/Import", "/Admin/Import?diff=records"));
+                break;
+            case JobNames.LogligBatch:
+                list.Add(new(JobAction.Link, "Ручной батч — /Admin/Swimmers/Loglig", "/Admin/Swimmers/Loglig"));
+                break;
+        }
+        list.Add(new(JobAction.Link, "Включатель и интервал — /Admin/Settings", "/Admin/Settings"));
+        return list;
     }
 
     // ── Очереди ────────────────────────────────────────────────────────────────
@@ -331,8 +512,33 @@ public sealed class BackgroundJobsStatusService(
             Status = QueueStatus(queued, running, last is null ? null
                 : last.State == ImportJobState.Failed ? $"последнее упало {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"
                 : $"последнее ок {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"),
+            Monitor = new JobMonitorExtras
+            {
+                Zone = JobZones.Local,
+                TimelineMode = JobTimelineModes.Runs,
+                LastRunAt = last?.CompletedAt?.UtcDateTime,
+                LastSummary = last is null ? null : last.State == ImportJobState.Failed ? last.Error : last.Result?.Message ?? "готово",
+                LastError = last?.State == ImportJobState.Failed ? last.Error : null,
+                // Начала у задания импорта нет — только постановка в очередь: «идёт с» — от неё.
+                StateSince = jobs.Where(j => j.State == ImportJobState.Running).Min(j => (DateTimeOffset?)j.QueuedAt)?.UtcDateTime,
+                Queue = new JobQueueCounts(queued, running, jobs.Count(j => j.State == ImportJobState.Completed),
+                    jobs.Count(j => j.State == ImportJobState.Failed)),
+                QueueRuns = QueueRuns(jobs.Where(j => j.State != ImportJobState.Queued)
+                    .Select(j => (j.QueuedAt, j.CompletedAt, j.State == ImportJobState.Running, j.State == ImportJobState.Failed))),
+                Actions = [new(JobAction.Link, "Вся история импортов — /Admin/ImportHistory", "/Admin/ImportHistory"),
+                           new(JobAction.Link, "Поставить импорт — /Admin/Import", "/Admin/Import")],
+            },
         };
     }
+
+    /// <summary>Прогоны очереди из памяти процесса → метки таймлайна и полоска исходов (свежие первыми).</summary>
+    private static IReadOnlyList<JobWindowRun> QueueRuns(
+        IEnumerable<(DateTimeOffset Start, DateTimeOffset? End, bool Running, bool Failed)> runs) =>
+        [.. runs
+            .Select(r => new JobWindowRun(null, r.Start.UtcDateTime, r.Running ? null : r.End?.UtcDateTime,
+                r.Running ? JobRunOutcomes.Running : r.Failed ? JobRunOutcomes.Failed : JobRunOutcomes.Success,
+                JobTriggers.Manual, null, null))
+            .OrderByDescending(r => r.FinishedAt ?? DateTime.MaxValue)];
 
     private JobCard BuildCountryRunQueue(RecordSourceFreshnessDto? check, DateTime now)
     {
@@ -384,6 +590,25 @@ public sealed class BackgroundJobsStatusService(
                 : QueueStatus(runs.Count(r => r.State == RecordCountryRunState.Queued), 0, last is null ? null
                     : last.State == RecordCountryRunState.Failed ? $"последний упал {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"
                     : $"последний ок {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"),
+            Monitor = new JobMonitorExtras
+            {
+                Zone = JobZones.Local,
+                TimelineMode = JobTimelineModes.Runs,
+                LastRunAt = last?.CompletedAt?.UtcDateTime,
+                LastSummary = last is null ? null
+                    : last.State == RecordCountryRunState.Failed ? last.Error
+                    : $"{last.Done} из {last.Total} стран, строк {last.RowsFetched}, упало {last.Failed.Count}",
+                LastError = last?.State == RecordCountryRunState.Failed ? last.Error : null,
+                LastSuccessAt = check?.CheckedAt,
+                StateSince = current?.QueuedAt.UtcDateTime,
+                Progress = current is null ? null
+                    : new JobProgress(current.Done, current.Total, current.CurrentCode, "стран", $"строк {current.RowsFetched}"),
+                Queue = new JobQueueCounts(runs.Count(r => r.State == RecordCountryRunState.Queued), current is null ? 0 : 1,
+                    runs.Count(r => r.State == RecordCountryRunState.Completed), runs.Count(r => r.State == RecordCountryRunState.Failed)),
+                QueueRuns = QueueRuns(runs.Where(r => r.State != RecordCountryRunState.Queued)
+                    .Select(r => (r.QueuedAt, r.CompletedAt, r.State == RecordCountryRunState.Running, r.State == RecordCountryRunState.Failed))),
+                Actions = [new(JobAction.Link, "Запуск и дифф — /Admin/Import", "/Admin/Import")],
+            },
         };
     }
 
@@ -422,6 +647,27 @@ public sealed class BackgroundJobsStatusService(
                 : QueueStatus(0, 0, last is null ? null
                     : last.State == ClubPairLogligRunStates.Failed ? $"последняя упала {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"
                     : $"последняя ок {JobTimeText.Ago(last.CompletedAt!.Value.UtcDateTime, now)}"),
+            Monitor = new JobMonitorExtras
+            {
+                Zone = JobZones.Local,
+                TimelineMode = JobTimelineModes.Runs,
+                LastRunAt = last?.CompletedAt?.UtcDateTime,
+                LastSummary = last is null ? null
+                    : last.State == ClubPairLogligRunStates.Failed ? last.Error
+                    : $"{Scope(last)}: пар {last.PairsDone}, карточек {last.SwimmersDone}, не открылось {last.Failed}",
+                LastError = last?.State == ClubPairLogligRunStates.Failed ? last.Error : null,
+                StateSince = current is null ? null : (current.StartedAt ?? current.QueuedAt).UtcDateTime,
+                Progress = current is null || current.State == ClubPairLogligRunStates.Queued ? null
+                    : new JobProgress(current.SwimmersDone, current.SwimmersTotal, Scope(current), "карточек",
+                        $"пар {current.PairsDone} из {current.PairsTotal}"),
+                Queue = new JobQueueCounts(runs.Count(r => r.State == ClubPairLogligRunStates.Queued),
+                    runs.Count(r => r.State == ClubPairLogligRunStates.Running),
+                    runs.Count(r => r.CompletedAt is not null && r.State != ClubPairLogligRunStates.Failed),
+                    runs.Count(r => r.State == ClubPairLogligRunStates.Failed)),
+                QueueRuns = QueueRuns(runs.Where(r => r.State != ClubPairLogligRunStates.Queued)
+                    .Select(r => (r.StartedAt ?? r.QueuedAt, r.CompletedAt, r.Active, r.State == ClubPairLogligRunStates.Failed))),
+                Actions = [new(JobAction.Link, "Запуск и сводки — /Admin/Clubs", "/Admin/Clubs?filter=dedup-unsure")],
+            },
         };
     }
 
@@ -461,6 +707,15 @@ public sealed class BackgroundJobsStatusService(
                 : ping.Ok ? $"база доступна, пинг {JobTimeText.Ago(ping.At.UtcDateTime, now)}"
                 : $"база НЕ отвечает, пинг {JobTimeText.Ago(ping.At.UtcDateTime, now)}",
             Alert = ping is { Ok: false } ? "danger" : null,
+            Monitor = new JobMonitorExtras
+            {
+                Interval = TimeSpan.FromSeconds(30),
+                LastRunAt = ping?.At.UtcDateTime,
+                LastSuccessAt = ping is { Ok: true } ? ping.At.UtcDateTime : null,
+                LastSummary = ping is null ? null
+                    : $"{(ping.Ok ? "база доступна" : "база НЕ отвечает")} · пингов {ping.Pings}, неудачных {ping.Failures}",
+                LastError = ping is { Ok: false } ? ping.LastError : null,
+            },
         };
     }
 
@@ -508,6 +763,15 @@ public sealed class BackgroundJobsStatusService(
                 : state.Behind ? $"локальная база отстаёт ({JobTimeText.Ago(state.CheckedAt.UtcDateTime, now)})"
                 : $"в синхроне ({JobTimeText.Ago(state.CheckedAt.UtcDateTime, now)})",
             Alert = active && state is { Error: null, Behind: true } ? "warning" : null,
+            Monitor = new JobMonitorExtras
+            {
+                Interval = TimeSpan.FromMinutes(15),
+                LastRunAt = state?.CheckedAt.UtcDateTime,
+                LastSummary = state is null ? null
+                    : state.Error is not null ? "прод недоступен"
+                    : $"{(state.Behind ? "отстаёт" : "в синхроне")}: прод v{state.ProdVersion}, локальная v{state.SyncedFromVersion?.ToString() ?? "—"}",
+                LastError = state?.Error,
+            },
         };
     }
 
@@ -540,6 +804,14 @@ public sealed class BackgroundJobsStatusService(
                 : s.Listening ? $"слушает; принято {s.Received}, отправлено {s.Published}"
                 : "НЕ слушает" + (s.LastError is { } e ? $": {e}" : ""),
             Alert = s.Enabled && !s.Listening ? "danger" : null,
+            Monitor = new JobMonitorExtras
+            {
+                LastRunAt = s.LastReceivedAt?.UtcDateTime,
+                StateSince = s.Listening ? s.ListeningSince?.UtcDateTime : null,
+                LastSummary = $"принято {s.Received} · отправлено {s.Published}",
+                LastError = s.Enabled && !s.Listening ? s.LastError : null,
+                Actions = [new(JobAction.Link, "Кэш и журнал сбросов — /Admin/Cache", "/Admin/Cache")],
+            },
         };
     }
 

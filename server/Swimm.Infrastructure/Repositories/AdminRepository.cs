@@ -201,12 +201,17 @@ public class AdminRepository : IAdminRepository
         };
     }
 
-    public async Task<List<ImportHistoryDto>> GetImportHistoryAsync()
+    public async Task<List<ImportHistoryDto>> GetImportHistoryAsync(int? take = null)
     {
-        return await _db.ImportHistory
+        // take — LIMIT в SQL: мониторинг /Admin/Jobs опрашивает пять последних раз в 30 с.
+        var query = _db.ImportHistory
             .AsNoTracking()
             .Include(h => h.Competition)
             .OrderByDescending(h => h.ImportDate)
+            .ThenByDescending(h => h.Id)
+            .AsQueryable();
+        if (take is { } n) query = query.Take(n);
+        return await query
             .Select(h => new ImportHistoryDto
             {
                 Id = h.Id,

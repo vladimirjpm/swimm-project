@@ -358,6 +358,8 @@ public static class DependencyInjection
         services.AddScoped<ICompetitionDiscoveryService, CompetitionDiscoveryService>();
         // Журнал запусков фоновых задач по расписанию (В12): «последний запуск» в базе, не в памяти
         services.AddScoped<IJobRunStore, JobRunStore>();
+        // «Ждёт тебя» у results-auto — счётчик и «Требует внимания» мониторинга /Admin/Jobs
+        services.AddScoped<IResultsAutoWaitingQuery, ResultsAutoWaitingQuery>();
         services.AddScoped<IStartListPullService, StartListPullService>();
         services.AddScoped<IStartListStitchService, StartListStitchService>();
         services.AddScoped<IStartListScheduleService, StartListScheduleService>();
