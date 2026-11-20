@@ -40,7 +40,8 @@
 | /Admin/AppInsights | [appinsights.md](appinsights.md) | **Телеметрия прод-сайта** из Azure Application Insights: плитки (запросы, 5xx, p95, исключения, Postgres, приём), частые исключения, медленные операции, ошибки по маршруту, сбои фона; период и роль; три состояния «нет данных» |
 | /Admin/Settings | [settings.md](settings.md) | Параметры приложения (in-memory settings) |
 | /Admin/Services | [services.md](services.md) | **Сайты и кабинеты проекта**: Azure, GitHub, Cloudflare, Resend, Google, источники данных — зачем каждый и ссылки |
-| /Admin/Docs/{section} | [docs.md](docs.md) | **Документация** репозитория в админке: Important / Rules / Decisions, MD читается с диска |
+| /Admin/Docs/{section} | [docs.md](docs.md) | **Документация** репозитория в админке: Important / Rules / Decisions / Admin notes, MD читается с диска |
+| (на любой странице) | [admin-notes.md](admin-notes.md) | **Справки админки** «ⓘ»: MD-файлы `docs/admin-notes/`, значок по ключу `data-note` с попапом; `GET /api/admin/notes`; список — `/Admin/Docs/notes` |
 | /Admin/UiPreview | [uipreview.md](uipreview.md) | Витрина компонентов админки |
 
 Общее для всех страниц: Razor Pages в `server/Swimm.API/Pages/Admin/**`,

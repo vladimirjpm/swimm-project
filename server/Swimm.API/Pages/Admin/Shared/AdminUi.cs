@@ -55,6 +55,8 @@ public static class AdminNav
         new("Important", "award", "/Admin/Docs/important", "Docs"),
         new("Rules", "shield", "/Admin/Docs/rules", "Docs"),
         new("Decisions", "tag", "/Admin/Docs/decisions", "Docs"),
+        // Справки «ⓘ» — все файлы docs/admin-notes/ автоматически (AdminNotesDocs.cs).
+        new("Admin notes", "inbox", "/Admin/Docs/notes", "Docs"),
     ];
 
     /// <summary>Человекочитаемые заголовки секций сайдбара (пустая секция — без заголовка).</summary>

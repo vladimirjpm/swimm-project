@@ -143,7 +143,12 @@
         $('jobs-refresh').addEventListener('click', load);
         document.addEventListener('click', e => {
             const t = e.target.closest('[data-job]');
-            if (t && state.data && !t.closest('#job-detail')) M.openDetail(t.dataset.job, t, state.data);
+            if (t && state.data && !t.closest('#job-detail')) {
+                M.openDetail(t.dataset.job, t, state.data);
+                // Клик по пометке «ⓘ» на дорожке/плитке — панель и сразу справка у значка в её шапке.
+                const mark = e.target.closest('[data-note-mark]');
+                if (mark && window.AdminNotes) window.AdminNotes.open(mark.dataset.noteMark);
+            }
         });
         $('jobs-view').addEventListener('keydown', arrowNav);
         M.setDetailActionHandler(load);

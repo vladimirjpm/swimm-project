@@ -347,6 +347,8 @@ builder.Services.AddSingleton<DbStatusService>();
 builder.Services.AddHostedService<DbPingBackgroundService>();
 // Состояние всех фоновых служб — /Admin/Jobs и блок «Jobs» дашборда (docs/admin-pages/jobs.md).
 builder.Services.AddScoped<IBackgroundJobsStatus, BackgroundJobsStatusService>();
+// Справки админки — docs/admin-notes/*.md, значки «ⓘ» (docs/admin-pages/admin-notes.md).
+builder.Services.AddSingleton<IAdminNotes>(sp => new AdminNotesService(sp.GetRequiredService<IWebHostEnvironment>()));
 
 // Разработка: не отстаёт ли локальная копия от прода (В17). Молчит без ProdVersionConnection.
 if (builder.Environment.IsDevelopment())
