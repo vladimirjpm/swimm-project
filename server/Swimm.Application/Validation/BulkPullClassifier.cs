@@ -34,7 +34,7 @@ public static class BulkPullClassifier
         // не тот режим, в котором его стоит проглядеть (решение Влада 2026-08-23).
         var records = preview.RecordPreview?.Count ?? 0;
         if (records > 0)
-            reasons.Add($"бьёт рекордов: {records} — нужна ручная проверка");
+            reasons.Add($"бьёт рекордов: {records}{(preview.RecordPreview!.Swims < records ? InSwims(preview.RecordPreview.Swims) : "")} — нужна ручная проверка");
 
         if (preview.ExistingCompetitionId is int existing)
             reasons.Add($"соревнование уже в БД (#{existing}) — нужно решение о перезаписи");
@@ -81,6 +81,13 @@ public static class BulkPullClassifier
 
         return (BulkPullVerdict.Clean, reasons);
     }
+
+    /// <summary>
+    /// « в 1 заплыве» — только когда заплывов МЕНЬШЕ, чем рекордов: один заплыв бьёт open и
+    /// возрастной сразу, и без уточнения «рекордов: 2» читается как две проблемы (16917, 20.11.2026).
+    /// </summary>
+    private static string InSwims(int swims)
+        => swims <= 0 ? "" : $" в {swims} {(swims % 10 == 1 && swims % 100 != 11 ? "заплыве" : "заплывах")}";
 
     /// <summary>
     /// Ровно те же формулировки, по которым одиночное превью ставит «∅ нет протокола».

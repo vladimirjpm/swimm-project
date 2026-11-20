@@ -17,6 +17,13 @@ public sealed class ImportRecordPreviewDto
     public int Count { get; set; }
 
     /// <summary>
+    /// В скольких ЗАПЛЫВАХ эти рекорды. Один заплыв часто бьёт два рекорда сразу (open +
+    /// возрастной), и «рекордов: 2» читается как две проблемы, хотя строка протокола одна
+    /// (compID 16917, 20.11.2026: 01:29.97 на 200 комплексом). 0 — не посчитано.
+    /// </summary>
+    public int Swims { get; set; }
+
+    /// <summary>
     /// Строки для показа человеку (обрезано — в UI нужен не список, а сигнал).
     /// </summary>
     public List<ImportRecordPreviewRow> Rows { get; set; } = [];
