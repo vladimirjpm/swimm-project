@@ -852,9 +852,12 @@
                     '<ul class="mt-2 space-y-2">' + [...byRow.values()].map(g => {
                         const s = g.swim;
                         const recs = g.records.map(r =>
-                            `<div class="text-admin-text-muted" dir="rtl" style="text-align:left">${esc(r.kind)}: ${esc(r.recordTime)} ${esc(r.recordHolder)}</div>`).join('');
+                            `<div class="text-admin-text-muted">бьёт ${esc(r.kind)}: ${esc(r.recordTime)}${r.recordHolder ? ` — <bdi>${esc(r.recordHolder)}</bdi>` : ''}</div>`).join('');
+                        // Строка LTR, имена в <bdi>: при dir="rtl" ивритское имя уезжало в конец
+                        // («individual_medley · 01:29.97 200 · ליאם אלמוג») и читалось как ещё один
+                        // держатель рекорда, а не как тот, кто проплыл (20.11.2026).
                         return `<li class="rounded-md border border-admin-border bg-admin-surface/60 px-2.5 py-2">`
-                            + `<div class="font-semibold text-admin-text" dir="rtl" style="text-align:left">${esc(s.swimmerName)} · ${esc(s.distance)} ${esc(s.styleName)} · <b>${esc(s.time)}</b></div>`
+                            + `<div class="font-semibold text-admin-text"><span class="font-normal text-admin-text-muted">проплыл:</span> <bdi>${esc(s.swimmerName)}</bdi> · ${esc(s.distance)} ${esc(s.styleName)} · <b>${esc(s.time)}</b></div>`
                             + `<div class="mt-0.5 space-y-0.5 text-[11.5px]">${recs}</div>`
                             + `<div class="mt-1.5 border-t border-admin-border pt-1.5">`
                             + `<label class="flex items-center gap-1.5 cursor-pointer text-admin-text-muted">`
@@ -862,7 +865,7 @@
                             + ` data-note="${esc(suspectNote(g))}"> пометить заплыв сомнительным</label>`
                             // Сюда приезжает вердикт по карточке loglig (или поле для привязки
                             // id и пола, если пловец ещё не привязан) — см. loadRecordCheck.
-                            + `<div class="record-check mt-1 text-[11.5px]" data-row="${s.rowIndex}"></div>`
+                            + `<div class="record-check mt-1 text-[11.5px]" data-row="${s.rowIndex}" data-name="${esc(s.swimmerName)}"></div>`
                             + `</div>`
                             + `</li>`;
                     }).join('') +
@@ -953,7 +956,7 @@
                 const shownId = r.logligId ?? r.suggestedLogligId;
                 const link = r.logligUrl
                     ? ` <a href="${esc(r.logligUrl)}" target="_blank" rel="noopener"
-                           class="text-admin-accent hover:underline">карточка loglig #${shownId} ↗</a>`
+                           class="text-admin-accent hover:underline">карточка loglig${box.dataset.name ? ` <bdi>${esc(box.dataset.name)}</bdi>` : ''} #${shownId} ↗</a>`
                     : '';
 
                 // Пловец в базе есть, но не привязан — даём привязать прямо тут (и пол заодно:
