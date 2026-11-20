@@ -34,7 +34,8 @@ public interface IAdminRepository
     /// <summary>Ретеншн журнала логинов: удалить события старше 90 дней. Возвращает число удалённых.</summary>
     Task<int> CleanupLoginHistoryAsync();
     Task<AdminStatsDto> GetStatsAsync();
-    Task<List<ImportHistoryDto>> GetImportHistoryAsync();
+    /// <param name="take">Сколько последних строк; null — все.</param>
+    Task<List<ImportHistoryDto>> GetImportHistoryAsync(int? take = null);
     Task<bool> SetImportApprovedAsync(int id, bool approved);
     Task<List<CompetitionAdminDto>> GetCompetitionsAsync();
     Task<bool> UpdateCompetitionAsync(int id, bool isAward, bool showCombineAllResults, IReadOnlyCollection<string> categoryKeys);

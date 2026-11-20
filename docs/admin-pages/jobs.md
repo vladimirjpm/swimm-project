@@ -13,6 +13,7 @@
 | Подсчёт | `JobsOverviewBuilder` (`Swimm.Application/Mapping`) — чистые функции: статус расписания (`Schedule`), просрочка, сводка-плитки и проблемные службы (`Build`). Тесты — `JobsOverviewBuilderTests` |
 | DTO | `Swimm.Application/Dtos/BackgroundJobsDtos.cs`: `JobCard`, `JobsSummary`, `OverviewTile`, `BackgroundJobsReport` |
 | API дашборда | `GET /api/admin/jobs/summary` (`JobsAdminController`) |
+| API мониторинга (20.11.2026) | `GET /api/admin/jobs/monitor` — всё для новой страницы одним JSON; `GET /api/admin/jobs/runs/{id}` — один прогон с подробностями. Контракт — раздел [«Контракт мониторинга»](#контракт-мониторинга-get-apiadminjobsmonitor) ниже |
 
 Не путать с `/Admin/Services` — там внешние сайты и кабинеты.
 
@@ -284,6 +285,156 @@ warning — есть что применить или пора проверит�
   тренировках — тоже (у них свой UNIQUE журнала доставки).
 - Тесты: `JobRunClaimPgTests` (настоящий Postgres: 12 одновременных заявок — один победитель; два
   «процесса» `ScheduledJob` — работа один раз), `JobScheduleTests`, `JobsOverviewBuilderTests`.
+
+## Контракт мониторинга (`GET /api/admin/jobs/monitor`)
+
+Слой данных редизайна страницы (передача дизайнера `!design_handoff/design_handoff_admin_jobs_monitor/`,
+решения Влада 20.11.2026). Страница (виды «Таймлайн» и «Стена», панель деталей службы) и блок Jobs
+дашборда рисуются **на клиенте** из этого JSON; готовые строки фактов разбирать не нужно. Нынешняя
+страница и `GET /api/admin/jobs/summary` работают как раньше.
+
+| Что | Где |
+|---|---|
+| Ручки | `JobsAdminController`: `GET monitor`, `GET runs/{id}` (404 — строки нет: вытеснена обрезкой). Та же защита, что у `summary`: `[Authorize(Roles = "Admin")]`, antiforgery |
+| Порт | `IBackgroundJobsStatus.GetMonitorAsync` / `GetRunDetailsAsync` |
+| Сборка | `BackgroundJobsStatusService` кладёт в карточку структурные поля (`JobCard.Monitor`, тип `JobMonitorExtras`), чистый `JobsMonitorBuilder` (`Swimm.Application/Mapping`) собирает ответ |
+| DTO | `Swimm.Application/Dtos/JobsMonitorDtos.cs` (`JobsMonitor`, `JobMonitorItem`, …) |
+| Тесты | `JobsMonitorBuilderTests` (статус, зона, окно, план, исходы, счётчики, панели, «ждёт тебя»), `JobsAdminControllerContractTests` (имена полей JSON), `JobRunStorePgTests.Light_log_has_details_flag_without_details` |
+
+JSON — camelCase, время — UTC ISO 8601 (`2026-11-20T14:20:00Z`); форматирует клиент (у Влада — Израиль).
+
+### Корень ответа
+
+| Поле | Что |
+|---|---|
+| `now` | серверное «сейчас» (UTC) — от него считать «N мин назад», а не от часов браузера |
+| `environment` | `ProdAdmin` \| `Development` (чип среды) |
+| `journal` | чей журнал показан: `prod` (прод-база, ProdAdmin — «журнал прод-базы, общий с продом») \| `local` |
+| `windowFrom`, `windowTo`, `windowHours` | окно таймлайна: **36 ч, скользящее** — от часа «сейчас» минус 18 ч; «сейчас» посередине, граница суток всегда внутри |
+| `zones[]` | зоны в порядке прод → local, только непустые (см. ниже) |
+| `counters` | шесть счётчиков: `failed`, `overdue`, `running`, `waiting` («ждёт тебя»), `ok` (вместе с `idle`), `off` |
+| `jobs[]` | все службы в порядке нынешней страницы: расписания, очереди, служебные |
+| `attention[]` | «Требует внимания» |
+| `running[]` | «Идёт сейчас» |
+| `upcoming[]` | «Ближайшие запуски» (до 8) |
+| `waiting[]` | строки results-auto «ждёт тебя»: `id`, `orgCompId`, `name` (иврит — `dir="auto"`), `dateStart`, `dateEnd`, `reason`, `checkedAt` |
+| `summary` | **та же** сводка, что `GET /summary` (`JobsOverviewBuilder.Build`), с теми же `counters` |
+| `recordsSources` | плитка «Рекорды · источники» (`RecordsCheckTileBuilder`): `value`, `sub`, `tone`, `lastCheckedAt` |
+| `recentImports[]` | 5 последних импортов (`ImportHistoryDto`, как на нынешней странице) |
+
+### Зона (`zone`, `zones[]`)
+
+| Значение | Когда |
+|---|---|
+| `prod` | задача **не запущена здесь**, а этот процесс следит за её прод-журналом — ровно условие факта «не запущена — работает на ПРОДЕ…» (`Placement.Watching` у discovery/start-list/results-auto при `AutoPull:Enabled` прода; `training-reminders` в ProdAdmin). Не список ключей |
+| `local` | всё остальное: выполняется в этом процессе или выключено здесь. **В Development — всегда `local`**, зоны `prod` нет |
+
+`zones[]`: `key`, `process`, `pulseAt`, `pulseKind`, `jobKeys` (порядок служб в зоне). Пульс прода —
+`process` = `RunBy` последней строки журнала с подписью `Production@…`, `pulseAt` = последний тик
+`training-reminders` (`Sys_JobRuns.LastAttemptAt`), `pulseKind` = `tick`. Пульс local — подпись этого
+процесса (`JobRunOrigin`) и время его запуска, `pulseKind` = `started`. Подгруппы внутри зоны — по
+`kind` службы.
+
+### Статус (`status`) — шесть значений
+
+Получается из бейджа нынешней карточки (`JobsMonitorBuilder.Status`; бейдж уже выбран по приоритету
+идёт → выключена → упала → просрочена): исходный бейдж — в `badge` (`text`, `variant`).
+
+| `status` | `badge.variant` | Бейджи сейчас |
+|---|---|---|
+| `failed` | danger | «последний запуск упал», «последний тик упал», «база недоступна», «не слушает» |
+| `overdue` | warning | «просрочена», «молчит», «ещё не запускалась», «ещё не сверяла», «локальная отстаёт», «прод недоступен», «ждёт первого пинга» |
+| `running` | info | «идёт сейчас», «импортирует», «идёт прогон», «идёт проверка» |
+| `ok` | success (не очередь) | «работает», «база доступна», «слушает», «в синхроне» |
+| `idle` | success (очередь) | «ждёт задания» |
+| `off` | neutral | «выключена», «выключен», «не в этом процессе» |
+
+⚠ `status` шире, чем `alert` (проблема для главной цифры дашборда, `summary.problems`): «ещё не
+запускалась», «ждёт первого пинга», «прод недоступен», «ещё не сверяла» — `overdue`, но `alert = null`.
+Счётчик «просрочена» и число проблем дашборда поэтому могут не совпадать — это разные вопросы.
+
+### Служба (`jobs[]`)
+
+| Поле | Что |
+|---|---|
+| `key`, `title`, `kind` | ключ (`discovery`, `import`, `db-ping`…), название, вид `schedule` \| `queue` \| `service` |
+| `zone`, `status`, `badge`, `statusText` | см. выше; `statusText` — короткий статус одной строкой (как в списке служб нынешней страницы) |
+| `alert`, `active` | проблема `danger`/`warning`/null (как в `summary.problems`); работает (здесь или наблюдается) и не выключена |
+| `what`, `service` | «что делает» и имя класса службы |
+| `intervalSeconds`, `intervalKey` | интервал (расписания — из Admin/Settings; напоминания 300, пинг 30, сверка с продом 900; очереди и мост — null) |
+| `toggle` | выключатель расписания: `key`, `value`, `isDefault` (ключа в Admin/Settings нет); у очередей/служебных null — их включают флаги процесса |
+| `settings[]` | параметры: `key`, `value` (как хранится; null — умолчание), `isDefault` — интервал, `ResultsAutoMode` у results-auto, `StartListDaysAhead`, `LogligBatchPerRun` |
+| `lastRunAt`, `lastSuccessAt` | последняя попытка/тик/пинг/сверка и последний успех |
+| `lastRun`, `lastDurationSeconds` | последняя строка истории (форма — как `history[]`) и её длительность. У напоминаний это последний **непустой** тик |
+| `nextAt`, `nextIsRetry`, `nextApprox` | когда станет пора (то же правило, что `JobSchedule.IsDue`); повтор после ошибки (через 1 ч); план приблизителен (`start-list`: шаг — тик, частоту стартов решает правило близости) |
+| `dueNow` | пора уже сейчас — запустится при ближайшей проверке журнала |
+| `overdueSince`, `overdueSeconds` | только при `status = overdue` и известном моменте «пора»: оранжевый отрезок от `overdueSince` до `now` |
+| `claim` | заявка `Sys_JobRuns`: `since`, `by` («среда@машина#pid»), `live` (false — **брошенная**, старше `ClaimStaleAfter` = 2 ч), `origin` |
+| `lastError` | полный текст последней ошибки (как хранится, до 1000 символов); null, если последняя попытка удалась |
+| `lastSummary` | итог последней работы одной строкой (у расписаний — из истории: итог или ошибка) |
+| `stateSince` | с какого момента в текущем состоянии: идёт с…, мост слушает с… |
+| `recentOutcomes[]` | до 15 исходов, **свежие первыми**: `success` \| `failed` \| `running` (идущий — первым) |
+| `timelineMode` | `runs` — метки прогонов + план; `ticker` — напоминания: сплошная лента «тикает» + метки непустых тиков, плана нет; `none` — служебные (плашка, без дорожки) |
+| `windowRuns[]` | прогоны в окне по возрастанию: `id` (null у идущего и у очередей), `startedAt`, `finishedAt` (null — идёт), `outcome`, `trigger`, `origin`, `runBy`. Идущий по заявке — открытый отрезок до «сейчас» |
+| `planned[]` | плановые моменты после `now` до `windowTo`: первый — `nextAt`, дальше шагом интервала (до 48); у выключенных и `ticker` пусто |
+| `progress` | `done`, `total`, `current`, `unit`, `note` — у прогона по странам («120 из 470 стран, сейчас FRA, строк 3400») и проверки пар клубов; null — «без оценки» |
+| `queue` | очередь в памяти процесса: `queued`, `running`, `completed`, `failed` (с запуска процесса) |
+| `facts[]` | пары «подпись–значение» (`label`, `value`, `variant`) для панели деталей — те же факты, что у нынешней карточки (у `records-check` плюс факт «Источники») |
+| `actions[]` | `kind` (`link` — переход; `post` — кнопка: POST с antiforgery), `text`, `url`, `hint`. Сейчас: «Проверить сейчас» у `records-check` (`POST /api/admin/records/check-all`, до 5 минут) и ссылки (Входящие, ждут тебя, `/Admin/Import`, `/Admin/ImportHistory`, `/Admin/Clubs`, `/Admin/Cache`, `/Admin/Settings`) |
+| `history[]` | до 15 последних прогонов (свежие первыми): `id`, `startedAt`, `finishedAt`, `durationSeconds`, `trigger` + `triggerText` (фон/кнопка/CLI/после импорта), `origin` + `originText` (прод/ProdAdmin/локально; null у строк старше 20.11.2026), `runBy`, `success`, `summary`, `error`, `hasDetails` |
+
+`origin` — код по подписи `RunBy`: `prod` \| `prodadmin` \| `local` \| `other` \| null.
+
+У **очередей** прогоны и исходы — из памяти процесса (после перезапуска с нуля), `history[]` пустая
+(постоянная история импорта — `/Admin/ImportHistory` и `recentImports`). У **служебных** нет ни
+прогонов, ни плана.
+
+### Панели
+
+- `attention[]` — `key`, `title`, `zone`, `kind`, `status`, `text` (объяснение по-русски), `since`, `href`.
+  Порядок: `failed` (текст — «Упала: <ошибка>»), `abandoned-claim` (брошенная заявка, в том числе у
+  службы в норме), `overdue` («Пора с HH:MM, прогона нет уже N. Последний успех — …»), `waiting`
+  (по строке results-auto «ждёт тебя»: «Старт «…» #compId не взят автоматически: <причина>»,
+  `href` — `/Admin/Competitions?filter=autopull-blocked&q=<имя>`, `status` = `waiting`). У служб `href`
+  = null: клиент открывает панель деталей по `key`. «Ждут Apply» у рекордов сюда и в «ждёт тебя»
+  **не** входят (решение 20.11.2026) — они видны фактом «Источники» и в `recordsSources`.
+- `running[]` — `key`, `title`, `zone`, `since`, `by` (кто взял заявку; у очередей null), `progress`.
+- `upcoming[]` — работающие службы с `nextAt` в будущем, по возрастанию: `key`, `title`, `zone`, `at`,
+  `isRetry` (повтор после ошибки — красным), `approx`.
+
+### «Ждёт тебя»
+
+Правило одно — `ResultsAutoWaiting` (`Swimm.Application/Mapping`): вердикт `blocked`, проверена за
+последние 24 ч, строка `new` и не связана с соревнованием в базе. Его же зовёт блок «Соревнования»
+дашборда (`competitions.autoPullBlocked24h`) — цифры совпадают. Строки — `IResultsAutoWaitingQuery`
+(`ResultsAutoWaitingQuery`): вердикт/окно/статус — в SQL, матч с соревнованиями только при кандидатах.
+
+### Честность напоминаний
+
+`training-reminders` пишет в историю только непустые тики (что-то отправил или упал), пустые сдвигают
+лишь `Sys_JobRuns`. Поэтому: `lastRunAt` — последний тик (любой), `windowRuns`/`history` — только
+непустые, `timelineMode = ticker`. Сплошную ленту клиент рисует как «тикает» от последнего известного
+тика, а не как набор прогонов: истории пустых тиков нет.
+
+### Подробности прогона (`GET /api/admin/jobs/runs/{id}`)
+
+`id`, `name`, `trigger`, `startedAt`, `finishedAt`, `success`, `runBy`, `origin`, `summary`, `error`,
+`details` (JSON как записан: discovery — `DiscoveryRunDetails`, results-auto — `ResultsAutoTickReport`;
+null — нет), `discoveryChanges` (только discovery: готовый вид окна «Что изменилось» — `DiscoveryRunChangesView`,
+группы new/postponed/updated/missing со ссылками; тот же `DiscoveryRunChangesBuilder`, что попап нынешней
+страницы). Звать по `history[].hasDetails = true`.
+
+### Цена опроса (раз в 30 с, в ProdAdmin — против прод-базы)
+
+Один `GET monitor` = **4–5 запросов**: `Sys_JobRuns` (все строки, ~8), `Sys_JobRunLog` **без колонки
+`Details`** (только `Details IS NOT NULL`; ≤ 50 строк на задачу, на проде 20.11 — ~70 строк), «ждёт
+тебя» по `Sys_DiscoveredCompetitions` (фильтр в SQL) + соревнования (id, имя, дата) **только если
+кандидаты есть**, 5 последних `Sys_ImportHistory` (LIMIT в SQL). Статистика 24 ч / 7 дн считается по уже
+прочитанному журналу (`JobRunStats.From` — та же функция, что `GetStatsAsync`). Свежесть рекордов
+(`GetFreshnessAsync`, ~25 запросов) запоминается в памяти сервиса на 10 мин; ключ — последняя попытка
+`records-check` и последний прогон по странам, поэтому после проверки она перечитывается сразу, а Apply
+и CLI `--records-check` видны не позже 10 мин. Остальное (очереди, пинг, мост, настройки) — память
+процесса. Локально: первый вызов ~0,4 с (прогрев), дальше ~20 мс.
 
 ## Грабли
 

@@ -40,6 +40,9 @@ public sealed record JobCard(
 
     /// <summary>Проблема службы: danger | warning; null — всё в порядке.</summary>
     public string? Alert { get; init; }
+
+    /// <summary>Структурные поля для мониторинга (GET /api/admin/jobs/monitor, <c>JobsMonitorBuilder</c>).</summary>
+    public JobMonitorExtras Monitor { get; init; } = new();
 }
 
 public static class JobKinds
@@ -78,7 +81,14 @@ public sealed record JobsSummary(
     string? NextTitle,
     DateTime? NextAt,
     string Tone,
-    IReadOnlyList<OverviewTile> Tiles);
+    IReadOnlyList<OverviewTile> Tiles)
+{
+    /// <summary>
+    /// Шесть счётчиков мониторинга: упала · просрочена · идут · ждёт тебя · в норме · выключены
+    /// (статус каждой службы — <c>JobsMonitorBuilder.Status</c>).
+    /// </summary>
+    public JobsCounters Counters { get; init; } = JobsCounters.Empty;
+}
 
 /// <summary>Состояние процесса и служебных служб, которое сводка берёт не из карточек.</summary>
 public sealed record JobsInfraState(

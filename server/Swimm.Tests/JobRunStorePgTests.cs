@@ -107,6 +107,43 @@ public class JobRunStorePgTests
         }
     }
 
+    /// <summary>
+    /// Мониторинг /Admin/Jobs опрашивает журнал раз в 30 с: лёгкое чтение отдаёт признак
+    /// подробностей без самих подробностей, а строка по id — с ними (окно «Что изменилось»).
+    /// </summary>
+    [Fact]
+    public async Task Light_log_has_details_flag_without_details()
+    {
+        await using var db = await TryCreate();
+        if (db is null) return;
+
+        var name = "utest-job-" + Guid.NewGuid().ToString("N")[..8];
+        var store = new JobRunStore(db);
+        try
+        {
+            await store.AppendLogAsync(new JobRunRecord(name, JobTriggers.Manual, DateTime.UtcNow, DateTime.UtcNow,
+                Success: true, "с подробностями", Error: null, Details: """{"changes":[]}"""));
+            await store.AppendLogAsync(new JobRunRecord(name, JobTriggers.Manual, DateTime.UtcNow.AddMinutes(-1),
+                DateTime.UtcNow, Success: true, "без подробностей", Error: null));
+
+            db.ChangeTracker.Clear();
+            var rows = (await store.ListLogLightAsync()).Where(r => r.Name == name).ToList();
+            var with = rows.Single(r => r.Summary == "с подробностями");
+            Assert.True(with.HasDetails);
+            Assert.Null(with.Details);
+            Assert.False(rows.Single(r => r.Summary == "без подробностей").HasDetails);
+
+            var full = await store.GetLogAsync(with.Id);
+            Assert.NotNull(full);
+            Assert.Contains("changes", full.Details);
+            Assert.Null(await store.GetLogAsync(-1));
+        }
+        finally
+        {
+            await Cleanup(db, name);
+        }
+    }
+
     [Fact]
     public async Task Unknown_trigger_is_rejected_by_check()
     {

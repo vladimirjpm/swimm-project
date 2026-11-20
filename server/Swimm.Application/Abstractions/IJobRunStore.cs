@@ -50,12 +50,37 @@ public interface IJobRunStore
     /// <summary>Последние <paramref name="perJob"/> прогонов каждой задачи, свежие первыми.</summary>
     Task<IReadOnlyList<JobRunLogRow>> ListLogAsync(int perJob, CancellationToken ct = default);
 
+    /// <summary>
+    /// Весь журнал (свежие первыми) БЕЗ колонки <c>Details</c> — только признак <c>HasDetails</c>:
+    /// мониторинг опрашивает его раз в 30 с, в том числе из ProdAdmin против прод-базы. Строк не
+    /// больше <c>JobRunLog.KeepPerJob</c> на задачу.
+    /// </summary>
+    Task<IReadOnlyList<JobRunLogRow>> ListLogLightAsync(CancellationToken ct = default);
+
+    /// <summary>Одна строка истории с подробностями; null — нет такой (вытеснена обрезкой).</summary>
+    Task<JobRunLogRow?> GetLogAsync(long id, CancellationToken ct = default);
+
     /// <summary>Сколько прогонов (всех задач) было за сутки и за неделю до <paramref name="now"/> и сколько из них упало.</summary>
     Task<JobRunStats> GetStatsAsync(DateTime now, CancellationToken ct = default);
 }
 
 /// <summary>Прогоны всех задач за 24 ч и 7 дней — сводка вверху /Admin/Jobs.</summary>
-public sealed record JobRunStats(int Runs24h, int Failed24h, int Runs7d, int Failed7d);
+public sealed record JobRunStats(int Runs24h, int Failed24h, int Runs7d, int Failed7d)
+{
+    /// <summary>
+    /// Подсчёт по строкам журнала — один на хранилище (<c>GetStatsAsync</c>) и мониторинг (лёгкий
+    /// журнал уже прочитан — второй запрос не нужен).
+    /// </summary>
+    public static JobRunStats From(IEnumerable<(DateTime StartedAt, bool Success)> runs, DateTime now)
+    {
+        var day = now.AddDays(-1);
+        var week = now.AddDays(-7);
+        var inWeek = runs.Where(r => r.StartedAt >= week).ToList();
+        return new JobRunStats(
+            inWeek.Count(r => r.StartedAt >= day), inWeek.Count(r => r.StartedAt >= day && !r.Success),
+            inWeek.Count, inWeek.Count(r => !r.Success));
+    }
+}
 
 /// <summary>Состояние задачи в журнале (UTC).</summary>
 public sealed record JobRunState(DateTime? LastAttemptAt, DateTime? LastSuccessAt);
@@ -112,4 +137,11 @@ public sealed record JobRunLogRow(
     string? Summary,
     string? Error,
     string? Details = null,
-    string? RunBy = null);
+    string? RunBy = null)
+{
+    /// <summary>
+    /// Подробности у строки есть. Лёгкое чтение журнала (<see cref="IJobRunStore.ListLogLightAsync"/>)
+    /// колонку <c>Details</c> не тянет — только этот признак.
+    /// </summary>
+    public bool HasDetails { get; init; } = Details is not null;
+}
