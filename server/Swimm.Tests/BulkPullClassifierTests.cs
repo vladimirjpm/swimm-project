@@ -62,6 +62,21 @@ public class BulkPullClassifierTests
         Assert.Contains(reasons, r => r.Contains("рекорд"));
     }
 
+    [Theory]
+    [InlineData(2, 1, "бьёт рекордов: 2 в 1 заплыве — нужна ручная проверка")]   // open + возрастной, 16917
+    [InlineData(5, 3, "бьёт рекордов: 5 в 3 заплывах — нужна ручная проверка")]
+    [InlineData(2, 2, "бьёт рекордов: 2 — нужна ручная проверка")]               // по рекорду на заплыв — уточнять нечего
+    [InlineData(2, 0, "бьёт рекордов: 2 — нужна ручная проверка")]               // заплывы не посчитаны
+    public void RecordReason_SaysHowManySwims_WhenOneSwimBreaksSeveral(int records, int swims, string expected)
+    {
+        var preview = Preview(records: records);
+        preview.RecordPreview!.Swims = swims;
+
+        var (_, reasons) = BulkPullClassifier.Classify(preview, Regulation(), isChampionshipByName: false);
+
+        Assert.Contains(expected, reasons);
+    }
+
     [Fact]
     public void NeedsReview_WhenCompetitionAlreadyInDb()
     {

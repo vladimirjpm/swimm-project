@@ -47,6 +47,7 @@ public class ImportRecordPreviewService(SwimmDbContext db, ISettingsService? set
             return new ImportRecordPreviewDto
             {
                 Count = beaten.Count,
+                Swims = beaten.Select(b => b.Row.ResultId).Distinct().Count(),
                 Rows = beaten.Take(MaxRows).Select(b => new ImportRecordPreviewRow
                 {
                     // ResultId кандидата на превью — это порядковый номер строки в файле
