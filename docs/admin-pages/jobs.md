@@ -167,7 +167,8 @@ warning — есть что применить или пора проверит�
   по `BackgroundJobs:Enabled`, но в ProdAdmin — только пока прод сам не забирает. «Прод забирает» ProdAdmin
   узнаёт из закоммиченного `appsettings.Production.json` (`HostingMode.ProdAutoPullEnabled`): поэтому
   включать надо **файлом**, а не переменной App Service — её ProdAdmin не видит.
-- **Сейчас** флаг `false` (П0 не пройдена): всё ровно как до П2 — забор идёт из ProdAdmin.
+- **Сейчас** флаг `true` (П0 пройдена 20.11.2026): `discovery`, `start-list`, `results-auto` ведёт прод,
+  у ProdAdmin этой службы нет. Аварийно вернуть в ProdAdmin — `false` той же строкой файла + деплой.
 - **Остальные расписания ProdAdmin** (`loglig-verify`, `loglig-batch`, `records-check`,
   `swimmer-club-check`) — в своих службах под одним `BackgroundJobs:Enabled`, флаг их не трогает.
 - **Выключатели в базе главные:** `DiscoveryEnabled` / `StartListEnabled` гасятся в `/Admin/Settings` из

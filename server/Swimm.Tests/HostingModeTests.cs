@@ -131,17 +131,17 @@ public class HostingModeTests
     }
 
     [Fact]
-    public void ProductionConfig_ShipsWithAutoPullOff_UntilNetworkProbe()
+    public void ProductionConfig_ShipsWithAutoPullOn_AfterNetworkProbe()
     {
-        // ⚠ П0 (проба сети с App Service до loglig.com:2053) не пройдена — флаг выключен. Включение
-        // после П0 — одна строка в этом файле; тест тогда меняется вместе с ней.
+        // П0 пройдена 20.11.2026 (с App Service loglig.com:2053 и isr.org.il отвечают 200) — флаг включён.
+        // Аварийное выключение — та же одна строка в файле; тест тогда меняется вместе с ней.
         var path = Path.Combine(RepoRoot(), "server", "Swimm.API", "appsettings.Production.json");
         var cfg = new ConfigurationBuilder().AddJsonFile(path).Build();
 
-        Assert.False(HostingMode.AutoPullEnabled(cfg));
-        Assert.False(HostingMode.DiscoveryScheduleEnabled(cfg, Production));
-        // ProdAdmin читает тот же файл: прод не забирает → своё расписание остаётся (как до П2).
-        Assert.False(HostingMode.ProdAutoPullEnabled(Path.Combine(RepoRoot(), "server", "Swimm.API")));
+        Assert.True(HostingMode.AutoPullEnabled(cfg));
+        Assert.True(HostingMode.DiscoveryScheduleEnabled(cfg, Production));
+        // ProdAdmin читает тот же файл: прод забирает сам → своё расписание этих задач ProdAdmin снимает (Р-6).
+        Assert.True(HostingMode.ProdAutoPullEnabled(Path.Combine(RepoRoot(), "server", "Swimm.API")));
     }
 
     [Fact]
