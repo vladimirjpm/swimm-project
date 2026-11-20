@@ -54,7 +54,8 @@
 
     let dashStatus = null;
     let dashCache = null;   // сводка кэша — отдельным живым запросом (buildCacheBlock)
-    let dashJobs = null;    // сводка фоновых служб — отдельным живым запросом (buildJobsBlock)
+    let dashJobs = null;    // ответ GET /jobs/monitor — отдельным живым запросом (buildJobsBlock)
+    let dashJobKey = null;  // служба, подсвеченная кликом по квадратику «карты служб»
     let dashAi;             // сводка App Insights: undefined — грузится, null — упала; отдельный запрос (buildAppInsightsBlock)
     // Свежесть источников рекордов из журнала проверок (records-freshness-plan U4) — тоже
     // своим запросом: сбой журнала не роняет блок «Рекорды».
@@ -207,43 +208,9 @@
         };
     }
 
-    // Блок «Jobs» (docs/admin-pages/index.md): сводка фоновых служб из GET /api/admin/jobs/summary —
-    // та же, что плитки вверху /Admin/Jobs (JobsOverviewBuilder), здесь её не пересчитываем.
-    // Главная цифра — служб с проблемой (ошибка, просрочка, база/мост лежат, локальная отстаёт).
-    function buildJobsBlock(j) {
-        if (!j) return { key: 'jobs', title: 'Jobs', href: '/Admin/Jobs', heroValue: '—',
-                         heroSubs: 'сводка фоновых служб не загрузилась', metrics: [] };
-
-        const problems = j.problems || [];
-        const tone = j.tone === 'danger' ? 'text-admin-danger' : 'text-admin-warning';
-        const st = j.stats;
-        const list = problems.map(p =>
-            `<a href="/Admin/Jobs#job-${esc(p.key)}" class="flex items-baseline gap-2 py-1.5 px-2 rounded-md text-[12px] no-underline hover:bg-admin-surface-hover">
-                <span class="${p.tone === 'danger' ? 'text-admin-danger' : 'text-admin-warning'} font-semibold whitespace-nowrap">${esc(p.title)}</span>
-                <span class="flex-1 min-w-0 text-admin-text-muted">${esc(p.text)}</span>
-            </a>`).join('');
-
-        return {
-            key: 'jobs', title: 'Jobs', href: '/Admin/Jobs',
-            // В строке колонка под цифру узкая — сама цифра короткая, слова — в подписи.
-            heroValue: problems.length
-                ? `<span class="${tone}">${fmtN(problems.length)}</span>`
-                : '<span class="text-admin-success">✓</span>',
-            heroSubs: `${problems.length ? `служб с проблемой: ${fmtN(problems.length)}` : 'все в порядке'} · ` +
-                      `${fmtN(j.total)} служб, работают ${fmtN(j.active)} · ошибок за 24 ч: ${fmtN(st.failed24h)}`,
-            rowNote: `${fmtN(j.total)} служб · ${fmtN(st.failed24h)} ошибок за 24 ч`,
-            metrics: [
-                { v: j.failedSchedules, label: 'Расписания с ошибкой', sub: 'последняя попытка упала', tone: 'danger', href: '/Admin/Jobs#schedules' },
-                { v: j.overdueSchedules, label: 'Просрочены', sub: 'пора дольше 30 мин, а прогона нет', tone: 'warn', href: '/Admin/Jobs#schedules' },
-                { v: st.failed24h, label: 'Ошибок за 24 ч', sub: `прогонов ${fmtN(st.runs24h)}, за 7 дней ${fmtN(st.runs7d)}`, tone: 'danger', href: '/Admin/Jobs#schedules' },
-            ],
-            extraDetailHtml: problems.length
-                ? `<div class="mt-3 px-2 text-[11px] uppercase tracking-wide text-admin-text-muted">Службы с проблемой</div><div class="mt-1 flex flex-col">${list}</div>`
-                : `<div class="mt-3 px-2 text-[12px] text-admin-text-muted">${j.nextTitle
-                      ? `Следующий запуск: <strong class="text-admin-text">${esc(j.nextTitle)}</strong>, ${fmtDT(j.nextAt)}`
-                      : 'Расписания в этом процессе не работают — они идут в ProdAdmin.'}</div>`,
-        };
-    }
+    // Блок «Jobs» (docs/admin-pages/index.md): строку и панель рисует dashboard-jobs.js из ответа
+    // GET /api/admin/jobs/monitor (одного — он же даёт сводку, те же цифры, что на /Admin/Jobs).
+    function buildJobsBlock(m) { return window.AdminDashJobs.build(m, dashJobKey); }
 
     // Блок «Кэш» (docs/admin-pages/index.md): сводка из GET /api/admin/cache/summary — живая, не из
     // двухминутной сводки дашборда, иначе после кнопки сброса число ещё две минуты было бы старым.
@@ -691,7 +658,7 @@
                 <div class="text-admin-text text-[13px] font-semibold">${esc(b.title)}</div>
                 <div class="text-admin-text text-xl font-bold mt-0.5">${b.heroValue}</div>
             </div>
-            <div class="flex-1 flex flex-wrap gap-1.5 items-center min-w-0">${b.metrics.map(renderMini).join('')}${b.rowNote ? `<span class="text-[11px] text-admin-text-muted">${esc(b.rowNote)}</span>` : ''}</div>
+            ${b.rowHtml != null ? `<div class="flex-1 min-w-0 flex flex-col gap-1.5">${b.rowHtml}</div>` : `<div class="flex-1 flex flex-wrap gap-1.5 items-center min-w-0">${b.metrics.map(renderMini).join('')}${b.rowNote ? `<span class="text-[11px] text-admin-text-muted">${esc(b.rowNote)}</span>` : ''}</div>`}
             <div class="text-admin-text-muted/60 text-sm flex-shrink-0">›</div>
         </div>`;
     }
@@ -776,9 +743,9 @@
                 <span class="text-admin-text text-[34px] font-bold leading-none">${b.heroValue}</span>
                 <span class="text-admin-text-muted text-xs">${esc(b.heroSubs)}</span>
             </div>
-            <div class="flex flex-col mt-3">${b.metrics.map(renderDetailRow).join('')}</div>
+            ${b.detailHtml != null ? b.detailHtml : `<div class="flex flex-col mt-3">${b.metrics.map(renderDetailRow).join('')}</div>
             ${b.extraDetailHtml || ''}
-            <div class="mt-4 border border-dashed border-[#3a3f4c] rounded-lg h-[100px] flex items-center justify-center text-admin-text-muted/70 font-mono text-[11px]">тренд метрики по снапшотам — v2</div>`;
+            <div class="mt-4 border border-dashed border-[#3a3f4c] rounded-lg h-[100px] flex items-center justify-center text-admin-text-muted/70 font-mono text-[11px]">тренд метрики по снапшотам — v2</div>`}`;
     }
 
     function renderSystem(s) {
@@ -821,8 +788,13 @@
             const key = row.dataset.key;
             row.addEventListener('click', (e) => {
                 if (e.target.closest('[data-drag-handle]')) return;
+                // Квадратик «карты служб»: выбираем блок Jobs и подсвечиваем строку службы в панели.
+                const tile = e.target.closest('[data-job-key]');
+                if (tile) dashJobKey = dashJobKey === tile.dataset.jobKey ? null : tile.dataset.jobKey;
                 dashSelected = key;
                 renderRows();
+                if (tile && dashJobKey)
+                    document.querySelector('#dash-detail [data-job-row].ring-1')?.scrollIntoView({ block: 'nearest' });
             });
             row.addEventListener('dragover', (e) => e.preventDefault());
             row.addEventListener('drop', (e) => {
@@ -857,7 +829,7 @@
         [dashStatus, dashCache, dashJobs, recFresh] = await Promise.all([
             api(`${API}/dashboard/status`),
             api(`${API}/cache/summary`).catch(() => null),
-            api(`${API}/jobs/summary`).catch(() => null),
+            api(`${API}/jobs/monitor`).catch(() => null),
             api(`${API}/records/freshness`).catch(() => null),
         ]);
         renderRows();

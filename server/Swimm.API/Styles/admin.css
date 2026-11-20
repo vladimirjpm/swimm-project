@@ -20,7 +20,7 @@
   --color-admin-danger: #ff6b6b;
   --color-admin-success: #4caf50;
   --color-admin-warning: #ffa726;
-  /* Зоны выполнения фоновых служб (/Admin/Jobs и блок Jobs дашборда): прод · Azure и этот компьютер. */
+  /* Зоны мониторинга служб (/Admin/Jobs и блок Jobs дашборда): где выполняется — прод (Azure) / local. */
   --color-admin-env-prod: #a78bfa;
   --color-admin-env-local: #f472b6;
 }
