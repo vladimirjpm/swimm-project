@@ -4,6 +4,10 @@
     var pageTitle = ViewData["Title"] as string ?? "Admin";
     var pageSubtitle = ViewData["PageSubtitle"] as string;
     var csrfToken = Antiforgery.GetAndStoreTokens(Context).RequestToken!;
+    // Страница во всю ширину (без потолка 1200 px) и со своей шапкой вместо _PageHeader —
+    // только /Admin/Jobs (мониторинг: дорожки и плитки резиновые, docs/admin-pages/jobs.md).
+    var wideMain = ViewData["WideMain"] is true;
+    var ownHeader = ViewData["OwnHeader"] is true;
 }
 <!DOCTYPE html>
 <html lang="ru">
@@ -35,8 +39,11 @@
     <partial name="/Pages/Admin/Shared/_ModeBanner.cshtml" />
     <partial name="/Pages/Admin/Shared/_DbBanner.cshtml" />
 
-    <main class="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 lg:px-8">
-        <partial name="/Pages/Admin/Shared/_PageHeader.cshtml" model="new PageHeaderModel(pageTitle, pageSubtitle)" />
+    <main class="mx-auto w-full @(wideMain ? "max-w-none" : "max-w-[1200px]") flex-1 px-4 py-6 lg:px-8">
+        @if (!ownHeader)
+        {
+            <partial name="/Pages/Admin/Shared/_PageHeader.cshtml" model="new PageHeaderModel(pageTitle, pageSubtitle)" />
+        }
         @RenderBody()
     </main>
 </div>
