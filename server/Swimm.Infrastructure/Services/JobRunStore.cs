@@ -10,8 +10,11 @@ namespace Swimm.Infrastructure.Services;
 /// Журнал запусков фоновых задач в <c>Sys_JobRuns</c> (В12) и история прогонов с итогом в
 /// <c>Sys_JobRunLog</c> (/Admin/Jobs). Пишет <see cref="SwimmDbContext"/> (рантайм-роль swimm_rw):
 /// таблицы служебные, публичному пути их не видно.
+///
+/// <paramref name="origin"/> — подпись процесса («среда@машина#pid»): ставится в <c>RunBy</c> каждой
+/// строки истории, кто бы её ни писал (расписание, кнопка, CLI). Не задана (тесты) — null.
 /// </summary>
-public class JobRunStore(SwimmDbContext db) : IJobRunStore
+public class JobRunStore(SwimmDbContext db, JobRunOrigin? origin = null) : IJobRunStore
 {
     public async Task<JobRunState> GetAsync(string name, CancellationToken ct = default)
     {
@@ -52,6 +55,7 @@ public class JobRunStore(SwimmDbContext db) : IJobRunStore
             Summary = JobRunLog.Clip(run.Summary),
             Error = run.Success ? null : JobRunLog.Clip(run.Error) ?? "ошибка без текста",
             Details = string.IsNullOrWhiteSpace(run.Details) ? null : run.Details,
+            RunBy = string.IsNullOrWhiteSpace(origin?.Value) ? null : ClipOwner(origin.Value),
         });
         await db.SaveChangesAsync(ct);
 
@@ -143,7 +147,7 @@ public class JobRunStore(SwimmDbContext db) : IJobRunStore
         // Строк в таблице не больше KeepPerJob на задачу, а задач — единицы: читаем всё и режем в памяти.
         var rows = await db.JobRunLog.AsNoTracking()
             .OrderByDescending(e => e.StartedAt).ThenByDescending(e => e.Id)
-            .Select(e => new JobRunLogRow(e.Id, e.Name, e.Trigger, e.StartedAt, e.FinishedAt, e.Success, e.Summary, e.Error, e.Details))
+            .Select(e => new JobRunLogRow(e.Id, e.Name, e.Trigger, e.StartedAt, e.FinishedAt, e.Success, e.Summary, e.Error, e.Details, e.RunBy))
             .ToListAsync(ct);
         return rows.GroupBy(r => r.Name).SelectMany(g => g.Take(Math.Max(1, perJob))).ToList();
     }

@@ -91,7 +91,17 @@ public sealed record JobRunRecord(
     string? Error,
     string? Details = null);
 
-/// <summary>Строка истории прогонов (UTC). <paramref name="Details"/> — JSON <c>JobRunDetails</c> или null.</summary>
+/// <summary>
+/// Подпись процесса, который пишет журнал: «среда@машина#pid». Одна на процесс (singleton в
+/// Program.cs); хранилище ставит её в <c>Sys_JobRunLog.RunBy</c> у каждой строки истории — так
+/// видно, шёл прогон с прода, из ProdAdmin или локально. Та же строка — владелец заявки П1.
+/// </summary>
+public sealed record JobRunOrigin(string Value);
+
+/// <summary>
+/// Строка истории прогонов (UTC). <paramref name="Details"/> — JSON <c>JobRunDetails</c> или null;
+/// <paramref name="RunBy"/> — откуда шёл прогон (<see cref="JobRunOrigin"/>), null у старых строк.
+/// </summary>
 public sealed record JobRunLogRow(
     long Id,
     string Name,
@@ -101,4 +111,5 @@ public sealed record JobRunLogRow(
     bool Success,
     string? Summary,
     string? Error,
-    string? Details = null);
+    string? Details = null,
+    string? RunBy = null);

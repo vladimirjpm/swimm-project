@@ -220,5 +220,11 @@ public class JobsOverviewBuilderTests
         Assert.Equal("3 дн.", JobTimeText.Human(TimeSpan.FromDays(3)));
         Assert.Equal("только что", JobTimeText.Ago(Now.AddSeconds(5), Now));
         Assert.Equal("кнопка", JobTimeText.Trigger(JobTriggers.Manual));
+        // Откуда шёл прогон — по среде из подписи «среда@машина#pid».
+        Assert.Equal("прод", JobTimeText.Origin("Production@lw0sdlwk000691#17"));
+        Assert.Equal("ProdAdmin", JobTimeText.Origin("ProdAdmin@VLADDELL#24156"));
+        Assert.Equal("локально", JobTimeText.Origin("Development@VLADDELL#1"));
+        Assert.Equal("Staging", JobTimeText.Origin("Staging@box#2"));
+        Assert.Null(JobTimeText.Origin(null));
     }
 }

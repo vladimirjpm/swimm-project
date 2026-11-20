@@ -39,4 +39,11 @@ public class JobRunLogEntry
     /// задача подробностей не пишет или изменений не было.
     /// </summary>
     public string? Details { get; set; }
+
+    /// <summary>
+    /// ОТКУДА шёл прогон: «среда@машина#pid» процесса, записавшего строку (<c>JobRunOrigin</c>) —
+    /// «Production@…» сайт в Azure, «ProdAdmin@…» запуск Влада, «Development@…» локальная база.
+    /// Пишет хранилище само, при любом триггере. null — строка старше 20.11.2026.
+    /// </summary>
+    public string? RunBy { get; set; }
 }

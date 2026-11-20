@@ -127,6 +127,14 @@ warning — есть что применить или пора проверит�
   `JobRunStorePgTests.Details_jsonb_round_trip` (настоящий Postgres под swimm_rw).
 - Рост ограничен: после каждой записи у задачи остаются последние `JobRunLog.KeepPerJob` = 50.
 - `Trigger` ограничен CHECK `CK_Sys_JobRunLog_Trigger`: `schedule` / `manual` / `cli`.
+- **`RunBy` — откуда шёл прогон** (миграция `AddJobRunLogRunBy`, 20.11.2026): подпись процесса
+  «среда@машина#pid» (`JobRunOrigin`, singleton в `Program.cs`; та же строка, что владелец заявки
+  П1). Ставит само хранилище в `AppendLogAsync` — поэтому есть при любом триггере, вызывающие её не
+  передают. На странице — колонка «Откуда»: `Production` → «прод», `ProdAdmin` → «ProdAdmin»,
+  `Development` → «локально» (`JobTimeText.Origin`), полная подпись — в подсказке. У строк старше
+  20.11.2026 — «—». Зачем: с `AutoPull:Enabled` забор идёт с прода, а журнал у прода и ProdAdmin
+  общий — без подписи не отличить, кто выполнил прогон.
+  ⚠ Порядок выката: миграция на прод ДО деплоя (код пишет и читает колонку).
 - Sys_, приватная: без гранта `swimm_ro`, **не** в `server/db/seed-tables.txt` — у каждой базы
   свой журнал (миграция `AddJobRunLog`).
 

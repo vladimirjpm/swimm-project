@@ -166,4 +166,22 @@ public static class JobTimeText
         JobTriggers.Import => "после импорта",
         _ => trigger,
     };
+
+    /// <summary>
+    /// Откуда шёл прогон — по подписи «среда@машина#pid» (<c>Sys_JobRunLog.RunBy</c>): «прод» (сайт в
+    /// Azure), «ProdAdmin» (запуск Влада против прод-базы), «локально». null (строка старше подписи) — null.
+    /// </summary>
+    public static string? Origin(string? runBy)
+    {
+        if (string.IsNullOrWhiteSpace(runBy)) return null;
+        var at = runBy.IndexOf('@');
+        var env = at > 0 ? runBy[..at] : runBy;
+        return env switch
+        {
+            "Production" => "прод",
+            "ProdAdmin" => "ProdAdmin",
+            "Development" => "локально",
+            _ => env,
+        };
+    }
 }
