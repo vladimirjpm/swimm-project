@@ -154,7 +154,7 @@ public sealed class BackgroundJobsStatusService(
         DiscoveryRunChangesView? changes = null;
         if (row.Name == JobNames.Discovery && JobRunDetails.ParseDiscovery(row.Details) is { } parsed)
         {
-            // Какой старт уже есть в базе — так же, как страница (JobsModel.BuildRunChangesAsync).
+            // Какой старт уже есть в базе — так же, как связывает /Admin/Competitions.
             var competitionIdByOrgCompId = (await discovery.GetAllAsync(ct))
                 .Where(d => d.MatchedCompetitionId is not null)
                 .GroupBy(d => d.OrgCompId)

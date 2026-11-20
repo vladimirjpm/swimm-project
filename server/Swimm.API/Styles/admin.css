@@ -252,6 +252,31 @@
   .admin-md th {
     @apply bg-admin-surface-hover font-semibold;
   }
+
+  /* /Admin/Jobs (docs/admin-pages/jobs.md): сегменты переключателя вида, полосатая полоса
+     «идёт, без оценки» и подсветка службы, открытой в панели деталей. */
+  .jobs-seg {
+    @apply h-[26px] cursor-pointer border-0 bg-transparent px-3 text-admin-text-muted hover:text-admin-text;
+  }
+  .jobs-seg[aria-pressed="true"] {
+    @apply bg-admin-accent/16 font-semibold text-white;
+  }
+  .jobs-stripes {
+    background: repeating-linear-gradient(-45deg, var(--color-admin-accent) 0 6px, transparent 6px 12px);
+    background-size: 17px 17px;
+    animation: jobs-stripes 1s linear infinite;
+  }
+  .jobs-selected {
+    @apply outline-2 outline-offset-1 outline-admin-accent;
+  }
+}
+
+@keyframes jobs-stripes {
+  to { background-position: 17px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jobs-stripes { animation: none; }
 }
 
 /* ── Legacy-классы страниц (JS-рендер) ──────────────────────────────────────

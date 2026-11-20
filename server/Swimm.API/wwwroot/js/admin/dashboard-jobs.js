@@ -159,7 +159,7 @@
         const state = stateText(j, now);
         const problem = j.status === 'failed' || j.status === 'overdue' || j.status === 'running';
         const sel = hl === j.key ? ' bg-admin-surface-hover ring-1 ring-admin-accent/60' : '';
-        return `<a href="/Admin/Jobs?job=${encodeURIComponent(j.key)}" data-job-row="${esc(j.key)}" title="${esc(`${j.title} — ${state}`)}"
+        return `<a href="/Admin/Jobs#job-${encodeURIComponent(j.key)}" data-job-row="${esc(j.key)}" title="${esc(`${j.title} — ${state}`)}"
             class="grid grid-cols-[16px_minmax(0,1fr)_auto_132px] gap-x-2 items-center h-[26px] shrink-0 px-2 rounded-md text-[13px] text-admin-text no-underline hover:bg-admin-surface-hover${sel}">
             <span class="flex ${TEXT_CLS[j.status] || TEXT_CLS.off}">${stIcon(j.status, 'w-3.5 h-3.5 shrink-0', 2.2)}</span>
             <span class="truncate text-white" dir="auto">${esc(j.title)}</span>
