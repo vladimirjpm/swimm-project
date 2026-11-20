@@ -112,6 +112,9 @@ builder.Services.AddControllers();
 builder.Services.AddRazorPages();
 // Красная полоса админки в ProdAdmin: куда подключены и с какой ветки (читается раз на старте).
 builder.Services.AddSingleton(_ => ProdAdminGuard.Describe(builder.Configuration, builder.Environment));
+// Подпись процесса в истории прогонов (Sys_JobRunLog.RunBy): откуда шёл прогон — прод, ProdAdmin, локально.
+builder.Services.AddSingleton(new Swimm.Application.Abstractions.JobRunOrigin(
+    Swimm.API.BackgroundServices.JobClaimOwner.Of(builder.Environment)));
 
 // Аудит админки (фаза 7.4): actor берётся из HTTP-контекста через ICurrentActor.
 builder.Services.AddHttpContextAccessor();

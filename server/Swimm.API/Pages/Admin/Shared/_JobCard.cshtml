@@ -50,7 +50,7 @@
                 <div class="overflow-x-auto">
                     <table class="admin-table">
                         <thead>
-                            <tr><th>Начало</th><th>Кто</th><th>Длилось</th><th>Что сделала</th></tr>
+                            <tr><th>Начало</th><th>Кто</th><th>Откуда</th><th>Длилось</th><th>Что сделала</th></tr>
                         </thead>
                         <tbody>
                         @foreach (var run in Model.History)
@@ -70,6 +70,7 @@
                                     }
                                 </td>
                                 <td class="whitespace-nowrap text-xs">@JobTimeText.Trigger(run.Trigger)</td>
+                                <td class="whitespace-nowrap text-xs" title="@run.RunBy">@(JobTimeText.Origin(run.RunBy) ?? "—")</td>
                                 <td class="whitespace-nowrap text-xs">@JobTimeText.Duration(run.StartedAt, run.FinishedAt)</td>
                                 <td class="text-xs">
                                     @if (!run.Success)

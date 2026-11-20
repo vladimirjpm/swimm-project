@@ -128,6 +128,35 @@ public class JobScheduleTests
         Assert.Equal(Now, row.LastSuccessAt);
     }
 
+    [Fact]
+    public async Task Store_stamps_every_history_row_with_process_origin()
+    {
+        // Откуда шёл прогон — подпись процесса, а не триггера: её ставит само хранилище,
+        // поэтому она есть и у расписания, и у кнопки, и у «только истории».
+        await using var db = CreateDb(nameof(Store_stamps_every_history_row_with_process_origin));
+        var store = new JobRunStore(db, new JobRunOrigin("Production@lw0sdlwk000691#17"));
+
+        await store.RecordAsync(Run(JobNames.Discovery, Now.AddHours(-2)));
+        await store.AppendLogAsync(Run(JobNames.Discovery, Now.AddHours(-1), trigger: JobTriggers.Manual));
+
+        var log = await store.ListLogAsync(10);
+        Assert.Equal(2, log.Count);
+        Assert.All(log, r => Assert.Equal("Production@lw0sdlwk000691#17", r.RunBy));
+    }
+
+    [Fact]
+    public async Task Store_without_origin_leaves_run_by_empty_and_clips_long_one()
+    {
+        await using var db = CreateDb(nameof(Store_without_origin_leaves_run_by_empty_and_clips_long_one));
+        await new JobRunStore(db).AppendLogAsync(Run(JobNames.Discovery, Now.AddHours(-2)));
+        await new JobRunStore(db, new JobRunOrigin(new string('x', 500)))
+            .AppendLogAsync(Run(JobNames.StartList, Now.AddHours(-1)));
+
+        var log = await new JobRunStore(db).ListLogAsync(10);
+        Assert.Null(log.Single(r => r.Name == JobNames.Discovery).RunBy);
+        Assert.Equal(JobSchedule.MaxClaimOwnerLength, log.Single(r => r.Name == JobNames.StartList).RunBy!.Length);
+    }
+
     /// <summary>
     /// Заявка на прогон (замок П1) обычным путём — как хранилище ведёт себя не на Postgres.
     /// Атомарность проверяет <see cref="JobRunClaimPgTests"/> на настоящей базе.
