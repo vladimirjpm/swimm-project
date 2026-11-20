@@ -12,7 +12,7 @@
 | Реализация | `Swimm.API/Services/BackgroundJobsStatusService.cs` — каталог служб, карточки, короткий статус. В API-слое, как `HttpCurrentActor`: нужны флаги процесса (`HostingMode`) и `DbStatusService` |
 | Подсчёт | `JobsOverviewBuilder` (`Swimm.Application/Mapping`) — чистые функции: статус расписания (`Schedule`), просрочка, сводка-плитки и проблемные службы (`Build`). Тесты — `JobsOverviewBuilderTests` |
 | DTO | `Swimm.Application/Dtos/BackgroundJobsDtos.cs`: `JobCard`, `JobsSummary`, `OverviewTile`, `BackgroundJobsReport` |
-| API дашборда | `GET /api/admin/jobs/summary` (`JobsAdminController`) |
+| API дашборда | с 20.11.2026 блок «Jobs» берёт всё из `GET /api/admin/jobs/monitor` (`summary` внутри — та же сводка); `GET /api/admin/jobs/summary` (`JobsAdminController`) остаётся |
 | API мониторинга (20.11.2026) | `GET /api/admin/jobs/monitor` — всё для новой страницы одним JSON; `GET /api/admin/jobs/runs/{id}` — один прогон с подробностями. Контракт — раздел [«Контракт мониторинга»](#контракт-мониторинга-get-apiadminjobsmonitor) ниже |
 
 Не путать с `/Admin/Services` — там внешние сайты и кабинеты.
@@ -302,6 +302,8 @@ warning — есть что применить или пора проверит�
 | Тесты | `JobsMonitorBuilderTests` (статус, зона, окно, план, исходы, счётчики, панели, «ждёт тебя»), `JobsAdminControllerContractTests` (имена полей JSON), `JobRunStorePgTests.Light_log_has_details_flag_without_details` |
 
 JSON — camelCase, время — UTC ISO 8601 (`2026-11-20T14:20:00Z`); форматирует клиент (у Влада — Израиль).
+
+**Клиенты контракта:** страница `/Admin/Jobs` и блок «Jobs» дашборда ([index.md](index.md), п. 9; `wwwroot/js/admin/dashboard-jobs.js`). Строка службы в панели блока ведёт на `/Admin/Jobs?job=<key>` (ключ — `jobs[].key`) — страница должна по этому параметру открыть панель деталей службы.
 
 ### Корень ответа
 
