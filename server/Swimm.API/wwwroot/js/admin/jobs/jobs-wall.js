@@ -27,7 +27,7 @@
                 class="flex min-w-0 cursor-pointer flex-col rounded-lg border p-3 text-left text-admin-text transition-colors hover:brightness-110 focus-visible:outline-2 focus-visible:outline-admin-accent ${m.tile} ${compact ? '' : '2xl:p-4'}">
             <span class="flex min-w-0 items-center gap-2" title="${esc(j.badge.text)}">
                 ${M.statusDot(j.status)}<span class="sr-only">${esc(m.word)}:</span>
-                <span class="min-w-0 flex-1 truncate font-semibold text-white">${esc(j.title)}</span>
+                <span class="min-w-0 flex-1 truncate font-semibold text-white">${esc(j.title)}</span><span data-note-mark="job.${esc(j.key)}"></span>
                 ${!compact && interval ? `<span class="hidden whitespace-nowrap font-mono 2xl:inline text-[11px] text-admin-text-muted">${esc(interval)}</span>` : ''}
             </span>
             <span class="mt-1.5 block truncate font-bold leading-tight ${m.text} ${compact ? 'text-base' : 'text-lg 2xl:text-[22px]'}" title="${esc(M.mainLine(j, nowMs))}">${esc(M.mainLine(j, nowMs))}</span>

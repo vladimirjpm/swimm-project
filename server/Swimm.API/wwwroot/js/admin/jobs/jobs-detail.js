@@ -116,7 +116,7 @@
         let html = `<header class="sticky top-0 z-10 flex items-start gap-3 border-b border-admin-border bg-admin-surface px-5 py-4">
             ${M.statusDot(j.status, 'size-7')}
             <div class="min-w-0 flex-1">
-                <h2 id="job-detail-title" class="m-0 text-base font-semibold text-white">${esc(j.title)}</h2>
+                <h2 id="job-detail-title" class="m-0 flex items-center gap-1.5 text-base font-semibold text-white"><span class="min-w-0">${esc(j.title)}</span><span data-note="job.${esc(j.key)}"></span></h2>
                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-admin-text-muted">
                     ${M.zoneTag(j.zone, d.environment)}<span>${esc(z.title)}</span><span>${esc(kind)}</span>
                     <code class="font-mono">${esc(j.service)}</code>
@@ -174,9 +174,11 @@
         // Перерисовка при опросе: сохранить прокрутку и фокус (по data-атрибуту элемента).
         const scroll = b.scrollTop;
         const f = document.activeElement && b.contains(document.activeElement) ? document.activeElement : null;
-        const fSel = f ? (f.dataset.run ? `[data-run="${f.dataset.run}"]` : f.dataset.post ? `[data-post="${f.dataset.post}"]` : f.hasAttribute('data-close-detail') ? '[data-close-detail]' : null) : null;
+        const fSel = f ? (f.dataset.run ? `[data-run="${f.dataset.run}"]` : f.dataset.post ? `[data-post="${f.dataset.post}"]` : f.dataset.noteBtn ? `[data-note-btn="${CSS.escape(f.dataset.noteBtn)}"]` : f.hasAttribute('data-close-detail') ? '[data-close-detail]' : null) : null;
         b.innerHTML = html;
         lastHtml = html;
+        // Значок справки «ⓘ» — сразу, а не наблюдателем: чтобы фокус вернулся и на него (admin-notes.js).
+        if (window.AdminNotes) window.AdminNotes.scan(b);
         b.scrollTop = scroll;
         if (fSel) { const el = b.querySelector(fSel); if (el) el.focus({ preventScroll: true }); }
     }

@@ -104,7 +104,7 @@
                 class="${LANE_GRID} w-full cursor-pointer rounded-md border-0 bg-transparent px-1 py-1 text-left text-admin-text hover:bg-white/[.04] focus-visible:outline-2 focus-visible:outline-admin-accent 2xl:min-h-10">
             <span class="flex min-w-0 items-center gap-2" title="${esc(j.badge.text)}">
                 ${M.statusIcon(j.status, false)}
-                <span class="min-w-0 flex-1 truncate font-semibold text-white">${esc(j.title)}</span>
+                <span class="min-w-0 flex-1 truncate font-semibold text-white">${esc(j.title)}</span><span data-note-mark="job.${esc(j.key)}"></span>
                 <span class="hidden whitespace-nowrap text-[11px] font-semibold 2xl:inline ${m.text}">${esc(m.word)}</span>
             </span>
             ${bar(d, w, j, ticks)}
@@ -123,7 +123,7 @@
         return `<button type="button" data-job="${esc(j.key)}" aria-label="${esc(M.ariaJob(j, nowMs))}"
                 class="flex min-w-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-left text-admin-text hover:bg-admin-surface-hover focus-visible:outline-2 focus-visible:outline-admin-accent ${j.status === 'off' ? 'border-dashed border-admin-border bg-transparent' : 'border-admin-border bg-admin-surface'}">
             ${M.statusIcon(j.status, false)}
-            <span class="min-w-0 truncate font-semibold text-white sm:shrink-0 sm:max-w-[60%]">${esc(j.title)}</span>
+            <span class="min-w-0 truncate font-semibold text-white sm:shrink-0 sm:max-w-[60%]">${esc(j.title)}</span><span data-note-mark="job.${esc(j.key)}"></span>
             <span class="hidden min-w-0 flex-1 truncate text-xs text-admin-text-muted sm:block" dir="auto">${M.bidi(j.status === "off" ? M.offReason(j) : sum)}</span>
             <span class="ml-auto whitespace-nowrap font-mono text-[11px] ${m.text}">${esc(j.status === 'off' ? 'выключена' : M.mainLine(j, nowMs))}</span>
         </button>`;

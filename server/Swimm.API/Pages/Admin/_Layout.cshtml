@@ -106,6 +106,8 @@ async function api(url, opts = {}) {
     return res.json();
 }
 </script>
+@* Справки «ⓘ» по ключу: <span data-note="ключ"></span> на любой странице (docs/admin-pages/admin-notes.md). *@
+<script src="~/js/admin/admin-notes.js" asp-append-version="true"></script>
 
 @await RenderSectionAsync("Scripts", required: false)
 

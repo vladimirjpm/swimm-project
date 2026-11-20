@@ -252,6 +252,17 @@
   .admin-md th {
     @apply bg-admin-surface-hover font-semibold;
   }
+  /* Попап справки (admin-notes.js): последний абзац без отступа снизу. */
+  #admin-note-pop .admin-md > :last-child {
+    @apply mb-0;
+  }
+
+  /* Метка справки «ⓘ» (docs/admin-pages/admin-notes.md): пока список не пришёл или справки нет,
+     пустой <span data-note> не должен давать лишний промежуток в flex-строке. */
+  [data-note]:empty,
+  [data-note-mark]:empty {
+    display: none;
+  }
 
   /* /Admin/Jobs (docs/admin-pages/jobs.md): сегменты переключателя вида, полосатая полоса
      «идёт, без оценки» и подсветка службы, открытой в панели деталей. */

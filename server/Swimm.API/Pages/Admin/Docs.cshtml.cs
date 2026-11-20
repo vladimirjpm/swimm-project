@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.API.Pages.Admin.Shared;
+using Swimm.Application.Abstractions;
 
 namespace Swimm.API.Pages.Admin;
 
@@ -21,9 +22,16 @@ namespace Swimm.API.Pages.Admin;
 public class DocsModel : PageModel
 {
     private readonly IWebHostEnvironment _env;
+    private readonly IAdminNotes _notes;
 
-    public DocsModel(IWebHostEnvironment env) => _env = env;
+    public DocsModel(IWebHostEnvironment env, IAdminNotes notes)
+    {
+        _env = env;
+        _notes = notes;
+    }
 
+    /// <summary>Статические разделы <see cref="DocsCatalog"/> + «Справки админки» из папки (<see cref="AdminNotesDocs"/>).</summary>
+    public IReadOnlyList<DocSection> Sections { get; private set; } = [];
     public DocSection Section { get; private set; } = null!;
     public string? FilePath { get; private set; }
     public DocEntry? Entry { get; private set; }
@@ -33,12 +41,13 @@ public class DocsModel : PageModel
 
     public IActionResult OnGet(string? section, string? file)
     {
-        var found = DocsCatalog.Sections.FirstOrDefault(s => s.Key == section);
-        if (found is null) return RedirectToPage(new { section = DocsCatalog.Sections[0].Key });
+        Sections = [.. DocsCatalog.Sections, AdminNotesDocs.Section(_notes)];
+        var found = Sections.FirstOrDefault(s => s.Key == section);
+        if (found is null) return RedirectToPage(new { section = Sections[0].Key });
         Section = found;
 
         FilePath = string.IsNullOrWhiteSpace(file) ? found.Docs.FirstOrDefault()?.Path : file.Trim();
-        Entry = DocsCatalog.Sections.SelectMany(s => s.Docs).FirstOrDefault(d => d.Path == FilePath);
+        Entry = Sections.SelectMany(s => s.Docs).FirstOrDefault(d => d.Path == FilePath);
         if (FilePath is null) return Page();
 
         if (!DocsCatalog.IsAllowed(FilePath))
