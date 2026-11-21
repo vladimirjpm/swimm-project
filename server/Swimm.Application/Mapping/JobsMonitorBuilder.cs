@@ -238,10 +238,31 @@ public static class JobsMonitorBuilder
         list.AddRange(waiting.Select(w =>
             new JobAttentionItem(JobNames.ResultsAuto, resultsAuto?.Title ?? "Результаты прошедших стартов",
                 resultsAuto?.Zone ?? JobZones.Local, JobAttentionKinds.Waiting, "waiting",
-                $"Старт «{w.Name}» #{w.OrgCompId} не взят автоматически: {w.Reason ?? "причина не записана"}",
+                WaitingText(w),
                 w.CheckedAt,
-                $"/Admin/Competitions?filter={AutoPullFilters.Blocked}&q={Uri.EscapeDataString(w.Name)}")));
+                // Фильтр autopull-blocked показывает только вердикт blocked — застрявшую ищем по имени.
+                w.Verdict == ResultsAutoVerdicts.Blocked
+                    ? $"/Admin/Competitions?filter={AutoPullFilters.Blocked}&q={Uri.EscapeDataString(w.Name)}"
+                    : $"/Admin/Competitions?q={Uri.EscapeDataString(w.Name)}")));
         return list;
+    }
+
+    /// <summary>
+    /// Текст строки «ждёт тебя». У застрявшей (<c>ResultsAutoWaiting.IsStuck</c>) — сколько дней
+    /// прошло и что именно не дозрело: сама задача этот вердикт уже не сменит.
+    /// </summary>
+    private static string WaitingText(ResultsAutoWaitingRow w)
+    {
+        var reason = w.Reason ?? "причина не записана";
+        var head = $"Старт «{w.Name}» #{w.OrgCompId}";
+        return w.Verdict switch
+        {
+            ResultsAutoVerdicts.NotFinished =>
+                $"{head} прошёл {w.DateEnd:dd.MM}, а результаты до сих пор неполные — реши, брать ли как есть: {reason}",
+            ResultsAutoVerdicts.Empty =>
+                $"{head} прошёл {w.DateEnd:dd.MM}, а протокола результатов до сих пор нет: {reason}",
+            _ => $"{head} не взят автоматически: {reason}",
+        };
     }
 
     /// <summary>«Идёт сейчас»: с какого момента, кто запустил и прогресс (null — без оценки).</summary>

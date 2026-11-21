@@ -292,9 +292,13 @@ public sealed record JobUpcomingItem(string Key, string Title, string Zone, Date
 /// <summary>
 /// Строка results-auto «ждёт тебя»: проверена за сутки, вердикт blocked, не затянута
 /// (<c>ResultsAutoWaiting</c> — тот же расчёт, что <c>competitions.autoPullBlocked24h</c> дашборда).
+/// С 21.11.2026 сюда же идут «застрявшие» (<c>ResultsAutoWaiting.IsStuck</c>): <paramref name="Verdict"/>
+/// = <c>not-finished</c> / <c>empty</c>, старт кончился больше полутора суток назад.
 /// </summary>
+/// <param name="Verdict">Вердикт строки: <c>blocked</c> — «ждёт тебя»; <c>not-finished</c> / <c>empty</c> — застряла.</param>
 public sealed record ResultsAutoWaitingRow(
-    int Id, int OrgCompId, string Name, DateTime DateStart, DateTime DateEnd, string? Reason, DateTime? CheckedAt);
+    int Id, int OrgCompId, string Name, DateTime DateStart, DateTime DateEnd, string? Reason, DateTime? CheckedAt,
+    string Verdict = "blocked");
 
 /// <summary>Ответ <c>GET /api/admin/jobs/monitor</c> — всё для страницы /Admin/Jobs одним JSON.</summary>
 /// <param name="Environment">Среда процесса: ProdAdmin | Development.</param>
