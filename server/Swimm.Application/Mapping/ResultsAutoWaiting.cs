@@ -22,4 +22,27 @@ public static class ResultsAutoWaiting
         && checkedAt is { } at && at >= Since(now)
         && status == DiscoveredCompetitionStatus.New
         && !alreadyInDb;
+
+    /// <summary>
+    /// Через сколько после начала последнего дня «ещё идёт» / «протокола нет» перестаёт быть
+    /// ожиданием: полтора суток — день старта кончился, прошло ещё утро следующего.
+    /// </summary>
+    public static readonly TimeSpan StuckAfter = TimeSpan.FromHours(36);
+
+    /// <summary>
+    /// «Застряло»: вердикт «ещё идёт» или «протокола нет», а старт кончился больше
+    /// <see cref="StuckAfter"/> назад. Сама задача такой вердикт не сменит (у 16903 сутки спустя
+    /// не хватало двух эстафет из 16 событий, 21.11.2026) и после окна в
+    /// <see cref="ResultsAutoRules.WindowDays"/> дней молча перестанет смотреть — значит, это
+    /// решение человека: брать как есть, ждать или пометить «нет протокола».
+    /// Окно — по дате старта, а не по времени проверки: «протокола нет» перепроверяется редко.
+    /// В «Требует внимания» /Admin/Jobs идёт рядом с <see cref="IsWaiting"/>; число дашборда
+    /// <c>autoPullBlocked24h</c> и фильтр autopull-blocked — по-прежнему только «ждёт тебя».
+    /// </summary>
+    public static bool IsStuck(string? verdict, DateTime dateEnd, string status, bool alreadyInDb, DateTime now) =>
+        verdict is ResultsAutoVerdicts.NotFinished or ResultsAutoVerdicts.Empty
+        && now >= dateEnd + StuckAfter
+        && now < dateEnd.AddDays(ResultsAutoRules.WindowDays + 1)
+        && status == DiscoveredCompetitionStatus.New
+        && !alreadyInDb;
 }

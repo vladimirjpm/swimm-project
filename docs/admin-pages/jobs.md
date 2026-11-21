@@ -373,7 +373,7 @@ JSON — camelCase, время — UTC ISO 8601 (`2026-11-20T14:20:00Z`); фор
 | `attention[]` | «Требует внимания» |
 | `running[]` | «Идёт сейчас» |
 | `upcoming[]` | «Ближайшие запуски» (до 8) |
-| `waiting[]` | строки results-auto «ждёт тебя»: `id`, `orgCompId`, `name` (иврит — `dir="auto"`), `dateStart`, `dateEnd`, `reason`, `checkedAt` |
+| `waiting[]` | строки results-auto «ждёт тебя»: `id`, `orgCompId`, `name` (иврит — `dir="auto"`), `dateStart`, `dateEnd`, `reason`, `checkedAt`, `verdict` (`blocked`; `not-finished` / `empty` — застрявшие, см. «Ждёт тебя») |
 | `summary` | **та же** сводка, что `GET /summary` (`JobsOverviewBuilder.Build`), с теми же `counters` |
 | `recordsSources` | плитка «Рекорды · источники» (`RecordsCheckTileBuilder`): `value`, `sub`, `tone`, `lastCheckedAt` |
 | `recentImports[]` | 5 последних импортов (`ImportHistoryDto`, как на нынешней странице) |
@@ -464,6 +464,18 @@ JSON — camelCase, время — UTC ISO 8601 (`2026-11-20T14:20:00Z`); фор
 последние 24 ч, строка `new` и не связана с соревнованием в базе. Его же зовёт блок «Соревнования»
 дашборда (`competitions.autoPullBlocked24h`) — цифры совпадают. Строки — `IResultsAutoWaitingQuery`
 (`ResultsAutoWaitingQuery`): вердикт/окно/статус — в SQL, матч с соревнованиями только при кандидатах.
+
+**Застрявшие (21.11.2026).** В `waiting[]`, `attention[]` и счётчик «ждёт тебя» идут ещё строки
+`ResultsAutoWaiting.IsStuck`: вердикт `not-finished` или `empty`, строка `new`, не в базе, а последний
+день старта начался больше 36 ч назад (`StuckAfter`) и не раньше окна задачи (7 дней + 1). Окно — по
+дате старта, не по времени проверки. Зачем: «ещё идёт» сама задача не сменит (16903 — сутки спустя не
+хватало двух эстафет из 16 событий), после окна она молча перестаёт смотреть, а блок писал «Всё в
+порядке». Текст — «Старт «…» #compId прошёл ДД.ММ, а результаты до сих пор неполные — реши, брать ли
+как есть: <причина>» / «…а протокола результатов до сих пор нет: <причина>»; `kind` тот же `waiting`,
+`href` — `/Admin/Competitions?q=<имя>` (фильтр `autopull-blocked` таких строк не показывает). У строки
+`waiting[]` поле `verdict`. ⚠ Число дашборда `autoPullBlocked24h` и фильтр — по-прежнему только
+`blocked`, поэтому счётчик Jobs теперь может быть больше него. Старты без номера loglig сюда не
+входят: задача их не смотрит.
 
 ### Честность напоминаний
 

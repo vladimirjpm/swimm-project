@@ -379,6 +379,39 @@ public class JobsMonitorBuilderTests
     public void Waiting_rule(string verdict, int checkedHoursAgo, string status, bool inDb, bool expected) =>
         Assert.Equal(expected, ResultsAutoWaiting.IsWaiting(verdict, Now.AddHours(checkedHoursAgo), status, inDb, Now));
 
+    // Застряло: «ещё идёт» / «протокола нет», а старт кончился больше полутора суток назад (16903, 21.11.2026).
+    [Theory]
+    [InlineData(ResultsAutoVerdicts.NotFinished, -37, DiscoveredCompetitionStatus.New, false, true)]
+    [InlineData(ResultsAutoVerdicts.Empty, -37, DiscoveredCompetitionStatus.New, false, true)]
+    [InlineData(ResultsAutoVerdicts.NotFinished, -35, DiscoveredCompetitionStatus.New, false, false)]   // ещё честно идёт
+    [InlineData(ResultsAutoVerdicts.NotFinished, -24 * 9, DiscoveredCompetitionStatus.New, false, false)] // окно задачи закрылось
+    [InlineData(ResultsAutoVerdicts.NotFinished, -37, DiscoveredCompetitionStatus.New, true, false)]    // уже затянули руками
+    [InlineData(ResultsAutoVerdicts.Empty, -37, DiscoveredCompetitionStatus.Ignored, false, false)]
+    [InlineData(ResultsAutoVerdicts.Blocked, -37, DiscoveredCompetitionStatus.New, false, false)]       // это IsWaiting
+    [InlineData(ResultsAutoVerdicts.WouldTake, -37, DiscoveredCompetitionStatus.New, false, false)]
+    public void Stuck_rule(string verdict, int endedHoursAgo, string status, bool inDb, bool expected) =>
+        Assert.Equal(expected, ResultsAutoWaiting.IsStuck(verdict, Now.AddHours(endedHoursAgo), status, inDb, Now));
+
+    [Fact]
+    public void Attention_stuck_rows_say_what_is_stuck_and_link_without_blocked_filter()
+    {
+        var ended = Now.AddDays(-2);
+        var waiting = new[]
+        {
+            new ResultsAutoWaitingRow(1, 16903, "ליגה", ended, ended, "ждут 2 из 16 событий", Now.AddHours(-1), ResultsAutoVerdicts.NotFinished),
+            new ResultsAutoWaitingRow(2, 16897, "הרצליה", ended, ended, "No competitions found in PDF", Now.AddHours(-3), ResultsAutoVerdicts.Empty),
+        };
+
+        var list = JobsMonitorBuilder.Attention([], waiting, Now);
+
+        Assert.All(list, a => Assert.Equal(JobAttentionKinds.Waiting, a.Kind));
+        Assert.Contains("результаты до сих пор неполные", list[0].Text);
+        Assert.Contains("ждут 2 из 16 событий", list[0].Text);
+        Assert.Contains($"{ended:dd.MM}", list[0].Text);
+        Assert.Contains("протокола результатов до сих пор нет", list[1].Text);
+        Assert.All(list, a => Assert.StartsWith("/Admin/Competitions?q=", a.Href));
+    }
+
     [Fact]
     public void Waiting_rule_unchecked_row_never_waits() =>
         Assert.False(ResultsAutoWaiting.IsWaiting(ResultsAutoVerdicts.Blocked, null, DiscoveredCompetitionStatus.New, false, Now));
