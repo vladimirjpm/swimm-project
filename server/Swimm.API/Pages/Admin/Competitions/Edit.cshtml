@@ -29,6 +29,38 @@
         </div>
     }
 
+    @if (!Model.IsNew && Model.Existing?.PartialResults is string partial)
+    {
+        var accepted = Model.Existing.PartialResultsAcceptedAt;
+        <!-- ── Результаты неполные (Р114) ────────────────────────────────────── -->
+        <div class="admin-card mb-5 border-l-[3px] @(accepted == null ? "border-l-admin-warning" : "border-l-admin-border")" id="partial-results">
+            <h2 class="text-sm font-semibold text-white mb-1">
+                @(accepted == null ? "⏳ Результаты неполные" : "✓ Неполные — принято как есть")
+            </h2>
+            <p class="text-sm text-admin-text mb-2" dir="auto">@partial</p>
+            <p class="text-xs text-admin-text-muted mb-3">
+                Отметку ставит импорт по разобранному протоколу этого дня
+                (@(Model.Existing.PartialResultsAt?.ToString("dd.MM.yyyy HH:mm") ?? "?") UTC).
+                Повторный импорт полного протокола снимет её сам.
+                @if (accepted == null)
+                {
+                    <text>Если остального не будет — прими как есть: чип «Partial results» уйдёт с сайта и из «Требует внимания» на /Admin/Jobs и не вернётся при повторном импорте того же протокола.</text>
+                }
+                else
+                {
+                    <text>Принято @accepted.Value.ToString("dd.MM.yyyy HH:mm") UTC — на сайте и в «Требует внимания» отметки нет. Если импорт принесёт другой неполный протокол, она вернётся.</text>
+                }
+            </p>
+            <form method="post" asp-page-handler="AcceptPartial" asp-route-back="@Model.BackUrl" class="inline">
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" name="accepted" value="@(accepted == null ? "true" : "false")" />
+                <button type="submit" class="admin-btn @(accepted == null ? "admin-btn-primary" : "admin-btn-ghost")">
+                    @(accepted == null ? "Принять как есть — остального не будет" : "Вернуть отметку")
+                </button>
+            </form>
+        </div>
+    }
+
     <!-- ── Основные поля ─────────────────────────────────────────────────────── -->
     <form method="post" asp-page-handler="Save" asp-route-back="@Model.BackUrl" class="admin-card mb-5">
         <input type="hidden" asp-for="Id" />

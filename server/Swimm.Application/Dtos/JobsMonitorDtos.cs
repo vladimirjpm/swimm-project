@@ -295,10 +295,18 @@ public sealed record JobUpcomingItem(string Key, string Title, string Zone, Date
 /// С 21.11.2026 сюда же идут «застрявшие» (<c>ResultsAutoWaiting.IsStuck</c>): <paramref name="Verdict"/>
 /// = <c>not-finished</c> / <c>empty</c>, старт кончился больше полутора суток назад.
 /// </summary>
-/// <param name="Verdict">Вердикт строки: <c>blocked</c> — «ждёт тебя»; <c>not-finished</c> / <c>empty</c> — застряла.</param>
+/// С 22.11.2026 — и соревнования, затянутые с неполными результатами (<c>PartialResultsWaiting</c>, Р114):
+/// <paramref name="Verdict"/> = <c>partial</c>, <see cref="CompetitionId"/> = день в базе, <paramref name="Id"/> = он же.
+/// </summary>
+/// <param name="Verdict">Вердикт строки: <c>blocked</c> — «ждёт тебя»; <c>not-finished</c> / <c>empty</c> — застряла;
+/// <c>partial</c> — затянуто неполным.</param>
 public sealed record ResultsAutoWaitingRow(
     int Id, int OrgCompId, string Name, DateTime DateStart, DateTime DateEnd, string? Reason, DateTime? CheckedAt,
-    string Verdict = "blocked");
+    string Verdict = "blocked")
+{
+    /// <summary>День соревнования в базе — только у <c>partial</c>; у строк «Входящих» null.</summary>
+    public int? CompetitionId { get; init; }
+}
 
 /// <summary>Ответ <c>GET /api/admin/jobs/monitor</c> — всё для страницы /Admin/Jobs одним JSON.</summary>
 /// <param name="Environment">Среда процесса: ProdAdmin | Development.</param>

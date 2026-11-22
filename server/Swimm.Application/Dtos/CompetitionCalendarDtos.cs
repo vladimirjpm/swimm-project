@@ -110,6 +110,14 @@ public sealed class CalendarMeetDto
     /// У затянутых (event/competition) — null.</summary>
     [JsonPropertyName("source_url")]
     public string? SourceUrl { get; init; }
+
+    /// <summary>
+    /// «Результаты неполные» (Р114): чего ещё нет — по-английски, подсказка чипа «Partial results».
+    /// Не статус: <see cref="Status"/> у однодневного остаётся <c>done</c> (он про даты и дни, его
+    /// читают фильтры и разметка календаря). null — протокол полный, принят как есть или старта ещё нет.
+    /// </summary>
+    [JsonPropertyName("partial_results")]
+    public string? PartialResults { get; init; }
 }
 
 public sealed class CalendarMeetDayDto

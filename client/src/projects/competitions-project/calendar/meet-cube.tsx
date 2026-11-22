@@ -15,6 +15,7 @@ import {
 import type { CalendarMeet } from './calendar-types';
 import GroupBadge from './group-badge';
 import { StatusButton } from './status-mark';
+import UI_PartialResultsChip from '../../components/mix/partial-results-chip/partial-results-chip';
 
 /*
  * Куб соревнования: дата-плитка + имя + мета + кнопка статуса (10c: Results / Startlist / Results
@@ -125,6 +126,11 @@ function MeetCube({ meet, today }: { meet: CalendarMeet; today: string }) {
                 {part === meet.venue ? <span dir="auto">{part}</span> : part}
               </React.Fragment>
             ))}
+          </span>
+        )}
+        {meet.partial_results && (
+          <span className="flex">
+            <UI_PartialResultsChip hint={meet.partial_results} size="sm" variant="deep" />
           </span>
         )}
         {wide && meet.days.length > 1 && <MeetDayStrip meet={meet} />}

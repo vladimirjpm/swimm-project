@@ -61,6 +61,8 @@ export interface CalendarMeet {
   has_start_list: boolean;
   /** Страница старта на isr.org.il — только у `upcoming` со строкой «Входящих»; ведёт `Details ↗`, если заявок нет. */
   source_url: string | null;
+  /** «Результаты неполные» (Р114): подсказка чипа «Partial results»; null/нет — полный. Не статус: `status` от него не меняется. */
+  partial_results?: string | null;
 }
 
 export interface CompetitionCalendar {

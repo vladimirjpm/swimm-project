@@ -3,6 +3,7 @@ import type { CompetitionSource } from '../../../../utils/helpers/competition-so
 import { competitionTileData } from '../../../../utils/helpers/competition-source';
 import type { CompetitionOverview } from './types';
 import { PAGE_CONTAINER } from '../../../../utils/layout';
+import UI_PartialResultsChip from '../../../components/mix/partial-results-chip/partial-results-chip';
 import CompetitionTile from './competition-tile';
 import './competition-header-top.css';
 
@@ -38,6 +39,13 @@ export default function CompetitionHeaderTop({
   const dates = datesLabel(overview);
   const s = overview?.summary;
   const tile = competitionTileData(source);
+  // «Partial results» (Р114): обзор считает по выбранной области (день/событие), селектор — по
+  // всему источнику; обзора ещё нет — берём из селектора, чтобы чип не мигал.
+  const partial = overview ? overview.summary.partial_results : source?.partial_results;
+  const partialChip = partial ? <UI_PartialResultsChip hint={partial} variant="hero" /> : null;
+  const partialHint = partial ? (
+    <div className="mt-1 text-[11.5px] font-semibold" style={{ opacity: 0.85 }} dir="auto">{partial}</div>
+  ) : null;
 
   // Мета одной лентой: каждый пункт nowrap, перенос — только между пунктами (10b).
   const meta: string[] = [];
@@ -127,6 +135,7 @@ export default function CompetitionHeaderTop({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {dayCount > 1 && daysBadge}
           {dates && <span className="whitespace-nowrap">{dates}</span>}
+          {partialChip}
         </div>
         {metaFacts.length > 0 && (
           <div className="flex flex-wrap items-center gap-x-1.5">
@@ -138,6 +147,7 @@ export default function CompetitionHeaderTop({
             ))}
           </div>
         )}
+        {partialHint}
       </div>
 
       {/* Кнопки 36px по макету; тап-таргет ≥44px добирается паддингом строки (4+36+4). */}
@@ -176,7 +186,9 @@ export default function CompetitionHeaderTop({
             {meta.map((m) => (
               <span key={m} className="whitespace-nowrap">{m}</span>
             ))}
+            {partialChip}
           </div>
+          {partialHint}
         </div>
       </div>
 

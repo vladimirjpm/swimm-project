@@ -11,6 +11,15 @@ internal sealed class CompetitionConfiguration : IEntityTypeConfiguration<Compet
         entity.ToTable("Competitions");
         entity.HasIndex(e => new { e.Name, e.Date, e.PoolType }).IsUnique();
 
+        // «Результаты неполные» (Р114): блок «Требует внимания» / счётчик «ждёт тебя» и чип
+        // витрины ищут дни, где отметка стоит и не принята. Таких единицы, а соревнований будут
+        // сотни тысяч — частичный индекс по Id держит только их. Фильтр обязан совпадать с
+        // условием запросов (PartialResultsState.IsShownFor) буква в букву, иначе планировщик
+        // его не возьмёт.
+        entity.HasIndex(e => e.Id)
+            .HasDatabaseName("IX_Competitions_PartialResults_Shown")
+            .HasFilter("\"PartialResults\" IS NOT NULL AND \"PartialResultsAcceptedAt\" IS NULL");
+
         // Уникальность OrgCompId обеспечена реальным UNIQUE constraint'ом (raw SQL в миграции),
         // а не EF alternate key — тот требует NOT NULL, а OrgCompId должен быть nullable
         // (у старых соревнований его пока нет). См. CompetitionResultUrl.

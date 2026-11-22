@@ -87,4 +87,12 @@ public sealed class CompetitionSourceDto
 
     [JsonPropertyName("result_count")]
     public int ResultCount { get; init; }
+
+    /// <summary>
+    /// «Результаты неполные» (Р114): чего ещё нет — по-английски, подсказка чипа «Partial results».
+    /// У события — видимые отметки дней одной строкой (<c>PartialResultsRule.CombineDays</c>).
+    /// null — протокол полный или принят как есть.
+    /// </summary>
+    [JsonPropertyName("partial_results")]
+    public string? PartialResults { get; init; }
 }

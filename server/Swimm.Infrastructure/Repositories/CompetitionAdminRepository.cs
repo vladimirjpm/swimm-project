@@ -464,6 +464,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     DayCount = days.Count,
                     TotalResultCount = days.Sum(d => d.ResultCount),
                     SuspectCount = days.Sum(d => d.SuspectCount),
+                    PartialDayCount = days.Count(d => d.PartialResults != null),
                     // Событие проверено, только если проверены ВСЕ дни; показываем самый
                     // старый прогон — по нему видно, не устарела ли проверка.
                     QualityScannedAt = days.All(d => d.QualityScannedAt != null)
@@ -586,7 +587,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             ? _db.CompetitionResultUrls.Count(u => u.OrgCompId == c.OrgCompId)
             : 0,
         QualityScannedAt = c.QualityScannedAt,
-        SuspectCount = _db.Results.Count(r => r.CompetitionId == c.Id && r.SuspectReason != null)
+        SuspectCount = _db.Results.Count(r => r.CompetitionId == c.Id && r.SuspectReason != null),
+        // Видна, пока стоит и не принята как есть (PartialResultsState.IsShownFor — тот же предикат).
+        PartialResults = c.PartialResultsAcceptedAt == null ? c.PartialResults : null
     };
 
     /// <summary>«дд/ММ/гггг – дд/ММ/гггг» по дням события (или один день, если даты совпали).</summary>
@@ -628,6 +631,9 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             PointRuleClubsId = c.PointRuleClubsId,
             PointRuleSwimmersId = c.PointRuleSwimmersId,
             ClubPointsDisabled = c.ClubPointsDisabled,
+            PartialResults = c.PartialResults,
+            PartialResultsAt = c.PartialResultsAt,
+            PartialResultsAcceptedAt = c.PartialResultsAcceptedAt,
             EventDayCount = c.EventId == null
                 ? 1
                 : await _db.Competitions.CountAsync(x => x.EventId == c.EventId),
@@ -1060,4 +1066,19 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             .OrderBy(c => c.DayNumber)
             .Select(c => c.Id)
             .ToListAsync();
+
+    public async Task<CompetitionSaveResult> SetPartialResultsAcceptedAsync(int id, bool accepted)
+    {
+        var comp = await _db.Competitions.FindAsync(id);
+        if (comp == null) return CompetitionSaveResult.Fail($"Соревнование #{id} не найдено");
+        if (comp.PartialResults == null)
+            return CompetitionSaveResult.Fail("Отметки «результаты неполные» нет — принимать нечего.");
+
+        var state = PartialResultsState.Of(comp);
+        var next = accepted ? PartialResultsRule.Accept(state, DateTime.UtcNow) : PartialResultsRule.Unaccept(state);
+        next.WriteTo(comp);
+        // Сохранение через трекер: перехватчик сам сбросит кэш витрины (строка Competitions) —
+        // чип «Partial results» пропадёт/вернётся без ручного сброса.
+        return await SaveAsync(comp);
+    }
 }

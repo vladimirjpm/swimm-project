@@ -104,6 +104,32 @@ public class Competition
   /// </summary>
   public DateTime? QualityScannedAt { get; set; }
 
+  // ── Неполный протокол (Р114 в docs/data-integrity.md) ──
+
+  /// <summary>
+  /// Результаты дня НЕПОЛНЫЕ: чего не хватает, по-русски для админки — тот же текст, что даёт
+  /// <c>CompetitionProgress</c> у results-auto («ждут 2 из 16 событий; …»). null — протокол
+  /// полный. Ставит и снимает импорт (<c>PartialResultsRule.Apply</c>) по разобранному файлу этого
+  /// дня; руками не правится, только «принять как есть» (<see cref="PartialResultsAcceptedAt"/>).
+  /// </summary>
+  [MaxLength(1000)]
+  public string? PartialResults { get; set; }
+
+  /// <summary>То же для витрины — по-английски (видимый UI сайта только English). null вместе с <see cref="PartialResults"/>.</summary>
+  [MaxLength(1000)]
+  public string? PartialResultsEn { get; set; }
+
+  /// <summary>Когда импорт в последний раз нашёл протокол неполным (с этим текстом). null — полный.</summary>
+  public DateTime? PartialResultsAt { get; set; }
+
+  /// <summary>
+  /// «Принято как есть»: админ сказал «остального не будет» (/Admin/Competitions/Edit). Отметка
+  /// тогда не показывается ни на сайте, ни в «Требует внимания». Принятие относится к ТЕКСТУ
+  /// <see cref="PartialResults"/> на момент нажатия: повторный импорт того же неполного протокола
+  /// (тот же текст) его сохраняет, другой неполный — сбрасывает, полный — снимает всё.
+  /// </summary>
+  public DateTime? PartialResultsAcceptedAt { get; set; }
+
   // ── Правила очков (Э0 — только привязка, расчёт не читает) ─────────────────
 
   /// <summary>Правило клубных очков, привязанное вручную. null — подбор по дате и scope.</summary>

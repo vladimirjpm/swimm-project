@@ -4,6 +4,7 @@ using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Repositories;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -28,10 +29,11 @@ public sealed class ResultsAutoWaitingQuery(SwimmDbContext db) : IResultsAutoWai
                                  || d.AutoPullVerdict == ResultsAutoVerdicts.Empty)
                                 && d.DateEnd <= stuckUntil && d.DateEnd > stuckFrom)))
             .ToListAsync(ct);
-        if (candidates.Count == 0) return [];
+        var partial = await PartialAsync(ct);
+        if (candidates.Count == 0) return PartialResultsWaiting.Merge([], partial);
 
         var matches = await new DiscoveryCompetitionMatcher(db).MatchAsync(candidates, ct);
-        return candidates
+        var auto = candidates
             .Where(d =>
             {
                 var inDb = matches.GetValueOrDefault(d.Id) is not null;
@@ -46,5 +48,18 @@ public sealed class ResultsAutoWaitingQuery(SwimmDbContext db) : IResultsAutoWai
                 d.Id, d.OrgCompId, d.Name, d.DateStart, d.DateEnd, d.AutoPullBlockedReason, d.AutoPullCheckedAt,
                 d.AutoPullVerdict ?? ResultsAutoVerdicts.Blocked))
             .ToList();
+        return PartialResultsWaiting.Merge(auto, partial);
     }
+
+    /// <summary>
+    /// Соревнования, затянутые с неполными результатами и не принятые как есть (Р114, тот же
+    /// предикат, что <see cref="PartialResultsState.IsShownFor"/>). Без окна: отметка ждёт решения,
+    /// пока её не снимет полный протокол или «Принять как есть».
+    /// </summary>
+    private async Task<IReadOnlyList<PartialResultsDay>> PartialAsync(CancellationToken ct) =>
+        await db.Competitions.AsNoTracking()
+            .WherePartialShown()
+            .Select(c => new PartialResultsDay(c.Id, c.Name, c.Date, c.DayNumber,
+                c.OrgCompId ?? (c.Event != null ? c.Event.OrgCompId : null), c.PartialResults!, c.PartialResultsAt))
+            .ToListAsync(ct);
 }

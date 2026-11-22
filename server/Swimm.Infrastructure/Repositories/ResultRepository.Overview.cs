@@ -90,7 +90,8 @@ public partial class ResultRepository
                 ResultCount = resultCount,
                 DayCount = days.Count,
                 SwimmerCount = swimmerCount,
-                ClubCount = clubCount
+                ClubCount = clubCount,
+                PartialResults = PartialResultsRule.CombineDays(days.Select(d => (d.DayNumber, d.PartialResults)))
             },
             HasAwards = hasAwards,
             Days = days,
@@ -127,7 +128,9 @@ public partial class ResultRepository
                 r.CompetitionId,
                 r.Competition.Date,
                 r.Competition.DayNumber,
-                r.Competition.SubName
+                r.Competition.SubName,
+                // «Результаты неполные» (Р114): видна, пока не принята как есть.
+                PartialResults = r.Competition.PartialResultsAcceptedAt == null ? r.Competition.PartialResultsEn : null
             })
             .Select(g => new OverviewDayDto
             {
@@ -135,6 +138,7 @@ public partial class ResultRepository
                 Date = g.Key.Date,
                 DayNumber = g.Key.DayNumber,
                 SubName = g.Key.SubName,
+                PartialResults = g.Key.PartialResults,
                 ResultCount = g.Count()
             })
             .ToListAsync();

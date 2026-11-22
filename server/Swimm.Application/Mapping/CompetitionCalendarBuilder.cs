@@ -26,6 +26,10 @@ public sealed class CalendarCompetitionRow
     public int? OrgCompId { get; init; }
     /// <summary>У дня есть результаты — день «загружен».</summary>
     public bool HasResults { get; init; }
+    /// <summary>Видимая отметка «результаты неполные» дня (EN, Р114); null — полный или принят как есть.</summary>
+    public string? PartialResults { get; init; }
+    /// <summary>Номер дня события — подпись «Day N» в подсказке многодневки.</summary>
+    public int? DayNumber { get; init; }
     /// <summary>Членство в категориях (сырые <c>Category.Key</c>).</summary>
     public IReadOnlyCollection<string> CategoryKeys { get; init; } = [];
     /// <summary>Источники стартового протокола дня (<c>CompetitionSources.OrgCompId</c>).</summary>
@@ -395,6 +399,9 @@ public static class CompetitionCalendarBuilder
             PostponedTo = null,
             HasStartList = m.HasStartList,
             SourceUrl = own is null ? null : SourceUrlFor(own.OrgCompId),
+            // Отдельным полем, а не статусом: status — про даты и дни (done/in_progress), отметка —
+            // про полноту протокола загруженного дня (Р114).
+            PartialResults = PartialResultsRule.CombineDays(m.Rows.Select(r => (r.DayNumber, r.PartialResults))),
         };
     }
 

@@ -240,8 +240,11 @@ public static class JobsMonitorBuilder
                 resultsAuto?.Zone ?? JobZones.Local, JobAttentionKinds.Waiting, "waiting",
                 WaitingText(w),
                 w.CheckedAt,
-                // Фильтр autopull-blocked показывает только вердикт blocked — застрявшую ищем по имени.
-                w.Verdict == ResultsAutoVerdicts.Blocked
+                // Фильтр autopull-blocked показывает только вердикт blocked — застрявшую ищем по имени;
+                // затянутое неполным — прямо на Edit соревнования, к блоку «Результаты неполные».
+                w.Verdict == PartialResultsWaiting.Verdict && w.CompetitionId is int cid
+                    ? PartialResultsWaiting.Href(cid)
+                    : w.Verdict == ResultsAutoVerdicts.Blocked
                     ? $"/Admin/Competitions?filter={AutoPullFilters.Blocked}&q={Uri.EscapeDataString(w.Name)}"
                     : $"/Admin/Competitions?q={Uri.EscapeDataString(w.Name)}")));
         return list;
@@ -261,6 +264,7 @@ public static class JobsMonitorBuilder
                 $"{head} прошёл {w.DateEnd:dd.MM}, а результаты до сих пор неполные — реши, брать ли как есть: {reason}",
             ResultsAutoVerdicts.Empty =>
                 $"{head} прошёл {w.DateEnd:dd.MM}, а протокола результатов до сих пор нет: {reason}",
+            PartialResultsWaiting.Verdict => PartialResultsWaiting.Text(w),
             _ => $"{head} не взят автоматически: {reason}",
         };
     }
