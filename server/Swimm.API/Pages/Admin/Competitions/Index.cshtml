@@ -311,8 +311,10 @@
 <!-- Фильтры -->
 <form method="get" id="filters-form" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Поиск по названию
-        <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-72" placeholder="Название или подзаголовок…" />
+        Поиск
+        @* Число ищется ещё и как номер: compID федерации или Id соревнования в базе. *@
+        <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-72" placeholder="Название, compID или № в базе…"
+               title="Подстрока в названии или подзаголовке; число — ещё и compID федерации или номер соревнования в базе (у события — любого дня)" />
     </label>
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
         Стадия
