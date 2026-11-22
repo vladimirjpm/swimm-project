@@ -4,6 +4,7 @@ using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
 using Swimm.Infrastructure.Data;
+using Swimm.Infrastructure.Repositories;
 
 namespace Swimm.Infrastructure.Services;
 
@@ -57,7 +58,7 @@ public sealed class ResultsAutoWaitingQuery(SwimmDbContext db) : IResultsAutoWai
     /// </summary>
     private async Task<IReadOnlyList<PartialResultsDay>> PartialAsync(CancellationToken ct) =>
         await db.Competitions.AsNoTracking()
-            .Where(c => c.PartialResults != null && c.PartialResultsAcceptedAt == null)
+            .WherePartialShown()
             .Select(c => new PartialResultsDay(c.Id, c.Name, c.Date, c.DayNumber,
                 c.OrgCompId ?? (c.Event != null ? c.Event.OrgCompId : null), c.PartialResults!, c.PartialResultsAt))
             .ToListAsync(ct);

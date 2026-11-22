@@ -12,7 +12,7 @@ using Swimm.Infrastructure.Data;
 namespace Swimm.Infrastructure.Migrations
 {
     [DbContext(typeof(SwimmDbContext))]
-    [Migration("20261122053111_CompetitionPartialResults")]
+    [Migration("20261122060500_CompetitionPartialResults")]
     partial class CompetitionPartialResults
     {
         /// <inheritdoc />
@@ -661,6 +661,10 @@ namespace Swimm.Infrastructure.Migrations
                     b.HasIndex("CountryId");
 
                     b.HasIndex("EventId");
+
+                    b.HasIndex("Id")
+                        .HasDatabaseName("IX_Competitions_PartialResults_Shown")
+                        .HasFilter("\"PartialResults\" IS NOT NULL AND \"PartialResultsAcceptedAt\" IS NULL");
 
                     b.HasIndex("PointRuleClubsId");
 

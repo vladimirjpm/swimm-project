@@ -659,6 +659,10 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.HasIndex("EventId");
 
+                    b.HasIndex("Id")
+                        .HasDatabaseName("IX_Competitions_PartialResults_Shown")
+                        .HasFilter("\"PartialResults\" IS NOT NULL AND \"PartialResultsAcceptedAt\" IS NULL");
+
                     b.HasIndex("PointRuleClubsId");
 
                     b.HasIndex("PointRuleSwimmersId");

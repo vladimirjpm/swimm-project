@@ -533,7 +533,7 @@ public partial class ResultRepository : IResultRepository
         // «Результаты неполные» (Р114): только видимые отметки (стоит и не принята как есть) —
         // обычно их единицы, поэтому отдельным запросом, а не подзапросом в каждую строку.
         var partialDays = await _db.Competitions.AsNoTracking()
-            .Where(c => c.PartialResults != null && c.PartialResultsAcceptedAt == null)
+            .WherePartialShown()
             .Select(c => new { c.Id, c.EventId, c.DayNumber, c.PartialResultsEn })
             .ToListAsync();
         var partialByCompetition = partialDays.ToDictionary(p => p.Id, p => p.PartialResultsEn);

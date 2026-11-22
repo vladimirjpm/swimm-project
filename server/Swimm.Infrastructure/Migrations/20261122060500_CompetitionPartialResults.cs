@@ -36,11 +36,21 @@ namespace Swimm.Infrastructure.Migrations
                 type: "character varying(1000)",
                 maxLength: 1000,
                 nullable: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Competitions_PartialResults_Shown",
+                table: "Competitions",
+                column: "Id",
+                filter: "\"PartialResults\" IS NOT NULL AND \"PartialResultsAcceptedAt\" IS NULL");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropIndex(
+                name: "IX_Competitions_PartialResults_Shown",
+                table: "Competitions");
+
             migrationBuilder.DropColumn(
                 name: "PartialResults",
                 table: "Competitions");
