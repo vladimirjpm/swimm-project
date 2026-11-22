@@ -1,0 +1,38 @@
+{
+  "note": null,
+  "sets": [
+    {
+      "title": null, "repeat": 1, "level_ids": null,
+      "lines": [
+        { "reps": 4, "distance": 100, "text": "1-חת' 1-(25 סגנון + 75 חת') 1-(50 סגנון + 50 חת') 1-(75 סגנון + 25 חת')", "intensity": null,
+          "per_level": { "37": { "send_off": "rest :10", "reps": null }, "38": { "send_off": "rest :10", "reps": null }, "39": { "send_off": "rest :10", "reps": null }, "36": { "send_off": "rest :10", "reps": null } } },
+        { "reps": 6, "distance": 50, "text": "חתירה 1-(25 כלב+25 מלא) 1-(25 מסרק+25 מלא) 1-(25 יד' ישרות+25 מלא)", "intensity": null,
+          "per_level": { "37": { "send_off": "rest :10", "reps": null }, "38": { "send_off": "rest :10", "reps": null }, "39": { "send_off": "rest :10", "reps": null }, "36": { "send_off": "rest :10", "reps": null } } },
+        { "reps": 8, "distance": 25, "text": "חתירה הגברה 1-4, 4V-1V, לשמור על כמות תנועות", "intensity": "1-4V",
+          "per_level": { "37": { "send_off": ":30", "reps": null }, "38": { "send_off": ":35", "reps": null }, "39": { "send_off": ":35", "reps": null }, "36": { "send_off": ":40", "reps": null } } }
+      ]
+    },
+    {
+      "title": "זומרס", "repeat": 1, "level_ids": null,
+      "lines": [
+        { "reps": 4, "distance": 100, "text": "מעורב 100 כל סגנון (מי ששוחה 3 בלי פרפר)", "intensity": null,
+          "per_level": { "37": { "send_off": "rest :15", "reps": null }, "38": { "send_off": "rest :15", "reps": null }, "39": { "send_off": "rest :15", "reps": 3 }, "36": { "send_off": "rest :15", "reps": 3 } } },
+        { "reps": 6, "distance": 50, "text": "הלוך יד אחת חזור יד שניה. פרפר\\גב\\חתירה (מי ששוחה 4 רק גב\\חת')", "intensity": null,
+          "per_level": { "37": { "send_off": null, "reps": null }, "38": { "send_off": null, "reps": null }, "39": { "send_off": null, "reps": 4 }, "36": { "send_off": null, "reps": 4 } } },
+        { "reps": 8, "distance": 25, "text": "רגליים הלוך 2V חזור 4V", "intensity": null,
+          "per_level": { "37": { "send_off": ":30", "reps": null }, "38": { "send_off": ":35", "reps": null }, "39": { "send_off": ":35", "reps": null }, "36": { "send_off": ":40", "reps": null } } }
+      ]
+    },
+    {
+      "title": "כפות", "repeat": 1, "level_ids": null,
+      "lines": [
+        { "reps": 4, "distance": 100, "text": "חתירה", "intensity": "2V",
+          "per_level": { "37": { "send_off": "1:45", "reps": null }, "38": { "send_off": "1:55", "reps": null }, "39": { "send_off": "2:05", "reps": 3 }, "36": { "send_off": "2:15", "reps": 3 } } },
+        { "reps": 6, "distance": 50, "text": "גב", "intensity": "3V",
+          "per_level": { "37": { "send_off": "1:10", "reps": null }, "38": { "send_off": "1:15", "reps": null }, "39": { "send_off": "1:25", "reps": 4 }, "36": { "send_off": "1:30", "reps": 4 } } },
+        { "reps": 8, "distance": 25, "text": "1-פרפר או חזה 4V, 1-חתירה 2V", "intensity": null,
+          "per_level": { "37": { "send_off": ":35", "reps": null }, "38": { "send_off": ":40", "reps": null }, "39": { "send_off": ":40", "reps": null }, "36": { "send_off": ":45", "reps": null } } }
+      ]
+    }
+  ]
+}
