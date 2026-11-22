@@ -8,12 +8,23 @@
 
 | Слой | Файлы |
 |---|---|
-| Расчёт | `server/Swimm.Infrastructure/Repositories/ResultRepository.Overview.cs` → `GetCompetitionOverviewAsync`; по методу на карточку: `BestSwimProjection`, `LoadMedalRowsAsync` + `BuildMedalists` (Most decorated), `LoadHighPointAwardsAsync` (legacy / по правилу), `LoadAppliedClubRulesAsync` / `LoadClubPointsVerifiedAsync` / `IsClubPointsUnofficialAsync` (Top clubs; сами очки — `GetClubSummaryAsync` в `ResultRepository.cs`), `DetectNewRecordsAsync` |
+| Расчёт | `server/Swimm.Infrastructure/Repositories/ResultRepository.Overview.cs` → `GetCompetitionOverviewAsync`; данные — одной загрузкой `LoadOverviewDataAsync` (`ResultRepository.OverviewData.cs`, см. ниже «Как грузятся данные»); по методу на карточку: `BestSwimOf`, `BuildMedalRows` + `BuildMedalists` (Most decorated), `LoadHighPointAwardsAsync` (legacy / по правилу), `BuildAppliedClubRules` / `ClubPointsVerifiedOf` / `IsClubPointsUnofficial` (Top clubs; сами очки — `BuildClubSummary` в `ResultRepository.cs`, общий с `/api/club-summary`), `DetectNewRecordsAsync` |
 | Контракт | `server/Swimm.Application/Dtos/CompetitionOverviewDto.cs`, эндпоинт `GET /api/competition-overview` |
 | Мозаика | `client/.../competition-header/overview2/competition-overview2.tsx` + `module-defs.ts` (порядок и ключи модулей) |
 | Карточки | `overview2/module-card-*.tsx` |
 | Типы клиента | `client/.../competition-header/types.ts` |
 | Тесты | `server/Swimm.Tests/`: `OverviewBestSwimCardTests`, `OverviewMostDecoratedTests`, `OverviewHighPointCardTests`, `OverviewTopClubsCardTests` (+ `OverviewClubPointsUnofficialTests`), `OverviewNewRecordsCardTests`, `OverviewOrgCompIdTests`; сводка, дни и базовые случаи карточек — `ResultRepositoryTests` (`Overview_*`). Общая посадка — `OverviewTestKit`. Меняешь правило карточки — тест рядом с её именем |
+
+**Как грузятся данные (22.11.2026)**
+
+Строки выборки, её дни (`Competitions`) и составы эстафет грузятся **один раз** на вызов —
+три запроса в `LoadOverviewDataAsync`; карточки считают по ним в памяти. Отдельно в базу
+ходят только справочники: правила очков (клубов и пловцов), источники стартового протокола и
+счётчики заявок, прежние названия клубов (один запрос на три зачёта), регламенты серий,
+примечание к расхождению, контекстные очки правила «по заплыву» и рекорды Израиля (кэш).
+Было ~30 SQL на холодный вызов, стало 8–10; ответ сверен побайтово на всей локальной базе.
+⚠ Новый фильтр карточки в памяти обязан повторять SQL-семантику: в частности, Postgres
+сортирует `NULL` в конец `ASC`, а LINQ — в начало (Best swim: время без значения — последним).
 
 **Общее для всех карточек**
 
