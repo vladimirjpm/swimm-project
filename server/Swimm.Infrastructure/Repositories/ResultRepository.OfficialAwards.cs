@@ -17,18 +17,18 @@ public partial class ResultRepository
     /// всё событие, как у High Point в режиме события (§4 плана): у дней разные регламенты.
     /// </summary>
     private async Task<List<OverviewOfficialAwardsDayDto>> LoadOfficialAwardsAsync(
-        IQueryable<ResultRecord> query, ResultFilter filter, IReadOnlyList<OverviewDayDto> days)
+        OverviewData data, ResultFilter filter, IReadOnlyList<OverviewDayDto> days)
     {
-        var dayIds = days.Select(d => d.CompetitionId).ToList();
-        var seriesDays = await _db.Competitions.AsNoTracking()
-            .Where(c => dayIds.Contains(c.Id) && c.SeriesPartId != null)
+        // Привязка дня к части серии приезжает вместе с днями (LoadOverviewDataAsync).
+        var seriesDays = days
+            .Select(d => data.Competitions[d.CompetitionId])
+            .Where(c => c.SeriesPartId != null)
             .Select(c => new
             {
                 c.Id, c.Date, c.DayNumber, PartId = c.SeriesPartId!.Value, c.SeriesRegulationCheckedAt,
-                PartName = c.SeriesPart!.Name, PartNameEn = c.SeriesPart.NameEn,
-                c.SeriesPart.SeriesId, SeriesName = c.SeriesPart.Series.Name, SeriesNameEn = c.SeriesPart.Series.NameEn
+                c.PartName, c.PartNameEn, SeriesId = c.SeriesId!.Value, c.SeriesName, c.SeriesNameEn
             })
-            .ToListAsync();
+            .ToList();
         if (seriesDays.Count == 0) return [];
 
         var seriesIds = seriesDays.Select(d => d.SeriesId).Distinct().ToList();
@@ -56,7 +56,7 @@ public partial class ResultRepository
                 .ToList();
             if (regulation is null || awards is not { Count: > 0 }) continue;
 
-            var rows = await LoadOfficialAwardRowsAsync(query.Where(r => r.CompetitionId == day.Id), filter);
+            var rows = OfficialAwardRows(data, day.Id, filter);
             var seasonStart = SeasonMath.StartYearOf(date);
             var scoringRows = rows
                 .Select(r => new SeriesAwardRow(r.SwimmerId, r.Gender,
@@ -126,27 +126,27 @@ public partial class ResultRepository
     /// ошибки протокола (SuspectReason) не участвуют — награда это наш вывод (Р76, §8 В5 плана).
     /// Пара-очки с FINA не сравнимы (Р67). Combine — дисциплина один раз, как у High Point.
     /// </summary>
-    private static Task<List<OfficialAwardSourceRow>> LoadOfficialAwardRowsAsync(
-        IQueryable<ResultRecord> dayQuery, ResultFilter filter) =>
-        dayQuery
-            .Where(r => r.RelayId == null && !r.TimeFail && r.SuspectReason == null
+    private static List<OfficialAwardSourceRow> OfficialAwardRows(OverviewData data, int dayId, ResultFilter filter) =>
+        data.Rows
+            .Where(r => r.CompetitionId == dayId
+                        && r.RelayId == null && !r.TimeFail && r.SuspectReason == null
                         && !r.IsParaPoints && r.InternationalPoints > 0
                         && (r.Gender == "male" || r.Gender == "female")
-                        && (!filter.Combined || !r.Competition.ShowCombineAllResults || r.IsBestResult != false))
+                        && (!filter.Combined || !data.CompetitionOf(r).ShowCombineAllResults || r.IsBestResult != false))
             .Select(r => new OfficialAwardSourceRow
             {
                 SwimmerId = r.SwimmerId,
-                FirstName = r.Swimmer.FirstName,
-                LastName = r.Swimmer.LastName,
-                FirstNameEn = r.Swimmer.FirstNameEn,
-                LastNameEn = r.Swimmer.LastNameEn,
-                Club = r.ClubName != null ? r.ClubName.Name : r.Club.Name,   // как напечатано (Р97)
+                FirstName = r.FirstName,
+                LastName = r.LastName,
+                FirstNameEn = r.FirstNameEn,
+                LastNameEn = r.LastNameEn,
+                Club = r.Club,   // как напечатано (Р97)
                 ClubId = r.ClubId,
                 Gender = r.Gender,
-                BirthYear = r.Swimmer.BirthYear,
+                BirthYear = r.BirthYear,
                 InternationalPoints = r.InternationalPoints
             })
-            .ToListAsync();
+            .ToList();
 
     private sealed class OfficialAwardSourceRow
     {

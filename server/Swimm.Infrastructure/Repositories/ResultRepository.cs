@@ -248,46 +248,90 @@ public partial class ResultRepository : IResultRepository
         // Псевдоклубы (страна/сборная вместо клуба, Maccabiah) в клубный зачёт не входят.
         var rows = await query
             .Where(r => !r.Club.IsPseudo)
-            .Select(r => new
+            .Select(r => new ClubSummaryRow
             {
-                r.Id,
-                r.CompetitionId,
-                r.ClubId,
+                Id = r.Id,
+                CompetitionId = r.CompetitionId,
+                ClubId = r.ClubId,
                 // Как напечатано (Р97): зачёт соревнования — экран протокола.
                 ClubName = r.ClubName != null ? r.ClubName.Name : r.Club.Name,
                 ClubNameEn = r.ClubName != null ? r.ClubName.NameEn : r.Club.NameEn,
                 ClubNow = r.ClubName != null ? r.Club.Name : null,
                 RelayTeamName = r.Relay != null ? r.Relay.TeamName : null,
-                r.SwimmerId,
+                SwimmerId = r.SwimmerId,
                 // Место prelim-заплыва — ранжир сессии, не награда: медали и клубные очки
                 // дают за финал (у бугрим протокол печатает места и в предварительных).
                 // Общий финал «כללי» (Round=final-open) тоже не зачётный: единица зачёта —
                 // возрастная ступень, там пловец очки и получает (Р43).
                 Position = r.HeatType == "prelim" || r.HeatType == "extra" || r.Round == ResultRounds.FinalOpen
                     ? null : r.Position,
-                r.CombinedPlace,
+                CombinedPlace = r.CombinedPlace,
                 ShowCombine = r.Competition.ShowCombineAllResults,
-                r.TimeFail,
+                TimeFail = r.TimeFail,
                 IsRelay = r.RelayId != null,
                 IsMasters = r.Competition.IsMasters,
                 RuleId = r.Competition.PointRuleClubsId,
-                r.CompetitionDate
+                CompetitionDate = r.CompetitionDate
             })
             .ToListAsync();
 
         // Правила очков грузим целиком (их единицы), применяем в памяти — как в сезонном зачёте.
-        var rules = await _db.PointRulesClubs.AsNoTracking()
+        var rules = await LoadClubRulesAsync();
+        var contextPoints = await LoadContextClubPointsAsync(rules, rows);
+
+        var summary = BuildClubSummary(rows, rules, contextPoints, filter.Combined);
+        await ApplyFormerClubNamesAsync(summary);
+        return summary;
+    }
+
+    /// <summary>
+    /// Строка клубного зачёта: минимальная проекция. Класс с init-свойствами, а не анонимный тип:
+    /// её же Overview собирает в памяти из своих общих строк (ResultRepository.OverviewData.cs).
+    /// </summary>
+    private sealed class ClubSummaryRow
+    {
+        public long Id { get; init; }
+        public int CompetitionId { get; init; }
+        public int ClubId { get; init; }
+        public string? ClubName { get; init; }
+        public string? ClubNameEn { get; init; }
+        public string? ClubNow { get; init; }
+        public string? RelayTeamName { get; init; }
+        public int SwimmerId { get; init; }
+        /// <summary>Протокольное место без незачётных раундов (prelim/extra/final-open).</summary>
+        public int? Position { get; init; }
+        public int? CombinedPlace { get; init; }
+        public bool ShowCombine { get; init; }
+        public bool TimeFail { get; init; }
+        public bool IsRelay { get; init; }
+        public bool IsMasters { get; init; }
+        public int? RuleId { get; init; }
+        public DateTime CompetitionDate { get; init; }
+    }
+
+    private Task<List<PointRuleClubs>> LoadClubRulesAsync() =>
+        _db.PointRulesClubs.AsNoTracking()
             .Include(r => r.Entries)
             .ToListAsync();
 
-        // Правило «по заплыву целиком» (схема Красного моря): очки зависят от всех участников
-        // заплыва, а не от отфильтрованной выборки, — их считает ContextClubPoints по
-        // соревнованию целиком. Объединённых мест у такого правила нет: зачёт по протоколу.
-        var contextPoints = await ContextClubPoints.LoadAsync(_db.Results, rules,
+    /// <summary>
+    /// Правило «по заплыву целиком» (схема Красного моря): очки зависят от всех участников
+    /// заплыва, а не от отфильтрованной выборки, — их считает ContextClubPoints по
+    /// соревнованию целиком. Объединённых мест у такого правила нет: зачёт по протоколу.
+    /// Результат — по Id строки, поэтому один на любые подвыборки тех же соревнований (по полу).
+    /// </summary>
+    private Task<IReadOnlyDictionary<long, int>> LoadContextClubPointsAsync(
+        IReadOnlyCollection<PointRuleClubs> rules, IEnumerable<ClubSummaryRow> rows) =>
+        ContextClubPoints.LoadAsync(_db.Results, rules,
             ContextClubPoints.CompetitionsNeedingContext(rules, rows
                 .Select(r => (r.CompetitionId, r.RuleId, r.IsMasters, DateOnly.FromDateTime(r.CompetitionDate)))
                 .Distinct()));
 
+    /// <summary>Клубный зачёт по строкам — без обращений к базе (кроме прежних названий, их отдельно).</summary>
+    private static List<ClubSummaryDto> BuildClubSummary(
+        IReadOnlyCollection<ClubSummaryRow> rows, IReadOnlyCollection<PointRuleClubs> rules,
+        IReadOnlyDictionary<long, int> contextPoints, bool combined)
+    {
         // Агрегация и ранжирование — в общем ClubStandingCalculator (Application/Mapping):
         // тот же алгоритм считает материализованный зачёт страницы клуба. Здесь остаётся
         // только то, что зависит от Infrastructure: правило очков и выбор места.
@@ -312,7 +356,7 @@ public partial class ResultRepository : IResultRepository
             // Раньше здесь всегда стояло протокольное Position, из-за чего Overview
             // на combine-all соревнованиях показывал очки не той системы (план Э2).
             var contextual = PointRulesClubsScoring.NeedsContext(rule);
-            var place = contextual ? r.Position : EffectivePlace(filter.Combined && r.ShowCombine, r.Position, r.CombinedPlace);
+            var place = contextual ? r.Position : EffectivePlace(combined && r.ShowCombine, r.Position, r.CombinedPlace);
             var points = contextual
                 ? contextPoints.GetValueOrDefault(r.Id)
                 : PointRulesClubsScoring.RelayPointsFor(rule, place, r.TimeFail, r.IsRelay);
@@ -345,26 +389,31 @@ public partial class ResultRepository : IResultRepository
         foreach (var s in summary)
             if (nowByKey.TryGetValue(s.Club, out var now) && now != s.Club) s.ClubNow = now;
 
-        // Прежние названия (Н7): поиск в фильтре клуба находит клуб и по старому названию —
-        // протокол 2024/25 напечатан под «הפועל …», а строка фильтра уже под текущим именем.
-        var clubIds = summary.Select(s => s.ClubId).Where(id => id > 0).Distinct().ToList();
-        if (clubIds.Count > 0)
-        {
-            var former = (await _db.ClubNames.AsNoTracking()
-                    .Where(n => clubIds.Contains(n.ClubId) && n.Kind == ClubNameKinds.Former)
-                    .Select(n => new { n.ClubId, n.Name, n.NameEn })
-                    .ToListAsync())
-                .GroupBy(n => n.ClubId)
-                .ToDictionary(g => g.Key, g => g
-                    .SelectMany(n => new[] { n.Name, n.NameEn })
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .Distinct()
-                    .ToList());
-            foreach (var s in summary)
-                if (former.TryGetValue(s.ClubId, out var names)) s.FormerNames = names;
-        }
-
         return summary;
+    }
+
+    /// <summary>
+    /// Прежние названия (Н7): поиск в фильтре клуба находит клуб и по старому названию —
+    /// протокол 2024/25 напечатан под «הפועל …», а строка фильтра уже под текущим именем.
+    /// Один запрос на все переданные зачёты (Overview отдаёт три: общий, ♂, ♀).
+    /// </summary>
+    private async Task ApplyFormerClubNamesAsync(params IReadOnlyList<ClubSummaryDto>[] summaries)
+    {
+        var clubIds = summaries.SelectMany(s => s).Select(s => s.ClubId).Where(id => id > 0).Distinct().ToList();
+        if (clubIds.Count == 0) return;
+
+        var former = (await _db.ClubNames.AsNoTracking()
+                .Where(n => clubIds.Contains(n.ClubId) && n.Kind == ClubNameKinds.Former)
+                .Select(n => new { n.ClubId, n.Name, n.NameEn })
+                .ToListAsync())
+            .GroupBy(n => n.ClubId)
+            .ToDictionary(g => g.Key, g => g
+                .SelectMany(n => new[] { n.Name, n.NameEn })
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList());
+        foreach (var s in summaries.SelectMany(s => s))
+            if (former.TryGetValue(s.ClubId, out var names)) s.FormerNames = names;
     }
 
     /// <summary>
