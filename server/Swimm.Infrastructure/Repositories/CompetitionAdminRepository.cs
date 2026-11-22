@@ -120,7 +120,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 Status = d.Status, Languages = d.Languages, LastError = d.LastError, LogligId = d.LogligId,
                 EmptySourceAt = d.EmptySourceAt, Discipline = d.Discipline,
                 AutoPullVerdict = d.AutoPullVerdict, AutoPullBlockedReason = d.AutoPullBlockedReason,
-                AutoPullCheckedAt = d.AutoPullCheckedAt, AutoPullPoolType = d.AutoPullPoolType
+                AutoPullCheckedAt = d.AutoPullCheckedAt, AutoPullPoolType = d.AutoPullPoolType,
+                PreviousDateStart = d.PreviousDateStart, MissingSince = d.MissingSince
             };
 
             // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.
@@ -145,7 +146,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 // Сезон — общим предикатом ниже, вместе с БД-строками.
                 if (!string.IsNullOrWhiteSpace(categoryKey)) continue;
                 if (!string.IsNullOrWhiteSpace(search) &&
-                    d.Name.IndexOf(search.Trim(), StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    d.Name.IndexOf(search.Trim(), StringComparison.OrdinalIgnoreCase) < 0 &&
+                    SearchNumber(search) != d.OrgCompId) continue;
 
                 unified.Add(new UnifiedCompetitionRowDto
                 {
@@ -379,6 +381,14 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     }
 
     /// <summary>
+    /// Поиск — целое положительное число? Тогда он ищет ещё и по номеру (compID федерации или Id
+    /// соревнования в базе), а не только подстрокой в названии.
+    /// </summary>
+    private static int? SearchNumber(string? search) =>
+        int.TryParse(search?.Trim(), System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var n) && n > 0 ? n : null;
+
+    /// <summary>
     /// «Головы» списка = одиночные соревнования ИЛИ многодневные события (свёрнуты в одну строку),
     /// с фильтрами поиск/категория/сезон. «Голова» события — день с минимальным DayNumber
     /// (min, а не ==1, чтобы событие не пропало, если день 1 удалили). Общий шов для
@@ -398,9 +408,22 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 .Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
             // По имени/подзаголовку головы. У события имя общее на всех днях — поиск по названию
             // события работает; по подзаголовку конкретного дня внутри события — нет (приемлемо).
-            heads = heads.Where(c =>
-                EF.Functions.ILike(c.Name, $"%{s}%", "\\") ||
-                (c.SubName != null && EF.Functions.ILike(c.SubName, $"%{s}%", "\\")));
+            //
+            // Число — ещё и номер: compID федерации или Id соревнования в базе, у события — любого
+            // его дня (решение Влада 22.11.2026). На список по номеру ведут находки /Admin/Health
+            // (`?q=<Id соревнования>`) — раньше поиск понимал только имя, и они открывали пустой
+            // список. Имя тоже остаётся: «2026» должно находить старты по году в названии.
+            if (SearchNumber(search) is int n)
+                heads = heads.Where(c =>
+                    EF.Functions.ILike(c.Name, $"%{s}%", "\\") ||
+                    (c.SubName != null && EF.Functions.ILike(c.SubName, $"%{s}%", "\\")) ||
+                    c.Id == n || c.OrgCompId == n ||
+                    (c.EventId != null && _db.Competitions.Any(x =>
+                        x.EventId == c.EventId && (x.Id == n || x.OrgCompId == n))));
+            else
+                heads = heads.Where(c =>
+                    EF.Functions.ILike(c.Name, $"%{s}%", "\\") ||
+                    (c.SubName != null && EF.Functions.ILike(c.SubName, $"%{s}%", "\\")));
         }
 
         if (!string.IsNullOrWhiteSpace(categoryKey))

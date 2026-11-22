@@ -86,6 +86,12 @@ public sealed class UnifiedSiteInfo
 
     /// <summary>Длина бассейна, с которой задача взяла бы старт (у would-take).</summary>
     public string? AutoPullPoolType { get; set; }
+
+    /// <summary>Перенос: первая объявленная дата начала (null — переноса нет или его отменили).</summary>
+    public DateTime? PreviousDateStart { get; set; }
+
+    /// <summary>Пропал из списка isr.org.il (вероятно, отменён) — с какого момента; null — на месте.</summary>
+    public DateTime? MissingSince { get; set; }
 }
 
 /// <summary>

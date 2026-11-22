@@ -66,7 +66,7 @@ public sealed class NoShowUnmatchedCheck(SwimmDbContext db) : IDataCheck
                 "Competition", c.CompetitionId ?? 0,
                 $"{c.CompName}: без результата {c.NoShow} из {totals.GetValueOrDefault(c.CompetitionId ?? 0, c.NoShow)}",
                 $"compID {c.OrgCompId}",
-                $"/Admin/Competitions?search={c.OrgCompId}",
+                $"/Admin/Competitions?q={c.OrgCompId}",
                 PublicRoutes.Competition(c.CompetitionId ?? 0)))
             .ToList());
     }

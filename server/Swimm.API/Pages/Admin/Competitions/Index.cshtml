@@ -99,6 +99,31 @@
         return $"<span class=\"ml-1 inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold {cls}\" title=\"{title}\">{System.Net.WebUtility.HtmlEncode(text)}</span>";
     }
 
+    // Перенос и пропажа старта (решение Влада 22.11.2026): их ставит суточный забор «Входящих»
+    // (DiscoverySyncRules), а видно их было только в календаре сайта. Перенос — дата старта
+    // сдвинута федерацией (в подсказке «было → стало»); пропал — старта нет в списке isr.org.il,
+    // скорее всего отменён. Оба бывают только у будущих стартов текущего сезона.
+    string DateChangeChipsHtml(Swimm.Application.Dtos.UnifiedSiteInfo? site)
+    {
+        if (site == null) return "";
+        var sb = new System.Text.StringBuilder();
+        const string chip = "ml-1 inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold";
+        if (site.PreviousDateStart is { } was)
+        {
+            var title = System.Net.WebUtility.HtmlEncode(
+                $"Федерация перенесла старт: было {was:dd.MM.yyyy}, стало {site.DateStart:dd.MM.yyyy}");
+            sb.Append($"<span class=\"{chip} bg-admin-warning/15 text-admin-warning\" title=\"{title}\">⇄ перенесён с {was:dd.MM}</span>");
+        }
+        if (site.MissingSince is { } gone)
+        {
+            var local = gone.ToLocalTime();
+            var title = System.Net.WebUtility.HtmlEncode(
+                $"Старт пропал из списка isr.org.il {local:dd.MM.yyyy HH:mm} — вероятно, отменён. Появится снова — пометка снимется сама.");
+            sb.Append($"<span class=\"{chip} bg-admin-danger/15 text-admin-danger\" title=\"{title}\">✕ пропал с сайта · {local:dd.MM}</span>");
+        }
+        return sb.ToString();
+    }
+
     // Чип results-auto (П5, prod-auto-pull-plan §4.5): вердикт последней проверки задачи, в
     // подсказке — причина и когда смотрела. Не смотрела — пусто.
     string AutoPullChipHtml(Swimm.Application.Dtos.UnifiedSiteInfo? site)
@@ -311,8 +336,10 @@
 <!-- Фильтры -->
 <form method="get" id="filters-form" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Поиск по названию
-        <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-72" placeholder="Название или подзаголовок…" />
+        Поиск
+        @* Число ищется ещё и как номер: compID федерации или Id соревнования в базе. *@
+        <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-72" placeholder="Название, compID или № в базе…"
+               title="Подстрока в названии или подзаголовке; число — ещё и compID федерации или номер соревнования в базе (у события — любого дня)" />
     </label>
     <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
         Стадия
@@ -543,7 +570,7 @@ else
                         <!-- Многодневное событие: заголовок (дни и действия — в панели) -->
                         @* data-disc-id — якорь для бейджа «затянуто» после успешного импорта. *@
                         <tr id="evhead-@ev.EventId" data-disc-id="@(u.Site?.DiscoveredId)">
-                            <td>@Html.Raw(StageBadgeHtml(badge))@Html.Raw(StartListBadgeHtml(u.Site))</td>
+                            <td>@Html.Raw(StageBadgeHtml(badge))@Html.Raw(StartListBadgeHtml(u.Site))@Html.Raw(DateChangeChipsHtml(u.Site))</td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
                                 <span class="font-medium text-admin-text">@ev.EventName</span>
@@ -600,7 +627,7 @@ else
                     {
                         <!-- Одиночное соревнование (импортировано или только в БД) -->
                         <tr data-disc-id="@(u.Site?.DiscoveredId)">
-                            <td>@Html.Raw(StageBadgeHtml(badge))@Html.Raw(StartListBadgeHtml(u.Site))</td>
+                            <td>@Html.Raw(StageBadgeHtml(badge))@Html.Raw(StartListBadgeHtml(u.Site))@Html.Raw(DateChangeChipsHtml(u.Site))</td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
                                 <a href="@EditUrl(c.Id)" class="text-admin-accent hover:underline font-medium">@c.Name</a>@Html.Raw(PartialBadge(c.PartialResults))
@@ -661,6 +688,7 @@ else
                                           title="Протокола нет: PDF пустой (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола</span>
                                 }
                                 @Html.Raw(StartListBadgeHtml(s))
+                                @Html.Raw(DateChangeChipsHtml(s))
                                 @Html.Raw(AutoPullChipHtml(s))
                             </td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
