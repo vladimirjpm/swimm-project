@@ -185,6 +185,13 @@ public partial class ResultRepository
             })
             .ToDictionaryAsync(c => c.Id);
 
+        // Строки и дни — две команды без общего снимка (READ COMMITTED): день, удалённый между
+        // ними (переимпорт, --split-days), оставил бы строки без соревнования, и любой
+        // data.Competitions[...] в карточках упал бы KeyNotFoundException → 500. Такие строки
+        // отбрасываем здесь, в одном месте: ответ — как если бы их уже не было.
+        if (competitions.Count < competitionIds.Count)
+            rows = rows.Where(r => competitions.ContainsKey(r.CompetitionId)).ToList();
+
         var relayIds = rows.Where(r => r.RelayId != null).Select(r => r.RelayId!.Value).Distinct().ToList();
         var members = await _db.RelayMembers.AsNoTracking()
             .Where(m => relayIds.Contains(m.RelayId))

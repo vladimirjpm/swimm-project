@@ -97,6 +97,30 @@ public class OverviewSharedDataTests
         Assert.Equal(clean.Id, overview.BestSwim!.SwimmerId);
     }
 
+    /// <summary>
+    /// Строки и дни читаются двумя командами без общего снимка: день, удалённый между ними
+    /// (переимпорт, --split-days), не должен ронять Overview в 500. Моделируем это строками,
+    /// чьего соревнования в базе нет (InMemory не держит FK): ответ — пустой обзор, без исключения.
+    /// </summary>
+    [Fact]
+    public async Task RowsOfDeletedCompetition_AreDropped_NoException()
+    {
+        await using var kit = await OverviewTestKit.CreateAsync(nameof(RowsOfDeletedCompetition_AreDropped_NoException));
+        var comp = await kit.AddCompetitionAsync();
+        var swimmer = await kit.AddSwimmerAsync("Orphan");
+        var orphan = kit.Row(comp, swimmer, position: 1, points: 700);
+        orphan.CompetitionId = 999_999;
+        await kit.AddRowsAsync(orphan);
+
+        var overview = await kit.OverviewAsync(new ResultFilter { CompetitionId = 999_999 });
+
+        Assert.Equal(0, overview.Summary.ResultCount);
+        Assert.Empty(overview.Days);
+        Assert.Null(overview.BestSwim);
+        Assert.Empty(overview.TopMedalists);
+        Assert.Empty(overview.TopClubs);
+    }
+
     private static string Json<T>(IEnumerable<T> items) => JsonSerializer.Serialize(items.ToList());
 
     private sealed class NoCache : Swimm.Application.Abstractions.ICacheService
