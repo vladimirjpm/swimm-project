@@ -593,6 +593,20 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int?>("OrgCompId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("PartialResults")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("PartialResultsAcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PartialResultsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PartialResultsEn")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<int?>("PointRuleClubsId")
                         .HasColumnType("integer");
 

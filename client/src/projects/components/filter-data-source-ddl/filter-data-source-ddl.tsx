@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import './filter-data-source-ddl.css';
 import UI_CompetitionName from '../mix/competition-name/competition-name';
+import UI_PartialResultsChip from '../mix/partial-results-chip/partial-results-chip';
 import { useAppSelector } from '../../../store/store';
 import { routes } from '../../../utils/routes';
 import { seasonLabel, seasonStartYear } from '../../../utils/helpers/season-helper';
@@ -188,6 +189,7 @@ const DataSourceDDL: React.FC<DataSourceDDLProps> = ({ renderHeader, canLoadResu
           >
             <UI_CompetitionName name={s.name} isChampionship={isChampionshipSource(s)} />
           </span>
+          {s.partial_results && <UI_PartialResultsChip hint={s.partial_results} size="sm" />}
         </span>
         {live ? (
           <span className="flex shrink-0 items-center gap-1.5">

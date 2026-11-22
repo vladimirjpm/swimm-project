@@ -50,6 +50,11 @@ public sealed class CompetitionListItemDto : ICompetitionFlags
 
     /// <summary>Помеченных недостоверными строк сейчас (авто + ручные).</summary>
     public int SuspectCount { get; set; }
+    /// <summary>
+    /// «Результаты неполные» (Р114) — текст для чипа, только пока отметка ВИДНА (стоит и не
+    /// принята как есть, <c>PartialResultsState.IsShownFor</c>). null — показывать нечего.
+    /// </summary>
+    public string? PartialResults { get; set; }
     /// <summary>Привязанное правило клубных очков; null — «Авто» (для панели быстрой правки).</summary>
     public int? PointRuleClubsId { get; set; }
     /// <summary>Привязанное правило High Point; null — «Авто».</summary>
@@ -91,6 +96,9 @@ public sealed class CompetitionRowDto : ICompetitionFlags
 
     /// <summary>Помеченных строк по всем дням события.</summary>
     public int SuspectCount { get; set; }
+
+    /// <summary>Дней события с видимой отметкой «результаты неполные» (Р114).</summary>
+    public int PartialDayCount { get; set; }
     /// <summary>Дни события по возрастанию DayNumber (для раскрытия строки).</summary>
     public List<CompetitionListItemDto> Days { get; set; } = [];
 
@@ -152,6 +160,13 @@ public sealed class CompetitionEditDto
 
     /// <summary>Сколько дней у события (1 — одиночное соревнование). Для операции «проставить всем дням».</summary>
     public int EventDayCount { get; set; } = 1;
+
+    /// <summary>«Результаты неполные» (Р114): чего не хватает, по-русски; null — протокол полный.</summary>
+    public string? PartialResults { get; set; }
+    /// <summary>Когда импорт нашёл протокол неполным.</summary>
+    public DateTime? PartialResultsAt { get; set; }
+    /// <summary>Когда админ принял неполный протокол как есть; null — не принимал.</summary>
+    public DateTime? PartialResultsAcceptedAt { get; set; }
 }
 
 /// <summary>URL PDF-результатов соревнования (связь по OrgCompId).</summary>

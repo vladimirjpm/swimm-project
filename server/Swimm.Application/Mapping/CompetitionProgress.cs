@@ -30,6 +30,40 @@ public sealed record CompetitionProgressSummary(IReadOnlyList<EventProgress> Eve
     public bool IsFinished => Events.Count > 0 && Events.All(e => e.Finished);
 
     public IReadOnlyList<string> Pending => Events.Where(e => !e.Finished).Select(e => e.PendingReason!).ToList();
+
+    /// <summary>Сколько причин перечислять поимённо; остальные — «и ещё N».</summary>
+    public const int ListedPending = 3;
+
+    /// <summary>
+    /// Что ждёт, строками для человека: «ждут N из M событий», до <see cref="ListedPending"/> причин,
+    /// «и ещё K». ОДИН текст на results-auto (причина «ещё идёт») и отметку «результаты неполные»
+    /// у соревнования (<see cref="PartialResultsRule"/>). Пусто — всё проплыто.
+    /// </summary>
+    public IReadOnlyList<string> PendingLines()
+    {
+        if (IsFinished) return [];
+        if (Events.Count == 0) return ["в разборе нет ни одного события"];
+        var pending = Pending;
+        var lines = new List<string> { $"ждут {pending.Count} из {Events.Count} событий" };
+        lines.AddRange(pending.Take(ListedPending));
+        if (pending.Count > ListedPending) lines.Add($"и ещё {pending.Count - ListedPending}");
+        return lines;
+    }
+
+    /// <summary>
+    /// То же по-английски для витрины (видимый UI сайта только English): «Waiting for 2 of 16
+    /// events: A; B». Названия событий — как напечатаны в протоколе (это данные). null — всё проплыто.
+    /// </summary>
+    public string? PendingTextEn()
+    {
+        if (IsFinished) return null;
+        if (Events.Count == 0) return "No events in the published results yet";
+        var names = Events.Where(e => !e.Finished).Select(e => e.Event.Trim()).ToList();
+        var listed = string.Join("; ", names.Take(ListedPending));
+        var more = names.Count > ListedPending ? $"; and {names.Count - ListedPending} more" : "";
+        var noun = Events.Count == 1 ? "event" : "events";
+        return $"Waiting for {names.Count} of {Events.Count} {noun}: {listed}{more}";
+    }
 }
 
 /// <summary>

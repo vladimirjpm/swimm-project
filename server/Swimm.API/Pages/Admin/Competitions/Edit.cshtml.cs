@@ -65,6 +65,27 @@ public class EditModel : PageModel
         return RedirectToSelf(Id);
     }
 
+    /// <summary>
+    /// «Результаты неполные» (Р114): принять как есть («остального не будет») или вернуть отметку.
+    /// Своя форма, как у серии: остальные поля не трогает.
+    /// </summary>
+    public async Task<IActionResult> OnPostAcceptPartialAsync(bool accepted)
+    {
+        if (IsNew) return RedirectToList();
+        var result = await _repo.SetPartialResultsAcceptedAsync(Id!.Value, accepted);
+        if (!result.Success)
+        {
+            TempData["Flash"] = result.Error;
+            return RedirectToSelf(Id);
+        }
+
+        await _audit.LogAsync(accepted ? "competition.partial-accept" : "competition.partial-unaccept",
+            "Competition", Id!.Value.ToString(),
+            accepted ? "Неполные результаты приняты как есть" : "Отметка «результаты неполные» возвращена");
+        TempData["Flash"] = accepted ? "Принято как есть — отметка скрыта" : "Отметка «результаты неполные» возвращена";
+        return RedirectToSelf(Id);
+    }
+
     [BindProperty(SupportsGet = true)]
     public int? Id { get; set; }
 

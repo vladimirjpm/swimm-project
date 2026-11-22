@@ -80,6 +80,9 @@ public class CompetitionCalendarRepository : ICompetitionCalendarRepository
                 c.StandingKindOverride,
                 c.OrgCompId,
                 HasResults = _read.Results.Any(r => r.CompetitionId == c.Id),
+                // «Результаты неполные» (Р114): видна, пока не принята как есть.
+                PartialResults = c.PartialResultsAcceptedAt == null ? c.PartialResultsEn : null,
+                c.DayNumber,
             })
             .ToListAsync(ct);
 
@@ -174,6 +177,8 @@ public class CompetitionCalendarRepository : ICompetitionCalendarRepository
                 StandingKindOverride = d.StandingKindOverride,
                 OrgCompId = d.OrgCompId,
                 HasResults = d.HasResults,
+                PartialResults = d.PartialResults,
+                DayNumber = d.DayNumber,
                 CategoryKeys = categoriesById.GetValueOrDefault(d.Id) ?? [],
                 SourceOrgCompIds = sourcesById.GetValueOrDefault(d.Id) ?? [],
             }).ToList(),

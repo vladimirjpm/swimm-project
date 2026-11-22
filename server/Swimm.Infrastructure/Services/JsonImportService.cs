@@ -201,6 +201,8 @@ public class JsonImportService : IImportService
         private int created, skipped, errors;
         private int suspectFlagged;
         private Dictionary<(int CompetitionId, string EventKey), int> expectedByEvent = null!;
+        // «Результаты неполные» (Р114): строки разбора по дням этого импорта — для CompetitionProgress.
+        private Dictionary<int, List<ProgressRow>> progressRows = new();
         private List<string> errorMessages = null!;
         private List<ResultRecord> resultBatch = null!;
 
@@ -271,6 +273,7 @@ public class JsonImportService : IImportService
         {
             await using var transaction = await _db.Database.BeginTransactionAsync();
             tx = transaction;
+            progressRows = new Dictionary<int, List<ProgressRow>>();
             try
             {
                 await AttachToEventAsync();
@@ -287,6 +290,7 @@ public class JsonImportService : IImportService
                 await RemoveOrphanSwimmersAsync();
                 await UpdateEventDatesAsync();
                 await MarkSplitsAsync();
+                await MarkPartialResultsAsync();
                 await StampOrgCompIdAsync();
                 await WriteImportHistoryAsync();
 
@@ -740,6 +744,14 @@ public class JsonImportService : IImportService
             (int CompetitionId, string EventKey) reconKey = (competition.Id, ImportReconciler.EventKey(
                 styleName, item.EventStyleLen, item.IsRelay == true, item.EventCategory));
             expectedByEvent[reconKey] = expectedByEvent.GetValueOrDefault(reconKey) + 1;
+
+            // Та же проекция, что у results-auto (CompetitionProgress.EvaluateJson): событие
+            // протокола, эстафета, заплыв, время как напечатано, time_fail. Без заголовка события
+            // (не loglig-файл) — ключ дисциплины, как у сверки Д1.
+            var eventName = string.IsNullOrWhiteSpace(item.Event) ? reconKey.EventKey : item.Event;
+            if (!progressRows.TryGetValue(competition.Id, out var dayRows))
+                progressRows[competition.Id] = dayRows = [];
+            dayRows.Add(new ProgressRow(eventName, item.IsRelay == true, item.Heat ?? 0, item.Time, item.TimeFail));
         }
 
         // 4. Club
@@ -1156,6 +1168,31 @@ public class JsonImportService : IImportService
                 await _db.SaveChangesAsync();
                 diagnosticLog.Add($"Промежуточные эстафет есть — HasSplits у соревнований: {string.Join(", ", competitionsWithSplits)}");
             }
+        }
+
+        // «Результаты неполные» (Р114, PartialResultsRule): по строкам КАЖДОГО дня этого файла —
+        // проплыты ли все события. Ставит, обновляет или снимает отметку у дня; «принято как
+        // есть» переживает повторный импорт того же неполного протокола. Импорт только личных
+        // или только эстафет (пособытийный забор loglig, PreserveRelays/PreserveIndividuals) —
+        // не весь протокол, судить о полноте по нему нельзя: отметку не трогаем.
+        private async Task MarkPartialResultsAsync()
+        {
+            if (preserveRelays || preserveIndividuals || progressRows.Count == 0) return;
+            var now = DateTime.UtcNow;
+            var ids = progressRows.Keys.ToList();
+            var changed = false;
+            foreach (var c in await _db.Competitions.Where(c => ids.Contains(c.Id)).ToListAsync())
+            {
+                var before = PartialResultsState.Of(c);
+                var after = PartialResultsRule.Apply(before, CompetitionProgress.Evaluate(progressRows[c.Id]), now);
+                if (after == before) continue;
+                after.WriteTo(c);
+                changed = true;
+                diagnosticLog.Add(after.Note is null
+                    ? $"Результаты полные — отметка «неполные» снята у соревнования #{c.Id}"
+                    : $"Результаты неполные у соревнования #{c.Id}{(after.AcceptedAt is null ? "" : " (принято как есть)")}: {after.Note}");
+            }
+            if (changed) await _db.SaveChangesAsync();
         }
 
         // Штамп OrgCompId (compID сайта) на «первичное» соревнование этого импорта — приходит

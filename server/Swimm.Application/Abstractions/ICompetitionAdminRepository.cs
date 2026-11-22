@@ -80,6 +80,13 @@ public interface ICompetitionAdminRepository
     /// <summary>Id всех дней события (включая «голову»), по возрастанию DayNumber.</summary>
     Task<IReadOnlyList<int>> GetEventDayIdsAsync(int eventId);
 
+    /// <summary>
+    /// «Результаты неполные» (Р114): принять неполный протокол как есть (<paramref name="accepted"/>
+    /// = true — «остального не будет») или вернуть отметку. Правило — <c>PartialResultsRule</c>.
+    /// Ошибка — соревнования нет или отметки нет (принимать нечего).
+    /// </summary>
+    Task<CompetitionSaveResult> SetPartialResultsAcceptedAsync(int id, bool accepted);
+
     // ── CompetitionResultUrls (связь по OrgCompId) ─────────────────────────────
 
     /// <summary>Добавить URL результатов. Требует заданного OrgCompId; проверяет уникальность (OrgCompId, Culture).</summary>

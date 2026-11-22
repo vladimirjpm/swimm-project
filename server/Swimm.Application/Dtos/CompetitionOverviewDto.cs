@@ -132,6 +132,11 @@ public sealed class OverviewSummaryDto
     [JsonPropertyName("day_count")] public int DayCount { get; init; }
     [JsonPropertyName("swimmer_count")] public int SwimmerCount { get; init; }
     [JsonPropertyName("club_count")] public int ClubCount { get; init; }
+    /// <summary>
+    /// «Результаты неполные» (Р114): чего ещё нет — по-английски, для чипа «Partial results» в шапке.
+    /// У многодневки — видимые отметки дней одной строкой («Day 2: …»). null — всё полное или принято как есть.
+    /// </summary>
+    [JsonPropertyName("partial_results")] public string? PartialResults { get; init; }
 }
 
 public sealed class OverviewDayDto
@@ -141,6 +146,8 @@ public sealed class OverviewDayDto
     [JsonPropertyName("date")] public string Date { get; init; } = "";
     [JsonPropertyName("day_number")] public int? DayNumber { get; init; }
     [JsonPropertyName("sub_name")] public string? SubName { get; init; }
+    /// <summary>Отметка «результаты неполные» этого дня (EN); null — день полный или принят как есть.</summary>
+    [JsonPropertyName("partial_results")] public string? PartialResults { get; init; }
     [JsonPropertyName("result_count")] public int ResultCount { get; init; }
 }
 

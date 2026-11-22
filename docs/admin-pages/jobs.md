@@ -373,7 +373,7 @@ JSON — camelCase, время — UTC ISO 8601 (`2026-11-20T14:20:00Z`); фор
 | `attention[]` | «Требует внимания» |
 | `running[]` | «Идёт сейчас» |
 | `upcoming[]` | «Ближайшие запуски» (до 8) |
-| `waiting[]` | строки results-auto «ждёт тебя»: `id`, `orgCompId`, `name` (иврит — `dir="auto"`), `dateStart`, `dateEnd`, `reason`, `checkedAt`, `verdict` (`blocked`; `not-finished` / `empty` — застрявшие, см. «Ждёт тебя») |
+| `waiting[]` | строки results-auto «ждёт тебя»: `id`, `orgCompId`, `name` (иврит — `dir="auto"`), `dateStart`, `dateEnd`, `reason`, `checkedAt`, `verdict` (`blocked`; `not-finished` / `empty` — застрявшие; `partial` — затянуто неполным, тогда есть `competitionId`; см. «Ждёт тебя») |
 | `summary` | **та же** сводка, что `GET /summary` (`JobsOverviewBuilder.Build`), с теми же `counters` |
 | `recordsSources` | плитка «Рекорды · источники» (`RecordsCheckTileBuilder`): `value`, `sub`, `tone`, `lastCheckedAt` |
 | `recentImports[]` | 5 последних импортов (`ImportHistoryDto`, как на нынешней странице) |
@@ -476,6 +476,18 @@ JSON — camelCase, время — UTC ISO 8601 (`2026-11-20T14:20:00Z`); фор
 `waiting[]` поле `verdict`. ⚠ Число дашборда `autoPullBlocked24h` и фильтр — по-прежнему только
 `blocked`, поэтому счётчик Jobs теперь может быть больше него. Старты без номера loglig сюда не
 входят: задача их не смотрит.
+
+**Затянуто неполным (22.11.2026, Р114).** Ещё один источник строк — соревнования с отметкой
+«результаты неполные», которую не приняли как есть (`Competitions.PartialResults` не пуст,
+`PartialResultsAcceptedAt` пуст). Ставит её импорт ([data-integrity.md](../data-integrity.md) Р114),
+окна нет: строка висит, пока полный протокол не снимет отметку или Влад не нажмёт «Принять как есть»
+на Edit. В `waiting[]` у такой строки `verdict = partial`, `id` и `competitionId` — день в базе,
+`orgCompId` — свой или события (0 — нет). Текст: «Соревнование «…» #compId (ДД.ММ.ГГГГ) затянуто с
+неполными результатами: <что ждёт>. Полный протокол снимет отметку сам; остального не будет —
+«Принять как есть»»; `href` —
+`/Admin/Competitions/Edit?id=<id>#partial-results`. Идёт в счётчик «ждёт тебя» (`waiting.Count`).
+Склейка — `PartialResultsWaiting.Merge`: строка «Входящих» с тем же compID отбрасывается, поэтому
+застрявший и уже затянутый старт — одна строка, а не две.
 
 ### Честность напоминаний
 

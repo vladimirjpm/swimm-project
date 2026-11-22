@@ -530,6 +530,17 @@ public partial class ResultRepository : IResultRepository
             })
             .ToListAsync();
 
+        // «Результаты неполные» (Р114): только видимые отметки (стоит и не принята как есть) —
+        // обычно их единицы, поэтому отдельным запросом, а не подзапросом в каждую строку.
+        var partialDays = await _db.Competitions.AsNoTracking()
+            .Where(c => c.PartialResults != null && c.PartialResultsAcceptedAt == null)
+            .Select(c => new { c.Id, c.EventId, c.DayNumber, c.PartialResultsEn })
+            .ToListAsync();
+        var partialByCompetition = partialDays.ToDictionary(p => p.Id, p => p.PartialResultsEn);
+        var partialByEvent = partialDays.Where(p => p.EventId != null)
+            .GroupBy(p => p.EventId!.Value)
+            .ToDictionary(g => g.Key, g => PartialResultsRule.CombineDays(g.Select(p => (p.DayNumber, p.PartialResultsEn))));
+
         // Значок серии турнира (docs/plans/series-emblem-plan.md) — плитка шапки соревнования
         // показывает его вместо значка сезона (переключатель CompetitionTile). Проекция без байтов
         // картинки: только то, из чего собирается публичный адрес. Событию — значок серии первого
@@ -636,7 +647,8 @@ public partial class ResultRepository : IResultRepository
                 ResultCount = e.ResultCount,
                 DayDates = SortDayDates(e.DayDates),
                 // Порядок дней — общий с sitemap (CompetitionDays): дата, DayNumber, Id.
-                DayIds = CompetitionDays.OrderedIds(e.Days.Select(d => new CompetitionDays.Day(d.Id, d.DayNumber, d.Date)))
+                DayIds = CompetitionDays.OrderedIds(e.Days.Select(d => new CompetitionDays.Day(d.Id, d.DayNumber, d.Date))),
+                PartialResults = partialByEvent.GetValueOrDefault(e.Id)
             }));
         }
 
@@ -661,7 +673,8 @@ public partial class ResultRepository : IResultRepository
                 DayCount = 1,
                 ResultCount = c.ResultCount,
                 DayDates = string.IsNullOrWhiteSpace(c.Date) ? [] : [c.Date],
-                DayIds = [c.Id]
+                DayIds = [c.Id],
+                PartialResults = partialByCompetition.GetValueOrDefault(c.Id)
             }));
         }
 

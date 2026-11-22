@@ -150,6 +150,12 @@
     //   есть помеченные  → оранжевый бейдж с числом (работа);
     //   проверено, пусто → зелёная галочка с датой прогона;
     //   не проверялось   → ничего, чтобы не создавать ложного успокоения.
+    // «Результаты неполные» (Р114): импорт нашёл непроплытые события, и их не приняли как есть.
+    // Текст — в title; снять — «Принять как есть» на Edit или повторный импорт полного протокола.
+    static string PartialBadge(string? note, string? label = null) => note == null ? "" :
+        $"<span class=\"inline-block ml-1.5 py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-warning/15 text-admin-warning\" " +
+        $"title=\"{System.Net.WebUtility.HtmlEncode(note)}\">⏳ {label ?? "неполные"}</span>";
+
     static string QualityBadge(DateTime? scannedAt, int suspectCount)
     {
         if (suspectCount > 0)
@@ -542,6 +548,12 @@ else
                             <td>
                                 <span class="font-medium text-admin-text">@ev.EventName</span>
                                 <span class="ml-1.5 inline-block py-0.5 px-1.5 rounded text-[10px] font-semibold bg-admin-success/15 text-admin-success">@ev.DayCount @DaysWord(ev.DayCount)</span>
+                                @if (ev.PartialDayCount > 0)
+                                {
+                                    @Html.Raw(PartialBadge(
+                                        string.Join("\n", ev.Days.Where(d => d.PartialResults != null).Select(d => $"День {d.DayNumber?.ToString() ?? "?"}: {d.PartialResults}")),
+                                        $"неполные: {ev.PartialDayCount} {DaysWord(ev.PartialDayCount)}"))
+                                }
                                 @await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", ev.Categories)
                             </td>
                             <td class="whitespace-nowrap text-admin-text-muted">@Html.Raw(DateRangeHtml(ev.DateRange))</td>
@@ -591,7 +603,7 @@ else
                             <td>@Html.Raw(StageBadgeHtml(badge))@Html.Raw(StartListBadgeHtml(u.Site))</td>
                             <td class="text-center">@(u.IsChampionship ? "🏆" : "")</td>
                             <td>
-                                <a href="@EditUrl(c.Id)" class="text-admin-accent hover:underline font-medium">@c.Name</a>
+                                <a href="@EditUrl(c.Id)" class="text-admin-accent hover:underline font-medium">@c.Name</a>@Html.Raw(PartialBadge(c.PartialResults))
                                 @if (!string.IsNullOrEmpty(c.SubName))
                                 {
                                     <div class="text-[11px] text-admin-text-muted truncate max-w-[280px]" title="@c.SubName">@c.SubName</div>
@@ -742,7 +754,7 @@ else
                                             {
                                                 <tr>
                                                     <td class="w-40">
-                                                        <a href="@EditUrl(d.Id)" class="text-admin-accent hover:underline">День @(d.DayNumber?.ToString() ?? "?")</a>
+                                                        <a href="@EditUrl(d.Id)" class="text-admin-accent hover:underline">День @(d.DayNumber?.ToString() ?? "?")</a>@Html.Raw(PartialBadge(d.PartialResults))
                                                         @if (!string.IsNullOrEmpty(d.SubName))
                                                         {
                                                             <div class="text-[11px] text-admin-text-muted truncate max-w-[280px]" title="@d.SubName">@d.SubName</div>

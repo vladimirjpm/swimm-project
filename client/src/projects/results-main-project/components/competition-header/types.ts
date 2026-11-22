@@ -9,6 +9,8 @@ export interface OverviewSummary {
   day_count: number;
   swimmer_count: number;
   club_count: number;
+  /** «Результаты неполные» (Р114): чего ещё нет, по-английски; null/нет — протокол полный. */
+  partial_results?: string | null;
 }
 
 export interface OverviewDay {
@@ -17,6 +19,8 @@ export interface OverviewDay {
   date: string;
   day_number: number | null;
   sub_name: string | null;
+  /** Отметка «результаты неполные» этого дня; null — день полный. */
+  partial_results?: string | null;
   result_count: number;
 }
 

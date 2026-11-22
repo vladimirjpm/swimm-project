@@ -243,11 +243,9 @@ public static class ResultsAutoRules
             return new(ResultsAutoVerdicts.Failed, ["разбор не читается — «закончено ли» не проверить"]);
         if (!input.Progress.IsFinished)
         {
-            var pending = input.Progress.Pending;
-            var reasons = new List<string> { $"соревнование не закончено: ждут {pending.Count} из {input.Progress.Events.Count} событий" };
-            reasons.AddRange(pending.Take(3));
-            if (pending.Count > 3) reasons.Add($"и ещё {pending.Count - 3}");
-            if (input.Progress.Events.Count == 0) reasons[0] = "в разборе нет ни одного события";
+            // Строки — общие с отметкой «результаты неполные» у соревнования (PartialResultsRule).
+            var reasons = input.Progress.PendingLines().ToList();
+            if (input.Progress.Events.Count > 0) reasons[0] = "соревнование не закончено: " + reasons[0];
             return new(ResultsAutoVerdicts.NotFinished, reasons);
         }
 

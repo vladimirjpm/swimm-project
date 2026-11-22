@@ -33,6 +33,8 @@ export type CompetitionSource = {
    * серии или у серии нет значка. Плитка шапки рисует его вместо значка сезона.
    */
   emblem_url?: string | null;
+  /** «Результаты неполные» (Р114): подсказка чипа «Partial results»; null/нет — протокол полный. */
+  partial_results?: string | null;
 };
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
