@@ -120,7 +120,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 Status = d.Status, Languages = d.Languages, LastError = d.LastError, LogligId = d.LogligId,
                 EmptySourceAt = d.EmptySourceAt, Discipline = d.Discipline,
                 AutoPullVerdict = d.AutoPullVerdict, AutoPullBlockedReason = d.AutoPullBlockedReason,
-                AutoPullCheckedAt = d.AutoPullCheckedAt, AutoPullPoolType = d.AutoPullPoolType
+                AutoPullCheckedAt = d.AutoPullCheckedAt, AutoPullPoolType = d.AutoPullPoolType,
+                PreviousDateStart = d.PreviousDateStart, MissingSince = d.MissingSince
             };
 
             // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.
