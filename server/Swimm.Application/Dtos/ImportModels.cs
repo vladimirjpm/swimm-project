@@ -75,7 +75,15 @@ public sealed record ImportEventOptions(
     /// ключа соревнования — бассейн входит в уникальный ключ (Name|Date|PoolType), и менять
     /// его после импорта значит плодить дубль.
     /// </summary>
-    string? PoolType = null);
+    string? PoolType = null,
+
+    /// <summary>
+    /// Р119: импортировать файл одной датой, даже если у этого compID в базе уже есть дни с
+    /// другими датами и файл покрывает их строки (<c>CollapsedProtocolRule</c>). По умолчанию
+    /// false — такой импорт откатывается: свёрнутый протокол положил бы те же результаты дублем
+    /// (e62). UI этот флаг не взводит; он для осознанного обхода, когда правило ошиблось.
+    /// </summary>
+    bool AllowCollapsedProtocol = false);
 
 public class ImportResult
 {
