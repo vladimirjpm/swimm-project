@@ -45,6 +45,13 @@ public static class CompetitionListUrl
     /// адрес открыл бы текущий месяц, и к списку всех сезонов было бы не вернуться.</summary>
     public const string AllSeasons = "all";
 
+    /// <summary>
+    /// Весь список (все сезоны, «p» по 20) — для ссылок с других экранов, которым нужен не текущий
+    /// месяц, а всё: дашборд «Без правила очков», Health «дубль даты у события», Jobs «Входящие»
+    /// (решение Влада 23.11.2026). Сайдбар, admin-home и Import остаются голыми — текущий месяц.
+    /// </summary>
+    public const string AllSeasonsHref = "/Admin/Competitions?season=" + AllSeasons;
+
     /// <summary>Размер страницы, когда месяц не выбран (поиск, <c>filter=</c>, весь сезон).</summary>
     public const int PageSize = 20;
 

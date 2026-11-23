@@ -41,6 +41,18 @@ public class CompetitionListUrlTests
     public void AnyParameter_KeepsTheExplicitSelection(string key, string value) =>
         Assert.False(CompetitionListUrl.ShouldOpenOnCurrentMonth(Q((key, value))));
 
+    [Fact]
+    public void AllSeasonsHref_OpensTheWholeList_AsBeforeTheChange()
+    {
+        // Дашборд «Без правила очков», Health «дубль даты у события», Jobs «Входящие»
+        // (решение Влада 23.11.2026): все сезоны, без подставленного месяца.
+        var query = new Uri("http://x" + CompetitionListUrl.AllSeasonsHref).Query.TrimStart('?')
+            .Split('&').Select(p => p.Split('=')).Select(p => (p[0], (string?)p[1])).ToArray();
+        Assert.Equal("/Admin/Competitions?season=all", CompetitionListUrl.AllSeasonsHref);
+        Assert.False(CompetitionListUrl.ShouldOpenOnCurrentMonth(Q(query)));
+        Assert.Null(CompetitionListUrl.ParseSeason(query.Single().Item2));
+    }
+
     [Theory]
     [InlineData(2026, 11, 23, 2027, 11)]
     [InlineData(2026, 9, 1, 2027, 9)]    // сентябрь — первый месяц нового сезона
