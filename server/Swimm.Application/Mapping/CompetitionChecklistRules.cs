@@ -36,6 +36,11 @@ public enum ChecklistPhase
     Importing,
     /// <summary>Импорт не прошёл.</summary>
     ImportFailed,
+    /// <summary>
+    /// Тянуть нечего (Р116): разбор ответил «пустой PDF» или «все строки — неявка». Это не сбой —
+    /// сервер уже поставил «∅ нет протокола», строка закрыта; шаг 5 решён, дальше идти некуда.
+    /// </summary>
+    NothingToPull,
 }
 
 /// <summary>
@@ -50,6 +55,12 @@ public enum ChecklistPhase
 /// <param name="DayCount">Дней старта (по датам сайта).</param>
 /// <param name="QualityScanned">Проверка качества уже прогонялась.</param>
 /// <param name="SuspectCount">Строк, помеченных сомнительными.</param>
+/// <param name="OnFederationSite">Строка есть у федерации (не PDF-импорт без OrgCompId) — шаг 1.</param>
+/// <param name="Incomplete">
+/// У затянутого протокол неполный: видимая отметка «результаты неполные» (Р114) или затянуты не все
+/// дни по сайту федерации (Р115) — шаг 5 с «!». У дня события — по отметке этого дня.
+/// </param>
+/// <param name="Hidden">Строка скрыта (Ignored) — шаг 5 серый: «скрыто», а не «тянуть нечего».</param>
 public sealed record ChecklistInput(
     CompetitionRowState State,
     bool Imported = false,
@@ -58,15 +69,18 @@ public sealed record ChecklistInput(
     int WarmUpDays = 0,
     int DayCount = 1,
     bool QualityScanned = false,
-    int SuspectCount = 0);
+    int SuspectCount = 0,
+    bool OnFederationSite = true,
+    bool Incomplete = false,
+    bool Hidden = false);
 
 /// <summary>
 /// Девять шагов чек-листа (хэндофф 3.5): 1 найден у федерации, 2 стартовый протокол, 3 разминка,
 /// 4 старт прошёл, 5 протокол скачан и разобран, 6 проверь превью, 7 импорт, 8 проверка качества,
 /// 9 после импорта. Шаги 1–4 — по данным строки; 5–9 — по состоянию и фазе затягивания.
 ///
-/// Этап 4 включает чек-лист только для «ждёт затягивания»; правило уже отвечает и для остальных
-/// состояний (этап 6 рисует их по нему же, таблица случаев — хэндофф 3.5).
+/// С этапа 6 чек-лист — у строк всех состояний (таблица случаев — хэндофф 3.5 и
+/// docs/admin-pages/competitions.md); у многодневного события шаги 5–9 считаются по каждому дню.
 /// </summary>
 public static class CompetitionChecklistRules
 {
@@ -77,6 +91,7 @@ public static class CompetitionChecklistRules
     [
         ChecklistPhase.Parsing, ChecklistPhase.ParseFailed, ChecklistPhase.Preview,
         ChecklistPhase.PreviewExpired, ChecklistPhase.Importing, ChecklistPhase.ImportFailed,
+        ChecklistPhase.NothingToPull,
     ];
 
     /// <summary>Статусы девяти шагов (индекс 0 — шаг 1).</summary>
@@ -85,7 +100,8 @@ public static class CompetitionChecklistRules
         var s = new ChecklistStepStatus[StepCount];
         var notStarted = input.State is CompetitionRowState.Ahead or CompetitionRowState.Running;
 
-        s[0] = ChecklistStepStatus.Done;
+        // PDF-импорт без страницы федерации (DbOnly) — «найден у федерации» не про него.
+        s[0] = input.OnFederationSite ? ChecklistStepStatus.Done : ChecklistStepStatus.Pending;
         // Шаги 2–3 у прошедшего старта («ждёт затягивания», «ждём протокол», закрыто): несделанное —
         // серым, без «!» (решение Влада 23.11.2026): после старта их уже никто не задаст, а у долга
         // прошлых сезонов «!» был бы шумом. До старта и пока он идёт — «!» остаётся.
@@ -130,6 +146,7 @@ public static class CompetitionChecklistRules
         ChecklistPhase.PreviewExpired => "preview-expired",
         ChecklistPhase.Importing => "importing",
         ChecklistPhase.ImportFailed => "import-failed",
+        ChecklistPhase.NothingToPull => "nothing",
         _ => "none",
     };
 
@@ -151,13 +168,17 @@ public static class CompetitionChecklistRules
             // Шаг 9 — «действия доступны» (хэндофф 3.5), текущим он становится, только когда
             // проверка качества уже прогнана; до того текущий — шаг 8.
             var quality = i.SuspectCount > 0 ? A : i.QualityScanned ? D : C;
-            return [D, D, D, quality, quality == C ? P : C];
+            // Неполный протокол у затянутого (Р114 / Р115) — «!» у шага 5: ждём остальное или «Принять как есть».
+            return [i.Incomplete ? A : D, D, D, quality, quality == C ? P : C];
         }
         return i.State switch
         {
             CompetitionRowState.ReadyToPull => [C, P, P, P, P],
-            // Ждём протокол; закрыто без импорта (∅, скрыто, «✓ имп.» руками) — шаг 5 с причиной подписью.
-            CompetitionRowState.WaitingProtocol or CompetitionRowState.Closed => [A, P, P, P, P],
+            // Ждём протокол — шаг 5 «!» с причиной подписью.
+            CompetitionRowState.WaitingProtocol => [A, P, P, P, P],
+            // Закрыто без импорта: скрыто — серое; «∅ нет протокола» и «✓ имп.» руками — шаг 5 решён
+            // («протокола нет» / «помечено импортированным»), дальше идти некуда.
+            CompetitionRowState.Closed => [i.Hidden ? P : D, P, P, P, P],
             _ => [P, P, P, P, P],
         };
     }
@@ -174,6 +195,7 @@ public static class CompetitionChecklistRules
             ChecklistPhase.PreviewExpired => [D, A, P, P, P],
             ChecklistPhase.Importing => [D, D, C, P, P],
             ChecklistPhase.ImportFailed => [D, D, A, P, P],
+            ChecklistPhase.NothingToPull => [D, P, P, P, P],
             _ => [P, P, P, P, P],
         };
     }

@@ -155,37 +155,35 @@
                 show(keyFor(new URL(location.href).searchParams.get('sel'))));
         })();
 
-        // Подтверждение каскадного удаления (одиночное / день / всё событие) — как в /Admin/Competitions.
-        document.querySelectorAll('.comp-delete-form').forEach(form => {
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const kind = form.dataset.kind;
-                const name = form.dataset.name || 'соревнование';
-                const rows = form.dataset.rows || '0';
-                let title, message;
-                if (kind === 'event') {
-                    const days = form.dataset.days || '?';
-                    title = 'Удалить всё событие?';
-                    message = `«${name}» — будут удалены ВСЕ ${days} дн. вместе с результатами (${rows} строк), эстафетами и галереями. Действие необратимо.`;
-                } else if (kind === 'day') {
-                    title = 'Удалить день?';
-                    message = `«${name}» — будут удалены его результаты (${rows} строк). Действие необратимо.`;
-                } else {
-                    title = 'Удалить соревнование?';
-                    message = `«${name}» — будут удалены его результаты (${rows} строк), эстафеты и галереи. Действие необратимо.`;
-                }
-                const ok = await adminConfirm({ title, message, confirmText: 'Удалить', danger: true });
-                if (ok) form.submit();
+        // Дни многодневного события (вариант E, этап 6; хэндофф 3.5): шаги 1–4 общие, шаги 5–9 — у
+        // выбранного дня (.ck-scope[data-day]). Форма быстрой правки у события одна (она пишет во
+        // все дни) — переезжает в шаг 6 выбранного дня. Ход затягивания перерисовывается: превью и
+        // строки хода живут в видимой области.
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.ck-day-btn');
+            if (!btn) return;
+            const panel = btn.closest('.row-panel');
+            const day = btn.dataset.day;
+            panel.querySelectorAll('.ck-day-btn').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+            panel.querySelectorAll('.ck-scope').forEach(sc => sc.classList.toggle('hidden', sc.dataset.day !== day));
+            const form = panel.querySelector('.qe-form');
+            const slot = panel.querySelector(`.ck-scope[data-day="${day}"] .qe-slot`);
+            if (form && slot && form.parentElement !== slot) slot.appendChild(form);
+            window.pullFlow?.render();
+        });
+
+        // Выпадающие «Ещё ▾» (шапка страницы и панели) и «Фильтры» — <details>: клик мимо закрывает.
+        document.addEventListener('click', (e) => {
+            document.querySelectorAll('details.ck-more[open], details.page-pop[open]').forEach(d => {
+                if (!d.contains(e.target)) d.removeAttribute('open');
             });
         });
 
         // ── Ход одиночного затягивания — в правой панели строки (вариант E, этап 4) ──
         // Затягивание идёт минуты и в несколько шагов (скачать PDF → разобрать → превью → фоновый
         // job импорта → автопроверка качества). Раньше шаги жили в плавающей панели в углу экрана,
-        // теперь — в панели своей строки: у чек-листа («ждёт затягивания») это статусы и строки шагов
-        // 5–7, у прежней панели строки (Перезатянуть, «Затянуть» идущего / «ждём протокол») — список
-        // строк под кнопками. Тексты строк — прежней панели «Затягивание».
+        // теперь — в чек-листе своей строки (у всех состояний с этапа 6): статусы и строки шагов 5–7,
+        // у события — в выбранном дне. Тексты строк — прежней панели «Затягивание».
         //
         // Переживает F5 и переключение строк: весь ход (фаза, строки, ответ превью, выбор в превью,
         // jobId) лежит в sessionStorage под одним ключом. Превью на сервере живёт 60 минут по
@@ -194,7 +192,6 @@
         // Статусы шагов на каждую фазу посчитаны сервером (CompetitionChecklistRules → data-phases).
         window.pullFlow = (function () {
             const FLOW_KEY = 'pullFlow';        // текущий ход (переживает F5)
-            const PENDING_KEY = 'pullPending';  // ключ страницы до этапа 4 — подхватываем после выкладки
             const DONE_KEY = 'pullDone';        // итог, который надо показать после reload
             const PREVIEW_TTL_MS = 60 * 60 * 1000;
             const RESTART_PARSE_MS = 10 * 60 * 1000;
@@ -221,11 +218,23 @@
                 'parse-failed': ['сбой', 'bg-admin-danger/15 text-admin-danger'],
                 'import-failed': ['сбой', 'bg-admin-danger/15 text-admin-danger'],
                 'preview-expired': ['превью устарело', 'bg-admin-warning/15 text-admin-warning'],
+                nothing: ['∅ нет протокола', 'bg-white/[.08] text-admin-text-muted'],
             };
             const PHASE_TEXT = {
                 parsing: 'скачиваю и разбираю протокол', preview: 'превью готово, ждёт «Импортировать»',
                 importing: 'импорт идёт в фоне', 'parse-failed': 'разбор не удался',
                 'import-failed': 'импорт не прошёл', 'preview-expired': 'превью устарело',
+                nothing: 'тянуть нечего',
+            };
+            // Р116: ответы разбора «тянуть нечего» — те же формулировки, по которым сервер ставит
+            // «∅ нет протокола» (DiscoveryPreviewService.LooksLikeEmptySource, NoStartProtocol.Marker).
+            // Это не сбой: шаг 5 решён, строка закрыта (после F5 — в «Закрыто»).
+            const NO_START_MARKER = 'все строки — неявка';
+            const EMPTY_MARKERS = ['No competitions found', '0 lines extracted', 'не распознал ни одного результата'];
+            const nothingToPull = (message) => {
+                const m = String(message ?? '').toLowerCase();
+                if (m.includes(NO_START_MARKER)) return 'тянуть нечего: в протоколе одни неявки (NS)';
+                return EMPTY_MARKERS.some(x => m.includes(x.toLowerCase())) ? 'тянуть нечего: протокол пуст' : null;
             };
 
             // { discId, name, org, repull, phase, startedAt, previewAt, p, form, jobId, lines:[{step,text,state}], captions:{} }
@@ -246,15 +255,25 @@
             };
             const previewBox = () => document.getElementById('preview-box');
 
+            // Статусы — из data-phases ближайшей области: у панели (шаги 1–4) и у .ck-scope (шаги 5–9;
+            // у события — своя у каждого дня: отметки «неполные» и качество у дней разные).
             function setStatuses(panel, phase) {
-                let map = {};
-                try { map = JSON.parse(panel.dataset.phases || '{}'); } catch { /* без статусов */ }
-                const statuses = map[phase] ?? map.none ?? [];
+                const cache = new Map();
                 panel.querySelectorAll('.ck-step').forEach(li => {
-                    const s = statuses[Number(li.dataset.step) - 1];
+                    const holder = li.closest('[data-phases]');
+                    if (!cache.has(holder)) {
+                        let map = {};
+                        try { map = JSON.parse(holder?.dataset.phases || '{}'); } catch { /* без статусов */ }
+                        cache.set(holder, map[phase] ?? map.none ?? []);
+                    }
+                    const s = cache.get(holder)[Number(li.dataset.step) - 1];
                     if (s) li.dataset.status = s;
                 });
             }
+
+            // Шаг видимой области: у события шаги 5–9 повторены по дням, ход идёт в выбранном.
+            const stepOf = (panel, n) => [...panel.querySelectorAll(`.ck-step[data-step="${n}"]`)]
+                .find(li => !li.closest('.ck-scope.hidden')) ?? null;
 
             function linesHtml(lines) {
                 return lines.map(l => `
@@ -272,14 +291,16 @@
 
             // Панель без хода: статусы и подписи — как нарисовал сервер.
             function resetPanel(panel) {
+                if (!panel.classList.contains('checklist')) return; // пачка (#panel-bulk) — не чек-лист
                 panel.querySelectorAll('.ck-log').forEach(ol => fillLog(ol, []));
-                if (!panel.classList.contains('checklist')) return;
                 setStatuses(panel, 'none');
                 panel.querySelectorAll('.ck-caption').forEach(c => { c.textContent = c.dataset.default ?? ''; });
-                panel.querySelector('.ck-pull-btn')?.classList.remove('hidden');
+                panel.querySelectorAll('.ck-pull-btn').forEach(b => b.classList.remove('hidden'));
+                const chip = panel.querySelector('.ck-state-chip');
+                if (chip?.dataset.default !== undefined) chip.textContent = chip.dataset.default;
             }
 
-            // Кнопки «Затянуть» / «Перезатянуть» (чек-лист и прежняя панель): гаснут все, пока импорт
+            // Кнопки «Затянуть» / «Перезатянуть»: гаснут все, пока импорт
             // ставится или идёт, и у своей строки — пока идёт её разбор.
             function lockPullButtons() {
                 const busy = importBusy();
@@ -329,26 +350,28 @@
                 }
 
                 const showPreview = flow.phase === 'preview';
-                if (panel.classList.contains('checklist')) {
-                    setStatuses(panel, flow.phase);
-                    // Строки хода — только у текущего шага и у шага со сбоем: у сделанного итог в подписи.
-                    for (let n = 5; n <= 7; n++) {
-                        const li = panel.querySelector(`.ck-step[data-step="${n}"]`);
-                        const open = ['current', 'attention'].includes(li?.dataset.status);
-                        fillLog(li?.querySelector('.ck-log'), open ? flow.lines.filter(l => l.step === n) : []);
-                    }
-                    Object.entries(flow.captions ?? {}).forEach(([n, text]) => {
-                        const c = panel.querySelector(`.ck-step[data-step="${n}"] .ck-caption`);
-                        if (c) c.textContent = text;
-                    });
-                    // «Затянуть» — пока хода нет или он сорвался; в разборе, превью и импорте — только PDF.
-                    panel.querySelector('.ck-pull-btn')?.classList.toggle('hidden',
-                        ['parsing', 'preview', 'importing'].includes(flow.phase));
-                } else {
-                    fillLog(panel.querySelector('.ck-log'), flow.lines);
+                setStatuses(panel, flow.phase);
+                // Строки хода — только у текущего шага и у шага со сбоем: у сделанного итог в подписи.
+                for (let n = 5; n <= 7; n++) {
+                    const li = stepOf(panel, n);
+                    const open = ['current', 'attention'].includes(li?.dataset.status);
+                    fillLog(li?.querySelector('.ck-log'), open ? flow.lines.filter(l => l.step === n) : []);
+                }
+                Object.entries(flow.captions ?? {}).forEach(([n, text]) => {
+                    const c = stepOf(panel, Number(n))?.querySelector('.ck-caption');
+                    if (c) c.textContent = text;
+                });
+                // «Затянуть» / «Перезатянуть» — пока хода нет или он сорвался; в разборе, превью и импорте — только PDF.
+                panel.querySelectorAll('.ck-pull-btn').forEach(b => b.classList.toggle('hidden',
+                    ['parsing', 'preview', 'importing'].includes(flow.phase)));
+                // Р116: строка уже закрыта сервером («∅ нет протокола») — так и называем её до F5.
+                const chip = panel.querySelector('.ck-state-chip');
+                if (chip && flow.phase === 'nothing') {
+                    chip.dataset.default ??= chip.textContent;
+                    chip.textContent = 'закрыто · тянуть нечего';
                 }
                 if (box) {
-                    const slot = panel.querySelector('.ck-preview-slot');
+                    const slot = stepOf(panel, 6)?.querySelector('.ck-preview-slot');
                     if (slot && box.parentElement !== slot) slot.appendChild(box);
                     box.classList.toggle('hidden', !showPreview);
                 }
@@ -433,8 +456,17 @@
             }
 
             function parseFailed(message) {
-                finish('fail', `Не удалось разобрать: ${esc(message)}`, 5);
                 flow.p = null;
+                const nothing = nothingToPull(message);
+                if (nothing) {
+                    // Р116: не «не удалось» — спокойный исход; подробность сервера — строкой хода.
+                    finish('ok', esc(nothing), 5);
+                    flow.lines.push({ step: 5, state: 'wait', text: esc(message) });
+                    flow.captions[5] = nothing;
+                    commit('nothing');
+                    return;
+                }
+                finish('fail', `Не удалось разобрать: ${esc(message)}`, 5);
                 commit('parse-failed');
             }
 
@@ -525,9 +557,8 @@
                 commit('import-failed');
             }
 
-            // Итог после reload: строка уже «импортировано» (закрыто), у неё прежняя панель строки
-            // до этапа 6 — итог пишется в её список хода. Проверка качества прошла сама в импорте:
-            // её ✓ / ⚑ N — в шапке панели и в строке списка.
+            // Итог после reload: строка уже «импортировано» (закрыто) — итог пишется под шагом 7 её
+            // чек-листа. Проверка качества прошла сама в импорте: её ✓ / ⚑ N — у шага 8 и в строке списка.
             function showDone(d) {
                 const lines = [{ step: 7, text: `Затянуто: создано ${d.created} из ${d.total}`, state: 'ok' }];
                 if (d.skipped) lines.push({ step: 7, text: `пропущено ${d.skipped}`, state: 'wait' });
@@ -550,7 +581,8 @@
                 const panel = panelOf(d.discId);
                 const title = '<li class="font-semibold text-white">Итог затягивания</li>';
                 if (panel) {
-                    const ol = panel.querySelector('.ck-log');
+                    // Итог — под шагом 7 «Импорт» (у события — видимого дня).
+                    const ol = stepOf(panel, 7)?.querySelector('.ck-log');
                     if (ol) { ol.innerHTML = title + linesHtml(lines); ol.classList.remove('hidden'); }
                     if (!row.querySelector('.pulled-badge'))
                         row.querySelector('.row-marks')?.insertAdjacentHTML('beforeend',
@@ -572,15 +604,11 @@
                 const done = store.get(DONE_KEY);
                 if (done) { store.del(DONE_KEY); store.del(FLOW_KEY); showDone(done); return; }
 
-                const legacy = store.get(PENDING_KEY);
-                if (legacy) {
-                    store.del(PENDING_KEY);
-                    flow = { discId: String(legacy.discId), name: legacy.name, phase: 'importing', jobId: legacy.jobId,
-                        startedAt: Date.now(), lines: [], captions: {} };
-                }
-                flow = flow ?? store.get(FLOW_KEY);
+                flow = store.get(FLOW_KEY);
                 if (!flow) return;
                 flow.lines ??= []; flow.captions ??= {};
+                // «Тянуть нечего» (Р116): после F5 сервер уже показывает строку закрытой («∅») — ход не нужен.
+                if (flow.phase === 'nothing') { flow = null; save(); render(); return; }
 
                 if (flow.phase === 'parsing') {
                     // Запрос разбора оборвала перезагрузка — запускаем его заново (это только превью).
@@ -1242,9 +1270,9 @@
             document.addEventListener('click', (ev) => {
                 const btn = ev.target.closest('.splits-btn, .splits-dry, .splits-apply');
                 if (!btn) return;
-                const panel = btn.closest('.row-panel') ?? btn.closest('td');
+                // Отчёт — под шагом 9 своей области (у события — своего дня).
                 const box = btn.classList.contains('splits-btn')
-                    ? panel?.querySelector('.splits-box')
+                    ? btn.closest('.ck-step')?.querySelector('.splits-box')
                     : btn.closest('.splits-box');
                 if (!box) return;
                 run(box, btn.classList.contains('splits-apply'));
@@ -1267,9 +1295,13 @@
             }
             const discName = (id) => (window.__DISC?.[id]?.name) || ('#' + id);
 
-            document.getElementById('btn-sync').addEventListener('click', async () => {
-                const btn = document.getElementById('btn-sync');
-                const year = document.getElementById('sync-year').value;
+            // «Проверить сайт федерации» — текущий сезон; «Ещё ▾ → Сезон на сайте → Забрать» — прошлый (cYear).
+            // Один забор и одни сообщения на обе кнопки (бывшие «Проверить сейчас» + селект «Сезон на сайте»).
+            document.getElementById('btn-sync').addEventListener('click', (e) => runSync(e.currentTarget, ''));
+            document.getElementById('btn-sync-year')?.addEventListener('click', (e) =>
+                runSync(e.currentTarget, document.getElementById('sync-year').value));
+            async function runSync(btn, year) {
+                btn.closest('details')?.removeAttribute('open');
                 btn.disabled = true;
                 info.textContent = year ? `Проверяю сезон ${year} на сайте…` : 'Проверяю сайт…';
                 try {
@@ -1292,7 +1324,7 @@
                         location.reload();
                     }
                 } catch (e) { info.textContent = ''; toast('Ошибка: ' + e.message, 5000); btn.disabled = false; }
-            });
+            }
 
             window.discStatus = async function (id, status) {
                 try {
