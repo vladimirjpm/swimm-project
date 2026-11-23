@@ -14,6 +14,8 @@ namespace Swimm.Application.Dtos;
 /// <param name="ClubStanding">Официальный клубный зачёт: есть ли, по какой шкале, есть ли правило.</param>
 /// <param name="Flags">Флаги соревнования, предложенные по источникам (см. <see cref="CompetitionFlagSuggestion"/>).</param>
 /// <param name="Error">Разбор не удался; остальные поля тогда пусты.</param>
+/// <param name="CollapsedProtocol">Р119: файл одной датой покрывает уже затянутые дни этого compID с
+/// другими датами — импорт создал бы дубль; «Импортировать» заблокирована, пачка — ручная проверка.</param>
 public sealed record DiscoveryPreviewResult(
     Guid PreviewId,
     ParsedCompetition? Parsed,
@@ -23,7 +25,8 @@ public sealed record DiscoveryPreviewResult(
     ImportRecordPreviewDto? RecordPreview,
     OfficialClubStandingProbe? ClubStanding,
     CompetitionFlagSuggestion? Flags = null,
-    string? Error = null)
+    string? Error = null,
+    Validation.CollapsedProtocolFinding? CollapsedProtocol = null)
 {
     public static DiscoveryPreviewResult Failed(string error) =>
         new(Guid.Empty, null, [], null, [], null, null, null, error);

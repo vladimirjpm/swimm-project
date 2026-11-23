@@ -1399,7 +1399,7 @@
                     const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
                     if (!pullFlow.isActive(id, token)) return; // пока шёл разбор, ход отменили или начали другой
                     // existingCompetitionId — для перезаписи; needsPool — правило бассейна у «Импортировать» (Р118).
-                    preview = { previewId: p.previewId, id, name, existingCompetitionId: p.existingCompetitionId ?? null, needsPool: needsPool(p) };
+                    preview = { previewId: p.previewId, id, name, existingCompetitionId: p.existingCompetitionId ?? null, needsPool: needsPool(p), collapsed: p.collapsedProtocol ?? null };
                     pullFlow.previewReady(p);
                     await showPreview(p, name, repull);
                     updateRemaining();
@@ -1419,7 +1419,8 @@
                 btn.disabled = true;
                 btn.title = 'Восстанавливаю выбор в превью…';
                 preview = { previewId: f.p.previewId, id: Number(f.discId), name: f.name,
-                    existingCompetitionId: f.p.existingCompetitionId ?? null, needsPool: needsPool(f.p) };
+                    existingCompetitionId: f.p.existingCompetitionId ?? null, needsPool: needsPool(f.p),
+                    collapsed: f.p.collapsedProtocol ?? null };
                 await showPreview(f.p, f.name, f.repull);
                 const restored = applyForm(f.form);
                 updateRemaining();
@@ -1433,7 +1434,7 @@
                         () => { btn.disabled = false; err.classList.add('hidden'); }, { once: true });
                     return;
                 }
-                btn.disabled = false;
+                btn.disabled = !!preview.collapsed; // Р119: свёрнутый протокол не импортируется
             };
 
             // Выбор в превью (бассейн, флаги, категории, правило, событие, перезапись, «сомнительные»)
@@ -1486,7 +1487,7 @@
                 const pool = document.getElementById('flag-pool').value;
                 // Правило то же, что у «Импортировать»: бассейн обязателен, если в файле есть новый день.
                 const poolHint = document.getElementById('pool-hint');
-                poolHint.classList.toggle('hidden', !!pool || !needsPool(f.p));
+                poolHint.classList.toggle('hidden', !!pool || !needsPool(f.p) || !!f.p.collapsedProtocol);
                 poolHint.textContent = f.p.existingCompetitionId
                     ? 'в файле есть новый день — выбери бассейн (существующим дням он не меняется)'
                     : 'выбери — без бассейна импорт не начнётся';
@@ -1494,6 +1495,10 @@
                 const left = [];
                 if (!pool && needsPool(f.p)) left.push('бассейн');
                 if (recs) left.push(`${recs} ${recs % 10 === 1 && recs % 100 !== 11 ? 'рекорд' : recs % 10 >= 2 && recs % 10 <= 4 && (recs % 100 < 12 || recs % 100 > 14) ? 'рекорда' : 'рекордов'}`);
+                if (f.p.collapsedProtocol) {
+                    pullFlow.setCaption(6, 'импорт заблокирован: протокол свёрнут в одну дату, эти результаты уже затянуты днями события');
+                    return;
+                }
                 const note = f.repull
                     ? (f.p.existingCompetitionId ? ' · перезапись существующих результатов уже включена'
                         : ' · совпадения с существующим соревнованием НЕ найдено — импорт создаст новое, проверь дату и название')
@@ -1798,6 +1803,15 @@
                 const warn = document.getElementById('preview-warnings');
                 warn.classList.toggle('hidden', !(p.warnings?.length));
                 warn.innerHTML = (p.warnings ?? []).map(esc).join('<br>');
+
+                // Р119: протокол свёрнут в одну дату, а эти результаты уже затянуты днями события —
+                // импорт дал бы дубль. «Импортировать» гаснет; сервер такой импорт тоже откатит.
+                const collapsedBox = document.getElementById('preview-collapsed');
+                const importBtn = document.getElementById('btn-import');
+                collapsedBox.classList.toggle('hidden', !p.collapsedProtocol);
+                collapsedBox.textContent = p.collapsedProtocol?.message ?? '';
+                importBtn.disabled = !!p.collapsedProtocol;
+                importBtn.title = p.collapsedProtocol ? 'Протокол свёрнут в одну дату — импорт создал бы дубль уже затянутых дней' : '';
 
                 renderCompetitionFlags(p.flags);
                 renderRecordPreview(p.recordPreview);
@@ -2122,6 +2136,10 @@
 
             document.getElementById('btn-import').addEventListener('click', async () => {
                 if (!preview) return;
+                if (preview.collapsed) {
+                    alert('Импорт заблокирован: ' + preview.collapsed.message);
+                    return;
+                }
                 // Бассейн протокол не пишет, а у парсера умолчание 25 м (И-30: летний чемпионат
                 // лёг 25-метровым). Файл, где есть хоть один НОВЫЙ день, без явного выбора не
                 // импортируем (Р118: новый день события иначе молча получит умолчание парсера);

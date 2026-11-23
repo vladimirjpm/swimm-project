@@ -174,6 +174,13 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
             parsed = parsed with { Warnings = [.. parsed.Warnings, .. matchWarnings] };
         var existingCompetitionId = existingMatches.FirstOrDefault(m => m.ExistingCompetitionId != null)?.ExistingCompetitionId;
 
+        // Р119: протокол свёрнут в одну дату, а дни этого compID уже затянуты другими датами (путь Б
+        // по дням, e62) — импорт положил бы те же строки ещё раз. Тем же правилом, что импорт.
+        var collapsed = orgCompId is int coc
+            ? await CollapsedProtocolGuard.DetectAsync(
+                _db, coc, parsed.Competitions.Select(c => c.Date), parsed.ResultCount, ct)
+            : null;
+
         // Сколько рекордов побьёт файл (Б2). Считается ДО «Применить»: настоящий рекорд —
         // событие редкое, а десяток разом почти всегда значит, что протокол разобрался неверно.
         var recordPreview = await _recordPreview.AnalyzeAsync(parsed.ResultsJson, ct);
@@ -187,7 +194,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
 
         return new DiscoveryPreviewResult(
             previewId, parsed, languages, existingCompetitionId, existingMatches, recordPreview,
-            standingProbe, flags);
+            standingProbe, flags, CollapsedProtocol: collapsed);
     }
 
     /// <summary>

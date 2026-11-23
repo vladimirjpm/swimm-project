@@ -215,7 +215,12 @@ public class DiscoveryAdminController : ControllerBase
             officialClubStanding = StandingResponse(p.ClubStanding, p.Parsed),
             // Флаги соревнования (медали, чемпионат, мастерс, «зачёт не ведётся», бассейн)
             // с обоснованиями. Предложение — галочки в превью изменяемы.
-            flags = p.Flags
+            flags = p.Flags,
+            // Р119: протокол свёрнут в одну дату и покрывает уже затянутые дни — «Импортировать»
+            // заблокирована (и сервер такой импорт откатит).
+            collapsedProtocol = p.CollapsedProtocol is { } c
+                ? new { message = c.Message, fileDate = c.FileDate, fileRows = c.FileRows, otherDaysRows = c.OtherDaysRows, days = c.Days }
+                : null
         });
     }
 

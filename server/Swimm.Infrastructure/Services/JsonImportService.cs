@@ -261,6 +261,7 @@ public class JsonImportService : IImportService
         {
             if (await ReadItemsAsync() is { } early) return early;
             await LoadReferenceCachesAsync();
+            if (await RefuseCollapsedProtocolAsync() is { } collapsed) return collapsed;
 
             // Весь импорт выполняется в одной транзакции — при любой ошибке откатываем целиком.
             // BeginTransactionAsync нельзя вызывать напрямую при включённом EnableRetryOnFailure —
@@ -331,6 +332,30 @@ public class JsonImportService : IImportService
                     Message = "Import failed and was rolled back"
                 };
             }
+        }
+
+        /// <summary>
+        /// Р119: файл одной датой, а у этого compID в базе уже есть дни с другими датами, и файл
+        /// покрывает их строки, — свёрнутый протокол (e62). Без явного
+        /// <see cref="ImportEventOptions.AllowCollapsedProtocol"/> не импортируем, как «Дубль».
+        /// Проверка ДО транзакции: базу она только читает. Без compID (файл на /Admin/Import, путь Б
+        /// по дням) не срабатывает — там человек сам выбрал дату дня.
+        /// </summary>
+        private async Task<ImportResult?> RefuseCollapsedProtocolAsync()
+        {
+            if (orgCompId is not int oc || eventOptions?.AllowCollapsedProtocol == true) return null;
+            var finding = await CollapsedProtocolGuard.DetectAsync(_db, oc, items.Select(i => i.Date), items.Count);
+            if (finding is null) return null;
+
+            diagnosticLog.Add(finding.Message);
+            return new ImportResult
+            {
+                TotalRows = items.Count,
+                Message = finding.Message,
+                ErrorMessages = [$"Collapsed protocol: compID {oc}, file date {finding.FileDate}, " +
+                                 $"{finding.FileRows} rows vs {finding.OtherDaysRows} in other days"],
+                DiagnosticLog = diagnosticLog
+            };
         }
 
         private async Task<ImportResult?> ReadItemsAsync()

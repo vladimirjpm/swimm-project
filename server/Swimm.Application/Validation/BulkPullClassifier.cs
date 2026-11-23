@@ -30,6 +30,11 @@ public static class BulkPullClassifier
             return (verdict, reasons);
         }
 
+        // Р119: свёрнутый в одну дату протокол поверх уже затянутых дней — импорт дал бы дубль.
+        // Первой причиной: из всех вопросов этот главный, остальные без него не важны.
+        if (preview.CollapsedProtocol is { } collapsed)
+            reasons.Add($"{collapsed.Message} — нужна ручная проверка");
+
         // Рекорды — всегда руками. Порога нет намеренно: настоящий рекорд редок, а пачка
         // не тот режим, в котором его стоит проглядеть (решение Влада 2026-08-23).
         var records = preview.RecordPreview?.Count ?? 0;
