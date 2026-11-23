@@ -149,7 +149,7 @@
             <label class="flex flex-col gap-1">
                 <span class="flex items-center gap-2 text-xs text-admin-text-muted">
                     OrgCompId (ID у организатора)
-                    @if (Model.Existing.OrgCompId is int orgId)
+                    @if (Model.Existing?.OrgCompId is int orgId)
                     {
                         @* Ссылка на карточку у организатора — та же, что в списке
                            (Index.cshtml): со страницы правки чаще всего и надо свериться

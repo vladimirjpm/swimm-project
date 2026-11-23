@@ -711,7 +711,8 @@
             var suspects = comp?.SuspectCount ?? (day == null ? db?.SuspectCount ?? 0 : 0);
             // Р114 — текст отметки (у дня — своей); Р115 — у всей строки.
             var incomplete = db == null ? null : comp?.PartialResults ?? r115;
-            var input = baseInput with { QualityScanned = scanned != null, SuspectCount = suspects, Incomplete = incomplete != null };
+            // Строк в базе нет — проверять нечего: шаг 8 не «текущий».
+            var input = baseInput with { QualityScanned = scanned != null || (db != null && results == 0), SuspectCount = suspects, Incomplete = incomplete != null };
             var none = Swimm.Application.Mapping.CompetitionChecklistRules.Build(input);
 
             (string Text, string? Title, bool Danger) Step5()
