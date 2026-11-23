@@ -13,7 +13,7 @@ namespace Swimm.API.Pages.Admin.Competitions;
 /// Соревнования: объединённый список справочника БД (Competitions) и входящих isr.org.il
 /// (Discovery) одной таблицей со стадией жизненного цикла. Заменил обе прежние страницы
 /// (Competitions/Index + Discovery). Действия входящих — через /api/admin/discovery/*
-/// (клиентский JS); CRUD БД — здесь (Edit-страница + каскадное удаление).
+/// (клиентский JS); CRUD БД — Edit-страница (там же каскадное удаление) и быстрая правка здесь.
 /// </summary>
 [Authorize(Roles = "Admin")]
 public class IndexModel : PageModel
@@ -21,7 +21,6 @@ public class IndexModel : PageModel
     private const int PageSize = CompetitionListUrl.PageSize;
     private readonly TimeProvider _time;
     private readonly ICompetitionAdminRepository _repo;
-    private readonly IImportService _import;
     private readonly IPointRulesAdminRepository _rules;
     private readonly IAdminAuditService _audit;
     private readonly IConfiguration _config;
@@ -29,7 +28,7 @@ public class IndexModel : PageModel
     private readonly ILogger<IndexModel> _logger;
     private readonly ISeriesAdminRepository _series;
 
-    public IndexModel(ICompetitionAdminRepository repo, IImportService import,
+    public IndexModel(ICompetitionAdminRepository repo,
         IPointRulesAdminRepository rules, IAdminAuditService audit,
         IConfiguration config, IWebHostEnvironment env, ILogger<IndexModel> logger,
         ISeriesAdminRepository series, TimeProvider time)
@@ -37,7 +36,6 @@ public class IndexModel : PageModel
         _time = time;
         _series = series;
         _repo = repo;
-        _import = import;
         _rules = rules;
         _audit = audit;
         _config = config;
@@ -324,54 +322,6 @@ public class IndexModel : PageModel
         return RedirectToBackToList();
     }
 
-    /// <summary>Каскадное удаление одного соревнования (одиночного или отдельного дня события).</summary>
-    public async Task<IActionResult> OnPostDeleteAsync(int id)
-    {
-        var deleted = await _import.DeleteCompetitionAsync(id);
-        if (deleted == null)
-        {
-            TempData["Flash"] = "Соревнование не найдено — возможно, уже удалено.";
-            return RedirectToBackToList(withSelected: KeepsSelectionAfterDelete);
-        }
-
-        _logger.LogWarning(
-            "Admin {User} каскадно удалил соревнование #{Id} «{Name}»: {Results} результатов, " +
-            "{Relays} эстафет, {Galleries} галерей, {ResultUrls} URL, {ImportHistory} записей истории, {Swimmers} пловцов-сирот",
-            User.Identity?.Name ?? "?", deleted.CompetitionId, deleted.CompetitionName,
-            deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory, deleted.Swimmers);
-
-        await _audit.LogAsync("competition.delete", "Competition", deleted.CompetitionId.ToString(),
-            $"Каскадно удалено соревнование «{deleted.CompetitionName}» ({deleted.Results} результатов)",
-            deleted);
-
-        TempData["Flash"] = $"Соревнование «{deleted.CompetitionName}» удалено ({deleted.Results} результатов)";
-        return RedirectToBackToList(withSelected: KeepsSelectionAfterDelete);
-    }
-
-    /// <summary>Каскадное удаление всего многодневного события: все дни + сам CompetitionEvent.</summary>
-    public async Task<IActionResult> OnPostDeleteEventAsync(int eventId)
-    {
-        var deleted = await _import.DeleteCompetitionEventAsync(eventId);
-        if (deleted == null)
-        {
-            TempData["Flash"] = "Событие не найдено — возможно, уже удалено.";
-            return RedirectToBackToList(withSelected: false);
-        }
-
-        _logger.LogWarning(
-            "Admin {User} каскадно удалил многодневное событие #{Id} «{Name}»: {Results} результатов, " +
-            "{Relays} эстафет, {Galleries} галерей, {ResultUrls} URL, {ImportHistory} записей истории, {Swimmers} пловцов-сирот",
-            User.Identity?.Name ?? "?", deleted.CompetitionId, deleted.CompetitionName,
-            deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory, deleted.Swimmers);
-
-        await _audit.LogAsync("competition.delete-event", "CompetitionEvent", eventId.ToString(),
-            $"Каскадно удалено многодневное событие «{deleted.CompetitionName}» ({deleted.Results} результатов)",
-            deleted);
-
-        TempData["Flash"] = $"Событие «{deleted.CompetitionName}» удалено вместе со всеми днями ({deleted.Results} результатов)";
-        return RedirectToBackToList(withSelected: false);
-    }
-
     /// <summary>
     /// Параметры текущей выборки — ОДИН список на ссылки, формы и редиректы после POST
     /// (раньше их было шесть копий, и в редиректе быстрой правки потерялись discipline и filter).
@@ -404,15 +354,9 @@ public class IndexModel : PageModel
         return d;
     }
 
-    // Сохраняем текущие фильтры/страницу при возврате к списку. После удаления выбранной строки
-    // sel не несём (withSelected: false): её больше нет, и вместо «Выбери соревнование…» стояла бы
-    // заглушка «не видно при текущих фильтрах».
+    // Сохраняем текущие фильтры/страницу при возврате к списку (после быстрой правки — с sel своей строки).
+    // Удаления в списке с этапа 6 варианта E нет — только на Edit.
     private IActionResult RedirectToBackToList(bool withSelected = true) =>
         RedirectToPage("Index", new Microsoft.AspNetCore.Routing.RouteValueDictionary(
             ListRoute(withSelected: withSelected).ToDictionary(kv => kv.Key, kv => (object?)kv.Value)));
-
-    // «Удалить» у дня события: само событие остаётся (если дней больше одного) — его выбор (sel=e…)
-    // сохраняем. Удалили одиночное (sel=c…) — выбора больше нет.
-    private bool KeepsSelectionAfterDelete =>
-        Selected?.Trim() is { Length: > 1 } k && (k[0] is 'e' or 'E');
 }

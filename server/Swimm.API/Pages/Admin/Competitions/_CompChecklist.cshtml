@@ -1,19 +1,30 @@
 @model Swimm.API.Pages.Admin.Competitions.CompChecklistView
 @*
-    Правая панель-чек-лист строки «ждёт затягивания» (вариант E, этап 4; хэндофф 3.5).
+    Правая панель-чек-лист выбранного соревнования (вариант E, этапы 4 и 6; хэндофф 3.5) — у строк
+    ВСЕХ состояний: впереди, идёт, ждёт затягивания, ждём протокол, импортировано, ∅ / скрыто /
+    «✓ имп.», недотянутая многодневка (Р115), «результаты неполные» (Р114), многодневное событие.
     Девять шагов: статус кружка — data-status у li (pending / current / done / attention), вид
     кружка и названия — group-data-[status=…] утилитами, поэтому JS хода меняет ТОЛЬКО атрибут.
     Статусы на каждую фазу затягивания посчитаны сервером (CompetitionChecklistRules) и лежат в
-    data-phases панели; подписи шагов JS хода заменяет текстами прежней панели «Затягивание».
-    Превью (шаг 6) — общий блок #preview-box, JS переносит его в .ck-preview-slot своей строки.
-    Остальные состояния строки — этап 6; пока у них прежняя панель строки.
+    data-phases: у панели (шаги 1–4) и у каждой области шагов 5–9 (.ck-scope; у события — по дню).
+    Превью (шаг 6) — общий блок #preview-box, JS переносит его в .ck-preview-slot видимой области.
+    Удаления здесь нет — только на странице Edit, блок «Опасная зона» (хэндофф, раздел 5).
 *@
 @{
     var s = Model.Site;
-    var id = s.DiscoveredId;
+    var db = Model.Db;
+    var st = Model.Row.Status;
+    int? id = s?.DiscoveredId;
     const string quiet = "cursor-pointer text-[13px] text-admin-text-muted hover:text-admin-text";
     const string ghost = "admin-btn admin-btn-ghost py-1 px-2.5";
-    var finished = s.DateStart <= DateTime.UtcNow;
+    const string menuItem = "block w-full cursor-pointer rounded px-2.5 py-1.5 text-left text-[13px] text-admin-text no-underline hover:bg-admin-surface-hover";
+    var finished = s != null && s.DateStart <= DateTime.UtcNow;
+    var hidden = s?.Status == "ignored" && db == null;
+    var markedImported = s?.Status == "imported" && db == null;
+    var empty = s?.EmptySourceAt != null;
+    var siteActive = s != null && !hidden;
+    var state = st?.State;
+    var firstScope = Model.Scopes[0];
 }
 
 <div id="panel-@Model.Key" class="row-panel checklist admin-card p-0 @(Model.Selected ? "" : "hidden")" data-key="@Model.Key"
@@ -26,39 +37,173 @@
                 <span class="mt-1.5 shrink-0 text-admin-warning" title="Чемпионат Израиля">@Html.Raw(Model.TrophyHtml)</span>
             }
             <h2 class="min-w-0 flex-1 text-lg font-semibold leading-snug text-white" dir="rtl" style="text-align:left">@Model.Name</h2>
-            @* Тихие кнопки шапки (хэндофф 3.5). «✓ имп.» и вид спорта — сюда же, до меню «Ещё» этапа 6. *@
+            @* Тихие кнопки шапки (хэндофф 3.5) и меню «Ещё» (хэндофф 5: «✓ имп.», вид спорта). *@
             <div class="flex shrink-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 pt-1">
-                <button type="button" class="@quiet" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
-                <button type="button" class="@quiet" onclick="discStatus(@id,'ignored')" title="Скрыть строку (вернуть — фильтр «Стадия: скрыто»)">Скрыть</button>
-                @if (finished)
+                @if (Model.EditUrl != null)
                 {
-                    <button type="button" class="@quiet" onclick="discStatus(@id,'imported')" title="Пометить импортированным вручную">✓ имп.</button>
+                    <a href="@Model.EditUrl" class="@quiet no-underline" title="Страница соревнования: имя, дата, URL результатов, удаление">Изменить</a>
                 }
-                <select onchange="discDiscipline(@id, this.value)" class="rounded border border-admin-border bg-transparent px-1 py-0.5 text-[11px] text-admin-text-muted" title="Вид спорта">
-                    @foreach (var (value, label) in new[] { ("swimming", "плавание"), ("artistic", "артистич."), ("other", "прочее") })
+                @if (s != null && db == null && !hidden)
+                {
+                    @if (!empty)
                     {
-                        <option value="@value" selected="@(s.Discipline == value)">@label</option>
+                        <button type="button" class="@quiet" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
                     }
-                </select>
+                    else
+                    {
+                        <button type="button" class="@quiet" onclick="discEmptySource(@id, false)" title="Снять пометку — протокол появился">Протокол есть</button>
+                    }
+                    @if (markedImported)
+                    {
+                        <button type="button" class="@quiet" onclick="discStatus(@id,'new')" title="Снять ручную пометку «импортировано» — строка снова в работе">Вернуть</button>
+                    }
+                    <button type="button" class="@quiet" onclick="discStatus(@id,'ignored')" title="Скрыть строку (вернуть — «Вернуть» в её панели; найти — переключатель «Закрыто»)">Скрыть</button>
+                }
+                else if (hidden)
+                {
+                    <button type="button" class="@quiet" onclick="discStatus(@id,'new')" title="Вернуть скрытую строку в работу">Вернуть</button>
+                }
+                @if (s != null)
+                {
+                    @* «Ещё»: <details> с классами админки — готового выпадающего меню в админке нет. *@
+                    <details class="ck-more relative">
+                        <summary class="@quiet list-none [&::-webkit-details-marker]:hidden" title="Редкие действия строки">Ещё ▾</summary>
+                        <div class="absolute right-0 z-20 mt-1 w-60 rounded-md border border-admin-border bg-admin-surface p-1 shadow-xl shadow-black/50">
+                            @if (db == null && s.Status == "new" && finished)
+                            {
+                                <button type="button" class="@menuItem" onclick="discStatus(@id,'imported')"
+                                        title="Строка закроется без импорта (например, результаты уже в базе под другим именем)">✓ имп. — пометить импортированным вручную</button>
+                            }
+                            @if (db != null || hidden)
+                            {
+                                @* У строки в базе и у скрытой «Нет протокола» — редкость (прежняя кнопка была у всех строк сайта). *@
+                                <button type="button" class="@menuItem" onclick="discEmptySource(@id, @(empty ? "false" : "true"))"
+                                        title="@(empty ? "Снять пометку — протокол появился" : "Протокола нет: PDF пустой")">@(empty ? "Протокол есть" : "Нет протокола")</button>
+                            }
+                            <label class="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[13px] text-admin-text-muted" title="Вид спорта: эвристика по названию иногда промахивается">
+                                Вид спорта
+                                <select onchange="discDiscipline(@id, this.value)" class="admin-input py-0.5 text-[12px]">
+                                    @foreach (var (value, label) in new[] { ("swimming", "плавание"), ("artistic", "артистич."), ("other", "прочее") })
+                                    {
+                                        <option value="@value" selected="@(s.Discipline == value)">@label</option>
+                                    }
+                                </select>
+                            </label>
+                        </div>
+                    </details>
+                }
             </div>
         </div>
         <div class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-admin-text-muted">
             <span class="tabular-nums">@Model.PanelDate</span>
-            <span class="inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold @Model.StateChipCls">@Model.StateText</span>
-            <a href="https://isr.org.il/comp.asp?compID=@s.OrgCompId" target="_blank" rel="noopener"
-               class="text-admin-accent hover:underline" title="ID федерации (OrgCompId): @s.OrgCompId">страница федерации ↗</a>
+            <span class="ck-state-chip inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold @Model.StateChipCls">@Model.StateText</span>
+            @if (s != null)
+            {
+                <a href="https://isr.org.il/comp.asp?compID=@s.OrgCompId" target="_blank" rel="noopener"
+                   class="text-admin-accent hover:underline" title="ID федерации (OrgCompId): @s.OrgCompId">страница федерации ↗</a>
+            }
             @Html.Raw(Model.HeaderChipsHtml)
+            @if (db != null && s?.EmptySourceAt is { } emptyAt)
+            {
+                <span class="inline-block whitespace-nowrap rounded bg-white/[.08] px-1.5 py-0.5 text-[10px] font-bold text-admin-text-muted"
+                      title="Протокола нет: PDF пустой или в нём одни неявки (NS) (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола · @emptyAt.ToLocalTime().ToString("dd.MM")</span>
+            }
         </div>
         @* Бывшие колонки таблицы — компактно (хэндофф, раздел 5: «предложение — в шапке панели»). *@
         <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-admin-text-muted">@Html.Raw(Model.MetaHtml)</div>
+        @if (Model.Categories != null)
+        {
+            <div class="mt-1.5">@Model.Categories</div>
+        }
+
+        @* Многодневное событие: общая часть (всё событие) — над строкой дней; шаги 5–9 — у выбранного дня. *@
+        @if (Model.IsEvent)
+        {
+            @* Общие действия события (решения Влада 23.11.2026): «Перезатянуть» тянет весь протокол
+               федерации этого compID — все его дни, поэтому одна кнопка над днями, а не в каждом дне;
+               «Качество» на всё событие (eventId) — как до этапа 6, по дню — в шаге 8 дня. *@
+            @if (db != null && (s != null && finished || db.TotalResultCount > 0))
+            {
+                <div class="ck-event-actions mt-3 flex flex-wrap items-center gap-2 text-[11px] text-admin-text-muted">
+                    <span>Всё событие:</span>
+                    @if (s != null && finished)
+                    {
+                        <button type="button" class="ck-pull-btn @ghost" onclick="discPreview(@id, true)"
+                                title="Скачать протокол события заново и перезаписать результаты — все дни этого протокола федерации">Перезатянуть весь протокол события</button>
+                    }
+                    @if (db.TotalResultCount > 0)
+                    {
+                        @if (db.SuspectCount > 0)
+                        {
+                            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold bg-admin-warning/15 text-admin-warning" title="Помеченных недостоверными строк во всём событии: @db.SuspectCount">⚑ @db.SuspectCount</span>
+                        }
+                        else if (db.QualityScannedAt is { } eqa)
+                        {
+                            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold bg-admin-success/15 text-admin-success" title="Проверено @eqa.ToLocalTime().ToString("dd.MM.yyyy HH:mm") — подозрительных строк нет">✓</span>
+                        }
+                        <button type="button" class="@ghost quality-btn" data-event-id="@db.EventId" data-title="@Model.Name"
+                                title="Проверить достоверность результатов всего события (все дни)">Качество события</button>
+                    }
+                </div>
+            }
+            @* Ход «Перезатянуть» и превью события — здесь, а не в выбранном дне: тянется весь протокол
+               (все дни), при смене дня ничего не «прыгает» (ревью PR #267). Пишет JS (pullFlow). *@
+            <div class="ck-event-flow">
+                <ol class="ck-log mt-2 hidden space-y-1 text-[12px]"></ol>
+                <div class="ck-preview-slot"></div>
+            </div>
+            @if (Model.QuickEdit != null)
+            {
+                @* Быстрая правка события — одна на все дни (пишет во все дни; бассейн и правила — события /
+                   первого дня), поэтому в общей части, а не под выбранным днём (ревью PR #267). *@
+                <details class="ck-event-quick mt-2">
+                    <summary class="cursor-pointer text-[12px] text-admin-accent hover:underline">Быстрая правка — для всех дней события (@db!.DayCount)</summary>
+                    @Model.QuickEdit
+                </details>
+            }
+            <nav class="ck-days mt-3 flex flex-wrap gap-1 rounded-md border border-admin-border p-1 text-xs" aria-label="Дни события">
+                @foreach (var sc in Model.Scopes.Where(x => x.Day != null))
+                {
+                    var on = sc == firstScope;
+                    <button type="button" class="ck-day-btn cursor-pointer whitespace-nowrap rounded px-2 py-1 aria-[pressed=true]:bg-admin-accent/15 aria-[pressed=true]:font-semibold aria-[pressed=true]:text-admin-accent text-admin-text-muted hover:bg-admin-surface-hover hover:text-admin-text"
+                            data-day="@sc.Day!.Id" aria-pressed="@(on ? "true" : "false")">
+                        @sc.Label@(sc.Incomplete != null ? " ⏳" : "")
+                    </button>
+                }
+            </nav>
+            @* Строка выбранного дня (бывшая таблица дней прежней панели): «Изменить» — Edit ЭТОГО дня. *@
+            @foreach (var sc in Model.Scopes.Where(x => x.Day != null))
+            {
+                var d = sc.Day!;
+                <div class="ck-scope mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-admin-text-muted @(sc == firstScope ? "" : "hidden")" data-day="@d.Id">
+                    <a href="@Model.DayEditUrls[d.Id]" class="text-admin-accent hover:underline" title="Страница этого дня: имя, дата, URL результатов, удаление">Изменить день @(d.DayNumber?.ToString() ?? "?")</a>
+                    <span>бассейн <span class="text-admin-text">@(string.IsNullOrEmpty(d.PoolType) ? "—" : d.PoolType)</span></span>
+                    <span>строк <span class="tabular-nums text-admin-text">@d.ResultCount</span></span>
+                    @if (d.OrgCompId is int doc)
+                    {
+                        <span>ID федерации <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a></span>
+                    }
+                    <a href="@Model.DayPublicUrls[d.Id]" target="_blank" rel="noopener" class="text-admin-accent hover:underline">swimhub ↗</a>
+                    @await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)
+                    @if (!string.IsNullOrEmpty(d.SubName))
+                    {
+                        <span class="max-w-[260px] truncate" dir="auto" title="@d.SubName">@d.SubName</span>
+                    }
+                    @if (d.PartialResults != null)
+                    {
+                        <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold bg-admin-warning/15 text-admin-warning" title="@d.PartialResults">⏳ неполные</span>
+                    }
+                </div>
+            }
+        }
     </div>
 
     @* ── Девять шагов ── *@
-    <ol class="relative px-5 py-4">
+    <div class="relative px-5 py-4">
         <span aria-hidden="true" class="absolute bottom-6 left-[31.5px] top-6 w-px bg-admin-border"></span>
 
         @{
-            void StepHead(Swimm.API.Pages.Admin.Competitions.CompChecklistStep st)
+            void StepHead(Swimm.API.Pages.Admin.Competitions.CompChecklistStep step)
             {
                 <span class="relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full bg-admin-surface">
                     <span class="flex size-6 items-center justify-center rounded-full text-[11px] font-bold
@@ -66,69 +211,187 @@
                                  group-data-[status=current]:bg-admin-accent group-data-[status=current]:text-[#0c2536]
                                  group-data-[status=done]:bg-admin-success/15 group-data-[status=done]:text-admin-success
                                  group-data-[status=attention]:bg-admin-warning/15 group-data-[status=attention]:text-admin-warning">
-                        <span class="group-data-[status=attention]:hidden group-data-[status=done]:hidden">@st.No</span>
+                        <span class="group-data-[status=attention]:hidden group-data-[status=done]:hidden">@step.No</span>
                         <span class="hidden group-data-[status=done]:inline">✓</span>
                         <span class="hidden group-data-[status=attention]:inline">!</span>
                     </span>
                 </span>
             }
             string Code(Swimm.Application.Mapping.ChecklistStepStatus x) => Swimm.Application.Mapping.CompetitionChecklistRules.Code(x);
-            string CaptionCls(Swimm.API.Pages.Admin.Competitions.CompChecklistStep st) =>
-                st.CaptionDanger ? "text-admin-danger" : "text-admin-text-muted";
+            string CaptionCls(Swimm.API.Pages.Admin.Competitions.CompChecklistStep step) =>
+                step.CaptionDanger ? "text-admin-danger" : "text-admin-text-muted";
         }
 
-        @for (var no = 1; no <= Model.Steps.Count; no++)
-        {
-            var st = Model.Step(no);
-            <li class="ck-step group relative flex gap-3 pb-4 last:pb-0" data-step="@no" data-status="@Code(st.Status)">
-                @{ StepHead(st); }
-                <div class="min-w-0 flex-1 pt-0.5">
-                    <div class="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                        <span class="text-[13.5px] font-semibold text-admin-text group-data-[status=pending]:text-admin-text-muted">@st.Title</span>
-                        <span class="ck-caption min-w-0 text-xs @CaptionCls(st)" dir="auto" title="@st.CaptionTitle" data-default="@st.Caption">@st.Caption</span>
-                        <span class="ck-actions ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
-                            @switch (no)
-                            {
-                                case 2:
-                                    <button type="button" class="@ghost" onclick="discStartList(@id, this)"
-                                            title="Затянуть стартовый протокол (программа + заявки) с loglig">Обновить</button>
+        @* Шаги 1–4 — общие. *@
+        <ol>
+            @for (var no = 1; no <= 4; no++)
+            {
+                var step = Model.Step(no);
+                <li class="ck-step group relative flex gap-3 pb-4" data-step="@no" data-status="@Code(step.Status)">
+                    @{ StepHead(step); }
+                    <div class="min-w-0 flex-1 pt-0.5">
+                        <div class="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                            <span class="text-[13.5px] font-semibold text-admin-text group-data-[status=pending]:text-admin-text-muted">@step.Title</span>
+                            <span class="ck-caption min-w-0 text-xs @CaptionCls(step)" dir="auto" title="@step.CaptionTitle" data-default="@step.Caption">@step.Caption</span>
+                            <span class="ck-actions ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+                                @if (no == 2)
+                                {
+                                    @if (siteActive)
+                                    {
+                                        <button type="button" class="@ghost" onclick="discStartList(@id, this)"
+                                                title="Затянуть стартовый протокол (программа + заявки) с loglig">Обновить</button>
+                                    }
                                     @* «Источники» привязываются к соревнованию в базе — у строки до импорта их нет. *@
-                                    break;
-                                case 3:
+                                    @if ((db?.Single ?? db?.Days.FirstOrDefault()) is { } head)
+                                    {
+                                        <button type="button" class="@ghost sources-btn" data-competition-id="@head.Id" data-title="@Model.Name"
+                                                title="Из каких compID федерации собирается стартовый протокол">⇄ Источники</button>
+                                    }
+                                }
+                                else if (no == 3 && siteActive)
+                                {
                                     <button type="button" class="@ghost" onclick="discMeetInfo(@id)"
                                             title="Разминка по дням (из регламента, руками) и флаг «чемпионат»">Задать</button>
-                                    break;
-                                case 5:
-                                    <button type="button" class="ck-pull-btn admin-btn admin-btn-primary py-1 px-3"
-                                            onclick="discPreview(@id)" title="Скачать PDF с isr.org.il, разобрать и показать превью">Затянуть</button>
-                                    <a href="/api/admin/discovery/@id/pdf" class="@ghost">PDF</a>
-                                    break;
-                                case 9:
-                                    if (finished && string.IsNullOrEmpty(s.Languages))
-                                    {
-                                        <button type="button" class="@ghost" onclick="discSyncLangs(@id, this)"
-                                                title="Скачать HE+EN пару и дозаполнить англ. имена пловцов">Синхр. языки</button>
-                                    }
-                                    else if (s.Languages == "he")
-                                    {
-                                        <span class="text-[11px] text-admin-text-muted" title="Второй язык на loglig не найден">только HE</span>
-                                    }
-                                    break;
-                            }
-                        </span>
+                                }
+                            </span>
+                        </div>
                     </div>
-                    @if (no == 5 && Model.AutoReason != null)
-                    {
-                        <div class="mt-0.5 text-[11px] text-admin-text-muted" dir="auto">@Model.AutoReason</div>
-                    }
-                    @* Строки хода (тексты прежней панели «Затягивание») — пишет JS. *@
-                    <ol class="ck-log mt-1 hidden space-y-1 text-[12px]"></ol>
-                    @if (no == 6)
-                    {
-                        <div class="ck-preview-slot"></div>
-                    }
-                </div>
-            </li>
+                </li>
+            }
+        </ol>
+
+        @* Шаги 5–9 — у одиночной строки одна область, у события — по области на день. *@
+        @foreach (var sc in Model.Scopes)
+        {
+            var dayComp = sc.Day ?? db?.Single;
+            var scHidden = Model.IsEvent && sc != firstScope;
+            <ol class="ck-scope @(scHidden ? "hidden" : "")" data-day="@(sc.Day?.Id)" data-phases="@sc.PhasesJson">
+                @for (var no = 5; no <= 9; no++)
+                {
+                    var step = sc.Step(no);
+                    <li class="ck-step group relative flex gap-3 pb-4 @(no == 9 ? "pb-0" : "")" data-step="@no" data-status="@Code(step.Status)">
+                        @{ StepHead(step); }
+                        <div class="min-w-0 flex-1 pt-0.5">
+                            <div class="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                                <span class="text-[13.5px] font-semibold text-admin-text group-data-[status=pending]:text-admin-text-muted">@step.Title</span>
+                                <span class="ck-caption min-w-0 text-xs @CaptionCls(step)" dir="auto" title="@step.CaptionTitle" data-default="@step.Caption">@step.Caption</span>
+                                <span class="ck-actions ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+                                    @switch (no)
+                                    {
+                                        case 5:
+                                            if (db == null && s != null)
+                                            {
+                                                if (!hidden && finished)
+                                                {
+                                                    // Основная кнопка — когда шаг текущий («ждёт затягивания»); у «идёт», «ждём протокол»
+                                                    // и закрытых без импорта — обычная: тянуть можно, но это не главный ход.
+                                                    var primary = state == Swimm.Application.Mapping.CompetitionRowState.ReadyToPull;
+                                                    <button type="button" class="ck-pull-btn @(primary ? "admin-btn admin-btn-primary py-1 px-3" : ghost)"
+                                                            onclick="discPreview(@id)" title="Скачать PDF с isr.org.il, разобрать и показать превью">Затянуть</button>
+                                                }
+                                                if (state == Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol && !empty)
+                                                {
+                                                    <button type="button" class="@ghost" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
+                                                }
+                                                if (empty && !hidden)
+                                                {
+                                                    <button type="button" class="@ghost" onclick="discEmptySource(@id, false)" title="Снять пометку — протокол появился">Протокол есть</button>
+                                                }
+                                                if (hidden || markedImported)
+                                                {
+                                                    <button type="button" class="@ghost" onclick="discStatus(@id,'new')" title="Вернуть строку в работу">Вернуть</button>
+                                                }
+                                            }
+                                            else if (db != null && s != null && finished && !Model.IsEvent)
+                                            {
+                                                // Перезатянуть: протокол на сайте правят (DQ, опечатки), парсер чинится. У события —
+                                                // одна кнопка над днями (тянет все дни протокола), не здесь.
+                                                <button type="button" class="ck-pull-btn @ghost" onclick="discPreview(@id, true)"
+                                                        title="Скачать протокол заново и перезаписать результаты">Перезатянуть</button>
+                                            }
+                                            if (s != null)
+                                            {
+                                                <a href="/api/admin/discovery/@id/pdf" class="@ghost">PDF</a>
+                                            }
+                                            if (sc.Incomplete != null && Model.EditUrl != null)
+                                            {
+                                                var accept = dayComp != null && Model.DayEditUrls.TryGetValue(dayComp.Id, out var du) ? du : Model.EditUrl;
+                                                <a href="@accept" class="text-[12px] text-admin-accent hover:underline"
+                                                   title="Остального протокола не будет — снять долг на странице «Изменить» (блок «Принять как есть»)">Принять как есть ↗</a>
+                                            }
+                                            break;
+                                        case 8:
+                                            if (sc.ResultCount > 0 && db != null)
+                                            {
+                                                if (sc.SuspectCount > 0)
+                                                {
+                                                    <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold bg-admin-warning/15 text-admin-warning" title="Помеченных недостоверными строк: @sc.SuspectCount">⚑ @sc.SuspectCount</span>
+                                                }
+                                                else if (sc.QualityScannedAt is { } qa)
+                                                {
+                                                    <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold bg-admin-success/15 text-admin-success" title="Проверено @qa.ToLocalTime().ToString("dd.MM.yyyy HH:mm") — подозрительных строк нет">✓</span>
+                                                }
+                                                <button type="button" class="@ghost quality-btn"
+                                                        data-event-id="@(Model.IsEvent && sc.Day == null ? db.EventId?.ToString() : null)"
+                                                        data-competition-id="@(dayComp?.Id.ToString())"
+                                                        data-title="@(Model.Name + (sc.Label != null ? " · " + sc.Label : ""))"
+                                                        title="Проверить достоверность результатов">Качество</button>
+                                            }
+                                            break;
+                                        case 9:
+                                            if (finished && s != null && string.IsNullOrEmpty(s.Languages))
+                                            {
+                                                <button type="button" class="@ghost" onclick="discSyncLangs(@id, this)"
+                                                        title="Скачать HE+EN пару и дозаполнить англ. имена пловцов">Синхр. языки</button>
+                                            }
+                                            else if (s?.Languages == "he")
+                                            {
+                                                <span class="text-[11px] text-admin-text-muted" title="Второй язык на loglig не найден">только HE</span>
+                                            }
+                                            if (db != null && s != null)
+                                            {
+                                                <button type="button" class="@ghost" onclick="discStampLoglig(@s.OrgCompId, this)"
+                                                        title="Проставить пловцам loglig-id по протоколу соревнования">Loglig-id</button>
+                                            }
+                                            @* Доклейка промежуточных (Д5): только к строкам, которые УЖЕ в базе. *@
+                                            if (dayComp != null && sc.ResultCount > 0)
+                                            {
+                                                <button type="button" class="@ghost splits-btn" data-competition-id="@dayComp.Id" data-title="@Model.Name"
+                                                        title="Скачать промежуточные с loglig и дописать их к строкам, которые уже в базе (сперва сухой прогон)">Промежуточные</button>
+                                            }
+                                            break;
+                                    }
+                                </span>
+                            </div>
+                            @if (no == 5)
+                            {
+                                @if (!string.IsNullOrEmpty(s?.LastError))
+                                {
+                                    <div class="mt-0.5 text-[11px] text-admin-danger" dir="ltr" title="Ошибка последнего забора">@s!.LastError</div>
+                                }
+                                @if (Model.AutoReason != null)
+                                {
+                                    <div class="mt-0.5 text-[11px] text-admin-text-muted" dir="auto">@Model.AutoReason</div>
+                                }
+                            }
+                            @* Строки хода (тексты прежней панели «Затягивание») и итог импорта — пишет JS. *@
+                            <ol class="ck-log mt-1 hidden space-y-1 text-[12px]"></ol>
+                            @if (no == 6 && !Model.IsEvent)
+                            {
+                                <div class="ck-preview-slot"></div>
+                                @* Быстрая правка — шаг 6 у одиночной строки в базе; у события — в общей части панели. *@
+                                @Model.QuickEdit
+                            }
+                            @if (no == 9 && dayComp != null && sc.ResultCount > 0)
+                            {
+                                @* Отчёт доклейки промежуточных — печатается целиком, с разбивкой по дням. *@
+                                <div class="splits-box mt-2 hidden rounded-md border border-admin-border bg-admin-surface/60 p-3 text-[12.5px]"
+                                     data-comp="@dayComp.Id"></div>
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
         }
-    </ol>
+    </div>
 </div>

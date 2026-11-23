@@ -1,0 +1,102 @@
+@model Swimm.API.Pages.Admin.Competitions.CompQuickEditView
+@*
+    Быстрая правка строки базы — шаг 6 чек-листа (вариант E, этап 6; раньше — низ прежней панели
+    строки). Только поля, общие для всех дней события; имя / дата / страна — на Edit. У события форма
+    одна на панель: JS переносит её в шаг 6 выбранного дня (.qe-slot), поэтому id и data-comp не
+    дублируются. После «Сохранить» — тот же адрес списка с sel своей строки (Route).
+*@
+@{
+    var db = Model.Db;
+    var head = Model.Head;
+    var selectedKeys = (db.IsEvent ? db.Categories : head.Categories).Select(x => x.Key).ToHashSet();
+    var poolType = (db.IsEvent ? db.PoolType : head.PoolType) ?? "";
+}
+<form method="post" asp-page="/Admin/Competitions/Index" asp-page-handler="QuickSave" asp-all-route-data="Model.Route"
+      class="qe-form mt-2 rounded-md border border-admin-border p-3">
+    <input type="hidden" name="id" value="@head.Id" />
+    <div class="mb-2 text-xs text-admin-text-muted">
+        Категории
+        @if (db.IsEvent)
+        {
+            <span class="text-admin-warning">· сохранение применится ко всем дням события (@db.DayCount)</span>
+        }
+    </div>
+    <div class="flex flex-wrap gap-x-5 gap-y-2">
+        @foreach (var cat in Model.AllCategories)
+        {
+            <label class="inline-flex cursor-pointer select-none items-center gap-2 text-sm">
+                <input type="checkbox" name="categoryKeys" value="@cat.Key"
+                       checked="@selectedKeys.Contains(cat.Key)" class="h-4 w-4 cursor-pointer" />
+                <span class="text-admin-text">@(!string.IsNullOrEmpty(cat.Badge) ? cat.Badge + " " : "")@cat.Name</span>
+            </label>
+        }
+    </div>
+    <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+        <label class="inline-flex cursor-pointer select-none items-center gap-2 text-sm">
+            <input type="checkbox" name="isAward" value="true" checked="@(db.IsEvent ? db.IsAward : head.IsAward)" class="h-4 w-4 cursor-pointer" />
+            <span class="text-admin-text">Awards</span>
+        </label>
+        <label class="inline-flex cursor-pointer select-none items-center gap-2 text-sm">
+            <input type="checkbox" name="isChampionship" value="true" checked="@(db.IsEvent ? db.IsChampionship : head.IsChampionship)" class="h-4 w-4 cursor-pointer" />
+            <span class="text-admin-text">🏆 Чемпионат Израиля</span>
+        </label>
+        <label class="inline-flex cursor-pointer select-none items-center gap-2 text-sm">
+            <input type="checkbox" name="showCombineAllResults" value="true" checked="@(db.IsEvent ? db.ShowCombineAllResults : head.ShowCombineAllResults)" class="h-4 w-4 cursor-pointer" />
+            <span class="text-admin-text">Combine all results</span>
+        </label>
+        <label class="inline-flex cursor-pointer select-none items-center gap-2 text-sm"
+               title="Лига, товарищеский старт — очки клубам тут никто не считает. Реестр перестаёт требовать правило очков.">
+            <input type="checkbox" name="clubPointsDisabled" value="true" checked="@(db.IsEvent ? db.ClubPointsDisabled : head.ClubPointsDisabled)" class="h-4 w-4 cursor-pointer" />
+            <span class="text-admin-text">Клубный зачёт не ведётся</span>
+        </label>
+    </div>
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <label class="flex flex-col gap-0.5 text-xs text-admin-text-muted">
+            Тип бассейна
+            <select name="poolType" class="admin-input">
+                @foreach (var pt in Model.PoolTypes)
+                {
+                    <option value="@pt" selected="@(pt == poolType)">@pt</option>
+                }
+            </select>
+        </label>
+        <label class="flex flex-col gap-0.5 text-xs text-admin-text-muted">
+            Клубные очки
+            <select name="pointRuleClubsId" class="admin-input max-w-[16rem]">
+                <option value="">Авто (по дате и типу)</option>
+                @foreach (var r in Model.ClubRules)
+                {
+                    <option value="@r.Id" selected="@(r.Id == head.PointRuleClubsId)">@r.Version</option>
+                }
+            </select>
+        </label>
+        <label class="flex flex-col gap-0.5 text-xs text-admin-text-muted">
+            High Point
+            <select name="pointRuleSwimmersId" class="admin-input max-w-[16rem]">
+                <option value="">Авто (по дате и типу)</option>
+                @foreach (var r in Model.SwimmerRules)
+                {
+                    <option value="@r.Id" selected="@(r.Id == head.PointRuleSwimmersId)">@r.Version</option>
+                }
+            </select>
+        </label>
+        <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
+    </div>
+
+    @* Регламент (תקנון): по нему проставляются те же галочки, что выше.
+       Файл никуда не сохраняется — только читается ради подсказки. *@
+    <div class="mt-3 border-t border-admin-border/60 pt-3">
+        <div class="mb-1.5 text-xs text-admin-text-muted">
+            Регламент (תקנון) — проверю медали, клубный зачёт и чемпионат, галочки поставлю сам.
+            Без файла возьму его с loglig сам; файл нужен, только если ссылки там нет.
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <input type="file" accept=".pdf" class="admin-input regulation-file text-xs" data-comp="@head.Id" />
+            <button type="button" class="admin-btn admin-btn-ghost regulation-check text-xs"
+                    data-comp="@head.Id" data-org="@((head.OrgCompId ?? Model.SiteOrgCompId)?.ToString() ?? "")">
+                Проверить регламент
+            </button>
+        </div>
+        <div class="regulation-result mt-1.5 text-[11px]" data-comp="@head.Id"></div>
+    </div>
+</form>

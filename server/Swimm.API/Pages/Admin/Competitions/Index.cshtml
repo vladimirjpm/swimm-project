@@ -3,7 +3,8 @@
 @model Swimm.API.Pages.Admin.Competitions.IndexModel
 @{
     ViewData["Title"] = "Competitions";
-    ViewData["PageSubtitle"] = "Соревнования: справочник БД + входящие isr.org.il одним списком";
+    // Своя шапка (хэндофф 3.1): заголовок в одной строке с поиском и кнопками — как у /Admin/Jobs.
+    ViewData["OwnHeader"] = true;
 
     // Все ссылки списка собираются из ОДНОГО набора параметров (Model.ListRoute) — правкой поверх него.
     string ListUrl(Action<Dictionary<string, string>> change, bool withPage = false, bool withSelected = false)
@@ -44,16 +45,6 @@
         || !string.IsNullOrEmpty(Model.Stage) || !string.IsNullOrEmpty(Model.State)
         || !string.IsNullOrEmpty(Model.Kind);
 
-    // Short — подпись для экранов уже 1920: таблица широкая (стадия, категории, площадка,
-    // действия), и «импортировано» съедает колонку, из-за которой переносится всё остальное.
-    (string Text, string Short, string Cls) StageBadge(CompetitionStage s) => s switch
-    {
-        CompetitionStage.OnSite => ("на сайте", "сайт", "bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]"),
-        CompetitionStage.Imported => ("импортировано", "имп", "bg-[rgba(102,187,106,0.2)] text-[#66bb6a]"),
-        CompetitionStage.DbOnly => ("только в БД", "БД", "bg-white/[.08] text-admin-text-muted"),
-        _ => ("скрыто", "скрыто", "bg-white/[.05] text-admin-text-muted/70"),
-    };
-
     // Ссылка «посмотреть соревнование на сайте» — вторая строка в колонке OrgCompId.
     // Есть только у строк, которые уже в справочнике: у site-строк соревнования в БД ещё нет,
     // и вести там некуда. У многодневки ведёт на первый день — публичная страница открывает
@@ -73,47 +64,6 @@
             ? $"<a href=\"{Model.PublicSiteBaseUrl}/results?eventId={id}\" target=\"_blank\" rel=\"noopener\" "
               + "class=\"text-admin-accent hover:underline\">swimhub ↗</a>"
             : "";
-
-    // Бейдж стадии: короткий текст по умолчанию, полный — только на широком экране.
-    // Полная подпись остаётся в title, чтобы сокращение не пришлось разгадывать.
-    string StageBadgeHtml((string Text, string Short, string Cls) b) =>
-        $"<span class=\"inline-block py-0.5 px-2 rounded text-xs font-semibold {b.Cls}\" title=\"{b.Text}\">" +
-        $"<span class=\"min-[1920px]:hidden\">{b.Short}</span>" +
-        $"<span class=\"hidden min-[1920px]:inline\">{b.Text}</span></span>";
-
-    // Бейдж «стартовый протокол затянут» (решение Влада 18.10.2026): исход последнего забора
-    // из журнала Sys_StartListPulls, правило — StartListBadgeRules. Ни разу не тянули — пусто.
-    // В подсказке — последние заборы: видно, что протокол менялся (+добавились / −снялись / пересев).
-    string StartListBadgeHtml(Swimm.Application.Dtos.UnifiedSiteInfo? site)
-    {
-        if (site?.StartList is not { } b) return "";
-
-        static string When(DateTime utc) => utc.ToLocalTime().ToString("dd.MM HH:mm");
-        var (label, cls) = b.Kind switch
-        {
-            Swimm.Application.Mapping.StartListBadgeKind.Ok => ($"SL {b.Last.Entries}", "bg-admin-success/15 text-admin-success"),
-            Swimm.Application.Mapping.StartListBadgeKind.Partial => ("SL частично", "bg-admin-warning/15 text-admin-warning"),
-            Swimm.Application.Mapping.StartListBadgeKind.Empty => ("SL пусто", "bg-white/[.08] text-admin-text-muted"),
-            _ => ("SL ошибка", "bg-admin-danger/15 text-admin-danger"),
-        };
-        // «Пора обновить» перекрашивает в жёлтый всё, кроме ошибки — та и так красная.
-        if (b.Stale && b.Kind != Swimm.Application.Mapping.StartListBadgeKind.Error)
-            cls = "bg-admin-warning/15 text-admin-warning";
-
-        var lines = new List<string>
-        {
-            $"Стартовый протокол: последний забор {When(b.Last.PulledAt)}, заявок {b.Last.Entries}, заплывов {b.Last.Events}",
-        };
-        if (b.Stale)
-            lines.Add($"До старта ≤ {Swimm.Application.Mapping.StartListBadgeRules.StaleWindowDays} дн., а забору больше суток — нажми «Стартовый протокол» ещё раз");
-        lines.Add("Последние заборы:");
-        lines.AddRange(b.History.Select(p =>
-            $"{When(p.PulledAt)} · {p.Status} · заявок {p.Entries} (+{p.Added} −{p.Removed} пересев {p.Moved})"));
-        var title = System.Net.WebUtility.HtmlEncode(string.Join("\n", lines));
-
-        var text = $"{label} · {When(b.Last.PulledAt)}" + (b.Stale ? " · обновить" : "");
-        return $"<span class=\"ml-1 inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold {cls}\" title=\"{title}\">{System.Net.WebUtility.HtmlEncode(text)}</span>";
-    }
 
     // Перенос и пропажа старта (решение Влада 22.11.2026): их ставит суточный забор «Входящих»
     // (DiscoverySyncRules), а видно их было только в календаре сайта. Перенос — дата старта
@@ -173,29 +123,11 @@
         return (n % 10) switch { 1 => "день", >= 2 and <= 4 => "дня", _ => "дней" };
     }
 
-    // Состояние проверки качества у строки. Три состояния, и «не проверялось» — отдельное:
-    // пустой список без отметки о прогоне читался бы как «всё чисто», хотя никто не смотрел.
-    //   есть помеченные  → оранжевый бейдж с числом (работа);
-    //   проверено, пусто → зелёная галочка с датой прогона;
-    //   не проверялось   → ничего, чтобы не создавать ложного успокоения.
     // «Результаты неполные» (Р114): импорт нашёл непроплытые события, и их не приняли как есть.
     // Текст — в title; снять — «Принять как есть» на Edit или повторный импорт полного протокола.
     static string PartialBadge(string? note, string? label = null) => note == null ? "" :
         $"<span class=\"inline-block ml-1.5 py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-warning/15 text-admin-warning\" " +
         $"title=\"{System.Net.WebUtility.HtmlEncode(note)}\">⏳ {label ?? "неполные"}</span>";
-
-    static string QualityBadge(DateTime? scannedAt, int suspectCount)
-    {
-        if (suspectCount > 0)
-            return $"<span class=\"inline-block mr-1 py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-warning/15 text-admin-warning\" " +
-                   $"title=\"Помеченных недостоверными строк: {suspectCount}\">⚑ {suspectCount}</span>";
-
-        if (scannedAt is { } at)
-            return $"<span class=\"inline-block mr-1 py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-success/15 text-admin-success\" " +
-                   $"title=\"Проверено {at.ToLocalTime():dd.MM.yyyy HH:mm} — подозрительных строк нет\">✓</span>";
-
-        return "";
-    }
 
     // Бейджи языков загруженных PDF (he — синий, en — фиолетовый).
     static string LangBadges(string? languages)
@@ -205,73 +137,166 @@
             $"<span class=\"inline-block ml-1 py-0.5 px-1.5 rounded text-[10px] font-bold uppercase {(l == "he" ? "bg-[rgba(79,195,247,0.15)] text-[#4fc3f7]" : "bg-[rgba(186,104,200,0.2)] text-[#ce93d8]")}\">{l}</span>"));
     }
 
-    // Кнопки действий Discovery для site-стороны строки (imported=true — только синхр.языки + PDF;
-    // site-only — Затянуть/✓имп./синхр.языки/PDF/скрыть). Имена не через onclick (экранирование) —
-    // discPreview читает имя из window.__DISC по id.
-    static string SiteActions(Swimm.Application.Dtos.UnifiedSiteInfo s, bool imported)
-    {
-        const string api = "/api/admin/discovery";
-        const string btn = "admin-btn admin-btn-ghost py-1 px-2.5";
-        var finished = s.DateStart <= DateTime.UtcNow;
-        var sb = new System.Text.StringBuilder();
-        if (!imported && s.Status != "ignored" && finished)
-        {
-            sb.Append($"<button onclick=\"discPreview({s.DiscoveredId})\" class=\"{btn}\">Затянуть</button> ");
-            sb.Append($"<button onclick=\"discStatus({s.DiscoveredId},'imported')\" class=\"{btn}\" title=\"Пометить импортированным вручную\">✓ имп.</button> ");
-        }
-        // Уже импортированное тоже нужно уметь тянуть заново: протокол на сайте правят
-        // (дисквалификации, опечатки), да и наш парсер чинится — старым разбором остаются
-        // испорченные строки. Открывает то же превью, но с заранее взведённой перезаписью.
-        if (imported && finished)
-            sb.Append($"<button onclick=\"discPreview({s.DiscoveredId}, true)\" class=\"{btn}\" title=\"Скачать протокол заново и перезаписать результаты\">Перезатянуть</button> ");
-        if (finished && string.IsNullOrEmpty(s.Languages))
-            sb.Append($"<button onclick=\"discSyncLangs({s.DiscoveredId}, this)\" class=\"{btn}\" title=\"Скачать HE+EN пару и дозаполнить англ. имена пловцов\">Синхр. языки</button> ");
-        else if (s.Languages == "he")
-            sb.Append("<span class=\"text-[11px] text-admin-text-muted\" title=\"Второй язык на loglig не найден\">только HE</span> ");
-        // Loglig-id пловцам из протокола: на импорте делается само, кнопка — для тех стартов,
-        // что импортированы раньше (их сотня, а привязок в базе почти нет).
-        if (imported)
-            sb.Append($"<button onclick=\"discStampLoglig({s.OrgCompId}, this)\" class=\"{btn}\" title=\"Проставить пловцам loglig-id по протоколу соревнования\">Loglig-id</button> ");
-        // Стартовый протокол (docs/plans/start-list-plan.md, С5): нужен в первую очередь
-        // будущим стартам (у прошедших уже есть результаты, но на них удобно проверять
-        // забор), поэтому рисуется всем не скрытым строкам, не только imported/finished.
-        if (s.Status != "ignored")
-            sb.Append($"<button onclick=\"discStartList({s.DiscoveredId}, this)\" class=\"{btn}\" title=\"Затянуть стартовый протокол (программа + заявки) с loglig\">Стартовый протокол</button> ");
-        // Справка о старте (Т1): время разминки руками + переопределение флага «чемпионат».
-        // Из неё таб Start list считает «во сколько приезжать», и нужна она тем же будущим
-        // стартам, что и кнопка выше, — поэтому стоит рядом и по тому же условию.
-        if (s.Status != "ignored")
-            sb.Append($"<button onclick=\"discMeetInfo({s.DiscoveredId})\" class=\"{btn}\" title=\"Разминка по дням (из регламента, руками) и флаг «чемпионат»\">Разминка</button> ");
-        sb.Append($"<a href=\"{api}/{s.DiscoveredId}/pdf\" class=\"{btn}\">PDF</a> ");
-        // Ручная пометка «нет протокола»: PDF на сайте бывает пустым (страница без единой
-        // строки), и без пометки строка выглядит обычной «новой» — её пробуют затянуть снова.
-        sb.Append(s.EmptySourceAt is null
-            ? $"<button onclick=\"discEmptySource({s.DiscoveredId}, true)\" class=\"{btn}\" title=\"Протокола нет: PDF пустой\">∅ нет протокола</button> "
-            : $"<button onclick=\"discEmptySource({s.DiscoveredId}, false)\" class=\"{btn}\" title=\"Снять пометку — протокол появился\">↺ протокол есть</button> ");
-        if (!imported)
-            sb.Append(s.Status == "ignored"
-                ? $"<button onclick=\"discStatus({s.DiscoveredId},'new')\" class=\"{btn}\">вернуть</button>"
-                : $"<button onclick=\"discStatus({s.DiscoveredId},'ignored')\" class=\"{btn}\" title=\"Скрыть\">✕</button>");
-
-        // Вид спорта — селектом прямо в строке: эвристика по названию иногда промахивается,
-        // и поправить её должно быть дешевле, чем разбираться, почему строка пропала.
-        var sel = "text-[11px] bg-transparent border border-admin-border rounded px-1 py-0.5 ml-1";
-        sb.Append($"<select onchange=\"discDiscipline({s.DiscoveredId}, this.value)\" class=\"{sel}\" title=\"Вид спорта\">");
-        foreach (var (value, label) in new[] { ("swimming", "плавание"), ("artistic", "артистич."), ("other", "прочее") })
-            sb.Append($"<option value=\"{value}\"{(s.Discipline == value ? " selected" : "")}>{label}</option>");
-        sb.Append("</select>");
-        return sb.ToString();
-    }
 }
 
-<div class="admin-card border-l-[3px] border-l-admin-accent py-3 px-4 mb-4 text-[0.85rem] text-admin-text-muted leading-relaxed">
-    Одно соревнование — одна строка со стадией (<b>на сайте</b> / <b>импортировано</b> /
-    <b>только в БД</b> / <b>скрыто</b>). Справочник БД и входящие с
-    <a class="text-admin-accent" href="https://isr.org.il/competitions.asp" target="_blank" rel="noopener">isr.org.il</a>
-    объединены. Действия входящих (Проверить/Затянуть/импорт, синхр. языки, скрыть) и CRUD
-    справочника (изменить/удалить/создать) — здесь же.
-</div>
+@{
+    // «Фильтры» (вариант E, этап 6; хэндофф 3.1 и 5): стадия, категория, тип, дисциплина, синтетика —
+    // одной кнопкой рядом с поиском, поля внутри прежние. Заданный фильтр виден на кнопке числом.
+    var activeFilters = new[]
+    {
+        !string.IsNullOrEmpty(Model.Stage), !string.IsNullOrEmpty(Model.CategoryKey), !string.IsNullOrEmpty(Model.Kind),
+        !string.IsNullOrEmpty(Model.Discipline), Model.ShowSynthetic,
+    }.Count(x => x);
+    var thisYear = DateTime.UtcNow.Year;
+    const string popItem = "block rounded px-2.5 py-1.5 text-[13px] text-admin-text no-underline hover:bg-admin-surface-hover";
+}
 
+@* ── Шапка страницы (хэндофф 3.1): заголовок, поиск + «Фильтры», «Проверить сайт федерации»,
+   «Ещё ▾» (Правила очков, Перенос результатов, Сезон на сайте), «+ Новое соревнование».
+   Выпадающие — <details> с классами админки: готового выпадающего меню в админке нет. *@
+<header class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+    <h1 class="mr-2 text-xl font-semibold text-white">Competitions</h1>
+
+    @* Одна форма на поиск и фильтры: «Найти» не сбрасывает фильтры, а выбор фильтра — поиск. *@
+    <form method="get" id="filters-form" class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        @* Число ищется ещё и как номер: compID федерации или Id соревнования в базе. *@
+        <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-full min-w-[14rem] max-w-[22rem] flex-1"
+               placeholder="Название, ID федерации или № в базе" aria-label="Поиск"
+               title="Подстрока в названии или подзаголовке; число — ещё и ID федерации (compID) или номер соревнования в базе (у события — любого дня). Поиск идёт по всем сезонам." />
+
+        <details class="page-pop relative">
+            <summary class="admin-btn list-none [&::-webkit-details-marker]:hidden @(activeFilters > 0 ? "border-admin-accent/40 text-admin-accent" : "admin-btn-ghost")"
+                     title="Стадия, категория, тип, дисциплина, синтетика@(activeFilters > 0 ? $" — задано: {activeFilters}" : "")">
+                Фильтры@(activeFilters > 0 ? $" · {activeFilters}" : "") ▾
+            </summary>
+            <div class="admin-card absolute left-0 z-30 mt-1 flex w-[22rem] flex-col gap-3 p-4 shadow-xl shadow-black/50">
+                <label class="flex flex-col gap-0.5 text-xs text-admin-text-muted">
+                    Стадия
+                    <select name="stage" class="admin-input">
+                        <option value="">Все</option>
+                        <option value="OnSite" selected="@(Model.Stage == "OnSite")">на сайте</option>
+                        <option value="Imported" selected="@(Model.Stage == "Imported")">импортировано</option>
+                        <option value="DbOnly" selected="@(Model.Stage == "DbOnly")">только в БД</option>
+                        <option value="Ignored" selected="@(Model.Stage == "Ignored")">скрыто</option>
+                    </select>
+                </label>
+                <label class="flex flex-col gap-0.5 text-xs text-admin-text-muted">
+                    Категория
+                    <select name="cat" class="admin-input">
+                        <option value="">Все</option>
+                        @foreach (var cat in Model.Categories)
+                        {
+                            <option value="@cat.Key" selected="@(cat.Key == Model.CategoryKey)">@(!string.IsNullOrEmpty(cat.Badge) ? cat.Badge + " " : "")@cat.Name</option>
+                        }
+                    </select>
+                </label>
+                <label class="flex flex-col gap-0.5 text-xs text-admin-text-muted">
+                    Тип
+                    <select name="kind" class="admin-input">
+                        <option value="">Все</option>
+                        <option value="champ" selected="@(Model.Kind == "champ")">чемпионат Израиля</option>
+                    </select>
+                </label>
+                <label class="flex flex-col gap-0.5 text-xs text-admin-text-muted">
+                    Дисциплина
+                    @* Федерация проводит не только плавание: артистическое (שחייה אומנותית) во
+                       входящих есть, а нам не нужно. Прячем ФИЛЬТРОМ с дефолтом, не удаляя строки —
+                       понадобится, переключат на «все». *@
+                    <select name="discipline" class="admin-input">
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.Discipline))">плавание</option>
+                        <option value="artistic" selected="@(Model.Discipline == "artistic")">артистическое</option>
+                        <option value="other" selected="@(Model.Discipline == "other")">прочее</option>
+                        <option value="all" selected="@(Model.Discipline == "all")">все</option>
+                    </select>
+                </label>
+                <label class="flex items-center gap-2 text-[13px] text-admin-text-muted">
+                    <input type="checkbox" name="synth" value="true" checked="@Model.ShowSynthetic" class="cursor-pointer" />
+                    показать синтетику (SYNTH)
+                </label>
+                @* Скрытые фильтром дисциплины — счётчиком: молча пропавшие строки читаются как потеря данных. *@
+                @if (Model.HiddenByDiscipline > 0)
+                {
+                    <div class="text-[12px] text-admin-text-muted">
+                        Скрыто фильтром дисциплины: <strong class="text-admin-text">@Model.HiddenByDiscipline</strong>
+                        <a class="ml-1 text-admin-accent hover:underline" href="@ListUrl(d => d["discipline"] = "all")">показать все ↗</a>
+                    </div>
+                }
+                @* Фильтр results-auto (П5): те же ссылки, что в блоке дашборда; сезон и месяц сбрасываются —
+                   окно задачи (7 дней) короче любого из них. *@
+                <div class="text-[12px] text-admin-text-muted">
+                    results-auto:
+                    <a class="ml-1 text-admin-accent hover:underline" href="@Url.Page("Index", new { filter = Swimm.Application.Mapping.AutoPullFilters.Blocked })">ждут тебя</a>
+                    ·
+                    <a class="text-admin-accent hover:underline" href="@Url.Page("Index", new { filter = Swimm.Application.Mapping.AutoPullFilters.WouldTake })">взяла бы сама</a>
+                </div>
+                <div class="flex items-center gap-2 border-t border-admin-border pt-3">
+                    <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
+                    @if (hasFilters)
+                    {
+                        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Сброс</a>
+                    }
+                </div>
+            </div>
+        </details>
+        @* Скрытые фильтром дисциплины — ещё и рядом с кнопкой: без раскрытия меню их не видно. *@
+        @if (Model.HiddenByDiscipline > 0)
+        {
+            <a class="whitespace-nowrap text-[12px] text-admin-text-muted hover:text-admin-text" href="@ListUrl(d => d["discipline"] = "all")"
+               title="Скрыто фильтром дисциплины — показать все ↗">скрыто дисциплиной: @Model.HiddenByDiscipline ↗</a>
+        }
+
+        @* Решение Влада 23.11.2026: дисциплина/категория/тип/стадия держат выбранный месяц, а поиск —
+           ВСЕГДА по всем сезонам. Сезон и месяц форма шлёт как fseason/fmonth (не season/month):
+           сервер (CompetitionListUrl.FormRedirect) переадресует на чистый адрес и при непустом q
+           их выбрасывает. Готовые ссылки с q и season (Jobs «Что изменилось») этих имён не несут —
+           их выборка прежняя. Работает и без JS. *@
+        <input type="hidden" name="@Swimm.Application.Mapping.CompetitionListUrl.FormSeasonKey" value="@Model.SeasonParam" />
+        <input type="hidden" name="@Swimm.Application.Mapping.CompetitionListUrl.FormMonthKey" value="@Model.Month" />
+        <input type="hidden" name="state" value="@Model.State" />
+        @if (!string.IsNullOrEmpty(Model.QualityFilter))
+        {
+            <input type="hidden" name="filter" value="@Model.QualityFilter" />
+        }
+    </form>
+
+    <div class="flex items-center gap-2">
+        @* Бывшая «Проверить сейчас»: тот же забор текущего сезона, те же сообщения (#sync-info). *@
+        <button id="btn-sync" type="button" class="admin-btn admin-btn-ghost cursor-pointer">Проверить сайт федерации</button>
+        <details class="page-pop relative">
+            <summary class="admin-btn admin-btn-ghost list-none [&::-webkit-details-marker]:hidden">Ещё ▾</summary>
+            <div class="admin-card absolute right-0 z-30 mt-1 flex w-72 flex-col gap-0.5 p-1.5 shadow-xl shadow-black/50">
+                <a href="/Admin/Competitions/AssignRules" class="@popItem">Правила очков</a>
+                <a href="/Admin/Competitions/MoveResults" class="@popItem">Перенос результатов</a>
+                @* «Сезон на сайте»: забрать прошлый сезон у федерации (cYear) — после забора страница
+                   откроется на этом сезоне. Текущий — кнопкой «Проверить сайт федерации». *@
+                <div class="mt-1 border-t border-admin-border px-2.5 pb-1 pt-2">
+                    <div class="mb-1.5 text-xs text-admin-text-muted">Сезон на сайте — забрать прошлый сезон у федерации</div>
+                    <div class="flex items-center gap-2">
+                        <select id="sync-year" class="admin-input py-1">
+                            @for (var y = thisYear; y >= 2010; y--)
+                            {
+                                <option value="@y">@($"{y - 1}/{y % 100:00}")</option>
+                            }
+                        </select>
+                        <button id="btn-sync-year" type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 cursor-pointer">Забрать</button>
+                    </div>
+                </div>
+            </div>
+        </details>
+        <a href="/Admin/Competitions/Edit" class="admin-btn admin-btn-ghost">+ Новое соревнование</a>
+    </div>
+    <span id="sync-info" class="w-full text-[12.5px] text-admin-text-muted empty:hidden"></span>
+</header>
+
+@{ var flash = TempData["Flash"] as string; }
+@if (!string.IsNullOrEmpty(flash))
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
+    </script>
+}
+
+@* Жёлтая плашка фильтра «здоровья данных» (?filter=) — обязательна, над списком (хэндофф 5). *@
 @if (!string.IsNullOrEmpty(Model.QualityFilter))
 {
     var label = Model.QualityFilter switch
@@ -289,125 +314,6 @@
         <a href="@ListUrl(d => { d.Remove("filter"); d.Remove("stage"); })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
     </div>
 }
-
-@* Скрытые фильтром дисциплины показываем счётчиком: молча пропавшие строки читаются
-   как потеря данных, а так видно и сколько их, и куда нажать. *@
-@if (Model.HiddenByDiscipline > 0)
-{
-    <div class="mb-3 text-[12px] text-admin-text-muted">
-        Скрыто фильтром дисциплины: <strong class="text-admin-text">@Model.HiddenByDiscipline</strong>
-        <a class="text-admin-accent hover:underline ml-1"
-           href="@ListUrl(d => d["discipline"] = "all")">показать все ↗</a>
-    </div>
-}
-
-@* Фильтр results-auto (П5): те же ссылки, что в блоке дашборда; сезон и месяц сбрасываются —
-   окно задачи (7 дней) короче любого из них. *@
-<div class="mb-3 text-[12px] text-admin-text-muted">
-    results-auto:
-    <a class="text-admin-accent hover:underline ml-1" href="@Url.Page("Index", new { filter = Swimm.Application.Mapping.AutoPullFilters.Blocked })">ждут тебя</a>
-    ·
-    <a class="text-admin-accent hover:underline" href="@Url.Page("Index", new { filter = Swimm.Application.Mapping.AutoPullFilters.WouldTake })">взяла бы сама</a>
-</div>
-
-@{ var flash = TempData["Flash"] as string; }
-@if (!string.IsNullOrEmpty(flash))
-{
-    <script>
-        document.addEventListener('DOMContentLoaded', () => toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(flash)), 3000));
-    </script>
-}
-
-<div class="mb-4 flex flex-wrap items-center gap-3">
-    <button id="btn-sync" class="admin-btn admin-btn-primary cursor-pointer">Проверить сейчас</button>
-    @{ var thisYear = DateTime.UtcNow.Year; }
-    <label class="text-[12.5px] text-admin-text-muted flex items-center gap-1.5">
-        Сезон на сайте
-        <select id="sync-year" class="admin-input py-1">
-            <option value="">текущий</option>
-            @for (var y = thisYear; y >= 2010; y--)
-            {
-                <option value="@y">@($"{y - 1}/{y % 100:00}")</option>
-            }
-        </select>
-    </label>
-    <span id="sync-info" class="text-[12.5px] text-admin-text-muted"></span>
-    <a href="/Admin/Competitions/AssignRules" class="admin-btn admin-btn-ghost ml-auto">Правила очков</a>
-    <a href="/Admin/Competitions/MoveResults" class="admin-btn admin-btn-ghost">Перенос результатов</a>
-    <a href="/Admin/Competitions/Edit" class="admin-btn admin-btn-primary">+ Новое соревнование</a>
-</div>
-
-<!-- Фильтры -->
-<form method="get" id="filters-form" class="admin-card flex flex-wrap items-end gap-3 px-4 py-3 mb-4">
-    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Поиск
-        @* Число ищется ещё и как номер: compID федерации или Id соревнования в базе. *@
-        <input name="q" value="@Model.Search" autocomplete="off" class="admin-input w-72" placeholder="Название, compID или № в базе…"
-               title="Подстрока в названии или подзаголовке; число — ещё и compID федерации или номер соревнования в базе (у события — любого дня)" />
-    </label>
-    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Стадия
-        <select name="stage" class="admin-input">
-            <option value="">Все</option>
-            <option value="OnSite" selected="@(Model.Stage == "OnSite")">на сайте</option>
-            <option value="Imported" selected="@(Model.Stage == "Imported")">импортировано</option>
-            <option value="DbOnly" selected="@(Model.Stage == "DbOnly")">только в БД</option>
-            <option value="Ignored" selected="@(Model.Stage == "Ignored")">скрыто</option>
-        </select>
-    </label>
-    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Категория
-        <select name="cat" class="admin-input">
-            <option value="">Все</option>
-            @foreach (var cat in Model.Categories)
-            {
-                <option value="@cat.Key" selected="@(cat.Key == Model.CategoryKey)">@(!string.IsNullOrEmpty(cat.Badge) ? cat.Badge + " " : "")@cat.Name</option>
-            }
-        </select>
-    </label>
-    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Тип
-        <select name="kind" class="admin-input">
-            <option value="">Все</option>
-            <option value="champ" selected="@(Model.Kind == "champ")">чемпионат Израиля</option>
-        </select>
-    </label>
-    <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-        Дисциплина
-        @* Федерация проводит не только плавание: артистическое (שחייה אומנותית) во
-           входящих есть, а нам не нужно. Прячем ФИЛЬТРОМ с дефолтом, не удаляя строки —
-           понадобится, переключат на «все». *@
-        <select name="discipline" class="admin-input">
-            <option value="" selected="@(string.IsNullOrEmpty(Model.Discipline))">плавание</option>
-            <option value="artistic" selected="@(Model.Discipline == "artistic")">артистическое</option>
-            <option value="other" selected="@(Model.Discipline == "other")">прочее</option>
-            <option value="all" selected="@(Model.Discipline == "all")">все</option>
-        </select>
-    </label>
-    @* Сезон выбирается чипами над списком (там же счётчики «затянуто из всего»), а не селектом —
-       здесь только скрытое поле, чтобы «Найти» не сбрасывало выбранный сезон. *@
-    @* Решение Влада 23.11.2026: дисциплина/категория/тип/стадия держат выбранный месяц, а поиск —
-       ВСЕГДА по всем сезонам. Сезон и месяц форма шлёт как fseason/fmonth (не season/month):
-       сервер (CompetitionListUrl.FormRedirect) переадресует на чистый адрес и при непустом q
-       их выбрасывает. Готовые ссылки с q и season (Jobs «Что изменилось») этих имён не несут —
-       их выборка прежняя. Работает и без JS. *@
-    <input type="hidden" name="@Swimm.Application.Mapping.CompetitionListUrl.FormSeasonKey" value="@Model.SeasonParam" />
-    <input type="hidden" name="@Swimm.Application.Mapping.CompetitionListUrl.FormMonthKey" value="@Model.Month" />
-    <input type="hidden" name="state" value="@Model.State" />
-    @if (!string.IsNullOrEmpty(Model.QualityFilter))
-    {
-        <input type="hidden" name="filter" value="@Model.QualityFilter" />
-    }
-    <label class="flex items-center gap-2 text-[13px] text-admin-text-muted self-center mt-3.5">
-        <input type="checkbox" name="synth" value="true" checked="@Model.ShowSynthetic" class="cursor-pointer" />
-        показать синтетику (SYNTH)
-    </label>
-    <button type="submit" class="admin-btn admin-btn-primary">Найти</button>
-    @if (hasFilters)
-    {
-        <a href="@Url.Page("Index")" class="admin-btn admin-btn-ghost">Сброс</a>
-    }
-</form>
 
 @{
     // Расшифровка чисел для title ячеек полос (затянуто / тянуть нечего / ждёт затягивания).
@@ -657,7 +563,7 @@
             Add("bg-admin-danger/15 text-admin-danger",
                 st?.SuggestHide == true ? $"пропал {st.MissingDays} дн. — скрыть?" : "пропал",
                 $"Старт пропал из списка isr.org.il {Swimm.Application.Constants.IsraelTime.ToLocal(gone):dd.MM.yyyy} — вероятно, отменён (день по Израилю, от него считается «пропал N дн.»)."
-                + (st?.SuggestHide == true ? " Скрыть — кнопкой «✕» в панели справа; само ничего не закрывается." : ""));
+                + (st?.SuggestHide == true ? " Скрыть — кнопкой «Скрыть» в шапке панели справа; само ничего не закрывается." : ""));
         if (s?.StartList is { Stale: true } && st?.State is Swimm.Application.Mapping.CompetitionRowState.Ahead or Swimm.Application.Mapping.CompetitionRowState.Running)
             Add("bg-admin-warning/15 text-admin-warning", "обновить", "Стартовый протокол устарел: до старта мало дней, а забору больше суток");
         if (SuspectOf(u) is > 0 and var n)
@@ -729,12 +635,8 @@
     string RowEditUrl(int id, string key) =>
         $"/Admin/Competitions/Edit?id={id}&back={Uri.EscapeDataString(SelUrl(key))}";
 
-    // ── Правая панель-чек-лист (вариант E, этап 4; хэндофф 3.5) ─────────────────────────────
-    // Этап 4: только «ждёт затягивания», которой ещё нет в базе. Недотянутая многодневка (Р115) тоже
-    // «ждёт затягивания», но у неё есть дни в базе (Изменить, Качество, быстрая правка, Удалить) —
-    // их место в чек-листе рисует этап 6, до него у неё прежняя панель. Остальные состояния — этап 6.
-    bool IsChecklistRow(Swimm.Application.Dtos.UnifiedCompetitionRowDto u) =>
-        u.Db == null && u.Site != null && u.Status?.State == Swimm.Application.Mapping.CompetitionRowState.ReadyToPull;
+    // ── Правая панель-чек-лист (вариант E, этапы 4 и 6; хэндофф 3.5) ────────────────────────
+    // С этапа 6 — у строк ВСЕХ состояний. Прежней панели строки больше нет.
 
     (string Text, string? Title) StartListCaption(Swimm.Application.Dtos.UnifiedSiteInfo s)
     {
@@ -747,64 +649,186 @@
             Swimm.Application.Mapping.StartListBadgeKind.Empty => $"забирали {at} — пусто (посева на loglig нет)",
             _ => $"забор {at} сорвался",
         };
-        var title = "Последние заборы:\n" + string.Join("\n", b.History.Select(p =>
+        // «Пора обновить» (бывший жёлтый SL-бейдж): до старта мало дней, а забору больше суток.
+        if (b.Stale) text += " · обновить";
+        var title = (b.Stale ? $"До старта ≤ {Swimm.Application.Mapping.StartListBadgeRules.StaleWindowDays} дн., а забору больше суток — нажми «Обновить»\n" : "")
+            + "Последние заборы:\n" + string.Join("\n", b.History.Select(p =>
             $"{p.PulledAt.ToLocalTime():dd.MM HH:mm} · {p.Status} · заявок {p.Entries} (+{p.Added} −{p.Removed} пересев {p.Moved})"));
         return (text, title);
     }
 
-    Swimm.API.Pages.Admin.Competitions.CompChecklistView ChecklistView(Swimm.Application.Dtos.UnifiedCompetitionRowDto u, string key)
+    string Plural(int n, string one, string few, string many)
     {
-        var s = u.Site!;
-        var st = u.Status!;
-        var days = st.FirstDay is { } f && st.LastDay is { } l ? l.DayNumber - f.DayNumber + 1 : 1;
-        var input = new Swimm.Application.Mapping.ChecklistInput(st.State, Imported: u.Db != null,
-            StartList: s.StartList?.Kind, StartListStale: s.StartList?.Stale == true,
-            WarmUpDays: s.WarmUpDays, DayCount: days);
-        var none = Swimm.Application.Mapping.CompetitionChecklistRules.Build(input);
-        var phases = new Dictionary<string, string[]>
-        {
-            ["none"] = none.Select(Swimm.Application.Mapping.CompetitionChecklistRules.Code).ToArray(),
-        };
-        foreach (var ph in Swimm.Application.Mapping.CompetitionChecklistRules.LivePhases)
-            phases[Swimm.Application.Mapping.CompetitionChecklistRules.Code(ph)] = Swimm.Application.Mapping.CompetitionChecklistRules
-                .Build(input, ph).Select(Swimm.Application.Mapping.CompetitionChecklistRules.Code).ToArray();
+        var t = n % 100;
+        if (t is >= 11 and <= 14) return many;
+        return (n % 10) switch { 1 => one, >= 2 and <= 4 => few, _ => many };
+    }
 
-        var sl = StartListCaption(s);
-        var warm = s.WarmUpDays == 0 ? "не задана"
+    // «День 1 · 28.07» — дата дня хранится текстом «дд/ММ/гггг».
+    string DayLabel(Swimm.Application.Dtos.CompetitionListItemDto d, int index)
+    {
+        var no = d.DayNumber ?? index + 1;
+        return DateTime.TryParseExact(d.Date, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var dt)
+            ? $"День {no} · {dt:dd.MM}"
+            : $"День {no}";
+    }
+
+    async Task<Swimm.API.Pages.Admin.Competitions.CompChecklistView> ChecklistView(Swimm.Application.Dtos.UnifiedCompetitionRowDto u, string key)
+    {
+        var s = u.Site;
+        var db = u.Db;
+        var st = u.Status ?? new Swimm.Application.Mapping.CompetitionRowStatus(Swimm.Application.Mapping.CompetitionRowState.Closed);
+        var head = db?.Single ?? (db?.Days.Count > 0 ? db.Days[0] : null);
+        var days = st.FirstDay is { } f && st.LastDay is { } l ? l.DayNumber - f.DayNumber + 1 : 1;
+        var hidden = s?.Status == "ignored" && db == null;
+        var markedImported = s?.Status == "imported" && db == null;
+        var r115 = st is { PulledDays: int pd, SiteDays: int sd } ? $"Затянуто {pd} из {sd} {DaysWord(sd)} по сайту федерации" : null;
+        var baseInput = new Swimm.Application.Mapping.ChecklistInput(st.State, Imported: db != null,
+            StartList: s?.StartList?.Kind, StartListStale: s?.StartList?.Stale == true,
+            WarmUpDays: s?.WarmUpDays ?? 0, DayCount: days,
+            OnFederationSite: s != null, Hidden: hidden);
+
+        string Phases(Swimm.Application.Mapping.ChecklistInput input)
+        {
+            var map = new Dictionary<string, string[]>
+            {
+                ["none"] = Swimm.Application.Mapping.CompetitionChecklistRules.Build(input)
+                    .Select(Swimm.Application.Mapping.CompetitionChecklistRules.Code).ToArray(),
+            };
+            foreach (var ph in Swimm.Application.Mapping.CompetitionChecklistRules.LivePhases)
+                map[Swimm.Application.Mapping.CompetitionChecklistRules.Code(ph)] = Swimm.Application.Mapping.CompetitionChecklistRules
+                    .Build(input, ph).Select(Swimm.Application.Mapping.CompetitionChecklistRules.Code).ToArray();
+            return System.Text.Json.JsonSerializer.Serialize(map);
+        }
+
+        // ── Шаги 5–9 одной области (одиночная строка или день события) ──
+        Swimm.API.Pages.Admin.Competitions.CompChecklistScope Scope(Swimm.Application.Dtos.CompetitionListItemDto? day, string? label)
+        {
+            var comp = day ?? db?.Single;
+            var results = day?.ResultCount ?? db?.Single?.ResultCount ?? (db?.IsEvent == true ? db.TotalResultCount : 0);
+            var scanned = comp?.QualityScannedAt ?? (day == null ? db?.QualityScannedAt : null);
+            var suspects = comp?.SuspectCount ?? (day == null ? db?.SuspectCount ?? 0 : 0);
+            // Р114 — текст отметки (у дня — своей); Р115 — у всей строки.
+            var incomplete = db == null ? null : comp?.PartialResults ?? r115;
+            // Строк в базе нет — проверять нечего: шаг 8 не «текущий».
+            var input = baseInput with { QualityScanned = scanned != null || (db != null && results == 0), SuspectCount = suspects, Incomplete = incomplete != null };
+            var none = Swimm.Application.Mapping.CompetitionChecklistRules.Build(input);
+
+            (string Text, string? Title, bool Danger) Step5()
+            {
+                if (db != null)
+                {
+                    if (incomplete != null) return (incomplete.Length > 90 ? incomplete[..90] + "…" : incomplete, incomplete, false);
+                    var t = $"{results} {Plural(results, "результат", "результата", "результатов")} в базе";
+                    return (s == null ? t + " · PDF-импорт без страницы федерации" : t, null, false);
+                }
+                if (hidden) return ("скрыто", "Строка скрыта — в долг не идёт. «Вернуть» — снова в работу", false);
+                if (markedImported) return ("помечено импортированным (вручную)", "«✓ имп.»: строка закрыта без импорта", false);
+                if (s?.EmptySourceAt is { } ea) return ($"протокола нет · с {Swimm.Application.Constants.IsraelTime.ToLocal(ea):dd.MM.yyyy}", "PDF пустой или в нём одни неявки (NS) — тянуть нечего", false);
+                return st.State switch
+                {
+                    Swimm.Application.Mapping.CompetitionRowState.Ahead => ("после старта", null, false),
+                    Swimm.Application.Mapping.CompetitionRowState.Running => ("старт идёт — протокол может быть неполным; тянуть можно", null, false),
+                    Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol when st.Reason == Swimm.Application.Mapping.WaitingProtocolReason.Incomplete
+                        && !string.IsNullOrEmpty(s?.AutoPullBlockedReason) => ($"неполный: {s!.AutoPullBlockedReason}", null, false),
+                    Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol => (ReasonText(st.Reason), null, st.ParseFailed),
+                    _ when !string.IsNullOrEmpty(s?.LastError) => ("последний забор сорвался", null, true),
+                    _ => ("PDF с isr.org.il → разбор → превью", null, false),
+                };
+            }
+
+            var s5 = Step5();
+            var s8 = db == null ? "запустится сама после импорта"
+                : results == 0 ? "строк в базе нет"
+                : suspects > 0 ? $"помечено сомнительными: {suspects}"
+                : scanned is { } at ? $"проверено {at.ToLocalTime():dd.MM.yyyy}"
+                : "ещё не проверялось";
+            var steps = new List<Swimm.API.Pages.Admin.Competitions.CompChecklistStep>
+            {
+                new(5, "Протокол скачан и разобран", s5.Text, none[4], s5.Title, s5.Danger),
+                new(6, "Проверь превью", day != null ? "превью проверено · быстрая правка — выше, для всего события"
+                    : db != null ? "быстрая правка: категории, флаги, бассейн, очки" : "бассейн, рекорды, флаги, категории, очки, событие", none[5]),
+                new(7, "Импорт", db != null ? "в базе" : "1–5 минут, в фоне", none[6]),
+                new(8, "Проверка качества", s8, none[7]),
+                new(9, "После импорта", "Синхр. языки · Loglig-id · Промежуточные", none[8]),
+            };
+            return new(day, label, steps, Phases(input), incomplete, results, scanned, suspects);
+        }
+
+        var scopes = db is { IsEvent: true } ev && ev.Days.Count > 0
+            ? ev.Days.Select((d, i) => Scope(d, DayLabel(d, i))).ToList()
+            : new List<Swimm.API.Pages.Admin.Competitions.CompChecklistScope> { Scope(null, null) };
+        var headNone = Swimm.Application.Mapping.CompetitionChecklistRules.Build(baseInput with
+        {
+            QualityScanned = scopes[0].QualityScannedAt != null, SuspectCount = scopes[0].SuspectCount, Incomplete = scopes[0].Incomplete != null,
+        });
+
+        var sl = s != null ? StartListCaption(s) : ("—", "Строки нет на сайте федерации (PDF-импорт)");
+        var warm = s == null ? "—"
+            : s.WarmUpDays == 0 ? "не задана"
             : s.WarmUpDays >= days ? (days > 1 ? $"задана на все {days} {DaysWord(days)}" : "задана")
             : $"задана на {s.WarmUpDays} из {days} {DaysWord(days)}";
-        var found = s.DiscoveredAt == default ? "—" : Swimm.Application.Constants.IsraelTime.ToLocal(s.DiscoveredAt).ToString("dd.MM.yyyy");
-        var hasError = !string.IsNullOrEmpty(s.LastError);
-        var steps = new List<Swimm.API.Pages.Admin.Competitions.CompChecklistStep>
+        var found = s == null ? "нет на сайте федерации — PDF-импорт"
+            : s.DiscoveredAt == default ? "—" : Swimm.Application.Constants.IsraelTime.ToLocal(s.DiscoveredAt).ToString("dd.MM.yyyy");
+        var started = st.State switch
         {
-            new(1, "Найден у федерации", found, none[0], "Когда забор «Входящих» впервые увидел старт на isr.org.il"),
-            new(2, "Стартовый протокол", sl.Text, none[1], sl.Title),
-            new(3, "Разминка", warm, none[2], "Время разминки по дням — руками, из регламента (תקנון)"),
-            new(4, "Старт прошёл", PanelDate(st), none[3]),
-            // Ошибка забора — подписью шага 5 (хэндофф, раздел 5: «не нарисовано, предложение»).
-            new(5, "Протокол скачан и разобран", hasError ? s.LastError! : "PDF с isr.org.il → разбор → превью", none[4],
-                hasError ? "Ошибка последнего забора" : null, CaptionDanger: hasError),
-            new(6, "Проверь превью", "бассейн, рекорды, флаги, категории, очки, событие", none[5]),
-            new(7, "Импорт", "1–5 минут, в фоне", none[6]),
-            new(8, "Проверка качества", "запустится сама после импорта", none[7]),
-            new(9, "После импорта", "Синхр. языки · Loglig-id · Промежуточные", none[8]),
+            Swimm.Application.Mapping.CompetitionRowState.Ahead => $"старт {PanelDate(st)}",
+            Swimm.Application.Mapping.CompetitionRowState.Running => $"{StateText(st)} · {PanelDate(st)}",
+            _ => PanelDate(st),
+        };
+        var headSteps = new List<Swimm.API.Pages.Admin.Competitions.CompChecklistStep>
+        {
+            new(1, "Найден у федерации", found, headNone[0], "Когда забор «Входящих» впервые увидел старт на isr.org.il"),
+            new(2, "Стартовый протокол", sl.Item1, headNone[1], sl.Item2),
+            new(3, "Разминка", warm, headNone[2], "Время разминки по дням — руками, из регламента (תקנון)"),
+            new(4, "Старт прошёл", started, headNone[3]),
         };
 
-        var chips = DateChangeChipsHtml(s) + AutoPullChipHtml(s)
-            + (st.SuggestHide ? $"<span class=\"ml-1 inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-danger/15 text-admin-danger\" title=\"Пропал с сайта {Swimm.Application.Mapping.CompetitionRowStateRules.MissingSuggestHideDays}+ дн. назад, старт прошёл. Скрыть — «Скрыть» выше; само не закрывается.\">пропал {st.MissingDays} дн. — скрыть?</span>" : "");
         var enc = (string? x) => System.Net.WebUtility.HtmlEncode(x ?? "");
-        var meta = $"<span title=\"ID соревнования на isr.org.il (OrgCompId)\">ID федерации {s.OrgCompId}</span>"
-            + $"<span dir=\"rtl\" title=\"Площадка и языки загруженных PDF\">{enc(s.Venue ?? "—")}{LangBadges(s.Languages)}</span>"
-            + "<span>бассейн —</span><span>строк —</span>"
-            + (Model.SeriesFor(s.Name) is { } series
+        const string chipCls = "ml-1 inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold";
+        var chips = DateChangeChipsHtml(s) + AutoPullChipHtml(s)
+            + (st.SuggestHide ? $"<span class=\"{chipCls} bg-admin-danger/15 text-admin-danger\" title=\"Пропал с сайта {Swimm.Application.Mapping.CompetitionRowStateRules.MissingSuggestHideDays}+ дн. назад, старт прошёл. Скрыть — «Скрыть» выше; само не закрывается.\">пропал {st.MissingDays} дн. — скрыть?</span>" : "")
+            + (db is { IsEvent: true } evh ? $"<span class=\"{chipCls} bg-admin-success/15 text-admin-success\">{evh.DayCount} {DaysWord(evh.DayCount)}</span>" : "")
+            + (db is { IsEvent: true } evp && evp.PartialDayCount > 0
+                ? PartialBadge(string.Join("\n", evp.Days.Where(d => d.PartialResults != null).Select(d => $"День {d.DayNumber?.ToString() ?? "?"}: {d.PartialResults}")),
+                    $"неполные: {evp.PartialDayCount} {DaysWord(evp.PartialDayCount)}")
+                : PartialBadge(db?.Single?.PartialResults));
+
+        var org = db?.Single?.OrgCompId ?? s?.OrgCompId ?? db?.Days.Select(d => d.OrgCompId).FirstOrDefault(x => x != null);
+        var pool = db?.Single?.PoolType ?? db?.PoolType;
+        var rows = db?.Single?.ResultCount ?? db?.TotalResultCount;
+        var meta = (org is int oc
+                ? $"<span title=\"ID соревнования на isr.org.il (OrgCompId)\">ID федерации <a href=\"https://isr.org.il/comp.asp?compID={oc}\" target=\"_blank\" rel=\"noopener\" class=\"text-admin-accent hover:underline\">{oc} ↗</a></span>"
+                : "<span>ID федерации —</span>")
+            + (db is { IsEvent: true } evl ? PublicEventLink(evl.EventId) : PublicCompetitionLink(db?.Single?.Id))
+            + $"<span>бассейн <span class=\"text-admin-text\">{enc(string.IsNullOrEmpty(pool) ? "—" : pool)}</span></span>"
+            + $"<span>строк <span class=\"tabular-nums text-admin-text\">{(rows?.ToString() ?? "—")}</span></span>"
+            + (s != null ? $"<span dir=\"rtl\" title=\"Площадка и языки загруженных PDF\">{enc(s.Venue ?? "—")}{LangBadges(s.Languages)}</span>" : "")
+            + (db?.Single?.SubName is { Length: > 0 } sub ? $"<span class=\"max-w-[260px] truncate\" dir=\"auto\" title=\"{enc(sub)}\">{enc(sub)}</span>" : "")
+            + (s != null && db == null && Model.SeriesFor(s.Name) is { } series
                 ? $"<a href=\"/Admin/Series/Edit?id={series.Id}\" class=\"admin-badge border-admin-accent/30 bg-admin-accent/15 text-admin-accent\" title=\"Название содержит ключевую фразу серии — при затягивании дни привяжутся к её частям\">Series: {enc(series.Name)}</a>"
                 : "");
-        string? auto = s.AutoPullVerdict is { } v
-            ? $"auto: {Swimm.Application.Mapping.ResultsAutoVerdicts.Label(v)}" + (string.IsNullOrEmpty(s.AutoPullBlockedReason) ? "" : $" — {s.AutoPullBlockedReason}")
+        // Причина results-auto: у «неполный: …» она уже в подписи шага 5 — тут только вердикт.
+        string? auto = s?.AutoPullVerdict is { } v
+            ? $"auto: {Swimm.Application.Mapping.ResultsAutoVerdicts.Label(v)}"
+              + (string.IsNullOrEmpty(s.AutoPullBlockedReason) || scopes[0].Step(5).Caption.Contains(s.AutoPullBlockedReason) ? "" : $" — {s.AutoPullBlockedReason}")
             : null;
 
-        return new(u, key, RowName(u), PanelDate(st), StateText(st), StateChipCls(st), trophyHtml, chips, meta, steps,
-            System.Text.Json.JsonSerializer.Serialize(phases), auto, key == selKey);
+        var dayEdit = db?.Days.ToDictionary(d => d.Id, d => RowEditUrl(d.Id, key)) ?? new Dictionary<int, string>();
+        var dayPublic = db?.Days.ToDictionary(d => d.Id, d => $"{Model.PublicSiteBaseUrl}/competitions/{d.Id}") ?? new Dictionary<int, string>();
+        Microsoft.AspNetCore.Html.IHtmlContent? quick = head != null && db != null
+            ? await Html.PartialAsync("/Pages/Admin/Competitions/_CompQuickEdit.cshtml",
+                new Swimm.API.Pages.Admin.Competitions.CompQuickEditView(db, head, s?.OrgCompId, RowRoute(key),
+                    Model.Categories, Model.PoolTypeOptions, Model.ClubRules, Model.SwimmerRules))
+            : null;
+        Microsoft.AspNetCore.Html.IHtmlContent? cats = db == null ? null
+            : await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", db.IsEvent ? db.Categories : db.Single!.Categories);
+
+        return new(u, key, RowName(u), PanelDate(st), StateText(st), StateChipCls(st), trophyHtml, chips, meta,
+            headSteps, Phases(baseInput with { QualityScanned = scopes[0].QualityScannedAt != null, SuspectCount = scopes[0].SuspectCount, Incomplete = scopes[0].Incomplete != null }),
+            scopes, auto, key == selKey,
+            head != null ? RowEditUrl(head.Id, key) : null, dayEdit, dayPublic, quick, cats);
     }
 }
 
@@ -937,8 +961,8 @@
     </section>
 
     @* ── Правая колонка: выбранное соревнование. Панели отрисованы у всех строк страницы, видна
-       одна (sel), JS переключает без перезагрузки. «Ждёт затягивания» (не в базе) — чек-лист
-       (_CompChecklist, этап 4); остальные — прежняя панель строки целиком, до этапа 6. *@
+       одна (sel), JS переключает без перезагрузки. У строк всех состояний — чек-лист (_CompChecklist,
+       этапы 4 и 6); у многодневного события — общая часть и шаги 5–9 по дням. *@
     <div id="comp-detail" data-auto-key="@(Model.AutoSelectedRow == null ? null : Swimm.Application.Mapping.CompetitionRowKey.Of(Model.AutoSelectedRow))" class="sticky top-4 max-h-[calc(100vh-2rem)] min-w-0 overflow-y-auto">
         @* Затягивание, чья строка не на этой странице списка (другой месяц, фильтры): ход идёт, видно его здесь. *@
         <div id="pull-elsewhere" class="admin-card mb-3 hidden px-4 py-2.5 text-[13px]"></div>
@@ -986,345 +1010,7 @@
         @foreach (var u in items)
         {
             var rowKey = Swimm.Application.Mapping.CompetitionRowKey.Of(u);
-            if (IsChecklistRow(u))
-            {
-                <partial name="/Pages/Admin/Competitions/_CompChecklist.cshtml" model="ChecklistView(u, rowKey)" />
-                continue;
-            }
-            var formRoute = RowRoute(rowKey);
-            var head = u.Db?.Single ?? (u.Db?.Days.Count > 0 ? u.Db.Days[0] : null);
-            var rowTitle = RowName(u);
-            var rowResults = u.Db?.Single?.ResultCount ?? u.Db?.TotalResultCount ?? 0;
-            var badge = StageBadge(u.Stage);
-            var st = u.Status;
-            var org = u.Db?.Single?.OrgCompId ?? u.Site?.OrgCompId ?? u.Db?.Days.Select(d => d.OrgCompId).FirstOrDefault(x => x != null);
-            var pool = u.Db?.Single?.PoolType ?? u.Db?.PoolType;
-            <div id="panel-@rowKey" class="row-panel admin-card p-4 @(rowKey == selKey ? "" : "hidden")" data-key="@rowKey">
-                @* Шапка: название, дата, состояние; колонки прежней таблицы (стадия, ID федерации,
-                   площадка/языки, бассейн, строк) — строкой под ним. *@
-                <div class="mb-3 border-b border-admin-border pb-3">
-                    <div class="flex items-start gap-2">
-                        @if (u.IsChampionship)
-                        {
-                            <span class="mt-1 shrink-0 text-admin-warning" title="Чемпионат Израиля"><partial name="/Pages/Admin/Shared/_Icon.cshtml" model='"trophy"' /></span>
-                        }
-                        <h2 class="min-w-0 flex-1 text-base font-semibold text-white" dir="rtl" style="text-align:left">
-                            @if (u.Db?.Single is { } hc)
-                            {
-                                <a href="@RowEditUrl(hc.Id, rowKey)" class="hover:underline" title="Изменить">@rowTitle</a>
-                            }
-                            else
-                            {
-                                @rowTitle
-                            }
-                        </h2>
-                    </div>
-                    <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-admin-text-muted">
-                        <span class="tabular-nums">@PanelDate(st)</span>
-                        <span class="@chip @StateChipCls(st)">@StateText(st)</span>
-                        @Html.Raw(StageBadgeHtml(badge))
-                        @if (u.Db is { IsEvent: true } evh)
-                        {
-                            <span class="@chip bg-admin-success/15 text-admin-success">@evh.DayCount @DaysWord(evh.DayCount)</span>
-                        }
-                        @if (u.Db is { IsEvent: true } evp0 && evp0.PartialDayCount > 0)
-                        {
-                            @Html.Raw(PartialBadge(
-                                string.Join("\n", evp0.Days.Where(d => d.PartialResults != null).Select(d => $"День {d.DayNumber?.ToString() ?? "?"}: {d.PartialResults}")),
-                                $"неполные: {evp0.PartialDayCount} {DaysWord(evp0.PartialDayCount)}"))
-                        }
-                        else if (u.Db?.Single is { } cp)
-                        {
-                            @Html.Raw(PartialBadge(cp.PartialResults))
-                        }
-                        @if (u.Site?.EmptySourceAt is { } emptyAt)
-                        {
-                            <span class="@chip bg-white/[.08] text-admin-text-muted"
-                                  title="Протокола нет: PDF пустой или в нём одни неявки (NS) (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола</span>
-                        }
-                        @Html.Raw(StartListBadgeHtml(u.Site))
-                        @Html.Raw(DateChangeChipsHtml(u.Site))
-                        @if (st?.SuggestHide == true)
-                        {
-                            <span class="@chip bg-admin-danger/15 text-admin-danger" title="Пропал с сайта @Swimm.Application.Mapping.CompetitionRowStateRules.MissingSuggestHideDays+ дн. назад, старт прошёл. Скрыть — «✕» ниже; само не закрывается.">пропал @st.MissingDays дн. — скрыть?</span>
-                        }
-                        @Html.Raw(AutoPullChipHtml(u.Site))
-                        @if (rowResults > 0)
-                        {
-                            @Html.Raw(QualityBadge(u.Db?.Single?.QualityScannedAt ?? u.Db?.QualityScannedAt, u.Db?.Single?.SuspectCount ?? u.Db?.SuspectCount ?? 0))
-                        }
-                    </div>
-                    <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-admin-text-muted">
-                        <span title="ID соревнования на isr.org.il (OrgCompId)">
-                            ID федерации:
-                            @if (org is int oc)
-                            {
-                                <a href="https://isr.org.il/comp.asp?compID=@oc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@oc ↗</a>
-                            }
-                            else { <text>—</text> }
-                        </span>
-                        @if (u.Db is { IsEvent: true } evl)
-                        {
-                            @Html.Raw(PublicEventLink(evl.EventId))
-                        }
-                        else if (u.Db?.Single is { } cl)
-                        {
-                            @Html.Raw(PublicCompetitionLink(cl.Id))
-                        }
-                        <span>бассейн: <span class="text-admin-text">@(string.IsNullOrEmpty(pool) ? "—" : pool)</span></span>
-                        <span>строк: <span class="tabular-nums text-admin-text">@(u.Db == null ? "—" : rowResults.ToString())</span></span>
-                        @if (u.Site != null)
-                        {
-                            <span dir="rtl" title="Площадка и языки загруженных PDF">@(u.Site.Venue ?? "—")@Html.Raw(LangBadges(u.Site.Languages))</span>
-                        }
-                        @if (u.Site != null && u.Db == null && Model.SeriesFor(u.Site.Name) is { } series)
-                        {
-                            @* Выпуск серии турнира: при затягивании день привяжется к её части сам (§5.8). *@
-                            <a href="/Admin/Series/Edit?id=@series.Id"
-                               class="admin-badge border-admin-accent/30 bg-admin-accent/15 text-admin-accent"
-                               title="Название содержит ключевую фразу серии — при затягивании дни привяжутся к её частям">Series: @series.Name</a>
-                        }
-                    </div>
-                    @if (st is { PulledDays: int pd, SiteDays: int sd })
-                    {
-                        @* Недотянутая многодневка (решение Влада 23.11.2026): ложный долг снимает «Принять как есть» на Edit. *@
-                        <div class="missing-days-note mt-1.5 text-[11px] text-admin-warning">
-                            Затянуто @pd из @sd дней по сайту федерации — если остальных дней не будет, «Принять как есть» на странице «Изменить».
-                        </div>
-                    }
-                    @if (!string.IsNullOrEmpty(u.Site?.LastError))
-                    {
-                        <div class="mt-1.5 text-[11px] text-[#ef9a9a]" dir="ltr">@u.Site!.LastError</div>
-                    }
-                    @* Причина results-auto (П5): «ждёт тебя» читается прямо здесь, а не только в подсказке чипа. *@
-                    @if (u.Site?.AutoPullVerdict == Swimm.Application.Mapping.ResultsAutoVerdicts.Blocked && !string.IsNullOrEmpty(u.Site.AutoPullBlockedReason))
-                    {
-                        <div class="mt-1 text-[11px] text-admin-warning" dir="auto">auto: @u.Site.AutoPullBlockedReason</div>
-                    }
-                    @if (u.Db is { IsEvent: true } evc)
-                    {
-                        <div class="mt-1.5">@await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", evc.Categories)</div>
-                    }
-                    else if (u.Db?.Single is { } cc)
-                    {
-                        @if (!string.IsNullOrEmpty(cc.SubName))
-                        {
-                            <div class="mt-1 truncate text-[11px] text-admin-text-muted" title="@cc.SubName">@cc.SubName</div>
-                        }
-                        <div class="mt-1.5">@await Html.PartialAsync("/Pages/Admin/Competitions/_CompCategories.cshtml", cc.Categories)</div>
-                    }
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2">
-                    @if (head != null)
-                    {
-                        <a href="@RowEditUrl(head.Id, rowKey)" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
-                    }
-                    @if (rowResults > 0 && u.Db is { } dbq)
-                    {
-                        <button type="button" class="admin-btn admin-btn-primary py-1 px-2.5 quality-btn"
-                                data-event-id="@(dbq.IsEvent ? dbq.EventId?.ToString() : null)"
-                                data-competition-id="@(dbq.IsEvent ? null : dbq.Single?.Id.ToString())"
-                                data-title="@rowTitle"
-                                title="Проверить достоверность результатов">⚑ Качество</button>
-                    }
-                    @* Источники стартового протокола: у окружных чемпионатов их
-                       несколько на один наш старт, и собрать их может только человек
-                       (docs/plans/start-list-plan.md, решение от 2026-08-28). *@
-                    @if (head != null)
-                    {
-                        <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 sources-btn"
-                                data-competition-id="@head.Id"
-                                data-title="@rowTitle"
-                                title="Из каких compID федерации собирается стартовый протокол">⇄ Источники</button>
-                    }
-                    @* Доклейка промежуточных (Д5): пишет два поля к строкам, которые
-                       УЖЕ в базе, — поэтому нужна только там, где строки есть.
-                       Переимпорт ради промежуточных задваивал соревнование (И-28). *@
-                    @if (head != null && rowResults > 0)
-                    {
-                        <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 splits-btn"
-                                data-competition-id="@head.Id"
-                                data-title="@rowTitle"
-                                title="Скачать промежуточные с loglig и дописать их к строкам, которые уже в базе (сперва сухой прогон)">⏱ Промежуточные</button>
-                    }
-                    @Html.Raw(u.Site != null ? SiteActions(u.Site, imported: u.Db != null) : "")
-                    @* «Удалить» уходит из списка на этапе 6 (останется только на Edit). *@
-                    @if (u.Db is { IsEvent: true } evd)
-                    {
-                        <form method="post" asp-page-handler="DeleteEvent" asp-all-route-data="formRoute"
-                              class="inline comp-delete-form" data-kind="event" data-name="@evd.EventName" data-days="@evd.DayCount" data-rows="@evd.TotalResultCount">
-                            <input type="hidden" name="eventId" value="@evd.EventId" />
-                            <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
-                        </form>
-                    }
-                    else if (u.Db?.Single is { } cd)
-                    {
-                        <form method="post" asp-page-handler="Delete" asp-all-route-data="formRoute"
-                              class="inline comp-delete-form" data-kind="single" data-name="@cd.Name" data-rows="@cd.ResultCount">
-                            <input type="hidden" name="id" value="@cd.Id" />
-                            <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
-                        </form>
-                    }
-                </div>
-
-                @* Ход «Затянуть» / «Перезатянуть» прежней панели (шаги — тексты прежней панели «Затягивание»)
-                   и превью — здесь же, в панели своей строки (этап 4: плавающей панели хода больше нет). *@
-                <ol class="ck-log mt-3 hidden space-y-1 text-[12px]"></ol>
-                <div class="ck-preview-slot"></div>
-
-                @if (head != null && rowResults > 0)
-                {
-                    @* Отчёт доклейки. Без «Сверки с файлом» он ЕДИНСТВЕННЫЙ контроль
-                       (план, Д3) — поэтому печатается целиком, с разбивкой по дням. *@
-                    <div class="splits-box mt-3 hidden rounded-md border border-admin-border bg-admin-surface/60 p-3 text-[12.5px]"
-                         data-comp="@head.Id"></div>
-                }
-
-                @if (u.Db is { IsEvent: true } evp)
-                {
-                    <div class="mt-3 overflow-x-auto rounded-md border border-admin-border">
-                        <table class="admin-table m-0">
-                            <tbody>
-                                @foreach (var d in evp.Days)
-                                {
-                                    <tr>
-                                        <td class="w-32">
-                                            <a href="@RowEditUrl(d.Id, rowKey)" class="text-admin-accent hover:underline">День @(d.DayNumber?.ToString() ?? "?")</a>@Html.Raw(PartialBadge(d.PartialResults))
-                                            @if (!string.IsNullOrEmpty(d.SubName))
-                                            {
-                                                <div class="max-w-[220px] truncate text-[11px] text-admin-text-muted" title="@d.SubName">@d.SubName</div>
-                                            }
-                                        </td>
-                                        <td class="whitespace-nowrap text-admin-text-muted">@(string.IsNullOrEmpty(d.Date) ? "—" : d.Date)</td>
-                                        <td>@(string.IsNullOrEmpty(d.PoolType) ? "—" : d.PoolType)</td>
-                                        <td class="text-admin-text-muted">
-                                            <div class="flex flex-col gap-0.5">
-                                                @if (d.OrgCompId is int doc)
-                                                {
-                                                    <a href="https://isr.org.il/comp.asp?compID=@doc" target="_blank" rel="noopener" class="text-admin-accent hover:underline">@doc ↗</a>
-                                                }
-                                                else { <span>—</span> }
-                                                @Html.Raw(PublicCompetitionLink(d.Id))
-                                            </div>
-                                        </td>
-                                        <td>@await Html.PartialAsync("/Pages/Admin/Competitions/_CompFlags.cshtml", d)</td>
-                                        <td class="text-right tabular-nums">@d.ResultCount</td>
-                                        <td class="col-actions text-right whitespace-nowrap">
-                                            <a href="@RowEditUrl(d.Id, rowKey)" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
-                                            <form method="post" asp-page-handler="Delete"
-                                                  asp-all-route-data="formRoute"
-                                                  class="inline comp-delete-form" data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
-                                                <input type="hidden" name="id" value="@d.Id" />
-                                                <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-
-                @if (head != null)
-                {
-                    @* Быстрая правка: только поля, общие для всех дней события. Имя/дата/страна — на Edit. *@
-                    <form method="post" asp-page-handler="QuickSave"
-                          asp-all-route-data="formRoute"
-                          class="mt-3 border-t border-admin-border pt-3">
-                        <input type="hidden" name="id" value="@head.Id" />
-                        @{
-                            var selectedKeys = (u.Db!.IsEvent ? u.Db.Categories : head.Categories).Select(x => x.Key).ToHashSet();
-                            var poolType = (u.Db.IsEvent ? u.Db.PoolType : head.PoolType) ?? "";
-                        }
-                        <div class="mb-2 text-xs text-admin-text-muted">
-                            Категории
-                            @if (u.Db.IsEvent)
-                            {
-                                <span class="text-admin-warning">· сохранение применится ко всем дням события (@u.Db.DayCount)</span>
-                            }
-                        </div>
-                        <div class="flex flex-wrap gap-x-5 gap-y-2">
-                            @foreach (var cat in Model.Categories)
-                            {
-                                <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                                    <input type="checkbox" name="categoryKeys" value="@cat.Key"
-                                           checked="@selectedKeys.Contains(cat.Key)" class="w-4 h-4 cursor-pointer" />
-                                    <span class="text-admin-text">@(!string.IsNullOrEmpty(cat.Badge) ? cat.Badge + " " : "")@cat.Name</span>
-                                </label>
-                            }
-                        </div>
-                        <div class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-                            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                                <input type="checkbox" name="isAward" value="true" checked="@(u.Db.IsEvent ? u.Db.IsAward : head.IsAward)" class="w-4 h-4 cursor-pointer" />
-                                <span class="text-admin-text">Awards</span>
-                            </label>
-                            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                                <input type="checkbox" name="isChampionship" value="true" checked="@(u.Db.IsEvent ? u.Db.IsChampionship : head.IsChampionship)" class="w-4 h-4 cursor-pointer" />
-                                <span class="text-admin-text">🏆 Чемпионат Израиля</span>
-                            </label>
-                            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                                <input type="checkbox" name="showCombineAllResults" value="true" checked="@(u.Db.IsEvent ? u.Db.ShowCombineAllResults : head.ShowCombineAllResults)" class="w-4 h-4 cursor-pointer" />
-                                <span class="text-admin-text">Combine all results</span>
-                            </label>
-                            <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none"
-                                   title="Лига, товарищеский старт — очки клубам тут никто не считает. Реестр перестаёт требовать правило очков.">
-                                <input type="checkbox" name="clubPointsDisabled" value="true" checked="@(u.Db.IsEvent ? u.Db.ClubPointsDisabled : head.ClubPointsDisabled)" class="w-4 h-4 cursor-pointer" />
-                                <span class="text-admin-text">Клубный зачёт не ведётся</span>
-                            </label>
-                        </div>
-                        <div class="mt-3 flex flex-wrap items-end gap-3">
-                            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-                                Тип бассейна
-                                <select name="poolType" class="admin-input">
-                                    @foreach (var pt in Model.PoolTypeOptions)
-                                    {
-                                        <option value="@pt" selected="@(pt == poolType)">@pt</option>
-                                    }
-                                </select>
-                            </label>
-                            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-                                Клубные очки
-                                <select name="pointRuleClubsId" class="admin-input max-w-[16rem]">
-                                    <option value="">Авто (по дате и типу)</option>
-                                    @foreach (var r in Model.ClubRules)
-                                    {
-                                        <option value="@r.Id" selected="@(r.Id == head.PointRuleClubsId)">@r.Version</option>
-                                    }
-                                </select>
-                            </label>
-                            <label class="text-xs text-admin-text-muted flex flex-col gap-0.5">
-                                High Point
-                                <select name="pointRuleSwimmersId" class="admin-input max-w-[16rem]">
-                                    <option value="">Авто (по дате и типу)</option>
-                                    @foreach (var r in Model.SwimmerRules)
-                                    {
-                                        <option value="@r.Id" selected="@(r.Id == head.PointRuleSwimmersId)">@r.Version</option>
-                                    }
-                                </select>
-                            </label>
-                            <button type="submit" class="admin-btn admin-btn-primary">Сохранить</button>
-                        </div>
-
-                        @* Регламент (תקנון): по нему проставляются те же галочки, что выше.
-                           Файл никуда не сохраняется — только читается ради подсказки. *@
-                        <div class="mt-3 pt-3 border-t border-admin-border/60">
-                            <div class="text-xs text-admin-text-muted mb-1.5">
-                                Регламент (תקנון) — проверю медали, клубный зачёт и чемпионат, галочки поставлю сам.
-                                Без файла возьму его с loglig сам; файл нужен, только если ссылки там нет.
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <input type="file" accept=".pdf" class="admin-input text-xs regulation-file" data-comp="@head.Id" />
-                                <button type="button" class="admin-btn admin-btn-ghost text-xs regulation-check"
-                                        data-comp="@head.Id" data-org="@((head.OrgCompId ?? u.Site?.OrgCompId)?.ToString() ?? "")">
-                                    Проверить регламент
-                                </button>
-                            </div>
-                            <div class="regulation-result text-[11px] mt-1.5" data-comp="@head.Id"></div>
-                        </div>
-                    </form>
-                }
-            </div>
+            <partial name="/Pages/Admin/Competitions/_CompChecklist.cshtml" model="await ChecklistView(u, rowKey)" />
         }
 
         @* Превью — шаг 6 чек-листа; JS переносит блок в слот панели своей строки (этап 4). *@

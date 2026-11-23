@@ -135,6 +135,88 @@ public class CompetitionChecklistRulesTests
     {
         Assert.Equal("current", CompetitionChecklistRules.Code(C));
         Assert.Equal("import-failed", CompetitionChecklistRules.Code(ChecklistPhase.ImportFailed));
-        Assert.Equal(6, CompetitionChecklistRules.LivePhases.Count);
+        Assert.Equal("nothing", CompetitionChecklistRules.Code(ChecklistPhase.NothingToPull));
+        Assert.Equal(7, CompetitionChecklistRules.LivePhases.Count);
+    }
+
+    // ── Этап 6: таблица случаев хэндоффа 3.5 целиком ─────────────────────────────────────────
+
+    [Fact]
+    public void Case_Ahead() =>
+        Assert.Equal(new[] { D, D, D, C, P, P, P, P, P }, Build(Ready with { State = CompetitionRowState.Ahead }));
+
+    [Fact]
+    public void Case_Running_Step5Grey() =>
+        Assert.Equal(new[] { D, D, D, C, P, P, P, P, P }, Build(Ready with { State = CompetitionRowState.Running }));
+
+    [Fact]
+    public void Case_WaitingProtocol() =>
+        Assert.Equal(new[] { D, D, D, D, A, P, P, P, P }, Build(Ready with { State = CompetitionRowState.WaitingProtocol }));
+
+    [Fact]
+    public void Case_Imported_QualityNotScanned() =>
+        Assert.Equal(new[] { D, D, D, D, D, D, D, C, P }, Build(Ready with { State = CompetitionRowState.Closed, Imported = true }));
+
+    // ∅ и «✓ имп.» — шаг 5 решён («протокола нет» / «помечено»); скрыто — серое.
+    [Theory]
+    [InlineData(false, ChecklistStepStatus.Done)]
+    [InlineData(true, ChecklistStepStatus.Pending)]
+    public void Case_ClosedWithoutImport(bool hidden, ChecklistStepStatus step5)
+    {
+        var s = Build(new ChecklistInput(CompetitionRowState.Closed, Hidden: hidden));
+        Assert.Equal(step5, s[4]);
+        Assert.Equal(new[] { P, P, P, P }, s[5..]);
+        Assert.DoesNotContain(C, s);
+    }
+
+    // Р114 / Р115: чек-лист импортированного, шаг 5 — «!».
+    [Theory]
+    [InlineData(CompetitionRowState.WaitingProtocol)]
+    [InlineData(CompetitionRowState.Closed)]
+    public void Case_ImportedIncomplete_Step5Attention(CompetitionRowState state)
+    {
+        var s = Build(Ready with { State = state, Imported = true, Incomplete = true, QualityScanned = true });
+        Assert.Equal(new[] { A, D, D, D, C }, s[4..]);
+    }
+
+    [Fact]
+    public void Case_DbOnly_NotOnFederationSite_Step1Grey()
+    {
+        var s = Build(new ChecklistInput(CompetitionRowState.Closed, Imported: true, OnFederationSite: false, QualityScanned: true));
+        Assert.Equal(P, s[0]);
+        Assert.Equal(new[] { D, D, D, D, C }, s[4..]);
+    }
+
+    // Р116: «одни неявки» / «протокол пуст» — не сбой: шаг 5 решён, без «!».
+    [Fact]
+    public void NothingToPull_Phase_IsCalm()
+    {
+        var s = Build(Ready, ChecklistPhase.NothingToPull);
+        Assert.Equal(new[] { D, P, P, P, P }, s[4..]);
+        Assert.DoesNotContain(A, s);
+    }
+
+    // Перезатягивание импортированного идёт теми же фазами.
+    [Fact]
+    public void Imported_Repull_PhaseWins() =>
+        Assert.Equal(new[] { D, C, P, P, P },
+            Build(Ready with { State = CompetitionRowState.Closed, Imported = true, Incomplete = true }, ChecklistPhase.Preview)[4..]);
+
+    /// <summary>Инвариант на новых входах этапа 6: не больше одного текущего шага.</summary>
+    [Fact]
+    public void AtMostOneCurrent_WithStage6Inputs()
+    {
+        var phases = new[] { ChecklistPhase.None }.Concat(CompetitionChecklistRules.LivePhases);
+        foreach (var state in System.Enum.GetValues<CompetitionRowState>())
+        foreach (var imported in new[] { false, true })
+        foreach (var incomplete in new[] { false, true })
+        foreach (var hidden in new[] { false, true })
+        foreach (var onSite in new[] { false, true })
+        foreach (var scanned in new[] { false, true })
+        foreach (var phase in phases)
+        {
+            var input = new ChecklistInput(state, imported, null, false, 0, 2, scanned, 0, onSite, incomplete, hidden);
+            Assert.True(Build(input, phase).Count(x => x == C) <= 1, $"{input} {phase}");
+        }
     }
 }
