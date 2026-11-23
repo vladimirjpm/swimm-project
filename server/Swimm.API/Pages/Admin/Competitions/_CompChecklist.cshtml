@@ -127,6 +127,33 @@
                     </button>
                 }
             </nav>
+            @* Общие действия события (решения Влада 23.11.2026): «Перезатянуть» тянет весь протокол
+               федерации этого compID — все его дни, поэтому одна кнопка над днями, а не в каждом дне;
+               «Качество» на всё событие (eventId) — как до этапа 6, по дню — в шаге 8 дня. *@
+            @if (db != null && (s != null && finished || db.TotalResultCount > 0))
+            {
+                <div class="ck-event-actions mt-2 flex flex-wrap items-center gap-2 text-[11px] text-admin-text-muted">
+                    <span>Всё событие:</span>
+                    @if (s != null && finished)
+                    {
+                        <button type="button" class="ck-pull-btn @ghost" onclick="discPreview(@id, true)"
+                                title="Скачать протокол события заново и перезаписать результаты — все дни этого протокола федерации">Перезатянуть весь протокол события</button>
+                    }
+                    @if (db.TotalResultCount > 0)
+                    {
+                        @if (db.SuspectCount > 0)
+                        {
+                            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold bg-admin-warning/15 text-admin-warning" title="Помеченных недостоверными строк во всём событии: @db.SuspectCount">⚑ @db.SuspectCount</span>
+                        }
+                        else if (db.QualityScannedAt is { } eqa)
+                        {
+                            <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold bg-admin-success/15 text-admin-success" title="Проверено @eqa.ToLocalTime().ToString("dd.MM.yyyy HH:mm") — подозрительных строк нет">✓</span>
+                        }
+                        <button type="button" class="@ghost quality-btn" data-event-id="@db.EventId" data-title="@Model.Name"
+                                title="Проверить достоверность результатов всего события (все дни)">Качество события</button>
+                    }
+                </div>
+            }
             @* Строка выбранного дня (бывшая таблица дней прежней панели): «Изменить» — Edit ЭТОГО дня. *@
             @foreach (var sc in Model.Scopes)
             {
@@ -259,12 +286,12 @@
                                                     <button type="button" class="@ghost" onclick="discStatus(@id,'new')" title="Вернуть строку в работу">Вернуть</button>
                                                 }
                                             }
-                                            else if (db != null && s != null && finished)
+                                            else if (db != null && s != null && finished && !Model.IsEvent)
                                             {
                                                 // Перезатянуть: протокол на сайте правят (DQ, опечатки), парсер чинится. У события —
-                                                // протокол федерации целиком (все его дни).
+                                                // одна кнопка над днями (тянет все дни протокола), не здесь.
                                                 <button type="button" class="ck-pull-btn @ghost" onclick="discPreview(@id, true)"
-                                                        title="@(Model.IsEvent ? "Скачать протокол события заново и перезаписать результаты (все дни этого протокола)" : "Скачать протокол заново и перезаписать результаты")">Перезатянуть</button>
+                                                        title="Скачать протокол заново и перезаписать результаты">Перезатянуть</button>
                                             }
                                             if (s != null)
                                             {
