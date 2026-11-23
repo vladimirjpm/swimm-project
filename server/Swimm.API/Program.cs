@@ -110,6 +110,9 @@ builder.Services.AddCors(options =>
 builder.Services.AddProblemDetails();
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
+// Часы — инъекцией, чтобы «сегодня» (состояния /Admin/Competitions) подменялось в тестах.
+// Сервисы с необязательным TimeProvider (ResultsAutoService, AppInsightsReader) получат тот же System.
+builder.Services.AddSingleton(TimeProvider.System);
 // Красная полоса админки в ProdAdmin: куда подключены и с какой ветки (читается раз на старте).
 builder.Services.AddSingleton(_ => ProdAdminGuard.Describe(builder.Configuration, builder.Environment));
 // Подпись процесса в истории прогонов (Sys_JobRunLog.RunBy): откуда шёл прогон — прод, ProdAdmin, локально.

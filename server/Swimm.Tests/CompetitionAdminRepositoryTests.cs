@@ -155,7 +155,7 @@ public class CompetitionAdminRepositoryTests
         var chip2026 = all.SeasonCounts!.First(s => s.Season == 2026);
         Assert.Equal(3, chip2026.Total);     // imported + onSite + ignored
         Assert.Equal(1, chip2026.Imported);  // в БД только imported
-        Assert.Equal(new SeasonCountDto(2020, 1, 1), all.SeasonCounts!.First(s => s.Season == 2020));
+        Assert.Equal(new SeasonCountDto(2020, 1, 1) { States = new(0, 0, 0, 0, 1) }, all.SeasonCounts!.First(s => s.Season == 2020));
         // Сезон выбран → чипы прежние, а счётчики месяцев уже по сезону.
         Assert.Equal(2, season2026.SeasonCounts!.Count);
         Assert.Equal(0, season2026.MonthCounts[0]);   // январь 2020 в сезон 2026 не входит

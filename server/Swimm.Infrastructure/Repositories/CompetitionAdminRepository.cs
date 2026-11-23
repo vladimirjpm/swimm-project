@@ -70,10 +70,12 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
 
     public async Task<UnifiedCompetitionList> GetUnifiedAsync(
         string? search, string? categoryKey, int? season, string? stage, bool showSynthetic, int? month, int page, int pageSize,
-        string? qualityFilter = null, string? kind = null, string? discipline = null)
+        string? qualityFilter = null, string? kind = null, string? discipline = null,
+        string? state = null, DateOnly? today = null, bool unpaged = false)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
+        var day = today ?? CompetitionRowStateRules.IsraelToday(DateTimeOffset.UtcNow);
 
         // 1) БД-сторона: все «головы» под фильтрами (без пагинации — мержим и режем в памяти).
         // На admin-масштабе (~1.5k соревнований) это приемлемо; при росте — вынести в БД-пагинацию.
@@ -216,6 +218,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             _ => unified
         };
 
+        // 3c) Рабочее состояние каждой строки (хэндофф «вариант E», раздел 2) — до всех счётчиков.
+        foreach (var u in unified)
+            u.Status = CompetitionRowStateRules.Evaluate(StateInput(u), day);
+
         // 4) Счётчики по сезонам — ДО фильтра по сезону, иначе на чипах остался бы один сезон.
         // «Затянуто» = строка есть в справочнике БД (стадии Imported/DbOnly), т.е. Db != null.
         var seasonCounts = unified
@@ -223,7 +229,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             .GroupBy(u => SeasonOf(u.SortDate))
             .OrderByDescending(g => g.Key)
             .Select(g => new SeasonCountDto(
-                g.Key, g.Count(), g.Count(u => u.Db != null), g.Count(IsNothingToPull)))
+                g.Key, g.Count(), g.Count(u => u.Db != null), g.Count(IsNothingToPull))
+            {
+                States = CompetitionStateCounts.Of(g.Select(u => u.Status)),
+            })
             .ToList();
 
         // 4b) Фильтр по сезону (сен–авг) — один предикат на обе стороны, по дате строки.
@@ -234,25 +243,37 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var monthCounts = new int[12];
         var monthImported = new int[12];
         var monthNothingToPull = new int[12];
+        var monthStates = Enumerable.Repeat(CompetitionStateCounts.Zero, 12).ToArray();
         foreach (var u in unified)
             if (u.SortDate.Year > 1) // непарсибельные даты (MinValue) не считаем
             {
                 monthCounts[u.SortDate.Month - 1]++;
                 if (u.Db != null) monthImported[u.SortDate.Month - 1]++;
                 else if (IsNothingToPull(u)) monthNothingToPull[u.SortDate.Month - 1]++;
+                monthStates[u.SortDate.Month - 1] = monthStates[u.SortDate.Month - 1].Add(u.Status!.State);
             }
 
         // 5) Фильтр по месяцу (если задан) + единый date-desc порядок + пагинация в памяти.
         if (month is >= 1 and <= 12)
             unified = unified.Where(u => u.SortDate.Year > 1 && u.SortDate.Month == month).ToList();
 
+        // 5b) Числа переключателя состояний — под всеми фильтрами, кроме самого ?state=.
+        var listStates = CompetitionStateCounts.Of(unified.Select(u => u.Status));
+        if (CompetitionStateFilters.Parse(state) is { } bucket)
+            unified = unified.Where(u => u.Status!.Bucket == bucket).ToList();
+
         unified = unified.OrderByDescending(u => u.SortDate).ToList();
         var total = unified.Count;
+        if (unpaged)
+        {
+            page = 1;
+            pageSize = Math.Max(total, 1);
+        }
         var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         await AttachStartListBadgesAsync(pageItems);
         return new UnifiedCompetitionList(
             new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts,
-            hiddenByDiscipline, monthImported, seasonCounts, monthNothingToPull);
+            hiddenByDiscipline, monthImported, seasonCounts, monthNothingToPull, monthStates, listStates);
     }
 
     /// <summary>
@@ -296,6 +317,45 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     /// трёх незатянутых соревнований показал бы зелёную галочку. Ошибка забора
     /// (<c>LastError</c>) — тем более повод вернуться, а не закрытый вопрос.
     /// </summary>
+    /// <summary>
+    /// Вход правила состояний из строки списка. Даты: у строки базы — свои (одиночное — дата,
+    /// событие — первый и последний день), у строки «Входящих» — с сайта. Даты «Входящих»
+    /// лежат полночью без пояса — это уже местные календарные дни, переводить не нужно.
+    /// «Не опубликованы» — ошибка забора при пустом loglig-id (детали читались, iframe нет):
+    /// так её ставят и суточный забор, и забор стартового протокола.
+    /// </summary>
+    private static CompetitionRowStateInput StateInput(UnifiedCompetitionRowDto u)
+    {
+        DateOnly? first = null, last = null;
+        if (u.Db != null)
+        {
+            var dates = (u.Db.Single != null ? [u.Db.Single.Date] : u.Db.Days.Select(d => d.Date))
+                .Select(ParseDbDate).OfType<DateOnly>().ToList();
+            if (dates.Count > 0) { first = dates.Min(); last = dates.Max(); }
+        }
+        if (first == null && u.Site != null)
+        {
+            first = DateOnly.FromDateTime(u.Site.DateStart);
+            last = DateOnly.FromDateTime(u.Site.DateEnd);
+        }
+        if (first is { Year: <= 1 }) first = last = null;
+
+        var partial = u.Db != null && (u.Db.Single != null
+            ? u.Db.Single.PartialResults != null
+            : u.Db.PartialDayCount > 0);
+
+        return new CompetitionRowStateInput(
+            u.Stage, first, last,
+            AutoPullVerdict: u.Site?.AutoPullVerdict,
+            NoProtocolMark: u.Site?.EmptySourceAt != null,
+            ResultsNotPublished: u.Site is { LastError: not null, LogligId: null },
+            PartialResults: partial);
+    }
+
+    private static DateOnly? ParseDbDate(string? s) =>
+        DateOnly.TryParseExact(s, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var d) ? d : null;
+
     private static bool IsNothingToPull(UnifiedCompetitionRowDto u) =>
         u.Db == null && (u.Stage == CompetitionStage.Ignored || u.Site?.EmptySourceAt != null);
 

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.API.Pages.Admin.Shared;
 
 namespace Swimm.API.Pages.Admin.Competitions;
@@ -16,7 +17,8 @@ namespace Swimm.API.Pages.Admin.Competitions;
 [Authorize(Roles = "Admin")]
 public class IndexModel : PageModel
 {
-    private const int PageSize = 20;
+    private const int PageSize = CompetitionListUrl.PageSize;
+    private readonly TimeProvider _time;
     private readonly ICompetitionAdminRepository _repo;
     private readonly IImportService _import;
     private readonly IPointRulesAdminRepository _rules;
@@ -29,8 +31,9 @@ public class IndexModel : PageModel
     public IndexModel(ICompetitionAdminRepository repo, IImportService import,
         IPointRulesAdminRepository rules, IAdminAuditService audit,
         IConfiguration config, IWebHostEnvironment env, ILogger<IndexModel> logger,
-        ISeriesAdminRepository series)
+        ISeriesAdminRepository series, TimeProvider time)
     {
+        _time = time;
         _series = series;
         _repo = repo;
         _import = import;
@@ -47,9 +50,57 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true, Name = "cat")]
     public string? CategoryKey { get; set; }
 
-    /// <summary>Сезон (сен–авг) по году окончания: 2025 = 24/25. Совпадает с cYear на isr.org.il.</summary>
+    /// <summary>
+    /// Сырой <c>?season=</c>: год окончания сезона (2025 = 24/25, совпадает с cYear на isr.org.il)
+    /// или <see cref="CompetitionListUrl.AllSeasons"/> — явный выбор чипа «Все». Строкой, а не
+    /// числом: «all» нужен, чтобы голый адрес (= текущий месяц) отличался от «все сезоны».
+    /// </summary>
     [BindProperty(SupportsGet = true, Name = "season")]
-    public int? Season { get; set; }
+    public string? SeasonParam { get; set; }
+
+    /// <summary>Выбранный сезон (год окончания); null — все сезоны.</summary>
+    public int? Season => CompetitionListUrl.ParseSeason(SeasonParam);
+
+    /// <summary>
+    /// Фильтр по корзине состояния: <c>?state=waiting|ahead|closed</c>
+    /// (<see cref="CompetitionStateFilters"/>; «Ждут / Впереди / Закрыто»). Пусто — все.
+    /// Комбинируется со <c>stage</c>, на счётчики сезонов/месяцев/переключателя не влияет.
+    /// </summary>
+    [BindProperty(SupportsGet = true, Name = "state")]
+    public string? State { get; set; }
+
+    /// <summary>Разобранный <see cref="State"/>; null — фильтра нет (пусто или незнакомое значение).</summary>
+    public CompetitionStateBucket? StateBucket => CompetitionStateFilters.Parse(State);
+
+    /// <summary>
+    /// Выбранное соревнование — ключ строки (<see cref="CompetitionRowKey"/>: <c>e{EventId}</c>,
+    /// <c>c{Id}</c>, <c>s{DiscoveredId}</c>). Этапы 3–4 откроют по нему правую панель вместо
+    /// раскрытых строк в sessionStorage; на этапе 1 только разбирается и сохраняется в ссылках.
+    /// </summary>
+    [BindProperty(SupportsGet = true, Name = "sel")]
+    public string? Selected { get; set; }
+
+    /// <summary>Строка под <see cref="Selected"/> среди строк страницы; null — не выбрана или не видна при фильтрах.</summary>
+    public UnifiedCompetitionRowDto? SelectedRow { get; private set; }
+
+    /// <summary>Сегодня по Израилю — граница «впереди / идёт / прошёл».</summary>
+    public DateOnly Today { get; private set; }
+
+    /// <summary>Адрес был пустым — подставлены текущий сезон и месяц (хэндофф, раздел 6.1).</summary>
+    public bool OpenedOnCurrentMonth { get; private set; }
+
+    /// <summary>
+    /// Состояния по месяцам (индекс 0 = январь) — с фильтром сезона, без месяца, как
+    /// <see cref="MonthCounts"/>. Порядок полосы сезона — <see cref="CompetitionRowStateRules.SeasonMonthOrder"/>.
+    /// </summary>
+    public IReadOnlyList<CompetitionStateCounts> MonthStates { get; private set; } =
+        Enumerable.Repeat(CompetitionStateCounts.Zero, 12).ToList();
+
+    /// <summary>Состояния всего списка под текущими фильтрами (с месяцем), без <c>?state=</c> — числа переключателя.</summary>
+    public CompetitionStateCounts ListStates { get; private set; } = CompetitionStateCounts.Zero;
+
+    /// <summary>Строки страницы «ждёт затягивания», по блокам дней (последний день старта), свежий день первым.</summary>
+    public IReadOnlyList<ReadyToPullDay<UnifiedCompetitionRowDto>> ReadyToPullByDay { get; private set; } = [];
 
     /// <summary>Тип соревнования: «champ» — только чемпионаты (по названию), пусто — все.</summary>
     [BindProperty(SupportsGet = true, Name = "kind")]
@@ -135,6 +186,20 @@ public class IndexModel : PageModel
     public async Task OnGetAsync()
     {
         PublicSiteBaseUrl = PublicSite.BaseUrl(_config, _env);
+        Today = CompetitionRowStateRules.IsraelToday(_time.GetUtcNow());
+
+        // Голый адрес — текущий сезон и месяц. Любой непустой параметр — выборка задана явно.
+        if (CompetitionListUrl.ShouldOpenOnCurrentMonth(
+                Request.Query.Select(kv => new KeyValuePair<string, string?>(kv.Key, kv.Value.ToString()))))
+        {
+            var (season, month) = CompetitionListUrl.CurrentSeasonMonth(Today);
+            SeasonParam = season.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Month = month;
+            OpenedOnCurrentMonth = true;
+        }
+        if (StateBucket == null) State = null;
+        if (!CompetitionRowKey.IsValid(Selected)) Selected = null;
+        if (Month is not (>= 1 and <= 12)) Month = null;
 
         if (PageNumber < 1) PageNumber = 1;
         if (string.IsNullOrEmpty(Stage))
@@ -153,12 +218,19 @@ public class IndexModel : PageModel
             Swimm.Application.Mapping.AutoPullFilters.Blocked or Swimm.Application.Mapping.AutoPullFilters.WouldTake => FilterAlias,
             _ => null
         };
-        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month, PageNumber, PageSize, QualityFilter, Kind, Discipline);
+        // Выбран месяц — он показывается целиком, без пагинации; иначе «p» по 20.
+        var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month,
+            PageNumber, PageSize, QualityFilter, Kind, Discipline,
+            state: State, today: Today, unpaged: Month != null);
         Result = list.Page;
         MonthCounts = list.MonthCounts;
         MonthImported = list.MonthImported ?? new int[12];
         MonthNothingToPull = list.MonthNothingToPull ?? new int[12];
         SeasonCounts = list.SeasonCounts ?? [];
+        MonthStates = list.MonthStates ?? MonthStates;
+        ListStates = list.ListStates ?? CompetitionStateCounts.Zero;
+        ReadyToPullByDay = CompetitionRowStateRules.GroupReadyToPullByDay(Result.Items, u => u.Status);
+        SelectedRow = Selected == null ? null : Result.Items.FirstOrDefault(u => CompetitionRowKey.Matches(u, Selected));
         HiddenByDiscipline = list.HiddenByDiscipline;
         Categories = await _repo.GetAllCategoriesAsync();
         ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
@@ -255,11 +327,40 @@ public class IndexModel : PageModel
         return RedirectToBackToList();
     }
 
+    /// <summary>
+    /// Параметры текущей выборки — ОДИН список на ссылки, формы и редиректы после POST
+    /// (раньше их было шесть копий, и в редиректе быстрой правки потерялись discipline и filter).
+    /// Пустые не попадают: «назад» в браузере возвращает ту же выборку. <c>p</c> — только при
+    /// <paramref name="withPage"/>, <c>sel</c> — при <paramref name="withSelected"/>.
+    /// </summary>
+    public Dictionary<string, string> ListRoute(bool withPage = true, bool withSelected = true)
+    {
+        var d = new Dictionary<string, string>();
+        void Put(string key, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value)) d[key] = value;
+        }
+
+        Put("q", Search);
+        Put("cat", CategoryKey);
+        Put("season", SeasonParam);
+        Put("kind", Kind);
+        Put("discipline", Discipline);
+        Put("stage", Stage);
+        Put("state", State);
+        Put("synth", ShowSynthetic ? "true" : null);
+        Put("month", Month?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        // На GET алиасы ignored / discovery-new уже превращены в stage, остальное — в QualityFilter;
+        // на POST QualityFilter не разбирается, там идёт сырой filter из адреса формы.
+        Put("filter", QualityFilter ?? (Request.Method == HttpMethods.Get ? null : FilterAlias));
+        // С месяцем пагинации нет — «p» в адресе был бы мусором.
+        if (withPage && Month == null) Put("p", (Result.Items.Count > 0 ? Result.Page : PageNumber).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (withSelected) Put("sel", Selected);
+        return d;
+    }
+
     // Сохраняем текущие фильтры/страницу при возврате к списку.
     private IActionResult RedirectToBackToList() =>
-        RedirectToPage("Index", new
-        {
-            q = Search, cat = CategoryKey, season = Season, kind = Kind, stage = Stage,
-            synth = ShowSynthetic ? "true" : null, month = Month, p = PageNumber
-        });
+        RedirectToPage("Index", new Microsoft.AspNetCore.Routing.RouteValueDictionary(
+            ListRoute().ToDictionary(kv => kv.Key, kv => (object?)kv.Value)));
 }

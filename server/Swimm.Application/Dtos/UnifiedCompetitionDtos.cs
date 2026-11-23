@@ -33,7 +33,13 @@ public sealed record UnifiedCompetitionList(
     IReadOnlyList<SeasonCountDto>? SeasonCounts = null,
     /// <summary>Из <see cref="MonthCounts"/> — сколько НЕЛЬЗЯ затянуть (нечего брать: пустой
     /// протокол или результаты не опубликованы). Без этого «12 из 14» читается как долг.</summary>
-    IReadOnlyList<int>? MonthNothingToPull = null);
+    IReadOnlyList<int>? MonthNothingToPull = null,
+    /// <summary>Состояния (хэндофф «вариант E», раздел 2) по месяцам: индекс 0 = январь, под теми же
+    /// фильтрами, что <see cref="MonthCounts"/> (с сезоном, без месяца). <c>Total</c> = <see cref="MonthCounts"/>.</summary>
+    IReadOnlyList<Mapping.CompetitionStateCounts>? MonthStates = null,
+    /// <summary>Состояния всего списка под текущими фильтрами (с месяцем), но БЕЗ фильтра
+    /// <c>?state=</c> — числа переключателя «Все / Ждут / Впереди / Закрыто».</summary>
+    Mapping.CompetitionStateCounts? ListStates = null);
 
 /// <summary>
 /// Сезон (год окончания, 2026 = 25/26) со счётчиками. Три числа, а не два: «затянуто»,
@@ -42,6 +48,10 @@ public sealed record UnifiedCompetitionList(
 /// </summary>
 public sealed record SeasonCountDto(int Season, int Total, int Imported, int NothingToPull = 0)
 {
+    /// <summary>Состояния строк сезона — для полосы сезонов (закрыто / долг / впереди).
+    /// Инвариант: <c>States.Total == Total</c>.</summary>
+    public Mapping.CompetitionStateCounts States { get; init; } = Mapping.CompetitionStateCounts.Zero;
+
     /// <summary>Сколько ещё можно затянуть. 0 — сезон закрыт, показываем ✓.</summary>
     public int Pending => Math.Max(0, Total - Imported - NothingToPull);
 }
@@ -123,4 +133,14 @@ public sealed class UnifiedCompetitionRowDto
     /// обнаружении/импорте, а не угадывается на каждый показ.
     /// </summary>
     public string Discipline { get; set; } = "swimming";
+
+    /// <summary>
+    /// Рабочее состояние (впереди / идёт / ждёт затягивания / ждём протокол / закрыто) с причиной
+    /// и пометками — <see cref="Mapping.CompetitionRowStateRules.Evaluate"/>. Репозиторий
+    /// заполняет его у всех строк до счётчиков.
+    /// </summary>
+    public Mapping.CompetitionRowStatus? Status { get; set; }
+
+    /// <summary>Ключ строки (<c>?sel=</c>, раскрытие панели) — <see cref="Mapping.CompetitionRowKey"/>.</summary>
+    public string Key => Mapping.CompetitionRowKey.Of(this);
 }
