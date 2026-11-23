@@ -294,6 +294,9 @@
                 setStatuses(panel, 'none');
                 panel.querySelectorAll('.ck-caption').forEach(c => { c.textContent = c.dataset.default ?? ''; });
                 panel.querySelectorAll('.ck-pull-btn').forEach(b => b.classList.remove('hidden'));
+                // «Нет протокола»: подсветка снимается, копия в шаге 5 прячется (у «ждём протокол» её нет в .ck-noproto-step).
+                panel.querySelectorAll('.ck-noproto').forEach(b => b.classList.remove('ck-noproto-pulse'));
+                panel.querySelectorAll('.ck-noproto-step').forEach(b => b.classList.add('hidden'));
                 const chip = panel.querySelector('.ck-state-chip');
                 if (chip?.dataset.default !== undefined) chip.textContent = chip.dataset.default;
             }
@@ -373,6 +376,13 @@
                     ['parsing', 'preview', 'importing'].includes(flow.phase)));
                 // Р116: строка уже закрыта сервером («∅ нет протокола») — так и называем её до F5.
                 const chip = panel.querySelector('.ck-state-chip');
+                // Исход «тянуть нечего» (Р116/пустой PDF; НЕ сбой B4): «Нет протокола» светится — это следующий шаг.
+                // Подсвечено всё до следующего render(): клик перезагружает страницу, другая строка / новое
+                // «Затянуть» меняют flow. После F5 flow 'nothing' сбрасывается (restore), подсветка не переживает.
+                if (flow.phase === 'nothing') {
+                    panel.querySelectorAll('.ck-noproto').forEach(b => b.classList.add('ck-noproto-pulse'));
+                    stepOf(panel, 5)?.querySelectorAll('.ck-noproto-step').forEach(b => b.classList.remove('hidden'));
+                }
                 if (chip && flow.phase === 'nothing') {
                     chip.dataset.default ??= chip.textContent;
                     chip.textContent = 'закрыто · тянуть нечего';

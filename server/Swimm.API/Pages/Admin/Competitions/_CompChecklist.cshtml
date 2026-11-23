@@ -47,7 +47,7 @@
                 {
                     @if (!empty)
                     {
-                        <button type="button" class="@quiet" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
+                        <button type="button" class="@quiet ck-noproto" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
                     }
                     else
                     {
@@ -289,9 +289,12 @@
                                                     <button type="button" class="ck-pull-btn @(primary ? "admin-btn admin-btn-primary py-1 px-3" : ghost)"
                                                             onclick="discPreview(@id)" title="Скачать PDF с isr.org.il, разобрать и показать превью">Затянуть</button>
                                                 }
-                                                if (state == Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol && !empty)
+                                                if (!empty && !hidden && (finished || state == Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol))
                                                 {
-                                                    <button type="button" class="@ghost" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
+                                                    // У «ждём протокол» кнопка видна всегда; у остальных — скрыта, JS показывает её
+                                                    // только при исходе «тянуть нечего: протокол пуст» (там же она подсвечивается).
+                                                    var waiting = state == Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol;
+                                                    <button type="button" class="ck-noproto @(waiting ? "" : "ck-noproto-step hidden") @ghost" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
                                                 }
                                                 if (empty && !hidden)
                                                 {
