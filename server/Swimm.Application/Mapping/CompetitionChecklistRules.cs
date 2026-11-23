@@ -86,8 +86,12 @@ public static class CompetitionChecklistRules
         var notStarted = input.State is CompetitionRowState.Ahead or CompetitionRowState.Running;
 
         s[0] = ChecklistStepStatus.Done;
-        s[1] = StartListStatus(input, notStarted);
-        s[2] = input.WarmUpDays >= Math.Max(1, input.DayCount) ? ChecklistStepStatus.Done : ChecklistStepStatus.Attention;
+        // Шаги 2–3 у прошедшего старта («ждёт затягивания», «ждём протокол», закрыто): несделанное —
+        // серым, без «!» (решение Влада 23.11.2026): после старта их уже никто не задаст, а у долга
+        // прошлых сезонов «!» был бы шумом. До старта и пока он идёт — «!» остаётся.
+        var missed = notStarted ? ChecklistStepStatus.Attention : ChecklistStepStatus.Pending;
+        s[1] = StartListStatus(input, notStarted) == ChecklistStepStatus.Done ? ChecklistStepStatus.Done : missed;
+        s[2] = input.WarmUpDays >= Math.Max(1, input.DayCount) ? ChecklistStepStatus.Done : missed;
         s[3] = notStarted ? ChecklistStepStatus.Current : ChecklistStepStatus.Done;
 
         var tail = phase == ChecklistPhase.None ? ByState(input) : ByPhase(phase);

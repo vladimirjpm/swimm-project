@@ -135,12 +135,18 @@
                 box.scrollTop = 0;
                 // Правая колонка липкая; если страницу прокрутили выше её начала — подтянуть.
                 if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ block: 'start' });
+                // Пачка (этап 5) слушает: спрятали её — показать строку возврата над списком.
+                document.dispatchEvent(new CustomEvent('comp:panel', { detail: { key } }));
             }
+            // Пачка открывается тем же show('bulk') (#panel-bulk — тоже .row-panel), «Закрыть» у неё
+            // возвращает панель выбранной строки.
+            window.compShow = show;
+            window.compShowCurrent = () => show(keyFor(new URL(location.href).searchParams.get('sel')));
 
             rows.forEach(r => r.addEventListener('click', e => {
                 if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                 e.preventDefault();
-                if (r.getAttribute('aria-current') === 'true') return;
+                if (r.getAttribute('aria-current') === 'true' && document.getElementById('panel-bulk')?.classList.contains('hidden') !== false) return;
                 show(r.dataset.key);
                 history.pushState({ sel: r.dataset.key }, '', r.href);
             }));
@@ -279,10 +285,13 @@
                 const busy = importBusy();
                 const own = flow ? panelOf(flow.discId) : null;
                 document.querySelectorAll('#comp-detail .ck-pull-btn, #comp-detail button[onclick^="discPreview("]').forEach(b => {
-                    const lock = busy || (!!own && b.closest('.row-panel') === own && flow.phase === 'parsing');
+                    const key = b.closest('.row-panel')?.dataset.key;
+                    const discId = key ? document.querySelector(`.comp-row[data-key="${key}"]`)?.dataset.discId : null;
+                    const byBulk = discId ? window.bulkPull?.blocks(discId) : null;
+                    const lock = busy || !!byBulk || (!!own && b.closest('.row-panel') === own && flow.phase === 'parsing');
                     if (b.dataset.title === undefined) b.dataset.title = b.title;
                     b.disabled = lock;
-                    b.title = lock ? (busy ? 'Идёт импорт — дождись его конца' : 'Разбор этой строки уже идёт') : b.dataset.title;
+                    b.title = lock ? (busy ? 'Идёт импорт — дождись его конца' : byBulk ?? 'Разбор этой строки уже идёт') : b.dataset.title;
                 });
                 const imp = document.getElementById('btn-import');
                 if (imp && flow?.queuing) imp.disabled = true;
@@ -291,6 +300,7 @@
             function render() {
                 document.querySelectorAll('#comp-detail .row-panel').forEach(resetPanel);
                 lockPullButtons();
+                window.bulkPull?.paintOffers(); // пачку нельзя ставить, пока идёт одиночное
                 document.querySelectorAll('.comp-row .flow-mark').forEach(m => m.remove());
                 const elsewhere = document.getElementById('pull-elsewhere');
                 elsewhere?.classList.add('hidden');
@@ -376,6 +386,12 @@
 
             /// «Затянуть» / «Перезатянуть». false — нельзя: идёт импорт (любой строки) или разбор этой же.
             function start(discId, name, repull) {
+                // Пачка (этап 5): два импорта одного старта одновременно быть не должно.
+                const byBulk = window.bulkPull?.blocks(discId);
+                if (byBulk) {
+                    alert(byBulk + '.');
+                    return false;
+                }
                 if (importBusy()) {
                     alert(`Сначала дождись импорта «${flow.name}» — он идёт в фоне.`);
                     return false;
@@ -604,23 +620,49 @@
                 beginImport, importNotStarted, importQueued, restore, render, step, finish, commit };
         })();
 
-        // ── Пакетное затягивание (docs/plans/bulk-pull-plan.md) ────────────────────
-        // Забор идёт минутами и живёт на сервере: панель только поллит состояние, а batchId
-        // лежит в sessionStorage — перезагрузка страницы пачку не теряет.
-        (function () {
+        // ── Пачки «за день» / «за месяц» (вариант E, этап 5; docs/plans/bulk-pull-plan.md) ──
+        // Забор идёт минутами и живёт на сервере: панель только поллит состояние. Пачка
+        // показывается в правой области ВМЕСТО чек-листа (#panel-bulk); клик по строке списка
+        // возвращает чек-лист, а к пачке ведёт строка #bulk-strip над списком.
+        //
+        // Кто попадает в пачку, решает сервер (BulkPullSelection): у каждой кнопки готовые id для
+        // обоих положений чекбокса «включая чемпионаты», JS выбирает набор и шлёт его как есть.
+        //
+        // Переживает F5: batchId, подпись кнопки и «была ли пачка открыта» — в sessionStorage.
+        // Пачка висит, пока её не закроют («Закрыть»), в том числе готовая.
+        //
+        // Сосуществование с одиночным «Затянуть» (pullFlow): пока пачка тянет или импортирует —
+        // одиночное запрещено целиком; пока она открыта и в ней есть что импортировать — запрещено
+        // для её строк. Пачку нельзя поставить, пока идёт одиночный разбор, превью или импорт.
+        window.bulkPull = (function () {
             const API = '/api/admin/discovery';
             const KEY = 'admin-bulk-pull-batch';
-            const card = document.getElementById('bulk-card');
-            const startBtn = document.getElementById('bulk-pull-btn');
-            if (!card) return;
+            const META_KEY = 'admin-bulk-pull-meta';   // { label, n, ids } — что было на кнопке
+            const SHOWN_KEY = 'admin-bulk-pull-shown'; // '1' — пачка была открыта справа
+            const panel = document.getElementById('panel-bulk');
+            if (!panel) return null;
 
             const progress = document.getElementById('bulk-progress');
+            const scopeBox = document.getElementById('bulk-scope');
             const skippedBox = document.getElementById('bulk-skipped');
             const rowsBox = document.getElementById('bulk-rows');
             const importBtn = document.getElementById('bulk-import-btn');
             const importOut = document.getElementById('bulk-import-result');
+            const strip = document.getElementById('bulk-strip');
+            const stripText = document.getElementById('bulk-strip-text');
+            const champBox = document.getElementById('bulk-include-champ');
+            const offers = [...document.querySelectorAll('.bulk-offer')];
+            const ss = {
+                get(k) { try { return sessionStorage.getItem(k); } catch { return null; } },
+                set(k, v) { try { sessionStorage.setItem(k, v); } catch { /* приватный режим */ } },
+                del(k) { try { sessionStorage.removeItem(k); } catch { /* приватный режим */ } },
+            };
             let timer = null;
-            let batchId = sessionStorage.getItem(KEY);
+            let batchId = ss.get(KEY);
+            let meta = null;
+            try { meta = JSON.parse(ss.get(META_KEY) ?? 'null'); } catch { meta = null; }
+            let last = null;          // последний статус пачки с сервера
+            let sawPending = false;   // в этой загрузке видели импорт в ходе — по его концу обновить список
 
             function esc(v) {
                 return String(v ?? '').replace(/[&<>"']/g, c =>
@@ -664,12 +706,23 @@
                 }
             }
 
-            // Импортировать из пачки больше нечего: всё затянутое уже ушло в очередь и доимпортировалось.
             // Пометка источника длины бассейна в колонке «Из регламента» (PoolTypeSources в Application).
             const POOL_SOURCE = { venue: ' (справочник бассейнов)', default: ' (умолчание лиг)' };
 
-            const nothingLeft = batch => batch.finished && !batch.importsPending
-                && !(batch.rows || []).some(r => r.previewId && !r.queued);
+            const running = b => !!b && !b.finished;
+            const busy = () => running(last) || !!last?.importsPending;
+            // Строки пачки, которые ещё можно импортировать из неё (или ещё тянутся): одиночное
+            // «Затянуть» для них запрещено — иначе один старт ушёл бы в импорт дважды.
+            function heldIds() {
+                if (!last) return new Set();
+                const pulled = new Map((last.rows || []).map(r => [r.discoveredId, r]));
+                return new Set((last.queueIds || []).filter(id => {
+                    const r = pulled.get(id);
+                    if (!r) return !last.finished;              // ещё не затянута
+                    if (r.queued) return r.importState === 'queued' || r.importState === 'running';
+                    return !!r.previewId;                        // затянута, ждёт решения
+                }).map(String));
+            }
 
             function renderRows(rows) {
                 if (!rows.length) { rowsBox.innerHTML = ''; return; }
@@ -729,18 +782,118 @@
 
             rowsBox.addEventListener('change', updateImportBtn);
 
+            // ── Кнопки пачек в списке ──
+            const includeChamp = () => !!champBox?.checked;
+            const idsOf = o => ((includeChamp() ? o.dataset.idsAll : o.dataset.ids) || '').split(',').filter(Boolean).map(Number);
+
+            // Число на кнопке, «чемпионат — отдельно», «ещё K — следующим заходом» — по положению чекбокса.
+            function paintOffers() {
+                const lock = busy() ? 'Идёт пачка — дождись её конца (строка над списком → показать)'
+                    : (window.pullFlow?.current?.()?.phase && ['parsing', 'preview', 'importing'].includes(window.pullFlow.current().phase))
+                        ? 'Идёт одиночное затягивание — закончи или отмени его' : null;
+                offers.forEach(o => {
+                    const ids = idsOf(o);
+                    const all = (o.dataset.idsAll || '').split(',').filter(Boolean);
+                    const left = Number(includeChamp() ? o.dataset.leftAll : o.dataset.left) || 0;
+                    const btn = o.querySelector('.bulk-btn');
+                    o.querySelector('.bulk-n').textContent = ids.length;
+                    btn.classList.toggle('hidden', ids.length === 0);
+                    btn.disabled = !!lock;
+                    if (btn.dataset.title === undefined) btn.dataset.title = btn.title;
+                    btn.title = lock ?? btn.dataset.title;
+                    o.querySelector('.bulk-champ-only')?.classList.toggle('hidden', !(ids.length === 0 && all.length > 0));
+                    const l = o.querySelector('.bulk-left');
+                    if (l) { l.classList.toggle('hidden', left <= 0); l.querySelector('.bulk-left-n').textContent = left; }
+                });
+            }
+            champBox?.addEventListener('change', paintOffers);
+
+            function offerLabel(o) {
+                if (o.dataset.scope === 'month') {
+                    const title = o.closest('section')?.querySelector('.text-base.font-semibold')?.textContent?.trim();
+                    return `За месяц${title ? ' · ' + title : ''}`;
+                }
+                const head = o.closest('[data-ready-day]')?.querySelector('.text-\\[13px\\].font-semibold')?.textContent?.trim();
+                return `За день${head ? ' · ' + head : ''}`;
+            }
+
+            // ── Пометки строк списка: «в пачке», «тяну…», вердикт, «импорт…» ──
+            function markRows() {
+                document.querySelectorAll('.comp-row .bulk-mark').forEach(m => m.remove());
+                if (!last) return;
+                const pulled = new Map((last.rows || []).map(r => [r.discoveredId, r]));
+                (last.queueIds || []).forEach((id, i) => {
+                    const row = document.querySelector(`.comp-row[data-disc-id="${id}"]`);
+                    if (!row) return;
+                    const r = pulled.get(id);
+                    let text, cls = 'bg-admin-accent/15 text-admin-accent';
+                    if (!r) {
+                        if (last.finished) return;
+                        text = i === (last.done ?? 0) ? 'пачка: тяну…' : 'в пачке';
+                    } else if (r.queued) {
+                        if (r.importState === 'queued' || r.importState === 'running') text = 'импорт…';
+                        else if (r.importState === 'failed') { text = 'импорт упал'; cls = 'bg-admin-danger/15 text-admin-danger'; }
+                        else { text = '✓ импорт'; cls = 'bg-admin-success/15 text-admin-success'; }
+                    } else {
+                        const v = VERDICTS[r.verdict] ?? VERDICTS.Failed;
+                        text = `${v.icon} в пачке`;
+                    }
+                    row.querySelector('.row-marks')?.insertAdjacentHTML('afterbegin',
+                        `<span class="bulk-mark inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold ${cls}" title="Строка в пакетном затягивании">${esc(text)}</span>`);
+                });
+            }
+
+            // ── Показ: пачка справа или строка «Идёт пачка… → показать» над списком ──
+            const isShown = () => !panel.classList.contains('hidden');
+            function showBulk() {
+                if (window.compShow) window.compShow('bulk');
+                else {
+                    document.querySelectorAll('#comp-detail .row-panel').forEach(p => p.classList.toggle('hidden', p !== panel));
+                    document.getElementById('panel-none')?.classList.add('hidden');
+                }
+                ss.set(SHOWN_KEY, '1');
+                paintStrip();
+            }
+
+            function paintStrip() {
+                const visible = !!last && !isShown();
+                strip.classList.toggle('hidden', !visible);
+                strip.classList.toggle('flex', visible);
+                if (!visible) return;
+                const sent = (last.rows || []).filter(r => r.queued);
+                const done = sent.filter(r => r.importState === 'completed' || r.importState === 'failed');
+                stripText.textContent = running(last) ? `Идёт пачка: ${last.done} из ${last.total}`
+                    : last.importsPending ? `Пачка: импорт ${done.length} из ${sent.length}`
+                    : `Пачка готова: ${last.total}` + (done.length ? ` · импортировано ${done.length}` : '');
+            }
+            strip.addEventListener('click', showBulk);
+            // Выбор строки списка спрятал пачку — показать строку возврата.
+            document.addEventListener('comp:panel', e => {
+                if (e.detail?.key !== 'bulk') ss.del(SHOWN_KEY);
+                paintStrip();
+            });
+
             function render(batch) {
-                card.classList.remove('hidden');
+                last = batch;
+                if (batch.importsPending) sawPending = true;
                 const sent = (batch.rows || []).filter(r => r.queued);
                 const done = sent.filter(r => r.importState === 'completed' || r.importState === 'failed');
                 const failed = sent.filter(r => r.importState === 'failed').length;
                 const spin = '<span class="admin-spinner mr-1.5 align-middle text-admin-accent"></span>';
 
+                // Подпись: что было на кнопке и сколько ушло. Ушло меньше — строки перестали ждать
+                // затягивания между показом кнопки и кликом (затянуты, скрыты).
+                if (meta) {
+                    const gone = (meta.n ?? 0) - (batch.total ?? 0) - (batch.skippedChampionships?.length ?? 0);
+                    scopeBox.innerHTML = `${esc(meta.label)} · на кнопке ${meta.n}, в пачке ${batch.total}`
+                        + (gone > 0 ? ` · <span class="text-admin-warning">${gone} уже не ждут затягивания (затянуты или скрыты) — пропущены</span>` : '');
+                } else scopeBox.textContent = `В пачке ${batch.total}`;
+
                 if (batch.error) {
                     progress.textContent = batch.error;
                 } else if (!batch.finished) {
                     progress.innerHTML = spin + `Тяну ${Math.min(batch.done + 1, batch.total)} из ${batch.total}… `
-                        + '<span class="opacity-70">(можно уйти со страницы и вернуться)</span>';
+                        + '<span class="opacity-70">(можно открыть другую строку или уйти со страницы и вернуться)</span>';
                 } else if (batch.importsPending) {
                     // Импорт идёт в фоновой очереди по одному — счётчик по завершённым строкам.
                     progress.innerHTML = spin + `Затянуто ${batch.done} из ${batch.total}. `
@@ -756,8 +909,6 @@
                         + (sent.length ? ` В импорт отправлено: ${sent.length}.` : '');
                 }
 
-                // Кнопки «заняты», пока идёт их работа: забор пачки и импорт отмеченных.
-                if (startBtn) adminBusy(startBtn, !batch.finished, 'Тяну…');
                 adminBusy(importBtn, !!batch.importsPending, 'Импортирую…');
 
                 const skipped = batch.skippedChampionships || [];
@@ -768,6 +919,10 @@
                         + '. Отметьте «включая чемпионаты», если нужны они.';
                 }
                 renderRows(batch.rows || []);
+                markRows();
+                paintOffers();
+                paintStrip();
+                window.pullFlow?.render?.(); // замки одиночного «Затянуть»
             }
 
             async function poll() {
@@ -776,11 +931,20 @@
                     const batch = await api(`${API}/bulk-pull/${batchId}`);
                     render(batch);
                     // Опрос живёт, пока тянется пачка ИЛИ идёт импорт отправленных строк.
-                    if (batch.finished && !batch.importsPending) { clearInterval(timer); timer = null; }
+                    if (batch.finished && !batch.importsPending) {
+                        clearInterval(timer); timer = null;
+                        // Импорт отмеченных доработал в этой загрузке — обновить список: строки ушли в
+                        // «закрыто» / «ждём протокол · неполный». Пачка после перезагрузки на месте.
+                        if (sawPending) {
+                            sawPending = false;
+                            if (isShown()) ss.set(SHOWN_KEY, '1');
+                            importOut.textContent = 'Импорт завершён — обновляю список…';
+                            setTimeout(() => location.reload(), 800);
+                        }
+                    }
                 } catch (err) {
                     clearInterval(timer); timer = null;
-                    sessionStorage.removeItem(KEY);
-                    batchId = null;
+                    forget();
                     progress.textContent = err.message;
                 }
             }
@@ -791,45 +955,49 @@
                 timer = setInterval(poll, 2000);
             }
 
-            // «включая чемпионаты» меняет и состав пачки, и число на кнопке: оба списка
-            // собраны сервером тем же отбором, что применит BulkPullService (без чемпионатов
-            // по умолчанию, не больше MaxBatchSize). Пусто — кнопки нет.
-            const champBox = document.getElementById('bulk-include-champ');
-            if (startBtn && champBox) {
-                champBox.addEventListener('change', () => {
-                    const ids = champBox.checked ? startBtn.dataset.idsAll : startBtn.dataset.idsNoChamp;
-                    startBtn.dataset.ids = ids || '';
-                    const n = (ids || '').split(',').filter(Boolean).length;
-                    document.getElementById('bulk-pull-count').textContent = n;
-                    startBtn.classList.toggle('hidden', n === 0);
-                });
+            function forget() {
+                [KEY, META_KEY, SHOWN_KEY].forEach(ss.del);
+                batchId = null; meta = null; last = null;
+                markRows(); paintOffers(); paintStrip();
+                window.pullFlow?.render?.();
             }
 
-            if (startBtn) {
-                startBtn.addEventListener('click', async () => {
-                    const ids = (startBtn.dataset.ids || '').split(',').filter(Boolean).map(Number);
-                    const includeChampionships = document.getElementById('bulk-include-champ').checked;
-                    adminBusy(startBtn, true, 'Тяну…'); // снимет render(), когда пачка закончится
-                    card.classList.remove('hidden');
-                    importOut.textContent = '';
-                    rowsBox.innerHTML = '';
-                    progress.textContent = 'Ставлю пачку…';
-                    try {
-                        const batch = await api(`${API}/bulk-pull`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ids, includeChampionships })
-                        });
-                        batchId = batch.batchId;
-                        sessionStorage.setItem(KEY, batchId);
-                        render(batch);
-                        watch();
-                    } catch (err) {
-                        progress.textContent = err.message;
-                        adminBusy(startBtn, false);
-                    }
-                });
-            }
+            offers.forEach(o => o.querySelector('.bulk-btn').addEventListener('click', async () => {
+                const btn = o.querySelector('.bulk-btn');
+                const ids = idsOf(o);
+                if (!ids.length) return;
+                if (busy()) { alert('Идёт другая пачка — дождись её конца: строка над списком → «показать».'); return; }
+                const f = window.pullFlow?.current?.();
+                if (f && (['parsing', 'preview', 'importing'].includes(f.phase) || f.queuing)) {
+                    alert(`Сначала закончи одиночное затягивание «${f.name}»: импортируй его или нажми «Отмена» в превью.`);
+                    return;
+                }
+                const includeChampionships = includeChamp();
+                meta = { label: offerLabel(o), n: ids.length };
+                btn.disabled = true;
+                importOut.textContent = '';
+                rowsBox.innerHTML = '';
+                skippedBox.classList.add('hidden');
+                scopeBox.textContent = `${meta.label} · на кнопке ${meta.n}`;
+                progress.textContent = 'Ставлю пачку…';
+                last = null;
+                showBulk();
+                try {
+                    const batch = await api(`${API}/bulk-pull`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids, includeChampionships })
+                    });
+                    batchId = batch.batchId;
+                    ss.set(KEY, batchId);
+                    ss.set(META_KEY, JSON.stringify(meta));
+                    render(batch);
+                    watch();
+                } catch (err) {
+                    progress.textContent = err.message;
+                    paintOffers();
+                }
+            }));
 
             document.getElementById('bulk-uncheck-noreg').addEventListener('click', () => {
                 rowsBox.querySelectorAll('tr[data-verdict="NoRegulation"] input.bulk-row')
@@ -838,13 +1006,16 @@
             });
 
             document.getElementById('bulk-close').addEventListener('click', () => {
-                card.classList.add('hidden');
-                sessionStorage.removeItem(KEY);
+                // Закрытие только убирает пачку со страницы: забор и импорт на сервере идут дальше.
+                if (busy() && !confirm('Пачка ещё идёт на сервере. Закрыть её здесь? Вернуться к ней будет нельзя, забор и импорт продолжатся.')) return;
                 if (timer) { clearInterval(timer); timer = null; }
-                batchId = null;
-                // Закрытие только прячет панель: пачка и импорт на сервере идут дальше.
-                if (startBtn) adminBusy(startBtn, false);
                 adminBusy(importBtn, false);
+                rowsBox.innerHTML = '';
+                importOut.textContent = '';
+                forget();
+                panel.classList.add('hidden');
+                if (window.compShowCurrent) window.compShowCurrent();
+                else document.getElementById('panel-none')?.classList.remove('hidden');
                 updateImportBtn();
             });
 
@@ -861,9 +1032,11 @@
                     });
                     const skipped = (r.skipped || []).map(esc).join('<br>');
                     importOut.innerHTML = `В очередь ушло: ${r.queued}. Ход — в таблице выше и в `
-                        + '<a href="/Admin/ImportHistory" class="text-admin-accent hover:underline">истории импортов</a>.'
+                        + '<a href="/Admin/ImportHistory" class="text-admin-accent hover:underline">истории импортов</a>. '
+                        + 'Когда импорт закончится, список обновится сам.'
                         + (skipped ? `<div class="mt-1 text-admin-warning">${skipped}</div>` : '');
                     rowsBox.querySelectorAll('input.bulk-row:checked').forEach(cb => { cb.checked = false; cb.disabled = true; });
+                    sawPending = true;
                     // Опрос мог остановиться на конце забора — запускаем снова: теперь он ждёт
                     // конца импорта, а «занятость» кнопки ведёт render() по importsPending.
                     watch();
@@ -874,20 +1047,30 @@
                 }
             });
 
-            // Незакрытая пачка с прошлой загрузки страницы — показываем её снова, но только
-            // если из неё ещё есть что импортировать. Отработанная пачка (всё затянутое уже в
-            // очереди) снова не всплывает: она выглядела бы предложением затянуть то, что
-            // уже импортировано.
+            paintOffers();
+            // Пачка с прошлой загрузки страницы — на месте, пока её не закрыли (в том числе готовая):
+            // открыта справа, если была открыта, иначе — строкой над списком.
             if (batchId) {
                 api(`${API}/bulk-pull/${batchId}`).then(batch => {
-                    if (nothingLeft(batch)) {
-                        sessionStorage.removeItem(KEY);
-                        batchId = null;
-                    } else {
-                        watch();
-                    }
-                }).catch(() => { sessionStorage.removeItem(KEY); batchId = null; });
+                    render(batch);
+                    if (ss.get(SHOWN_KEY) === '1') showBulk();
+                    if (!batch.finished || batch.importsPending) watch();
+                }).catch(() => forget());
             }
+
+            return {
+                busy,
+                /** Одиночное «Затянуть» этой строки запрещено пачкой — текст причины, иначе null. */
+                blocks(discId) {
+                    if (!last) return null;
+                    if (busy()) return running(last)
+                        ? 'Идёт пачка — одиночное «Затянуть» после неё (строка над списком → показать)'
+                        : 'Идёт импорт пачки — одиночное «Затянуть» после него';
+                    return heldIds().has(String(discId))
+                        ? 'Строка в открытой пачке — импортируй её оттуда или закрой пачку' : null;
+                },
+                paintOffers,
+            };
         })();
 
         // ── Доклейка промежуточных (Д5, docs/plans/splits-attach-without-repull-plan.md) ──

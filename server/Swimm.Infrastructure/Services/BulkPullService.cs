@@ -58,11 +58,17 @@ public sealed class BulkPullService : IBulkPullService
         var all = await discovery.GetAllAsync(ct);
 
         var wanted = discoveredIds.Distinct().ToHashSet();
+        // Потолок — не молчаливое обрезание: в пачку уходит ровно то, что на кнопке, а кнопка сама
+        // берёт не больше потолка (BulkPullSelection) и говорит, сколько осталось следующим заходом.
+        if (wanted.Count > MaxBatchSize)
+            throw new ArgumentOutOfRangeException(nameof(discoveredIds),
+                $"В пачке {wanted.Count} строк — больше потолка {MaxBatchSize}. Остальное — следующим заходом.");
         var rows = all.Where(d => wanted.Contains(d.Id)).ToList();
 
-        // Тянуть нечего: скрытые админом, с пустым протоколом и уже связанные с БД строкой.
-        // Те же правила, что у счётчика долга на чипах месяцев — иначе кнопка и счётчик
-        // разойдутся в числах (docs/admin-pages/competitions.md).
+        // Кто попадает в пачку, решает страница одним правилом (BulkPullSelection) — сюда приходят
+        // уже отобранные id. Здесь только страховка от того, что изменилось между показом кнопки и
+        // кликом: строку успели скрыть или затянуть. Новых строк этот фильтр не добавляет, а
+        // убавку панель пачки показывает («ушло меньше, чем было на кнопке»).
         var pullable = rows
             .Where(d => !string.Equals(d.Status, "ignored", StringComparison.OrdinalIgnoreCase))
             .Where(d => d.MatchedCompetitionId is null)
@@ -76,7 +82,7 @@ public sealed class BulkPullService : IBulkPullService
             pullable = pullable.Except(championships).ToList();
 
         // Порядок — по дате: разбирать пачку удобнее в том же порядке, в каком она в списке.
-        var queue = pullable.OrderBy(d => d.DateStart).Take(MaxBatchSize).ToList();
+        var queue = pullable.OrderBy(d => d.DateStart).ThenBy(d => d.Id).ToList();
 
         var batch = new BatchState
         {
@@ -297,7 +303,8 @@ public sealed class BulkPullService : IBulkPullService
         var pending = rows.Any(r => r.ImportState is "queued" or "running");
 
         return new BulkPullBatchDto(
-            batch.Id, batch.Total, rows.Count, batch.Finished, rows, batch.SkippedChampionships, error, pending);
+            batch.Id, batch.Total, rows.Count, batch.Finished, rows, batch.SkippedChampionships, error, pending,
+            [.. batch.Queue.Select(q => q.Id)]);
     }
 
     /// <summary>

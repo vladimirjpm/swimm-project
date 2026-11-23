@@ -495,23 +495,31 @@
 </div>
 
 @{
-    // Пакетное затягивание (docs/plans/bulk-pull-plan.md): кандидаты — строки, которых нет
-    // в БД и по которым есть что тянуть. Те же правила, что у счётчика долга на чипах:
-    // скрытые (Ignored) и с пустым протоколом (EmptySourceAt) — не долг.
-    // С этапа 1 «варианта E» — только состояние «ждёт затягивания»: месяц теперь виден целиком,
-    // и будущие, идущие и «ждём протокол» иначе уезжали бы в пачку (хэндофф, раздел 4).
-    // Число на кнопке = сколько строк реально уйдёт: сервис сам отбрасывает чемпионаты (пока
-    // не отмечено «включая чемпионаты») и берёт не больше BulkPullLimits.MaxBatchSize, по дате
-    // от ранней. Поэтому здесь два готовых списка с тем же отбором, а чекбокс переключает их.
-    var bulkRows = Model.Result.Items
-        .Where(u => u.Db == null && u.Site != null
-                    && u.Status?.State == Swimm.Application.Mapping.CompetitionRowState.ReadyToPull)
-        .OrderBy(u => u.Site!.DateStart)
-        .ToList();
-    var bulkIdsAll = bulkRows.Take(Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize)
-        .Select(u => u.Site!.DiscoveredId).ToList();
-    var bulkIdsNoChamp = bulkRows.Where(u => !u.IsChampionship).Take(Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize)
-        .Select(u => u.Site!.DiscoveredId).ToList();
+    // Пачки «за день» / «за месяц» (вариант E, этап 5; хэндофф 4). Кто попадает в пачку и число
+    // на кнопке — ОДНО правило на сервере (BulkPullSelection → Model.MonthBulk / Model.DayBulk):
+    // кнопка несёт готовые id для обоих положений чекбокса «включая чемпионаты», JS только
+    // выбирает один набор и отправляет его как есть. Видимые строки JS не перебирает.
+    var maxBatch = Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize;
+    // Разметка одной кнопки пачки. Подпись и число переключает JS по чекбоксу; без JS видно
+    // положение «без чемпионатов» (чекбокс по умолчанию снят).
+    Microsoft.AspNetCore.Html.IHtmlContent BulkOffer(Swimm.Application.Mapping.BulkPullOffer offer, string scope, string label, string btnCls, string? dayTitle)
+    {
+        var off = offer.WithoutChampionships;
+        var on = offer.WithChampionships;
+        string Ids(Swimm.Application.Mapping.BulkPullPick p) => string.Join(",", p.Ids);
+        var title = (scope == "month"
+                ? "Все «ждёт затягивания» выбранного месяца под текущими фильтрами"
+                : $"Все «ждёт затягивания» дня {dayTitle} под текущими фильтрами")
+            + $". Не попадают: ждём протокол, идёт, впереди, закрытые, уже в базе; чемпионаты — только с «включая чемпионаты». Не больше {maxBatch} за раз.";
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<span class=\"bulk-offer flex flex-col items-end gap-0.5\" data-scope=\"{scope}\" data-label=\"{label}\" data-ids=\"{Ids(off)}\" data-ids-all=\"{Ids(on)}\" data-left=\"{off.Left}\" data-left-all=\"{on.Left}\">");
+        sb.Append($"<button type=\"button\" class=\"bulk-btn {btnCls} {(off.Count == 0 ? "hidden" : "")}\" title=\"{System.Net.WebUtility.HtmlEncode(title)}\">");
+        sb.Append($"<span>{label} (<span class=\"bulk-n\">{off.Count}</span>)</span></button>");
+        sb.Append($"<span class=\"bulk-champ-only whitespace-nowrap text-[11px] text-admin-text-muted {(offer.OnlyChampionships ? "" : "hidden")}\" title=\"Чемпионаты Израиля разбираются штучно; отметь «включая чемпионаты», чтобы взять в пачку\">чемпионат — отдельно</span>");
+        sb.Append($"<span class=\"bulk-left whitespace-nowrap text-[11px] text-admin-text-muted {(off.Left > 0 ? "" : "hidden")}\" title=\"Потолок пачки — {maxBatch} строк за раз\">ещё <span class=\"bulk-left-n\">{off.Left}</span> — следующим заходом</span>");
+        sb.Append("</span>");
+        return new Microsoft.AspNetCore.Html.HtmlString(sb.ToString());
+    }
 
     // ── Список слева (вариант E, этап 3; хэндофф 3.4) ──────────────────────────────────────
     // Группы: «Ждут затягивания» (блоками дней) → «Ждём протокол» → «Впереди» («идёт» первыми)
@@ -539,31 +547,6 @@
         return string.IsNullOrWhiteSpace(Model.Search) ? scope : $"Поиск «{Model.Search!.Trim()}» · {scope}";
     }
 }
-
-@* Панель пачки: не модал — забор идёт минутами, из него надо уметь уйти и вернуться
-   (batchId переживает перезагрузку страницы в sessionStorage). Этап 5 перенесёт её в правую область. *@
-<div id="bulk-card" class="admin-card mb-4 hidden p-4">
-    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div class="text-sm font-semibold text-admin-text">Пакетное затягивание</div>
-        <button type="button" id="bulk-close" class="cursor-pointer text-[13px] text-admin-text-muted hover:underline">Закрыть</button>
-    </div>
-    <div id="bulk-progress" class="mb-2 text-[13px] text-admin-text-muted"></div>
-    <div id="bulk-skipped" class="mb-2 hidden text-[12.5px] text-admin-text-muted"></div>
-    <div id="bulk-rows" class="mb-3 overflow-x-auto"></div>
-    <div class="flex flex-wrap items-center gap-2">
-        <button type="button" id="bulk-import-btn" class="admin-btn admin-btn-primary py-1 px-3" disabled>
-            Импортировать отмеченные
-        </button>
-        <button type="button" id="bulk-uncheck-noreg" class="admin-btn admin-btn-ghost py-1 px-3">
-            Снять все без регламента
-        </button>
-        <span class="text-[12px] text-admin-text-muted">
-            Категория всем — <strong class="text-admin-text">Age 8-99</strong>;
-            перезапись существующего и удаление лишнего не применяются.
-        </span>
-    </div>
-    <div id="bulk-import-result" class="mt-2 text-[12.5px]"></div>
-</div>
 
 @{
     // Кубок чемпионата — та же иконка trophy, что в сайдбаре (_Icon). Рендерится один раз в строку:
@@ -828,6 +811,13 @@
 <div class="grid grid-cols-[clamp(360px,34%,420px)_minmax(0,1fr)] items-start gap-4">
     @* ── Левая колонка: список ── *@
     <section class="admin-card min-w-0 overflow-hidden p-0" aria-label="Список соревнований">
+        @* Пачка идёт или готова, а справа открыт чек-лист строки — вернуться к пачке отсюда.
+           Текст и видимость ведёт JS пачки (решение — вопрос в PR этапа 5). *@
+        <button type="button" id="bulk-strip"
+                class="mx-3 mt-3 hidden w-[calc(100%-1.5rem)] cursor-pointer items-center gap-2 rounded-md border border-admin-accent/30 bg-admin-accent/10 px-3 py-1.5 text-left text-[13px] text-admin-text hover:bg-admin-accent/15">
+            <span id="bulk-strip-text" class="min-w-0 flex-1"></span>
+            <span class="shrink-0 font-semibold text-admin-accent">→ показать</span>
+        </button>
         @* Шапка месяца (рамка): заголовок + пачка. Этап 5 подставит сюда «Затянуть за месяц (N)»,
            в шапки блоков дней — «за день (N)»; пока — прежняя кнопка пачки и её чекбокс. *@
         <div class="m-3 rounded-md border border-admin-border px-3 py-2.5">
@@ -838,24 +828,27 @@
                         @Model.Result.TotalCount @(Model.Result.TotalCount % 10 == 1 && Model.Result.TotalCount % 100 != 11 ? "строка" : "строк")@(Model.Unpaged || Model.Result.TotalPages <= 1 ? "" : $" · стр. {Model.Result.Page} из {Model.Result.TotalPages}")
                     </div>
                 </div>
-                @if (bulkIdsAll.Count > 0)
+                @* «Затянуть за месяц (N)» — только у выбранного месяца сезона; чекбокс под ней относится
+                   к ней (решение Влада) и меняет и её N, и N кнопок дней. Кнопки «за сезон» нет. *@
+                @if (Model.MonthBulk is { IsEmpty: false } monthBulk)
                 {
                     <div id="list-bulk" class="flex flex-col items-end gap-1">
-                        <button type="button" id="bulk-pull-btn"
-                                class="admin-btn admin-btn-primary py-1 px-2.5 @(bulkIdsNoChamp.Count == 0 ? "hidden" : "")"
-                                data-ids="@string.Join(",", bulkIdsNoChamp)"
-                                data-ids-no-champ="@string.Join(",", bulkIdsNoChamp)"
-                                data-ids-all="@string.Join(",", bulkIdsAll)"
-                                title="Только «ждёт затягивания» этой страницы списка; не больше @Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize за раз">
-                            @* Подпись одним span: у admin-btn есть gap, и число в своём span иначе отъезжало «( 5 )». *@
-                            <span>⏬ Затянуть все незатянутые (<span id="bulk-pull-count">@bulkIdsNoChamp.Count</span>)</span>
-                        </button>
+                        @BulkOffer(monthBulk, "month", "Затянуть за месяц", "admin-btn admin-btn-primary py-1 px-2.5", null)
                         <label class="flex cursor-pointer items-center gap-1.5 text-xs text-admin-text-muted"
                                title="Чемпионаты Израиля разбираются штучно: медали, зачёт и категории у них свои">
                             <input type="checkbox" id="bulk-include-champ" class="cursor-pointer" />
                             включая чемпионаты
                         </label>
                     </div>
+                }
+                else if (Model.DayBulk.Values.Any(o => !o.IsEmpty))
+                {
+                    @* Месяца нет (поиск, весь сезон), а кнопки дней есть: чекбокс нужен им. *@
+                    <label id="list-bulk" class="flex cursor-pointer items-center gap-1.5 self-end text-xs text-admin-text-muted"
+                           title="Чемпионаты Израиля разбираются штучно: медали, зачёт и категории у них свои">
+                        <input type="checkbox" id="bulk-include-champ" class="cursor-pointer" />
+                        включая чемпионаты
+                    </label>
                 }
             </div>
         </div>
@@ -897,8 +890,14 @@
                                 @(day.Day == DateOnly.MinValue ? "Без даты" : $"{char.ToUpper(weekdays[(int)day.Day.DayOfWeek][0])}{weekdays[(int)day.Day.DayOfWeek][1..]} {day.Day:dd.MM}{Yr(day.Day)}")
                             </span>
                             <span class="text-[11px] text-admin-text-muted">@DaysAgo(day.Day)</span>
-                            @* Этап 5: справа — «Затянуть за день (N)» / «чемпионат — отдельно». *@
-                            <span class="day-actions ml-auto"></span>
+                            @* «Затянуть за день (N)» / «чемпионат — отдельно» — правило BulkPullSelection. *@
+                            <span class="day-actions ml-auto">
+                                @if (Model.DayBulk.TryGetValue(day.Day, out var dayBulk) && !dayBulk.IsEmpty)
+                                {
+                                    @BulkOffer(dayBulk, "day", "Затянуть за день", "admin-btn py-0.5 px-2 border-admin-accent/40 text-admin-accent hover:bg-admin-accent/15",
+                                        day.Day == DateOnly.MinValue ? "без даты" : day.Day.ToString("dd.MM"))
+                                }
+                            </span>
                         </div>
                         <div>
                             @foreach (var u in day.Rows) { ListRow(u, showDate: false); }
@@ -943,6 +942,36 @@
     <div id="comp-detail" data-auto-key="@(Model.AutoSelectedRow == null ? null : Swimm.Application.Mapping.CompetitionRowKey.Of(Model.AutoSelectedRow))" class="sticky top-4 max-h-[calc(100vh-2rem)] min-w-0 overflow-y-auto">
         @* Затягивание, чья строка не на этой странице списка (другой месяц, фильтры): ход идёт, видно его здесь. *@
         <div id="pull-elsewhere" class="admin-card mb-3 hidden px-4 py-2.5 text-[13px]"></div>
+        @* Пачка (вариант E, этап 5): показывается ВМЕСТО чек-листа соревнования. Не модал — забор
+           идёт минутами, из него надо уметь уйти (клик по строке списка) и вернуться (строка
+           #bulk-strip над списком); batchId переживает F5 в sessionStorage. Класс row-panel —
+           чтобы выбор строки прятал пачку тем же show(), что и панели строк. *@
+        <div id="panel-bulk" class="row-panel admin-card hidden p-4" data-key="bulk">
+            <div class="mb-3 flex flex-wrap items-start justify-between gap-2 border-b border-admin-border pb-3">
+                <div class="min-w-0">
+                    <h2 class="text-base font-semibold text-white">Пакетное затягивание</h2>
+                    <div id="bulk-scope" class="mt-0.5 text-xs text-admin-text-muted"></div>
+                </div>
+                <button type="button" id="bulk-close" class="cursor-pointer text-[13px] text-admin-text-muted hover:text-admin-text"
+                        title="Убрать пачку со страницы. Забор и импорт на сервере это не останавливает.">Закрыть</button>
+            </div>
+            <div id="bulk-progress" class="mb-2 text-[13px] text-admin-text-muted"></div>
+            <div id="bulk-skipped" class="mb-2 hidden text-[12.5px] text-admin-text-muted"></div>
+            <div id="bulk-rows" class="mb-3 overflow-x-auto"></div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" id="bulk-import-btn" class="admin-btn admin-btn-primary py-1 px-3" disabled>
+                    Импортировать отмеченные
+                </button>
+                <button type="button" id="bulk-uncheck-noreg" class="admin-btn admin-btn-ghost py-1 px-3">
+                    Снять все без регламента
+                </button>
+                <span class="text-[12px] text-admin-text-muted">
+                    Категория всем — <strong class="text-admin-text">Age 8-99</strong>;
+                    перезапись существующего и удаление лишнего не применяются.
+                </span>
+            </div>
+            <div id="bulk-import-result" class="mt-2 text-[12.5px]"></div>
+        </div>
         <div id="panel-none" class="admin-card text-[13px] text-admin-text-muted @(selRow != null ? "hidden" : "")">
             @if (!string.IsNullOrEmpty(Model.Selected) && selRow == null)
             {

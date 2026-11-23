@@ -38,7 +38,7 @@ public class BulkPullServiceTests
     }
 
     /// <summary>Превью, которое всегда удаётся: один день, без рекордов и совпадений.</summary>
-    private sealed class FakePreviews : IDiscoveryPreviewService
+    internal sealed class FakePreviews : IDiscoveryPreviewService
     {
         private readonly Dictionary<Guid, DiscoveryPreviewEntry> _entries = [];
         public List<int> Pulled { get; } = [];
@@ -75,7 +75,7 @@ public class BulkPullServiceTests
                 new RegulationAnalysisDto(HasMedals: true, HasClubStanding: false, IsChampionship: false, [])));
     }
 
-    private sealed class FakeQueue : IImportJobQueue
+    internal sealed class FakeQueue : IImportJobQueue
     {
         public List<(string FileName, IReadOnlyList<string>? Categories, ImportEventOptions? Options, string Payload)> Jobs { get; } = [];
 
@@ -103,7 +103,7 @@ public class BulkPullServiceTests
 
     // ── сборка ────────────────────────────────────────────────────────────────
 
-    private static DiscoveredCompetitionDto Row(
+    internal static DiscoveredCompetitionDto Row(
         int id, string name = "ליגה מס 3", string status = "new", int? matchedCompetitionId = null) =>
         new(id, OrgCompId: 16700 + id, name,
             DateStart: new DateTime(2025, 11, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(id),
@@ -113,7 +113,7 @@ public class BulkPullServiceTests
             MatchedCompetitionName: matchedCompetitionId is null ? null : "уже в БД",
             MatchedCompetitionId: matchedCompetitionId, Languages: null);
 
-    private static (BulkPullService Service, FakeQueue Queue, FakePreviews Previews) Build(
+    internal static (BulkPullService Service, FakeQueue Queue, FakePreviews Previews) Build(
         params DiscoveredCompetitionDto[] rows)
     {
         var queue = new FakeQueue();
@@ -132,7 +132,7 @@ public class BulkPullServiceTests
         return (service, queue, previews);
     }
 
-    private static async Task<BulkPullBatchDto> WaitFinishedAsync(BulkPullService service, Guid batchId)
+    internal static async Task<BulkPullBatchDto> WaitFinishedAsync(BulkPullService service, Guid batchId)
     {
         for (var i = 0; i < 100; i++)
         {
@@ -187,16 +187,30 @@ public class BulkPullServiceTests
     }
 
     [Fact]
-    public async Task CapsBatchSize()
+    public async Task RejectsMoreThanTheCap_InsteadOfSilentlyCutting()
     {
-        // 40 строк в выборке — в работу уходит только MaxBatchSize: пачка на весь сезон
-        // это получасовой забор и десятки мегабайт разборов в памяти.
+        // 40 строк — больше потолка: пачка на весь сезон — получасовой забор и десятки мегабайт
+        // разборов в памяти. Раньше сервис молча брал первые 30; теперь кнопка страницы сама берёт
+        // не больше потолка (BulkPullSelection), а лишнее сервис отвергает, а не режет.
         var rows = Enumerable.Range(1, 40).Select(i => Row(i, $"Meet {i}")).ToArray();
-        var (service, _, _) = Build(rows);
+        var (service, _, previews) = Build(rows);
 
-        var started = await service.StartAsync([.. rows.Select(r => r.Id)], includeChampionships: false);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            service.StartAsync([.. rows.Select(r => r.Id)], includeChampionships: false));
+        Assert.Empty(previews.Pulled);
 
+        var started = await service.StartAsync([.. rows.Take(service.MaxBatchSize).Select(r => r.Id)], includeChampionships: false);
         Assert.Equal(service.MaxBatchSize, started.Total);
+    }
+
+    [Fact]
+    public async Task Status_CarriesTheQueueIds_InPullOrder()
+    {
+        var (service, _, _) = Build(Row(3), Row(1), Row(2));
+        var started = await service.StartAsync([3, 1, 2], includeChampionships: false);
+        Assert.Equal([1, 2, 3], started.QueueIds);
+        await WaitFinishedAsync(service, started.BatchId);
+        Assert.Equal([1, 2, 3], service.GetStatus(started.BatchId)!.QueueIds);
     }
 
     // ── импорт ────────────────────────────────────────────────────────────────

@@ -115,6 +115,20 @@ public class IndexModel : PageModel
     /// <summary>Строки страницы «ждёт затягивания», по блокам дней (последний день старта), свежий день первым.</summary>
     public IReadOnlyList<ReadyToPullDay<UnifiedCompetitionRowDto>> ReadyToPullByDay { get; private set; } = [];
 
+    /// <summary>
+    /// Кнопка «Затянуть за месяц (N)» — только когда выбран месяц сезона (месяц виден целиком);
+    /// null — месяца нет (поиск, filter=, весь сезон, все сезоны): кнопки нет (хэндофф 4).
+    /// Отбор — <see cref="BulkPullSelection"/>, тот же, что у кнопок дней.
+    /// </summary>
+    public BulkPullOffer? MonthBulk { get; private set; }
+
+    /// <summary>
+    /// «Затянуть за день (N)» по блокам дней «Ждут затягивания». Пусто — кнопок дней нет: список
+    /// разбит на страницы, и блок дня на этой странице мог быть неполным.
+    /// </summary>
+    public IReadOnlyDictionary<DateOnly, BulkPullOffer> DayBulk { get; private set; } =
+        new Dictionary<DateOnly, BulkPullOffer>();
+
     /// <summary>Тип соревнования: «champ» — только чемпионаты (по названию), пусто — все.</summary>
     [BindProperty(SupportsGet = true, Name = "kind")]
     public string? Kind { get; set; }
@@ -250,6 +264,11 @@ public class IndexModel : PageModel
         MonthStates = list.MonthStates ?? MonthStates;
         ListStates = list.ListStates ?? CompetitionStateCounts.Zero;
         ReadyToPullByDay = CompetitionRowStateRules.GroupReadyToPullByDay(Result.Items, u => u.Status);
+        // Пачки (хэндофф 4): N на кнопке и id в ней — одним правилом BulkPullSelection.
+        MonthBulk = Unpaged ? BulkPullSelection.Offer(Result.Items) : null;
+        DayBulk = Unpaged || Result.TotalPages <= 1
+            ? ReadyToPullByDay.ToDictionary(d => d.Day, d => BulkPullSelection.Offer(d.Rows))
+            : new Dictionary<DateOnly, BulkPullOffer>();
         SelectedRow = Selected == null ? null : Result.Items.FirstOrDefault(u => CompetitionRowKey.Matches(u, Selected));
         // Без sel справа сразу первая «ждёт затягивания» (самый свежий день, первая строка блока) —
         // решение Влада 23.11.2026. В адрес не пишется: голый адрес остаётся голым. Явный sel главнее.
