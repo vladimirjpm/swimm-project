@@ -628,7 +628,7 @@ public class JsonImportService : IImportService
             var poolType = NormalizePoolType(eventOptions?.PoolType ?? item.PoolType);
             var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, poolType);
 
-            // Д2/Р117: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
+            // Д2/Р118: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
             // или бассейн разошлись; правило общее с превью (ImportCompetitionMatcher.MatchDay).
             // Кладём находку в кэш под именным ключом, чтобы весь дальнейший цикл
             // (upsert-пометка, категории, touched) работал как обычно.
@@ -1823,7 +1823,7 @@ public class JsonImportService : IImportService
     /// Name = имя события, а исходно распарсенный заголовок уходит в SubName — поэтому матчим и по
     /// нему тоже, иначе превью не находит уже существующие дни переименованного события (см. кейс
     /// "Maccabiah 2025 -" в SubName при Name="Maccabiah 2026"). Пустой/неизвестный PoolType дня
-    /// пропускает поиск по имени (ключ неполон — матч ненадёжен). С compID (Р117) сперва — дни этого
+    /// пропускает поиск по имени (ключ неполон — матч ненадёжен). С compID (Р118) сперва — дни этого
     /// compID по дате, тем же <see cref="ImportCompetitionMatcher.MatchDay"/>, что и импорт.
     /// </summary>
     public async Task<List<ExistingCompetitionMatch>> FindExistingCompetitionsAsync(
@@ -1849,7 +1849,7 @@ public class JsonImportService : IImportService
         var byKey = ImportCompetitionMatcher.BuildIndex(
             existing, c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
 
-        // Д2/Р117: дни того же compID по дате — первыми, как в импорте (LoadReferenceCachesAsync).
+        // Д2/Р118: дни того же compID по дате — первыми, как в импорте (LoadReferenceCachesAsync).
         var linkedDaysByDate = orgCompId is int oc
             ? ImportCompetitionMatcher.BuildDateIndex(
                 await CompetitionIdentity.ResolveDaysAsync(_db, oc),

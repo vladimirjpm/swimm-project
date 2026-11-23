@@ -73,12 +73,12 @@ internal static class ImportCompetitionMatcher
 
     /// <summary>
     /// ЕДИНСТВЕННОЕ правило «этот день файла — уже существующее соревнование» для превью
-    /// (<c>FindExistingCompetitionsAsync</c>) и импорта (<c>ResolveCompetitionAsync</c>), Р117:
+    /// (<c>FindExistingCompetitionsAsync</c>) и импорта (<c>ResolveCompetitionAsync</c>), Р118:
     /// сперва день того же compID по дате (Д2, имя и бассейн не важны), потом ключ
     /// (Name|SubName)|Date|PoolType. <paramref name="nameKey"/> = null — ключ неполон
     /// (бассейн неизвестен), по имени не ищем.
     ///
-    /// До Р117 превью смотрело только ключ, а импорт — сначала compID: у c1973 (compID 16926)
+    /// До Р118 превью смотрело только ключ, а импорт — сначала compID: у c1973 (compID 16926)
     /// бассейн в базе 50m, а парсер без указания в протоколе ставит 25m → превью «не нашло»,
     /// «Перезатянуть» не взводило перезапись, импорт находил день по compID и падал «Дублем».
     /// </summary>

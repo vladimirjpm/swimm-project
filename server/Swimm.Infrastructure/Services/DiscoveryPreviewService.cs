@@ -132,7 +132,11 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
 
         if (parsed.ResultCount == 0)
         {
-            await _discovery.SetEmptySourceAsync(discoveredId, true, "auto", ct);
+            // B4 — СБОЙ разбора, а не «тянуть нечего» (решение Влада, 23.11.2026): PDF скачан, парсер
+            // отработал без исключения, но не собрал ни одного результата — вероятно, сменился формат.
+            // Пометку «∅ нет протокола» НЕ ставим (иначе поломка парсера прячется в «закрыто»); уже
+            // стоящую авто-пометку не трогаем — её снимает только удачный разбор ниже.
+            // Настоящий пустой PDF — исключение «No competitions found» выше.
             return DiscoveryPreviewResult.Failed(
                 "Парсер не распознал ни одного результата — формат протокола изменился? (B4)");
         }
@@ -159,7 +163,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         // ради той же шкалы) был бы лишним.
         var standingProbe = await ProbeClubStandingAsync(discoveredId, ct);
 
-        // compID строки «Входящих» — то же сопоставление, что сделает импорт (Р117): без него
+        // compID строки «Входящих» — то же сопоставление, что сделает импорт (Р118): без него
         // превью не узнаёт затянутый день с разошедшимся именем/бассейном, «Перезатянуть» не
         // взводит перезапись, а импорт находит день по compID и откатывается «Дублем».
         var orgCompId = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId)?.OrgCompId;

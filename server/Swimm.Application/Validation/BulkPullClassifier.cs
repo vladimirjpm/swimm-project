@@ -92,10 +92,10 @@ public static class BulkPullClassifier
     /// <summary>
     /// Ровно те же формулировки, по которым одиночное превью ставит «∅ нет протокола».
     /// Списком, а не подстрокой «not found»: иначе сетевые сбои считались бы пустым файлом.
+    /// «Парсер не распознал ни одного результата (B4)» сюда НЕ входит: это сбой разбора (23.11.2026).
     /// </summary>
     private static bool LooksLikeEmptySource(string message) =>
         message.Contains("No competitions found", StringComparison.OrdinalIgnoreCase)
         || message.Contains("0 lines extracted", StringComparison.OrdinalIgnoreCase)
-        || message.Contains("не распознал ни одного результата", StringComparison.OrdinalIgnoreCase)
         || message.Contains(NoStartProtocol.Marker, StringComparison.OrdinalIgnoreCase);
 }

@@ -12,7 +12,7 @@ using Xunit;
 namespace Swimm.Tests;
 
 /// <summary>
-/// Р117 (docs/data-integrity.md): превью и импорт сопоставляют день файла с существующим
+/// Р118 (docs/data-integrity.md): превью и импорт сопоставляют день файла с существующим
 /// соревнованием ОДНИМ правилом — <c>ImportCompetitionMatcher.MatchDay</c>: сперва день того же
 /// compID по дате (Д2), потом (Name|SubName)|Date|PoolType.
 ///
