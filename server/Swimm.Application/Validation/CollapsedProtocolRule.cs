@@ -27,8 +27,8 @@ public sealed record CollapsedProtocolFinding(string FileDate, int FileRows, IRe
                 : "";
             return $"{CollapsedProtocolRule.Marker}: в файле одна дата {FileDate} ({FileRows} строк), а у этого " +
                    $"compID в базе уже есть дни {days} (всего {total}{same}). Импорт положил бы эти результаты " +
-                   "ещё раз — дублем. Импорт заблокирован; раскладка такого протокола по дням — решение Влада " +
-                   "(docs/data-integrity.md, Р119).";
+                   "ещё раз — дублем. Импорт заблокирован (docs/data-integrity.md, Р119): по дням такой " +
+                   "протокол заливают файлом на /Admin/Import; если блок ложный — галочка «Я проверил» в превью.";
         }
     }
 }
@@ -52,6 +52,12 @@ public static class CollapsedProtocolRule
 {
     /// <summary>Начало сообщения — по нему его узнают в журнале и тестах.</summary>
     public const string Marker = "⛔ Протокол свёрнут в одну дату";
+
+    /// <summary>
+    /// Начало строки журнала импорта, прошедшего с обходом (галочка «Я проверил — импортировать
+    /// всё равно» в превью /Admin/Competitions, решение Влада 23.11). Тот же текст — в аудите.
+    /// </summary>
+    public const string OverrideMarker = "⚠ Р119 обход";
 
     /// <summary>
     /// Какую долю строк дней с другой датой должен покрывать файл. 0,9 — «почти то же число»: у e62

@@ -1414,28 +1414,55 @@
             // «Импортировать» погашена, пока выбор не вернулся: иначе в окне ожидания списков событий и
             // категорий импорт ушёл бы без галочек и с бассейном/событием по умолчанию.
             window.discRestorePreview = async function (f) {
-                const btn = document.getElementById('btn-import');
                 const err = document.getElementById('preview-error');
-                btn.disabled = true;
-                btn.title = 'Восстанавливаю выбор в превью…';
+                importHold = 'Восстанавливаю выбор в превью…';
+                syncImportButton();
                 preview = { previewId: f.p.previewId, id: Number(f.discId), name: f.name,
                     existingCompetitionId: f.p.existingCompetitionId ?? null, needsPool: needsPool(f.p),
                     collapsed: f.p.collapsedProtocol ?? null };
                 await showPreview(f.p, f.name, f.repull);
                 const restored = applyForm(f.form);
                 updateRemaining();
-                btn.title = '';
                 if (restored.eventLost) {
                     // Сохранённого события нет в списке (список не загрузился или событие удалено):
                     // молча ушло бы eventId=null, и день не привязался бы к событию.
+                    importHold = 'Проверь поле «Событие»';
+                    syncImportButton();
                     err.textContent = 'Не удалось восстановить выбор события — проверь поле «Событие» (или «Отмена» и «Затянуть» заново).';
                     err.classList.remove('hidden');
+                    // Снимаем только СВОЮ задержку — свёрнутый протокол решает галочка (Р119).
                     document.getElementById('event-select').addEventListener('change',
-                        () => { btn.disabled = false; err.classList.add('hidden'); }, { once: true });
+                        () => { importHold = null; syncImportButton(); err.classList.add('hidden'); }, { once: true });
                     return;
                 }
-                btn.disabled = !!preview.collapsed; // Р119: свёрнутый протокол не импортируется
+                importHold = null;
+                syncImportButton();
             };
+
+            // Состояние «Импортировать» — ТОЛЬКО здесь (иначе разные пути снова разъедутся, как
+            // восстановление после F5 включало кнопку у свёрнутого протокола в обход галочки).
+            // importHold — временная задержка (восстановление выбора, потерянное событие);
+            // свёрнутый протокол (Р119) гасит кнопку, пока не отмечена «Я проверил».
+            let importHold = null;
+            function collapsedOverride() {
+                return !!preview?.collapsed && document.getElementById('collapsed-override-cb').checked;
+            }
+            /// Р119 держит импорт: протокол свёрнут, галочка «Я проверил» не отмечена. Одна проверка
+            /// для кнопки, подсказки бассейна и подписи шага 6.
+            function collapsedBlocked() {
+                return !!preview?.collapsed && !collapsedOverride();
+            }
+            function syncImportButton() {
+                const btn = document.getElementById('btn-import');
+                const blocked = collapsedBlocked();
+                btn.disabled = !!importHold || blocked;
+                btn.title = importHold
+                    ?? (blocked ? 'Протокол свёрнут в одну дату — импорт создал бы дубль уже затянутых дней. Обход — галочка «Я проверил» в красном блоке.' : '');
+            }
+            document.getElementById('collapsed-override-cb').addEventListener('change', () => {
+                syncImportButton();
+                updateRemaining();
+            });
 
             // Выбор в превью (бассейн, флаги, категории, правило, событие, перезапись, «сомнительные»)
             // — в pullFlow, чтобы F5 его не терял.
@@ -1487,7 +1514,9 @@
                 const pool = document.getElementById('flag-pool').value;
                 // Правило то же, что у «Импортировать»: бассейн обязателен, если в файле есть новый день.
                 const poolHint = document.getElementById('pool-hint');
-                poolHint.classList.toggle('hidden', !!pool || !needsPool(f.p) || !!f.p.collapsedProtocol);
+                // Заблокированному свёрнутому протоколу бассейн не нужен; с галочкой обхода строки ложатся
+                // в день с датой файла (у e62 — новый день), и бассейн снова обязателен.
+                poolHint.classList.toggle('hidden', !!pool || !needsPool(f.p) || collapsedBlocked());
                 poolHint.textContent = f.p.existingCompetitionId
                     ? 'в файле есть новый день — выбери бассейн (существующим дням он не меняется)'
                     : 'выбери — без бассейна импорт не начнётся';
@@ -1495,10 +1524,12 @@
                 const left = [];
                 if (!pool && needsPool(f.p)) left.push('бассейн');
                 if (recs) left.push(`${recs} ${recs % 10 === 1 && recs % 100 !== 11 ? 'рекорд' : recs % 10 >= 2 && recs % 10 <= 4 && (recs % 100 < 12 || recs % 100 > 14) ? 'рекорда' : 'рекордов'}`);
-                if (f.p.collapsedProtocol) {
+                if (collapsedBlocked()) {
                     pullFlow.setCaption(6, 'импорт заблокирован: протокол свёрнут в одну дату, эти результаты уже затянуты днями события');
                     return;
                 }
+                if (f.p.collapsedProtocol)
+                    left.unshift('⚠ обход Р119 отмечен — строки лягут в день файла');
                 const note = f.repull
                     ? (f.p.existingCompetitionId ? ' · перезапись существующих результатов уже включена'
                         : ' · совпадения с существующим соревнованием НЕ найдено — импорт создаст новое, проверь дату и название')
@@ -1806,12 +1837,13 @@
 
                 // Р119: протокол свёрнут в одну дату, а эти результаты уже затянуты днями события —
                 // импорт дал бы дубль. «Импортировать» гаснет; сервер такой импорт тоже откатит.
+                // Обход — галочка «Я проверил»; каждое новое превью начинает с неотмеченной.
                 const collapsedBox = document.getElementById('preview-collapsed');
-                const importBtn = document.getElementById('btn-import');
                 collapsedBox.classList.toggle('hidden', !p.collapsedProtocol);
-                collapsedBox.textContent = p.collapsedProtocol?.message ?? '';
-                importBtn.disabled = !!p.collapsedProtocol;
-                importBtn.title = p.collapsedProtocol ? 'Протокол свёрнут в одну дату — импорт создал бы дубль уже затянутых дней' : '';
+                document.getElementById('preview-collapsed-msg').textContent = p.collapsedProtocol?.message ?? '';
+                document.getElementById('collapsed-override-date').textContent = p.collapsedProtocol?.fileDate ?? '';
+                document.getElementById('collapsed-override-cb').checked = false;
+                syncImportButton();
 
                 renderCompetitionFlags(p.flags);
                 renderRecordPreview(p.recordPreview);
@@ -2136,8 +2168,10 @@
 
             document.getElementById('btn-import').addEventListener('click', async () => {
                 if (!preview) return;
-                if (preview.collapsed) {
-                    alert('Импорт заблокирован: ' + preview.collapsed.message);
+                const allowCollapsed = collapsedOverride();
+                if (preview.collapsed && !allowCollapsed) {
+                    alert('Импорт заблокирован: ' + preview.collapsed.message
+                        + '\n\nЕсли блок ложный — отметь «Я проверил — импортировать всё равно» в красном блоке.');
                     return;
                 }
                 // Бассейн протокол не пишет, а у парсера умолчание 25 м (И-30: летний чемпионат
@@ -2175,16 +2209,19 @@
                             // Галочки «пометить заплыв сомнительным» у строк-рекордов: строка
                             // ляжет в БД сразу помеченной и не побудет рекордом на витрине.
                             suspectFlags: [...document.querySelectorAll('.suspect-flag:checked')]
-                                .map(i => ({ rowIndex: Number(i.value), note: i.dataset.note || null }))
+                                .map(i => ({ rowIndex: Number(i.value), note: i.dataset.note || null })),
+                            // Р119: явное согласие на импорт свёрнутого протокола (галочка «Я проверил»).
+                            // Сервер примет его, только если у этого превью блок был.
+                            allowCollapsedProtocol: allowCollapsed
                         })
                     });
                     preview = null;
                     document.getElementById('preview-error').classList.add('hidden');
-                    document.getElementById('btn-import').disabled = false;
+                    syncImportButton();
                     pullFlow.importQueued(r.jobId, discId);
                 } catch (e) {
                     pullFlow.importNotStarted(discId);
-                    document.getElementById('btn-import').disabled = false;
+                    syncImportButton();
                     // Превью остаётся открытым: поправить и нажать снова (истёк previewId — «Отмена» и «Затянуть»).
                     const err = document.getElementById('preview-error');
                     err.textContent = `Импорт не запустился: ${e.message}`;

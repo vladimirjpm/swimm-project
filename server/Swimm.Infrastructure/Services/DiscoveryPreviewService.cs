@@ -187,7 +187,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
 
         var previewId = Guid.NewGuid();
         _cache.Set(CacheKey(previewId),
-            new DiscoveryPreviewEntry(parsed, primaryName, discoveredId, standingProbe, recordPreview),
+            new DiscoveryPreviewEntry(parsed, primaryName, discoveredId, standingProbe, recordPreview, collapsed),
             EntryLifetime);
 
         var flags = await SuggestFlagsAsync(discoveredId, parsed, standingProbe, ct);

@@ -479,11 +479,26 @@ public class DiscoveryAdminController : ControllerBase
             IsChampionship: request.IsChampionship,
             IsMasters: request.IsMasters,
             ClubPointsDisabled: request.ClubPointsDisabled,
-            PoolType: request.PoolType);
+            PoolType: request.PoolType,
+            AllowCollapsedProtocol: AllowsCollapsedProtocol(request, entry));
 
         // compID сайта — штампуется в Competition.OrgCompId для связи Discovery ↔ Competitions.
         var discoveredOrgCompId = (await _discovery.GetAllAsync(ct))
             .FirstOrDefault(d => d.Id == entry.DiscoveredId)?.OrgCompId;
+
+        // Обход Р119 — в аудит до постановки в очередь: кто и на какой блок согласился. Это СОГЛАСИЕ,
+        // а не результат: чем кончился импорт, видно в его журнале («⚠ Р119 обход» — если обход сработал).
+        if (eventOptions.AllowCollapsedProtocol && entry.CollapsedProtocol is { } collapsed)
+            await _audit.LogAsync("competition.import-collapsed-override", "DiscoveredCompetition",
+                entry.DiscoveredId.ToString(),
+                $"{Swimm.Application.Validation.CollapsedProtocolRule.OverrideMarker}: compID {discoveredOrgCompId} — " +
+                $"разрешён обход Р119, импорт поставлен в очередь (файл одной датой {collapsed.FileDate}, " +
+                $"{collapsed.FileRows} строк; затянутые дни — {collapsed.OtherDaysRows} строк) — «Я проверил — импортировать всё равно»",
+                new
+                {
+                    entry.DiscoveredId, OrgCompId = discoveredOrgCompId, collapsed.FileDate, collapsed.FileRows,
+                    collapsed.OtherDaysRows, collapsed.Days, request.EventId, request.OverwriteExisting
+                }, ct);
 
         // Галочки «пометить сомнительным» из превью: адресуются порядковым номером строки
         // в разобранном файле (ImportRecordPreviewRow.RowIndex) и уезжают в сам payload
@@ -629,5 +644,15 @@ public class DiscoveryAdminController : ControllerBase
         bool? IsChampionship = null,
         bool? IsMasters = null,
         bool? ClubPointsDisabled = null,
-        string? PoolType = null);
+        string? PoolType = null,
+        // Р119: галочка «Я проверил — импортировать всё равно» под красным блоком превью.
+        bool AllowCollapsedProtocol = false);
+
+    /// <summary>
+    /// Р119: обход свёрнутого протокола — только явная галочка И только когда у этого превью блок
+    /// действительно был. Флаг без показанного блока не передаём: если база с тех пор изменилась и
+    /// импорт найдёт свёрнутость сам, он откажет, как без галочки.
+    /// </summary>
+    internal static bool AllowsCollapsedProtocol(DiscoveryImportRequest request, DiscoveryPreviewEntry entry) =>
+        request.AllowCollapsedProtocol && entry.CollapsedProtocol is not null;
 }

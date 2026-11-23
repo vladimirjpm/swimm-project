@@ -44,6 +44,9 @@ public class BulkPullServiceTests
         private readonly Dictionary<Guid, DiscoveryPreviewEntry> _entries = [];
         public List<int> Pulled { get; } = [];
 
+        /// <summary>Р119: находка «свёрнутый протокол» для каждого превью (null — нет).</summary>
+        public Swimm.Application.Validation.CollapsedProtocolFinding? Collapsed { get; set; }
+
         public TimeSpan EntryLifetime => TimeSpan.FromMinutes(60);
 
         public Task<DiscoveryPreviewResult> PreviewAsync(int discoveredId, CancellationToken ct = default)
@@ -57,9 +60,11 @@ public class BulkPullServiceTests
                 Competitions = [new ParsedCompetitionSummary("Meet", "01/11/2025", 10)]
             };
             var previewId = Guid.NewGuid();
-            _entries[previewId] = new DiscoveryPreviewEntry(parsed, $"file-{discoveredId}.pdf", discoveredId, null);
+            _entries[previewId] = new DiscoveryPreviewEntry(parsed, $"file-{discoveredId}.pdf", discoveredId, null,
+                CollapsedProtocol: Collapsed);
             return Task.FromResult(new DiscoveryPreviewResult(
-                previewId, parsed, ["he"], null, [], new ImportRecordPreviewDto { Count = 0 }, null));
+                previewId, parsed, ["he"], null, [], new ImportRecordPreviewDto { Count = 0 }, null,
+                CollapsedProtocol: Collapsed));
         }
 
         public DiscoveryPreviewEntry? GetEntry(Guid previewId) => _entries.GetValueOrDefault(previewId);
