@@ -72,9 +72,14 @@ public sealed record CompetitionFlagSuggestion(
 /// (<c>IPreviewRecordCheckService</c>) не пересчитывала детектор заново — она работает по
 /// previewId, а не по файлу.
 /// </param>
+/// <param name="CollapsedProtocol">
+/// Р119: находка «свёрнутый протокол» этого превью. Галочку обхода сервер принимает, только
+/// если блок у этого превью был: согласие дают на показанный админу блок, а не вслепую.
+/// </param>
 public sealed record DiscoveryPreviewEntry(
     ParsedCompetition Parsed, string FileName, int DiscoveredId, OfficialClubStandingProbe? ClubStanding,
-    ImportRecordPreviewDto? Records = null);
+    ImportRecordPreviewDto? Records = null,
+    Validation.CollapsedProtocolFinding? CollapsedProtocol = null);
 
 /// <summary>Скачанный протокол одной строки входящих. <c>Pdf</c> = null — см. <c>Error</c>.</summary>
 public sealed record DiscoveryProtocolPdf(byte[]? Pdf, string FileName, string? Error);

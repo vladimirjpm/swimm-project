@@ -12,8 +12,23 @@
     @* «Распознано результатов: N» и дни файла («<соревнование> — <дата> (N)»). *@
     <div id="preview-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
     <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
-    @* Р119: протокол свёрнут в одну дату поверх уже затянутых дней — «Импортировать» заблокирована. *@
-    <div id="preview-collapsed" class="mb-3 hidden rounded-md border-2 border-admin-danger bg-admin-danger/10 p-3 text-[13px] font-semibold text-admin-danger"></div>
+    @* Р119: протокол свёрнут в одну дату поверх уже затянутых дней — «Импортировать» заблокирована,
+       пока админ не отметит «Я проверил» (решение Влада 23.11: правило может ошибиться — например,
+       «свои» дни события на деле принадлежат соседнему compID). Галочка не переживает F5 и новое
+       превью: согласие даётся заново на каждый показанный блок. *@
+    <div id="preview-collapsed" class="mb-3 hidden rounded-md border-2 border-admin-danger bg-admin-danger/10 p-3 text-[13px]">
+        <div id="preview-collapsed-msg" class="font-semibold text-admin-danger"></div>
+        <label class="mt-2 flex cursor-pointer items-start gap-2 text-admin-text">
+            <input type="checkbox" id="collapsed-override-cb" class="mt-0.5 cursor-pointer" />
+            <span>
+                <b>Я проверил — импортировать всё равно.</b>
+                Все строки файла лягут в день с датой файла (<span id="collapsed-override-date" class="font-semibold"></span>).
+                Если эти результаты уже затянуты днями события — получится <b>дубль</b>, и чистить его придётся руками.
+                Отмечай, только если блок ложный (например, «свои» дни на деле — соседний compID того же события).
+                Обход запишется в аудит и журнал импорта.
+            </span>
+        </label>
+    </div>
 
     @* Бассейн протокол не пишет, а у парсера умолчание 25 м (И-30) — без выбора импорт нового не начнётся. *@
     <div class="mb-3">

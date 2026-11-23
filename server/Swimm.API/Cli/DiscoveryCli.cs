@@ -180,6 +180,16 @@ internal static class DiscoveryCli
             }
             Console.WriteLine($"Сухой прогон: дней в протоколе {parsed.Competitions.Count}, в базе {repullDays.Count}" +
                               (repullEventId is int ev ? $" (событие #{ev})" : "") + ". Ничего не импортировано.");
+
+            // Р119: та же проверка, что сделает импорт до транзакции. Сухой прогон не должен
+            // обещать перезалив, который настоящий --repull откатит (CLI обхода не имеет).
+            var collapsed = await Swimm.Infrastructure.Services.CollapsedProtocolGuard.DetectAsync(
+                db, row.OrgCompId, parsed.Competitions.Select(c => c.Date), parsed.ResultCount);
+            if (collapsed is not null)
+                Console.Error.WriteLine(
+                    $"ВНИМАНИЕ: настоящий --repull ОТКАЖЕТ — {collapsed.Message}\n" +
+                    "  Обхода в CLI нет: перезабор такого протокола — превью на /Admin/Competitions " +
+                    "(галочка «Я проверил»), если блок ложный, или файлом по дням на /Admin/Import.");
             return;
         }
 

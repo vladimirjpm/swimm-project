@@ -198,6 +198,102 @@ public class CollapsedProtocolTests
 
         Assert.Equal(26, r.Created); // осознанный обход: правило ошиблось — человек берёт на себя
         Assert.Equal(3, await db.Competitions.CountAsync());
+        // След обхода — в журнале импорта, вместе с тем, на что согласились.
+        var trace = Assert.Single(r.DiagnosticLog, l => l.StartsWith(CollapsedProtocolRule.OverrideMarker));
+        Assert.Contains(CollapsedProtocolRule.Marker, trace);
+    }
+
+    [Fact]
+    public async Task Import_FlagWithoutCollapse_LeavesNoOverrideTrace()
+    {
+        // Флаг на обычном перезаборе ничего не обходит — и в журнале не врёт про обход.
+        await using var db = CreateDb(nameof(Import_FlagWithoutCollapse_LeavesNoOverrideTrace));
+        await SeedE62Async(db);
+
+        var r = await new JsonImportService(db, new NullCache()).ImportAsync(
+            ToStream(Rows("05/11/2026", "a", 12)), "x.json", null,
+            new ImportEventOptions(null, null, OverwriteExisting: true, AllowCollapsedProtocol: true), CompId);
+
+        Assert.DoesNotContain(r.DiagnosticLog, l => l.StartsWith(CollapsedProtocolRule.OverrideMarker));
+    }
+
+    // ── сценарий ревью: соседний compID в общем событии (ложный блок, ради него — галочка) ──
+
+    /// <summary>
+    /// Событие из протоколов разных номеров федерации (окружные e1/e7/e10/e12): день 2 — соседний
+    /// compID, но штампа у него нет (импорт файлом). Детектор считает его «своим» — и законный
+    /// перезабор дня 1 своего compID блокируется. Это поведение фиксируем: правило не чиним
+    /// (решение Влада 23.11), выход — галочка «Я проверил» в превью.
+    /// </summary>
+    private static IEnumerable<object> GrownDayOne() => Rows("05/11/2026", "a", 14); // день 1 дорос до 14 строк
+
+    [Fact]
+    public async Task Review_NeighbourCompIdDayWithoutStamp_InSharedEvent_Blocks()
+    {
+        await using var db = CreateDb(nameof(Review_NeighbourCompIdDayWithoutStamp_InSharedEvent_Blocks));
+        await SeedE62Async(db); // день 06/11 (14 строк) без штампа — здесь он «соседний compID»
+
+        var f = await CollapsedProtocolGuard.DetectAsync(db, CompId, ["05/11/2026"], 14);
+        Assert.NotNull(f); // ложный блок: дубля не было бы — это другой номер федерации
+
+        var refused = await new JsonImportService(db, new NullCache()).ImportAsync(
+            ToStream(GrownDayOne()), "isrorg-16891.pdf", null,
+            new ImportEventOptions(null, null, OverwriteExisting: true), CompId);
+        Assert.StartsWith(CollapsedProtocolRule.Marker, refused.Message);
+        Assert.Equal(26, await db.Results.CountAsync());
+    }
+
+    [Fact]
+    public async Task Review_NeighbourCompIdDay_WithOverride_RepullsDayOne()
+    {
+        await using var db = CreateDb(nameof(Review_NeighbourCompIdDay_WithOverride_RepullsDayOne));
+        await SeedE62Async(db);
+
+        var r = await new JsonImportService(db, new NullCache()).ImportAsync(
+            ToStream(GrownDayOne()), "isrorg-16891.pdf", null,
+            new ImportEventOptions(null, null, OverwriteExisting: true, AllowCollapsedProtocol: true), CompId);
+
+        Assert.DoesNotContain(CollapsedProtocolRule.Marker, r.Message ?? "");
+        Assert.Equal(2, await db.Competitions.CountAsync()); // нового дня нет
+        Assert.Equal(14 + 14, await db.Results.CountAsync()); // день 1 дорос, соседний день не тронут
+        Assert.Contains(r.DiagnosticLog, l => l.StartsWith(CollapsedProtocolRule.OverrideMarker));
+    }
+
+    // ── галочка из превью: что сервер принимает ─────────────────────────────────
+
+    private static DiscoveryPreviewEntry Entry(CollapsedProtocolFinding? f) =>
+        new(new ParsedCompetition { Format = "IsrOrg", ResultsJson = "[]" }, "f.pdf", 1, null, CollapsedProtocol: f);
+
+    private static Swimm.API.Controllers.DiscoveryAdminController.DiscoveryImportRequest Req(bool allow) =>
+        new(Guid.NewGuid(), null, null, null, AllowCollapsedProtocol: allow);
+
+    [Fact]
+    public void Controller_Override_OnlyWithCheckbox_AndOnlyForShownBlock()
+    {
+        var finding = CollapsedProtocolRule.Detect(["07/11/2026"], 1579, [D(1874, "05/11/2026", 766), D(1875, "06/11/2026", 813)]);
+
+        Assert.True(Swimm.API.Controllers.DiscoveryAdminController.AllowsCollapsedProtocol(Req(true), Entry(finding)));
+        // Без галочки — отказ, как раньше.
+        Assert.False(Swimm.API.Controllers.DiscoveryAdminController.AllowsCollapsedProtocol(Req(false), Entry(finding)));
+        // Галочка на превью без блока ничего не даёт: согласие — на показанный блок, не вслепую.
+        Assert.False(Swimm.API.Controllers.DiscoveryAdminController.AllowsCollapsedProtocol(Req(true), Entry(null)));
+    }
+
+    [Fact]
+    public async Task Bulk_CollapsedRow_ImportedFromBatch_NeverCarriesTheFlag()
+    {
+        // Пачка ставит NeedsReview, но админ может отметить строку и нажать «Импортировать» —
+        // флаг обхода она не передаёт никогда, и импорт откажет (Р119).
+        var (service, queue, previews) = BulkPullServiceTests.Build(BulkPullServiceTests.Row(1));
+        previews.Collapsed = CollapsedProtocolRule.Detect(["01/11/2025"], 10, [D(1, "31/10/2025", 10)]);
+        var started = await service.StartAsync([1], includeChampionships: false);
+        var batch = await BulkPullServiceTests.WaitFinishedAsync(service, started.BatchId);
+        Assert.Equal(BulkPullVerdict.NeedsReview, Assert.Single(batch.Rows).Verdict);
+
+        await service.ImportAsync(started.BatchId, [1]);
+
+        var job = Assert.Single(queue.Jobs);
+        Assert.False(job.Options!.AllowCollapsedProtocol);
     }
 
     [Fact]

@@ -340,12 +340,20 @@ public class JsonImportService : IImportService
         /// <see cref="ImportEventOptions.AllowCollapsedProtocol"/> не импортируем, как «Дубль».
         /// Проверка ДО транзакции: базу она только читает. Без compID (файл на /Admin/Import, путь Б
         /// по дням) не срабатывает — там человек сам выбрал дату дня.
+        /// С флагом (галочка в превью) импорт идёт, но в журнале остаётся строка об обходе.
         /// </summary>
         private async Task<ImportResult?> RefuseCollapsedProtocolAsync()
         {
-            if (orgCompId is not int oc || eventOptions?.AllowCollapsedProtocol == true) return null;
+            if (orgCompId is not int oc) return null;
             var finding = await CollapsedProtocolGuard.DetectAsync(_db, oc, items.Select(i => i.Date), items.Count);
             if (finding is null) return null;
+
+            if (eventOptions?.AllowCollapsedProtocol == true)
+            {
+                diagnosticLog.Add($"{Swimm.Application.Validation.CollapsedProtocolRule.OverrideMarker}: импорт с обходом защиты — администратор отметил " +
+                                  $"«Я проверил — импортировать всё равно». {finding.Message}");
+                return null;
+            }
 
             diagnosticLog.Add(finding.Message);
             return new ImportResult
