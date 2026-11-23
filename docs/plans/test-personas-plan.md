@@ -70,8 +70,53 @@
 | `utest-coach` | Coach, владелец тест-групп, лимит групп исчерпан |
 | `utest-media-author` | медиа private/members/public + публикация на одобрении |
 | `utest-blocked` | IsActive=false |
+| `utest-admin` | site-админ (роль Admin) — для агентов в ЛОКАЛЬНОЙ админке (23.11.2026), см. ниже |
 
 Тест-группы (флаг `IsTest`): `[TEST] Open`, `[TEST] Approval`.
+
+## Локальная админка под utest-admin (для агентов, 23.11.2026)
+
+Чтобы открыть `/Admin/*` в своём worktree и снять скриншоты. Пароли и токены не нужны.
+
+```powershell
+# 1. персонажи в локальной базе (идемпотентно; utest-admin появится, если его нет)
+$env:ASPNETCORE_ENVIRONMENT='Development'
+dotnet build server/Swimm.sln
+dotnet run --no-build --no-launch-profile --project server/Swimm.API -- --seed-personas
+# 2. API на СВОЁМ порту (5078 и bin/Debug основного чекаута — Влада, не трогать), обход включить переменной
+$env:DevAdminBypass='true'
+dotnet run --no-build --no-launch-profile --project server/Swimm.API --urls http://localhost:5079
+# 3. curl: кука персонажа → админка
+curl.exe -s -c jar.txt "http://localhost:5079/api/dev/persona?as=utest-admin"
+curl.exe -s -o NUL -w "%{http_code}" -b jar.txt http://localhost:5079/Admin/Competitions   # 200
+```
+
+В браузере предпросмотра: открыть `http://localhost:5079/api/dev/persona?as=utest-admin` (ставит
+куку `swimm_dev_persona`), затем `http://localhost:5079/Admin/Competitions`. Проверка —
+`/auth/me` отдаёт `utest-admin@swimm.test` с ролью Admin. После работы — остановить процесс API
+(иначе следующий `dotnet build` упрётся в lock).
+
+**Почему в worktree без шага 2 не пускало (подчат 22.11):** флаг `DevAdminBypass` живёт в
+`appsettings.Development.json`, а он в .gitignore — в свежем worktree его нет, обход выключен,
+а персонажа с ролью Admin не было вовсе.
+
+**Защита — все условия сразу** (`server/Swimm.API/Security/DevLocalGate.cs`):
+1. окружение Development (ProdAdmin, Production — нет);
+2. все рабочие строки подключения (`DefaultConnection`, `AdminConnection`, `ReadConnection`,
+   `MigrationConnection`) — на localhost; иначе «подключены к проду» (`ProdVersionConnection`
+   не в счёт — она только читает версию данных для жёлтой полосы);
+3. запрос с loopback и без `X-Forwarded-For` / `X-Original-For` / `Forwarded`.
+
+1–2 не выполнены — middleware обхода и ручек `/api/dev/*` нет (Warning в лог при `DevAdminBypass=true`),
+`--seed-personas` и кнопка «Сбросить» в /Admin/Users отказывают. 3 не выполнено — обычная
+авторизация, `/api/dev/*` → 404. Тесты — `server/Swimm.Tests/DevLocalGateTests.cs`.
+
+**Если строка `utest-admin` всё же окажется в прод-базе** — входа она не даёт: на проде нет
+обхода (условие 1); пароля (`Sys_UserLocalCredentials`) и внешнего логина (`Sys_UserExternalLogins`)
+у персонажа нет; Google не выдаст адрес в зоне `.test`, а сброс пароля/подтверждение почты
+требуют письма, которое на `.test` не доходит (RFC 2606). Перенос: `dump-seed.sh` не берёт
+`Sys_AppUsers`/`Sys_AppUserRoles` (`server/db/seed-tables.txt`) и падает, если они протекли в
+дамп; `/db-sync-from-prod` везёт только прод → локальная.
 
 ## Этапы (черновик)
 

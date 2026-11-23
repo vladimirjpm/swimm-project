@@ -59,6 +59,12 @@ plus repo-specific footguns.
 штатными командами то, что не требует решения, остальное — Владу списком; ранбук
 [`docs/dashboard-check.md`](docs/dashboard-check.md)).
 
+**Локальная админка для агента (скриншоты `/Admin/*`):** персонаж `utest-admin` — сидер
+`--seed-personas`, API с `DevAdminBypass=true` на своём порту, кука через
+`/api/dev/persona?as=utest-admin`. Команды и условия защиты — раздел «Локальная админка под
+utest-admin» в [`docs/plans/test-personas-plan.md`](docs/plans/test-personas-plan.md).
+Только Development + локальная база + localhost; ProdAdmin так не открыть.
+
 ---
 
 ## Golden rules

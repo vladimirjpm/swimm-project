@@ -18,8 +18,10 @@ public class IndexModel : PageModel
     private readonly IWebHostEnvironment _env;
     private readonly IAccountDeletionService _deletion;
 
+    private readonly IConfiguration _config;
+
     public IndexModel(IAdminRepository repo, ISettingsService settings, IAdminAuditService audit,
-        IPersonaSeeder personas, IWebHostEnvironment env, IAccountDeletionService deletion)
+        IPersonaSeeder personas, IWebHostEnvironment env, IAccountDeletionService deletion, IConfiguration config)
     {
         _repo = repo;
         _settings = settings;
@@ -27,6 +29,7 @@ public class IndexModel : PageModel
         _personas = personas;
         _env = env;
         _deletion = deletion;
+        _config = config;
     }
 
     /// <summary>
@@ -38,9 +41,10 @@ public class IndexModel : PageModel
     /// <summary>
     /// Кнопка «Сбросить» у тестового персонажа (просьба Влада 17.10.2026) — только Development:
     /// персонажи живут в локальной базе и на прод не переносятся (server/db/seed-tables.txt), а
-    /// ProdAdmin пишет в прод-БД.
+    /// ProdAdmin пишет в прод-БД. Условие — то же, что у сидера (<see cref="Swimm.API.Security.DevLocalGate"/>):
+    /// Development И локальная база (Development со строкой на прод — тоже нет).
     /// </summary>
-    public bool CanResetPersonas => _env.IsDevelopment();
+    public bool CanResetPersonas => Swimm.API.Security.DevLocalGate.WhyDisabled(_env, _config) is null;
 
     /// <summary>Персонаж из <see cref="TestPersonas.All"/> — его можно вернуть в исходное состояние.</summary>
     public static bool IsPersona(string email) =>

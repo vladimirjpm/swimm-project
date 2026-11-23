@@ -429,10 +429,10 @@ app.UseAuthentication();
 
 // Dev-обход логина в админку: appsettings.Development.json → "DevAdminBypass": true
 // (кем именно входим — "DevAdminBypassEmail", по умолчанию первый активный админ).
-// Работает ТОЛЬКО в Development и только если флаг включён явно; в проде ветка мертва.
+// Флаг — только просьба: включается, лишь если выполнены условия Security/DevLocalGate.cs
+// (Development + все рабочие строки подключения на localhost); запрос ещё и должен прийти с loopback.
 // Устройство и почему личность берётся из БД — в Security/DevAdminBypass.cs.
-if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("DevAdminBypass"))
-    app.UseDevAdminBypass();
+app.UseDevAdminBypassIfAllowed();
 
 app.UseAuthorization();
 
