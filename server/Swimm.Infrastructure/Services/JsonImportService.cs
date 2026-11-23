@@ -181,6 +181,8 @@ public class JsonImportService : IImportService
         private Dictionary<string, Country> countryByName = null!;
         private Dictionary<string, Competition> competitionCache = null!;
         private Dictionary<string, Competition> linkedDaysByDate = null!;
+        // Ключи, по которым уже предупредили «имя → X, compID → Y» (Р118): строк у дня тысячи.
+        private readonly HashSet<string> divergenceWarned = [];
         private Dictionary<string, Club> clubCache = null!;
         // Прежнее название (ClubNames), под которым клуб узнан по ключу clubCache, — Results.ClubNameId (Н3/Н5).
         private Dictionary<string, int?> clubNameIdCache = null!;
@@ -423,14 +425,18 @@ public class JsonImportService : IImportService
                 c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
 
             // Идентичность по штампу сайта (Д2, docs/data-integrity.md). Если импорт знает compID,
-            // сначала ищем СВОИ дни по дате внутри связанного соревнования/события, и только потом
-            // падаем на матчинг по имени. Штамп живёт либо на одиночном соревновании
-            // (Competition.OrgCompId — альтернативный ключ), либо на событии (CompetitionEvent.OrgCompId).
+            // день, не найденный по имени, ищется по дате среди СВОИХ дней связанного
+            // соревнования/события (ImportCompetitionMatcher.MatchDay, Р118). Штамп живёт либо на
+            // одиночном соревновании (Competition.OrgCompId — альтернативный ключ), либо на событии
+            // (CompetitionEvent.OrgCompId). Дни с чужим штампом и неоднозначные даты — не берутся.
             linkedDaysByDate = new Dictionary<string, Competition>();
             if (orgCompId is int linkOrgCompId)
             {
                 var linkedDays = await CompetitionIdentity.ResolveDaysAsync(_db, linkOrgCompId);
-                linkedDaysByDate = ImportCompetitionMatcher.BuildDateIndex(linkedDays, c => c.Date);
+                linkedDaysByDate = ImportCompetitionMatcher.BuildLinkedDayIndex(linkedDays, linkOrgCompId,
+                    items.Select(i => (i.Competition ?? string.Empty, i.Date ?? string.Empty)), out var ambiguous);
+                foreach (var date in ambiguous)
+                    diagnosticLog.Add(ImportCompetitionMatcher.AmbiguousDateWarning(date, linkOrgCompId));
                 if (linkedDaysByDate.Count > 0)
                     diagnosticLog.Add($"Идентичность: compID {linkOrgCompId} → {linkedDaysByDate.Count} день(дней) в БД, матчинг по дате");
             }
@@ -628,12 +634,14 @@ public class JsonImportService : IImportService
             var poolType = NormalizePoolType(eventOptions?.PoolType ?? item.PoolType);
             var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, poolType);
 
-            // Д2/Р118: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
-            // или бассейн разошлись; правило общее с превью (ImportCompetitionMatcher.MatchDay).
-            // Кладём находку в кэш под именным ключом, чтобы весь дальнейший цикл
-            // (upsert-пометка, категории, touched) работал как обычно.
-            if (ImportCompetitionMatcher.MatchDay(linkedDaysByDate, competitionCache, item.Date, compKey) is { } matched)
-                competitionCache[compKey] = matched;
+            // Д2/Р118: ключ (имя+дата+бассейн), при промахе — день того же compID ПО ДАТЕ, даже если
+            // название или бассейн разошлись; правило общее с превью (ImportCompetitionMatcher.MatchDay).
+            // Кладём находку в кэш под именным ключом (TryAdd: совпадение по ключу уже там и
+            // остаётся), чтобы весь дальнейший цикл (upsert-пометка, категории, touched) работал как обычно.
+            if (ImportCompetitionMatcher.MatchDay(linkedDaysByDate, competitionCache, item.Date, compKey, out var divergent) is { } matched)
+                competitionCache.TryAdd(compKey, matched);
+            if (divergent != null && divergenceWarned.Add(compKey))
+                diagnosticLog.Add(ImportCompetitionMatcher.DivergenceWarning(item.Date, competitionCache[compKey], divergent, orgCompId));
 
             // Соревнование уже есть (перезатягивание, дописывание дня): флаги из превью —
             // свежее решение человека, применяем и к нему. Не заданные (null) не трогаем.
@@ -1823,7 +1831,7 @@ public class JsonImportService : IImportService
     /// Name = имя события, а исходно распарсенный заголовок уходит в SubName — поэтому матчим и по
     /// нему тоже, иначе превью не находит уже существующие дни переименованного события (см. кейс
     /// "Maccabiah 2025 -" в SubName при Name="Maccabiah 2026"). Пустой/неизвестный PoolType дня
-    /// пропускает поиск по имени (ключ неполон — матч ненадёжен). С compID (Р118) сперва — дни этого
+    /// пропускает поиск по имени (ключ неполон — матч ненадёжен). С compID (Р118) при промахе ключа — дни этого
     /// compID по дате, тем же <see cref="ImportCompetitionMatcher.MatchDay"/>, что и импорт.
     /// </summary>
     public async Task<List<ExistingCompetitionMatch>> FindExistingCompetitionsAsync(
@@ -1849,11 +1857,12 @@ public class JsonImportService : IImportService
         var byKey = ImportCompetitionMatcher.BuildIndex(
             existing, c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
 
-        // Д2/Р118: дни того же compID по дате — первыми, как в импорте (LoadReferenceCachesAsync).
+        // Д2/Р118: при промахе ключа — день того же compID по дате, как в импорте (LoadReferenceCachesAsync).
+        var ambiguousDates = new HashSet<string>();
         var linkedDaysByDate = orgCompId is int oc
-            ? ImportCompetitionMatcher.BuildDateIndex(
-                await CompetitionIdentity.ResolveDaysAsync(_db, oc),
-                c => c.Date)
+            ? ImportCompetitionMatcher.BuildLinkedDayIndex(
+                await CompetitionIdentity.ResolveDaysAsync(_db, oc), oc,
+                competitions.Select(d => (d.Competition, d.Date)), out ambiguousDates)
             : new Dictionary<string, Competition>();
 
         foreach (var day in competitions)
@@ -1862,11 +1871,16 @@ public class JsonImportService : IImportService
             var key = string.IsNullOrWhiteSpace(day.PoolType)
                 ? null
                 : ImportCompetitionMatcher.Key(day.Competition, day.Date, NormalizePoolType(day.PoolType));
-            var found = ImportCompetitionMatcher.MatchDay(linkedDaysByDate, byKey, day.Date, key);
+            var found = ImportCompetitionMatcher.MatchDay(linkedDaysByDate, byKey, day.Date, key, out var divergent);
             int? existingResultCount = found != null
                 ? resultCounts.GetValueOrDefault(found.Id, 0)
                 : null;
-            result.Add(new ExistingCompetitionMatch(day.Competition, day.Date, found?.Id, found?.Name, existingResultCount));
+            var warning = found != null && divergent != null
+                ? ImportCompetitionMatcher.DivergenceWarning(day.Date, found, divergent, orgCompId)
+                : orgCompId is int aoc && ambiguousDates.Contains(day.Date)
+                    ? ImportCompetitionMatcher.AmbiguousDateWarning(day.Date, aoc)
+                    : null;
+            result.Add(new ExistingCompetitionMatch(day.Competition, day.Date, found?.Id, found?.Name, existingResultCount, warning));
         }
 
         return result;

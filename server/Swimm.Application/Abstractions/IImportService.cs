@@ -26,8 +26,8 @@ public interface IImportService
 
     /// <summary>
     /// Для превью перед импортом: по каждому дню файла ищет уже существующее в БД соревнование
-    /// тем же правилом, что ImportAsync (Р118): сперва дни compID <paramref name="orgCompId"/> по дате,
-    /// потом ключ (Name|SubName)|Date|PoolType. Не требует парсинга — принимает готовую сводку
+    /// тем же правилом, что ImportAsync (Р118): ключ (Name|SubName)|Date|PoolType, при промахе — дни compID
+    /// <paramref name="orgCompId"/> по дате. Не требует парсинга — принимает готовую сводку
     /// по дням из ParsedCompetition.Competitions. Без compID (файл на /Admin/Import) — только ключ.
     /// </summary>
     Task<List<ExistingCompetitionMatch>> FindExistingCompetitionsAsync(

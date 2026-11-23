@@ -1398,8 +1398,8 @@
                 try {
                     const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
                     if (!pullFlow.isActive(id, token)) return; // пока шёл разбор, ход отменили или начали другой
-                    // existingCompetitionId — правило бассейна у «Импортировать»: существующему он не обязателен.
-                    preview = { previewId: p.previewId, id, name, existingCompetitionId: p.existingCompetitionId ?? null };
+                    // existingCompetitionId — для перезаписи; needsPool — правило бассейна у «Импортировать» (Р118).
+                    preview = { previewId: p.previewId, id, name, existingCompetitionId: p.existingCompetitionId ?? null, needsPool: needsPool(p) };
                     pullFlow.previewReady(p);
                     await showPreview(p, name, repull);
                     updateRemaining();
@@ -1419,7 +1419,7 @@
                 btn.disabled = true;
                 btn.title = 'Восстанавливаю выбор в превью…';
                 preview = { previewId: f.p.previewId, id: Number(f.discId), name: f.name,
-                    existingCompetitionId: f.p.existingCompetitionId ?? null };
+                    existingCompetitionId: f.p.existingCompetitionId ?? null, needsPool: needsPool(f.p) };
                 await showPreview(f.p, f.name, f.repull);
                 const restored = applyForm(f.form);
                 updateRemaining();
@@ -1470,16 +1470,29 @@
                 return { eventLost };
             }
 
+            // Бассейн обязателен, если хоть один день файла в базе не найден (Р118): существующие дни
+            // бассейн сохраняют, а новый без выбора получил бы умолчание парсера (25 м, И-30).
+            // existingCompetitionId — лишь ПЕРВЫЙ найденный день и о новых днях ничего не говорит.
+            function needsPool(p) {
+                const days = p.existingCompetitions || [];
+                if (!days.length) return !p.existingCompetitionId;
+                return days.some(m => !m.existingCompetitionId);
+            }
+
             // Подпись шага 6: что ещё нужно до «Импортировать» (макет: «осталось: бассейн и 2 рекорда»).
             function updateRemaining() {
                 const f = pullFlow.current();
                 if (!f?.p) return;
                 const pool = document.getElementById('flag-pool').value;
-                // Правило то же, что у «Импортировать»: бассейн обязателен только новому соревнованию.
-                document.getElementById('pool-hint').classList.toggle('hidden', !!pool || !!f.p.existingCompetitionId);
+                // Правило то же, что у «Импортировать»: бассейн обязателен, если в файле есть новый день.
+                const poolHint = document.getElementById('pool-hint');
+                poolHint.classList.toggle('hidden', !!pool || !needsPool(f.p));
+                poolHint.textContent = f.p.existingCompetitionId
+                    ? 'в файле есть новый день — выбери бассейн (существующим дням он не меняется)'
+                    : 'выбери — без бассейна импорт не начнётся';
                 const recs = new Set((f.p.recordPreview?.rows ?? []).map(r => r.rowIndex)).size;
                 const left = [];
-                if (!pool && !f.p.existingCompetitionId) left.push('бассейн');
+                if (!pool && needsPool(f.p)) left.push('бассейн');
                 if (recs) left.push(`${recs} ${recs % 10 === 1 && recs % 100 !== 11 ? 'рекорд' : recs % 10 >= 2 && recs % 10 <= 4 && (recs % 100 < 12 || recs % 100 > 14) ? 'рекорда' : 'рекордов'}`);
                 const note = f.repull
                     ? (f.p.existingCompetitionId ? ' · перезапись существующих результатов уже включена'
@@ -2110,9 +2123,10 @@
             document.getElementById('btn-import').addEventListener('click', async () => {
                 if (!preview) return;
                 // Бассейн протокол не пишет, а у парсера умолчание 25 м (И-30: летний чемпионат
-                // лёг 25-метровым). Новое соревнование без явного выбора не импортируем; у
-                // существующего пустое поле ничего не меняет.
-                if (!preview.existingCompetitionId && !document.getElementById('flag-pool').value) {
+                // лёг 25-метровым). Файл, где есть хоть один НОВЫЙ день, без явного выбора не
+                // импортируем (Р118: новый день события иначе молча получит умолчание парсера);
+                // существующим дням бассейн не меняется — пустое поле им ничего не делает.
+                if (preview.needsPool && !document.getElementById('flag-pool').value) {
                     alert('Выбери длину бассейна (25 / 50 м): протокол её не указывает, регламент тоже.');
                     document.getElementById('flag-pool').focus();
                     return;

@@ -129,12 +129,15 @@ public class ImportResult
 /// Кол-во строк Results у сматченного соревнования (0/null — если матча нет). Используется UI
 /// для предупреждения о потенциальном массовом удалении при OverwriteExisting=true с неполным файлом.
 /// </param>
+/// <param name="MatchWarning">Р118: ключ и compID указали на разные соревнования либо дата compID
+/// неоднозначна — текст для предупреждения в превью; null — всё однозначно.</param>
 public sealed record ExistingCompetitionMatch(
     string Competition,
     string Date,
     int? ExistingCompetitionId,
     string? ExistingCompetitionName,
-    int? ExistingResultCount = null);
+    int? ExistingResultCount = null,
+    string? MatchWarning = null);
 
 public class ClearResult
 {
