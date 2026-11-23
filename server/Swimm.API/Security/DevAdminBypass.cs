@@ -29,8 +29,11 @@ namespace Swimm.API.Security;
 /// на клиенте это плашка, которую Vite внедряет только в dev. Настоящий вход (кука логина)
 /// сильнее переключателя: персонаж действует только на неаутентифицированный запрос.
 ///
-/// Работает ТОЛЬКО в Development и только при <c>"DevAdminBypass": true</c>; в проде ветка мертва
-/// и ручек /api/dev/* нет вовсе.
+/// Работает ТОЛЬКО при <c>"DevAdminBypass": true</c> И условиях <see cref="DevLocalGate"/>:
+/// Development, все рабочие строки подключения на localhost (не прод-база), запрос с loopback без
+/// прокси-заголовков. Не выполнены условия процесса — middleware и ручек /api/dev/* нет вовсе;
+/// не выполнено условие запроса — обычная авторизация и 404 на /api/dev/*.
+/// Агенту под админом — персонаж <c>utest-admin</c> (docs/plans/test-personas-plan.md).
 /// </summary>
 public static class DevAdminBypass
 {
@@ -53,14 +56,36 @@ public static class DevAdminBypass
     private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(30);
     private static readonly SemaphoreSlim Gate = new(1, 1);
 
+    /// <summary>
+    /// Точка включения из Program.cs (и из тестов — тот же код): флаг <c>DevAdminBypass</c> — только
+    /// просьба; включаемся, лишь если <see cref="DevLocalGate.WhyDisabled"/> молчит. Иначе — Warning
+    /// в лог и ничего не регистрируем. true — обход включён.
+    /// </summary>
+    public static bool UseDevAdminBypassIfAllowed(this WebApplication app)
+    {
+        if (!app.Configuration.GetValue<bool>("DevAdminBypass")) return false;
+        if (DevLocalGate.WhyDisabled(app.Environment, app.Configuration) is { } why)
+        {
+            app.Logger.LogWarning("DevAdminBypass=true, но обход НЕ включён: {Reason}.", why);
+            return false;
+        }
+        app.UseDevAdminBypass();
+        return true;
+    }
+
     public static void UseDevAdminBypass(this WebApplication app)
     {
+        // Второй замок к проверке в Program.cs: кто бы ни позвал — без условий сторожа не включаемся.
+        if (DevLocalGate.WhyDisabled(app.Environment, app.Configuration) is { } why)
+            throw new InvalidOperationException($"DevAdminBypass нельзя включить: {why}.");
+
         var defaultEmail = app.Configuration["DevAdminBypassEmail"];
         var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(DevAdminBypass));
 
         app.Use(async (context, next) =>
         {
-            if (context.User.Identity?.IsAuthenticated != true)
+            // Не с этой машины (или через прокси) — механизма нет: обычная авторизация.
+            if (context.User.Identity?.IsAuthenticated != true && DevLocalGate.IsLoopbackRequest(context))
             {
                 var persona = ReadPersona(context.Request.Cookies[PersonaCookie]);
                 // utest-guest — ровно то, что видит посетитель без входа: личность не подставляем.
@@ -89,12 +114,16 @@ public static class DevAdminBypass
 
     private static void MapPersonaEndpoints(WebApplication app, string? defaultEmail)
     {
-        app.MapGet("/api/dev/personas", (HttpContext context, SwimmDbContext db) =>
+        // Не с loopback — 404, как будто ручек нет.
+        var dev = app.MapGroup("/api/dev").AddEndpointFilter(async (ctx, next) =>
+            DevLocalGate.IsLoopbackRequest(ctx.HttpContext) ? await next(ctx) : Results.NotFound());
+
+        dev.MapGet("/personas", (HttpContext context, SwimmDbContext db) =>
             DescribeAsync(context, db, context.Request.Cookies[PersonaCookie], defaultEmail));
 
         // GET, а не POST: ручка есть только в Development, а так её можно дёрнуть и адресной
         // строкой (удобно агенту и руками). Ответ — тот же, что у /api/dev/personas.
-        app.MapGet("/api/dev/persona", (HttpContext context, SwimmDbContext db, string? @as) =>
+        dev.MapGet("/persona", (HttpContext context, SwimmDbContext db, string? @as) =>
         {
             string? chosen;
             if (string.IsNullOrWhiteSpace(@as) || @as == Default) chosen = null;

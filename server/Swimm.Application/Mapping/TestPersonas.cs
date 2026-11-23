@@ -75,6 +75,12 @@ public static class TestPersonas
     public const string Coach = "utest-coach";
     public const string MediaAuthor = "utest-media-author";
     public const string Blocked = "utest-blocked";
+    /// <summary>
+    /// Site-админ (решение Влада 23.11.2026): агенты открывают под ним ЛОКАЛЬНУЮ админку через
+    /// переключатель персонажа. Пароля и внешнего логина нет — войти можно только dev-обходом,
+    /// которого вне Development + локальной базы + loopback нет (Swimm.API/Security/DevLocalGate.cs).
+    /// </summary>
+    public const string SiteAdmin = "utest-admin";
 
     /// <summary>Тестовые группы сидера. Slug тоже с префиксом utest — видно, чьи они.</summary>
     public const string OpenGroupSlug = "utest-open";
@@ -82,6 +88,7 @@ public static class TestPersonas
 
     public const string RoleUser = "User";
     public const string RoleCoach = "Coach";
+    public const string RoleAdmin = "Admin";
 
     /// <summary>Ссылки медиа персонажей — example.com: настоящих видео нет, сторож пометит их битыми.</summary>
     public const string MediaUrlPrefix = "https://example.com/utest/";
@@ -142,6 +149,12 @@ public static class TestPersonas
             ],
         },
         new(Blocked, "Deactivated account") { IsActive = false },
+        // Ни групп, ни избранного: только роль. Последним — чтобы «первый активный админ»
+        // (личность обхода по умолчанию) остался прежним.
+        new(SiteAdmin, "Site admin: opens the local /Admin panel")
+        {
+            Roles = [RoleUser, RoleAdmin],
+        },
     ];
 
     public static TestPersona? ByEmail(string? email) =>
