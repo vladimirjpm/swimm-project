@@ -96,5 +96,6 @@ public static class BulkPullClassifier
     private static bool LooksLikeEmptySource(string message) =>
         message.Contains("No competitions found", StringComparison.OrdinalIgnoreCase)
         || message.Contains("0 lines extracted", StringComparison.OrdinalIgnoreCase)
-        || message.Contains("не распознал ни одного результата", StringComparison.OrdinalIgnoreCase);
+        || message.Contains("не распознал ни одного результата", StringComparison.OrdinalIgnoreCase)
+        || message.Contains(NoStartProtocol.Marker, StringComparison.OrdinalIgnoreCase);
 }

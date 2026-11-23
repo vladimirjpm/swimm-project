@@ -680,7 +680,7 @@
         if (SuspectOf(u) is > 0 and var n)
             Add("bg-admin-warning/15 text-admin-warning", $"⚑ {n}", $"Помеченных недостоверными строк: {n}");
         if (s?.EmptySourceAt != null)
-            Add("bg-white/[.08] text-admin-text-muted", "∅", "Протокола нет: PDF пустой — тянуть нечего");
+            Add("bg-white/[.08] text-admin-text-muted", "∅", "Протокола нет: PDF пустой или в нём одни неявки (NS) — тянуть нечего");
         if (u.Stage == CompetitionStage.Ignored)
             Add("bg-white/[.08] text-admin-text-muted", "скрыто");
         return sb.ToString();
@@ -1011,7 +1011,7 @@
                         @if (u.Site?.EmptySourceAt is { } emptyAt)
                         {
                             <span class="@chip bg-white/[.08] text-admin-text-muted"
-                                  title="Протокола нет: PDF пустой (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола</span>
+                                  title="Протокола нет: PDF пустой или в нём одни неявки (NS) (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола</span>
                         }
                         @Html.Raw(StartListBadgeHtml(u.Site))
                         @Html.Raw(DateChangeChipsHtml(u.Site))
