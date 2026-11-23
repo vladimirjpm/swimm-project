@@ -223,16 +223,15 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             u.Status = CompetitionRowStateRules.Evaluate(StateInput(u), day);
 
         // 4) Счётчики по сезонам — ДО фильтра по сезону, иначе на чипах остался бы один сезон.
-        // «Затянуто» = строка есть в справочнике БД (стадии Imported/DbOnly), т.е. Db != null.
+        // ОДИН источник — состояния строк: «затянуто» и «тянуть нечего» старого счётчика — это
+        // разбивка «закрыто» (CompetitionStateCounts.ClosedNothingToPull), а не отдельный подсчёт:
+        // иначе затянутая строка с отметкой «неполные» была бы на чипе и «затянуто», и «долг»,
+        // и сумма не сходилась бы со «всего».
         var seasonCounts = unified
             .Where(u => u.SortDate.Year > 1)
             .GroupBy(u => SeasonOf(u.SortDate))
             .OrderByDescending(g => g.Key)
-            .Select(g => new SeasonCountDto(
-                g.Key, g.Count(), g.Count(u => u.Db != null), g.Count(IsNothingToPull))
-            {
-                States = CompetitionStateCounts.Of(g.Select(u => u.Status)),
-            })
+            .Select(g => SeasonCountDto.FromStates(g.Key, CompetitionStateCounts.Of(g.Select(u => u.Status))))
             .ToList();
 
         // 4b) Фильтр по сезону (сен–авг) — один предикат на обе стороны, по дате строки.
@@ -240,18 +239,14 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             unified = unified.Where(u => u.SortDate.Year > 1 && SeasonOf(u.SortDate) == s).ToList();
 
         // 4c) Счётчики по месяцам (под текущими фильтрами вкл. сезон, но ДО фильтра по месяцу).
-        var monthCounts = new int[12];
-        var monthImported = new int[12];
-        var monthNothingToPull = new int[12];
         var monthStates = Enumerable.Repeat(CompetitionStateCounts.Zero, 12).ToArray();
         foreach (var u in unified)
             if (u.SortDate.Year > 1) // непарсибельные даты (MinValue) не считаем
-            {
-                monthCounts[u.SortDate.Month - 1]++;
-                if (u.Db != null) monthImported[u.SortDate.Month - 1]++;
-                else if (IsNothingToPull(u)) monthNothingToPull[u.SortDate.Month - 1]++;
-                monthStates[u.SortDate.Month - 1] = monthStates[u.SortDate.Month - 1].Add(u.Status!.State);
-            }
+                monthStates[u.SortDate.Month - 1] = monthStates[u.SortDate.Month - 1].Add(u.Status!);
+        var monthCounts = monthStates.Select(m => m.Total).ToArray();
+        var monthImported = monthStates.Select(m => m.ClosedInDb).ToArray();
+        var monthNothingToPull = monthStates.Select(m => m.ClosedNothingToPull).ToArray();
+
 
         // 5) Фильтр по месяцу (если задан) + единый date-desc порядок + пагинация в памяти.
         if (month is >= 1 and <= 12)
@@ -303,42 +298,40 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     }
 
     /// <summary>
-    /// Строка, по которой работы БОЛЬШЕ НЕТ, хотя в БД её нет: протокол пуст
-    /// (<c>EmptySourceAt</c> — ставится автоматически при разборе, который ничего не нашёл,
-    /// и снимается сам, если файл потом выложили) либо строка скрыта админом (Ignored —
-    /// решение принято).
+    /// Вход правила состояний из строки списка.
     ///
-    /// Нужно, чтобы счётчик не пугал зря: «12 из 14» читается как долг на две штуки, хотя
-    /// у обеих тянуть нечего и месяц закрыт.
+    /// Даты: у строки базы — свои (одиночное — дата, событие — первый и последний день), у
+    /// строки «Входящих» — с сайта. Если есть обе стороны, берётся ОБЪЕДИНЕНИЕ диапазонов:
+    /// многодневку тянут по дням (путь Б в docs/pull-to-prod.md), и в базе лежат только уже
+    /// затянутые дни — по ним одним последний день «прошёл» бы на второй день старта.
+    /// Даты «Входящих» лежат полночью без пояса — это уже местные календарные дни.
     ///
-    /// ⚠ Отсутствие loglig-id сюда НЕ входит, хотя соблазн есть: у 89 строк сезона 2025/26
-    /// его нет просто потому, что детали ещё не загружались (грузятся при первом
-    /// «Затянуть»). Это «ещё не пробовали», а не «нечего брать» — иначе целый апрель из
-    /// трёх незатянутых соревнований показал бы зелёную галочку. Ошибка забора
-    /// (<c>LastError</c>) — тем более повод вернуться, а не закрытый вопрос.
-    /// </summary>
-    /// <summary>
-    /// Вход правила состояний из строки списка. Даты: у строки базы — свои (одиночное — дата,
-    /// событие — первый и последний день), у строки «Входящих» — с сайта. Даты «Входящих»
-    /// лежат полночью без пояса — это уже местные календарные дни, переводить не нужно.
     /// «Не опубликованы» — ошибка забора при пустом loglig-id (детали читались, iframe нет):
-    /// так её ставят и суточный забор, и забор стартового протокола.
+    /// так её ставят и суточный забор, и забор стартового протокола. Пустой loglig-id БЕЗ
+    /// ошибки сюда не входит: детали просто ещё не загружались.
+    ///
+    /// «Помечено вручную» — строка «Входящих» со статусом imported, которой в базе нет
+    /// (кнопка «✓ имп.»): её закрыл человек.
     /// </summary>
     private static CompetitionRowStateInput StateInput(UnifiedCompetitionRowDto u)
     {
         DateOnly? first = null, last = null;
+        void Extend(DateOnly? from, DateOnly? to)
+        {
+            if (from is not { Year: > 1 } f) return;
+            var t = to is { Year: > 1 } tt && tt >= f ? tt : f;
+            first = first is { } a && a < f ? a : f;
+            last = last is { } b && b > t ? b : t;
+        }
+
         if (u.Db != null)
         {
             var dates = (u.Db.Single != null ? [u.Db.Single.Date] : u.Db.Days.Select(d => d.Date))
                 .Select(ParseDbDate).OfType<DateOnly>().ToList();
-            if (dates.Count > 0) { first = dates.Min(); last = dates.Max(); }
+            if (dates.Count > 0) Extend(dates.Min(), dates.Max());
         }
-        if (first == null && u.Site != null)
-        {
-            first = DateOnly.FromDateTime(u.Site.DateStart);
-            last = DateOnly.FromDateTime(u.Site.DateEnd);
-        }
-        if (first is { Year: <= 1 }) first = last = null;
+        if (u.Site != null)
+            Extend(DateOnly.FromDateTime(u.Site.DateStart), DateOnly.FromDateTime(u.Site.DateEnd));
 
         var partial = u.Db != null && (u.Db.Single != null
             ? u.Db.Single.PartialResults != null
@@ -349,15 +342,13 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             AutoPullVerdict: u.Site?.AutoPullVerdict,
             NoProtocolMark: u.Site?.EmptySourceAt != null,
             ResultsNotPublished: u.Site is { LastError: not null, LogligId: null },
-            PartialResults: partial);
+            PartialResults: partial,
+            MarkedImported: u.Db == null && string.Equals(u.Site?.Status, "imported", StringComparison.OrdinalIgnoreCase));
     }
 
     private static DateOnly? ParseDbDate(string? s) =>
         DateOnly.TryParseExact(s, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out var d) ? d : null;
-
-    private static bool IsNothingToPull(UnifiedCompetitionRowDto u) =>
-        u.Db == null && (u.Stage == CompetitionStage.Ignored || u.Site?.EmptySourceAt != null);
 
     /// <summary>
     /// Чемпионат = чемпионат ИЗРАИЛЯ по названию. Правило живёт в Application

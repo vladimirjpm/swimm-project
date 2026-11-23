@@ -19,7 +19,7 @@
     }
 
     // ВНИМАНИЕ: параметр пагинации — «p», НЕ «page» (page зарезервирован Razor Pages, ломает переходы).
-    string PageUrl(int pg) => ListUrl(d => Set(d, "p", Model.Month == null ? pg.ToString() : null), withSelected: true);
+    string PageUrl(int pg) => ListUrl(d => Set(d, "p", Model.Unpaged ? null : pg.ToString()), withSelected: true);
 
     // Ссылка на месяц (сброс страницы на 1; повторный клик по активному — снять фильтр).
     string MonthUrl(int? m) => ListUrl(d => Set(d, "month", m?.ToString()));
@@ -523,11 +523,18 @@
     // скрытые (Ignored) и с пустым протоколом (EmptySourceAt) — не долг.
     // С этапа 1 «варианта E» — только состояние «ждёт затягивания»: месяц теперь виден целиком,
     // и будущие, идущие и «ждём протокол» иначе уезжали бы в пачку (хэндофф, раздел 4).
-    var bulkIds = Model.Result.Items
+    // Число на кнопке = сколько строк реально уйдёт: сервис сам отбрасывает чемпионаты (пока
+    // не отмечено «включая чемпионаты») и берёт не больше BulkPullLimits.MaxBatchSize, по дате
+    // от ранней. Поэтому здесь два готовых списка с тем же отбором, а чекбокс переключает их.
+    var bulkRows = Model.Result.Items
         .Where(u => u.Db == null && u.Site != null
                     && u.Status?.State == Swimm.Application.Mapping.CompetitionRowState.ReadyToPull)
-        .Select(u => u.Site!.DiscoveredId)
+        .OrderBy(u => u.Site!.DateStart)
         .ToList();
+    var bulkIdsAll = bulkRows.Take(Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize)
+        .Select(u => u.Site!.DiscoveredId).ToList();
+    var bulkIdsNoChamp = bulkRows.Where(u => !u.IsChampionship).Take(Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize)
+        .Select(u => u.Site!.DiscoveredId).ToList();
 }
 
 <div class="mb-3 flex flex-wrap items-center gap-3 text-xs text-admin-text-muted">
@@ -566,16 +573,20 @@
         }
     </span>
 
-    @if (bulkIds.Count > 0)
+    @if (bulkIdsAll.Count > 0)
     {
         <label class="flex cursor-pointer items-center gap-1.5"
                title="Чемпионаты Израиля разбираются штучно: медали, зачёт и категории у них свои">
             <input type="checkbox" id="bulk-include-champ" class="cursor-pointer" />
             включая чемпионаты
         </label>
-        <button type="button" id="bulk-pull-btn" class="admin-btn admin-btn-primary py-1 px-2.5"
-                data-ids="@string.Join(",", bulkIds)">
-            ⏬ Затянуть все незатянутые (@bulkIds.Count)
+        <button type="button" id="bulk-pull-btn"
+                class="admin-btn admin-btn-primary py-1 px-2.5 @(bulkIdsNoChamp.Count == 0 ? "hidden" : "")"
+                data-ids="@string.Join(",", bulkIdsNoChamp)"
+                data-ids-no-champ="@string.Join(",", bulkIdsNoChamp)"
+                data-ids-all="@string.Join(",", bulkIdsAll)"
+                title="Только «ждёт затягивания»; не больше @Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize за раз">
+            ⏬ Затянуть все незатянутые (<span id="bulk-pull-count">@bulkIdsNoChamp.Count</span>)
         </button>
     }
 </div>

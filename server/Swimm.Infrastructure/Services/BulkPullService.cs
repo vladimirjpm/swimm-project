@@ -23,7 +23,7 @@ public sealed class BulkPullService : IBulkPullService
     /// <summary>Категория, которую получают все импортируемые пачкой (решение Влада 2026-08-23).</summary>
     public const string DefaultCategoryKey = "results-8-99";
 
-    public int MaxBatchSize => 30;
+    public int MaxBatchSize => BulkPullLimits.MaxBatchSize;
 
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger<BulkPullService> _logger;

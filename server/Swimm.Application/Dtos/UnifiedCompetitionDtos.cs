@@ -52,6 +52,11 @@ public sealed record SeasonCountDto(int Season, int Total, int Imported, int Not
     /// Инвариант: <c>States.Total == Total</c>.</summary>
     public Mapping.CompetitionStateCounts States { get; init; } = Mapping.CompetitionStateCounts.Zero;
 
+    /// <summary>Сезон из состояний его строк — единственный способ собрать счётчик: «затянуто» и
+    /// «тянуть нечего» — разбивка «закрыто», а не отдельный подсчёт.</summary>
+    public static SeasonCountDto FromStates(int season, Mapping.CompetitionStateCounts states) =>
+        new(season, states.Total, states.ClosedInDb, states.ClosedNothingToPull) { States = states };
+
     /// <summary>Сколько ещё можно затянуть. 0 — сезон закрыт, показываем ✓.</summary>
     public int Pending => Math.Max(0, Total - Imported - NothingToPull);
 }

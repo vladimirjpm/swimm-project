@@ -520,6 +520,20 @@
                 timer = setInterval(poll, 2000);
             }
 
+            // «включая чемпионаты» меняет и состав пачки, и число на кнопке: оба списка
+            // собраны сервером тем же отбором, что применит BulkPullService (без чемпионатов
+            // по умолчанию, не больше MaxBatchSize). Пусто — кнопки нет.
+            const champBox = document.getElementById('bulk-include-champ');
+            if (startBtn && champBox) {
+                champBox.addEventListener('change', () => {
+                    const ids = champBox.checked ? startBtn.dataset.idsAll : startBtn.dataset.idsNoChamp;
+                    startBtn.dataset.ids = ids || '';
+                    const n = (ids || '').split(',').filter(Boolean).length;
+                    document.getElementById('bulk-pull-count').textContent = n;
+                    startBtn.classList.toggle('hidden', n === 0);
+                });
+            }
+
             if (startBtn) {
                 startBtn.addEventListener('click', async () => {
                     const ids = (startBtn.dataset.ids || '').split(',').filter(Boolean).map(Number);

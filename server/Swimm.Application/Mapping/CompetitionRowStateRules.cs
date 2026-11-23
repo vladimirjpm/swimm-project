@@ -81,6 +81,8 @@ public static class CompetitionStateFilters
 /// без ошибки сюда НЕ входит — это «детали ещё не загружались», а не «нечего брать».
 /// </param>
 /// <param name="PartialResults">Видимая отметка «результаты неполные» (Р114) — бывает только у строк базы.</param>
+/// <param name="MarkedImported">Строка «Входящих» помечена вручную «✓ имп.» (статус imported), а в
+/// базе её нет — закрыл человек, тянуть не нужно.</param>
 public sealed record CompetitionRowStateInput(
     CompetitionStage Stage,
     DateOnly? FirstDay,
@@ -88,7 +90,8 @@ public sealed record CompetitionRowStateInput(
     string? AutoPullVerdict = null,
     bool NoProtocolMark = false,
     bool ResultsNotPublished = false,
-    bool PartialResults = false);
+    bool PartialResults = false,
+    bool MarkedImported = false);
 
 /// <summary>Итог: состояние, причина и пометки строки.</summary>
 /// <param name="Reason">Только у <see cref="CompetitionRowState.WaitingProtocol"/>.</param>
@@ -96,7 +99,7 @@ public sealed record CompetitionRowStateInput(
 /// <param name="DayCount">M — дней по датам старта; у однодневного 1.</param>
 /// <param name="NeedsYou">«ждёт тебя» — вердикт blocked (жёлтая пометка).</param>
 /// <param name="ParseFailed">«сбой разбора» — вердикт failed (красная пометка).</param>
-/// <param name="NothingToPull">Закрыто без импорта: скрыто или «∅» — серый цвет вместо зелёного.</param>
+/// <param name="NothingToPull">Закрыто без импорта: скрыто, «∅» или «✓ имп.» вручную — серый цвет вместо зелёного.</param>
 /// <param name="FirstDay">Первый день старта — для «впереди: через N дней».</param>
 /// <param name="LastDay">Последний день — по нему строки «ждёт затягивания» группируются в блоки дней.</param>
 public sealed record CompetitionRowStatus(
@@ -114,10 +117,19 @@ public sealed record CompetitionRowStatus(
     public CompetitionStateBucket Bucket => CompetitionRowStateRules.BucketOf(State);
 }
 
-/// <summary>Счётчики состояний одной ячейки (сезон, месяц или весь список под фильтрами).</summary>
-public sealed record CompetitionStateCounts(int Ahead, int Running, int ReadyToPull, int WaitingProtocol, int Closed)
+/// <summary>
+/// Счётчики состояний одной ячейки (сезон, месяц или весь список под фильтрами).
+/// <paramref name="ClosedNothingToPull"/> — часть <paramref name="Closed"/>: закрыто без импорта
+/// (скрыто, «∅», «✓ имп.» вручную). Из неё же собирается прежний счётчик чипа «затянуто+нечего/всего»
+/// — один источник, двух подсчётов нет.
+/// </summary>
+public sealed record CompetitionStateCounts(int Ahead, int Running, int ReadyToPull, int WaitingProtocol, int Closed,
+    int ClosedNothingToPull = 0)
 {
     public static readonly CompetitionStateCounts Zero = new(0, 0, 0, 0, 0);
+
+    /// <summary>Закрыто импортом (строка в базе) — «затянуто» прежнего счётчика.</summary>
+    public int ClosedInDb => Closed - ClosedNothingToPull;
 
     public int Total => Ahead + Running + ReadyToPull + WaitingProtocol + Closed;
 
@@ -143,12 +155,21 @@ public sealed record CompetitionStateCounts(int Ahead, int Running, int ReadyToP
         _ => this with { Closed = Closed + 1 },
     };
 
+    /// <summary>Строка целиком: состояние и, у закрытого, «закрыто без импорта».</summary>
+    public CompetitionStateCounts Add(CompetitionRowStatus status)
+    {
+        var next = Add(status.State);
+        return status is { State: CompetitionRowState.Closed, NothingToPull: true }
+            ? next with { ClosedNothingToPull = ClosedNothingToPull + 1 }
+            : next;
+    }
+
     public static CompetitionStateCounts operator +(CompetitionStateCounts a, CompetitionStateCounts b) =>
         new(a.Ahead + b.Ahead, a.Running + b.Running, a.ReadyToPull + b.ReadyToPull,
-            a.WaitingProtocol + b.WaitingProtocol, a.Closed + b.Closed);
+            a.WaitingProtocol + b.WaitingProtocol, a.Closed + b.Closed, a.ClosedNothingToPull + b.ClosedNothingToPull);
 
     public static CompetitionStateCounts Of(IEnumerable<CompetitionRowStatus?> statuses) =>
-        statuses.Aggregate(Zero, (acc, s) => s is null ? acc : acc.Add(s.State));
+        statuses.Aggregate(Zero, (acc, s) => s is null ? acc : acc.Add(s));
 }
 
 /// <summary>Блок дня группы «Ждут затягивания»: день (последний день старта) и его строки.</summary>
@@ -197,7 +218,7 @@ public static class CompetitionRowStateRules
                 return Make(CompetitionRowState.Closed, nothing: true);
             case CompetitionStage.Imported or CompetitionStage.DbOnly when !input.PartialResults:
                 return Make(CompetitionRowState.Closed);
-            case CompetitionStage.OnSite when input.NoProtocolMark:
+            case CompetitionStage.OnSite when input.NoProtocolMark || input.MarkedImported:
                 return Make(CompetitionRowState.Closed, nothing: true);
         }
 

@@ -149,7 +149,115 @@ public class CompetitionStateCountersTests
         Assert.Equal(2, paged.Page.TotalPages);
     }
 
+    // ── Многодневка, затянутая по дням (путь Б в docs/pull-to-prod.md) ──────────
+
+    private static async Task<SwimmDbContext> SeedDayByDayAsync(string name, bool partial)
+    {
+        // Старт 21–23.11 на сайте; в базе пока только день 1 (событие из одного дня).
+        var db = CreateDb(name);
+        db.CompetitionEvents.Add(new CompetitionEvent { Id = 5, Name = "Многодневка" });
+        db.Competitions.Add(new Competition
+        {
+            Id = 50, Name = "Многодневка", Date = "21/11/2026", PoolType = "50m", OrgCompId = 2050,
+            EventId = 5, DayNumber = 1,
+            PartialResults = partial ? "ждут 3 из 12 событий" : null,
+            PartialResultsAt = partial ? D(2026, 11, 21) : null,
+        });
+        db.DiscoveredCompetitions.Add(new DiscoveredCompetition
+        {
+            Id = 70, OrgCompId = 2050, Name = "Многодневка",
+            DateStart = D(2026, 11, 21), DateEnd = D(2026, 11, 23), Status = "imported",
+        });
+        await db.SaveChangesAsync();
+        return db;
+    }
+
+    [Fact]
+    public async Task DayByDay_Partial_IsRunningUntilTheSiteLastDay_DayCountFromSite()
+    {
+        await using var db = await SeedDayByDayAsync(nameof(DayByDay_Partial_IsRunningUntilTheSiteLastDay_DayCountFromSite), partial: true);
+        var repo = new CompetitionAdminRepository(db);
+
+        // 22.11 — в базе последний день уже «прошёл», но по сайту старт идёт: день 2 из 3.
+        var mid = (await repo.GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 22)))
+            .Page.Items.Single().Status!;
+        Assert.Equal(CompetitionRowState.Running, mid.State);
+        Assert.Equal((2, 3), (mid.RunningDay!.Value, mid.DayCount));
+
+        // 24.11 — старт кончился, протокол неполный → ждём протокол.
+        var after = (await repo.GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 24)))
+            .Page.Items.Single().Status!;
+        Assert.Equal(CompetitionRowState.WaitingProtocol, after.State);
+        Assert.Equal(WaitingProtocolReason.Incomplete, after.Reason);
+    }
+
+    [Fact]
+    public async Task DayByDay_WithoutPartialMark_StaysClosed_AsInTheHandoff()
+    {
+        // Вопрос Владу открыт («закрыто или идёт?»); пока правило хэндоффа: в базе = закрыто.
+        await using var db = await SeedDayByDayAsync(nameof(DayByDay_WithoutPartialMark_StaysClosed_AsInTheHandoff), partial: false);
+        var row = (await new CompetitionAdminRepository(db)
+            .GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 22))).Page.Items.Single();
+        Assert.Equal(CompetitionRowState.Closed, row.Status!.State);
+        Assert.Equal(3, row.Status.DayCount); // диапазон всё равно по сайту
+    }
+
+    // ── «✓ имп.» вручную: в базе строки нет, но её закрыл человек ─────────────
+
+    [Fact]
+    public async Task MarkedImportedByHand_IsClosed_AndNotInDebt()
+    {
+        await using var db = CreateDb(nameof(MarkedImportedByHand_IsClosed_AndNotInDebt));
+        db.DiscoveredCompetitions.Add(Site(1, D(2026, 11, 10), status: "imported"));
+        await db.SaveChangesAsync();
+
+        var list = await Get(db, season: 2027);
+        var row = list.Page.Items.Single();
+        Assert.Equal(CompetitionRowState.Closed, row.Status!.State);
+        Assert.True(row.Status.NothingToPull);
+        var s = list.SeasonCounts!.Single();
+        Assert.Equal((1, 0, 1, 0), (s.Total, s.Imported, s.NothingToPull, s.Pending));
+    }
+
+    // ── Один источник для чипа: старый счётчик собран из States ────────────────
+
+    [Fact]
+    public async Task OldChipCounter_ComesFromStates_PartialImportedIsDebtNotImported()
+    {
+        await using var db = await SeedDayByDayAsync(nameof(OldChipCounter_ComesFromStates_PartialImportedIsDebtNotImported), partial: true);
+        db.DiscoveredCompetitions.Add(Site(2, D(2026, 11, 14), empty: D(2026, 11, 15)));
+        await db.SaveChangesAsync();
+
+        var list = await new CompetitionAdminRepository(db)
+            .GetUnifiedAsync(null, null, 2027, null, false, null, 1, 20, today: new DateOnly(2026, 11, 24));
+        var s = list.SeasonCounts!.Single();
+        // Затянутая с «неполные» — долг, а не «затянуто»: затянуто 0 + нечего 1, ждёт 1, всего 2.
+        Assert.Equal((2, 0, 1, 1), (s.Total, s.Imported, s.NothingToPull, s.Pending));
+        Assert.Equal(s.Imported + s.NothingToPull, s.States.Closed);
+        Assert.Equal(s.Pending, s.States.Debt + s.States.AheadTotal);
+        Assert.Equal(list.MonthImported![10] + list.MonthNothingToPull![10], list.MonthStates![10].Closed);
+    }
+
     // ── Редирект после быстрой правки (баг из брифа: терялись discipline и filter) ──
+
+    private static IndexModel NewPage(ICompetitionAdminRepository? repo = null) =>
+        new(repo ?? Mock.Of<ICompetitionAdminRepository>(), Mock.Of<IImportService>(), Mock.Of<IPointRulesAdminRepository>(),
+            Mock.Of<IAdminAuditService>(), new ConfigurationBuilder().Build(),
+            Mock.Of<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>(), NullLogger<IndexModel>.Instance,
+            Mock.Of<ISeriesAdminRepository>(), TimeProvider.System);
+
+    [Theory]
+    [InlineData("2027", 11, true)]   // сезон и месяц — месяц целиком
+    [InlineData("all", 11, false)]   // месяц за все годы — по 20
+    [InlineData(null, 11, false)]
+    [InlineData("2027", null, false)]
+    public void Unpaged_OnlyWithSeasonAndMonth(string? season, int? month, bool unpaged)
+    {
+        var page = NewPage();
+        page.SeasonParam = season;
+        page.Month = month;
+        Assert.Equal(unpaged, page.Unpaged);
+    }
 
     [Fact]
     public async Task QuickSave_RedirectKeepsEveryListParameter()
@@ -157,15 +265,10 @@ public class CompetitionStateCountersTests
         var repo = new Mock<ICompetitionAdminRepository>();
         repo.Setup(r => r.QuickUpdateAsync(It.IsAny<CompetitionQuickEditDto>()))
             .ReturnsAsync(CompetitionSaveResult.Ok(1));
-        var page = new IndexModel(repo.Object, Mock.Of<IImportService>(), Mock.Of<IPointRulesAdminRepository>(),
-            Mock.Of<IAdminAuditService>(), new ConfigurationBuilder().Build(),
-            Mock.Of<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>(), NullLogger<IndexModel>.Instance,
-            Mock.Of<ISeriesAdminRepository>(), TimeProvider.System)
-        {
-            Search = "ליגה", CategoryKey = "results-main", SeasonParam = "2027", Kind = "champ",
-            Discipline = "all", Stage = "OnSite", FilterAlias = "no-results", ShowSynthetic = true,
-            Month = null, PageNumber = 2, State = "waiting", Selected = "c12",
-        };
+        var page = NewPage(repo.Object);
+        page.Search = "ליגה"; page.CategoryKey = "results-main"; page.SeasonParam = "2027"; page.Kind = "champ";
+        page.Discipline = "all"; page.Stage = "OnSite"; page.FilterAlias = "no-results"; page.ShowSynthetic = true;
+        page.Month = null; page.PageNumber = 2; page.State = "waiting"; page.Selected = "c12";
         var http = new DefaultHttpContext();
         http.Request.Method = "POST";
         page.PageContext = new PageContext { HttpContext = http };

@@ -132,6 +132,16 @@ public class CompetitionRowStateRulesTests
     }
 
     [Fact]
+    public void MarkedImportedByHand_IsClosed_Grey_AfterTheDate()
+    {
+        var s = CompetitionRowStateRules.Evaluate(new CompetitionRowStateInput(
+            CompetitionStage.OnSite, Fri, Fri, MarkedImported: true), Fri.AddDays(3));
+        Assert.Equal(CompetitionRowState.Closed, s.State);
+        Assert.True(s.NothingToPull);
+        Assert.Equal(1, CompetitionStateCounts.Zero.Add(s).ClosedNothingToPull);
+    }
+
+    [Fact]
     public void Ignored_IsClosed_Grey()
     {
         var s = CompetitionRowStateRules.Evaluate(

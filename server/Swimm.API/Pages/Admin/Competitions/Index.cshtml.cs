@@ -86,6 +86,12 @@ public class IndexModel : PageModel
     /// <summary>Сегодня по Израилю — граница «впереди / идёт / прошёл».</summary>
     public DateOnly Today { get; private set; }
 
+    /// <summary>
+    /// Без пагинации: выбраны И сезон, И месяц — месяц показывается целиком (10–25 строк). Месяц
+    /// без сезона (<c>season=all&amp;month=</c>) — это тот же месяц за все годы, там обычная «p» по 20.
+    /// </summary>
+    public bool Unpaged => Season != null && Month != null;
+
     /// <summary>Адрес был пустым — подставлены текущий сезон и месяц (хэндофф, раздел 6.1).</summary>
     public bool OpenedOnCurrentMonth { get; private set; }
 
@@ -218,10 +224,11 @@ public class IndexModel : PageModel
             Swimm.Application.Mapping.AutoPullFilters.Blocked or Swimm.Application.Mapping.AutoPullFilters.WouldTake => FilterAlias,
             _ => null
         };
-        // Выбран месяц — он показывается целиком, без пагинации; иначе «p» по 20.
+        // Выбраны сезон И месяц — месяц целиком, без пагинации; иначе (в т.ч. месяц за все годы
+        // при season=all) — «p» по 20.
         var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month,
             PageNumber, PageSize, QualityFilter, Kind, Discipline,
-            state: State, today: Today, unpaged: Month != null);
+            state: State, today: Today, unpaged: Unpaged);
         Result = list.Page;
         MonthCounts = list.MonthCounts;
         MonthImported = list.MonthImported ?? new int[12];
@@ -354,7 +361,7 @@ public class IndexModel : PageModel
         // на POST QualityFilter не разбирается, там идёт сырой filter из адреса формы.
         Put("filter", QualityFilter ?? (Request.Method == HttpMethods.Get ? null : FilterAlias));
         // С месяцем пагинации нет — «p» в адресе был бы мусором.
-        if (withPage && Month == null) Put("p", (Result.Items.Count > 0 ? Result.Page : PageNumber).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (withPage && !Unpaged) Put("p", (Result.Items.Count > 0 ? Result.Page : PageNumber).ToString(System.Globalization.CultureInfo.InvariantCulture));
         if (withSelected) Put("sel", Selected);
         return d;
     }
