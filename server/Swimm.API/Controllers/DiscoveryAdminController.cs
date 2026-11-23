@@ -486,13 +486,14 @@ public class DiscoveryAdminController : ControllerBase
         var discoveredOrgCompId = (await _discovery.GetAllAsync(ct))
             .FirstOrDefault(d => d.Id == entry.DiscoveredId)?.OrgCompId;
 
-        // Обход Р119 — в аудит до постановки в очередь: кто и на какой блок согласился.
+        // Обход Р119 — в аудит до постановки в очередь: кто и на какой блок согласился. Это СОГЛАСИЕ,
+        // а не результат: чем кончился импорт, видно в его журнале («⚠ Р119 обход» — если обход сработал).
         if (eventOptions.AllowCollapsedProtocol && entry.CollapsedProtocol is { } collapsed)
             await _audit.LogAsync("competition.import-collapsed-override", "DiscoveredCompetition",
                 entry.DiscoveredId.ToString(),
-                $"{Swimm.Application.Validation.CollapsedProtocolRule.OverrideMarker}: compID {discoveredOrgCompId}, " +
-                $"файл одной датой {collapsed.FileDate} ({collapsed.FileRows} строк) импортирован при уже " +
-                $"затянутых днях ({collapsed.OtherDaysRows} строк) — «Я проверил — импортировать всё равно»",
+                $"{Swimm.Application.Validation.CollapsedProtocolRule.OverrideMarker}: compID {discoveredOrgCompId} — " +
+                $"разрешён обход Р119, импорт поставлен в очередь (файл одной датой {collapsed.FileDate}, " +
+                $"{collapsed.FileRows} строк; затянутые дни — {collapsed.OtherDaysRows} строк) — «Я проверил — импортировать всё равно»",
                 new
                 {
                     entry.DiscoveredId, OrgCompId = discoveredOrgCompId, collapsed.FileDate, collapsed.FileRows,

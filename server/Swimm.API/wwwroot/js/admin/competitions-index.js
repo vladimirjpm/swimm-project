@@ -1447,9 +1447,14 @@
             function collapsedOverride() {
                 return !!preview?.collapsed && document.getElementById('collapsed-override-cb').checked;
             }
+            /// Р119 держит импорт: протокол свёрнут, галочка «Я проверил» не отмечена. Одна проверка
+            /// для кнопки, подсказки бассейна и подписи шага 6.
+            function collapsedBlocked() {
+                return !!preview?.collapsed && !collapsedOverride();
+            }
             function syncImportButton() {
                 const btn = document.getElementById('btn-import');
-                const blocked = !!preview?.collapsed && !collapsedOverride();
+                const blocked = collapsedBlocked();
                 btn.disabled = !!importHold || blocked;
                 btn.title = importHold
                     ?? (blocked ? 'Протокол свёрнут в одну дату — импорт создал бы дубль уже затянутых дней. Обход — галочка «Я проверил» в красном блоке.' : '');
@@ -1509,7 +1514,9 @@
                 const pool = document.getElementById('flag-pool').value;
                 // Правило то же, что у «Импортировать»: бассейн обязателен, если в файле есть новый день.
                 const poolHint = document.getElementById('pool-hint');
-                poolHint.classList.toggle('hidden', !!pool || !needsPool(f.p) || !!f.p.collapsedProtocol);
+                // Заблокированному свёрнутому протоколу бассейн не нужен; с галочкой обхода строки ложатся
+                // в день с датой файла (у e62 — новый день), и бассейн снова обязателен.
+                poolHint.classList.toggle('hidden', !!pool || !needsPool(f.p) || collapsedBlocked());
                 poolHint.textContent = f.p.existingCompetitionId
                     ? 'в файле есть новый день — выбери бассейн (существующим дням он не меняется)'
                     : 'выбери — без бассейна импорт не начнётся';
@@ -1517,7 +1524,7 @@
                 const left = [];
                 if (!pool && needsPool(f.p)) left.push('бассейн');
                 if (recs) left.push(`${recs} ${recs % 10 === 1 && recs % 100 !== 11 ? 'рекорд' : recs % 10 >= 2 && recs % 10 <= 4 && (recs % 100 < 12 || recs % 100 > 14) ? 'рекорда' : 'рекордов'}`);
-                if (f.p.collapsedProtocol && !collapsedOverride()) {
+                if (collapsedBlocked()) {
                     pullFlow.setCaption(6, 'импорт заблокирован: протокол свёрнут в одну дату, эти результаты уже затянуты днями события');
                     return;
                 }
