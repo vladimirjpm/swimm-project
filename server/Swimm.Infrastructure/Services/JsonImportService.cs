@@ -628,11 +628,12 @@ public class JsonImportService : IImportService
             var poolType = NormalizePoolType(eventOptions?.PoolType ?? item.PoolType);
             var compKey = ImportCompetitionMatcher.Key(displayName, item.Date ?? string.Empty, poolType);
 
-            // Д2: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
-            // разошлось. Кладём находку в кэш под именным ключом, чтобы весь дальнейший
-            // цикл (upsert-пометка, категории, touched) работал как обычно.
-            if (linkedDaysByDate.TryGetValue(item.Date ?? string.Empty, out var linkedDay))
-                competitionCache.TryAdd(compKey, linkedDay);
+            // Д2/Р117: день, привязанный к тому же compID, узнаём ПО ДАТЕ — даже если название
+            // или бассейн разошлись; правило общее с превью (ImportCompetitionMatcher.MatchDay).
+            // Кладём находку в кэш под именным ключом, чтобы весь дальнейший цикл
+            // (upsert-пометка, категории, touched) работал как обычно.
+            if (ImportCompetitionMatcher.MatchDay(linkedDaysByDate, competitionCache, item.Date, compKey) is { } matched)
+                competitionCache[compKey] = matched;
 
             // Соревнование уже есть (перезатягивание, дописывание дня): флаги из превью —
             // свежее решение человека, применяем и к нему. Не заданные (null) не трогаем.
@@ -1822,15 +1823,19 @@ public class JsonImportService : IImportService
     /// Name = имя события, а исходно распарсенный заголовок уходит в SubName — поэтому матчим и по
     /// нему тоже, иначе превью не находит уже существующие дни переименованного события (см. кейс
     /// "Maccabiah 2025 -" в SubName при Name="Maccabiah 2026"). Пустой/неизвестный PoolType дня
-    /// пропускается (ключ неполон — матч ненадёжен).
+    /// пропускает поиск по имени (ключ неполон — матч ненадёжен). С compID (Р117) сперва — дни этого
+    /// compID по дате, тем же <see cref="ImportCompetitionMatcher.MatchDay"/>, что и импорт.
     /// </summary>
-    public async Task<List<ExistingCompetitionMatch>> FindExistingCompetitionsAsync(IReadOnlyList<ParsedCompetitionSummary> competitions)
+    public async Task<List<ExistingCompetitionMatch>> FindExistingCompetitionsAsync(
+        IReadOnlyList<ParsedCompetitionSummary> competitions, int? orgCompId = null)
     {
         var result = new List<ExistingCompetitionMatch>();
         if (competitions.Count == 0) return result;
 
+        // Проекция в Competition (а не анонимный тип): индекс по compID строится из тех же
+        // сущностей, что у импорта, и обе половины правила MatchDay — одного типа.
         var existing = await _db.Competitions.AsNoTracking()
-            .Select(c => new { c.Id, c.Name, c.SubName, c.Date, c.PoolType })
+            .Select(c => new Competition { Id = c.Id, Name = c.Name, SubName = c.SubName, Date = c.Date, PoolType = c.PoolType })
             .ToListAsync();
         var resultCounts = await _db.Results.AsNoTracking()
             .GroupBy(r => r.CompetitionId)
@@ -1844,17 +1849,22 @@ public class JsonImportService : IImportService
         var byKey = ImportCompetitionMatcher.BuildIndex(
             existing, c => c.Name, c => c.SubName, c => c.Date, c => c.PoolType);
 
+        // Д2/Р117: дни того же compID по дате — первыми, как в импорте (LoadReferenceCachesAsync).
+        var linkedDaysByDate = orgCompId is int oc
+            ? ImportCompetitionMatcher.BuildDateIndex(
+                await CompetitionIdentity.ResolveDaysAsync(_db, oc),
+                c => c.Date)
+            : new Dictionary<string, Competition>();
+
         foreach (var day in competitions)
         {
-            (int Id, string Name)? found = null;
-            if (!string.IsNullOrWhiteSpace(day.PoolType))
-            {
-                var key = ImportCompetitionMatcher.Key(day.Competition, day.Date, NormalizePoolType(day.PoolType));
-                if (byKey.TryGetValue(key, out var m))
-                    found = (m.Id, m.Name);
-            }
-            int? existingResultCount = found.HasValue
-                ? resultCounts.GetValueOrDefault(found.Value.Id, 0)
+            // Неизвестный бассейн — ключ по имени неполон (матч ненадёжен), но compID по дате работает.
+            var key = string.IsNullOrWhiteSpace(day.PoolType)
+                ? null
+                : ImportCompetitionMatcher.Key(day.Competition, day.Date, NormalizePoolType(day.PoolType));
+            var found = ImportCompetitionMatcher.MatchDay(linkedDaysByDate, byKey, day.Date, key);
+            int? existingResultCount = found != null
+                ? resultCounts.GetValueOrDefault(found.Id, 0)
                 : null;
             result.Add(new ExistingCompetitionMatch(day.Competition, day.Date, found?.Id, found?.Name, existingResultCount));
         }
