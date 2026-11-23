@@ -51,6 +51,30 @@ public class BulkPullClassifierTests
         Assert.Empty(reasons);
     }
 
+    private const string B4Message = "Парсер не распознал ни одного результата — формат протокола изменился? (B4)";
+
+    [Fact]
+    public void B4_ParserRecognisedNothing_IsFailed_NotEmpty()
+    {
+        // B4 — поломка разбора (23.11.2026), а не «тянуть нечего»: в пачке 🔴, не ⚪.
+        var (verdict, reasons) = BulkPullClassifier.Classify(
+            DiscoveryPreviewResult.Failed(B4Message), regulation: null, isChampionshipByName: false);
+
+        Assert.Equal(BulkPullVerdict.Failed, verdict);
+        Assert.Equal([B4Message], reasons);
+    }
+
+    [Theory]
+    [InlineData("No competitions found in PDF (language=he).")]
+    [InlineData("PDF: 0 lines extracted")]
+    public void EmptyPdf_StaysEmpty(string message)
+    {
+        var (verdict, _) = BulkPullClassifier.Classify(
+            DiscoveryPreviewResult.Failed(message), regulation: null, isChampionshipByName: false);
+
+        Assert.Equal(BulkPullVerdict.Empty, verdict);
+    }
+
     [Fact]
     public void NeedsReview_WhenFileBreaksEvenOneRecord()
     {

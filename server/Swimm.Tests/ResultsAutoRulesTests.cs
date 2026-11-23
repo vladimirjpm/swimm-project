@@ -248,6 +248,18 @@ public class ResultsAutoRulesTests
     }
 
     [Fact]
+    public void B4_ParserRecognisedNothing_IsFailed_NotEmpty()
+    {
+        // Вердикт автопроверки строится от классификатора: B4 (формат изменился?) — «сбой разбора».
+        const string b4 = "Парсер не распознал ни одного результата — формат протокола изменился? (B4)";
+        var (cv, reasons) = Swimm.Application.Validation.BulkPullClassifier.Classify(
+            DiscoveryPreviewResult.Failed(b4), regulation: null, isChampionshipByName: false);
+        var d = ResultsAutoRules.Decide(Clean(cv, reasons.ToList()));
+        Assert.Equal(ResultsAutoVerdicts.Failed, d.Verdict);
+        Assert.Equal(b4, d.ReasonText);
+    }
+
+    [Fact]
     public void Failure_reason_keeps_first_line_only()
     {
         // Так парсер отдаёт пустой PDF loglig (сухой прогон П5, compID 16859): сообщение + отладочный лог.
