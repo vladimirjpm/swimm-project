@@ -163,7 +163,15 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         // ради той же шкалы) был бы лишним.
         var standingProbe = await ProbeClubStandingAsync(discoveredId, ct);
 
-        var existingMatches = await _import.FindExistingCompetitionsAsync(parsed.Competitions);
+        // compID строки «Входящих» — то же сопоставление, что сделает импорт (Р118): без него
+        // превью не узнаёт затянутый день с разошедшимся именем/бассейном, «Перезатянуть» не
+        // взводит перезапись, а импорт находит день по compID и откатывается «Дублем».
+        var orgCompId = await _discovery.GetOrgCompIdAsync(discoveredId, ct);
+        var existingMatches = await _import.FindExistingCompetitionsAsync(parsed.Competitions, orgCompId);
+        // «Имя → одно соревнование, compID → другое» и неоднозначная дата compID — админу в превью.
+        var matchWarnings = existingMatches.Select(m => m.MatchWarning).OfType<string>().Distinct().ToList();
+        if (matchWarnings.Count > 0)
+            parsed = parsed with { Warnings = [.. parsed.Warnings, .. matchWarnings] };
         var existingCompetitionId = existingMatches.FirstOrDefault(m => m.ExistingCompetitionId != null)?.ExistingCompetitionId;
 
         // Сколько рекордов побьёт файл (Б2). Считается ДО «Применить»: настоящий рекорд —

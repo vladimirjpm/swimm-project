@@ -1,3 +1,5 @@
+using Swimm.Domain.Entities;
+
 namespace Swimm.Infrastructure.Services;
 
 /// <summary>
@@ -70,4 +72,82 @@ internal static class ImportCompetitionMatcher
         }
         return byDate;
     }
+
+    /// <summary>
+    /// Индекс дней compID ПО ДАТЕ для <see cref="MatchDay"/> (Д2) — с двумя защитами (Р118):
+    /// <list type="bullet">
+    /// <item>день со СВОИМ штампом <c>OrgCompId</c>, не равным текущему compID, не берётся: событие
+    /// из окружных протоколов (на проде e1, e7, e10, e12) держит под одним <c>EventId</c> дни
+    /// разных compID, и <see cref="CompetitionIdentity.ResolveDaysAsync"/> отдаёт их все;</item>
+    /// <item>дата, на которую пришлось больше одного дня, неоднозначна — по compID не
+    /// сопоставляется вовсе (порядок строк без OrderBy случаен, «первый попавшийся» опасен),
+    /// дата уходит в <paramref name="ambiguousDates"/> для предупреждения;</item>
+    /// <item>то же со стороны файла: если в файле на одну дату несколько «дней» (разные заголовки
+    /// <paramref name="fileDays"/>, файл без события), по дате их не различить — иначе все части
+    /// легли бы в один день.</item>
+    /// </list>
+    /// </summary>
+    public static Dictionary<string, Competition> BuildLinkedDayIndex(
+        IEnumerable<Competition> days, int orgCompId,
+        IEnumerable<(string Name, string Date)> fileDays, out HashSet<string> ambiguousDates)
+    {
+        var fileAmbiguous = fileDays
+            .GroupBy(d => d.Date)
+            .Where(g => g.Select(d => d.Name).Distinct().Count() > 1)
+            .Select(g => g.Key)
+            .ToHashSet();
+        ambiguousDates = [];
+        var byDate = new Dictionary<string, Competition>();
+        foreach (var group in days
+                     .Where(d => d.OrgCompId is null || d.OrgCompId == orgCompId)
+                     .Where(d => !string.IsNullOrWhiteSpace(d.Date))
+                     .GroupBy(d => d.Date))
+        {
+            var list = group.ToList();
+            // Предупреждаем только о датах, где в базе ЕСТЬ дни этого compID: иначе сопоставлять и нечего.
+            if (list.Count == 1 && !fileAmbiguous.Contains(group.Key)) byDate[group.Key] = list[0];
+            else ambiguousDates.Add(group.Key);
+        }
+        return byDate;
+    }
+
+    /// <summary>
+    /// ЕДИНСТВЕННОЕ правило «этот день файла — уже существующее соревнование» для превью
+    /// (<c>FindExistingCompetitionsAsync</c>) и импорта (<c>ResolveCompetitionAsync</c>), Р118.
+    /// Порядок — тот же, что был у импорта с Д2: сперва ключ (Name|SubName)|Date|PoolType,
+    /// и только при промахе — день того же compID по дате (имя и бассейн не важны).
+    /// <paramref name="nameKey"/> = null — ключ неполон (бассейн неизвестен), по имени не ищем.
+    ///
+    /// Ключ указал на X, а compID по дате — на другой Y: берётся X (имя надёжнее штампа, который
+    /// мог встать ошибочно), Y отдаётся в <paramref name="divergentLinked"/> для предупреждения.
+    ///
+    /// До Р118 превью смотрело только ключ: у c1973 (compID 16926) бассейн в базе 50m, а парсер
+    /// без указания в протоколе ставит 25m → превью «не нашло», «Перезатянуть» не взводило
+    /// перезапись, а импорт находил день по compID и падал «Дублем».
+    /// </summary>
+    public static Competition? MatchDay(
+        IReadOnlyDictionary<string, Competition> linkedDaysByDate,
+        IReadOnlyDictionary<string, Competition> byKey,
+        string? date,
+        string? nameKey,
+        out Competition? divergentLinked)
+    {
+        divergentLinked = null;
+        linkedDaysByDate.TryGetValue(date ?? string.Empty, out var linked);
+        if (nameKey != null && byKey.TryGetValue(nameKey, out var byName))
+        {
+            if (linked != null && linked.Id != byName.Id) divergentLinked = linked;
+            return byName;
+        }
+        return linked;
+    }
+
+    /// <summary>Текст предупреждения: ключ и compID указали на разные соревнования.</summary>
+    public static string DivergenceWarning(string? date, Competition byName, Competition linked, int? orgCompId) =>
+        $"⚠ День {date}: по имени, дате и бассейну найдено соревнование #{byName.Id} «{byName.Name}», " +
+        $"а по compID {orgCompId} — другое, #{linked.Id} «{linked.Name}». Взято #{byName.Id}; проверь штамп OrgCompId.";
+
+    /// <summary>Текст предупреждения: на дату пришлось несколько дней compID.</summary>
+    public static string AmbiguousDateWarning(string date, int orgCompId) =>
+        $"⚠ compID {orgCompId}: на {date} несколько дней (в базе или в файле) — по compID этот день не сопоставлен, только по имени, дате и бассейну.";
 }
