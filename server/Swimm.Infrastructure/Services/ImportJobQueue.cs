@@ -33,7 +33,8 @@ public sealed class ImportJobQueue : IImportJobQueue
         {
             JobId = jobId,
             State = ImportJobState.Queued,
-            QueuedAt = DateTimeOffset.UtcNow
+            QueuedAt = DateTimeOffset.UtcNow,
+            OrgCompId = orgCompId
         };
         _statuses[jobId] = status;
         // У неограниченного канала TryWrite отказывает только после закрытия писателя (его никто
@@ -76,6 +77,13 @@ public sealed class ImportJobQueue : IImportJobQueue
             s.Result = result;
             s.CompletedAt = DateTimeOffset.UtcNow;
         }
+    }
+
+    /// <summary>Ход автодоклейки промежуточных (пост-шаг после импорта); null снимает.</summary>
+    public void SetSplits(Guid jobId, ImportSplitsStatus? splits)
+    {
+        if (_statuses.TryGetValue(jobId, out var s))
+            s.Splits = splits;
     }
 
     public void SetFailed(Guid jobId, string error)

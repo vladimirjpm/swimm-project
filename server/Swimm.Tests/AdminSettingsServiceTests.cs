@@ -42,7 +42,8 @@ public class AdminSettingsServiceTests
         // + SwimmerClubCheckEnabled/SwimmerClubCheckIntervalHours (сверка смены клуба с loglig, Р98, 2026-11-18)
         // + StartListIntervalHours (свой шаг обхода стартовых протоколов, П3, 2026-11-20)
         // + ResultsAutoMode/ResultsAutoEnabled/ResultsAutoIntervalHours (results-auto, П5, 2026-11-20)
-        Assert.Equal(42, all.Count);
+        // + SplitAttachOnImport (доклейка промежуточных сама после импорта, 2026-11-23)
+        Assert.Equal(43, all.Count);
     }
 
     [Fact]

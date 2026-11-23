@@ -96,7 +96,10 @@ public class SplitAttachService : ISplitAttachService
         var message = apply
             ? $"{source.Message}. {plan.Report}"
             : $"{source.Message}. СУХОЙ ПРОГОН (ничего не записано). {plan.Report}";
-        return new SplitAttachResult(apply, loglig, dayRows, plan.Report, message);
+        return new SplitAttachResult(apply, loglig, dayRows, plan.Report, message)
+        {
+            SourceIncomplete = source.Incomplete,
+        };
     }
 
     /// <summary>

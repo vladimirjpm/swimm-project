@@ -34,6 +34,8 @@ public sealed class CompetitionListItemDto : ICompetitionFlags
     public bool IsAward { get; set; }
     /// <summary>Чемпионат Израиля (ручной флаг).</summary>
     public bool IsChampionship { get; set; }
+    /// <summary>«⏱ Есть промежуточные» — ставит доклейка (кнопкой или сама после импорта); шаг 9 чек-листа.</summary>
+    public bool HasSplits { get; set; }
     public bool ShowCombineAllResults { get; set; }
     /// <summary>Клубный зачёт тут не ведётся — правило очков и не нужно.</summary>
     public bool ClubPointsDisabled { get; set; }

@@ -8,7 +8,14 @@ namespace Swimm.Application.Abstractions;
 /// </summary>
 /// <param name="Message">Что удалось скачать и разобрать — строкой в отчёт.</param>
 public sealed record SplitSource(
-    IReadOnlyList<SplitSourceTeam> Teams, IReadOnlyList<SplitSourceSwim> Swims, string Message);
+    IReadOnlyList<SplitSourceTeam> Teams, IReadOnlyList<SplitSourceSwim> Swims, string Message)
+{
+    /// <summary>
+    /// Часть источника не прочиталась (сеть, 504 loglig): пустые списки тогда значат «не знаем», а
+    /// не «промежуточных нет». Пропуск дисциплины без PDF у loglig — не сюда: там знаем, что нет.
+    /// </summary>
+    public bool Incomplete { get; init; }
+}
 
 /// <summary>
 /// Источник промежуточных для доклейки БЕЗ переимпорта. Отдельный порт от
@@ -28,6 +35,9 @@ public sealed record SplitAttachDay(int CompetitionId, string Name, string Date,
 public sealed record SplitAttachResult(
     bool Applied, int LogligId, IReadOnlyList<SplitAttachDay> Days, SplitAttachReport Report, string Message)
 {
+    /// <summary>Источник прочитан не полностью (<see cref="SplitSource.Incomplete"/>).</summary>
+    public bool SourceIncomplete { get; init; }
+
     public static SplitAttachResult Failed(string message) =>
         new(false, 0, [], new SplitAttachReport(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), message);
 }

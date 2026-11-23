@@ -342,6 +342,9 @@ public static class DependencyInjection
         services.AddScoped<ISwimmerMergeService, SwimmerMergeService>();
         services.AddScoped<IRelayMemberBackfillService, RelayMemberBackfillService>();
         services.AddScoped<ISplitAttachService, SplitAttachService>();
+        // Та же доклейка сама после импорта + итог последней доклейки дня для чек-листа (23.11.2026).
+        services.AddScoped<ISplitAutoAttachService, SplitAutoAttachService>();
+        services.AddScoped<ISplitAttachJournal, SplitAttachJournal>();
         services.AddScoped<IRelayLegCleanupService, RelayLegCleanupService>();
         services.AddScoped<ISwimmerDedupService, SwimmerDedupService>();
 

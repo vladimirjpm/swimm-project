@@ -313,7 +313,10 @@ public class AdminController : ControllerBase
             queuedAt = status.QueuedAt,
             completedAt = status.CompletedAt,
             result = status.Result,
-            error = status.Error
+            error = status.Error,
+            // Автодоклейка промежуточных — идёт ПОСЛЕ completed (шаг 9 чек-листа ждёт её отдельно);
+            // null — не ставилась.
+            splits = status.Splits
         });
     }
 

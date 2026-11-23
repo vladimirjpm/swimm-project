@@ -711,8 +711,15 @@
             var suspects = comp?.SuspectCount ?? (day == null ? db?.SuspectCount ?? 0 : 0);
             // Р114 — текст отметки (у дня — своей); Р115 — у всей строки.
             var incomplete = db == null ? null : comp?.PartialResults ?? r115;
+            // Промежуточные (шаг 9): идёт ли автодоклейка за импортом, итог последней доклейки дня
+            // из аудита, флаг HasSplits — SplitAutoAttachRules.Caption.
+            var splitNote = comp != null && Model.SplitNotes.TryGetValue(comp.Id, out var sn) ? sn : null;
+            var splitPending = db != null && (comp?.OrgCompId ?? s?.OrgCompId) is int spOc && Model.SplitsPendingOrgCompIds.Contains(spOc);
+            var splitCaption = db == null ? null
+                : Swimm.Application.Mapping.SplitAutoAttachRules.Caption(splitNote, comp?.HasSplits == true, splitPending);
+            var splitsFailed = !splitPending && splitNote?.Kind == Swimm.Application.Mapping.SplitAutoKind.Failed;
             // Строк в базе нет — проверять нечего: шаг 8 не «текущий».
-            var input = baseInput with { QualityScanned = scanned != null || (db != null && results == 0), SuspectCount = suspects, Incomplete = incomplete != null };
+            var input = baseInput with { QualityScanned = scanned != null || (db != null && results == 0), SuspectCount = suspects, Incomplete = incomplete != null, SplitsFailed = splitsFailed };
             var none = Swimm.Application.Mapping.CompetitionChecklistRules.Build(input);
 
             (string Text, string? Title, bool Danger) Step5()
@@ -751,7 +758,9 @@
                     : db != null ? "быстрая правка: категории, флаги, бассейн, очки" : "бассейн, рекорды, флаги, категории, очки, событие", none[5]),
                 new(7, "Импорт", db != null ? "в базе" : "1–5 минут, в фоне", none[6]),
                 new(8, "Проверка качества", s8, none[7]),
-                new(9, "После импорта", "Синхр. языки · Loglig-id · Промежуточные", none[8]),
+                splitCaption is { } sc9
+                    ? new(9, "После импорта", sc9.Text, none[8], sc9.Title, sc9.Danger)
+                    : new(9, "После импорта", "Синхр. языки · Loglig-id · Промежуточные", none[8]),
             };
             return new(day, label, steps, Phases(input), incomplete, results, scanned, suspects);
         }

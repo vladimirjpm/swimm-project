@@ -27,12 +27,17 @@ public class IndexModel : PageModel
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<IndexModel> _logger;
     private readonly ISeriesAdminRepository _series;
+    private readonly ISplitAttachJournal? _splitJournal;
+    private readonly IImportJobQueue? _jobs;
 
     public IndexModel(ICompetitionAdminRepository repo,
         IPointRulesAdminRepository rules, IAdminAuditService audit,
         IConfiguration config, IWebHostEnvironment env, ILogger<IndexModel> logger,
-        ISeriesAdminRepository series, TimeProvider time)
+        ISeriesAdminRepository series, TimeProvider time,
+        ISplitAttachJournal? splitJournal = null, IImportJobQueue? jobs = null)
     {
+        _splitJournal = splitJournal;
+        _jobs = jobs;
         _time = time;
         _series = series;
         _repo = repo;
@@ -278,7 +283,37 @@ public class IndexModel : PageModel
         ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
         SwimmerRules = await _rules.GetAllAsync(PointRuleKind.Swimmers);
         SeriesWithPhrases = (await _series.GetAllAsync()).Where(x => !string.IsNullOrEmpty(x.MatchPhrases)).ToList();
+        await LoadSplitsAsync();
         return Page();
+    }
+
+    /// <summary>Итог последней доклейки промежуточных по дню (аудит) — подпись шага 9.</summary>
+    public IReadOnlyDictionary<int, SplitAttachNote> SplitNotes { get; private set; } = new Dictionary<int, SplitAttachNote>();
+
+    /// <summary>compID, чья доклейка после импорта ещё идёт (очередь импорта в памяти этого процесса).</summary>
+    public IReadOnlySet<int> SplitsPendingOrgCompIds { get; private set; } = new HashSet<int>();
+
+    /// <summary>
+    /// Шаг 9 «После импорта»: итог автодоклейки переживает перезагрузку через аудит
+    /// (<c>competition.attach-splits</c>, пишется у автозапуска всегда — и при «нечего», и при сбое),
+    /// а «идёт сейчас» — из очереди импорта: страница перезагружается по Completed импорта, когда
+    /// доклейка за ним ещё качает loglig.
+    /// </summary>
+    private async Task LoadSplitsAsync()
+    {
+        if (_splitJournal != null)
+        {
+            var ids = Result.Items
+                .Where(u => u.Db != null)
+                .SelectMany(u => u.Db!.IsEvent ? u.Db.Days.Select(d => d.Id) : u.Db.Single != null ? new[] { u.Db.Single.Id } : Array.Empty<int>())
+                .ToList();
+            SplitNotes = await _splitJournal.GetLatestAsync(ids);
+        }
+        if (_jobs != null)
+            SplitsPendingOrgCompIds = _jobs.Snapshot()
+                .Where(j => j.OrgCompId != null && j.Splits is { State: "queued" or "running" })
+                .Select(j => j.OrgCompId!.Value)
+                .ToHashSet();
     }
 
     /// <summary>
