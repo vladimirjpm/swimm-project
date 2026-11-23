@@ -169,6 +169,61 @@ public class BulkPullSelectionTests
         Assert.True(BulkPullSelection.Offer([r115]).IsEmpty);
     }
 
+    // ── сервер перепроверяет строки кнопки на момент клика ─────────────────────
+
+    /// <summary>
+    /// Вкладка простояла час: присланные id перепроверяются тем же правилом на сейчас (настоящий
+    /// репозиторий списка). Каждый отсекаемый случай — отдельная строка; проходит только «ждёт».
+    /// </summary>
+    [Theory]
+    [InlineData("ready", true)]
+    [InlineData("marked-imported", false)]   // «✓ имп.»: Status=imported без строки в базе
+    [InlineData("empty-source", false)]      // «∅ нет протокола»
+    [InlineData("moved-ahead", false)]       // перенесли — стал «впереди»
+    [InlineData("running", false)]           // идёт
+    [InlineData("verdict-not-finished", false)]
+    [InlineData("verdict-empty", false)]
+    [InlineData("verdict-failed", false)]
+    [InlineData("ignored", false)]           // скрыто
+    [InlineData("in-db", false)]             // затянуто (связано с базой по ID федерации)
+    public async Task Service_RechecksEachRow_WithTheSameRule(string kind, bool taken)
+    {
+        var now = DateTime.UtcNow.Date;
+        var past = DateTime.SpecifyKind(now.AddDays(-10), DateTimeKind.Utc);
+        var site = Site(1, past);
+        switch (kind)
+        {
+            case "marked-imported": site.Status = "imported"; break;
+            case "empty-source": site.EmptySourceAt = past.AddDays(1); break;
+            case "moved-ahead": site.DateStart = site.DateEnd = DateTime.SpecifyKind(now.AddDays(5), DateTimeKind.Utc); break;
+            case "running":
+                site.DateStart = DateTime.SpecifyKind(now.AddDays(-2), DateTimeKind.Utc);
+                site.DateEnd = DateTime.SpecifyKind(now.AddDays(2), DateTimeKind.Utc);
+                break;
+            case "verdict-not-finished": site.AutoPullVerdict = ResultsAutoVerdicts.NotFinished; break;
+            case "verdict-empty": site.AutoPullVerdict = ResultsAutoVerdicts.Empty; break;
+            case "verdict-failed": site.AutoPullVerdict = ResultsAutoVerdicts.Failed; break;
+            case "ignored": site.Status = "ignored"; break;
+        }
+
+        var db = new SwimmDbContext(new DbContextOptionsBuilder<SwimmDbContext>()
+            .UseInMemoryDatabase(nameof(Service_RechecksEachRow_WithTheSameRule) + kind).Options);
+        db.DiscoveredCompetitions.Add(site);
+        if (kind == "in-db")
+            db.Competitions.Add(new Competition { Id = 7, Name = site.Name, Date = past.ToString("dd/MM/yyyy"), PoolType = "25m", OrgCompId = site.OrgCompId });
+        await db.SaveChangesAsync();
+
+        // Вкладка видела строку «ждёт» — в пачку она пришла по кнопке; DTO «Входящих» — как был при показе.
+        var (service, _, previews) = BulkPullServiceTests.Build(new CompetitionAdminRepository(db),
+            BulkPullServiceTests.Row(1, site.Name));
+        var batch = await service.StartAsync([1], includeChampionships: false);
+        await BulkPullServiceTests.WaitFinishedAsync(service, batch.BatchId);
+
+        Assert.Equal(taken ? 1 : 0, batch.Total);
+        Assert.Equal(taken ? [1] : [], previews.Pulled);
+        Assert.Equal(taken ? 0 : 1, batch.SkippedNotReady!.Count);
+    }
+
     // ── страница: где кнопки есть ────────────────────────────────────────────
 
     private static ISeriesAdminRepository Series()

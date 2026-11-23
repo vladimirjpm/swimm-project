@@ -116,8 +116,10 @@ public class IndexModel : PageModel
     public IReadOnlyList<ReadyToPullDay<UnifiedCompetitionRowDto>> ReadyToPullByDay { get; private set; } = [];
 
     /// <summary>
-    /// Кнопка «Затянуть за месяц (N)» — только когда выбран месяц сезона (месяц виден целиком);
-    /// null — месяца нет (поиск, filter=, весь сезон, все сезоны): кнопки нет (хэндофф 4).
+    /// Кнопка «Затянуть за месяц (N)» — когда выбраны сезон И месяц (<see cref="Unpaged"/>: месяц виден
+    /// целиком). Прочие фильтры (дисциплина, filter=, stage, state…) при этом сужают выборку, и кнопка
+    /// берёт отфильтрованное подмножество месяца — число на ней честное. null — месяца сезона нет
+    /// (поиск переводит на все сезоны, весь сезон, season=all): кнопки нет (хэндофф 4).
     /// Отбор — <see cref="BulkPullSelection"/>, тот же, что у кнопок дней.
     /// </summary>
     public BulkPullOffer? MonthBulk { get; private set; }

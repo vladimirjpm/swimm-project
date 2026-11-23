@@ -639,6 +639,11 @@
             const KEY = 'admin-bulk-pull-batch';
             const META_KEY = 'admin-bulk-pull-meta';   // { label, n, ids } — что было на кнопке
             const SHOWN_KEY = 'admin-bulk-pull-shown'; // '1' — пачка была открыта справа
+            // Состояние пользователя, которое должно пережить F5 и автоперезагрузку после импорта:
+            // { checks: {id: bool} — галочки, которые трогали руками; seen: {id: ms} — когда строка
+            // впервые пришла затянутой (превью живёт 60 минут); importResult: ответ bulk-import }.
+            const STATE_KEY = 'admin-bulk-pull-state';
+            const PREVIEW_TTL_MS = 60 * 60 * 1000;
             const panel = document.getElementById('panel-bulk');
             if (!panel) return null;
 
@@ -649,6 +654,11 @@
             const importBtn = document.getElementById('bulk-import-btn');
             const importOut = document.getElementById('bulk-import-result');
             const strip = document.getElementById('bulk-strip');
+            // Строка «связь потеряна» — над ходом пачки; заводится тут, разметку не трогаем.
+            const netNote = document.createElement('div');
+            netNote.className = 'mb-2 hidden text-[12.5px] text-admin-warning';
+            progress.before(netNote);
+            let restoredShown = false;
             const stripText = document.getElementById('bulk-strip-text');
             const champBox = document.getElementById('bulk-include-champ');
             const offers = [...document.querySelectorAll('.bulk-offer')];
@@ -663,6 +673,17 @@
             try { meta = JSON.parse(ss.get(META_KEY) ?? 'null'); } catch { meta = null; }
             let last = null;          // последний статус пачки с сервера
             let sawPending = false;   // в этой загрузке видели импорт в ходе — по его концу обновить список
+            // Окна без ответа сервера считаются «пачка идёт»: от клика до ответа POST (иначе второй
+            // клик по другой кнопке поставил бы вторую пачку) и после F5 до ответа GET (иначе
+            // запреты пусты, пока статус не пришёл).
+            let starting = false;
+            let restoring = !!batchId;
+            let state = {};
+            try { state = JSON.parse(ss.get(STATE_KEY) ?? '{}') ?? {}; } catch { state = {}; }
+            state.checks ??= {}; state.seen ??= {};
+            const saveState = () => ss.set(STATE_KEY, JSON.stringify(state));
+            const expired = r => !!r.previewId && !r.queued && state.seen[r.discoveredId]
+                && Date.now() - state.seen[r.discoveredId] > PREVIEW_TTL_MS;
 
             function esc(v) {
                 return String(v ?? '').replace(/[&<>"']/g, c =>
@@ -674,7 +695,11 @@
                 const res = await fetch(url, { credentials: 'same-origin', ...opts });
                 let body = null;
                 try { body = await res.json(); } catch { /* пустое тело */ }
-                if (!res.ok) throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+                if (!res.ok) {
+                    const err = new Error(body?.error ?? `${res.status} ${res.statusText}`);
+                    err.status = res.status;
+                    throw err;
+                }
                 return body;
             }
 
@@ -688,6 +713,8 @@
                 Failed:       { icon: '🔴', label: 'ошибка',         checked: false, cls: 'text-admin-danger' }
             };
             const QUEUED = { icon: '✓', label: 'отправлено в импорт', checked: false, cls: 'text-admin-success' };
+            // Разбор строки на сервере живёт 60 минут; дальше импортировать её из пачки нечем.
+            const EXPIRED = { icon: '⌛', label: 'разбор истёк — затяни заново', checked: false, cls: 'text-admin-text-muted' };
             const SPIN = '<span class="admin-spinner mr-1 size-3 align-middle"></span>';
 
             // Ход импорта отправленной строки (поле importState с сервера, 08.10.2026). null —
@@ -710,7 +737,7 @@
             const POOL_SOURCE = { venue: ' (справочник бассейнов)', default: ' (умолчание лиг)' };
 
             const running = b => !!b && !b.finished;
-            const busy = () => running(last) || !!last?.importsPending;
+            const busy = () => starting || restoring || running(last) || !!last?.importsPending;
             // Строки пачки, которые ещё можно импортировать из неё (или ещё тянутся): одиночное
             // «Затянуть» для них запрещено — иначе один старт ушёл бы в импорт дважды.
             function heldIds() {
@@ -720,22 +747,34 @@
                     const r = pulled.get(id);
                     if (!r) return !last.finished;              // ещё не затянута
                     if (r.queued) return r.importState === 'queued' || r.importState === 'running';
-                    return !!r.previewId;                        // затянута, ждёт решения
+                    return !!r.previewId && !expired(r);         // затянута, ждёт решения (разбор жив)
                 }).map(String));
             }
 
             function renderRows(rows) {
                 if (!rows.length) { rowsBox.innerHTML = ''; return; }
+                // Импорт из пачки уже был: оставшиеся строки по умолчанию СНЯТЫ — то, что не ушло
+                // с первым импортом, сознательно оставили (ревью PR #266).
+                const imported = rows.some(r => r.queued);
+                let stamped = false;
+                rows.forEach(r => {
+                    if (r.previewId && !state.seen[r.discoveredId]) { state.seen[r.discoveredId] = Date.now(); stamped = true; }
+                });
+                if (stamped) saveState();
                 const body = rows.map(r => {
                     // Уже отправленная в импорт строка — не предложение: разбор отдан очереди,
                     // повторно импортировать нечем. Без этого после перезагрузки страницы
                     // строки рисовались отмеченными, и пачка выглядела свежей (06.10.2026).
-                    const v = r.queued ? QUEUED : (VERDICTS[r.verdict] ?? VERDICTS.Failed);
-                    const canImport = !!r.previewId && !r.queued;
-                    // Галочку, которую админ уже трогал, перерисовка сохраняет: поллинг идёт
-                    // каждые 2 секунды, и снятые вручную отметки не должны возвращаться.
+                    const old = expired(r);
+                    const v = r.queued ? QUEUED : old ? EXPIRED : (VERDICTS[r.verdict] ?? VERDICTS.Failed);
+                    const canImport = !!r.previewId && !r.queued && !old;
+                    // Галочку, которую админ уже трогал, перерисовка сохраняет — и при опросе раз в
+                    // 2 секунды, и после F5 / автоперезагрузки (state.checks в sessionStorage).
                     const prev = rowsBox.querySelector(`input.bulk-row[value="${r.discoveredId}"]`);
-                    const checked = prev ? prev.checked : (v.checked && canImport);
+                    const stored = state.checks[r.discoveredId];
+                    const checked = canImport && (prev ? prev.checked
+                        : stored !== undefined ? stored
+                        : v.checked && !imported);
                     const reasons = (r.reasons || []).map(x => esc(x)).join('<br>');
                     const reg = r.regulationUrl
                         ? `<a href="${esc(r.regulationUrl)}" target="_blank" rel="noopener" class="text-admin-accent hover:underline">תקנון ↗</a>`
@@ -772,6 +811,15 @@
                 updateImportBtn();
             }
 
+            function paintImportResult() {
+                const r = state.importResult;
+                if (!r) return;
+                const skipped = (r.skipped || []).map(esc).join('<br>');
+                importOut.innerHTML = `В очередь ушло: ${r.queued}.`
+                    + (r.queued ? ' Ход — в таблице выше и в <a href="/Admin/ImportHistory" class="text-admin-accent hover:underline">истории импортов</a>.' : '')
+                    + (skipped ? `<div class="mt-1 text-admin-warning">Не ушло:<br>${skipped}</div>` : '');
+            }
+
             function updateImportBtn() {
                 // Пока импорт идёт, кнопка «занята» — подпись и доступность ведёт render().
                 if (importBtn.getAttribute('aria-busy') === 'true') return;
@@ -780,7 +828,13 @@
                 importBtn.textContent = n ? `Импортировать отмеченные (${n})` : 'Импортировать отмеченные';
             }
 
-            rowsBox.addEventListener('change', updateImportBtn);
+            // Галочки — состояние пользователя: каждое касание пишем, чтобы F5 и автоперезагрузка
+            // после импорта не вернули снятое (ревью PR #266).
+            function saveChecks() {
+                rowsBox.querySelectorAll('input.bulk-row:not(:disabled)').forEach(cb => { state.checks[cb.value] = cb.checked; });
+                saveState();
+            }
+            rowsBox.addEventListener('change', () => { saveChecks(); updateImportBtn(); });
 
             // ── Кнопки пачек в списке ──
             const includeChamp = () => !!champBox?.checked;
@@ -834,6 +888,8 @@
                         if (r.importState === 'queued' || r.importState === 'running') text = 'импорт…';
                         else if (r.importState === 'failed') { text = 'импорт упал'; cls = 'bg-admin-danger/15 text-admin-danger'; }
                         else { text = '✓ импорт'; cls = 'bg-admin-success/15 text-admin-success'; }
+                    } else if (expired(r)) {
+                        text = '⌛ разбор истёк'; cls = 'bg-admin-surface-hover text-admin-text-muted';
                     } else {
                         const v = VERDICTS[r.verdict] ?? VERDICTS.Failed;
                         text = `${v.icon} в пачке`;
@@ -856,6 +912,11 @@
             }
 
             function paintStrip() {
+                if (restoring && !last && !isShown()) {
+                    strip.classList.remove('hidden'); strip.classList.add('flex');
+                    stripText.textContent = 'Пачка: проверяю состояние на сервере…';
+                    return;
+                }
                 const visible = !!last && !isShown();
                 strip.classList.toggle('hidden', !visible);
                 strip.classList.toggle('flex', visible);
@@ -881,13 +942,14 @@
                 const failed = sent.filter(r => r.importState === 'failed').length;
                 const spin = '<span class="admin-spinner mr-1.5 align-middle text-admin-accent"></span>';
 
-                // Подпись: что было на кнопке и сколько ушло. Ушло меньше — строки перестали ждать
-                // затягивания между показом кнопки и кликом (затянуты, скрыты).
-                if (meta) {
-                    const gone = (meta.n ?? 0) - (batch.total ?? 0) - (batch.skippedChampionships?.length ?? 0);
-                    scopeBox.innerHTML = `${esc(meta.label)} · на кнопке ${meta.n}, в пачке ${batch.total}`
-                        + (gone > 0 ? ` · <span class="text-admin-warning">${gone} уже не ждут затягивания (затянуты или скрыты) — пропущены</span>` : '');
-                } else scopeBox.textContent = `В пачке ${batch.total}`;
+                // Подпись: что было на кнопке и сколько ушло. Ушло меньше — сервер перепроверил строки
+                // тем же правилом на момент клика, и часть уже не «ждёт затягивания» (skippedNotReady).
+                const gone = batch.skippedNotReady || [];
+                const goneHtml = gone.length
+                    ? ` · <span class="text-admin-warning" title="${esc(gone.join('\n'))}">${gone.length} уже не ждут затягивания (затянуты, скрыты, ∅, «✓ имп.», перенесены или ждут протокол) — пропущены</span>`
+                    : '';
+                if (meta) scopeBox.innerHTML = `${esc(meta.label)} · на кнопке ${meta.n}, в пачке ${batch.total}` + goneHtml;
+                else scopeBox.innerHTML = `В пачке ${batch.total}` + goneHtml;
 
                 if (batch.error) {
                     progress.textContent = batch.error;
@@ -919,6 +981,7 @@
                         + '. Отметьте «включая чемпионаты», если нужны они.';
                 }
                 renderRows(batch.rows || []);
+                paintImportResult();
                 markRows();
                 paintOffers();
                 paintStrip();
@@ -929,7 +992,10 @@
                 if (!batchId) return;
                 try {
                     const batch = await api(`${API}/bulk-pull/${batchId}`);
+                    netNote.classList.add('hidden');
+                    restoring = false;
                     render(batch);
+                    if (ss.get(SHOWN_KEY) === '1' && !restoredShown) { restoredShown = true; showBulk(); }
                     // Опрос живёт, пока тянется пачка ИЛИ идёт импорт отправленных строк.
                     if (batch.finished && !batch.importsPending) {
                         clearInterval(timer); timer = null;
@@ -938,14 +1004,23 @@
                         if (sawPending) {
                             sawPending = false;
                             if (isShown()) ss.set(SHOWN_KEY, '1');
-                            importOut.textContent = 'Импорт завершён — обновляю список…';
+                            importOut.insertAdjacentHTML('beforeend', '<div class="mt-1 text-admin-text-muted">Импорт завершён — обновляю список…</div>');
                             setTimeout(() => location.reload(), 800);
                         }
                     }
                 } catch (err) {
-                    clearInterval(timer); timer = null;
-                    forget();
-                    progress.textContent = err.message;
+                    // Забываем пачку только когда сервер сказал «такой нет» (404: перезапуск API).
+                    // Обрыв сети, 502 во время деплоя — пачка на сервере идёт: опрос продолжается,
+                    // запреты остаются.
+                    if (err.status === 404) {
+                        clearInterval(timer); timer = null;
+                        forget();
+                        progress.textContent = err.message;
+                    } else {
+                        netNote.textContent = `Связь с сервером потеряна (${err.message}) — пробую ещё…`;
+                        netNote.classList.remove('hidden');
+                        if (!timer) timer = setInterval(poll, 2000);
+                    }
                 }
             }
 
@@ -956,8 +1031,10 @@
             }
 
             function forget() {
-                [KEY, META_KEY, SHOWN_KEY].forEach(ss.del);
-                batchId = null; meta = null; last = null;
+                [KEY, META_KEY, SHOWN_KEY, STATE_KEY].forEach(ss.del);
+                batchId = null; meta = null; last = null; restoring = false; starting = false;
+                state = { checks: {}, seen: {} };
+                netNote.classList.add('hidden');
                 markRows(); paintOffers(); paintStrip();
                 window.pullFlow?.render?.();
             }
@@ -978,7 +1055,12 @@
                 if (held && !confirm(`В открытой пачке ${held} затянутых строк ещё не импортированы. Новая пачка её заменит — продолжить?`)) return;
                 const includeChampionships = includeChamp();
                 meta = { label: offerLabel(o), n: ids.length };
-                btn.disabled = true;
+                // С клика до ответа сервера гаснут ВСЕ кнопки пачек (busy() → starting).
+                starting = true;
+                paintOffers();
+                window.pullFlow?.render?.();
+                state = { checks: {}, seen: {} };
+                saveState();
                 importOut.textContent = '';
                 rowsBox.innerHTML = '';
                 skippedBox.classList.add('hidden');
@@ -995,17 +1077,21 @@
                     batchId = batch.batchId;
                     ss.set(KEY, batchId);
                     ss.set(META_KEY, JSON.stringify(meta));
+                    starting = false;
                     render(batch);
                     watch();
                 } catch (err) {
+                    starting = false;
                     progress.textContent = err.message;
                     paintOffers();
+                    window.pullFlow?.render?.();
                 }
             }));
 
             document.getElementById('bulk-uncheck-noreg').addEventListener('click', () => {
                 rowsBox.querySelectorAll('tr[data-verdict="NoRegulation"] input.bulk-row')
                     .forEach(cb => { cb.checked = false; });
+                saveChecks();
                 updateImportBtn();
             });
 
@@ -1034,13 +1120,16 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ batchId, ids })
                     });
-                    const skipped = (r.skipped || []).map(esc).join('<br>');
-                    importOut.innerHTML = `В очередь ушло: ${r.queued}. Ход — в таблице выше и в `
-                        + '<a href="/Admin/ImportHistory" class="text-admin-accent hover:underline">истории импортов</a>. '
-                        + 'Когда импорт закончится, список обновится сам.'
-                        + (skipped ? `<div class="mt-1 text-admin-warning">${skipped}</div>` : '');
-                    rowsBox.querySelectorAll('input.bulk-row:checked').forEach(cb => { cb.checked = false; cb.disabled = true; });
-                    sawPending = true;
+                    // Итог (сколько ушло, что пропущено и почему) — в состоянии пачки: переживает
+                    // автоперезагрузку. Ничего не ушло — перезагружать незачем, причины остаются на экране.
+                    state.importResult = { queued: r.queued, skipped: r.skipped || [], at: Date.now() };
+                    rowsBox.querySelectorAll('input.bulk-row:checked').forEach(cb => {
+                        cb.checked = false; cb.disabled = true; state.checks[cb.value] = false;
+                    });
+                    saveState();
+                    paintImportResult();
+                    if (r.queued > 0) sawPending = true;
+                    else adminBusy(importBtn, false);
                     // Опрос мог остановиться на конце забора — запускаем снова: теперь он ждёт
                     // конца импорта, а «занятость» кнопки ведёт render() по importsPending.
                     watch();
@@ -1054,18 +1143,22 @@
             paintOffers();
             // Пачка с прошлой загрузки страницы — на месте, пока её не закрыли (в том числе готовая):
             // открыта справа, если была открыта, иначе — строкой над списком.
+            // До ответа сервера пачка считается идущей (restoring): кнопки пачек и одиночное
+            // «Затянуть» погашены. Ответ 404 — пачки нет, забываем; обрыв — опрос пробует ещё.
             if (batchId) {
-                api(`${API}/bulk-pull/${batchId}`).then(batch => {
-                    render(batch);
-                    if (ss.get(SHOWN_KEY) === '1') showBulk();
-                    if (!batch.finished || batch.importsPending) watch();
-                }).catch(() => forget());
+                paintStrip();
+                window.pullFlow?.render?.();
+                (async () => {
+                    await poll();
+                    if (last && (!last.finished || last.importsPending) && !timer) timer = setInterval(poll, 2000);
+                })();
             }
 
             return {
                 busy,
                 /** Одиночное «Затянуть» этой строки запрещено пачкой — текст причины, иначе null. */
                 blocks(discId) {
+                    if (starting || restoring) return 'Проверяю пачку на сервере — подожди пару секунд';
                     if (!last) return null;
                     if (busy()) return running(last)
                         ? 'Идёт пачка — одиночное «Затянуть» после неё (строка над списком → показать)'

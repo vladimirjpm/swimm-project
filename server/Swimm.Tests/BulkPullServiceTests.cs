@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Infrastructure.Services;
@@ -113,13 +114,42 @@ public class BulkPullServiceTests
             MatchedCompetitionName: matchedCompetitionId is null ? null : "уже в БД",
             MatchedCompetitionId: matchedCompetitionId, Languages: null);
 
+    /// <summary>
+    /// Список страницы для перепроверки «ждёт затягивания» в StartAsync: по умолчанию ждут все
+    /// строки, кроме скрытых и связанных с базой (как в списке). Тесты самой перепроверки — с
+    /// настоящим репозиторием, BulkPullSelectionTests.
+    /// </summary>
+    internal static ICompetitionAdminRepository ListOf(IEnumerable<DiscoveredCompetitionDto> rows)
+    {
+        var items = rows.Select(d => new UnifiedCompetitionRowDto
+        {
+            Db = d.MatchedCompetitionId is null ? null : new CompetitionRowDto(),
+            Site = new UnifiedSiteInfo { DiscoveredId = d.Id, Name = d.Name, DateStart = d.DateStart, Status = d.Status },
+            Status = new Swimm.Application.Mapping.CompetitionRowStatus(d.Status == "ignored"
+                ? Swimm.Application.Mapping.CompetitionRowState.Closed
+                : Swimm.Application.Mapping.CompetitionRowState.ReadyToPull),
+        }).ToList();
+        var repo = new Moq.Mock<ICompetitionAdminRepository>();
+        repo.Setup(r => r.GetUnifiedAsync(Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(), Moq.It.IsAny<int?>(),
+                Moq.It.IsAny<string?>(), Moq.It.IsAny<bool>(), Moq.It.IsAny<int?>(), Moq.It.IsAny<int>(), Moq.It.IsAny<int>(),
+                Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(),
+                Moq.It.IsAny<DateOnly?>(), Moq.It.IsAny<bool>()))
+            .ReturnsAsync(new UnifiedCompetitionList(new PagedResult<UnifiedCompetitionRowDto>(items, items.Count, 1, Math.Max(1, items.Count)),
+                new int[12], 0));
+        return repo.Object;
+    }
+
     internal static (BulkPullService Service, FakeQueue Queue, FakePreviews Previews) Build(
-        params DiscoveredCompetitionDto[] rows)
+        params DiscoveredCompetitionDto[] rows) => Build(ListOf(rows), rows);
+
+    internal static (BulkPullService Service, FakeQueue Queue, FakePreviews Previews) Build(
+        ICompetitionAdminRepository list, params DiscoveredCompetitionDto[] rows)
     {
         var queue = new FakeQueue();
         var previews = new FakePreviews();
 
         var services = new ServiceCollection();
+        services.AddSingleton(list);
         services.AddSingleton<ICompetitionDiscoveryService>(new FakeDiscovery([.. rows]));
         services.AddSingleton<IDiscoveryPreviewService>(previews);
         services.AddSingleton<IRegulationFetchService>(new FakeRegulations());
