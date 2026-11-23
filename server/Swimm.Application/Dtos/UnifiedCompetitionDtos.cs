@@ -107,6 +107,15 @@ public sealed class UnifiedSiteInfo
 
     /// <summary>Пропал из списка isr.org.il (вероятно, отменён) — с какого момента; null — на месте.</summary>
     public DateTime? MissingSince { get; set; }
+
+    /// <summary>Когда забор «Входящих» впервые нашёл старт у федерации — шаг 1 чек-листа панели.</summary>
+    public DateTime DiscoveredAt { get; set; }
+
+    /// <summary>
+    /// Сколько дней старта с заданной разминкой (<c>CompetitionWarmUps</c> по OrgCompId) — шаг 3
+    /// чек-листа. Заполняется только у строк текущей страницы, как <see cref="StartList"/>.
+    /// </summary>
+    public int WarmUpDays { get; set; }
 }
 
 /// <summary>

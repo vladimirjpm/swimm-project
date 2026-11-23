@@ -1,0 +1,134 @@
+@model Swimm.API.Pages.Admin.Competitions.CompChecklistView
+@*
+    Правая панель-чек-лист строки «ждёт затягивания» (вариант E, этап 4; хэндофф 3.5).
+    Девять шагов: статус кружка — data-status у li (pending / current / done / attention), вид
+    кружка и названия — group-data-[status=…] утилитами, поэтому JS хода меняет ТОЛЬКО атрибут.
+    Статусы на каждую фазу затягивания посчитаны сервером (CompetitionChecklistRules) и лежат в
+    data-phases панели; подписи шагов JS хода заменяет текстами прежней панели «Затягивание».
+    Превью (шаг 6) — общий блок #preview-box, JS переносит его в .ck-preview-slot своей строки.
+    Остальные состояния строки — этап 6; пока у них прежняя панель строки.
+*@
+@{
+    var s = Model.Site;
+    var id = s.DiscoveredId;
+    const string quiet = "cursor-pointer text-[13px] text-admin-text-muted hover:text-admin-text";
+    const string ghost = "admin-btn admin-btn-ghost py-1 px-2.5";
+    var finished = s.DateStart <= DateTime.UtcNow;
+}
+
+<div id="panel-@Model.Key" class="row-panel checklist admin-card p-0 @(Model.Selected ? "" : "hidden")" data-key="@Model.Key"
+     data-disc-id="@id" data-phases="@Model.PhasesJson">
+    @* ── Шапка ── *@
+    <div class="border-b border-admin-border px-5 pb-4 pt-4">
+        <div class="flex items-start gap-3">
+            @if (Model.Row.IsChampionship)
+            {
+                <span class="mt-1.5 shrink-0 text-admin-warning" title="Чемпионат Израиля">@Html.Raw(Model.TrophyHtml)</span>
+            }
+            <h2 class="min-w-0 flex-1 text-lg font-semibold leading-snug text-white" dir="rtl" style="text-align:left">@Model.Name</h2>
+            @* Тихие кнопки шапки (хэндофф 3.5). «✓ имп.» и вид спорта — сюда же, до меню «Ещё» этапа 6. *@
+            <div class="flex shrink-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 pt-1">
+                <button type="button" class="@quiet" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
+                <button type="button" class="@quiet" onclick="discStatus(@id,'ignored')" title="Скрыть строку (вернуть — фильтр «Стадия: скрыто»)">Скрыть</button>
+                @if (finished)
+                {
+                    <button type="button" class="@quiet" onclick="discStatus(@id,'imported')" title="Пометить импортированным вручную">✓ имп.</button>
+                }
+                <select onchange="discDiscipline(@id, this.value)" class="rounded border border-admin-border bg-transparent px-1 py-0.5 text-[11px] text-admin-text-muted" title="Вид спорта">
+                    @foreach (var (value, label) in new[] { ("swimming", "плавание"), ("artistic", "артистич."), ("other", "прочее") })
+                    {
+                        <option value="@value" selected="@(s.Discipline == value)">@label</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-admin-text-muted">
+            <span class="tabular-nums">@Model.PanelDate</span>
+            <span class="inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold @Model.StateChipCls">@Model.StateText</span>
+            <a href="https://isr.org.il/comp.asp?compID=@s.OrgCompId" target="_blank" rel="noopener"
+               class="text-admin-accent hover:underline" title="ID федерации (OrgCompId): @s.OrgCompId">страница федерации ↗</a>
+            @Html.Raw(Model.HeaderChipsHtml)
+        </div>
+        @* Бывшие колонки таблицы — компактно (хэндофф, раздел 5: «предложение — в шапке панели»). *@
+        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-admin-text-muted">@Html.Raw(Model.MetaHtml)</div>
+    </div>
+
+    @* ── Девять шагов ── *@
+    <ol class="relative px-5 py-4">
+        <span aria-hidden="true" class="absolute bottom-6 left-[31.5px] top-6 w-px bg-admin-border"></span>
+
+        @{
+            void StepHead(Swimm.API.Pages.Admin.Competitions.CompChecklistStep st)
+            {
+                <span class="relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full bg-admin-surface">
+                    <span class="flex size-6 items-center justify-center rounded-full text-[11px] font-bold
+                                 group-data-[status=pending]:bg-admin-border group-data-[status=pending]:text-admin-text-muted
+                                 group-data-[status=current]:bg-admin-accent group-data-[status=current]:text-[#0c2536]
+                                 group-data-[status=done]:bg-admin-success/15 group-data-[status=done]:text-admin-success
+                                 group-data-[status=attention]:bg-admin-warning/15 group-data-[status=attention]:text-admin-warning">
+                        <span class="group-data-[status=attention]:hidden group-data-[status=done]:hidden">@st.No</span>
+                        <span class="hidden group-data-[status=done]:inline">✓</span>
+                        <span class="hidden group-data-[status=attention]:inline">!</span>
+                    </span>
+                </span>
+            }
+            string Code(Swimm.Application.Mapping.ChecklistStepStatus x) => Swimm.Application.Mapping.CompetitionChecklistRules.Code(x);
+            string CaptionCls(Swimm.API.Pages.Admin.Competitions.CompChecklistStep st) =>
+                st.CaptionDanger ? "text-admin-danger" : "text-admin-text-muted";
+        }
+
+        @for (var no = 1; no <= Model.Steps.Count; no++)
+        {
+            var st = Model.Step(no);
+            <li class="ck-step group relative flex gap-3 pb-4 last:pb-0" data-step="@no" data-status="@Code(st.Status)">
+                @{ StepHead(st); }
+                <div class="min-w-0 flex-1 pt-0.5">
+                    <div class="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                        <span class="text-[13.5px] font-semibold text-admin-text group-data-[status=pending]:text-admin-text-muted">@st.Title</span>
+                        <span class="ck-caption min-w-0 text-xs @CaptionCls(st)" dir="auto" title="@st.CaptionTitle" data-default="@st.Caption">@st.Caption</span>
+                        <span class="ck-actions ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+                            @switch (no)
+                            {
+                                case 2:
+                                    <button type="button" class="@ghost" onclick="discStartList(@id, this)"
+                                            title="Затянуть стартовый протокол (программа + заявки) с loglig">Обновить</button>
+                                    @* «Источники» привязываются к соревнованию в базе — у строки до импорта их нет. *@
+                                    break;
+                                case 3:
+                                    <button type="button" class="@ghost" onclick="discMeetInfo(@id)"
+                                            title="Разминка по дням (из регламента, руками) и флаг «чемпионат»">Задать</button>
+                                    break;
+                                case 5:
+                                    <button type="button" class="ck-pull-btn admin-btn admin-btn-primary py-1 px-3"
+                                            onclick="discPreview(@id)" title="Скачать PDF с isr.org.il, разобрать и показать превью">Затянуть</button>
+                                    <a href="/api/admin/discovery/@id/pdf" class="@ghost">PDF</a>
+                                    break;
+                                case 9:
+                                    if (finished && string.IsNullOrEmpty(s.Languages))
+                                    {
+                                        <button type="button" class="@ghost" onclick="discSyncLangs(@id, this)"
+                                                title="Скачать HE+EN пару и дозаполнить англ. имена пловцов">Синхр. языки</button>
+                                    }
+                                    else if (s.Languages == "he")
+                                    {
+                                        <span class="text-[11px] text-admin-text-muted" title="Второй язык на loglig не найден">только HE</span>
+                                    }
+                                    break;
+                            }
+                        </span>
+                    </div>
+                    @if (no == 5 && Model.AutoReason != null)
+                    {
+                        <div class="mt-0.5 text-[11px] text-admin-text-muted" dir="auto">@Model.AutoReason</div>
+                    }
+                    @* Строки хода (тексты прежней панели «Затягивание») — пишет JS. *@
+                    <ol class="ck-log mt-1 hidden space-y-1 text-[12px]"></ol>
+                    @if (no == 6)
+                    {
+                        <div class="ck-preview-slot"></div>
+                    }
+                </div>
+            </li>
+        }
+    </ol>
+</div>

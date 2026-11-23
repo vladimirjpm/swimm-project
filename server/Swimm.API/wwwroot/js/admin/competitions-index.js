@@ -132,14 +132,6 @@
                 rows.forEach(r => r.dataset.key === key && panel
                     ? r.setAttribute('aria-current', 'true')
                     : r.removeAttribute('aria-current'));
-                // Превью видно только у строки, для которой построено: иначе «Импортировать» под
-                // панелью строки B импортировало бы строку A. Открыто/закрыто — класс hidden
-                // (его ведут discPreview/«Отмена»/импорт), «чужая строка» — атрибут hidden.
-                const card = document.getElementById('preview-card');
-                if (card?.dataset.discId) {
-                    const row = rows.find(r => r.dataset.key === key);
-                    card.hidden = !panel || row?.dataset.discId !== card.dataset.discId;
-                }
                 box.scrollTop = 0;
                 // Правая колонка липкая; если страницу прокрутили выше её начала — подтянуть.
                 if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ block: 'start' });
@@ -182,92 +174,254 @@
             });
         });
 
-        // ── Панель хода затягивания ─────────────────────────────────────────────
-        // Затягивание идёт минуты и в несколько шагов (скачать PDF → распарсить → превью →
-        // фоновый job импорта), а тост живёт секунды и не переживает перезагрузку. Панель
-        // держит шаги на экране, опрашивает job до конца и после успеха обновляет таблицу,
-        // помечая строку бейджем «затянуто».
-        window.pullPanel = (function () {
-            const PENDING_KEY = 'pullPending';  // job, за которым следим (переживает F5)
+        // ── Ход одиночного затягивания — в правой панели строки (вариант E, этап 4) ──
+        // Затягивание идёт минуты и в несколько шагов (скачать PDF → разобрать → превью → фоновый
+        // job импорта → автопроверка качества). Раньше шаги жили в плавающей панели в углу экрана,
+        // теперь — в панели своей строки: у чек-листа («ждёт затягивания») это статусы и строки шагов
+        // 5–7, у прежней панели строки (Перезатянуть, «Затянуть» идущего / «ждём протокол») — список
+        // строк под кнопками. Тексты строк — прежней панели «Затягивание».
+        //
+        // Переживает F5 и переключение строк: весь ход (фаза, строки, ответ превью, выбор в превью,
+        // jobId) лежит в sessionStorage под одним ключом. Превью на сервере живёт 60 минут по
+        // previewId — после F5 блок превью собирается заново из сохранённого ответа, импорт уходит
+        // с тем же previewId. Разбор, прерванный перезагрузкой, запускается заново сам.
+        // Статусы шагов на каждую фазу посчитаны сервером (CompetitionChecklistRules → data-phases).
+        window.pullFlow = (function () {
+            const FLOW_KEY = 'pullFlow';        // текущий ход (переживает F5)
+            const PENDING_KEY = 'pullPending';  // ключ страницы до этапа 4 — подхватываем после выкладки
             const DONE_KEY = 'pullDone';        // итог, который надо показать после reload
+            const PREVIEW_TTL_MS = 60 * 60 * 1000;
+            const RESTART_PARSE_MS = 10 * 60 * 1000;
 
-            const panel = document.getElementById('pull-panel');
-            const nameEl = document.getElementById('pull-name');
-            const stepsEl = document.getElementById('pull-steps');
-            const footerEl = document.getElementById('pull-footer');
-            let steps = [];  // [{ text, state: 'run'|'ok'|'fail'|'wait' }]
+            const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const store = {
+                get(k) { try { return JSON.parse(sessionStorage.getItem(k) ?? 'null'); } catch { return null; } },
+                set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* приватный режим */ } },
+                del(k) { try { sessionStorage.removeItem(k); } catch { /* приватный режим */ } },
+            };
 
             const ICON = {
                 run: '<span class="text-admin-accent">●</span>',
                 ok: '<span class="text-admin-success">✓</span>',
-                fail: '<span class="text-[#ef9a9a]">✕</span>',
+                fail: '<span class="text-admin-danger">✕</span>',
                 wait: '<span class="text-admin-text-muted">○</span>',
             };
+            // Пометка в строке списка: видно, что строка A затягивается, пока справа открыта B.
+            const MARK = {
+                parsing: ['разбор…', 'bg-admin-accent/15 text-admin-accent'],
+                preview: ['превью', 'bg-admin-accent/15 text-admin-accent'],
+                importing: ['импорт…', 'bg-admin-accent/15 text-admin-accent'],
+                'parse-failed': ['сбой', 'bg-admin-danger/15 text-admin-danger'],
+                'import-failed': ['сбой', 'bg-admin-danger/15 text-admin-danger'],
+                'preview-expired': ['превью устарело', 'bg-admin-warning/15 text-admin-warning'],
+            };
+            const PHASE_TEXT = {
+                parsing: 'скачиваю и разбираю протокол', preview: 'превью готово, ждёт «Импортировать»',
+                importing: 'импорт идёт в фоне', 'parse-failed': 'разбор не удался',
+                'import-failed': 'импорт не прошёл', 'preview-expired': 'превью устарело',
+            };
 
-            function render() {
-                stepsEl.innerHTML = steps.map(s => `
-                    <li class="flex gap-2 ${s.state === 'fail' ? 'text-[#ef9a9a]' : s.state === 'wait' ? 'text-admin-text-muted' : ''}">
-                        <span class="w-3.5 shrink-0">${ICON[s.state] ?? ''}</span>
-                        <span class="min-w-0">${s.text}</span>
+            // { discId, name, org, repull, phase, startedAt, previewAt, p, form, jobId, lines:[{step,text,state}], captions:{} }
+            let flow = null;
+
+            // F5 обрывает запрос разбора («Failed to fetch»), и уходящая страница записала бы «сбой»
+            // поверх хода — после pagehide ход не пишем: его продолжит новая страница.
+            let leaving = false;
+            addEventListener('pagehide', () => { leaving = true; });
+            addEventListener('beforeunload', () => { leaving = true; });
+            const save = () => { if (!leaving) flow ? store.set(FLOW_KEY, flow) : store.del(FLOW_KEY); };
+            const rowOf = (discId) => document.querySelector(`.comp-row[data-disc-id="${discId}"]`);
+            const panelOf = (discId) => {
+                const row = rowOf(discId);
+                return row ? document.getElementById('panel-' + row.dataset.key) : null;
+            };
+            const previewBox = () => document.getElementById('preview-box');
+
+            function setStatuses(panel, phase) {
+                let map = {};
+                try { map = JSON.parse(panel.dataset.phases || '{}'); } catch { /* без статусов */ }
+                const statuses = map[phase] ?? map.none ?? [];
+                panel.querySelectorAll('.ck-step').forEach(li => {
+                    const s = statuses[Number(li.dataset.step) - 1];
+                    if (s) li.dataset.status = s;
+                });
+            }
+
+            function linesHtml(lines) {
+                return lines.map(l => `
+                    <li class="flex gap-2 ${l.state === 'fail' ? 'text-admin-danger' : l.state === 'wait' ? 'text-admin-text-muted' : 'text-admin-text'}">
+                        <span class="w-3.5 shrink-0">${ICON[l.state] ?? ''}</span>
+                        <span class="min-w-0">${l.text}</span>
                     </li>`).join('');
             }
 
-            function open(name) {
-                steps = [];
-                nameEl.textContent = name ?? '';
-                footerEl.classList.add('hidden');
-                footerEl.textContent = '';
-                panel.classList.remove('hidden');
-                render();
+            function fillLog(ol, lines) {
+                if (!ol) return;
+                ol.innerHTML = linesHtml(lines);
+                ol.classList.toggle('hidden', !lines.length);
             }
 
-            /// Новый шаг «в работе»; предыдущий незакрытый считаем успешным.
-            function step(text) {
-                const last = steps[steps.length - 1];
-                if (last && last.state === 'run') last.state = 'ok';
-                steps.push({ text, state: 'run' });
-                render();
+            // Панель без хода: статусы и подписи — как нарисовал сервер.
+            function resetPanel(panel) {
+                panel.querySelectorAll('.ck-log').forEach(ol => fillLog(ol, []));
+                if (!panel.classList.contains('checklist')) return;
+                setStatuses(panel, 'none');
+                panel.querySelectorAll('.ck-caption').forEach(c => { c.textContent = c.dataset.default ?? ''; });
+                panel.querySelector('.ck-pull-btn')?.classList.remove('hidden');
             }
 
-            function finish(state, text) {
-                const last = steps[steps.length - 1];
-                if (last && last.state === 'run') last.state = state === 'fail' ? 'fail' : 'ok';
-                if (text) steps.push({ text, state });
-                render();
-            }
+            function render() {
+                document.querySelectorAll('#comp-detail .row-panel').forEach(resetPanel);
+                document.querySelectorAll('.comp-row .flow-mark').forEach(m => m.remove());
+                const elsewhere = document.getElementById('pull-elsewhere');
+                elsewhere?.classList.add('hidden');
+                const box = previewBox();
+                if (!flow) { box?.classList.add('hidden'); return; }
 
-            function footer(html) {
-                footerEl.innerHTML = html;
-                footerEl.classList.remove('hidden');
-            }
-
-            document.getElementById('pull-close').addEventListener('click', () => {
-                panel.classList.add('hidden');
-                sessionStorage.removeItem(PENDING_KEY);
-            });
-
-            // Бейдж на строке списка: в её пометки (.row-marks), рядом с остальными.
-            function markRow(discId) {
-                const row = document.querySelector(`.comp-row[data-disc-id="${discId}"]`);
-                if (!row) return false;
-                const cell = row.querySelector('.row-marks');
-                if (cell && !cell.querySelector('.pulled-badge')) {
-                    cell.insertAdjacentHTML('beforeend',
-                        '<span class="pulled-badge inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-admin-success/20 text-admin-success">затянуто</span>');
+                const mark = MARK[flow.phase];
+                const row = rowOf(flow.discId);
+                if (row && mark) {
+                    row.querySelector('.row-marks')?.insertAdjacentHTML('afterbegin',
+                        `<span class="flow-mark inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold ${mark[1]}" title="Затягивание этой строки: ${esc(PHASE_TEXT[flow.phase])}">${mark[0]}</span>`);
                 }
-                row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                const panel = panelOf(flow.discId);
+                if (!panel) {
+                    // Строки нет на этой странице списка (другой месяц, фильтры) — ход виден над панелью.
+                    box?.classList.add('hidden');
+                    if (elsewhere) {
+                        const href = flow.org ? `/Admin/Competitions?q=${encodeURIComponent(flow.org)}&sel=s${flow.discId}` : null;
+                        elsewhere.innerHTML = `Затягивание «<bdi>${esc(flow.name)}</bdi>»: ${esc(PHASE_TEXT[flow.phase] ?? '')}. `
+                            + 'Строки нет в этом списке'
+                            + (href ? ` — <a class="text-admin-accent hover:underline" href="${href}">открыть её</a>` : '') + '.';
+                        elsewhere.classList.remove('hidden');
+                    }
+                    return;
+                }
+
+                const showPreview = flow.phase === 'preview';
+                if (panel.classList.contains('checklist')) {
+                    setStatuses(panel, flow.phase);
+                    // Строки хода — только у текущего шага и у шага со сбоем: у сделанного итог в подписи.
+                    for (let n = 5; n <= 7; n++) {
+                        const li = panel.querySelector(`.ck-step[data-step="${n}"]`);
+                        const open = ['current', 'attention'].includes(li?.dataset.status);
+                        fillLog(li?.querySelector('.ck-log'), open ? flow.lines.filter(l => l.step === n) : []);
+                    }
+                    Object.entries(flow.captions ?? {}).forEach(([n, text]) => {
+                        const c = panel.querySelector(`.ck-step[data-step="${n}"] .ck-caption`);
+                        if (c) c.textContent = text;
+                    });
+                    // «Затянуть» — пока хода нет или он сорвался; в разборе, превью и импорте — только PDF.
+                    panel.querySelector('.ck-pull-btn')?.classList.toggle('hidden',
+                        ['parsing', 'preview', 'importing'].includes(flow.phase));
+                } else {
+                    fillLog(panel.querySelector('.ck-log'), flow.lines);
+                }
+                if (box) {
+                    const slot = panel.querySelector('.ck-preview-slot');
+                    if (slot && box.parentElement !== slot) slot.appendChild(box);
+                    box.classList.toggle('hidden', !showPreview);
+                }
+            }
+
+            /// Новая строка «в работе» у шага; предыдущая незакрытая считается успешной.
+            function step(stepNo, text) {
+                const last = flow.lines[flow.lines.length - 1];
+                if (last && last.state === 'run') last.state = 'ok';
+                flow.lines.push({ step: stepNo, text, state: 'run' });
+            }
+            function finish(state, text, stepNo) {
+                const last = flow.lines[flow.lines.length - 1];
+                if (last && last.state === 'run') last.state = state === 'fail' ? 'fail' : 'ok';
+                if (text) flow.lines.push({ step: stepNo ?? last?.step ?? 5, text, state });
+            }
+            function commit(phase) {
+                if (phase) flow.phase = phase;
+                save();
+                render();
+            }
+
+            // F5 и «назад» должны вернуть ту же строку: без sel в адресе справа автовыбор, а после
+            // импорта он ушёл бы на следующую «ждёт затягивания». Адрес — ссылки строки: в нём уже
+            // подставленные сезон и месяц (голый адрес с одним sel открыл бы все сезоны).
+            function pinSelection(discId) {
+                const row = rowOf(discId);
+                if (!row || new URL(location.href).searchParams.get('sel')) return;
+                history.replaceState({ sel: row.dataset.key }, '', row.href);
+            }
+
+            /// «Затянуть» / «Перезатянуть». false — нельзя: идёт импорт другой строки.
+            function start(discId, name, repull) {
+                if (flow?.phase === 'importing' && String(flow.discId) !== String(discId)) {
+                    alert(`Сначала дождись импорта «${flow.name}» — он идёт в фоне.`);
+                    return false;
+                }
+                flow = {
+                    discId: String(discId), name, repull: !!repull, org: window.__DISC?.[discId]?.orgCompId ?? null,
+                    phase: 'parsing', startedAt: Date.now(), lines: [], captions: {},
+                };
+                step(5, repull ? 'Скачиваю протокол заново и разбираю…' : 'Скачиваю PDF с isr.org.il и разбираю…');
+                pinSelection(discId);
+                commit();
                 return true;
+            }
+
+            const isActive = (discId) => flow != null && flow.discId === String(discId);
+
+            function plural(n, one, few, many) {
+                const t = n % 100, u = n % 10;
+                return t >= 11 && t <= 14 ? many : u === 1 ? one : u >= 2 && u <= 4 ? few : many;
+            }
+
+            function previewReady(p) {
+                const days = p.competitions?.length ?? 0;
+                flow.p = p;
+                flow.previewAt = Date.now();
+                flow.form = null;
+                finish('ok', `Распознано результатов: ${p.resultCount}`, 5);
+                // Подпись шага 5 — как в макете: «533 результата · 1 день в файле».
+                flow.captions[5] = `${p.resultCount} ${plural(p.resultCount, 'результат', 'результата', 'результатов')}`
+                    + (days ? ` · ${days} ${plural(days, 'день', 'дня', 'дней')} в файле` : '');
+                step(6, 'Жду: проверь превью и нажми «Импортировать»');
+                commit('preview');
+            }
+
+            function parseFailed(message) {
+                finish('fail', `Не удалось разобрать: ${esc(message)}`, 5);
+                flow.p = null;
+                commit('parse-failed');
+            }
+
+            function cancel() {
+                flow = null;
+                save();
+                render();
+            }
+
+            const setCaption = (stepNo, text) => { if (flow) { flow.captions[stepNo] = text; commit(); } };
+            const saveForm = (form) => { if (flow?.phase === 'preview') { flow.form = form; save(); } };
+            const current = () => flow;
+
+            function importQueued(jobId) {
+                flow.jobId = jobId;
+                flow.p = null; flow.form = null;   // превью больше не нужно — не держим его в хранилище
+                step(7, 'Импорт поставлен в очередь…');
+                commit('importing');
+                watch(jobId);
             }
 
             // Опрос job'а. Импорт идёт в фоне, поэтому единственный честный признак конца —
             // состояние job'а, а не ответ на POST /import (он лишь ставит в очередь).
-            async function watch(jobId, discId, name) {
-                sessionStorage.setItem(PENDING_KEY, JSON.stringify({ jobId, discId, name }));
+            async function watch(jobId) {
                 const deadline = Date.now() + 10 * 60 * 1000;
-                let running = false;
+                // После F5 строка «Импортирую…» уже может быть в ходе — второй раз не пишем.
+                let running = flow.lines.some(l => l.text === 'Импортирую результаты…');
 
                 while (Date.now() < deadline) {
                     await new Promise(r => setTimeout(r, 1500));
+                    if (!flow || flow.jobId !== jobId) return; // ход сменился
                     let s;
                     try {
                         s = await fetch(`/api/admin/import/status/${jobId}`, { credentials: 'same-origin' })
@@ -275,13 +429,13 @@
                     } catch { continue; } // сеть моргнула — пробуем дальше
                     if (!s) continue;
 
-                    if (s.state === 'running' && !running) { running = true; step('Импортирую результаты…'); }
+                    if (s.state === 'running' && !running) { running = true; step(7, 'Импортирую результаты…'); commit(); }
 
                     if (s.state === 'completed') {
                         const r = s.result ?? {};
-                        sessionStorage.removeItem(PENDING_KEY);
-                        sessionStorage.setItem(DONE_KEY, JSON.stringify({
-                            discId, name, created: r.created ?? 0, total: r.totalRows ?? 0,
+                        store.set(DONE_KEY, {
+                            discId: flow.discId, name: flow.name, org: flow.org,
+                            created: r.created ?? 0, total: r.totalRows ?? 0,
                             skipped: r.skipped ?? 0, errors: r.errors ?? 0,
                             // Сверка с файлом (Д1): главный признак того, что импорт лёг верно.
                             recon: r.reconciliation ?? '', reconBad: r.reconciliationMismatches ?? 0,
@@ -290,71 +444,112 @@
                             checkWarn: r.dataCheckWarnings ?? 0,
                             // Галочки «сомнительный» из превью — подтверждаем, что пометка легла.
                             suspect: r.suspectFlagged ?? 0
-                        }));
-                        finish('ok', 'Готово. Обновляю таблицу…');
+                        });
+                        finish('ok', 'Готово. Обновляю таблицу…', 7);
+                        flow = null; save(); // итог уже в DONE_KEY
                         setTimeout(() => location.reload(), 700);
                         return;
                     }
                     if (s.state === 'failed') {
-                        sessionStorage.removeItem(PENDING_KEY);
-                        finish('fail', `Импорт не прошёл: ${esc(s.error ?? 'причина неизвестна')}`);
-                        footer('Подробности — в <a class="text-admin-accent hover:underline" href="/Admin/ImportHistory">Import History</a>.');
+                        finish('fail', `Импорт не прошёл: ${esc(s.error ?? 'причина неизвестна')}`, 7);
+                        flow.lines.push({ step: 7, state: 'wait',
+                            text: 'Подробности — в <a class="text-admin-accent hover:underline" href="/Admin/ImportHistory">Import History</a>.' });
+                        commit('import-failed');
                         return;
                     }
                 }
 
-                finish('fail', 'Жду слишком долго — статус смотри в Import History.');
+                finish('fail', 'Жду слишком долго — статус смотри в Import History.', 7);
+                commit('import-failed');
             }
 
-            // После reload: показать итог и повесить бейдж; если job ещё шёл — продолжить опрос.
-            function restore() {
-                const done = sessionStorage.getItem(DONE_KEY);
-                if (done) {
-                    sessionStorage.removeItem(DONE_KEY);
-                    const d = JSON.parse(done);
-                    open(d.name);
-                    steps = [{ text: `Затянуто: создано ${d.created} из ${d.total}`, state: 'ok' }];
-                    if (d.skipped) steps.push({ text: `пропущено ${d.skipped}`, state: 'wait' });
-                    if (d.errors) steps.push({ text: `ошибок ${d.errors}`, state: 'fail' });
-                    // Сверка с файлом важнее счётчиков: она отвечает на вопрос «легло ли верно».
-                    if (d.recon) steps.push({ text: esc(d.recon), state: d.reconBad ? 'fail' : 'ok' });
-                    // Пометки из превью: молча применённая пометка так же плоха, как молча потерянная.
-                    if (d.suspect) steps.push({ text: `Помечено сомнительными: ${d.suspect} (в рекорды не идут)`, state: 'ok' });
-                    // Проверки данных прогоняются сами (Д5) — показываем итог тут же.
-                    if (d.checks) steps.push({
-                        text: esc(d.checks),
-                        state: d.checkErr ? 'fail' : (d.checkWarn ? 'wait' : 'ok')
-                    });
-                    render();
+            // Итог после reload: строка уже «импортировано» (закрыто), у неё прежняя панель строки
+            // до этапа 6 — итог пишется в её список хода. Проверка качества прошла сама в импорте:
+            // её ✓ / ⚑ N — в шапке панели и в строке списка.
+            function showDone(d) {
+                const lines = [{ step: 7, text: `Затянуто: создано ${d.created} из ${d.total}`, state: 'ok' }];
+                if (d.skipped) lines.push({ step: 7, text: `пропущено ${d.skipped}`, state: 'wait' });
+                if (d.errors) lines.push({ step: 7, text: `ошибок ${d.errors}`, state: 'fail' });
+                // Сверка с файлом важнее счётчиков: она отвечает на вопрос «легло ли верно».
+                if (d.recon) lines.push({ step: 7, text: esc(d.recon), state: d.reconBad ? 'fail' : 'ok' });
+                // Пометки из превью: молча применённая пометка так же плоха, как молча потерянная.
+                if (d.suspect) lines.push({ step: 8, text: `Помечено сомнительными: ${d.suspect} (в рекорды не идут)`, state: 'ok' });
+                if (d.checks) lines.push({ step: 8, text: esc(d.checks), state: d.checkErr ? 'fail' : (d.checkWarn ? 'wait' : 'ok') });
 
-                    const rowFound = markRow(d.discId);
-                    if (d.reconBad) {
-                        footer('Данные разошлись с протоколом. Разбор — <code>docs/data-integrity.md</code> §8; '
-                             + 'чаще всего лечится повторным «Перезатянуть» с галкой «удалять лишние».');
-                    } else if (d.checkErr || d.checkWarn) {
-                        footer('Проверки данных нашли, что разобрать — '
-                             + '<a class="text-admin-accent hover:underline" href="/Admin/Health">Health</a>.');
-                    } else if (!rowFound) {
-                        footer('Строка не видна при текущих фильтрах — сбрось их, чтобы увидеть её со стадией «импортировано».');
-                    } else {
-                        footer('Дальше стоит нажать <b>⚑ Качество</b> — автозапуска проверки нет.');
-                    }
+                const row = rowOf(d.discId);
+                if (d.reconBad) {
+                    lines.push({ step: 8, state: 'wait', text: 'Данные разошлись с протоколом. Разбор — <code>docs/data-integrity.md</code> §8; '
+                        + 'чаще всего лечится повторным «Перезатянуть» с галкой «удалять лишние».' });
+                } else if (d.checkErr || d.checkWarn) {
+                    lines.push({ step: 8, state: 'wait', text: 'Проверки данных нашли, что разобрать — '
+                        + '<a class="text-admin-accent hover:underline" href="/Admin/Health">Health</a>.' });
+                }
+
+                const panel = panelOf(d.discId);
+                const title = '<li class="font-semibold text-white">Итог затягивания</li>';
+                if (panel) {
+                    const ol = panel.querySelector('.ck-log');
+                    if (ol) { ol.innerHTML = title + linesHtml(lines); ol.classList.remove('hidden'); }
+                    if (!row.querySelector('.pulled-badge'))
+                        row.querySelector('.row-marks')?.insertAdjacentHTML('beforeend',
+                            '<span class="pulled-badge inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-admin-success/20 text-admin-success">затянуто</span>');
+                    row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     return;
                 }
-
-                const pending = sessionStorage.getItem(PENDING_KEY);
-                if (pending) {
-                    const p = JSON.parse(pending);
-                    open(p.name);
-                    step('Импорт продолжается в фоне…');
-                    watch(p.jobId, p.discId, p.name);
-                }
+                const elsewhere = document.getElementById('pull-elsewhere');
+                if (!elsewhere) return;
+                const href = d.org ? `/Admin/Competitions?q=${encodeURIComponent(d.org)}&sel=s${d.discId}` : null;
+                elsewhere.innerHTML = `<div class="mb-1">«<bdi>${esc(d.name)}</bdi>»</div><ol class="space-y-1 text-[12px]">${title}${linesHtml(lines)}</ol>`
+                    + '<div class="mt-1 text-[12px] text-admin-text-muted">Строка не видна при текущих фильтрах — сбрось их, чтобы увидеть её со стадией «импортировано»'
+                    + (href ? ` (<a class="text-admin-accent hover:underline" href="${href}">открыть</a>)` : '') + '.</div>';
+                elsewhere.classList.remove('hidden');
             }
 
-            return { open, step, finish, footer, watch, restore };
-        })();
+            // После reload: итог, или продолжение хода с той фазы, где он был.
+            function restore() {
+                const done = store.get(DONE_KEY);
+                if (done) { store.del(DONE_KEY); store.del(FLOW_KEY); showDone(done); return; }
 
-        pullPanel.restore();
+                const legacy = store.get(PENDING_KEY);
+                if (legacy) {
+                    store.del(PENDING_KEY);
+                    flow = { discId: String(legacy.discId), name: legacy.name, phase: 'importing', jobId: legacy.jobId,
+                        startedAt: Date.now(), lines: [], captions: {} };
+                }
+                flow = flow ?? store.get(FLOW_KEY);
+                if (!flow) return;
+                flow.lines ??= []; flow.captions ??= {};
+
+                if (flow.phase === 'parsing') {
+                    // Запрос разбора оборвала перезагрузка — запускаем его заново (это только превью).
+                    if (Date.now() - (flow.startedAt ?? 0) < RESTART_PARSE_MS && typeof window.discPreview === 'function') {
+                        window.discPreview(flow.discId, flow.repull, true);
+                    } else { flow = null; save(); }
+                    return;
+                }
+                if (flow.phase === 'preview') {
+                    if (!flow.p || Date.now() - (flow.previewAt ?? 0) > PREVIEW_TTL_MS) {
+                        finish('fail', 'Превью устарело (живёт 60 минут) — нажми «Затянуть» ещё раз.', 6);
+                        flow.p = null;
+                        commit('preview-expired');
+                        return;
+                    }
+                    render();
+                    window.discRestorePreview?.(flow);
+                    return;
+                }
+                if (flow.phase === 'importing') {
+                    step(7, 'Импорт продолжается в фоне…');
+                    commit();
+                    watch(flow.jobId);
+                    return;
+                }
+                render(); // сбои — видны, пока не нажмут «Затянуть» снова
+            }
+
+            return { start, isActive, previewReady, parseFailed, cancel, setCaption, saveForm, current,
+                importQueued, restore, render, step, finish, commit };
+        })();
 
         // ── Пакетное затягивание (docs/plans/bulk-pull-plan.md) ────────────────────
         // Забор идёт минутами и живёт на сервере: панель только поллит состояние, а batchId
@@ -816,33 +1011,87 @@
 
             // repull=true («Перезатянуть») — то же превью, но с заранее взведённой перезаписью:
             // намерение уже выражено кликом, второй раз спрашивать незачем.
-            window.discPreview = async function (id, repull) {
+            // Ход и превью — в панели своей строки (pullFlow); restarted — разбор, оборванный F5,
+            // pullFlow.restore запускает заново.
+            window.discPreview = async function (id, repull, restarted) {
                 const name = discName(id);
-                pullPanel.open(name);
-                pullPanel.step(repull
-                    ? 'Скачиваю протокол заново и разбираю…'
-                    : 'Скачиваю PDF с isr.org.il и разбираю…');
+                preview = null;
+                if (!pullFlow.start(id, name, repull)) return;
+                if (restarted) {
+                    pullFlow.current().lines.unshift({ step: 5, state: 'wait', text: 'Разбор прервала перезагрузка страницы — запускаю заново.' });
+                    pullFlow.commit();
+                }
                 try {
                     const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
+                    if (!pullFlow.isActive(id)) return; // пока шёл разбор, ход отменили или начали другой
                     preview = { previewId: p.previewId, id, name };
-                    // Превью живёт в правой области под панелями — помечаем, чьё оно: при выборе
-                    // другой строки списка его прячет атрибут hidden (см. «Выбор строки списка»).
-                    const card = document.getElementById('preview-card');
-                    card.dataset.discId = String(id);
-                    card.hidden = false;
+                    pullFlow.previewReady(p);
                     await showPreview(p, name, repull);
-                    pullPanel.finish('ok', `Распознано результатов: ${p.resultCount}`);
-                    pullPanel.step('Жду: проверь превью и нажми «Импортировать»');
-                    pullPanel.footer(
-                        repull && p.existingCompetitionId
-                            ? 'Перезапись существующих результатов уже включена. Превью живёт 15 минут.'
-                            : repull
-                                ? 'Совпадения с существующим соревнованием НЕ найдено — импорт создаст новое. Проверь дату и название.'
-                                : 'Превью живёт 15 минут.');
+                    updateRemaining();
+                    document.getElementById('preview-box').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } catch (e) {
-                    pullPanel.finish('fail', `Не удалось разобрать: ${esc(e.message)}`);
+                    if (pullFlow.isActive(id)) pullFlow.parseFailed(e.message);
                 }
             };
+
+            // Превью после F5: ответ разбора сохранён в pullFlow, на сервере оно живёт 60 минут по
+            // previewId — собираем блок заново и возвращаем выбор, сделанный в нём до перезагрузки.
+            window.discRestorePreview = async function (f) {
+                preview = { previewId: f.p.previewId, id: Number(f.discId), name: f.name };
+                await showPreview(f.p, f.name, f.repull);
+                applyForm(f.form);
+                updateRemaining();
+            };
+
+            // Выбор в превью (бассейн, флаги, категории, правило, событие, перезапись, «сомнительные»)
+            // — в pullFlow, чтобы F5 его не терял.
+            const FORM_IDS = ['flag-pool', 'flag-award', 'flag-championship', 'flag-masters', 'flag-club-off',
+                'preview-rule-clubs', 'event-select', 'event-name', 'overwrite-existing-cb', 'delete-missing-cb'];
+            function captureForm() {
+                const form = { cats: [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value),
+                    suspect: [...document.querySelectorAll('.suspect-flag:checked')].map(i => i.value) };
+                FORM_IDS.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) form[id] = el.type === 'checkbox' ? el.checked : el.value;
+                });
+                return form;
+            }
+            function applyForm(form) {
+                if (!form) return;
+                FORM_IDS.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el || !(id in form)) return;
+                    if (el.type === 'checkbox') el.checked = !!form[id]; else el.value = form[id];
+                    el.dispatchEvent(new Event('change'));
+                });
+                const cats = new Set(form.cats ?? []), sus = new Set(form.suspect ?? []);
+                document.querySelectorAll('.disc-cat').forEach(i => { i.checked = cats.has(i.value); });
+                document.querySelectorAll('.suspect-flag').forEach(i => { i.checked = sus.has(i.value); });
+                pullFlow.saveForm(captureForm()); // change выше сохранял промежуточный выбор
+            }
+
+            // Подпись шага 6: что ещё нужно до «Импортировать» (макет: «осталось: бассейн и 2 рекорда»).
+            function updateRemaining() {
+                const f = pullFlow.current();
+                if (!f?.p) return;
+                const pool = document.getElementById('flag-pool').value;
+                document.getElementById('pool-hint').classList.toggle('hidden', !!pool);
+                const recs = new Set((f.p.recordPreview?.rows ?? []).map(r => r.rowIndex)).size;
+                const left = [];
+                if (!pool && !f.p.existingCompetitionId) left.push('бассейн');
+                if (recs) left.push(`${recs} ${recs % 10 === 1 && recs % 100 !== 11 ? 'рекорд' : recs % 10 >= 2 && recs % 10 <= 4 && (recs % 100 < 12 || recs % 100 > 14) ? 'рекорда' : 'рекордов'}`);
+                const note = f.repull
+                    ? (f.p.existingCompetitionId ? ' · перезапись существующих результатов уже включена'
+                        : ' · совпадения с существующим соревнованием НЕ найдено — импорт создаст новое, проверь дату и название')
+                    : '';
+                pullFlow.setCaption(6, (left.length ? `осталось: ${left.join(' и ')}` : 'всё выбрано — нажми «Импортировать»') + note);
+            }
+
+            document.getElementById('preview-box').addEventListener('change', () => {
+                pullFlow.saveForm(captureForm());
+                updateRemaining();
+            });
+            document.getElementById('event-name').addEventListener('input', () => pullFlow.saveForm(captureForm()));
 
             // «Сколько рекордов побьёт файл» — считается сервером ДО «Применить» (Б2).
             // Настоящий рекорд редок: много рекордов разом почти всегда значит, что протокол
@@ -889,7 +1138,7 @@
                 // loglig). Без этих границ четыре разных по смыслу строки читались как одна
                 // простыня, и глазами не находилось, где кончается один заплыв.
                 box.innerHTML =
-                    `<div class="font-semibold">${many ? '⚠ ' : ''}Файл побьёт рекордов: ${rp.count}</div>` +
+                    `<div class="font-semibold">${many ? '⚠ ' : ''}Побьёт рекордов: ${rp.count}</div>` +
                     (many ? '<div class="text-admin-text-muted">Столько рекордов сразу — обычно признак того, что протокол разобрался неверно. Стоит посмотреть глазами до «Применить».</div>' : '') +
                     '<ul class="mt-2 space-y-2">' + [...byRow.values()].map(g => {
                         const s = g.swim;
@@ -904,7 +1153,7 @@
                             + `<div class="mt-1.5 border-t border-admin-border pt-1.5">`
                             + `<label class="flex items-center gap-1.5 cursor-pointer text-admin-text-muted">`
                             + `<input type="checkbox" class="suspect-flag cursor-pointer" value="${s.rowIndex}"`
-                            + ` data-note="${esc(suspectNote(g))}"> пометить заплыв сомнительным</label>`
+                            + ` data-note="${esc(suspectNote(g))}"> пометить сомнительным</label>`
                             // Сюда приезжает вердикт по карточке loglig (или поле для привязки
                             // id и пола, если пловец ещё не привязан) — см. loadRecordCheck.
                             + `<div class="record-check mt-1 text-[11.5px]" data-row="${s.rowIndex}" data-name="${esc(s.swimmerName)}"></div>`
@@ -1126,8 +1375,6 @@
             }
 
             async function showPreview(p, name, repull) {
-                document.getElementById('preview-card').classList.remove('hidden');
-                document.getElementById('preview-title').textContent = `Превью: ${name}`;
                 document.getElementById('preview-summary').innerHTML =
                     `Распознано результатов: <b>${p.resultCount}</b>` +
                     (p.competitions?.length
@@ -1226,7 +1473,6 @@
                     ).join('');
                 } catch { /* категории опциональны */ }
 
-                document.getElementById('preview-card').scrollIntoView({ behavior: 'smooth' });
             }
 
             // Штамповка loglig-id по протоколу уже импортированного соревнования. Идёт по
@@ -1422,7 +1668,8 @@
 
             document.getElementById('btn-cancel-preview').addEventListener('click', () => {
                 preview = null;
-                document.getElementById('preview-card').classList.add('hidden');
+                document.getElementById('preview-error').classList.add('hidden');
+                pullFlow.cancel();
             });
             document.getElementById('event-select').addEventListener('change', (e) => {
                 document.getElementById('event-name').classList.toggle('hidden', e.target.value !== '__new__');
@@ -1496,12 +1743,15 @@
                                 .map(i => ({ rowIndex: Number(i.value), note: i.dataset.note || null }))
                         })
                     });
-                    const { id: discId, name } = preview;
                     preview = null;
-                    document.getElementById('preview-card').classList.add('hidden');
-                    pullPanel.step('Импорт поставлен в очередь…');
-                    pullPanel.watch(r.jobId, discId, name);
-                } catch (e) { pullPanel.finish('fail', `Импорт не запустился: ${esc(e.message)}`); }
+                    document.getElementById('preview-error').classList.add('hidden');
+                    pullFlow.importQueued(r.jobId);
+                } catch (e) {
+                    // Превью остаётся открытым: поправить и нажать снова (истёк previewId — «Отмена» и «Затянуть»).
+                    const err = document.getElementById('preview-error');
+                    err.textContent = `Импорт не запустился: ${e.message}`;
+                    err.classList.remove('hidden');
+                }
             });
         })();
 
@@ -1830,4 +2080,5 @@
             });
         })();
 
-    
+        // Ход одиночного затягивания после F5 — когда все обработчики выше уже объявлены.
+        pullFlow.restore();

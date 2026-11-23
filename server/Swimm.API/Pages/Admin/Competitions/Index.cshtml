@@ -745,6 +745,84 @@
     }
     string RowEditUrl(int id, string key) =>
         $"/Admin/Competitions/Edit?id={id}&back={Uri.EscapeDataString(SelUrl(key))}";
+
+    // ── Правая панель-чек-лист (вариант E, этап 4; хэндофф 3.5) ─────────────────────────────
+    // Этап 4: только «ждёт затягивания», которой ещё нет в базе. Недотянутая многодневка (Р115) тоже
+    // «ждёт затягивания», но у неё есть дни в базе (Изменить, Качество, быстрая правка, Удалить) —
+    // их место в чек-листе рисует этап 6, до него у неё прежняя панель. Остальные состояния — этап 6.
+    bool IsChecklistRow(Swimm.Application.Dtos.UnifiedCompetitionRowDto u) =>
+        u.Db == null && u.Site != null && u.Status?.State == Swimm.Application.Mapping.CompetitionRowState.ReadyToPull;
+
+    (string Text, string? Title) StartListCaption(Swimm.Application.Dtos.UnifiedSiteInfo s)
+    {
+        if (s.StartList is not { } b) return ("не забирали", "Стартовый протокол с loglig ещё не затягивали");
+        var at = b.Last.PulledAt.ToLocalTime().ToString("dd.MM");
+        var text = b.Kind switch
+        {
+            Swimm.Application.Mapping.StartListBadgeKind.Ok => $"забран {at} · заявок {b.Last.Entries}",
+            Swimm.Application.Mapping.StartListBadgeKind.Partial => $"забран частично {at} · заявок {b.Last.Entries}",
+            Swimm.Application.Mapping.StartListBadgeKind.Empty => $"забирали {at} — пусто (посева на loglig нет)",
+            _ => $"забор {at} сорвался",
+        };
+        var title = "Последние заборы:\n" + string.Join("\n", b.History.Select(p =>
+            $"{p.PulledAt.ToLocalTime():dd.MM HH:mm} · {p.Status} · заявок {p.Entries} (+{p.Added} −{p.Removed} пересев {p.Moved})"));
+        return (text, title);
+    }
+
+    Swimm.API.Pages.Admin.Competitions.CompChecklistView ChecklistView(Swimm.Application.Dtos.UnifiedCompetitionRowDto u, string key)
+    {
+        var s = u.Site!;
+        var st = u.Status!;
+        var days = st.FirstDay is { } f && st.LastDay is { } l ? l.DayNumber - f.DayNumber + 1 : 1;
+        var input = new Swimm.Application.Mapping.ChecklistInput(st.State, Imported: u.Db != null,
+            StartList: s.StartList?.Kind, StartListStale: s.StartList?.Stale == true,
+            WarmUpDays: s.WarmUpDays, DayCount: days);
+        var none = Swimm.Application.Mapping.CompetitionChecklistRules.Build(input);
+        var phases = new Dictionary<string, string[]>
+        {
+            ["none"] = none.Select(Swimm.Application.Mapping.CompetitionChecklistRules.Code).ToArray(),
+        };
+        foreach (var ph in Swimm.Application.Mapping.CompetitionChecklistRules.LivePhases)
+            phases[Swimm.Application.Mapping.CompetitionChecklistRules.Code(ph)] = Swimm.Application.Mapping.CompetitionChecklistRules
+                .Build(input, ph).Select(Swimm.Application.Mapping.CompetitionChecklistRules.Code).ToArray();
+
+        var sl = StartListCaption(s);
+        var warm = s.WarmUpDays == 0 ? "не задана"
+            : s.WarmUpDays >= days ? (days > 1 ? $"задана на все {days} {DaysWord(days)}" : "задана")
+            : $"задана на {s.WarmUpDays} из {days} {DaysWord(days)}";
+        var found = s.DiscoveredAt == default ? "—" : Swimm.Application.Constants.IsraelTime.ToLocal(s.DiscoveredAt).ToString("dd.MM.yyyy");
+        var hasError = !string.IsNullOrEmpty(s.LastError);
+        var steps = new List<Swimm.API.Pages.Admin.Competitions.CompChecklistStep>
+        {
+            new(1, "Найден у федерации", found, none[0], "Когда забор «Входящих» впервые увидел старт на isr.org.il"),
+            new(2, "Стартовый протокол", sl.Text, none[1], sl.Title),
+            new(3, "Разминка", warm, none[2], "Время разминки по дням — руками, из регламента (תקנון)"),
+            new(4, "Старт прошёл", PanelDate(st), none[3]),
+            // Ошибка забора — подписью шага 5 (хэндофф, раздел 5: «не нарисовано, предложение»).
+            new(5, "Протокол скачан и разобран", hasError ? s.LastError! : "PDF с isr.org.il → разбор → превью", none[4],
+                hasError ? "Ошибка последнего забора" : null, CaptionDanger: hasError),
+            new(6, "Проверь превью", "бассейн, рекорды, флаги, категории, очки, событие", none[5]),
+            new(7, "Импорт", "1–5 минут, в фоне", none[6]),
+            new(8, "Проверка качества", "запустится сама после импорта", none[7]),
+            new(9, "После импорта", "Синхр. языки · Loglig-id · Промежуточные", none[8]),
+        };
+
+        var chips = DateChangeChipsHtml(s) + AutoPullChipHtml(s)
+            + (st.SuggestHide ? $"<span class=\"ml-1 inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-danger/15 text-admin-danger\" title=\"Пропал с сайта {Swimm.Application.Mapping.CompetitionRowStateRules.MissingSuggestHideDays}+ дн. назад, старт прошёл. Скрыть — «Скрыть» выше; само не закрывается.\">пропал {st.MissingDays} дн. — скрыть?</span>" : "");
+        var enc = (string? x) => System.Net.WebUtility.HtmlEncode(x ?? "");
+        var meta = $"<span title=\"ID соревнования на isr.org.il (OrgCompId)\">ID федерации {s.OrgCompId}</span>"
+            + $"<span dir=\"rtl\" title=\"Площадка и языки загруженных PDF\">{enc(s.Venue ?? "—")}{LangBadges(s.Languages)}</span>"
+            + "<span>бассейн —</span><span>строк —</span>"
+            + (Model.SeriesFor(s.Name) is { } series
+                ? $"<a href=\"/Admin/Series/Edit?id={series.Id}\" class=\"admin-badge border-admin-accent/30 bg-admin-accent/15 text-admin-accent\" title=\"Название содержит ключевую фразу серии — при затягивании дни привяжутся к её частям\">Series: {enc(series.Name)}</a>"
+                : "");
+        string? auto = s.AutoPullVerdict is { } v
+            ? $"auto: {Swimm.Application.Mapping.ResultsAutoVerdicts.Label(v)}" + (string.IsNullOrEmpty(s.AutoPullBlockedReason) ? "" : $" — {s.AutoPullBlockedReason}")
+            : null;
+
+        return new(u, key, RowName(u), PanelDate(st), StateText(st), StateChipCls(st), trophyHtml, chips, meta, steps,
+            System.Text.Json.JsonSerializer.Serialize(phases), auto, key == selKey);
+    }
 }
 
 <div class="grid grid-cols-[clamp(360px,34%,420px)_minmax(0,1fr)] items-start gap-4">
@@ -859,11 +937,12 @@
         }
     </section>
 
-    @* ── Правая колонка: выбранное соревнование. До этапа 4 здесь — прежняя панель строки
-       целиком (все действия, дни события, быстрая правка, «Изменить», «Удалить»); панели
-       отрисованы у всех строк страницы, видна одна (sel), JS переключает без перезагрузки.
-       Этап 4 заменит содержимое чек-листом. *@
+    @* ── Правая колонка: выбранное соревнование. Панели отрисованы у всех строк страницы, видна
+       одна (sel), JS переключает без перезагрузки. «Ждёт затягивания» (не в базе) — чек-лист
+       (_CompChecklist, этап 4); остальные — прежняя панель строки целиком, до этапа 6. *@
     <div id="comp-detail" data-auto-key="@(Model.AutoSelectedRow == null ? null : Swimm.Application.Mapping.CompetitionRowKey.Of(Model.AutoSelectedRow))" class="sticky top-4 max-h-[calc(100vh-2rem)] min-w-0 overflow-y-auto">
+        @* Затягивание, чья строка не на этой странице списка (другой месяц, фильтры): ход идёт, видно его здесь. *@
+        <div id="pull-elsewhere" class="admin-card mb-3 hidden px-4 py-2.5 text-[13px]"></div>
         <div id="panel-none" class="admin-card text-[13px] text-admin-text-muted @(selRow != null ? "hidden" : "")">
             @if (!string.IsNullOrEmpty(Model.Selected) && selRow == null)
             {
@@ -878,6 +957,11 @@
         @foreach (var u in items)
         {
             var rowKey = Swimm.Application.Mapping.CompetitionRowKey.Of(u);
+            if (IsChecklistRow(u))
+            {
+                <partial name="/Pages/Admin/Competitions/_CompChecklist.cshtml" model="ChecklistView(u, rowKey)" />
+                continue;
+            }
             var formRoute = RowRoute(rowKey);
             var head = u.Db?.Single ?? (u.Db?.Days.Count > 0 ? u.Db.Days[0] : null);
             var rowTitle = RowName(u);
@@ -1055,6 +1139,11 @@
                     }
                 </div>
 
+                @* Ход «Затянуть» / «Перезатянуть» прежней панели (шаги — тексты прежней панели «Затягивание»)
+                   и превью — здесь же, в панели своей строки (этап 4: плавающей панели хода больше нет). *@
+                <ol class="ck-log mt-3 hidden space-y-1 text-[12px]"></ol>
+                <div class="ck-preview-slot"></div>
+
                 @if (head != null && rowResults > 0)
                 {
                     @* Отчёт доклейки. Без «Сверки с файлом» он ЕДИНСТВЕННЫЙ контроль
@@ -1209,131 +1298,9 @@
             </div>
         }
 
-        <!-- Превью «затянутого» PDF перед импортом (перенос из /Admin/Discovery) -->
-        <div id="preview-card" class="admin-card mt-4 hidden p-4">
-            <div class="mb-2 text-sm font-semibold text-admin-text" id="preview-title"></div>
-            <div id="preview-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
-            <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
-            @* Сколько рекордов побьёт файл (Б2) — подсказка перед «Применить», не запрет. *@
-            <div id="preview-records" class="hidden"></div>
-        
-            @* Флаги соревнования: заполняются сами (регламент, название, файл, проба зачёта) и
-               правятся руками. До этого их ставили ПОСЛЕ импорта, в панели строки, и забывали. *@
-            <div class="mb-3 rounded-md border border-admin-border bg-admin-surface/60 p-3">
-                <div class="mb-1.5 text-[13px] text-admin-text-muted">
-                    Флаги соревнования — проставлены по регламенту, названию и файлу; проверьте:
-                </div>
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
-                    <label class="flex cursor-pointer items-center gap-1.5" title="Вручают медали">
-                        <input type="checkbox" id="flag-award" class="cursor-pointer" /> Awards (медали)
-                    </label>
-                    <label class="flex cursor-pointer items-center gap-1.5" title="Чемпионат Израиля">
-                        <input type="checkbox" id="flag-championship" class="cursor-pointer" /> 🏆 Чемпионат Израиля
-                    </label>
-                    <label class="flex cursor-pointer items-center gap-1.5" title="Мастерс">
-                        <input type="checkbox" id="flag-masters" class="cursor-pointer" /> Masters
-                    </label>
-                    <label class="flex cursor-pointer items-center gap-1.5" title="Клубный зачёт на этом старте не ведётся">
-                        <input type="checkbox" id="flag-club-off" class="cursor-pointer" /> клубный зачёт не ведётся
-                    </label>
-                    <label class="flex items-center gap-1.5">
-                        бассейн:
-                        <select id="flag-pool" class="admin-input w-auto py-0.5 px-1.5 text-[12.5px]">
-                            <option value="">— не задан —</option>
-                            <option value="25m">25 м</option>
-                            <option value="50m">50 м</option>
-                        </select>
-                    </label>
-                </div>
-                <div id="flag-reasons" class="mt-1.5 space-y-0.5 text-[11.5px] text-admin-text-muted"></div>
-            </div>
-        
-            <div class="mb-3">
-                <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Категории</div>
-                <div id="preview-categories" class="flex flex-wrap gap-3 text-[13px]"></div>
-            </div>
-        
-            @* Официальный клубный зачёт (דירוג מועדונים) на loglig: есть ли он и по какой шкале.
-               Кнопка зачёта есть у ВСЕХ соревнований — признак только непустая таблица, поэтому
-               проверку делает сервер. Если шкала опознана, правило подставляется в селект ниже. *@
-            <div class="mb-3">
-                <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">Клубные очки</div>
-                <div id="preview-standing" class="mb-2 rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted">
-                    Проверяю официальный зачёт…
-                </div>
-                <select id="preview-rule-clubs" class="admin-input w-full max-w-md rounded-md px-3 py-2 text-[13px]">
-                    <option value="">Авто (по дате и типу)</option>
-                    @foreach (var r in Model.ClubRules)
-                    {
-                        <option value="@r.Id">@r.Version@(r.ManualOnly ? " · manual" : "")</option>
-                    }
-                </select>
-        
-                @* Зачёт есть, а правила под его шкалу нет: заводим прямо отсюда, иначе цикл
-                   «уйти на /Admin/PointsRules → завести → вернуться → перезатянуть». Кнопка, а не
-                   галочка «создать автоматически»: шкала снята эвристикой, и админ должен увидеть,
-                   что именно заводит (у גביע האביב 2026 регламент вдобавок содержал условие сверх
-                   шкалы — машине его не видно). *@
-                <div id="preview-rule-create" class="mt-2 hidden rounded-md border border-[rgba(255,213,79,0.4)] bg-[rgba(255,213,79,0.08)] p-3">
-                    <div class="mb-2 text-[12.5px] text-admin-text">
-                        Шкалы этого зачёта нет ни в одном правиле. Завести новое по снятой шкале?
-                    </div>
-                    <div id="preview-rule-scale" class="mb-2 font-mono text-[12px] text-admin-text-muted"></div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <input type="text" id="preview-rule-version" class="admin-input min-w-[220px] rounded-md px-3 py-2 text-[13px]"
-                               placeholder="Версия правила" />
-                        <button type="button" id="btn-create-rule" class="admin-btn admin-btn-ghost">Завести правило по этой шкале</button>
-                        <span class="text-[12px] text-admin-text-muted">manual · эстафеты ×2</span>
-                    </div>
-                </div>
-            </div>
-        
-            <div class="mb-3 hidden" id="overwrite-block">
-                <label class="inline-flex items-center gap-2 text-[13px] text-admin-text bg-[rgba(255,213,79,0.08)] border border-[rgba(255,213,79,0.3)] rounded-md py-2 px-3 cursor-pointer">
-                    <input type="checkbox" id="overwrite-existing-cb">
-                    Обновить существующее соревнование <span id="overwrite-comp-name" class="text-admin-text-muted"></span> (upsert: сматченные результаты обновятся на месте, медиа сохранится)
-                </label>
-                <label id="delete-missing-block" class="hidden mt-2 inline-flex items-center gap-2 text-[13px] text-admin-text bg-admin-danger/5 border border-admin-danger/30 rounded-md py-2 px-3 cursor-pointer">
-                    <input type="checkbox" id="delete-missing-cb">
-                    Удалять результаты, которых нет в файле
-                </label>
-                <div id="overwrite-delete-warning" class="hidden mt-2 text-[13px] text-admin-danger border-l-[3px] border-l-admin-danger bg-admin-danger/5 rounded-md py-2 px-3"></div>
-            </div>
-        
-            <div class="mb-4" id="event-block">
-                <div class="mb-1 text-[12px] font-semibold uppercase tracking-wide text-admin-text-muted">
-                    Многодневное событие (второй день того же турнира — выбери существующее)
-                </div>
-                <select id="event-select" class="admin-input w-full max-w-md rounded-md px-3 py-2 text-[13px]">
-                    <option value="">Без события (однодневное)</option>
-                    <option value="__new__">➕ Создать новое событие…</option>
-                </select>
-                <input type="text" id="event-name" class="admin-input mt-2 hidden w-full max-w-md rounded-md px-3 py-2 text-[13px]" placeholder="Название события" />
-            </div>
-        
-            <div class="flex gap-3">
-                <button id="btn-import" class="admin-btn admin-btn-primary cursor-pointer">Импортировать</button>
-                <button id="btn-cancel-preview" class="cursor-pointer rounded-md border border-admin-border px-4 py-2 text-[13px] text-admin-text-muted">Отмена</button>
-            </div>
-        </div>
+        @* Превью — шаг 6 чек-листа; JS переносит блок в слот панели своей строки (этап 4). *@
+        <partial name="/Pages/Admin/Competitions/_CompPreview.cshtml" model="Model.ClubRules" />
     </div>
-</div>
-
-@* Ход затягивания: закреплённая панель справа внизу. Раньше шаги уходили в тост, который
-   гаснет через несколько секунд — а затягивание идёт минуты (скачивание PDF, парсинг,
-   фоновый job), и админ терял из виду, чем всё кончилось. Панель живёт до закрытия,
-   переживает перезагрузку страницы (sessionStorage) и сама показывает итог. *@
-<div id="pull-panel"
-     class="fixed bottom-4 right-4 z-50 hidden w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-admin-border bg-admin-surface p-4 text-admin-text shadow-xl shadow-black/50">
-    <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-            <h2 class="text-sm font-semibold text-white">Затягивание</h2>
-            <div id="pull-name" class="mt-0.5 truncate text-[12px] text-admin-text-muted" dir="rtl" style="text-align:left"></div>
-        </div>
-        <button type="button" id="pull-close" class="admin-btn admin-btn-ghost py-1 px-2.5" title="Закрыть">✕</button>
-    </div>
-    <ol id="pull-steps" class="mt-3 space-y-1.5 text-[12.5px]"></ol>
-    <div id="pull-footer" class="mt-3 hidden text-[12px] text-admin-text-muted"></div>
 </div>
 
 @* Качество результатов: список помеченных строк + прогон проверок. Пометка НЕ скрывает
@@ -1462,7 +1429,7 @@
         Model.Result.Items.Where(u => u.Site != null)
             .GroupBy(u => u.Site!.DiscoveredId).Select(g => g.First())
             .ToDictionary(u => u.Site!.DiscoveredId.ToString(),
-                u => new { name = u.Site!.Name, languages = u.Site!.Languages })));
+                u => new { name = u.Site!.Name, languages = u.Site!.Languages, orgCompId = u.Site!.OrgCompId })));
 </script>
 <script src="~/js/admin/competitions-index.js" asp-append-version="true"></script>
 }

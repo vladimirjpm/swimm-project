@@ -123,7 +123,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 EmptySourceAt = d.EmptySourceAt, Discipline = d.Discipline,
                 AutoPullVerdict = d.AutoPullVerdict, AutoPullBlockedReason = d.AutoPullBlockedReason,
                 AutoPullCheckedAt = d.AutoPullCheckedAt, AutoPullPoolType = d.AutoPullPoolType,
-                PreviousDateStart = d.PreviousDateStart, MissingSince = d.MissingSince
+                PreviousDateStart = d.PreviousDateStart, MissingSince = d.MissingSince,
+                DiscoveredAt = d.DiscoveredAt
             };
 
             // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.
@@ -295,6 +296,15 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var now = DateTime.UtcNow;
         foreach (var site in rows.Select(r => r.Site).OfType<UnifiedSiteInfo>())
             site.StartList = StartListBadgeRules.Evaluate(byOrg[site.OrgCompId], site.DateStart, now);
+
+        // Разминка по дням (шаг 3 чек-листа панели) — тем же одним запросом на страницу.
+        var warmUps = await _db.CompetitionWarmUps.AsNoTracking()
+            .Where(w => orgIds.Contains(w.OrgCompId))
+            .GroupBy(w => w.OrgCompId)
+            .Select(g => new { OrgCompId = g.Key, Days = g.Count() })
+            .ToDictionaryAsync(x => x.OrgCompId, x => x.Days);
+        foreach (var site in rows.Select(r => r.Site).OfType<UnifiedSiteInfo>())
+            site.WarmUpDays = warmUps.GetValueOrDefault(site.OrgCompId);
     }
 
     /// <summary>
