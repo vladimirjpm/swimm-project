@@ -137,6 +137,15 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
                 "Парсер не распознал ни одного результата — формат протокола изменился? (B4)");
         }
 
+        // Все строки — неявка (NS/DNS): соревнование не проводилось или результаты не внесены
+        // (compID 14676). Протокола по сути нет — та же пометка, что у пустого PDF; снимется
+        // сама, когда при следующем «Затянуть» в файле появится хоть одно время.
+        if (NoStartProtocol.AllNoStart(parsed.ResultsJson))
+        {
+            await _discovery.SetEmptySourceAsync(discoveredId, true, "auto", ct);
+            return DiscoveryPreviewResult.Failed(NoStartProtocol.Message(parsed.ResultCount));
+        }
+
         // Разобралось — значит протокол всё-таки есть: снимаем прежнюю пометку «пусто»
         // (файл могли выложить позже, и строка не должна оставаться зачёркнутой навсегда).
         await _discovery.SetEmptySourceAsync(discoveredId, false, "auto", ct);
