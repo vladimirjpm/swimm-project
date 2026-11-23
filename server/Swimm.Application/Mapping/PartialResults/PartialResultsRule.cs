@@ -46,7 +46,13 @@ public static class PartialResultsRule
 
     public static PartialResultsState Apply(PartialResultsState current, CompetitionProgressSummary progress, DateTime now)
     {
-        if (progress.IsFinished) return PartialResultsState.Complete;
+        // Полный протокол дня — отметка снята. «Принято как есть» БЕЗ отметки — это принятие
+        // «затянуто меньше дней, чем по сайту» (решение Влада 23.11.2026): оно про событие, а не про
+        // протокол дня, и переимпорт полного дня его не отменяет.
+        if (progress.IsFinished)
+            return current.Note is null && current.AcceptedAt is not null
+                ? PartialResultsState.Complete with { AcceptedAt = current.AcceptedAt }
+                : PartialResultsState.Complete;
 
         var note = Clip(ResultsAutoRules.JoinReasons(progress.PendingLines()) ?? "результаты неполные");
         var noteEn = Clip(progress.PendingTextEn() ?? "Some events have no results yet");

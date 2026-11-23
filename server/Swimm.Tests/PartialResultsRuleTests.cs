@@ -67,6 +67,19 @@ public class PartialResultsRuleTests
     }
 
     [Fact]
+    public void Missing_days_acceptance_survives_reimport_of_a_complete_day()
+    {
+        // «Затянуто меньше дней, чем по сайту — принято» хранится как AcceptedAt без отметки
+        // (решение Влада 23.11.2026): полный переимпорт дня его не снимает.
+        var accepted = PartialResultsState.Complete with { AcceptedAt = T1 };
+        var s = PartialResultsRule.Apply(accepted, Partial16903(missingRelays: 0), T2);
+
+        Assert.Equal(T1, s.AcceptedAt);
+        Assert.Null(s.Note);
+        Assert.False(s.IsShown);
+    }
+
+    [Fact]
     public void Accepted_survives_reimport_of_the_same_partial_protocol()
     {
         var partial = PartialResultsRule.Apply(PartialResultsState.Complete, Partial16903(), T1);

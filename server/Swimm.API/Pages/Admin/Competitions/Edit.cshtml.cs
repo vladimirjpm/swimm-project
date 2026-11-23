@@ -81,8 +81,8 @@ public class EditModel : PageModel
 
         await _audit.LogAsync(accepted ? "competition.partial-accept" : "competition.partial-unaccept",
             "Competition", Id!.Value.ToString(),
-            accepted ? "Неполные результаты приняты как есть" : "Отметка «результаты неполные» возвращена");
-        TempData["Flash"] = accepted ? "Принято как есть — отметка скрыта" : "Отметка «результаты неполные» возвращена";
+            accepted ? "Неполные результаты (или недостающие дни по сайту) приняты как есть" : "Принятие «как есть» снято");
+        TempData["Flash"] = accepted ? "Принято как есть" : "Принятие «как есть» снято";
         return RedirectToSelf(Id);
     }
 

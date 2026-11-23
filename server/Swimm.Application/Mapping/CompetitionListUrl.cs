@@ -65,6 +65,43 @@ public static class CompetitionListUrl
     public static bool ShouldOpenOnCurrentMonth(IEnumerable<KeyValuePair<string, string?>> query) =>
         !query.Any(kv => !string.IsNullOrWhiteSpace(kv.Value));
 
+    /// <summary>Имя, под которым ФОРМА фильтров шлёт сезон (не <c>season</c>): отличает форму от готовой ссылки.</summary>
+    public const string FormSeasonKey = "fseason";
+    /// <summary>Имя, под которым форма фильтров шлёт месяц (не <c>month</c>).</summary>
+    public const string FormMonthKey = "fmonth";
+
+    /// <summary>
+    /// Адрес после отправки формы фильтров (решение Влада 23.11.2026): «поиск — всегда по всем
+    /// сезонам, остальные фильтры держат месяц». Форма шлёт сезон и месяц как <see cref="FormSeasonKey"/> /
+    /// <see cref="FormMonthKey"/>; здесь они становятся <c>season</c>/<c>month</c> — или выбрасываются,
+    /// если в <c>q</c> что-то есть. Готовые ссылки с <c>q</c> и <c>season</c> (Jobs «Что изменилось»)
+    /// этих ключей не несут и не трогаются: возвращается null. Пустые значения и <c>p</c> (новая
+    /// выборка — первая страница) в адрес не идут; остальное — как пришло.
+    /// </summary>
+    public static IReadOnlyList<KeyValuePair<string, string>>? FormRedirect(IEnumerable<KeyValuePair<string, string?>> query)
+    {
+        var all = query.ToList();
+        if (!all.Any(kv => kv.Key.Equals(FormSeasonKey, StringComparison.OrdinalIgnoreCase)
+                        || kv.Key.Equals(FormMonthKey, StringComparison.OrdinalIgnoreCase)))
+            return null;
+
+        string? Get(string key) => all.FirstOrDefault(kv => kv.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value;
+        var searching = !string.IsNullOrWhiteSpace(Get("q"));
+        var result = new List<KeyValuePair<string, string>>();
+        foreach (var (key, value) in all)
+        {
+            if (string.IsNullOrWhiteSpace(value)) continue;
+            if (key.Equals("p", StringComparison.OrdinalIgnoreCase)) continue;
+            var isSeason = key.Equals(FormSeasonKey, StringComparison.OrdinalIgnoreCase) || key.Equals("season", StringComparison.OrdinalIgnoreCase);
+            var isMonth = key.Equals(FormMonthKey, StringComparison.OrdinalIgnoreCase) || key.Equals("month", StringComparison.OrdinalIgnoreCase);
+            if ((isSeason || isMonth) && searching) continue;
+            var name = isSeason ? "season" : isMonth ? "month" : key;
+            if (result.Any(kv => kv.Key == name)) continue;
+            result.Add(new(name, value!.Trim()));
+        }
+        return result;
+    }
+
     /// <summary>Текущий сезон (год окончания, нумерация федерации) и месяц по местной дате.</summary>
     public static (int Season, int Month) CurrentSeasonMonth(DateOnly today)
     {

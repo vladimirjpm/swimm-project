@@ -55,6 +55,12 @@ public sealed class CompetitionListItemDto : ICompetitionFlags
     /// принята как есть, <c>PartialResultsState.IsShownFor</c>). null — показывать нечего.
     /// </summary>
     public string? PartialResults { get; set; }
+    /// <summary>
+    /// «Затянуто меньше дней, чем по сайту — принято как есть» (решение Влада 23.11.2026): у дня
+    /// стоит <c>PartialResultsAcceptedAt</c> при пустой отметке <c>PartialResults</c>. Без миграции:
+    /// все прочие читатели смотрят AcceptedAt только вместе с отметкой.
+    /// </summary>
+    public bool MissingDaysAccepted { get; set; }
     /// <summary>Привязанное правило клубных очков; null — «Авто» (для панели быстрой правки).</summary>
     public int? PointRuleClubsId { get; set; }
     /// <summary>Привязанное правило High Point; null — «Авто».</summary>
@@ -167,6 +173,18 @@ public sealed class CompetitionEditDto
     public DateTime? PartialResultsAt { get; set; }
     /// <summary>Когда админ принял неполный протокол как есть; null — не принимал.</summary>
     public DateTime? PartialResultsAcceptedAt { get; set; }
+
+    /// <summary>Разных дней старта в базе у этого соревнования (у дня события — у всего события).</summary>
+    public int DbDayCount { get; set; } = 1;
+    /// <summary>Дней в диапазоне сайта федерации (строка «Входящих» по OrgCompId); null — не найдена.</summary>
+    public int? SiteDayCount { get; set; }
+    /// <summary>
+    /// «Затянуто меньше дней, чем по сайту — принято как есть» (решение Влада 23.11.2026): когда
+    /// принято у любого дня (AcceptedAt при пустой отметке); null — не принималось.
+    /// </summary>
+    public DateTime? MissingDaysAcceptedAt { get; set; }
+    /// <summary>Дней в базе меньше, чем по сайту, — блок «затянуто N из M дней» на Edit.</summary>
+    public bool ShortOfSiteDays => Mapping.CompetitionRowStateRules.ShortOfSiteDays(DbDayCount, SiteDayCount);
 }
 
 /// <summary>URL PDF-результатов соревнования (связь по OrgCompId).</summary>

@@ -192,14 +192,67 @@ public class CompetitionStateCountersTests
     }
 
     [Fact]
-    public async Task DayByDay_WithoutPartialMark_StaysClosed_AsInTheHandoff()
+    public async Task DayByDay_WithoutPartialMark_IsRunningUntilTheSiteLastDay_ThenClosed()
     {
-        // Вопрос Владу открыт («закрыто или идёт?»); пока правило хэндоффа: в базе = закрыто.
-        await using var db = await SeedDayByDayAsync(nameof(DayByDay_WithoutPartialMark_StaysClosed_AsInTheHandoff), partial: false);
-        var row = (await new CompetitionAdminRepository(db)
-            .GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 22))).Page.Items.Single();
-        Assert.Equal(CompetitionRowState.Closed, row.Status!.State);
-        Assert.Equal(3, row.Status.DayCount); // диапазон всё равно по сайту
+        // Решение Влада 23.11.2026: затянутая по дням многодневка без «неполные» — «идёт», пока
+        // последний день по сайту федерации не прошёл; после — закрыто. Счётчики — в «впереди».
+        await using var db = await SeedDayByDayAsync(nameof(DayByDay_WithoutPartialMark_IsRunningUntilTheSiteLastDay_ThenClosed), partial: false);
+        var repo = new CompetitionAdminRepository(db);
+
+        var mid = await repo.GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 22));
+        var row = mid.Page.Items.Single();
+        Assert.Equal(CompetitionRowState.Running, row.Status!.State);
+        Assert.Equal((2, 3), (row.Status.RunningDay!.Value, row.Status.DayCount)); // диапазон по сайту
+        Assert.Equal(1, mid.ListStates!.AheadTotal);
+        Assert.Equal(0, mid.ListStates.Closed);
+        // Полоса сезона и месяца сходятся со списком.
+        Assert.Equal(1, mid.SeasonCounts!.Single().States.AheadTotal);
+        Assert.Equal(1, mid.MonthStates![10].Running);
+
+        // После последнего дня: в базе 1 день из 3 по сайту — «ждём протокол · неполный»
+        // (решение Влада 23.11.2026, недотянутая многодневка); счётчики — в долге.
+        var afterList = await repo.GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 24));
+        var after = afterList.Page.Items.Single().Status!;
+        Assert.Equal(CompetitionRowState.WaitingProtocol, after.State);
+        Assert.Equal(WaitingProtocolReason.Incomplete, after.Reason);
+        Assert.Equal((1, 3), (after.PulledDays!.Value, after.SiteDays!.Value));
+        Assert.Equal(1, afterList.ListStates!.Debt);
+        Assert.Equal(1, afterList.SeasonCounts!.Single().States.Debt);
+        Assert.Equal(1, afterList.MonthStates![10].WaitingProtocol);
+    }
+
+    [Fact]
+    public async Task DayByDay_ShortOfSiteDays_AcceptedAsIs_IsClosed()
+    {
+        // «Принять как есть» без отметки: AcceptedAt при пустой PartialResults у дня — строка закрыта.
+        await using var db = await SeedDayByDayAsync(nameof(DayByDay_ShortOfSiteDays_AcceptedAsIs_IsClosed), partial: false);
+        (await db.Competitions.FindAsync(50))!.PartialResultsAcceptedAt = D(2026, 11, 24);
+        await db.SaveChangesAsync();
+
+        var list = await new CompetitionAdminRepository(db)
+            .GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 25));
+        var row = list.Page.Items.Single().Status!;
+        Assert.Equal(CompetitionRowState.Closed, row.State);
+        Assert.Equal(1, list.ListStates!.Closed);
+        Assert.Equal(0, list.ListStates.Debt);
+    }
+
+    [Fact]
+    public async Task MissingDaysAccept_OnEdit_AcceptsAndUnaccepts_WithoutPartialMark()
+    {
+        await using var db = await SeedDayByDayAsync(nameof(MissingDaysAccept_OnEdit_AcceptsAndUnaccepts_WithoutPartialMark), partial: false);
+        var repo = new CompetitionAdminRepository(db);
+
+        var edit = (await repo.GetByIdAsync(50))!;
+        Assert.Equal((1, 3), (edit.DbDayCount, edit.SiteDayCount!.Value));
+        Assert.True(edit.ShortOfSiteDays);
+        Assert.Null(edit.MissingDaysAcceptedAt);
+
+        Assert.True((await repo.SetPartialResultsAcceptedAsync(50, accepted: true)).Success);
+        Assert.NotNull((await repo.GetByIdAsync(50))!.MissingDaysAcceptedAt);
+
+        Assert.True((await repo.SetPartialResultsAcceptedAsync(50, accepted: false)).Success);
+        Assert.Null((await repo.GetByIdAsync(50))!.MissingDaysAcceptedAt);
     }
 
     // ── «✓ имп.» вручную: в базе строки нет, но её закрыл человек ─────────────

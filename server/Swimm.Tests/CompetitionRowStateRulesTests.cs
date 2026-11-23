@@ -173,6 +173,118 @@ public class CompetitionRowStateRulesTests
         Assert.Equal(CompetitionRowState.Running, CompetitionRowStateRules.Evaluate(input, Fri.AddDays(1)).State);
     }
 
+    // ── Решение Влада 23.11.2026: затянутая по дням многодневка без «неполные» ──────────
+
+    [Theory]
+    [InlineData(CompetitionStage.Imported)]
+    [InlineData(CompetitionStage.DbOnly)]
+    public void PulledByDays_WithoutPartialMark_IsRunning_UntilLastDay_ThenClosed(CompetitionStage stage)
+    {
+        // Старт пт–вс, первый день затянули в субботу; по сайту последний день — воскресенье.
+        var input = new CompetitionRowStateInput(stage, Fri, Fri.AddDays(2));
+        var sat = CompetitionRowStateRules.Evaluate(input, Fri.AddDays(1));
+        Assert.Equal(CompetitionRowState.Running, sat.State);
+        Assert.Equal(2, sat.RunningDay);
+        Assert.Equal(3, sat.DayCount);
+        Assert.Equal(CompetitionStateBucket.Ahead, sat.Bucket); // в полосах — «впереди», как любой «идёт»
+        Assert.Equal(CompetitionRowState.Running, CompetitionRowStateRules.Evaluate(input, Fri.AddDays(2)).State);
+
+        var mon = CompetitionRowStateRules.Evaluate(input, Fri.AddDays(3));
+        Assert.Equal(CompetitionRowState.Closed, mon.State);
+        Assert.False(mon.NothingToPull);
+    }
+
+    [Fact]
+    public void ImportedOneDay_OnTheDay_StaysClosed()
+    {
+        // Правило «идёт» у затянутого — только для многодневки: однодневный, затянутый в день
+        // старта, закрыт сразу.
+        var s = CompetitionRowStateRules.Evaluate(new CompetitionRowStateInput(CompetitionStage.Imported, Fri, Fri), Fri);
+        Assert.Equal(CompetitionRowState.Closed, s.State);
+    }
+
+    // ── Решение Влада 23.11.2026: недотянутая многодневка ─────────────────────────────
+
+    private static CompetitionRowStatus Pulled(DateOnly today, int dbDays, int? siteDays, bool accepted = false,
+        CompetitionStage stage = CompetitionStage.Imported) =>
+        CompetitionRowStateRules.Evaluate(new CompetitionRowStateInput(
+            stage, Fri, Fri.AddDays((siteDays ?? 1) - 1),
+            DbDayCount: dbDays, SiteDayCount: siteDays, MissingDaysAccepted: accepted), today);
+
+    [Fact]
+    public void PulledTwoOfThree_AfterLastDay_IsWaitingProtocol_Incomplete()
+    {
+        var s = Pulled(Fri.AddDays(3), dbDays: 2, siteDays: 3);
+        Assert.Equal(CompetitionRowState.WaitingProtocol, s.State);
+        Assert.Equal(WaitingProtocolReason.Incomplete, s.Reason);
+        Assert.Equal((2, 3), (s.PulledDays!.Value, s.SiteDays!.Value));
+        Assert.Equal(CompetitionStateBucket.Debt, s.Bucket);
+        // Пока последний день по сайту не прошёл — «идёт», как у любой затянутой по дням.
+        Assert.Equal(CompetitionRowState.Running, Pulled(Fri.AddDays(2), dbDays: 2, siteDays: 3).State);
+    }
+
+    [Fact]
+    public void PulledTwoOfThree_AcceptedAsIs_IsClosed()
+    {
+        var s = Pulled(Fri.AddDays(3), dbDays: 2, siteDays: 3, accepted: true);
+        Assert.Equal(CompetitionRowState.Closed, s.State);
+        Assert.Null(s.PulledDays);
+    }
+
+    [Theory]
+    [InlineData(1, 1)] // однодневное
+    [InlineData(3, 3)] // затянуто полностью
+    [InlineData(4, 3)] // в базе дней больше, чем по сайту — не долг
+    public void FullyPulled_IsClosed(int dbDays, int siteDays) =>
+        Assert.Equal(CompetitionRowState.Closed, Pulled(Fri.AddDays(5), dbDays, siteDays).State);
+
+    [Fact]
+    public void DbOnly_WithoutSite_IsClosed() =>
+        Assert.Equal(CompetitionRowState.Closed, Pulled(Fri.AddDays(5), dbDays: 1, siteDays: null, stage: CompetitionStage.DbOnly).State);
+
+    // ── Решение Влада 23.11.2026: «пропал N дн. — скрыть?» ─────────────────────────
+
+    private static CompetitionRowStatus Missing(DateOnly today, DateOnly start, DateOnly missingSince,
+        CompetitionStage stage = CompetitionStage.OnSite) =>
+        CompetitionRowStateRules.Evaluate(new CompetitionRowStateInput(
+            stage, start, start, MissingSinceDay: missingSince), today);
+
+    [Fact]
+    public void Missing_AfterStart_IsStillDebt_AndSuggestsHide_FromThreshold()
+    {
+        var gone = Fri.AddDays(-10);
+        var before = Missing(gone.AddDays(CompetitionRowStateRules.MissingSuggestHideDays - 1), Fri.AddDays(-12), gone);
+        Assert.Equal(CompetitionStateBucket.Debt, before.Bucket);
+        Assert.Equal(CompetitionRowStateRules.MissingSuggestHideDays - 1, before.MissingDays);
+        Assert.False(before.SuggestHide);
+
+        var at = Missing(gone.AddDays(CompetitionRowStateRules.MissingSuggestHideDays), Fri.AddDays(-12), gone);
+        Assert.Equal(CompetitionRowState.ReadyToPull, at.State); // сама не закрывается
+        Assert.True(at.SuggestHide);
+    }
+
+    [Fact]
+    public void Missing_CountsFromMissingSince_NotFromStartDate()
+    {
+        // Старт прошёл месяц назад, а пропал вчера — предлагать скрыть рано.
+        var s = Missing(Fri, Fri.AddDays(-30), Fri.AddDays(-1));
+        Assert.Equal(1, s.MissingDays);
+        Assert.False(s.SuggestHide);
+    }
+
+    [Fact]
+    public void Missing_BeforeStart_NeverSuggestsHide()
+    {
+        var s = Missing(Fri, Fri.AddDays(5), Fri.AddDays(-20));
+        Assert.Equal(CompetitionRowState.Ahead, s.State);
+        Assert.Equal(20, s.MissingDays);
+        Assert.False(s.SuggestHide);
+    }
+
+    [Fact]
+    public void Missing_Closed_NeverSuggestsHide() =>
+        Assert.False(Missing(Fri, Fri.AddDays(-30), Fri.AddDays(-20), CompetitionStage.Ignored).SuggestHide);
+
     [Fact]
     public void UnknownDate_IsReadyToPull_SoItShowsUpInDebt() =>
         Assert.Equal(CompetitionRowState.ReadyToPull, CompetitionRowStateRules.Evaluate(

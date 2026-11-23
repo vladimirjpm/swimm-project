@@ -95,6 +95,8 @@
             const form = document.getElementById('filters-form');
             if (!form) return;
             form.addEventListener('submit', () => {
+                // Сезон и месяц уходят как fseason/fmonth: «поиск — по всем сезонам» решает сервер
+                // (CompetitionListUrl.FormRedirect), чтобы работало и без JS.
                 form.querySelectorAll('input[name], select[name]').forEach(el => {
                     if (el.type === 'checkbox') { if (!el.checked) el.disabled = true; }
                     else if (el.value === '') el.disabled = true;
@@ -105,33 +107,54 @@
                 el.addEventListener('change', () => form.requestSubmit()));
         })();
 
-        // Одна панель на строку: действия + дни события + быстрая правка. Состояние открытых
-        // строк переживает перезагрузку (после сохранения страница редиректится) — sessionStorage.
+        // Выбор строки списка (вариант E, этап 3): клик по строке открывает её панель справа.
+        // Выбор живёт в адресе (?sel=), поэтому F5 и «назад» возвращают ту же панель; панели всех
+        // строк страницы отрисованы сервером, JS только переключает видимую и пишет адрес
+        // (pushState) — без перезагрузки. Без JS ссылка строки ведёт на тот же адрес.
         (function () {
-            const KEY = 'admin-competitions-open-rows';
-            const open = new Set(JSON.parse(sessionStorage.getItem(KEY) || '[]'));
+            const rows = [...document.querySelectorAll('.comp-row[data-key]')];
+            const box = document.getElementById('comp-detail');
+            if (!rows.length || !box) return;
 
-            const apply = (btn, isOpen) => {
-                const panel = document.getElementById('panel-' + btn.dataset.key);
-                if (!panel) return;
-                panel.classList.toggle('hidden', !isOpen);
-                btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-                btn.textContent = isOpen ? '▾ Закрыть' : '▸ Открыть';
-                // Подсветка: строка-заголовок и её панель — один блок. Без неё при
-                // нескольких раскрытых строках непонятно, что именно сейчас тянется.
-                btn.closest('tr')?.classList.toggle('row-open', isOpen);
-                panel.classList.toggle('row-panel-open', isOpen);
+            // sel=s{N} находит и уже затянутую строку (ключ у неё c…/e…) — как CompetitionRowKey.Matches.
+            // Без sel в адресе справа — автовыбор сервера: первая «ждёт затягивания» (data-auto-key).
+            const keyFor = sel => {
+                if (!sel) return box.dataset.autoKey || null;
+                if (rows.some(r => r.dataset.key === sel)) return sel;
+                const m = /^s(\d+)$/i.exec(sel);
+                return m ? (rows.find(r => r.dataset.discId === m[1])?.dataset.key ?? null) : null;
             };
 
-            document.querySelectorAll('.row-toggle').forEach(btn => {
-                if (open.has(btn.dataset.key)) apply(btn, true);
-                btn.addEventListener('click', () => {
-                    const isOpen = btn.getAttribute('aria-expanded') !== 'true';
-                    apply(btn, isOpen);
-                    isOpen ? open.add(btn.dataset.key) : open.delete(btn.dataset.key);
-                    sessionStorage.setItem(KEY, JSON.stringify([...open]));
-                });
-            });
+            function show(key) {
+                const panel = key ? document.getElementById('panel-' + key) : null;
+                box.querySelectorAll('.row-panel').forEach(p => p.classList.toggle('hidden', p !== panel));
+                document.getElementById('panel-none')?.classList.toggle('hidden', !!panel);
+                rows.forEach(r => r.dataset.key === key && panel
+                    ? r.setAttribute('aria-current', 'true')
+                    : r.removeAttribute('aria-current'));
+                // Превью видно только у строки, для которой построено: иначе «Импортировать» под
+                // панелью строки B импортировало бы строку A. Открыто/закрыто — класс hidden
+                // (его ведут discPreview/«Отмена»/импорт), «чужая строка» — атрибут hidden.
+                const card = document.getElementById('preview-card');
+                if (card?.dataset.discId) {
+                    const row = rows.find(r => r.dataset.key === key);
+                    card.hidden = !panel || row?.dataset.discId !== card.dataset.discId;
+                }
+                box.scrollTop = 0;
+                // Правая колонка липкая; если страницу прокрутили выше её начала — подтянуть.
+                if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ block: 'start' });
+            }
+
+            rows.forEach(r => r.addEventListener('click', e => {
+                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                if (r.getAttribute('aria-current') === 'true') return;
+                show(r.dataset.key);
+                history.pushState({ sel: r.dataset.key }, '', r.href);
+            }));
+
+            window.addEventListener('popstate', () =>
+                show(keyFor(new URL(location.href).searchParams.get('sel'))));
         })();
 
         // Подтверждение каскадного удаления (одиночное / день / всё событие) — как в /Admin/Competitions.
@@ -223,16 +246,16 @@
                 sessionStorage.removeItem(PENDING_KEY);
             });
 
-            // Бейдж на строке: вешаем в ячейку стадии, рядом с «импортировано».
+            // Бейдж на строке списка: в её пометки (.row-marks), рядом с остальными.
             function markRow(discId) {
-                const row = document.querySelector(`tr[data-disc-id="${discId}"]`);
+                const row = document.querySelector(`.comp-row[data-disc-id="${discId}"]`);
                 if (!row) return false;
-                const cell = row.querySelector('td');
+                const cell = row.querySelector('.row-marks');
                 if (cell && !cell.querySelector('.pulled-badge')) {
                     cell.insertAdjacentHTML('beforeend',
-                        '<span class="pulled-badge ml-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-admin-success/20 text-admin-success">затянуто</span>');
+                        '<span class="pulled-badge inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-admin-success/20 text-admin-success">затянуто</span>');
                 }
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 return true;
             }
 
@@ -802,6 +825,11 @@
                 try {
                     const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
                     preview = { previewId: p.previewId, id, name };
+                    // Превью живёт в правой области под панелями — помечаем, чьё оно: при выборе
+                    // другой строки списка его прячет атрибут hidden (см. «Выбор строки списка»).
+                    const card = document.getElementById('preview-card');
+                    card.dataset.discId = String(id);
+                    card.hidden = false;
                     await showPreview(p, name, repull);
                     pullPanel.finish('ok', `Распознано результатов: ${p.resultCount}`);
                     pullPanel.step('Жду: проверь превью и нажми «Импортировать»');
