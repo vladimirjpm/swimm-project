@@ -504,7 +504,8 @@ public sealed class BackgroundJobsStatusService(
 
         return new JobCard("import", "Импорт протоколов", JobKinds.Queue, "ImportBackgroundService",
             "Исполняет импорты, поставленные в /Admin/Import и «Затянуть» во «Входящих»: разбор → " +
-            "запись в базу → клубный зачёт и loglig-id из протокола. Очередь в памяти: после " +
+            "запись в базу → клубный зачёт; затем во второй очереди (по одному старту на loglig) — " +
+            "промежуточные и loglig-id из протокола. Очередь в памяти: после " +
             "перезапуска счётчики с нуля; постоянная история — Sys_ImportHistory.",
             badge, facts, [], new JobLink("/Admin/ImportHistory", "Вся история импортов"))
         {

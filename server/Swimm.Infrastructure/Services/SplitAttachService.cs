@@ -33,7 +33,8 @@ public class SplitAttachService : ISplitAttachService
     }
 
     public async Task<SplitAttachResult> AttachAsync(
-        int competitionId, int? logligId, bool apply, CancellationToken ct = default)
+        int competitionId, int? logligId, bool apply, CancellationToken ct = default,
+        IReadOnlyCollection<int>? onlyDays = null)
     {
         var comp = await _db.Competitions.AsNoTracking()
             .Where(c => c.Id == competitionId)
@@ -43,10 +44,14 @@ public class SplitAttachService : ISplitAttachService
 
         // Промежуточные качаются на ВЕСЬ турнир, а строки лежат по дням (решение §6-2):
         // раскладываем за один заход по всем дням события, иначе день легко забыть.
-        var days = await _db.Competitions.AsNoTracking()
+        var days = (await _db.Competitions.AsNoTracking()
             .Where(c => comp.EventId != null ? c.EventId == comp.EventId : c.Id == comp.Id)
             .Select(c => new { c.Id, c.Name, c.Date })
-            .ToListAsync(ct);
+            .ToListAsync(ct))
+            // Автозапуск после импорта: только дни импортированного compID (см. onlyDays).
+            .Where(d => onlyDays == null || onlyDays.Contains(d.Id))
+            .ToList();
+        if (days.Count == 0) return SplitAttachResult.Failed($"У соревнования #{competitionId} нет дней в прогоне");
         var dayIds = days.Select(d => d.Id).ToList();
 
         // LogligId: параметром (у склеенных стартов строки discovery нет) или из discovery
@@ -96,7 +101,10 @@ public class SplitAttachService : ISplitAttachService
         var message = apply
             ? $"{source.Message}. {plan.Report}"
             : $"{source.Message}. СУХОЙ ПРОГОН (ничего не записано). {plan.Report}";
-        return new SplitAttachResult(apply, loglig, dayRows, plan.Report, message);
+        return new SplitAttachResult(apply, loglig, dayRows, plan.Report, message)
+        {
+            SourceIncomplete = source.Incomplete,
+        };
     }
 
     /// <summary>

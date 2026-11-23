@@ -684,6 +684,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         IsMasters = c.IsMasters,
         IsAward = c.IsAward,
         IsChampionship = c.IsChampionship,
+        HasSplits = c.HasSplits,
         ShowCombineAllResults = c.ShowCombineAllResults,
         ClubPointsDisabled = c.ClubPointsDisabled,
         PointRuleClubsId = c.PointRuleClubsId,

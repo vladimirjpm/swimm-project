@@ -20,14 +20,14 @@ namespace Swimm.API.Controllers;
 public class SplitsAdminController : ControllerBase
 {
     private readonly ISplitAttachService _attach;
-    private readonly IAdminAuditService _audit;
+    private readonly ISplitAutoAttachService _recorder;
     private readonly ILogger<SplitsAdminController> _logger;
 
-    public SplitsAdminController(ISplitAttachService attach, IAdminAuditService audit,
+    public SplitsAdminController(ISplitAttachService attach, ISplitAutoAttachService recorder,
         ILogger<SplitsAdminController> logger)
     {
         _attach = attach;
-        _audit = audit;
+        _recorder = recorder;
         _logger = logger;
     }
 
@@ -45,6 +45,15 @@ public class SplitsAdminController : ControllerBase
         _logger.LogInformation("Доклейка промежуточных: старт (competitionId={Id}, apply={Apply}, loglig={Loglig})",
             id, apply, loglig);
 
+        if (apply)
+        {
+            // Боевой прогон: итог — в аудит ВСЕГДА и каждому дню события (и «нечего», и сбой),
+            // иначе шаг 9 у остальных дней застрял бы на прошлом итоге (например «не удалось»
+            // автозапуска). Сбой источника — обычный исход, а не 500: причину читают в панели.
+            var run = await _recorder.AttachByButtonAsync(id, loglig, ct);
+            return Ok(Payload(run.Result, apply, ok: !run.Threw));
+        }
+
         SplitAttachResult outcome;
         try
         {
@@ -52,19 +61,11 @@ public class SplitsAdminController : ControllerBase
         }
         catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
         {
-            // Источник недоступен или не разобрался — это обычный исход, а не 500: админу
-            // нужно прочитать причину в панели, а не в логах.
-            _logger.LogWarning(ex, "Доклейка промежуточных: сорвалась (competitionId={Id})", id);
+            _logger.LogWarning(ex, "Доклейка промежуточных: сухой прогон сорвался (competitionId={Id})", id);
             return Ok(Payload(SplitAttachResult.Failed($"Не удалось: {ex.Message}"), apply, ok: false));
         }
 
-        // Пишем в аудит только боевой прогон — сухой ничего не меняет.
-        if (apply && (outcome.Report.LegWrites > 0 || outcome.Report.SwimWrites > 0))
-            await _audit.LogAsync("competition.attach-splits", "Competition", id.ToString(),
-                $"Доклеены промежуточные (#{id}, loglig {outcome.LogligId}): ног {outcome.Report.LegWrites}, "
-                + $"личных строк {outcome.Report.SwimWrites}",
-                outcome.Report, ct);
-
+        // Сухой прогон ничего не меняет — в аудит не идёт.
         return Ok(Payload(outcome, apply, ok: true));
     }
 

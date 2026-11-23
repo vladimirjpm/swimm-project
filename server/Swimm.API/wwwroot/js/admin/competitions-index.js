@@ -275,7 +275,7 @@
 
             function linesHtml(lines) {
                 return lines.map(l => `
-                    <li class="flex gap-2 ${l.state === 'fail' ? 'text-admin-danger' : l.state === 'wait' ? 'text-admin-text-muted' : 'text-admin-text'}">
+                    <li class="flex gap-2 ${l.state === 'fail' ? 'text-admin-danger' : l.state === 'wait' ? 'text-admin-text-muted' : 'text-admin-text'}"${l.splits ? ' data-splits-line' : ''}>
                         <span class="w-3.5 shrink-0">${ICON[l.state] ?? ''}</span>
                         <span class="min-w-0">${l.text}</span>
                     </li>`).join('');
@@ -544,7 +544,10 @@
                             checks: r.dataChecks ?? '', checkErr: r.dataCheckErrors ?? 0,
                             checkWarn: r.dataCheckWarnings ?? 0,
                             // Галочки «сомнительный» из превью — подтверждаем, что пометка легла.
-                            suspect: r.suspectFlagged ?? 0
+                            suspect: r.suspectFlagged ?? 0,
+                            // Автодоклейка промежуточных идёт ПОСЛЕ completed — после reload ждём её
+                            // по тому же job'у (watchSplits), итог — у шага 9.
+                            jobId, splits: s.splits ?? null
                         });
                         finish('ok', 'Готово. Обновляю таблицу…', 7);
                         flow = null; save(); // итог уже в DONE_KEY
@@ -566,7 +569,41 @@
 
             // Итог после reload: строка уже «импортировано» (закрыто) — итог пишется под шагом 7 её
             // чек-листа. Проверка качества прошла сама в импорте: её ✓ / ⚑ N — у шага 8 и в строке списка.
+            // Автодоклейка промежуточных за импортом: опрос того же job'а, пока splits не done; итог —
+            // подписью шага 9 (у события — у всех дней: доклейка идёт по всему событию) и строкой
+            // «Итога затягивания». После следующего F5 тот же итог рисует сервер — из аудита.
+            async function watchSplits(d) {
+                if (!d.jobId || !d.splits) return;
+                const deadline = Date.now() + 25 * 60 * 1000;
+                while (Date.now() < deadline) {
+                    await new Promise(r => setTimeout(r, 4000));
+                    let s;
+                    try {
+                        s = await fetch(`/api/admin/import/status/${d.jobId}`, { credentials: 'same-origin' })
+                            .then(r => r.ok ? r.json() : null);
+                    } catch { continue; }
+                    const sp = s?.splits;
+                    if (!sp) return; // процесс перезапущен или доклейка снята — итог покажет сервер
+                    if (sp.state !== 'done') continue;
+
+                    const failed = sp.kind === 'failed' || sp.kind === 'partial';
+                    const text = `промежуточные: ${sp.text ?? ''} · само после импорта`;
+                    const panel = panelOf(d.discId);
+                    panel?.querySelectorAll('.ck-step[data-step="9"] .ck-caption').forEach(c => {
+                        c.textContent = text;
+                        c.title = sp.message ?? '';
+                        c.classList.toggle('text-admin-danger', failed);
+                    });
+                    if (failed) panel?.querySelectorAll('.ck-step[data-step="9"]').forEach(li => { li.dataset.status = 'attention'; });
+                    document.querySelectorAll('[data-splits-line]').forEach(li => {
+                        li.outerHTML = linesHtml([{ step: 9, text: esc('Промежуточные: ' + (sp.text ?? '')), state: failed ? 'fail' : 'ok' }]);
+                    });
+                    return;
+                }
+            }
+
             function showDone(d) {
+                watchSplits(d);
                 const lines = [{ step: 7, text: `Затянуто: создано ${d.created} из ${d.total}`, state: 'ok' }];
                 if (d.skipped) lines.push({ step: 7, text: `пропущено ${d.skipped}`, state: 'wait' });
                 if (d.errors) lines.push({ step: 7, text: `ошибок ${d.errors}`, state: 'fail' });
@@ -575,6 +612,9 @@
                 // Пометки из превью: молча применённая пометка так же плоха, как молча потерянная.
                 if (d.suspect) lines.push({ step: 8, text: `Помечено сомнительными: ${d.suspect} (в рекорды не идут)`, state: 'ok' });
                 if (d.checks) lines.push({ step: 8, text: esc(d.checks), state: d.checkErr ? 'fail' : (d.checkWarn ? 'wait' : 'ok') });
+                // Промежуточные доклеиваются сами за импортом (решение Влада 23.11.2026): строка
+                // меняется, когда доклейка кончится (watchSplits).
+                if (d.splits) lines.push({ step: 9, text: 'Промежуточные: доклеиваются сами в фоне — итог у шага 9', state: 'wait', splits: true });
 
                 const row = rowOf(d.discId);
                 if (d.reconBad) {

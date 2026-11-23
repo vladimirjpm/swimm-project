@@ -59,6 +59,7 @@ public sealed class LogligSplitSourceProvider : ISplitSourceProvider
             .ToList();
         var swims = new List<SplitSourceSwim>();
         string swimsMessage;
+        var incomplete = false;
         try
         {
             foreach (var d in individual)
@@ -79,6 +80,7 @@ public sealed class LogligSplitSourceProvider : ISplitSourceProvider
             _logger.LogWarning(ex, "Личные промежуточные loglig {LogligId} не прочитаны", logligId);
             swims.Clear();
             swimsMessage = $"личные промежуточные не прочитаны: {ex.Message}";
+            incomplete = true;
         }
 
         var missingMessage = missing.Count == 0
@@ -86,7 +88,7 @@ public sealed class LogligSplitSourceProvider : ISplitSourceProvider
             : $"; без PDF промежуточных у loglig (пропущены): {string.Join(", ", missing)}";
         return new SplitSource(teams, swims,
             $"источник loglig {logligId}: эстафетных дисциплин {relays.Count}, команд {teams.Count}; "
-            + $"{swimsMessage}{missingMessage}");
+            + $"{swimsMessage}{missingMessage}") { Incomplete = incomplete };
     }
 
     /// <summary>
