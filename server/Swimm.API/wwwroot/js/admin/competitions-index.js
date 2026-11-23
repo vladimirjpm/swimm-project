@@ -95,6 +95,11 @@
             const form = document.getElementById('filters-form');
             if (!form) return;
             form.addEventListener('submit', () => {
+                // Фильтры держат месяц (решение Влада 23.11.2026), но поиск с голой страницы —
+                // по всем сезонам: подставленные по умолчанию сезон и месяц при непустом q не уходят.
+                const q = form.querySelector('input[name="q"]');
+                if (q && q.value.trim() !== '')
+                    form.querySelectorAll('input[data-default-month]').forEach(el => { el.disabled = true; });
                 form.querySelectorAll('input[name], select[name]').forEach(el => {
                     if (el.type === 'checkbox') { if (!el.checked) el.disabled = true; }
                     else if (el.value === '') el.disabled = true;
@@ -105,33 +110,45 @@
                 el.addEventListener('change', () => form.requestSubmit()));
         })();
 
-        // Одна панель на строку: действия + дни события + быстрая правка. Состояние открытых
-        // строк переживает перезагрузку (после сохранения страница редиректится) — sessionStorage.
+        // Выбор строки списка (вариант E, этап 3): клик по строке открывает её панель справа.
+        // Выбор живёт в адресе (?sel=), поэтому F5 и «назад» возвращают ту же панель; панели всех
+        // строк страницы отрисованы сервером, JS только переключает видимую и пишет адрес
+        // (pushState) — без перезагрузки. Без JS ссылка строки ведёт на тот же адрес.
         (function () {
-            const KEY = 'admin-competitions-open-rows';
-            const open = new Set(JSON.parse(sessionStorage.getItem(KEY) || '[]'));
+            const rows = [...document.querySelectorAll('.comp-row[data-key]')];
+            const box = document.getElementById('comp-detail');
+            if (!rows.length || !box) return;
 
-            const apply = (btn, isOpen) => {
-                const panel = document.getElementById('panel-' + btn.dataset.key);
-                if (!panel) return;
-                panel.classList.toggle('hidden', !isOpen);
-                btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-                btn.textContent = isOpen ? '▾ Закрыть' : '▸ Открыть';
-                // Подсветка: строка-заголовок и её панель — один блок. Без неё при
-                // нескольких раскрытых строках непонятно, что именно сейчас тянется.
-                btn.closest('tr')?.classList.toggle('row-open', isOpen);
-                panel.classList.toggle('row-panel-open', isOpen);
+            // sel=s{N} находит и уже затянутую строку (ключ у неё c…/e…) — как CompetitionRowKey.Matches.
+            const keyFor = sel => {
+                if (!sel) return null;
+                if (rows.some(r => r.dataset.key === sel)) return sel;
+                const m = /^s(\d+)$/i.exec(sel);
+                return m ? (rows.find(r => r.dataset.discId === m[1])?.dataset.key ?? null) : null;
             };
 
-            document.querySelectorAll('.row-toggle').forEach(btn => {
-                if (open.has(btn.dataset.key)) apply(btn, true);
-                btn.addEventListener('click', () => {
-                    const isOpen = btn.getAttribute('aria-expanded') !== 'true';
-                    apply(btn, isOpen);
-                    isOpen ? open.add(btn.dataset.key) : open.delete(btn.dataset.key);
-                    sessionStorage.setItem(KEY, JSON.stringify([...open]));
-                });
-            });
+            function show(key) {
+                const panel = key ? document.getElementById('panel-' + key) : null;
+                box.querySelectorAll('.row-panel').forEach(p => p.classList.toggle('hidden', p !== panel));
+                document.getElementById('panel-none')?.classList.toggle('hidden', !!panel);
+                rows.forEach(r => r.dataset.key === key && panel
+                    ? r.setAttribute('aria-current', 'true')
+                    : r.removeAttribute('aria-current'));
+                box.scrollTop = 0;
+                // Правая колонка липкая; если страницу прокрутили выше её начала — подтянуть.
+                if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ block: 'start' });
+            }
+
+            rows.forEach(r => r.addEventListener('click', e => {
+                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                if (r.getAttribute('aria-current') === 'true') return;
+                show(r.dataset.key);
+                history.pushState({ sel: r.dataset.key }, '', r.href);
+            }));
+
+            window.addEventListener('popstate', () =>
+                show(keyFor(new URL(location.href).searchParams.get('sel'))));
         })();
 
         // Подтверждение каскадного удаления (одиночное / день / всё событие) — как в /Admin/Competitions.
@@ -223,16 +240,16 @@
                 sessionStorage.removeItem(PENDING_KEY);
             });
 
-            // Бейдж на строке: вешаем в ячейку стадии, рядом с «импортировано».
+            // Бейдж на строке списка: в её пометки (.row-marks), рядом с остальными.
             function markRow(discId) {
-                const row = document.querySelector(`tr[data-disc-id="${discId}"]`);
+                const row = document.querySelector(`.comp-row[data-disc-id="${discId}"]`);
                 if (!row) return false;
-                const cell = row.querySelector('td');
+                const cell = row.querySelector('.row-marks');
                 if (cell && !cell.querySelector('.pulled-badge')) {
                     cell.insertAdjacentHTML('beforeend',
-                        '<span class="pulled-badge ml-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-admin-success/20 text-admin-success">затянуто</span>');
+                        '<span class="pulled-badge inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-admin-success/20 text-admin-success">затянуто</span>');
                 }
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 return true;
             }
 

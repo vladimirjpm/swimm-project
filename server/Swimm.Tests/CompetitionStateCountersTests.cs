@@ -192,14 +192,27 @@ public class CompetitionStateCountersTests
     }
 
     [Fact]
-    public async Task DayByDay_WithoutPartialMark_StaysClosed_AsInTheHandoff()
+    public async Task DayByDay_WithoutPartialMark_IsRunningUntilTheSiteLastDay_ThenClosed()
     {
-        // Вопрос Владу открыт («закрыто или идёт?»); пока правило хэндоффа: в базе = закрыто.
-        await using var db = await SeedDayByDayAsync(nameof(DayByDay_WithoutPartialMark_StaysClosed_AsInTheHandoff), partial: false);
-        var row = (await new CompetitionAdminRepository(db)
-            .GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 22))).Page.Items.Single();
-        Assert.Equal(CompetitionRowState.Closed, row.Status!.State);
-        Assert.Equal(3, row.Status.DayCount); // диапазон всё равно по сайту
+        // Решение Влада 23.11.2026: затянутая по дням многодневка без «неполные» — «идёт», пока
+        // последний день по сайту федерации не прошёл; после — закрыто. Счётчики — в «впереди».
+        await using var db = await SeedDayByDayAsync(nameof(DayByDay_WithoutPartialMark_IsRunningUntilTheSiteLastDay_ThenClosed), partial: false);
+        var repo = new CompetitionAdminRepository(db);
+
+        var mid = await repo.GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 22));
+        var row = mid.Page.Items.Single();
+        Assert.Equal(CompetitionRowState.Running, row.Status!.State);
+        Assert.Equal((2, 3), (row.Status.RunningDay!.Value, row.Status.DayCount)); // диапазон по сайту
+        Assert.Equal(1, mid.ListStates!.AheadTotal);
+        Assert.Equal(0, mid.ListStates.Closed);
+        // Полоса сезона и месяца сходятся со списком.
+        Assert.Equal(1, mid.SeasonCounts!.Single().States.AheadTotal);
+        Assert.Equal(1, mid.MonthStates![10].Running);
+
+        var after = (await repo.GetUnifiedAsync(null, null, null, null, false, null, 1, 20, today: new DateOnly(2026, 11, 24)))
+            .Page.Items.Single().Status!;
+        Assert.Equal(CompetitionRowState.Closed, after.State);
+        Assert.False(after.NothingToPull);
     }
 
     // ── «✓ имп.» вручную: в базе строки нет, но её закрыл человек ─────────────

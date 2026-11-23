@@ -343,7 +343,11 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             NoProtocolMark: u.Site?.EmptySourceAt != null,
             ResultsNotPublished: u.Site is { LastError: not null, LogligId: null },
             PartialResults: partial,
-            MarkedImported: u.Db == null && string.Equals(u.Site?.Status, "imported", StringComparison.OrdinalIgnoreCase));
+            MarkedImported: u.Db == null && string.Equals(u.Site?.Status, "imported", StringComparison.OrdinalIgnoreCase),
+            // MissingSince лежит в UTC — день пропажи считаем по Израилю, как и «сегодня».
+            MissingSinceDay: u.Site?.MissingSince is { } gone
+                ? DateOnly.FromDateTime(IsraelTime.ToLocal(gone))
+                : null);
     }
 
     private static DateOnly? ParseDbDate(string? s) =>

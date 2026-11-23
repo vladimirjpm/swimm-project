@@ -83,6 +83,8 @@ public static class CompetitionStateFilters
 /// <param name="PartialResults">Видимая отметка «результаты неполные» (Р114) — бывает только у строк базы.</param>
 /// <param name="MarkedImported">Строка «Входящих» помечена вручную «✓ имп.» (статус imported), а в
 /// базе её нет — закрыл человек, тянуть не нужно.</param>
+/// <param name="MissingSinceDay">Местный день, с которого строки нет в списке isr.org.il
+/// (<c>MissingSince</c>, ставит суточный забор); null — на месте.</param>
 public sealed record CompetitionRowStateInput(
     CompetitionStage Stage,
     DateOnly? FirstDay,
@@ -91,7 +93,8 @@ public sealed record CompetitionRowStateInput(
     bool NoProtocolMark = false,
     bool ResultsNotPublished = false,
     bool PartialResults = false,
-    bool MarkedImported = false);
+    bool MarkedImported = false,
+    DateOnly? MissingSinceDay = null);
 
 /// <summary>Итог: состояние, причина и пометки строки.</summary>
 /// <param name="Reason">Только у <see cref="CompetitionRowState.WaitingProtocol"/>.</param>
@@ -102,6 +105,10 @@ public sealed record CompetitionRowStateInput(
 /// <param name="NothingToPull">Закрыто без импорта: скрыто, «∅» или «✓ имп.» вручную — серый цвет вместо зелёного.</param>
 /// <param name="FirstDay">Первый день старта — для «впереди: через N дней».</param>
 /// <param name="LastDay">Последний день — по нему строки «ждёт затягивания» группируются в блоки дней.</param>
+/// <param name="MissingDays">Сколько дней строки нет на сайте федерации (от <c>MissingSince</c>); null — на месте.</param>
+/// <param name="SuggestHide">«пропал N дн. — скрыть?»: старт прошёл, строка в долге и пропала
+/// <see cref="CompetitionRowStateRules.MissingSuggestHideDays"/> дней назад или раньше. Сама
+/// не закрывается — скрывает Влад кнопкой «Скрыть» (решение 23.11.2026).</param>
 public sealed record CompetitionRowStatus(
     CompetitionRowState State,
     WaitingProtocolReason? Reason = null,
@@ -111,7 +118,9 @@ public sealed record CompetitionRowStatus(
     bool ParseFailed = false,
     bool NothingToPull = false,
     DateOnly? FirstDay = null,
-    DateOnly? LastDay = null)
+    DateOnly? LastDay = null,
+    int? MissingDays = null,
+    bool SuggestHide = false)
 {
     /// <summary>Сегмент полосы: закрыто / долг / впереди.</summary>
     public CompetitionStateBucket Bucket => CompetitionRowStateRules.BucketOf(State);
@@ -180,6 +189,13 @@ public static class CompetitionRowStateRules
     /// <summary>Месяцы в порядке сезона (сентябрь → август) — номера 1–12 для полосы месяцев.</summary>
     public static readonly IReadOnlyList<int> SeasonMonthOrder = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
 
+    /// <summary>
+    /// Через сколько дней пропажи с сайта федерации (считая от <c>MissingSince</c>, а не от даты
+    /// старта) прошедший старт в долге получает пометку «пропал N дн. — скрыть?» (решение Влада
+    /// 23.11.2026). Автоматически ничего не закрывается — скрывает человек кнопкой «Скрыть».
+    /// </summary>
+    public const int MissingSuggestHideDays = 7;
+
     /// <summary>«Сегодня» по времени Израиля — граница «впереди / идёт / прошёл».</summary>
     public static DateOnly IsraelToday(DateTimeOffset utcNow) =>
         DateOnly.FromDateTime(IsraelTime.ToLocal(utcNow.UtcDateTime));
@@ -197,12 +213,28 @@ public static class CompetitionRowStateRules
     /// Порядок:
     /// 1. Скрыто, «∅» → закрыто (серое). Строка базы → закрыто, кроме видимой отметки
     ///    «результаты неполные»: такая проходит по датам дальше, как строка с сайта.
+    ///    И кроме многодневки, затянутой по дням, пока её последний день (по сайту) не прошёл:
+    ///    это «идёт», после — закрыто (решение Влада 23.11.2026).
     /// 2. До первого дня → впереди; с первого по последний → идёт («день N из M»).
     /// 3. Прошёл: вердикт results-auto, если он есть (он свежее и точнее ошибки забора);
     ///    без вердикта — «не опубликованы» → ждём протокол, иначе → ждёт затягивания.
     /// Строка без даты (не читается) — ждёт затягивания: «прошёл» безопаснее «впереди», её видно в долге.
+    /// Пропажа с сайта состояние не меняет (прошедший старт — долг), только даёт пометку
+    /// <see cref="CompetitionRowStatus.SuggestHide"/>.
     /// </summary>
     public static CompetitionRowStatus Evaluate(CompetitionRowStateInput input, DateOnly today)
+    {
+        var status = EvaluateState(input, today);
+        if (input.MissingSinceDay is not { } gone) return status;
+        var days = Math.Max(0, today.DayNumber - gone.DayNumber);
+        return status with
+        {
+            MissingDays = days,
+            SuggestHide = status.Bucket == CompetitionStateBucket.Debt && days >= MissingSuggestHideDays,
+        };
+    }
+
+    private static CompetitionRowStatus EvaluateState(CompetitionRowStateInput input, DateOnly today)
     {
         var first = input.FirstDay;
         var last = input.LastDay is { } l && first is { } f && l >= f ? l : first;
@@ -217,7 +249,11 @@ public static class CompetitionRowStateRules
             case CompetitionStage.Ignored:
                 return Make(CompetitionRowState.Closed, nothing: true);
             case CompetitionStage.Imported or CompetitionStage.DbOnly when !input.PartialResults:
-                return Make(CompetitionRowState.Closed);
+                // Многодневку тянут по дням (путь Б в pull-to-prod): пока последний день по сайту
+                // не прошёл, затянутая часть — это «идёт», а не «закрыто» (решение Влада 23.11.2026).
+                return dayCount > 1 && first is { } fd && last is { } ld && today >= fd && today <= ld
+                    ? Make(CompetitionRowState.Running, runningDay: today.DayNumber - fd.DayNumber + 1)
+                    : Make(CompetitionRowState.Closed);
             case CompetitionStage.OnSite when input.NoProtocolMark || input.MarkedImported:
                 return Make(CompetitionRowState.Closed, nothing: true);
         }
