@@ -22,20 +22,40 @@ public class CompetitionChecklistRulesTests
     public void ReadyToPull_BeforePull_Step5IsCurrent_RestPending() =>
         Assert.Equal(new[] { D, D, D, D, C, P, P, P, P }, Build(Ready));
 
-    [Fact]
-    public void NoStartList_AndNoWarmUp_AreAttention()
+    // Решение Влада 23.11.2026: у прошедшего старта несделанные шаги 2–3 — серые, без «!»;
+    // до старта и пока он идёт — «!».
+    [Theory]
+    [InlineData(CompetitionRowState.Ahead, ChecklistStepStatus.Attention)]
+    [InlineData(CompetitionRowState.Running, ChecklistStepStatus.Attention)]
+    [InlineData(CompetitionRowState.ReadyToPull, ChecklistStepStatus.Pending)]
+    [InlineData(CompetitionRowState.WaitingProtocol, ChecklistStepStatus.Pending)]
+    [InlineData(CompetitionRowState.Closed, ChecklistStepStatus.Pending)]
+    public void NoStartList_AndNoWarmUp_AttentionOnlyBeforeTheStartIsOver(CompetitionRowState state, ChecklistStepStatus expected)
     {
-        var s = Build(new ChecklistInput(CompetitionRowState.ReadyToPull));
-        Assert.Equal(A, s[1]);
-        Assert.Equal(A, s[2]);
+        var s = Build(new ChecklistInput(state));
+        Assert.Equal(expected, s[1]);
+        Assert.Equal(expected, s[2]);
+    }
+
+    [Fact]
+    public void DoneSteps2And3_StayDone_AfterTheStart()
+    {
+        var s = Build(Ready with { State = CompetitionRowState.Closed, Imported = true });
+        Assert.Equal(new[] { D, D }, s[1..3]);
     }
 
     [Theory]
     [InlineData(StartListBadgeKind.Partial, ChecklistStepStatus.Done)]
-    [InlineData(StartListBadgeKind.Empty, ChecklistStepStatus.Attention)]
-    [InlineData(StartListBadgeKind.Error, ChecklistStepStatus.Attention)]
+    [InlineData(StartListBadgeKind.Empty, ChecklistStepStatus.Pending)]
+    [InlineData(StartListBadgeKind.Error, ChecklistStepStatus.Pending)]
     public void StartListKind_MapsToStep2(StartListBadgeKind kind, ChecklistStepStatus expected) =>
         Assert.Equal(expected, Build(Ready with { StartList = kind })[1]);
+
+    [Theory]
+    [InlineData(StartListBadgeKind.Empty)]
+    [InlineData(StartListBadgeKind.Error)]
+    public void StartListKind_BeforeStart_IsAttention(StartListBadgeKind kind) =>
+        Assert.Equal(A, Build(Ready with { State = CompetitionRowState.Ahead, StartList = kind })[1]);
 
     [Fact]
     public void StaleStartList_MattersOnlyBeforeStart()
@@ -45,8 +65,11 @@ public class CompetitionChecklistRulesTests
     }
 
     [Fact]
-    public void WarmUp_PartOfDays_IsAttention() =>
-        Assert.Equal(A, Build(Ready with { DayCount = 3, WarmUpDays = 2 })[2]);
+    public void WarmUp_PartOfDays_IsAttention_BeforeStart_GreyAfter()
+    {
+        Assert.Equal(A, Build(Ready with { State = CompetitionRowState.Ahead, DayCount = 3, WarmUpDays = 2 })[2]);
+        Assert.Equal(P, Build(Ready with { DayCount = 3, WarmUpDays = 2 })[2]);
+    }
 
     [Fact]
     public void Ahead_Step4Current_TailPending() =>

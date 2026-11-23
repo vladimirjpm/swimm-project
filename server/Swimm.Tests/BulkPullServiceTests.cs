@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
 using Swimm.Infrastructure.Services;
@@ -38,7 +39,7 @@ public class BulkPullServiceTests
     }
 
     /// <summary>Превью, которое всегда удаётся: один день, без рекордов и совпадений.</summary>
-    private sealed class FakePreviews : IDiscoveryPreviewService
+    internal sealed class FakePreviews : IDiscoveryPreviewService
     {
         private readonly Dictionary<Guid, DiscoveryPreviewEntry> _entries = [];
         public List<int> Pulled { get; } = [];
@@ -75,7 +76,7 @@ public class BulkPullServiceTests
                 new RegulationAnalysisDto(HasMedals: true, HasClubStanding: false, IsChampionship: false, [])));
     }
 
-    private sealed class FakeQueue : IImportJobQueue
+    internal sealed class FakeQueue : IImportJobQueue
     {
         public List<(string FileName, IReadOnlyList<string>? Categories, ImportEventOptions? Options, string Payload)> Jobs { get; } = [];
 
@@ -103,7 +104,7 @@ public class BulkPullServiceTests
 
     // ── сборка ────────────────────────────────────────────────────────────────
 
-    private static DiscoveredCompetitionDto Row(
+    internal static DiscoveredCompetitionDto Row(
         int id, string name = "ליגה מס 3", string status = "new", int? matchedCompetitionId = null) =>
         new(id, OrgCompId: 16700 + id, name,
             DateStart: new DateTime(2025, 11, 1, 0, 0, 0, DateTimeKind.Utc).AddDays(id),
@@ -113,13 +114,42 @@ public class BulkPullServiceTests
             MatchedCompetitionName: matchedCompetitionId is null ? null : "уже в БД",
             MatchedCompetitionId: matchedCompetitionId, Languages: null);
 
-    private static (BulkPullService Service, FakeQueue Queue, FakePreviews Previews) Build(
-        params DiscoveredCompetitionDto[] rows)
+    /// <summary>
+    /// Список страницы для перепроверки «ждёт затягивания» в StartAsync: по умолчанию ждут все
+    /// строки, кроме скрытых и связанных с базой (как в списке). Тесты самой перепроверки — с
+    /// настоящим репозиторием, BulkPullSelectionTests.
+    /// </summary>
+    internal static ICompetitionAdminRepository ListOf(IEnumerable<DiscoveredCompetitionDto> rows)
+    {
+        var items = rows.Select(d => new UnifiedCompetitionRowDto
+        {
+            Db = d.MatchedCompetitionId is null ? null : new CompetitionRowDto(),
+            Site = new UnifiedSiteInfo { DiscoveredId = d.Id, Name = d.Name, DateStart = d.DateStart, Status = d.Status },
+            Status = new Swimm.Application.Mapping.CompetitionRowStatus(d.Status == "ignored"
+                ? Swimm.Application.Mapping.CompetitionRowState.Closed
+                : Swimm.Application.Mapping.CompetitionRowState.ReadyToPull),
+        }).ToList();
+        var repo = new Moq.Mock<ICompetitionAdminRepository>();
+        repo.Setup(r => r.GetUnifiedAsync(Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(), Moq.It.IsAny<int?>(),
+                Moq.It.IsAny<string?>(), Moq.It.IsAny<bool>(), Moq.It.IsAny<int?>(), Moq.It.IsAny<int>(), Moq.It.IsAny<int>(),
+                Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(),
+                Moq.It.IsAny<DateOnly?>(), Moq.It.IsAny<bool>()))
+            .ReturnsAsync(new UnifiedCompetitionList(new PagedResult<UnifiedCompetitionRowDto>(items, items.Count, 1, Math.Max(1, items.Count)),
+                new int[12], 0));
+        return repo.Object;
+    }
+
+    internal static (BulkPullService Service, FakeQueue Queue, FakePreviews Previews) Build(
+        params DiscoveredCompetitionDto[] rows) => Build(ListOf(rows), rows);
+
+    internal static (BulkPullService Service, FakeQueue Queue, FakePreviews Previews) Build(
+        ICompetitionAdminRepository list, params DiscoveredCompetitionDto[] rows)
     {
         var queue = new FakeQueue();
         var previews = new FakePreviews();
 
         var services = new ServiceCollection();
+        services.AddSingleton(list);
         services.AddSingleton<ICompetitionDiscoveryService>(new FakeDiscovery([.. rows]));
         services.AddSingleton<IDiscoveryPreviewService>(previews);
         services.AddSingleton<IRegulationFetchService>(new FakeRegulations());
@@ -132,7 +162,7 @@ public class BulkPullServiceTests
         return (service, queue, previews);
     }
 
-    private static async Task<BulkPullBatchDto> WaitFinishedAsync(BulkPullService service, Guid batchId)
+    internal static async Task<BulkPullBatchDto> WaitFinishedAsync(BulkPullService service, Guid batchId)
     {
         for (var i = 0; i < 100; i++)
         {
@@ -187,16 +217,30 @@ public class BulkPullServiceTests
     }
 
     [Fact]
-    public async Task CapsBatchSize()
+    public async Task RejectsMoreThanTheCap_InsteadOfSilentlyCutting()
     {
-        // 40 строк в выборке — в работу уходит только MaxBatchSize: пачка на весь сезон
-        // это получасовой забор и десятки мегабайт разборов в памяти.
+        // 40 строк — больше потолка: пачка на весь сезон — получасовой забор и десятки мегабайт
+        // разборов в памяти. Раньше сервис молча брал первые 30; теперь кнопка страницы сама берёт
+        // не больше потолка (BulkPullSelection), а лишнее сервис отвергает, а не режет.
         var rows = Enumerable.Range(1, 40).Select(i => Row(i, $"Meet {i}")).ToArray();
-        var (service, _, _) = Build(rows);
+        var (service, _, previews) = Build(rows);
 
-        var started = await service.StartAsync([.. rows.Select(r => r.Id)], includeChampionships: false);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            service.StartAsync([.. rows.Select(r => r.Id)], includeChampionships: false));
+        Assert.Empty(previews.Pulled);
 
+        var started = await service.StartAsync([.. rows.Take(service.MaxBatchSize).Select(r => r.Id)], includeChampionships: false);
         Assert.Equal(service.MaxBatchSize, started.Total);
+    }
+
+    [Fact]
+    public async Task Status_CarriesTheQueueIds_InPullOrder()
+    {
+        var (service, _, _) = Build(Row(3), Row(1), Row(2));
+        var started = await service.StartAsync([3, 1, 2], includeChampionships: false);
+        Assert.Equal([1, 2, 3], started.QueueIds);
+        await WaitFinishedAsync(service, started.BatchId);
+        Assert.Equal([1, 2, 3], service.GetStatus(started.BatchId)!.QueueIds);
     }
 
     // ── импорт ────────────────────────────────────────────────────────────────

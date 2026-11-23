@@ -277,6 +277,9 @@ public class DiscoveryAdminController : ControllerBase
     {
         if (request.Ids is null || request.Ids.Length == 0)
             return BadRequest(new { error = "Список пуст — нечего затягивать." });
+        // Сервер не обрезает молча: кнопка страницы берёт не больше потолка (BulkPullSelection).
+        if (request.Ids.Distinct().Count() > _bulkPull.MaxBatchSize)
+            return BadRequest(new { error = $"Больше {_bulkPull.MaxBatchSize} строк за раз нельзя — остальное следующим заходом." });
 
         var batch = await _bulkPull.StartAsync(request.Ids, request.IncludeChampionships, ct);
 

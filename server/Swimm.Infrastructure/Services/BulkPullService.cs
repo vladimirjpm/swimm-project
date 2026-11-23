@@ -40,6 +40,7 @@ public sealed class BulkPullService : IBulkPullService
         public required Guid Id { get; init; }
         public required List<DiscoveredCompetitionDto> Queue { get; init; }
         public required List<string> SkippedChampionships { get; init; }
+        public List<string> SkippedNotReady { get; init; } = [];
         public List<BulkPullRowDto> Rows { get; } = [];
         /// <summary>
         /// Строки, уже отправленные в импорт, → задача очереди (под замком <see cref="Rows"/>).
@@ -58,15 +59,23 @@ public sealed class BulkPullService : IBulkPullService
         var all = await discovery.GetAllAsync(ct);
 
         var wanted = discoveredIds.Distinct().ToHashSet();
+        // Потолок — не молчаливое обрезание: в пачку уходит ровно то, что на кнопке, а кнопка сама
+        // берёт не больше потолка (BulkPullSelection) и говорит, сколько осталось следующим заходом.
+        if (wanted.Count > MaxBatchSize)
+            throw new ArgumentOutOfRangeException(nameof(discoveredIds),
+                $"В пачке {wanted.Count} строк — больше потолка {MaxBatchSize}. Остальное — следующим заходом.");
         var rows = all.Where(d => wanted.Contains(d.Id)).ToList();
 
-        // Тянуть нечего: скрытые админом, с пустым протоколом и уже связанные с БД строкой.
-        // Те же правила, что у счётчика долга на чипах месяцев — иначе кнопка и счётчик
-        // разойдутся в числах (docs/admin-pages/competitions.md).
-        var pullable = rows
-            .Where(d => !string.Equals(d.Status, "ignored", StringComparison.OrdinalIgnoreCase))
-            .Where(d => d.MatchedCompetitionId is null)
-            .ToList();
+        // Кто попадает в пачку, решает страница правилом BulkPullSelection — сюда приходят уже
+        // отобранные id. Вкладка могла простоять час: строку за это время скрыли, пометили «✓ имп.»
+        // или «∅», затянули, перенесли (стала «впереди» / «идёт»), results-auto поставил вердикт
+        // «не закончено» / «пусто» / «сбой». Поэтому каждая присланная строка ЗАНОВО проверяется
+        // тем же правилом на сейчас — по тем же объединённым строкам списка, что у страницы
+        // (ICompetitionAdminRepository.GetUnifiedAsync → CompetitionRowStateRules → IsCandidate).
+        // Не прошедшие пропускаются и уходят в SkippedNotReady; новых строк проверка не добавляет.
+        var stillReady = await StillReadyAsync(scope.ServiceProvider, ct);
+        var notReady = rows.Where(d => !stillReady.Contains(d.Id)).ToList();
+        var pullable = rows.Except(notReady).ToList();
 
         var championships = pullable
             .Where(d => CompetitionAdminRepository.IsChampionship(d.Name))
@@ -76,20 +85,23 @@ public sealed class BulkPullService : IBulkPullService
             pullable = pullable.Except(championships).ToList();
 
         // Порядок — по дате: разбирать пачку удобнее в том же порядке, в каком она в списке.
-        var queue = pullable.OrderBy(d => d.DateStart).Take(MaxBatchSize).ToList();
+        var queue = pullable.OrderBy(d => d.DateStart).ThenBy(d => d.Id).ToList();
 
         var batch = new BatchState
         {
             Id = Guid.NewGuid(),
             Queue = queue,
-            SkippedChampionships = includeChampionships ? [] : championships.Select(c => c.Name).ToList()
+            SkippedChampionships = includeChampionships ? [] : championships.Select(c => c.Name).ToList(),
+            SkippedNotReady = notReady.Select(d => d.Name).ToList()
         };
 
         if (queue.Count == 0)
         {
             batch.Finished = true;
             _batches[batch.Id] = batch;
-            return ToDto(batch, "Нечего тянуть: в выборке нет строк с непустым протоколом.");
+            return ToDto(batch, notReady.Count > 0
+                ? "Нечего тянуть: строки кнопки уже не ждут затягивания — обнови страницу (F5)."
+                : "Нечего тянуть: в выборке нет строк с непустым протоколом.");
         }
 
         _batches[batch.Id] = batch;
@@ -101,6 +113,22 @@ public sealed class BulkPullService : IBulkPullService
         _ = Task.Run(() => RunAsync(batch), CancellationToken.None);
 
         return ToDto(batch);
+    }
+
+    /// <summary>
+    /// DiscoveredId строк, которые СЕЙЧАС «ждут затягивания» и которых нет в базе, — то же правило,
+    /// что считает кнопку на странице (<see cref="BulkPullSelection.IsCandidate"/> над строками
+    /// списка без фильтров страницы: сезон, месяц, дисциплина и прочее здесь не важны).
+    /// </summary>
+    private static async Task<HashSet<int>> StillReadyAsync(IServiceProvider sp, CancellationToken ct)
+    {
+        var repo = sp.GetRequiredService<ICompetitionAdminRepository>();
+        var today = CompetitionRowStateRules.IsraelToday(
+            (sp.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow());
+        var list = await repo.GetUnifiedAsync(null, null, season: null, stage: null, showSynthetic: true,
+            month: null, page: 1, pageSize: 20, discipline: "all",
+            state: CompetitionStateFilters.Waiting, today: today, unpaged: true);
+        return list.Page.Items.Where(BulkPullSelection.IsCandidate).Select(u => u.Site!.DiscoveredId).ToHashSet();
     }
 
     public BulkPullBatchDto? GetStatus(Guid batchId) =>
@@ -297,7 +325,8 @@ public sealed class BulkPullService : IBulkPullService
         var pending = rows.Any(r => r.ImportState is "queued" or "running");
 
         return new BulkPullBatchDto(
-            batch.Id, batch.Total, rows.Count, batch.Finished, rows, batch.SkippedChampionships, error, pending);
+            batch.Id, batch.Total, rows.Count, batch.Finished, rows, batch.SkippedChampionships, error, pending,
+            [.. batch.Queue.Select(q => q.Id)], batch.SkippedNotReady);
     }
 
     /// <summary>

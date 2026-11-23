@@ -92,6 +92,10 @@ public sealed record BulkPullRowDto(
 /// <param name="Error">Пачка не стартовала (например, пустой список).</param>
 /// <param name="ImportsPending">Отправленные в импорт строки ещё в очереди или импортируются —
 /// панель продолжает опрос, пока это true, и только потом пишет «импорт завершён».</param>
+/// <param name="QueueIds">Строки пачки (DiscoveredId) в порядке забора — и ещё не затянутые: по ним
+/// страница помечает строки списка «в пачке» и запрещает одиночное «Затянуть» тех же строк.</param>
+/// <param name="SkippedNotReady">Строки кнопки, которые к клику уже не «ждут затягивания» (перепроверка
+/// сервера тем же правилом, что считает кнопку) — пропущены.</param>
 public sealed record BulkPullBatchDto(
     Guid BatchId,
     int Total,
@@ -100,7 +104,9 @@ public sealed record BulkPullBatchDto(
     IReadOnlyList<BulkPullRowDto> Rows,
     IReadOnlyList<string> SkippedChampionships,
     string? Error = null,
-    bool ImportsPending = false);
+    bool ImportsPending = false,
+    IReadOnlyList<int>? QueueIds = null,
+    IReadOnlyList<string>? SkippedNotReady = null);
 
 /// <summary>Итог пакетного импорта: сколько строк ушло в очередь и что не поехало.</summary>
 /// <param name="Queued">Сколько заданий поставлено в очередь импорта.</param>
