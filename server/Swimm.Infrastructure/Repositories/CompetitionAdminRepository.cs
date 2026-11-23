@@ -123,7 +123,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 EmptySourceAt = d.EmptySourceAt, Discipline = d.Discipline,
                 AutoPullVerdict = d.AutoPullVerdict, AutoPullBlockedReason = d.AutoPullBlockedReason,
                 AutoPullCheckedAt = d.AutoPullCheckedAt, AutoPullPoolType = d.AutoPullPoolType,
-                PreviousDateStart = d.PreviousDateStart, MissingSince = d.MissingSince
+                PreviousDateStart = d.PreviousDateStart, MissingSince = d.MissingSince,
+                DiscoveredAt = d.DiscoveredAt
             };
 
             // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.
@@ -295,6 +296,21 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var now = DateTime.UtcNow;
         foreach (var site in rows.Select(r => r.Site).OfType<UnifiedSiteInfo>())
             site.StartList = StartListBadgeRules.Evaluate(byOrg[site.OrgCompId], site.DateStart, now);
+
+        // Разминка по дням (шаг 3 чек-листа панели) — тем же одним запросом на страницу. Ключ таблицы —
+        // (OrgCompId, день), строка на день одна; но после переноса старта остаются дни по старым
+        // датам — считаем только дни внутри нынешних дат старта, иначе шаг 3 «сделан» раньше времени.
+        var warmUps = (await _db.CompetitionWarmUps.AsNoTracking()
+                .Where(w => orgIds.Contains(w.OrgCompId))
+                .Select(w => new { w.OrgCompId, w.Date })
+                .ToListAsync())
+            .ToLookup(w => w.OrgCompId, w => w.Date.Date);
+        foreach (var site in rows.Select(r => r.Site).OfType<UnifiedSiteInfo>())
+        {
+            var from = site.DateStart.Date;
+            var to = site.DateEnd < site.DateStart ? from : site.DateEnd.Date;
+            site.WarmUpDays = warmUps[site.OrgCompId].Where(d => d >= from && d <= to).Distinct().Count();
+        }
     }
 
     /// <summary>

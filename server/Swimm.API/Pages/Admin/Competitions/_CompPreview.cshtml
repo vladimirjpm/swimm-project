@@ -1,0 +1,119 @@
+@model IReadOnlyList<Swimm.Application.Dtos.PointRuleRowDto>
+@*
+    Превью «затянутого» PDF перед импортом — шаг 6 чек-листа (вариант E, этап 4). Блок один на
+    страницу: JS (discPreview) переносит его в .ck-preview-slot панели своей строки — у прежней
+    панели строки такой же слот под кнопками. Всё содержимое прежней карточки «Превью» — здесь,
+    id те же (их читают competitions-index.js и импорт).
+*@
+@{
+    const string label = "mb-1 text-[11px] font-semibold uppercase tracking-wide text-admin-text-muted";
+}
+<div id="preview-box" class="mt-2 hidden rounded-md border border-admin-accent/40 p-4">
+    @* «Распознано результатов: N» и дни файла («<соревнование> — <дата> (N)»). *@
+    <div id="preview-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
+    <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
+
+    @* Бассейн протокол не пишет, а у парсера умолчание 25 м (И-30) — без выбора импорт нового не начнётся. *@
+    <div class="mb-3">
+        <div class="@label">Бассейн</div>
+        <div class="flex flex-wrap items-center gap-3">
+            <select id="flag-pool" class="admin-input w-auto py-1 px-2 text-[13px]">
+                <option value="">— не задан —</option>
+                <option value="25m">25 м</option>
+                <option value="50m">50 м</option>
+            </select>
+            <span id="pool-hint" class="text-[12px] text-admin-warning">выбери — без бассейна импорт не начнётся</span>
+        </div>
+    </div>
+
+    @* Сколько рекордов побьёт файл (Б2) — подсказка перед «Импортировать», не запрет. *@
+    <div id="preview-records" class="hidden"></div>
+
+    @* Флаги соревнования: заполняются сами (регламент, название, файл, проба зачёта) и правятся руками. *@
+    <div class="mb-3 mt-3">
+        <div class="@label">Флаги</div>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
+            <label class="flex cursor-pointer items-center gap-1.5" title="Вручают медали">
+                <input type="checkbox" id="flag-award" class="cursor-pointer" /> Awards (медали)
+            </label>
+            <label class="flex cursor-pointer items-center gap-1.5" title="Чемпионат Израиля">
+                <input type="checkbox" id="flag-championship" class="cursor-pointer" /> 🏆 Чемпионат Израиля
+            </label>
+            <label class="flex cursor-pointer items-center gap-1.5" title="Мастерс">
+                <input type="checkbox" id="flag-masters" class="cursor-pointer" /> Masters
+            </label>
+            <label class="flex cursor-pointer items-center gap-1.5" title="Клубный зачёт на этом старте не ведётся">
+                <input type="checkbox" id="flag-club-off" class="cursor-pointer" /> клубный зачёт не ведётся
+            </label>
+        </div>
+        <div id="flag-reasons" class="mt-1.5 space-y-0.5 text-[11.5px] text-admin-text-muted"></div>
+    </div>
+
+    <div class="mb-3">
+        <div class="@label">Категории</div>
+        <div id="preview-categories" class="flex flex-wrap gap-3 text-[13px]"></div>
+    </div>
+
+    <div class="mb-3 grid gap-3 min-[1500px]:grid-cols-2">
+        @* Официальный клубный зачёт (דירוג מועדונים) на loglig: есть ли он и по какой шкале.
+           Если шкала опознана, правило подставляется в селект. *@
+        <div class="min-w-0">
+            <div class="@label">Клубные очки</div>
+            <div id="preview-standing" class="mb-2 rounded-md border border-admin-border px-3 py-2 text-[13px] text-admin-text-muted">
+                Проверяю официальный зачёт…
+            </div>
+            <select id="preview-rule-clubs" class="admin-input w-full rounded-md px-3 py-2 text-[13px]">
+                <option value="">Авто (по дате и типу)</option>
+                @foreach (var r in Model)
+                {
+                    <option value="@r.Id">@r.Version@(r.ManualOnly ? " · manual" : "")</option>
+                }
+            </select>
+
+            @* Зачёт есть, а правила под его шкалу нет: заводим прямо отсюда (кнопка, не галочка —
+               шкала снята эвристикой, админ должен увидеть, что заводит). *@
+            <div id="preview-rule-create" class="mt-2 hidden rounded-md border border-[rgba(255,213,79,0.4)] bg-[rgba(255,213,79,0.08)] p-3">
+                <div class="mb-2 text-[12.5px] text-admin-text">
+                    Шкалы этого зачёта нет ни в одном правиле. Завести новое по снятой шкале?
+                </div>
+                <div id="preview-rule-scale" class="mb-2 font-mono text-[12px] text-admin-text-muted"></div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input type="text" id="preview-rule-version" class="admin-input min-w-[220px] flex-1 rounded-md px-3 py-2 text-[13px]"
+                           placeholder="Версия правила" />
+                    <button type="button" id="btn-create-rule" class="admin-btn admin-btn-ghost">Завести правило по этой шкале</button>
+                    <span class="text-[12px] text-admin-text-muted">manual · эстафеты ×2</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="min-w-0" id="event-block">
+            <div class="@label">Событие</div>
+            <select id="event-select" class="admin-input w-full rounded-md px-3 py-2 text-[13px]"
+                    title="Многодневное событие: второй день того же турнира — выбери существующее">
+                <option value="">Без события (однодневное)</option>
+                <option value="__new__">➕ Создать новое событие…</option>
+            </select>
+            <input type="text" id="event-name" class="admin-input mt-2 hidden w-full rounded-md px-3 py-2 text-[13px]" placeholder="Название события" />
+        </div>
+    </div>
+
+    <div class="mb-3 hidden" id="overwrite-block">
+        <label class="inline-flex items-center gap-2 text-[13px] text-admin-text bg-[rgba(255,213,79,0.08)] border border-[rgba(255,213,79,0.3)] rounded-md py-2 px-3 cursor-pointer">
+            <input type="checkbox" id="overwrite-existing-cb">
+            Обновить существующее соревнование <span id="overwrite-comp-name" class="text-admin-text-muted"></span> (upsert: сматченные результаты обновятся на месте, медиа сохранится)
+        </label>
+        <label id="delete-missing-block" class="hidden mt-2 inline-flex items-center gap-2 text-[13px] text-admin-text bg-admin-danger/5 border border-admin-danger/30 rounded-md py-2 px-3 cursor-pointer">
+            <input type="checkbox" id="delete-missing-cb">
+            Удалять результаты, которых нет в файле
+        </label>
+        <div id="overwrite-delete-warning" class="hidden mt-2 text-[13px] text-admin-danger border-l-[3px] border-l-admin-danger bg-admin-danger/5 rounded-md py-2 px-3"></div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+        <button id="btn-import" class="admin-btn admin-btn-primary cursor-pointer">Импортировать</button>
+        <button id="btn-cancel-preview" class="admin-btn admin-btn-ghost">Отмена</button>
+        <span id="preview-note" class="text-[12px] text-admin-text-muted">превью живёт 60 минут</span>
+    </div>
+    @* «Импорт не запустился: …» — у кнопок, превью остаётся: поправить и нажать снова. *@
+    <div id="preview-error" class="mt-2 hidden text-[12.5px] text-admin-danger"></div>
+</div>
