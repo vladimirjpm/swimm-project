@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -82,6 +83,12 @@ public class IndexModel : PageModel
 
     /// <summary>Строка под <see cref="Selected"/> среди строк страницы; null — не выбрана или не видна при фильтрах.</summary>
     public UnifiedCompetitionRowDto? SelectedRow { get; private set; }
+
+    /// <summary>
+    /// Строка, открытая справа без <c>sel</c>: первая «ждёт затягивания» выдачи (решение Влада
+    /// 23.11.2026). Только показ — в адрес и ссылки не попадает; при явном <c>sel</c> — null.
+    /// </summary>
+    public UnifiedCompetitionRowDto? AutoSelectedRow { get; private set; }
 
     /// <summary>Сегодня по Израилю — граница «впереди / идёт / прошёл».</summary>
     public DateOnly Today { get; private set; }
@@ -189,8 +196,14 @@ public class IndexModel : PageModel
         return matched.Count == 1 ? matched[0] : null;
     }
 
-    public async Task OnGetAsync()
+    public async Task<IActionResult> OnGetAsync()
     {
+        // Отправка формы фильтров (fseason/fmonth) → чистый адрес: поиск по всем сезонам, прочие
+        // фильтры — в выбранном месяце (решение Влада 23.11.2026, CompetitionListUrl.FormRedirect).
+        if (CompetitionListUrl.FormRedirect(
+                Request.Query.Select(kv => new KeyValuePair<string, string?>(kv.Key, kv.Value.ToString()))) is { } canonical)
+            return Redirect(QueryHelpers.AddQueryString(Url.Page("Index")!, canonical!));
+
         PublicSiteBaseUrl = PublicSite.BaseUrl(_config, _env);
         Today = CompetitionRowStateRules.IsraelToday(_time.GetUtcNow());
 
@@ -238,11 +251,15 @@ public class IndexModel : PageModel
         ListStates = list.ListStates ?? CompetitionStateCounts.Zero;
         ReadyToPullByDay = CompetitionRowStateRules.GroupReadyToPullByDay(Result.Items, u => u.Status);
         SelectedRow = Selected == null ? null : Result.Items.FirstOrDefault(u => CompetitionRowKey.Matches(u, Selected));
+        // Без sel справа сразу первая «ждёт затягивания» (самый свежий день, первая строка блока) —
+        // решение Влада 23.11.2026. В адрес не пишется: голый адрес остаётся голым. Явный sel главнее.
+        AutoSelectedRow = Selected == null ? ReadyToPullByDay.FirstOrDefault()?.Rows.FirstOrDefault() : null;
         HiddenByDiscipline = list.HiddenByDiscipline;
         Categories = await _repo.GetAllCategoriesAsync();
         ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
         SwimmerRules = await _rules.GetAllAsync(PointRuleKind.Swimmers);
         SeriesWithPhrases = (await _series.GetAllAsync()).Where(x => !string.IsNullOrEmpty(x.MatchPhrases)).ToList();
+        return Page();
     }
 
     /// <summary>

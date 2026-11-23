@@ -203,6 +203,45 @@ public class CompetitionRowStateRulesTests
         Assert.Equal(CompetitionRowState.Closed, s.State);
     }
 
+    // ── Решение Влада 23.11.2026: недотянутая многодневка ─────────────────────────────
+
+    private static CompetitionRowStatus Pulled(DateOnly today, int dbDays, int? siteDays, bool accepted = false,
+        CompetitionStage stage = CompetitionStage.Imported) =>
+        CompetitionRowStateRules.Evaluate(new CompetitionRowStateInput(
+            stage, Fri, Fri.AddDays((siteDays ?? 1) - 1),
+            DbDayCount: dbDays, SiteDayCount: siteDays, MissingDaysAccepted: accepted), today);
+
+    [Fact]
+    public void PulledTwoOfThree_AfterLastDay_IsWaitingProtocol_Incomplete()
+    {
+        var s = Pulled(Fri.AddDays(3), dbDays: 2, siteDays: 3);
+        Assert.Equal(CompetitionRowState.WaitingProtocol, s.State);
+        Assert.Equal(WaitingProtocolReason.Incomplete, s.Reason);
+        Assert.Equal((2, 3), (s.PulledDays!.Value, s.SiteDays!.Value));
+        Assert.Equal(CompetitionStateBucket.Debt, s.Bucket);
+        // Пока последний день по сайту не прошёл — «идёт», как у любой затянутой по дням.
+        Assert.Equal(CompetitionRowState.Running, Pulled(Fri.AddDays(2), dbDays: 2, siteDays: 3).State);
+    }
+
+    [Fact]
+    public void PulledTwoOfThree_AcceptedAsIs_IsClosed()
+    {
+        var s = Pulled(Fri.AddDays(3), dbDays: 2, siteDays: 3, accepted: true);
+        Assert.Equal(CompetitionRowState.Closed, s.State);
+        Assert.Null(s.PulledDays);
+    }
+
+    [Theory]
+    [InlineData(1, 1)] // однодневное
+    [InlineData(3, 3)] // затянуто полностью
+    [InlineData(4, 3)] // в базе дней больше, чем по сайту — не долг
+    public void FullyPulled_IsClosed(int dbDays, int siteDays) =>
+        Assert.Equal(CompetitionRowState.Closed, Pulled(Fri.AddDays(5), dbDays, siteDays).State);
+
+    [Fact]
+    public void DbOnly_WithoutSite_IsClosed() =>
+        Assert.Equal(CompetitionRowState.Closed, Pulled(Fri.AddDays(5), dbDays: 1, siteDays: null, stage: CompetitionStage.DbOnly).State);
+
     // ── Решение Влада 23.11.2026: «пропал N дн. — скрыть?» ─────────────────────────
 
     private static CompetitionRowStatus Missing(DateOnly today, DateOnly start, DateOnly missingSince,

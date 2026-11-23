@@ -61,6 +61,39 @@
         </div>
     }
 
+    @if (!Model.IsNew && Model.Existing is { PartialResults: null } ex
+         && (ex.ShortOfSiteDays || ex.MissingDaysAcceptedAt != null))
+    {
+        var acceptedDays = ex.MissingDaysAcceptedAt;
+        <!-- ── Затянуто меньше дней, чем по сайту (решение Влада 23.11.2026) ─────── -->
+        <div class="admin-card mb-5 border-l-[3px] @(acceptedDays == null ? "border-l-admin-warning" : "border-l-admin-border")" id="missing-days">
+            <h2 class="text-sm font-semibold text-white mb-1">
+                @(acceptedDays == null ? "⏳ Затянуты не все дни" : "✓ Не все дни — принято как есть")
+            </h2>
+            <p class="text-sm text-admin-text mb-2">
+                В базе @ex.DbDayCount из @(ex.SiteDayCount?.ToString() ?? "?") дн. по сайту федерации.
+            </p>
+            <p class="text-xs text-admin-text-muted mb-3">
+                После последнего дня по сайту такое событие в /Admin/Competitions — «ждём протокол · неполный» (долг).
+                @if (acceptedDays == null)
+                {
+                    <text>Если остальных дней не было (сайт показывает диапазон длиннее реального старта) — прими как есть: строка закроется.</text>
+                }
+                else
+                {
+                    <text>Принято @acceptedDays.Value.ToString("dd.MM.yyyy HH:mm") UTC — строка закрыта. Затянешь недостающий день — принятие останется, но и не понадобится.</text>
+                }
+            </p>
+            <form method="post" asp-page-handler="AcceptPartial" asp-route-back="@Model.BackUrl" class="inline">
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" name="accepted" value="@(acceptedDays == null ? "true" : "false")" />
+                <button type="submit" class="admin-btn @(acceptedDays == null ? "admin-btn-primary" : "admin-btn-ghost")">
+                    @(acceptedDays == null ? "Принять как есть — других дней не будет" : "Вернуть в долг")
+                </button>
+            </form>
+        </div>
+    }
+
     <!-- ── Основные поля ─────────────────────────────────────────────────────── -->
     <form method="post" asp-page-handler="Save" asp-route-back="@Model.BackUrl" class="admin-card mb-5">
         <input type="hidden" asp-for="Id" />

@@ -94,7 +94,13 @@ public sealed record CompetitionRowStateInput(
     bool ResultsNotPublished = false,
     bool PartialResults = false,
     bool MarkedImported = false,
-    DateOnly? MissingSinceDay = null);
+    DateOnly? MissingSinceDay = null,
+    int DbDayCount = 0,
+    int? SiteDayCount = null,
+    bool MissingDaysAccepted = false);
+// DbDayCount — разных дней старта в базе (одиночное — 1, событие — его дни; 0 — строки базы нет).
+// SiteDayCount — дней в диапазоне сайта (DateStart..DateEnd строки «Входящих»); null — сайта нет.
+// MissingDaysAccepted — «затянуто меньше дней, чем по сайту» принято как есть на Edit.
 
 /// <summary>Итог: состояние, причина и пометки строки.</summary>
 /// <param name="Reason">Только у <see cref="CompetitionRowState.WaitingProtocol"/>.</param>
@@ -120,8 +126,12 @@ public sealed record CompetitionRowStatus(
     DateOnly? FirstDay = null,
     DateOnly? LastDay = null,
     int? MissingDays = null,
-    bool SuggestHide = false)
+    bool SuggestHide = false,
+    int? PulledDays = null,
+    int? SiteDays = null)
 {
+    // PulledDays / SiteDays — «затянуто N из M дней по сайту федерации»: только у затянутого, где
+    // дней в базе меньше, чем по сайту, и это не принято как есть (решение Влада 23.11.2026).
     /// <summary>Сегмент полосы: закрыто / долг / впереди.</summary>
     public CompetitionStateBucket Bucket => CompetitionRowStateRules.BucketOf(State);
 }
@@ -196,6 +206,13 @@ public static class CompetitionRowStateRules
     /// </summary>
     public const int MissingSuggestHideDays = 7;
 
+    /// <summary>
+    /// Затянуто меньше дней, чем в диапазоне сайта федерации (решение Влада 23.11.2026) — одно
+    /// правило для списка (долг «неполный») и Edit (блок «Принять как есть»).
+    /// </summary>
+    public static bool ShortOfSiteDays(int dbDays, int? siteDays) =>
+        siteDays is int sd && dbDays > 0 && dbDays < sd;
+
     /// <summary>«Сегодня» по времени Израиля — граница «впереди / идёт / прошёл».</summary>
     public static DateOnly IsraelToday(DateTimeOffset utcNow) =>
         DateOnly.FromDateTime(IsraelTime.ToLocal(utcNow.UtcDateTime));
@@ -249,11 +266,20 @@ public static class CompetitionRowStateRules
             case CompetitionStage.Ignored:
                 return Make(CompetitionRowState.Closed, nothing: true);
             case CompetitionStage.Imported or CompetitionStage.DbOnly when !input.PartialResults:
+            {
                 // Многодневку тянут по дням (путь Б в pull-to-prod): пока последний день по сайту
                 // не прошёл, затянутая часть — это «идёт», а не «закрыто» (решение Влада 23.11.2026).
-                return dayCount > 1 && first is { } fd && last is { } ld && today >= fd && today <= ld
-                    ? Make(CompetitionRowState.Running, runningDay: today.DayNumber - fd.DayNumber + 1)
-                    : Make(CompetitionRowState.Closed);
+                if (dayCount > 1 && first is { } fd && last is { } ld && today >= fd && today <= ld)
+                    return Make(CompetitionRowState.Running, runningDay: today.DayNumber - fd.DayNumber + 1);
+                // Недотянутая: дней в базе меньше, чем в диапазоне сайта, — после последнего дня это
+                // долг «ждём протокол · неполный», пока не приняли как есть (решение Влада 23.11.2026).
+                // Ложный долг (диапазон сайта длиннее реального старта) снимается «Принять как есть».
+                if (ShortOfSiteDays(input.DbDayCount, input.SiteDayCount)
+                    && !input.MissingDaysAccepted && last is { } end0 && today > end0)
+                    return Make(CompetitionRowState.WaitingProtocol, WaitingProtocolReason.Incomplete)
+                        with { PulledDays = input.DbDayCount, SiteDays = input.SiteDayCount };
+                return Make(CompetitionRowState.Closed);
+            }
             case CompetitionStage.OnSite when input.NoProtocolMark || input.MarkedImported:
                 return Make(CompetitionRowState.Closed, nothing: true);
         }

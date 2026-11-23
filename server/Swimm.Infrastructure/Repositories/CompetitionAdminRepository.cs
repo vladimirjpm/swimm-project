@@ -337,6 +337,18 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             ? u.Db.Single.PartialResults != null
             : u.Db.PartialDayCount > 0);
 
+        // Дней в базе против дней по сайту (решение Влада 23.11.2026): у одиночного — один,
+        // у события — разных дат его дней. Диапазон сайта — только Site (не объединение).
+        var dbDays = u.Db == null ? 0
+            : u.Db.Single != null ? 1
+            : u.Db.Days.Select(d => d.Date).Where(d => !string.IsNullOrEmpty(d)).Distinct().Count();
+        int? siteDays = u.Site is { } st && st.DateEnd.Date >= st.DateStart.Date
+            ? (st.DateEnd.Date - st.DateStart.Date).Days + 1
+            : null;
+        var missingDaysAccepted = u.Db != null && (u.Db.Single != null
+            ? u.Db.Single.MissingDaysAccepted
+            : u.Db.Days.Any(d => d.MissingDaysAccepted));
+
         return new CompetitionRowStateInput(
             u.Stage, first, last,
             AutoPullVerdict: u.Site?.AutoPullVerdict,
@@ -347,7 +359,10 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             // MissingSince лежит в UTC — день пропажи считаем по Израилю, как и «сегодня».
             MissingSinceDay: u.Site?.MissingSince is { } gone
                 ? DateOnly.FromDateTime(IsraelTime.ToLocal(gone))
-                : null);
+                : null,
+            DbDayCount: dbDays,
+            SiteDayCount: siteDays,
+            MissingDaysAccepted: missingDaysAccepted);
     }
 
     private static DateOnly? ParseDbDate(string? s) =>
@@ -667,7 +682,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         QualityScannedAt = c.QualityScannedAt,
         SuspectCount = _db.Results.Count(r => r.CompetitionId == c.Id && r.SuspectReason != null),
         // Видна, пока стоит и не принята как есть (PartialResultsState.IsShownFor — тот же предикат).
-        PartialResults = c.PartialResultsAcceptedAt == null ? c.PartialResults : null
+        PartialResults = c.PartialResultsAcceptedAt == null ? c.PartialResults : null,
+        MissingDaysAccepted = c.PartialResults == null && c.PartialResultsAcceptedAt != null
     };
 
     /// <summary>«дд/ММ/гггг – дд/ММ/гггг» по дням события (или один день, если даты совпали).</summary>
@@ -722,6 +738,11 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 .Join(_db.Categories, cc => cc.CategoryId, cat => cat.Id, (cc, cat) => cat.Key)
                 .ToListAsync()
         };
+
+        var days = await LoadSiteDaysAsync(c);
+        dto.DbDayCount = days.DbDays;
+        dto.SiteDayCount = days.SiteDays;
+        dto.MissingDaysAcceptedAt = days.AcceptedAt;
 
         if (c.OrgCompId != null)
         {
@@ -1150,7 +1171,7 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var comp = await _db.Competitions.FindAsync(id);
         if (comp == null) return CompetitionSaveResult.Fail($"Соревнование #{id} не найдено");
         if (comp.PartialResults == null)
-            return CompetitionSaveResult.Fail("Отметки «результаты неполные» нет — принимать нечего.");
+            return await SetMissingDaysAcceptedAsync(comp, accepted);
 
         var state = PartialResultsState.Of(comp);
         var next = accepted ? PartialResultsRule.Accept(state, DateTime.UtcNow) : PartialResultsRule.Unaccept(state);
@@ -1158,5 +1179,52 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         // Сохранение через трекер: перехватчик сам сбросит кэш витрины (строка Competitions) —
         // чип «Partial results» пропадёт/вернётся без ручного сброса.
         return await SaveAsync(comp);
+    }
+
+    /// <summary>
+    /// «Затянуто меньше дней, чем по сайту — принять как есть» (решение Влада 23.11.2026), без
+    /// миграции: принятие — <c>PartialResultsAcceptedAt</c> у дня при пустой отметке. Все прочие
+    /// читатели смотрят AcceptedAt только вместе с отметкой (витрина, «Требует внимания», частичный
+    /// индекс), поэтому для них ничего не меняется. Вернуть — снять принятие у всех дней события.
+    /// </summary>
+    private async Task<CompetitionSaveResult> SetMissingDaysAcceptedAsync(Competition comp, bool accepted)
+    {
+        var days = await LoadSiteDaysAsync(comp);
+        if (accepted)
+        {
+            if (!CompetitionRowStateRules.ShortOfSiteDays(days.DbDays, days.SiteDays))
+                return CompetitionSaveResult.Fail("Отметки «результаты неполные» нет и дней в базе не меньше, чем по сайту, — принимать нечего.");
+            comp.PartialResultsAcceptedAt = DateTime.UtcNow;
+            return await SaveAsync(comp);
+        }
+
+        List<Competition> accepted0 = comp.EventId is int eid
+            ? await _db.Competitions.Where(x => x.EventId == eid && x.PartialResults == null && x.PartialResultsAcceptedAt != null).ToListAsync()
+            : comp.PartialResultsAcceptedAt != null ? [comp] : [];
+        foreach (var d in accepted0) d.PartialResultsAcceptedAt = null;
+        await _db.SaveChangesAsync();
+        return CompetitionSaveResult.Ok(comp.Id);
+    }
+
+    /// <summary>
+    /// Дни соревнования против диапазона сайта: разных дат в базе (у дня события — у всего события),
+    /// дней по сайту (строка «Входящих» по OrgCompId любого дня; null — не найдена) и когда принято
+    /// «затянуто меньше дней» (AcceptedAt при пустой отметке у любого дня).
+    /// </summary>
+    private async Task<(int DbDays, int? SiteDays, DateTime? AcceptedAt)> LoadSiteDaysAsync(Competition c)
+    {
+        var days = c.EventId is int eid
+            ? await _db.Competitions.AsNoTracking().Where(x => x.EventId == eid)
+                .Select(x => new { x.Date, x.OrgCompId, x.PartialResults, x.PartialResultsAcceptedAt }).ToListAsync()
+            : [new { c.Date, c.OrgCompId, c.PartialResults, c.PartialResultsAcceptedAt }];
+        var dbDays = days.Select(d => d.Date).Where(d => !string.IsNullOrEmpty(d)).Distinct().Count();
+        var orgs = days.Where(d => d.OrgCompId != null).Select(d => d.OrgCompId!.Value).Distinct().ToList();
+        var site = orgs.Count == 0 ? null : await _db.DiscoveredCompetitions.AsNoTracking()
+            .Where(d => orgs.Contains(d.OrgCompId)).OrderBy(d => d.Id)
+            .Select(d => new { d.DateStart, d.DateEnd }).FirstOrDefaultAsync();
+        int? siteDays = site != null && site.DateEnd.Date >= site.DateStart.Date
+            ? (site.DateEnd.Date - site.DateStart.Date).Days + 1 : null;
+        var acceptedAt = days.Where(d => d.PartialResults == null).Max(d => d.PartialResultsAcceptedAt);
+        return (dbDays, siteDays, acceptedAt);
     }
 }

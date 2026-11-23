@@ -109,4 +109,32 @@ public class CompetitionListUrlTests
     [InlineData("c-1", false)]
     [InlineData("<script>", false)]
     public void RowKey_IsValid(string key, bool ok) => Assert.Equal(ok, CompetitionRowKey.IsValid(key));
+
+    // ── Форма фильтров: поиск всегда по всем сезонам (решение Влада 23.11.2026) ─────────
+
+    private static IReadOnlyList<KeyValuePair<string, string>>? Form(params (string K, string? V)[] q) =>
+        CompetitionListUrl.FormRedirect(q.Select(x => new KeyValuePair<string, string?>(x.K, x.V)));
+
+    [Fact]
+    public void FormRedirect_LinkWithQAndSeason_IsNotTouched() =>
+        // Jobs «Что изменилось»: ?q=…&season=…&discipline=all — готовая ссылка, не форма.
+        Assert.Null(Form(("q", "16891"), ("season", "2026"), ("discipline", "all")));
+
+    [Fact]
+    public void FormRedirect_Search_DropsSeasonAndMonth_EvenIfChosenExplicitly()
+    {
+        var r = Form(("q", "ליגה"), ("stage", ""), ("fseason", "2027"), ("fmonth", "11"), ("discipline", "all"), ("p", "3"));
+        Assert.Equal([new("q", "ליגה"), new("discipline", "all")], r);
+    }
+
+    [Fact]
+    public void FormRedirect_OtherFilters_KeepTheMonth()
+    {
+        var r = Form(("q", ""), ("cat", "age-8-99"), ("fseason", "2027"), ("fmonth", "11"), ("state", "waiting"));
+        Assert.Equal([new("cat", "age-8-99"), new("season", "2027"), new("month", "11"), new("state", "waiting")], r);
+    }
+
+    [Fact]
+    public void FormRedirect_AllSeasons_IsKept_WithoutSearch() =>
+        Assert.Equal([new KeyValuePair<string, string>("season", "all")], Form(("fseason", "all"), ("fmonth", "")));
 }

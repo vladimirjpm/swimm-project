@@ -95,11 +95,8 @@
             const form = document.getElementById('filters-form');
             if (!form) return;
             form.addEventListener('submit', () => {
-                // Фильтры держат месяц (решение Влада 23.11.2026), но поиск с голой страницы —
-                // по всем сезонам: подставленные по умолчанию сезон и месяц при непустом q не уходят.
-                const q = form.querySelector('input[name="q"]');
-                if (q && q.value.trim() !== '')
-                    form.querySelectorAll('input[data-default-month]').forEach(el => { el.disabled = true; });
+                // Сезон и месяц уходят как fseason/fmonth: «поиск — по всем сезонам» решает сервер
+                // (CompetitionListUrl.FormRedirect), чтобы работало и без JS.
                 form.querySelectorAll('input[name], select[name]').forEach(el => {
                     if (el.type === 'checkbox') { if (!el.checked) el.disabled = true; }
                     else if (el.value === '') el.disabled = true;
@@ -120,8 +117,9 @@
             if (!rows.length || !box) return;
 
             // sel=s{N} находит и уже затянутую строку (ключ у неё c…/e…) — как CompetitionRowKey.Matches.
+            // Без sel в адресе справа — автовыбор сервера: первая «ждёт затягивания» (data-auto-key).
             const keyFor = sel => {
-                if (!sel) return null;
+                if (!sel) return box.dataset.autoKey || null;
                 if (rows.some(r => r.dataset.key === sel)) return sel;
                 const m = /^s(\d+)$/i.exec(sel);
                 return m ? (rows.find(r => r.dataset.discId === m[1])?.dataset.key ?? null) : null;

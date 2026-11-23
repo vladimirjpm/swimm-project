@@ -386,12 +386,13 @@
     </label>
     @* Сезон выбирается чипами над списком (там же счётчики «затянуто из всего»), а не селектом —
        здесь только скрытое поле, чтобы «Найти» не сбрасывало выбранный сезон. *@
-    @* Фильтры держат месяц (решение Влада 23.11.2026): сезон и месяц уходят в форму всегда, и
-       дисциплина/категория/тип/стадия с голой страницы остаются в текущем месяце. Исключение —
-       поиск: если месяц подставлен по умолчанию (data-default-month), а в «Поиск» что-то
-       введено, скрипт выключает эти два поля — поиск идёт по всем сезонам, как раньше. *@
-    <input type="hidden" name="season" value="@Model.SeasonParam" data-default-month="@(Model.OpenedOnCurrentMonth ? "1" : null)" />
-    <input type="hidden" name="month" value="@Model.Month" data-default-month="@(Model.OpenedOnCurrentMonth ? "1" : null)" />
+    @* Решение Влада 23.11.2026: дисциплина/категория/тип/стадия держат выбранный месяц, а поиск —
+       ВСЕГДА по всем сезонам. Сезон и месяц форма шлёт как fseason/fmonth (не season/month):
+       сервер (CompetitionListUrl.FormRedirect) переадресует на чистый адрес и при непустом q
+       их выбрасывает. Готовые ссылки с q и season (Jobs «Что изменилось») этих имён не несут —
+       их выборка прежняя. Работает и без JS. *@
+    <input type="hidden" name="@Swimm.Application.Mapping.CompetitionListUrl.FormSeasonKey" value="@Model.SeasonParam" />
+    <input type="hidden" name="@Swimm.Application.Mapping.CompetitionListUrl.FormMonthKey" value="@Model.Month" />
     <input type="hidden" name="state" value="@Model.State" />
     @if (!string.IsNullOrEmpty(Model.QualityFilter))
     {
@@ -516,7 +517,8 @@
     // Группы: «Ждут затягивания» (блоками дней) → «Ждём протокол» → «Впереди» («идёт» первыми)
     // → «Закрыто». Строки — те же Result.Items, что раньше шли в таблицу; без месяца — та же «p».
     var items = Model.Result.Items;
-    var selRow = Model.SelectedRow;
+    // Явный sel — главнее; без него справа первая «ждёт затягивания» (AutoSelectedRow), адрес голый.
+    var selRow = Model.SelectedRow ?? Model.AutoSelectedRow;
     var selKey = selRow == null ? null : Swimm.Application.Mapping.CompetitionRowKey.Of(selRow);
     var waitingRows = items.Where(u => u.Status?.State == Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol).ToList();
     var aheadRows = items
@@ -861,7 +863,7 @@
        целиком (все действия, дни события, быстрая правка, «Изменить», «Удалить»); панели
        отрисованы у всех строк страницы, видна одна (sel), JS переключает без перезагрузки.
        Этап 4 заменит содержимое чек-листом. *@
-    <div id="comp-detail" class="sticky top-4 max-h-[calc(100vh-2rem)] min-w-0 overflow-y-auto">
+    <div id="comp-detail" data-auto-key="@(Model.AutoSelectedRow == null ? null : Swimm.Application.Mapping.CompetitionRowKey.Of(Model.AutoSelectedRow))" class="sticky top-4 max-h-[calc(100vh-2rem)] min-w-0 overflow-y-auto">
         <div id="panel-none" class="admin-card text-[13px] text-admin-text-muted @(selRow != null ? "hidden" : "")">
             @if (!string.IsNullOrEmpty(Model.Selected) && selRow == null)
             {
@@ -970,6 +972,13 @@
                                title="Название содержит ключевую фразу серии — при затягивании дни привяжутся к её частям">Series: @series.Name</a>
                         }
                     </div>
+                    @if (st is { PulledDays: int pd, SiteDays: int sd })
+                    {
+                        @* Недотянутая многодневка (решение Влада 23.11.2026): ложный долг снимает «Принять как есть» на Edit. *@
+                        <div class="missing-days-note mt-1.5 text-[11px] text-admin-warning">
+                            Затянуто @pd из @sd дней по сайту федерации — если остальных дней не будет, «Принять как есть» на странице «Изменить».
+                        </div>
+                    }
                     @if (!string.IsNullOrEmpty(u.Site?.LastError))
                     {
                         <div class="mt-1.5 text-[11px] text-[#ef9a9a]" dir="ltr">@u.Site!.LastError</div>
