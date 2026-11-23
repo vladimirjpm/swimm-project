@@ -57,10 +57,7 @@
                     {
                         <button type="button" class="@quiet" onclick="discStatus(@id,'new')" title="Снять ручную пометку «импортировано» — строка снова в работе">Вернуть</button>
                     }
-                    else
-                    {
-                        <button type="button" class="@quiet" onclick="discStatus(@id,'ignored')" title="Скрыть строку (вернуть — «Вернуть» в её панели; найти — переключатель «Закрыто»)">Скрыть</button>
-                    }
+                    <button type="button" class="@quiet" onclick="discStatus(@id,'ignored')" title="Скрыть строку (вернуть — «Вернуть» в её панели; найти — переключатель «Закрыто»)">Скрыть</button>
                 }
                 else if (hidden)
                 {
@@ -77,9 +74,9 @@
                                 <button type="button" class="@menuItem" onclick="discStatus(@id,'imported')"
                                         title="Строка закроется без импорта (например, результаты уже в базе под другим именем)">✓ имп. — пометить импортированным вручную</button>
                             }
-                            @if (db != null)
+                            @if (db != null || hidden)
                             {
-                                @* У строки в базе «Нет протокола» — редкость (прежняя кнопка была у всех строк сайта). *@
+                                @* У строки в базе и у скрытой «Нет протокола» — редкость (прежняя кнопка была у всех строк сайта). *@
                                 <button type="button" class="@menuItem" onclick="discEmptySource(@id, @(empty ? "false" : "true"))"
                                         title="@(empty ? "Снять пометку — протокол появился" : "Протокола нет: PDF пустой")">@(empty ? "Протокол есть" : "Нет протокола")</button>
                             }
@@ -106,6 +103,11 @@
                    class="text-admin-accent hover:underline" title="ID федерации (OrgCompId): @s.OrgCompId">страница федерации ↗</a>
             }
             @Html.Raw(Model.HeaderChipsHtml)
+            @if (db != null && s?.EmptySourceAt is { } emptyAt)
+            {
+                <span class="inline-block whitespace-nowrap rounded bg-white/[.08] px-1.5 py-0.5 text-[10px] font-bold text-admin-text-muted"
+                      title="Протокола нет: PDF пустой или в нём одни неявки (NS) (@emptyAt.ToLocalTime().ToString("dd.MM.yyyy"))">∅ нет протокола · @emptyAt.ToLocalTime().ToString("dd.MM")</span>
+            }
         </div>
         @* Бывшие колонки таблицы — компактно (хэндофф, раздел 5: «предложение — в шапке панели»). *@
         <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-admin-text-muted">@Html.Raw(Model.MetaHtml)</div>
@@ -114,25 +116,15 @@
             <div class="mt-1.5">@Model.Categories</div>
         }
 
-        @* Строка дней события: шаги 5–9 — у выбранного дня (хэндофф 3.5). *@
+        @* Многодневное событие: общая часть (всё событие) — над строкой дней; шаги 5–9 — у выбранного дня. *@
         @if (Model.IsEvent)
         {
-            <nav class="ck-days mt-3 flex flex-wrap gap-1 rounded-md border border-admin-border p-1 text-xs" aria-label="Дни события">
-                @foreach (var sc in Model.Scopes)
-                {
-                    var on = sc == firstScope;
-                    <button type="button" class="ck-day-btn cursor-pointer whitespace-nowrap rounded px-2 py-1 aria-[pressed=true]:bg-admin-accent/15 aria-[pressed=true]:font-semibold aria-[pressed=true]:text-admin-accent text-admin-text-muted hover:bg-admin-surface-hover hover:text-admin-text"
-                            data-day="@sc.Day!.Id" aria-pressed="@(on ? "true" : "false")">
-                        @sc.Label@(sc.Incomplete != null ? " ⏳" : "")
-                    </button>
-                }
-            </nav>
             @* Общие действия события (решения Влада 23.11.2026): «Перезатянуть» тянет весь протокол
                федерации этого compID — все его дни, поэтому одна кнопка над днями, а не в каждом дне;
                «Качество» на всё событие (eventId) — как до этапа 6, по дню — в шаге 8 дня. *@
             @if (db != null && (s != null && finished || db.TotalResultCount > 0))
             {
-                <div class="ck-event-actions mt-2 flex flex-wrap items-center gap-2 text-[11px] text-admin-text-muted">
+                <div class="ck-event-actions mt-3 flex flex-wrap items-center gap-2 text-[11px] text-admin-text-muted">
                     <span>Всё событие:</span>
                     @if (s != null && finished)
                     {
@@ -154,8 +146,33 @@
                     }
                 </div>
             }
+            @* Ход «Перезатянуть» и превью события — здесь, а не в выбранном дне: тянется весь протокол
+               (все дни), при смене дня ничего не «прыгает» (ревью PR #267). Пишет JS (pullFlow). *@
+            <div class="ck-event-flow">
+                <ol class="ck-log mt-2 hidden space-y-1 text-[12px]"></ol>
+                <div class="ck-preview-slot"></div>
+            </div>
+            @if (Model.QuickEdit != null)
+            {
+                @* Быстрая правка события — одна на все дни (пишет во все дни; бассейн и правила — события /
+                   первого дня), поэтому в общей части, а не под выбранным днём (ревью PR #267). *@
+                <details class="ck-event-quick mt-2">
+                    <summary class="cursor-pointer text-[12px] text-admin-accent hover:underline">Быстрая правка — для всех дней события (@db!.DayCount)</summary>
+                    @Model.QuickEdit
+                </details>
+            }
+            <nav class="ck-days mt-3 flex flex-wrap gap-1 rounded-md border border-admin-border p-1 text-xs" aria-label="Дни события">
+                @foreach (var sc in Model.Scopes.Where(x => x.Day != null))
+                {
+                    var on = sc == firstScope;
+                    <button type="button" class="ck-day-btn cursor-pointer whitespace-nowrap rounded px-2 py-1 aria-[pressed=true]:bg-admin-accent/15 aria-[pressed=true]:font-semibold aria-[pressed=true]:text-admin-accent text-admin-text-muted hover:bg-admin-surface-hover hover:text-admin-text"
+                            data-day="@sc.Day!.Id" aria-pressed="@(on ? "true" : "false")">
+                        @sc.Label@(sc.Incomplete != null ? " ⏳" : "")
+                    </button>
+                }
+            </nav>
             @* Строка выбранного дня (бывшая таблица дней прежней панели): «Изменить» — Edit ЭТОГО дня. *@
-            @foreach (var sc in Model.Scopes)
+            @foreach (var sc in Model.Scopes.Where(x => x.Day != null))
             {
                 var d = sc.Day!;
                 <div class="ck-scope mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-admin-text-muted @(sc == firstScope ? "" : "hidden")" data-day="@d.Id">
@@ -225,9 +242,8 @@
                                                 title="Затянуть стартовый протокол (программа + заявки) с loglig">Обновить</button>
                                     }
                                     @* «Источники» привязываются к соревнованию в базе — у строки до импорта их нет. *@
-                                    @if (db != null)
+                                    @if ((db?.Single ?? db?.Days.FirstOrDefault()) is { } head)
                                     {
-                                        var head = db.Single ?? db.Days[0];
                                         <button type="button" class="@ghost sources-btn" data-competition-id="@head.Id" data-title="@Model.Name"
                                                 title="Из каких compID федерации собирается стартовый протокол">⇄ Источники</button>
                                     }
@@ -360,14 +376,11 @@
                             }
                             @* Строки хода (тексты прежней панели «Затягивание») и итог импорта — пишет JS. *@
                             <ol class="ck-log mt-1 hidden space-y-1 text-[12px]"></ol>
-                            @if (no == 6)
+                            @if (no == 6 && !Model.IsEvent)
                             {
                                 <div class="ck-preview-slot"></div>
-                                @if (Model.QuickEdit != null)
-                                {
-                                    @* Быстрая правка — шаг 6 у строк в базе; у события форма одна, JS переносит её в выбранный день. *@
-                                    <div class="qe-slot">@if (sc == firstScope) { @Model.QuickEdit }</div>
-                                }
+                                @* Быстрая правка — шаг 6 у одиночной строки в базе; у события — в общей части панели. *@
+                                @Model.QuickEdit
                             }
                             @if (no == 9 && dayComp != null && sc.ResultCount > 0)
                             {

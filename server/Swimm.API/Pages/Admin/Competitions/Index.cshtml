@@ -563,7 +563,7 @@
             Add("bg-admin-danger/15 text-admin-danger",
                 st?.SuggestHide == true ? $"пропал {st.MissingDays} дн. — скрыть?" : "пропал",
                 $"Старт пропал из списка isr.org.il {Swimm.Application.Constants.IsraelTime.ToLocal(gone):dd.MM.yyyy} — вероятно, отменён (день по Израилю, от него считается «пропал N дн.»)."
-                + (st?.SuggestHide == true ? " Скрыть — кнопкой «✕» в панели справа; само ничего не закрывается." : ""));
+                + (st?.SuggestHide == true ? " Скрыть — кнопкой «Скрыть» в шапке панели справа; само ничего не закрывается." : ""));
         if (s?.StartList is { Stale: true } && st?.State is Swimm.Application.Mapping.CompetitionRowState.Ahead or Swimm.Application.Mapping.CompetitionRowState.Running)
             Add("bg-admin-warning/15 text-admin-warning", "обновить", "Стартовый протокол устарел: до старта мало дней, а забору больше суток");
         if (SuspectOf(u) is > 0 and var n)
@@ -747,7 +747,8 @@
             var steps = new List<Swimm.API.Pages.Admin.Competitions.CompChecklistStep>
             {
                 new(5, "Протокол скачан и разобран", s5.Text, none[4], s5.Title, s5.Danger),
-                new(6, "Проверь превью", db != null ? "быстрая правка: категории, флаги, бассейн, очки" : "бассейн, рекорды, флаги, категории, очки, событие", none[5]),
+                new(6, "Проверь превью", day != null ? "превью проверено · быстрая правка — выше, для всего события"
+                    : db != null ? "быстрая правка: категории, флаги, бассейн, очки" : "бассейн, рекорды, флаги, категории, очки, событие", none[5]),
                 new(7, "Импорт", db != null ? "в базе" : "1–5 минут, в фоне", none[6]),
                 new(8, "Проверка качества", s8, none[7]),
                 new(9, "После импорта", "Синхр. языки · Loglig-id · Промежуточные", none[8]),
@@ -960,8 +961,8 @@
     </section>
 
     @* ── Правая колонка: выбранное соревнование. Панели отрисованы у всех строк страницы, видна
-       одна (sel), JS переключает без перезагрузки. «Ждёт затягивания» (не в базе) — чек-лист
-       (_CompChecklist, этап 4); остальные — прежняя панель строки целиком, до этапа 6. *@
+       одна (sel), JS переключает без перезагрузки. У строк всех состояний — чек-лист (_CompChecklist,
+       этапы 4 и 6); у многодневного события — общая часть и шаги 5–9 по дням. *@
     <div id="comp-detail" data-auto-key="@(Model.AutoSelectedRow == null ? null : Swimm.Application.Mapping.CompetitionRowKey.Of(Model.AutoSelectedRow))" class="sticky top-4 max-h-[calc(100vh-2rem)] min-w-0 overflow-y-auto">
         @* Затягивание, чья строка не на этой странице списка (другой месяц, фильтры): ход идёт, видно его здесь. *@
         <div id="pull-elsewhere" class="admin-card mb-3 hidden px-4 py-2.5 text-[13px]"></div>

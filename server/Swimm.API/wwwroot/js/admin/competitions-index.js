@@ -156,9 +156,8 @@
         })();
 
         // Дни многодневного события (вариант E, этап 6; хэндофф 3.5): шаги 1–4 общие, шаги 5–9 — у
-        // выбранного дня (.ck-scope[data-day]). Форма быстрой правки у события одна (она пишет во
-        // все дни) — переезжает в шаг 6 выбранного дня. Ход затягивания перерисовывается: превью и
-        // строки хода живут в видимой области.
+        // выбранного дня (.ck-scope[data-day]). Быстрая правка, «Перезатянуть», «Качество события»,
+        // ход затягивания и превью — в общей части панели (они про всё событие) и при смене дня не двигаются.
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('.ck-day-btn');
             if (!btn) return;
@@ -166,10 +165,6 @@
             const day = btn.dataset.day;
             panel.querySelectorAll('.ck-day-btn').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
             panel.querySelectorAll('.ck-scope').forEach(sc => sc.classList.toggle('hidden', sc.dataset.day !== day));
-            const form = panel.querySelector('.qe-form');
-            const slot = panel.querySelector(`.ck-scope[data-day="${day}"] .qe-slot`);
-            if (form && slot && form.parentElement !== slot) slot.appendChild(form);
-            window.pullFlow?.render();
         });
 
         // Выпадающие «Ещё ▾» (шапка страницы и панели) и «Фильтры» — <details>: клик мимо закрывает.
@@ -226,11 +221,14 @@
                 'import-failed': 'импорт не прошёл', 'preview-expired': 'превью устарело',
                 nothing: 'тянуть нечего',
             };
-            // Р116: ответы разбора «тянуть нечего» — те же формулировки, по которым сервер ставит
-            // «∅ нет протокола» (DiscoveryPreviewService.LooksLikeEmptySource, NoStartProtocol.Marker).
-            // Это не сбой: шаг 5 решён, строка закрыта (после F5 — в «Закрыто»).
+            // Р116: спокойные ответы разбора «тянуть нечего» — только «все строки — неявка»
+            // (NoStartProtocol.Marker) и настоящий пустой PDF («No competitions found» / «0 lines extracted»).
+            // Это не сбой: шаг 5 решён, строка закрыта (сервер ставит «∅», после F5 — в «Закрыто»).
+            // «Парсер не распознал ни одного результата… (B4)» сюда НЕ входит: это поломка разбора —
+            // красный сбой с «!» и полным текстом (ревью PR #267), хотя сервер и пачка (BulkPullClassifier)
+            // считают её пустым источником.
             const NO_START_MARKER = 'все строки — неявка';
-            const EMPTY_MARKERS = ['No competitions found', '0 lines extracted', 'не распознал ни одного результата'];
+            const EMPTY_MARKERS = ['No competitions found', '0 lines extracted'];
             const nothingToPull = (message) => {
                 const m = String(message ?? '').toLowerCase();
                 if (m.includes(NO_START_MARKER)) return 'тянуть нечего: в протоколе одни неявки (NS)';
@@ -351,15 +349,24 @@
 
                 const showPreview = flow.phase === 'preview';
                 setStatuses(panel, flow.phase);
-                // Строки хода — только у текущего шага и у шага со сбоем: у сделанного итог в подписи.
-                for (let n = 5; n <= 7; n++) {
-                    const li = stepOf(panel, n);
-                    const open = ['current', 'attention'].includes(li?.dataset.status);
-                    fillLog(li?.querySelector('.ck-log'), open ? flow.lines.filter(l => l.step === n) : []);
+                // У многодневного события тянется весь протокол (все дни) — строки хода и превью живут в
+                // общей части панели (.ck-event-flow), а не в выбранном дне, и не «прыгают» при смене дня.
+                // Статусы и подписи шагов 5–7 — одинаковые у всех дней.
+                const eventFlow = panel.querySelector('.ck-event-flow');
+                if (eventFlow) {
+                    fillLog(eventFlow.querySelector('.ck-log'), flow.lines);
+                } else {
+                    // Строки хода — только у текущего шага и у шага со сбоем: у сделанного итог в подписи.
+                    // Исключение — «тянуть нечего» (Р116): шаг 5 сделан, но текст сервера («почему») виден.
+                    for (let n = 5; n <= 7; n++) {
+                        const li = stepOf(panel, n);
+                        const open = ['current', 'attention'].includes(li?.dataset.status)
+                            || (n === 5 && flow.phase === 'nothing');
+                        fillLog(li?.querySelector('.ck-log'), open ? flow.lines.filter(l => l.step === n) : []);
+                    }
                 }
                 Object.entries(flow.captions ?? {}).forEach(([n, text]) => {
-                    const c = stepOf(panel, Number(n))?.querySelector('.ck-caption');
-                    if (c) c.textContent = text;
+                    panel.querySelectorAll(`.ck-step[data-step="${n}"] .ck-caption`).forEach(c => { c.textContent = text; });
                 });
                 // «Затянуть» / «Перезатянуть» — пока хода нет или он сорвался; в разборе, превью и импорте — только PDF.
                 panel.querySelectorAll('.ck-pull-btn').forEach(b => b.classList.toggle('hidden',
@@ -371,7 +378,7 @@
                     chip.textContent = 'закрыто · тянуть нечего';
                 }
                 if (box) {
-                    const slot = stepOf(panel, 6)?.querySelector('.ck-preview-slot');
+                    const slot = eventFlow?.querySelector('.ck-preview-slot') ?? stepOf(panel, 6)?.querySelector('.ck-preview-slot');
                     if (slot && box.parentElement !== slot) slot.appendChild(box);
                     box.classList.toggle('hidden', !showPreview);
                 }
@@ -581,8 +588,8 @@
                 const panel = panelOf(d.discId);
                 const title = '<li class="font-semibold text-white">Итог затягивания</li>';
                 if (panel) {
-                    // Итог — под шагом 7 «Импорт» (у события — видимого дня).
-                    const ol = stepOf(panel, 7)?.querySelector('.ck-log');
+                    // Итог — под шагом 7 «Импорт»; у события — в общей части панели (тянулись все дни).
+                    const ol = panel.querySelector('.ck-event-flow .ck-log') ?? stepOf(panel, 7)?.querySelector('.ck-log');
                     if (ol) { ol.innerHTML = title + linesHtml(lines); ol.classList.remove('hidden'); }
                     if (!row.querySelector('.pulled-badge'))
                         row.querySelector('.row-marks')?.insertAdjacentHTML('beforeend',
