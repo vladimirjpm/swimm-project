@@ -139,7 +139,8 @@ freestyle-эстафета (где он первая нога), но не medley
 - **Сами после импорта (решение Влада 23.11.2026).** После каждого импорта, который что-то
   записал и знает compID (одиночное «Затянуть», пачка), `ImportBackgroundService` зовёт
   `ISplitAutoAttachService` → тот же `ISplitAttachService`, что у кнопки «Промежуточные» и
-  `--attach-splits`, боевым прогоном по всем дням события. Тумблер `SplitAttachOnImport` (вкл.),
+  `--attach-splits`, боевым прогоном по дням этого compID (не всего события: у окружных дни —
+  разные турниры loglig). Тумблер `SplitAttachOnImport` (вкл.),
   потолок 15 минут, отдельная очередь с одним читателем (на loglig — один старт за раз). Итог —
   аудит `competition.attach-splits` с актором `auto:import` у каждого дня (и «нечего», и «не
   удалось») и подпись шага 9 чек-листа. Подробно — [admin-pages/competitions.md](admin-pages/competitions.md),

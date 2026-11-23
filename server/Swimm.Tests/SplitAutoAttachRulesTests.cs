@@ -30,8 +30,24 @@ public class SplitAutoAttachRulesTests
     {
         Assert.Equal(SplitAutoKind.Failed,
             SplitAutoAttachRules.Classify(Result(true, 0, 0, 0, 0) with { SourceIncomplete = true }));
-        Assert.Equal(SplitAutoKind.Attached,
+        Assert.Equal(SplitAutoKind.Partial,
             SplitAutoAttachRules.Classify(Result(true, 4, 0, 8, 0) with { SourceIncomplete = true }));
+    }
+
+    // «Частично» — у всех дней прогона, с «!» и красной подписью; важнее «доклеено», слабее сбоя.
+    [Fact]
+    public void Partial_EveryDay_NeedsRetry_AndRanksBelowFailure()
+    {
+        Assert.Equal(SplitAutoKind.Partial, SplitAutoAttachRules.DayKind(SplitAutoKind.Partial, 0));
+        Assert.Equal(SplitAutoKind.Partial, SplitAutoAttachRules.DayKind(SplitAutoKind.Partial, 5));
+        Assert.True(SplitAutoAttachRules.NeedsRetry(SplitAutoKind.Partial));
+        Assert.False(SplitAutoAttachRules.NeedsRetry(SplitAutoKind.NothingOnLoglig));
+        Assert.Equal(SplitAutoKind.Partial, SplitAutoAttachRules.Combine([SplitAutoKind.Attached, SplitAutoKind.Partial]));
+        Assert.Equal(SplitAutoKind.Failed, SplitAutoAttachRules.Combine([SplitAutoKind.Partial, SplitAutoKind.Failed]));
+        Assert.Equal("частично — доклеено ног эстафет 8, часть loglig не прочиталась, повторите кнопкой",
+            SplitAutoAttachRules.Text(SplitAutoKind.Partial, 0, 8));
+        var note = new SplitAttachNote(DateTime.UtcNow, true, SplitAutoKind.Partial, 0, 8, "отчёт");
+        Assert.True(SplitAutoAttachRules.Caption(note, true, false)!.Value.Danger);
     }
 
     [Fact]
@@ -116,12 +132,12 @@ public class SplitAutoAttachRulesTests
     }
 
     [Fact]
-    public void Checklist_SplitsFailed_Step9Attention()
+    public void Checklist_SplitsNeedRetry_Step9Attention()
     {
-        var input = new ChecklistInput(CompetitionRowState.Closed, Imported: true, QualityScanned: true, SplitsFailed: true);
+        var input = new ChecklistInput(CompetitionRowState.Closed, Imported: true, QualityScanned: true, SplitsNeedRetry: true);
         var s = CompetitionChecklistRules.Build(input);
         Assert.Equal(ChecklistStepStatus.Attention, s[8]);
         Assert.Equal(ChecklistStepStatus.Current,
-            CompetitionChecklistRules.Build(input with { SplitsFailed = false })[8]);
+            CompetitionChecklistRules.Build(input with { SplitsNeedRetry = false })[8]);
     }
 }

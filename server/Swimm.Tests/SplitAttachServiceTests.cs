@@ -20,25 +20,26 @@ namespace Swimm.Tests;
 /// </summary>
 public class SplitAttachServiceTests
 {
-    private sealed class SourceStub(SplitSource source) : ISplitSourceProvider
+    internal sealed class SourceStub(SplitSource source) : ISplitSourceProvider
     {
         public Task<SplitSource> FetchAsync(int logligId, CancellationToken ct = default) =>
             Task.FromResult(source);
     }
 
-    private static SwimmDbContext CreateDb() =>
+    internal static SwimmDbContext CreateDb(params IInterceptor[] interceptors) =>
         new(new DbContextOptionsBuilder<SwimmDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .AddInterceptors(interceptors)
             .Options);
 
     /// <summary>
     /// Двухдневный старт: день 1 — эстафета 4×50 вольным (четыре ноги без промежуточных),
     /// день 2 — личные 100 на спине. Оба дня под одним событием, строка discovery одна.
     /// </summary>
-    private static async Task<SwimmDbContext> WorldAsync()
+    internal static async Task<SwimmDbContext> WorldAsync(params IInterceptor[] interceptors)
     {
-        var db = CreateDb();
+        var db = CreateDb(interceptors);
         db.CompetitionEvents.Add(new CompetitionEvent { Id = 7, Name = "чемпионат" });
         db.Competitions.Add(new Competition
         {
@@ -81,7 +82,7 @@ public class SplitAttachServiceTests
         return db;
     }
 
-    private static SplitSource Source() => new(
+    internal static SplitSource Source() => new(
         [new SplitSourceTeam("freestyle", "4X50", 3, 4, "01:52.30",
         [
             new SplitSourceLeg(1, 2011, "00:28.10"), new SplitSourceLeg(2, 2010, "00:28.40"),
@@ -181,5 +182,34 @@ public class SplitAttachServiceTests
 
         Assert.Contains("нет", result.Message);
         Assert.False(result.Applied);
+    }
+
+    // Автозапуск после импорта (ревью PR #273): дни одного события — разные compID (500 и 501), как в
+    // окружных чемпионатах e1/e7/e10/e12. onlyDays ограничивает и строки, и поиск LogligId.
+    [Fact]
+    public async Task OnlyDays_RestrictsRowsAndDays()
+    {
+        await using var db = await WorldAsync();
+
+        var result = await Service(db).AttachAsync(1, logligId: null, apply: true, onlyDays: [1]);
+
+        Assert.Equal(12345, result.LogligId);
+        Assert.Equal([1], result.Days.Select(d => d.CompetitionId));
+        Assert.Equal(4, result.Report.LegWrites);
+        Assert.Equal(0, result.Report.SwimWrites); // личный заплыв — в дне 2, его не трогали
+        Assert.True(string.IsNullOrEmpty((await db.Results.SingleAsync(r => r.Id == 1001)).TimeSplit));
+        Assert.False((await db.Competitions.SingleAsync(c => c.Id == 2)).HasSplits);
+    }
+
+    // У compID 501 своей строки discovery нет: прогон дня 2 не должен занять LogligId дня 1.
+    [Fact]
+    public async Task OnlyDays_DoesNotBorrowLogligIdOfAnotherCompId()
+    {
+        await using var db = await WorldAsync();
+
+        var result = await Service(db).AttachAsync(2, logligId: null, apply: true, onlyDays: [2]);
+
+        Assert.False(result.Applied);
+        Assert.Contains("LogligId не найден", result.Message);
     }
 }

@@ -717,9 +717,9 @@
             var splitPending = db != null && (comp?.OrgCompId ?? s?.OrgCompId) is int spOc && Model.SplitsPendingOrgCompIds.Contains(spOc);
             var splitCaption = db == null ? null
                 : Swimm.Application.Mapping.SplitAutoAttachRules.Caption(splitNote, comp?.HasSplits == true, splitPending);
-            var splitsFailed = !splitPending && splitNote?.Kind == Swimm.Application.Mapping.SplitAutoKind.Failed;
+            var splitsRetry = !splitPending && splitNote is { } snr && Swimm.Application.Mapping.SplitAutoAttachRules.NeedsRetry(snr.Kind);
             // Строк в базе нет — проверять нечего: шаг 8 не «текущий».
-            var input = baseInput with { QualityScanned = scanned != null || (db != null && results == 0), SuspectCount = suspects, Incomplete = incomplete != null, SplitsFailed = splitsFailed };
+            var input = baseInput with { QualityScanned = scanned != null || (db != null && results == 0), SuspectCount = suspects, Incomplete = incomplete != null, SplitsNeedRetry = splitsRetry };
             var none = Swimm.Application.Mapping.CompetitionChecklistRules.Build(input);
 
             (string Text, string? Title, bool Danger) Step5()

@@ -586,7 +586,7 @@
                     if (!sp) return; // процесс перезапущен или доклейка снята — итог покажет сервер
                     if (sp.state !== 'done') continue;
 
-                    const failed = sp.kind === 'failed';
+                    const failed = sp.kind === 'failed' || sp.kind === 'partial';
                     const text = `промежуточные: ${sp.text ?? ''} · само после импорта`;
                     const panel = panelOf(d.discId);
                     panel?.querySelectorAll('.ck-step[data-step="9"] .ck-caption').forEach(c => {

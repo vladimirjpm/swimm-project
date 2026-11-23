@@ -61,8 +61,8 @@ public enum ChecklistPhase
 /// дни по сайту федерации (Р115) — шаг 5 с «!». У дня события — по отметке этого дня.
 /// </param>
 /// <param name="Hidden">Строка скрыта (Ignored) — шаг 5 серый: «скрыто», а не «тянуть нечего».</param>
-/// <param name="SplitsFailed">
-/// Последняя доклейка промежуточных дня не удалась (сама после импорта или кнопкой) — шаг 9 «!»:
+/// <param name="SplitsNeedRetry">
+/// Последняя доклейка промежуточных дня не удалась или прошла частично (сама после импорта или кнопкой) — шаг 9 «!»:
 /// повторить кнопкой «Промежуточные».
 /// </param>
 public sealed record ChecklistInput(
@@ -77,7 +77,7 @@ public sealed record ChecklistInput(
     bool OnFederationSite = true,
     bool Incomplete = false,
     bool Hidden = false,
-    bool SplitsFailed = false);
+    bool SplitsNeedRetry = false);
 
 /// <summary>
 /// Девять шагов чек-листа (хэндофф 3.5): 1 найден у федерации, 2 стартовый протокол, 3 разминка,
@@ -175,7 +175,7 @@ public static class CompetitionChecklistRules
             var quality = i.SuspectCount > 0 ? A : i.QualityScanned ? D : C;
             // Неполный протокол у затянутого (Р114 / Р115) — «!» у шага 5: ждём остальное или «Принять как есть».
             // Сорвавшаяся доклейка промежуточных — «!» у шага 9 и в этом случае (повтор — кнопкой).
-            var after = i.SplitsFailed ? A : quality == C ? P : C;
+            var after = i.SplitsNeedRetry ? A : quality == C ? P : C;
             return [i.Incomplete ? A : D, D, D, quality, after];
         }
         return i.State switch

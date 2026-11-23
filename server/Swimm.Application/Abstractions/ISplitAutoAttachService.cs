@@ -23,8 +23,22 @@ public sealed record SplitAutoOutcome(
 /// </summary>
 public interface ISplitAutoAttachService
 {
+    /// <summary>
+    /// Сама после импорта: только дни с этим compID (и LogligId — его), по прогону на событие.
+    /// </summary>
     Task<SplitAutoOutcome> AttachAfterImportAsync(int orgCompId, Guid jobId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Боевой прогон кнопки «Промежуточные»: как раньше — по всем дням события, но итог пишется в
+    /// аудит ВСЕГДА и каждому дню (актор — админ), чтобы шаг 9 показывал последний исход, а не
+    /// застрявшее «не удалось» автозапуска. Сухой прогон сюда не ходит.
+    /// </summary>
+    Task<SplitButtonRun> AttachByButtonAsync(int competitionId, int? logligId, CancellationToken ct = default);
 }
+
+/// <summary>Итог боевого прогона кнопки.</summary>
+/// <param name="Threw">Прогон сорвался исключением (сайт лёг, таймаут) — панели это <c>ok: false</c>.</param>
+public sealed record SplitButtonRun(SplitAttachResult Result, SplitAutoKind Kind, bool Threw);
 
 /// <summary>Последняя доклейка дня — для шага 9 чек-листа.</summary>
 /// <param name="At">Когда (UTC).</param>

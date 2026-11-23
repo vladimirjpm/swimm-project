@@ -182,8 +182,7 @@ public sealed class ImportBackgroundService : BackgroundService
             {
                 try
                 {
-                    await using var scope = _scopeFactory.CreateAsyncScope();
-                    await RunLogligStepAsync(scope.ServiceProvider, step, stoppingToken);
+                    await RunLogligStepAsync(step, stoppingToken);
                 }
                 catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
                 {
@@ -201,11 +200,22 @@ public sealed class ImportBackgroundService : BackgroundService
     /// Шаги loglig одной задачи: сперва промежуточные (их видно на сайте и их итог ждёт шаг 9
     /// чек-листа), потом loglig-id. Друг от друга они не зависят: доклейка сопоставляет по
     /// дисциплине, времени и году рождения, а не по loglig-id пловца.
+    ///
+    /// У каждого шага СВОЙ scope (свой DbContext): сорвавшаяся посреди записи доклейка не должна
+    /// оставить штамповке трекер с недописанными изменениями.
     /// </summary>
-    internal async Task RunLogligStepAsync(IServiceProvider sp, LogligStep step, CancellationToken stoppingToken)
+    private async Task RunLogligStepAsync(LogligStep step, CancellationToken stoppingToken)
     {
-        if (step.Splits) await AttachSplitsAsync(sp, step, stoppingToken);
-        if (step.Stamp) await StampLogligAsync(sp, step, stoppingToken);
+        if (step.Splits)
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            await AttachSplitsAsync(scope.ServiceProvider, step, stoppingToken);
+        }
+        if (step.Stamp)
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            await StampLogligAsync(scope.ServiceProvider, step, stoppingToken);
+        }
     }
 
     // Промежуточные — тем же сервисом, что у кнопки «Промежуточные» и CLI `--attach-splits`

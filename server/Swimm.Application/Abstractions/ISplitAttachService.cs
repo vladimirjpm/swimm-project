@@ -52,6 +52,13 @@ public interface ISplitAttachService
     /// <param name="competitionId">Любой день старта — прогон идёт по ВСЕМ дням его события (§6-2).</param>
     /// <param name="logligId">Задан — берём его; иначе ищем по строке discovery (§6-1).</param>
     /// <param name="apply">false — сухой прогон: отчёт тот же, в базу ничего не пишем.</param>
+    /// <param name="onlyDays">
+    /// Ограничить прогон этими днями события (и LogligId искать только по их compID). null — все
+    /// дни события (кнопка, CLI). Нужен автозапуску после импорта: в окружных чемпионатах дни
+    /// одного события — разные compID с разными турнирами loglig (e1, e7, e10, e12), и чужой
+    /// LogligId дал бы дню ложное «нового нет».
+    /// </param>
     Task<SplitAttachResult> AttachAsync(
-        int competitionId, int? logligId, bool apply, CancellationToken ct = default);
+        int competitionId, int? logligId, bool apply, CancellationToken ct = default,
+        IReadOnlyCollection<int>? onlyDays = null);
 }
