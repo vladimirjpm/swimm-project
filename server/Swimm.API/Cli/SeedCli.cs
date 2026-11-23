@@ -36,12 +36,13 @@ internal static class SeedCli
     // Тестовые персонажи utest-* и тестовые группы (docs/plans/test-personas-plan.md, этап 2):
     //   dotnet run -- --seed-personas [--reset]
     // Идемпотентно; --reset сначала удаляет всех utest-пользователей и их тест-группы.
-    // Только Development: сидер заводит аккаунты, на живой базе им не место.
+    // Только Development И локальная база (Security/DevLocalGate.cs): сидер заводит аккаунты,
+    // в том числе utest-admin с ролью Admin, — на живой базе им не место.
     internal static async Task SeedPersonasAsync(WebApplication app, string[] args)
     {
-        if (!app.Environment.IsDevelopment())
+        if (Swimm.API.Security.DevLocalGate.WhyDisabled(app.Environment, app.Configuration) is { } why)
         {
-            Console.Error.WriteLine("--seed-personas работает только в Development (ASPNETCORE_ENVIRONMENT=Development).");
+            Console.Error.WriteLine($"--seed-personas работает только в Development против локальной базы: {why}.");
             Environment.Exit(1);
             return;
         }
