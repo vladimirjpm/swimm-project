@@ -67,15 +67,40 @@ public class CompetitionChecklistRulesTests
         Assert.Equal(Build(Ready)[..4], Build(Ready, ChecklistPhase.Importing)[..4]);
 
     [Theory]
-    [InlineData(0, false, ChecklistStepStatus.Current)]
-    [InlineData(0, true, ChecklistStepStatus.Done)]
-    [InlineData(3, true, ChecklistStepStatus.Attention)]
-    public void Imported_QualityStep(int suspects, bool scanned, ChecklistStepStatus expected)
+    [InlineData(0, false, ChecklistStepStatus.Current, ChecklistStepStatus.Pending)]
+    [InlineData(0, true, ChecklistStepStatus.Done, ChecklistStepStatus.Current)]
+    [InlineData(3, true, ChecklistStepStatus.Attention, ChecklistStepStatus.Current)]
+    public void Imported_QualityStep(int suspects, bool scanned, ChecklistStepStatus quality, ChecklistStepStatus after)
     {
         var s = Build(Ready with { State = CompetitionRowState.Closed, Imported = true, SuspectCount = suspects, QualityScanned = scanned });
         Assert.Equal(new[] { D, D, D }, s[4..7]);
-        Assert.Equal(expected, s[7]);
-        Assert.Equal(C, s[8]);
+        Assert.Equal(quality, s[7]);
+        Assert.Equal(after, s[8]); // шаг 9 текущий только после проверки качества
+    }
+
+    [Fact]
+    public void Running_PulledByHand_Step4Attention_PhaseStepCurrent()
+    {
+        var s = Build(Ready with { State = CompetitionRowState.Running }, ChecklistPhase.Importing);
+        Assert.Equal(A, s[3]);
+        Assert.Equal(C, s[6]);
+    }
+
+    /// <summary>Инвариант: текущий шаг — не больше одного, при любом состоянии, фазе и данных строки.</summary>
+    [Fact]
+    public void AtMostOneCurrent_ForEveryStateAndPhase()
+    {
+        var phases = new[] { ChecklistPhase.None }.Concat(CompetitionChecklistRules.LivePhases);
+        foreach (var state in System.Enum.GetValues<CompetitionRowState>())
+        foreach (var imported in new[] { false, true })
+        foreach (var (scanned, suspects) in new[] { (false, 0), (true, 0), (true, 2) })
+        foreach (var stale in new[] { false, true })
+        foreach (var phase in phases)
+        {
+            var input = new ChecklistInput(state, imported, StartListBadgeKind.Ok, stale, 0, 1, scanned, suspects);
+            var current = Build(input, phase).Count(x => x == C);
+            Assert.True(current <= 1, $"{state} imported={imported} scanned={scanned} suspects={suspects} phase={phase}: текущих {current}");
+        }
     }
 
     [Fact]

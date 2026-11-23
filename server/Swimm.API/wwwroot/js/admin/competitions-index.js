@@ -230,6 +230,8 @@
             let leaving = false;
             addEventListener('pagehide', () => { leaving = true; });
             addEventListener('beforeunload', () => { leaving = true; });
+            // Возврат из bfcache («Назад»): страница снова живая — иначе save() молча ничего не писал бы.
+            addEventListener('pageshow', () => { leaving = false; });
             const save = () => { if (!leaving) flow ? store.set(FLOW_KEY, flow) : store.del(FLOW_KEY); };
             const rowOf = (discId) => document.querySelector(`.comp-row[data-disc-id="${discId}"]`);
             const panelOf = (discId) => {
@@ -271,8 +273,24 @@
                 panel.querySelector('.ck-pull-btn')?.classList.remove('hidden');
             }
 
+            // Кнопки «Затянуть» / «Перезатянуть» (чек-лист и прежняя панель): гаснут все, пока импорт
+            // ставится или идёт, и у своей строки — пока идёт её разбор.
+            function lockPullButtons() {
+                const busy = importBusy();
+                const own = flow ? panelOf(flow.discId) : null;
+                document.querySelectorAll('#comp-detail .ck-pull-btn, #comp-detail button[onclick^="discPreview("]').forEach(b => {
+                    const lock = busy || (!!own && b.closest('.row-panel') === own && flow.phase === 'parsing');
+                    if (b.dataset.title === undefined) b.dataset.title = b.title;
+                    b.disabled = lock;
+                    b.title = lock ? (busy ? 'Идёт импорт — дождись его конца' : 'Разбор этой строки уже идёт') : b.dataset.title;
+                });
+                const imp = document.getElementById('btn-import');
+                if (imp && flow?.queuing) imp.disabled = true;
+            }
+
             function render() {
                 document.querySelectorAll('#comp-detail .row-panel').forEach(resetPanel);
+                lockPullButtons();
                 document.querySelectorAll('.comp-row .flow-mark').forEach(m => m.remove());
                 const elsewhere = document.getElementById('pull-elsewhere');
                 elsewhere?.classList.add('hidden');
@@ -352,10 +370,18 @@
                 history.replaceState({ sel: row.dataset.key }, '', row.href);
             }
 
-            /// «Затянуть» / «Перезатянуть». false — нельзя: идёт импорт другой строки.
+            // Импорт поставлен или ставится (клик «Импортировать», ответа ещё нет): новый ход
+            // заменил бы этот и потерял его jobId, а повтор той же строки поставил бы второй импорт.
+            const importBusy = () => flow != null && (flow.phase === 'importing' || flow.queuing === true);
+
+            /// «Затянуть» / «Перезатянуть». false — нельзя: идёт импорт (любой строки) или разбор этой же.
             function start(discId, name, repull) {
-                if (flow?.phase === 'importing' && String(flow.discId) !== String(discId)) {
+                if (importBusy()) {
                     alert(`Сначала дождись импорта «${flow.name}» — он идёт в фоне.`);
+                    return false;
+                }
+                if (flow?.phase === 'parsing' && flow.discId === String(discId)) {
+                    alert('Разбор этой строки уже идёт — дождись превью.');
                     return false;
                 }
                 flow = {
@@ -368,7 +394,9 @@
                 return true;
             }
 
-            const isActive = (discId) => flow != null && flow.discId === String(discId);
+            // token — startedAt хода: ответ разбора, пришедший после нового «Затянуть», отбрасывается.
+            const isActive = (discId, token) => flow != null && flow.discId === String(discId)
+                && (token === undefined || flow.startedAt === token);
 
             function plural(n, one, few, many) {
                 const t = n % 100, u = n % 10;
@@ -404,7 +432,25 @@
             const saveForm = (form) => { if (flow?.phase === 'preview') { flow.form = form; save(); } };
             const current = () => flow;
 
-            function importQueued(jobId) {
+            /// Клик «Импортировать»: с этого момента новый start запрещён, кнопки затягивания погашены.
+            function beginImport(discId) {
+                if (!isActive(discId) || flow.phase !== 'preview') return false;
+                flow.queuing = true;
+                commit();
+                return true;
+            }
+            /// «Импорт не запустился»: превью остаётся, ход снова свободен.
+            function importNotStarted(discId) {
+                if (!isActive(discId)) return;
+                flow.queuing = false;
+                commit();
+            }
+
+            function importQueued(jobId, discId) {
+                // Ход сменился, пока POST был в пути (не должно случаться: start запрещён) —
+                // чужому ходу jobId не отдаём.
+                if (!isActive(discId)) return;
+                flow.queuing = false;
                 flow.jobId = jobId;
                 flow.p = null; flow.form = null;   // превью больше не нужно — не держим его в хранилище
                 step(7, 'Импорт поставлен в очередь…');
@@ -527,6 +573,13 @@
                     } else { flow = null; save(); }
                     return;
                 }
+                if (flow.phase === 'preview' && flow.queuing) {
+                    // F5 между кликом «Импортировать» и ответом: ушёл ли импорт — не знаем (jobId не
+                    // дошёл). Превью одноразовое: если ушёл, повторный клик ответит «превью не найдено».
+                    flow.queuing = false;
+                    finish('fail', 'Перезагрузка оборвала постановку импорта — ушёл ли он, смотри в '
+                        + '<a class="text-admin-accent hover:underline" href="/Admin/ImportHistory">Import History</a>.', 6);
+                }
                 if (flow.phase === 'preview') {
                     if (!flow.p || Date.now() - (flow.previewAt ?? 0) > PREVIEW_TTL_MS) {
                         finish('fail', 'Превью устарело (живёт 60 минут) — нажми «Затянуть» ещё раз.', 6);
@@ -548,7 +601,7 @@
             }
 
             return { start, isActive, previewReady, parseFailed, cancel, setCaption, saveForm, current,
-                importQueued, restore, render, step, finish, commit };
+                beginImport, importNotStarted, importQueued, restore, render, step, finish, commit };
         })();
 
         // ── Пакетное затягивание (docs/plans/bulk-pull-plan.md) ────────────────────
@@ -1015,32 +1068,53 @@
             // pullFlow.restore запускает заново.
             window.discPreview = async function (id, repull, restarted) {
                 const name = discName(id);
-                preview = null;
                 if (!pullFlow.start(id, name, repull)) return;
+                preview = null;
+                document.getElementById('preview-error').classList.add('hidden');
+                const token = pullFlow.current().startedAt;
                 if (restarted) {
                     pullFlow.current().lines.unshift({ step: 5, state: 'wait', text: 'Разбор прервала перезагрузка страницы — запускаю заново.' });
                     pullFlow.commit();
                 }
                 try {
                     const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
-                    if (!pullFlow.isActive(id)) return; // пока шёл разбор, ход отменили или начали другой
-                    preview = { previewId: p.previewId, id, name };
+                    if (!pullFlow.isActive(id, token)) return; // пока шёл разбор, ход отменили или начали другой
+                    // existingCompetitionId — правило бассейна у «Импортировать»: существующему он не обязателен.
+                    preview = { previewId: p.previewId, id, name, existingCompetitionId: p.existingCompetitionId ?? null };
                     pullFlow.previewReady(p);
                     await showPreview(p, name, repull);
                     updateRemaining();
                     document.getElementById('preview-box').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } catch (e) {
-                    if (pullFlow.isActive(id)) pullFlow.parseFailed(e.message);
+                    if (pullFlow.isActive(id, token)) pullFlow.parseFailed(e.message);
                 }
             };
 
             // Превью после F5: ответ разбора сохранён в pullFlow, на сервере оно живёт 60 минут по
             // previewId — собираем блок заново и возвращаем выбор, сделанный в нём до перезагрузки.
+            // «Импортировать» погашена, пока выбор не вернулся: иначе в окне ожидания списков событий и
+            // категорий импорт ушёл бы без галочек и с бассейном/событием по умолчанию.
             window.discRestorePreview = async function (f) {
-                preview = { previewId: f.p.previewId, id: Number(f.discId), name: f.name };
+                const btn = document.getElementById('btn-import');
+                const err = document.getElementById('preview-error');
+                btn.disabled = true;
+                btn.title = 'Восстанавливаю выбор в превью…';
+                preview = { previewId: f.p.previewId, id: Number(f.discId), name: f.name,
+                    existingCompetitionId: f.p.existingCompetitionId ?? null };
                 await showPreview(f.p, f.name, f.repull);
-                applyForm(f.form);
+                const restored = applyForm(f.form);
                 updateRemaining();
+                btn.title = '';
+                if (restored.eventLost) {
+                    // Сохранённого события нет в списке (список не загрузился или событие удалено):
+                    // молча ушло бы eventId=null, и день не привязался бы к событию.
+                    err.textContent = 'Не удалось восстановить выбор события — проверь поле «Событие» (или «Отмена» и «Затянуть» заново).';
+                    err.classList.remove('hidden');
+                    document.getElementById('event-select').addEventListener('change',
+                        () => { btn.disabled = false; err.classList.add('hidden'); }, { once: true });
+                    return;
+                }
+                btn.disabled = false;
             };
 
             // Выбор в превью (бассейн, флаги, категории, правило, событие, перезапись, «сомнительные»)
@@ -1056,18 +1130,25 @@
                 });
                 return form;
             }
+            /// { eventLost: true } — сохранённое событие поставить нельзя (его нет в списке).
             function applyForm(form) {
-                if (!form) return;
+                if (!form) return {};
+                let eventLost = false;
                 FORM_IDS.forEach(id => {
                     const el = document.getElementById(id);
                     if (!el || !(id in form)) return;
-                    if (el.type === 'checkbox') el.checked = !!form[id]; else el.value = form[id];
+                    if (id === 'event-select' && form[id] && ![...el.options].some(o => o.value === form[id])) {
+                        eventLost = true;
+                        el.value = '';
+                    } else if (el.type === 'checkbox') el.checked = !!form[id]; else el.value = form[id];
                     el.dispatchEvent(new Event('change'));
                 });
                 const cats = new Set(form.cats ?? []), sus = new Set(form.suspect ?? []);
                 document.querySelectorAll('.disc-cat').forEach(i => { i.checked = cats.has(i.value); });
                 document.querySelectorAll('.suspect-flag').forEach(i => { i.checked = sus.has(i.value); });
-                pullFlow.saveForm(captureForm()); // change выше сохранял промежуточный выбор
+                // change выше сохранял промежуточный выбор; потерянное событие не затираем пустым.
+                if (!eventLost) pullFlow.saveForm(captureForm());
+                return { eventLost };
             }
 
             // Подпись шага 6: что ещё нужно до «Импортировать» (макет: «осталось: бассейн и 2 рекорда»).
@@ -1075,7 +1156,8 @@
                 const f = pullFlow.current();
                 if (!f?.p) return;
                 const pool = document.getElementById('flag-pool').value;
-                document.getElementById('pool-hint').classList.toggle('hidden', !!pool);
+                // Правило то же, что у «Импортировать»: бассейн обязателен только новому соревнованию.
+                document.getElementById('pool-hint').classList.toggle('hidden', !!pool || !!f.p.existingCompetitionId);
                 const recs = new Set((f.p.recordPreview?.rows ?? []).map(r => r.rowIndex)).size;
                 const left = [];
                 if (!pool && !f.p.existingCompetitionId) left.push('бассейн');
@@ -1716,6 +1798,8 @@
                     document.getElementById('flag-pool').focus();
                     return;
                 }
+                const discId = preview.id;
+                if (!pullFlow.beginImport(discId)) return;
                 const categoryKeys = [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value);
                 const eventChoice = document.getElementById('event-select').value;
                 try {
@@ -1745,8 +1829,11 @@
                     });
                     preview = null;
                     document.getElementById('preview-error').classList.add('hidden');
-                    pullFlow.importQueued(r.jobId);
+                    document.getElementById('btn-import').disabled = false;
+                    pullFlow.importQueued(r.jobId, discId);
                 } catch (e) {
+                    pullFlow.importNotStarted(discId);
+                    document.getElementById('btn-import').disabled = false;
                     // Превью остаётся открытым: поправить и нажать снова (истёк previewId — «Отмена» и «Затянуть»).
                     const err = document.getElementById('preview-error');
                     err.textContent = `Импорт не запустился: ${e.message}`;

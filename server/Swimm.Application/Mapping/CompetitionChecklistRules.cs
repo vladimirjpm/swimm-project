@@ -92,6 +92,19 @@ public static class CompetitionChecklistRules
 
         var tail = phase == ChecklistPhase.None ? ByState(input) : ByPhase(phase);
         Array.Copy(tail, 0, s, 4, 5);
+        return OneCurrent(s);
+    }
+
+    /// <summary>
+    /// Инвариант: текущий шаг — не больше одного. Конфликт бывает, когда старт ещё «впереди» / «идёт»
+    /// (шаг 4 текущий), а его уже тянут вручную (хэндофф 2: «пока старт идёт, тянуть можно») —
+    /// текущим остаётся шаг хода, а шаг 4 получает «!»: протокол идущего старта может быть неполным.
+    /// </summary>
+    private static ChecklistStepStatus[] OneCurrent(ChecklistStepStatus[] s)
+    {
+        var last = Array.LastIndexOf(s, ChecklistStepStatus.Current);
+        for (var i = 0; i < last; i++)
+            if (s[i] == ChecklistStepStatus.Current) s[i] = ChecklistStepStatus.Attention;
         return s;
     }
 
@@ -131,8 +144,10 @@ public static class CompetitionChecklistRules
 
         if (i.Imported)
         {
+            // Шаг 9 — «действия доступны» (хэндофф 3.5), текущим он становится, только когда
+            // проверка качества уже прогнана; до того текущий — шаг 8.
             var quality = i.SuspectCount > 0 ? A : i.QualityScanned ? D : C;
-            return [D, D, D, quality, C];
+            return [D, D, D, quality, quality == C ? P : C];
         }
         return i.State switch
         {
