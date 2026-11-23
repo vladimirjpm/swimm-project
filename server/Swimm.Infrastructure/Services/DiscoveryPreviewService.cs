@@ -132,7 +132,11 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
 
         if (parsed.ResultCount == 0)
         {
-            await _discovery.SetEmptySourceAsync(discoveredId, true, "auto", ct);
+            // B4 — СБОЙ разбора, а не «тянуть нечего» (решение Влада, 23.11.2026): PDF скачан, парсер
+            // отработал без исключения, но не собрал ни одного результата — вероятно, сменился формат.
+            // Пометку «∅ нет протокола» НЕ ставим (иначе поломка парсера прячется в «закрыто»); уже
+            // стоящую авто-пометку не трогаем — её снимает только удачный разбор ниже.
+            // Настоящий пустой PDF — исключение «No competitions found» выше.
             return DiscoveryPreviewResult.Failed(
                 "Парсер не распознал ни одного результата — формат протокола изменился? (B4)");
         }
