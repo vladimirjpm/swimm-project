@@ -128,4 +128,31 @@ public class PartialResultsImportTests
 
         Assert.Equal(before, after);
     }
+
+    [Fact]
+    public async Task Section_of_only_DNS_does_not_mark_the_day()
+    {
+        // Р120 сквозь импорт (16926): секция «на спине» — у обеих «DNS», вольный со временем.
+        await using var db = CreateDb(nameof(Section_of_only_DNS_does_not_mark_the_day));
+        object Dns(string last) => new
+        {
+            country = "ISR", competition = "utest ליגת חורף", date = "20/11/2026",
+            @event = "50m Backstroke - GIRLS 12", event_style_name = "Backstroke", event_style_len = "50",
+            event_style_gender = "female", pool_type = "25m", position = 0, heat = 1, lane = 1,
+            last_name = last, first_name = "utest", birth_year = 2014, club = "utest club",
+            time = "", time_fail = true, time_fail_note = "DNS",
+        };
+        object[] protocol =
+        [
+            Row("50m Freestyle - GIRLS 12", "Freestyle", "אאא", "0:32.10", false),
+            Row("50m Freestyle - GIRLS 12", "Freestyle", "בבב", "0:33.20", false),
+            Dns("אאא"), Dns("בבב"),
+        ];
+
+        var result = await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(protocol));
+        Assert.Empty(result.ErrorMessages);
+        var c = await db.Competitions.AsNoTracking().SingleAsync();
+        Assert.Null(c.PartialResults);
+        Assert.Equal(4, await db.Results.CountAsync()); // DNS лежат как напечатаны (Р76)
+    }
 }

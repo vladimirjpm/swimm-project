@@ -270,7 +270,7 @@ App Insights); его запросы в телеметрии помечены `s
 - **Что со строкой:** чемпионат по имени и многодневка по датам — сразу «ждёт тебя», без сети. Иначе —
   `IBulkPullService.PullOneAsync` (превью «Затянуть» + регламент + `BulkPullClassifier`, ровно путь
   пакетной кнопки) → гейты `ResultsAutoRules.Decide`: 🟢 классификатора (🟠 «без регламента» — тоже
-  «ждёт»), не чемпионат, один день в файле, закончено (`CompetitionProgress`), бассейн из регламента или
+  «ждёт»), не чемпионат, один день в файле, закончено (`CompetitionProgress`; секция или последний заплыв из одних отметок судей DNS/DQ/DNF — проплыты, «NS» и пустая графа — нет, Р120 в [data-integrity.md](../data-integrity.md)), бассейн из регламента или
   справочника (`IVenuePoolService.LoadAsync` → `Resolve`). Превью снимается из кэша сразу.
 - **Вердикт** — в строку: `AutoPullVerdict` (`would-take` / `blocked` / `not-finished` / `failed` /
   `empty`, CHECK `CK_Sys_DiscoveredCompetitions_AutoPullVerdict`), `AutoPullBlockedReason`,
