@@ -134,6 +134,14 @@
                 rows.forEach(r => r.dataset.key === key && panel
                     ? r.setAttribute('aria-current', 'true')
                     : r.removeAttribute('aria-current'));
+                // Превью видно только у строки, для которой построено: иначе «Импортировать» под
+                // панелью строки B импортировало бы строку A. Открыто/закрыто — класс hidden
+                // (его ведут discPreview/«Отмена»/импорт), «чужая строка» — атрибут hidden.
+                const card = document.getElementById('preview-card');
+                if (card?.dataset.discId) {
+                    const row = rows.find(r => r.dataset.key === key);
+                    card.hidden = !panel || row?.dataset.discId !== card.dataset.discId;
+                }
                 box.scrollTop = 0;
                 // Правая колонка липкая; если страницу прокрутили выше её начала — подтянуть.
                 if (box.getBoundingClientRect().top < 0) box.scrollIntoView({ block: 'start' });
@@ -819,6 +827,11 @@
                 try {
                     const p = await apiJson(`${API}/${id}/preview`, { method: 'POST' });
                     preview = { previewId: p.previewId, id, name };
+                    // Превью живёт в правой области под панелями — помечаем, чьё оно: при выборе
+                    // другой строки списка его прячет атрибут hidden (см. «Выбор строки списка»).
+                    const card = document.getElementById('preview-card');
+                    card.dataset.discId = String(id);
+                    card.hidden = false;
                     await showPreview(p, name, repull);
                     pullPanel.finish('ok', `Распознано результатов: ${p.resultCount}`);
                     pullPanel.step('Жду: проверь превью и нажми «Импортировать»');

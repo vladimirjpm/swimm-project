@@ -293,7 +293,7 @@ public class IndexModel : PageModel
         if (deleted == null)
         {
             TempData["Flash"] = "Соревнование не найдено — возможно, уже удалено.";
-            return RedirectToBackToList();
+            return RedirectToBackToList(withSelected: KeepsSelectionAfterDelete);
         }
 
         _logger.LogWarning(
@@ -307,7 +307,7 @@ public class IndexModel : PageModel
             deleted);
 
         TempData["Flash"] = $"Соревнование «{deleted.CompetitionName}» удалено ({deleted.Results} результатов)";
-        return RedirectToBackToList();
+        return RedirectToBackToList(withSelected: KeepsSelectionAfterDelete);
     }
 
     /// <summary>Каскадное удаление всего многодневного события: все дни + сам CompetitionEvent.</summary>
@@ -317,7 +317,7 @@ public class IndexModel : PageModel
         if (deleted == null)
         {
             TempData["Flash"] = "Событие не найдено — возможно, уже удалено.";
-            return RedirectToBackToList();
+            return RedirectToBackToList(withSelected: false);
         }
 
         _logger.LogWarning(
@@ -331,7 +331,7 @@ public class IndexModel : PageModel
             deleted);
 
         TempData["Flash"] = $"Событие «{deleted.CompetitionName}» удалено вместе со всеми днями ({deleted.Results} результатов)";
-        return RedirectToBackToList();
+        return RedirectToBackToList(withSelected: false);
     }
 
     /// <summary>
@@ -366,8 +366,15 @@ public class IndexModel : PageModel
         return d;
     }
 
-    // Сохраняем текущие фильтры/страницу при возврате к списку.
-    private IActionResult RedirectToBackToList() =>
+    // Сохраняем текущие фильтры/страницу при возврате к списку. После удаления выбранной строки
+    // sel не несём (withSelected: false): её больше нет, и вместо «Выбери соревнование…» стояла бы
+    // заглушка «не видно при текущих фильтрах».
+    private IActionResult RedirectToBackToList(bool withSelected = true) =>
         RedirectToPage("Index", new Microsoft.AspNetCore.Routing.RouteValueDictionary(
-            ListRoute().ToDictionary(kv => kv.Key, kv => (object?)kv.Value)));
+            ListRoute(withSelected: withSelected).ToDictionary(kv => kv.Key, kv => (object?)kv.Value)));
+
+    // «Удалить» у дня события: само событие остаётся (если дней больше одного) — его выбор (sel=e…)
+    // сохраняем. Удалили одиночное (sel=c…) — выбора больше нет.
+    private bool KeepsSelectionAfterDelete =>
+        Selected?.Trim() is { Length: > 1 } k && (k[0] is 'e' or 'E');
 }

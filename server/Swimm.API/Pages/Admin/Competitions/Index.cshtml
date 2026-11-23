@@ -132,7 +132,9 @@
         }
         if (site.MissingSince is { } gone)
         {
-            var local = gone.ToLocalTime();
+            // День пропажи — по Израилю, той же функцией, что и MissingSinceDay в правиле состояний
+            // (CompetitionAdminRepository.StateInput): иначе на Azure (UTC) дата здесь и «пропал N дн.» расходились.
+            var local = Swimm.Application.Constants.IsraelTime.ToLocal(gone);
             var title = System.Net.WebUtility.HtmlEncode(
                 $"Старт пропал из списка isr.org.il {local:dd.MM.yyyy HH:mm} — вероятно, отменён. Появится снова — пометка снимется сама.");
             sb.Append($"<span class=\"{chip} bg-admin-danger/15 text-admin-danger\" title=\"{title}\">✕ пропал с сайта · {local:dd.MM}</span>");
@@ -669,7 +671,7 @@
         if (s?.MissingSince is { } gone)
             Add("bg-admin-danger/15 text-admin-danger",
                 st?.SuggestHide == true ? $"пропал {st.MissingDays} дн. — скрыть?" : "пропал",
-                $"Старт пропал из списка isr.org.il {gone.ToLocalTime():dd.MM.yyyy} — вероятно, отменён."
+                $"Старт пропал из списка isr.org.il {Swimm.Application.Constants.IsraelTime.ToLocal(gone):dd.MM.yyyy} — вероятно, отменён (день по Израилю, от него считается «пропал N дн.»)."
                 + (st?.SuggestHide == true ? " Скрыть — кнопкой «✕» в панели справа; само ничего не закрывается." : ""));
         if (s?.StartList is { Stale: true } && st?.State is Swimm.Application.Mapping.CompetitionRowState.Ahead or Swimm.Application.Mapping.CompetitionRowState.Running)
             Add("bg-admin-warning/15 text-admin-warning", "обновить", "Стартовый протокол устарел: до старта мало дней, а забору больше суток");
