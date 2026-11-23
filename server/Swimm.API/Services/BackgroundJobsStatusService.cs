@@ -460,7 +460,7 @@ public sealed class BackgroundJobsStatusService(
         {
             case JobNames.Discovery:
             case JobNames.StartList:
-                list.Add(new(JobAction.Link, "Входящие и «Проверить сейчас» — /Admin/Competitions", "/Admin/Competitions"));
+                list.Add(new(JobAction.Link, "Входящие и «Проверить сейчас» — /Admin/Competitions", CompetitionListUrl.AllSeasonsHref));
                 break;
             case JobNames.ResultsAuto:
                 list.Add(new(JobAction.Link, "Ждут тебя — /Admin/Competitions", $"/Admin/Competitions?filter={AutoPullFilters.Blocked}"));

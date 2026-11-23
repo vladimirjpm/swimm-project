@@ -5,17 +5,38 @@
     ViewData["Title"] = "Competitions";
     ViewData["PageSubtitle"] = "Соревнования: справочник БД + входящие isr.org.il одним списком";
 
+    // Все ссылки списка собираются из ОДНОГО набора параметров (Model.ListRoute) — правкой поверх него.
+    string ListUrl(Action<Dictionary<string, string>> change, bool withPage = false, bool withSelected = false)
+    {
+        var d = Model.ListRoute(withPage, withSelected);
+        change(d);
+        return Url.Page("Index", new Microsoft.AspNetCore.Routing.RouteValueDictionary(
+            d.ToDictionary(kv => kv.Key, kv => (object?)kv.Value)))!;
+    }
+    void Set(Dictionary<string, string> d, string key, string? value)
+    {
+        if (string.IsNullOrEmpty(value)) d.Remove(key); else d[key] = value;
+    }
+
     // ВНИМАНИЕ: параметр пагинации — «p», НЕ «page» (page зарезервирован Razor Pages, ломает переходы).
-    string PageUrl(int pg) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, p = pg, filter = Model.QualityFilter })!;
+    string PageUrl(int pg) => ListUrl(d => Set(d, "p", Model.Unpaged ? null : pg.ToString()), withSelected: true);
 
     // Ссылка на месяц (сброс страницы на 1; повторный клик по активному — снять фильтр).
-    string MonthUrl(int? m) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, month = m, filter = Model.QualityFilter })!;
+    string MonthUrl(int? m) => ListUrl(d => Set(d, "month", m?.ToString()));
 
     // Ссылка на сезон (чипы над месяцами; смена сезона сбрасывает месяц и страницу).
-    string SeasonUrl(int? sn) =>
-        Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = sn, kind = Model.Kind, discipline = Model.Discipline, stage = Model.Stage, synth = Model.ShowSynthetic ? "true" : null, filter = Model.QualityFilter })!;
+    // «Все» — явное season=all: голый адрес открыл бы текущий месяц (CompetitionListUrl.AllSeasons).
+    string SeasonUrl(int? sn) => ListUrl(d =>
+    {
+        Set(d, "season", sn?.ToString() ?? Swimm.Application.Mapping.CompetitionListUrl.AllSeasons);
+        d.Remove("month");
+    });
+
+    // Временный фильтр состояния (этап 1; переключатель «Все / Ждут / Впереди / Закрыто» — этап 3).
+    string StateUrl(string? st) => ListUrl(d => Set(d, "state", st));
+
+    // Формы POST (быстрая правка, удаление): те же параметры, что у адреса, — редирект вернёт сюда.
+    var formRoute = Model.ListRoute();
 
     var monthNames = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
@@ -24,8 +45,10 @@
     var backParam = Uri.EscapeDataString(PageUrl(Model.Result.Page));
     string EditUrl(int id) => $"/Admin/Competitions/Edit?id={id}&back={backParam}";
 
+    // Подставленные по умолчанию сезон и месяц — не «фильтр»: «Сброс» привёл бы туда же.
     var hasFilters = !string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.CategoryKey)
-        || Model.Season != null || !string.IsNullOrEmpty(Model.Stage) || Model.Month != null
+        || (!Model.OpenedOnCurrentMonth && (!string.IsNullOrEmpty(Model.SeasonParam) || Model.Month != null))
+        || !string.IsNullOrEmpty(Model.Stage) || !string.IsNullOrEmpty(Model.State)
         || !string.IsNullOrEmpty(Model.Kind);
 
     // Short — подпись для экранов уже 1920: таблица широкая (стадия, категории, площадка,
@@ -282,7 +305,8 @@
     };
     <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 mb-4 flex items-center justify-between px-4 py-2 text-[13px]">
         <span>Активный фильтр «здоровья данных»: <strong class="text-admin-text">@label</strong></span>
-        <a href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, discipline = Model.Discipline, synth = Model.ShowSynthetic ? "true" : null, month = Model.Month })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
+        @* Снимает фильтр «здоровья» вместе со stage (алиасы ignored / discovery-new — это stage). *@
+        <a href="@ListUrl(d => { d.Remove("filter"); d.Remove("stage"); })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
     </div>
 }
 
@@ -293,7 +317,7 @@
     <div class="mb-3 text-[12px] text-admin-text-muted">
         Скрыто фильтром дисциплины: <strong class="text-admin-text">@Model.HiddenByDiscipline</strong>
         <a class="text-admin-accent hover:underline ml-1"
-           href="@Url.Page("Index", new { q = Model.Search, cat = Model.CategoryKey, season = Model.Season, kind = Model.Kind, stage = Model.Stage, discipline = "all", synth = Model.ShowSynthetic ? "true" : null, month = Model.Month, filter = Model.QualityFilter })">показать все ↗</a>
+           href="@ListUrl(d => d["discipline"] = "all")">показать все ↗</a>
     </div>
 }
 
@@ -382,8 +406,11 @@
     </label>
     @* Сезон выбирается чипами над списком (там же счётчики «затянуто из всего»), а не селектом —
        здесь только скрытое поле, чтобы «Найти» не сбрасывало выбранный сезон. *@
-    <input type="hidden" name="season" value="@Model.Season" />
-    <input type="hidden" name="month" value="@Model.Month" />
+    @* Подставленный по умолчанию текущий месяц в форму не уходит: поиск с голой страницы ищет
+       по всем сезонам, как раньше. Выбранные чипом сезон и месяц — уходят. *@
+    <input type="hidden" name="season" value="@(Model.OpenedOnCurrentMonth ? null : Model.SeasonParam)" />
+    <input type="hidden" name="month" value="@(Model.OpenedOnCurrentMonth ? null : Model.Month)" />
+    <input type="hidden" name="state" value="@Model.State" />
     @if (!string.IsNullOrEmpty(Model.QualityFilter))
     {
         <input type="hidden" name="filter" value="@Model.QualityFilter" />
@@ -426,6 +453,19 @@
         hint += pending > 0 ? $", ждёт затягивания {pending}" : " — всё, что можно, затянуто";
         return (html, hint);
     }
+
+    // Состояния (этап 1 «варианта E»): долг и «впереди» текстом рядом со счётчиком. Временный
+    // вывод — на этапе 2 чипы станут полосами с сегментами закрыто / долг / впереди.
+    string StatesHtml(Swimm.Application.Mapping.CompetitionStateCounts st)
+    {
+        var parts = new List<string>();
+        if (st.Debt > 0) parts.Add($"долг {st.Debt}");
+        if (st.AheadTotal > 0) parts.Add($"впереди {st.AheadTotal}");
+        return parts.Count == 0 ? "" : $"<span class=\"ml-1 opacity-70\">· {string.Join(" · ", parts)}</span>";
+    }
+    string StatesHint(Swimm.Application.Mapping.CompetitionStateCounts st) =>
+        $"закрыто {st.Closed} из {st.Total} · долг {st.Debt} (ждёт затягивания {st.ReadyToPull}, ждём протокол {st.WaitingProtocol})"
+        + $" · впереди {st.AheadTotal} (из них идёт {st.Running})";
 }
 
 @* Фильтр по сезонам: чип на сезон со счётчиком «затянуто (+нечего тянуть) из всего».
@@ -436,11 +476,13 @@
         var seasonImported = Model.SeasonCounts.Sum(s => s.Imported);
         var seasonNothing = Model.SeasonCounts.Sum(s => s.NothingToPull);
         var allCounter = PullCounter(seasonImported, seasonNothing, seasonTotal, Model.Season == null);
+        var allStates = Model.SeasonCounts.Aggregate(Swimm.Application.Mapping.CompetitionStateCounts.Zero,
+            (acc, s) => acc + s.States);
     }
     <a href="@SeasonUrl(null)"
        class="@(Model.Season == null ? "admin-btn filter-chip-active py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
-       title="Все сезоны: @allCounter.Hint">
-        Все @Html.Raw(allCounter.Html)
+       title="Все сезоны: @allCounter.Hint&#10;@StatesHint(allStates)">
+        Все @Html.Raw(allCounter.Html)@Html.Raw(StatesHtml(allStates))
     </a>
     @foreach (var s in Model.SeasonCounts)
     {
@@ -448,8 +490,8 @@
         var c = PullCounter(s.Imported, s.NothingToPull, s.Total, active);
         <a href="@SeasonUrl(active ? (int?)null : s.Season)"
            class="@(active ? "admin-btn filter-chip-active py-1 px-2.5" : "admin-btn admin-btn-ghost py-1 px-2.5")"
-           title="@(active ? $"Снять фильтр по сезону ({c.Hint})" : $"Сезон {s.Season - 1}/{s.Season % 100:00}: {c.Hint}")">
-            @($"{(s.Season - 1) % 100:00}-{s.Season % 100:00}") @Html.Raw(c.Html)
+           title="@(active ? $"Снять фильтр по сезону ({c.Hint})" : $"Сезон {s.Season - 1}/{s.Season % 100:00}: {c.Hint}")&#10;@StatesHint(s.States)">
+            @($"{(s.Season - 1) % 100:00}-{s.Season % 100:00}") @Html.Raw(c.Html)@Html.Raw(StatesHtml(s.States))
         </a>
     }
 </div>
@@ -464,12 +506,13 @@
         var imported = Model.MonthImported.Count > i ? Model.MonthImported[i] : 0;
         var nothing = Model.MonthNothingToPull.Count > i ? Model.MonthNothingToPull[i] : 0;
         var c = PullCounter(imported, nothing, count, active);
+        var ms = Model.MonthStates.Count > i ? Model.MonthStates[i] : Swimm.Application.Mapping.CompetitionStateCounts.Zero;
         <a href="@MonthUrl(active ? (int?)null : m)"
            class="@(active
                ? "admin-btn filter-chip-active py-1 px-2.5"
                : "admin-btn admin-btn-ghost py-1 px-2.5") @(count == 0 && !active ? "opacity-40" : "")"
-           title="@(active ? $"Снять фильтр по месяцу ({c.Hint})" : $"{monthNames[i]}: {c.Hint}")">
-            @monthNames[i] @Html.Raw(c.Html)
+           title="@(active ? $"Снять фильтр по месяцу ({c.Hint})" : $"{monthNames[i]}: {c.Hint}")&#10;@StatesHint(ms)">
+            @monthNames[i] @Html.Raw(c.Html)@Html.Raw(StatesHtml(ms))
         </a>
     }
 </div>
@@ -478,12 +521,20 @@
     // Пакетное затягивание (docs/plans/bulk-pull-plan.md): кандидаты — строки, которых нет
     // в БД и по которым есть что тянуть. Те же правила, что у счётчика долга на чипах:
     // скрытые (Ignored) и с пустым протоколом (EmptySourceAt) — не долг.
-    var bulkIds = Model.Result.Items
+    // С этапа 1 «варианта E» — только состояние «ждёт затягивания»: месяц теперь виден целиком,
+    // и будущие, идущие и «ждём протокол» иначе уезжали бы в пачку (хэндофф, раздел 4).
+    // Число на кнопке = сколько строк реально уйдёт: сервис сам отбрасывает чемпионаты (пока
+    // не отмечено «включая чемпионаты») и берёт не больше BulkPullLimits.MaxBatchSize, по дате
+    // от ранней. Поэтому здесь два готовых списка с тем же отбором, а чекбокс переключает их.
+    var bulkRows = Model.Result.Items
         .Where(u => u.Db == null && u.Site != null
-                    && u.Stage != Swimm.Application.Dtos.CompetitionStage.Ignored
-                    && u.Site.EmptySourceAt == null)
-        .Select(u => u.Site!.DiscoveredId)
+                    && u.Status?.State == Swimm.Application.Mapping.CompetitionRowState.ReadyToPull)
+        .OrderBy(u => u.Site!.DateStart)
         .ToList();
+    var bulkIdsAll = bulkRows.Take(Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize)
+        .Select(u => u.Site!.DiscoveredId).ToList();
+    var bulkIdsNoChamp = bulkRows.Where(u => !u.IsChampionship).Take(Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize)
+        .Select(u => u.Site!.DiscoveredId).ToList();
 }
 
 <div class="mb-3 flex flex-wrap items-center gap-3 text-xs text-admin-text-muted">
@@ -495,16 +546,47 @@
         }
     </span>
 
-    @if (bulkIds.Count > 0)
+    @* Фильтр состояния ?state= (временно ссылками; переключатель — этап 3). Числа — под всеми
+       фильтрами, кроме самого state. *@
+    @{
+        var ls = Model.ListStates;
+        var stateLinks = new (string? Value, string Label, int Count)[]
+        {
+            (null, "все", ls.Total),
+            (Swimm.Application.Mapping.CompetitionStateFilters.Waiting, "ждут", ls.Debt),
+            (Swimm.Application.Mapping.CompetitionStateFilters.Ahead, "впереди", ls.AheadTotal),
+            (Swimm.Application.Mapping.CompetitionStateFilters.Closed, "закрыто", ls.Closed),
+        };
+    }
+    <span title="@StatesHint(ls)">
+        @foreach (var (value, label, n) in stateLinks)
+        {
+            if (Model.State == value)
+            {
+                <strong class="text-admin-text">@label @n</strong>
+            }
+            else
+            {
+                <a class="text-admin-accent hover:underline" href="@StateUrl(value)">@label @n</a>
+            }
+            if (value != Swimm.Application.Mapping.CompetitionStateFilters.Closed) { <text> · </text> }
+        }
+    </span>
+
+    @if (bulkIdsAll.Count > 0)
     {
         <label class="flex cursor-pointer items-center gap-1.5"
                title="Чемпионаты Израиля разбираются штучно: медали, зачёт и категории у них свои">
             <input type="checkbox" id="bulk-include-champ" class="cursor-pointer" />
             включая чемпионаты
         </label>
-        <button type="button" id="bulk-pull-btn" class="admin-btn admin-btn-primary py-1 px-2.5"
-                data-ids="@string.Join(",", bulkIds)">
-            ⏬ Затянуть все незатянутые (@bulkIds.Count)
+        <button type="button" id="bulk-pull-btn"
+                class="admin-btn admin-btn-primary py-1 px-2.5 @(bulkIdsNoChamp.Count == 0 ? "hidden" : "")"
+                data-ids="@string.Join(",", bulkIdsNoChamp)"
+                data-ids-no-champ="@string.Join(",", bulkIdsNoChamp)"
+                data-ids-all="@string.Join(",", bulkIdsAll)"
+                title="Только «ждёт затягивания»; не больше @Swimm.Application.Abstractions.BulkPullLimits.MaxBatchSize за раз">
+            ⏬ Затянуть все незатянутые (<span id="bulk-pull-count">@bulkIdsNoChamp.Count</span>)
         </button>
     }
 </div>
@@ -613,9 +695,7 @@ else
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="DeleteEvent"
-                                      asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
-                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
+                                      asp-all-route-data="formRoute"
                                       class="inline comp-delete-form" data-kind="event" data-name="@ev.EventName" data-days="@ev.DayCount" data-rows="@ev.TotalResultCount">
                                     <input type="hidden" name="eventId" value="@ev.EventId" />
                                     <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
@@ -665,9 +745,7 @@ else
                                 <button type="button" class="admin-btn admin-btn-ghost py-1 px-2.5 row-toggle"
                                         data-key="@rowKey" aria-expanded="false">▸ Открыть</button>
                                 <form method="post" asp-page-handler="Delete"
-                                      asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
-                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
+                                      asp-all-route-data="formRoute"
                                       class="inline comp-delete-form" data-kind="single" data-name="@c.Name" data-rows="@c.ResultCount">
                                     <input type="hidden" name="id" value="@c.Id" />
                                     <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
@@ -805,9 +883,7 @@ else
                                                     <td class="col-actions text-right whitespace-nowrap">
                                                         <a href="@EditUrl(d.Id)" class="admin-btn admin-btn-ghost py-1 px-2.5">Изменить</a>
                                                         <form method="post" asp-page-handler="Delete"
-                                                              asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                                              asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
-                                                              asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
+                                                              asp-all-route-data="formRoute"
                                                               class="inline comp-delete-form" data-kind="day" data-name="День @(d.DayNumber?.ToString() ?? "?")" data-rows="@d.ResultCount">
                                                             <input type="hidden" name="id" value="@d.Id" />
                                                             <button type="submit" class="admin-btn admin-btn-danger py-1 px-2.5">Удалить</button>
@@ -824,9 +900,7 @@ else
                             {
                                 @* Быстрая правка: только поля, общие для всех дней события. Имя/дата/страна — на Edit. *@
                                 <form method="post" asp-page-handler="QuickSave"
-                                      asp-route-q="@Model.Search" asp-route-cat="@Model.CategoryKey"
-                                      asp-route-season="@Model.Season" asp-route-kind="@Model.Kind" asp-route-discipline="@Model.Discipline" asp-route-stage="@Model.Stage"
-                                      asp-route-synth="@(Model.ShowSynthetic ? "true" : null)" asp-route-month="@Model.Month" asp-route-p="@Model.Result.Page"
+                                      asp-all-route-data="formRoute"
                                       class="mt-3">
                                     <input type="hidden" name="id" value="@head.Id" />
                                     @{

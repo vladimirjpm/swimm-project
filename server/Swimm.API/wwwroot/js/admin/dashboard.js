@@ -306,7 +306,7 @@
             { v: cp.mismatchEvents, label: 'Расходятся с официальным', sub: 'сверено вручную, верны наши', tone: 'warn', href: '/Admin/PointsRules?kind=clubs&filter=mismatch' },
             // Бейдж «★ расхождение» без пояснения читатель проверить не может — это долг.
             { v: cp.mismatchWithoutNote, label: 'Без пояснения', sub: 'бейдж на витрине без доказательства', tone: 'danger', href: '/Admin/PointsRules?kind=clubs&filter=mismatch' },
-            { v: cp.noRuleEvents, label: 'Без правила очков', sub: 'клубный зачёт такого соревнования пуст', tone: 'warn', href: '/Admin/Competitions' },
+            { v: cp.noRuleEvents, label: 'Без правила очков', sub: 'клубный зачёт такого соревнования пуст', tone: 'warn', href: '/Admin/Competitions?season=all' },
             { v: cp.uncheckedEvents, label: 'Не сверялось', sub: 'правило есть, глазами не смотрели', tone: 'gray', href: '/Admin/PointsRules?kind=clubs&filter=none' },
         ];
 

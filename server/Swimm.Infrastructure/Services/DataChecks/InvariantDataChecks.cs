@@ -171,7 +171,7 @@ public sealed class DuplicateEventDayCheck(SwimmDbContext db) : IDataCheck
                 "CompetitionEvent", d.EventId,
                 $"событие #{d.EventId}: дата {d.Date} у соревнований {string.Join(", ", d.Ids)}",
                 null,
-                "/Admin/Competitions",
+                Swimm.Application.Mapping.CompetitionListUrl.AllSeasonsHref, // весь список, не текущий месяц
                 // На публичной стороне события нет — ведём на первый из спорных дней.
                 PublicRoutes.Competition(d.Ids.First())))
             .ToList());

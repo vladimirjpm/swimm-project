@@ -34,9 +34,15 @@ public interface ICompetitionAdminRepository
     /// <param name="discipline">Вид спорта (<c>Disciplines</c>): null/пусто — только плавание
     /// (дефолт, артистическое прячем), «all» — всё, иначе конкретная дисциплина. Скрытые не
     /// удаляются, а считаются: <c>UnifiedCompetitionList.HiddenByDiscipline</c>.</param>
+    /// <param name="state">Фильтр по корзине состояния (<c>Mapping.CompetitionStateFilters</c>:
+    /// waiting | ahead | closed); null/незнакомое — не фильтрует. На счётчики не влияет.</param>
+    /// <param name="today">«Сегодня» по Израилю — граница «впереди / идёт / прошёл»
+    /// (<c>Mapping.CompetitionRowStateRules.IsraelToday</c>); null — по системным часам.</param>
+    /// <param name="unpaged">true — все строки одной страницей (выбран месяц: он показывается целиком).</param>
     Task<UnifiedCompetitionList> GetUnifiedAsync(
         string? search, string? categoryKey, int? season, string? stage, bool showSynthetic, int? month, int page, int pageSize,
-        string? qualityFilter = null, string? kind = null, string? discipline = null);
+        string? qualityFilter = null, string? kind = null, string? discipline = null,
+        string? state = null, DateOnly? today = null, bool unpaged = false);
 
     /// <summary>Полные данные для формы Edit (включая URL-ы результатов). null — не найдено.</summary>
     Task<CompetitionEditDto?> GetByIdAsync(int id);

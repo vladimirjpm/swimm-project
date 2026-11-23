@@ -40,3 +40,10 @@ public interface IBulkPullService
     Task<BulkImportResultDto> ImportAsync(
         Guid batchId, IReadOnlyList<int> discoveredIds, CancellationToken ct = default);
 }
+
+/// <summary>Предел пачки — общий для сервиса и кнопки списка: число на кнопке обязано совпадать
+/// с тем, сколько строк реально уйдёт в работу.</summary>
+public static class BulkPullLimits
+{
+    public const int MaxBatchSize = 30;
+}
