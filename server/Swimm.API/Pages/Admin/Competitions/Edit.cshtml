@@ -418,6 +418,27 @@
                 </label>
                 <button type="submit" class="admin-btn admin-btn-danger">Удалить безвозвратно</button>
             </form>
+            @if (Model.Existing.EventId != null)
+            {
+                @* Удалить ВСЁ событие (все дни). До этапа 6 варианта E — кнопка «Удалить» у события в списке;
+                   с этапа 6 удаляют только здесь (handler DeleteEvent). Форма выше удаляет только этот день. *@
+                var evName = Model.Existing.EventName ?? Model.Existing.Name;
+                <p class="mt-5 mb-3 border-t border-admin-danger/20 pt-4 text-xs leading-relaxed text-admin-text-muted">
+                    Форма выше удаляет только <strong class="text-admin-text">этот день</strong>. Удалить событие целиком —
+                    все <strong class="text-admin-text">@Model.Existing.EventDayCount</strong> дн. с результатами, эстафетами и галереями,
+                    и само событие. <strong class="text-admin-danger">Действие необратимо.</strong>
+                </p>
+                <form method="post" asp-page-handler="DeleteEvent" asp-route-back="@Model.BackUrl" class="flex flex-wrap items-end gap-3">
+                    <input type="hidden" asp-for="Id" />
+                    <label class="flex min-w-[260px] flex-1 flex-col gap-1">
+                        <span class="text-xs text-admin-text-muted">
+                            Для подтверждения введите точное название события: <strong class="text-admin-text">@evName</strong>
+                        </span>
+                        <input asp-for="ConfirmEventName" class="admin-input" autocomplete="off" placeholder="Название события" />
+                    </label>
+                    <button type="submit" class="admin-btn admin-btn-danger">Удалить всё событие</button>
+                </form>
+            }
         </div>
     }
 </div>

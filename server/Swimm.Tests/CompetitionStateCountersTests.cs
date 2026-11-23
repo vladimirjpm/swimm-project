@@ -294,7 +294,7 @@ public class CompetitionStateCountersTests
     // ── Редирект после быстрой правки (баг из брифа: терялись discipline и filter) ──
 
     private static IndexModel NewPage(ICompetitionAdminRepository? repo = null) =>
-        new(repo ?? Mock.Of<ICompetitionAdminRepository>(), Mock.Of<IImportService>(), Mock.Of<IPointRulesAdminRepository>(),
+        new(repo ?? Mock.Of<ICompetitionAdminRepository>(), Mock.Of<IPointRulesAdminRepository>(),
             Mock.Of<IAdminAuditService>(), new ConfigurationBuilder().Build(),
             Mock.Of<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>(), NullLogger<IndexModel>.Instance,
             Mock.Of<ISeriesAdminRepository>(), TimeProvider.System);

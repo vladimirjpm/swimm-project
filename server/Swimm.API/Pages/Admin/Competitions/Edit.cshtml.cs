@@ -104,6 +104,30 @@ public class EditModel : PageModel
     /// <summary>Редирект к списку — с сохранением фильтров, откуда пришли.</summary>
     private IActionResult RedirectToList() => Redirect(BackLink);
 
+    /// <summary>
+    /// Редирект к списку после удаления (с этапа 6 варианта E удаляют только здесь). Фильтры те же,
+    /// но выбор удалённой строки (<c>sel</c>) убирается — иначе справа стояла бы заглушка «не видно
+    /// при текущих фильтрах». <paramref name="keepEventSelection"/> — удалили день, событие осталось:
+    /// его выбор (sel=e…) сохраняем, как раньше в списке.
+    /// </summary>
+    private IActionResult RedirectToListAfterDelete(bool keepEventSelection)
+    {
+        var back = BackLink;
+        var q = back.IndexOf('?');
+        if (q < 0) return Redirect(back);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(back[q..]);
+        if (query.TryGetValue("sel", out var sel) && !(keepEventSelection && sel.ToString().StartsWith('e')))
+        {
+            var kept = query.Where(kv => kv.Key != "sel")
+                .SelectMany(kv => kv.Value.Select(v => new KeyValuePair<string, string?>(kv.Key, v)));
+            back = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(back[..q], kept);
+        }
+        return Redirect(back);
+    }
+
+    /// <summary>Подтверждение удаления ВСЕГО события — точное название события.</summary>
+    [BindProperty] public string? ConfirmEventName { get; set; }
+
     /// <summary>Редирект на саму форму — back тащим дальше, иначе «К списку» забудет фильтры.</summary>
     private IActionResult RedirectToSelf(int? id) => RedirectToPage("Edit", new { id, back = BackUrl });
 
@@ -266,8 +290,54 @@ public class EditModel : PageModel
             User.Identity?.Name ?? "?", deleted.CompetitionId, deleted.CompetitionName,
             deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory, deleted.Swimmers);
 
+        // Журнал аудита — как у прежнего «Удалить» в списке (оно жило там до этапа 6 варианта E).
+        await _audit.LogAsync("competition.delete", "Competition", deleted.CompetitionId.ToString(),
+            $"Каскадно удалено соревнование «{deleted.CompetitionName}» ({deleted.Results} результатов)",
+            deleted);
+
         TempData["Flash"] = $"Соревнование «{deleted.CompetitionName}» удалено ({deleted.Results} результатов)";
-        return RedirectToList();
+        return RedirectToListAfterDelete(keepEventSelection: Existing.EventId != null);
+    }
+
+    /// <summary>
+    /// Каскадное удаление ВСЕГО многодневного события: все дни + сам CompetitionEvent. Раньше — кнопка
+    /// «Удалить» у события в списке; с этапа 6 варианта E удаляют только на Edit (блок «Опасная зона»).
+    /// </summary>
+    public async Task<IActionResult> OnPostDeleteEventAsync()
+    {
+        if (IsNew) return RedirectToList();
+
+        await LoadLookupsAsync();
+        Existing = await _repo.GetByIdAsync(Id!.Value);
+        if (Existing?.EventId is not int eventId) return RedirectToList();
+
+        var eventName = (Existing.EventName ?? Existing.Name).Trim();
+        if (!string.Equals(ConfirmEventName?.Trim(), eventName, StringComparison.Ordinal))
+        {
+            Error = "Название события введено неверно — удаление отменено.";
+            Input = ToForm(Existing);
+            return Page();
+        }
+
+        var deleted = await _import.DeleteCompetitionEventAsync(eventId);
+        if (deleted == null)
+        {
+            TempData["Flash"] = "Событие не найдено — возможно, уже удалено.";
+            return RedirectToListAfterDelete(keepEventSelection: false);
+        }
+
+        _logger.LogWarning(
+            "Admin {User} каскадно удалил многодневное событие #{Id} «{Name}»: {Results} результатов, " +
+            "{Relays} эстафет, {Galleries} галерей, {ResultUrls} URL, {ImportHistory} записей истории, {Swimmers} пловцов-сирот",
+            User.Identity?.Name ?? "?", deleted.CompetitionId, deleted.CompetitionName,
+            deleted.Results, deleted.Relays, deleted.Galleries, deleted.ResultUrls, deleted.ImportHistory, deleted.Swimmers);
+
+        await _audit.LogAsync("competition.delete-event", "CompetitionEvent", eventId.ToString(),
+            $"Каскадно удалено многодневное событие «{deleted.CompetitionName}» ({deleted.Results} результатов)",
+            deleted);
+
+        TempData["Flash"] = $"Событие «{deleted.CompetitionName}» удалено вместе со всеми днями ({deleted.Results} результатов)";
+        return RedirectToListAfterDelete(keepEventSelection: false);
     }
 
     /// <summary>

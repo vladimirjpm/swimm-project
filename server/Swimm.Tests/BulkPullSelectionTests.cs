@@ -235,7 +235,7 @@ public class BulkPullSelectionTests
 
     private static async Task<IndexModel> GetPage(SwimmDbContext db, string query)
     {
-        var page = new IndexModel(new CompetitionAdminRepository(db), Mock.Of<IImportService>(),
+        var page = new IndexModel(new CompetitionAdminRepository(db),
             Mock.Of<IPointRulesAdminRepository>(), Mock.Of<IAdminAuditService>(), new ConfigurationBuilder().Build(),
             Mock.Of<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>(), NullLogger<IndexModel>.Instance,
             Series(), new FixedTime(new DateTimeOffset(2026, 11, 23, 10, 0, 0, TimeSpan.Zero)));
