@@ -168,20 +168,42 @@
                     }
                     @if (problems.Incomplete)
                     {
-                        // Р115 («затянуто N из M дней») — у всей строки, одинаков у каждого дня: печатаем
-                        // один раз; разные отметки Р114 по дням — с подписью дня.
-                        var marked = Model.Scopes.Where(sc => sc.Incomplete != null).ToList();
-                        var parts = marked.Select(sc => sc.Incomplete!).Distinct().Count() == 1
-                            ? new List<string> { marked[0].Incomplete! }
-                            : marked.Select(sc => sc.Label != null ? $"{sc.Label}: {sc.Incomplete}" : sc.Incomplete!).ToList();
-                        <li class="flex flex-wrap items-baseline gap-x-1.5">
-                            <span class="inline-block rounded bg-admin-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-admin-warning">⏳</span>
-                            <span class="min-w-0 text-admin-text" dir="auto">неполный: @(parts.Count > 0 ? string.Join("; ", parts) : "протокол затянут не целиком")</span>
-                            @if (Model.EditUrl != null)
-                            {
-                                <a href="@Model.EditUrl" class="whitespace-nowrap text-admin-accent hover:underline"
-                                   title="Остального протокола не будет — снять долг на странице «Изменить» (блок «Принять как есть»)">Принять как есть ↗</a>
-                            }
+                        // Что именно не хватает (просьба Влада 24.11.2026) — IncompleteExplanationRules:
+                        // Р115 — даты по сайту, какие дни в базе и каких нет; Р114 — дисциплины без времён.
+                        // Читается без наведения мыши; подсказки — что это обычно значит и что делать.
+                        var explained = Swimm.Application.Mapping.IncompleteExplanationRules.For(Model.Row);
+                        var shownHints = new HashSet<string>();
+                        <li class="flex items-start gap-x-1.5">
+                            <span class="mt-0.5 inline-block shrink-0 rounded bg-admin-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-admin-warning">⏳</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="font-semibold text-admin-text">неполный — чего не хватает</div>
+                                @if (explained.Count == 0)
+                                {
+                                    <div class="text-admin-text-muted" dir="auto">@(firstScope.Incomplete ?? "протокол затянут не целиком")</div>
+                                }
+                                @foreach (var ex in explained)
+                                {
+                                    <div class="mt-0.5 text-admin-text" dir="auto">@ex.Headline</div>
+                                    @if (ex.Items.Count > 0)
+                                    {
+                                        <ul class="ml-4 list-disc text-admin-text-muted">
+                                            @foreach (var it in ex.Items)
+                                            {
+                                                <li dir="auto">@it</li>
+                                            }
+                                        </ul>
+                                    }
+                                    @foreach (var h in ex.Hints.Where(shownHints.Add))
+                                    {
+                                        <div class="mt-0.5 text-[11.5px] text-admin-text-muted">@h</div>
+                                    }
+                                }
+                                @if (Model.EditUrl != null)
+                                {
+                                    <a href="@Model.EditUrl" class="whitespace-nowrap text-admin-accent hover:underline"
+                                       title="Остального протокола не будет — снять долг на странице «Изменить» (блок «Принять как есть»)">Принять как есть ↗</a>
+                                }
+                            </div>
                         </li>
                     }
                     @if (problems.SplitsNeedRetry)

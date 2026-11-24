@@ -720,7 +720,11 @@
         var days = st.FirstDay is { } f && st.LastDay is { } l ? l.DayNumber - f.DayNumber + 1 : 1;
         var hidden = s?.Status == "ignored" && db == null;
         var markedImported = s?.Status == "imported" && db == null;
-        var r115 = st is { PulledDays: int pd, SiteDays: int sd } ? $"Затянуто {pd} из {sd} {DaysWord(sd)} по сайту федерации" : null;
+        // Шаг 5 у недотянутой — с датами, каких дней нет (полное объяснение — блок «Что не так»).
+        var r115 = st is { PulledDays: int pd, SiteDays: int sd }
+            ? $"Затянуто {pd} из {sd} {DaysWord(sd)} по сайту федерации"
+              + (Swimm.Application.Mapping.IncompleteExplanationRules.MissingDatesShort(u) is { } miss ? $" — {miss}" : "")
+            : null;
         var baseInput = new Swimm.Application.Mapping.ChecklistInput(st.State, Imported: db != null,
             StartList: s?.StartList?.Kind, StartListStale: s?.StartList?.Stale == true,
             WarmUpDays: s?.WarmUpDays ?? 0, DayCount: days,
