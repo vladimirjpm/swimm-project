@@ -51,6 +51,27 @@ public sealed record DiscoveredCompetitionDto(
     /// <summary>Языки успешно загруженных PDF: null | "he" | "en" | "he,en".</summary>
     string? Languages);
 
+/// <summary>Две ступени «нет loglig-iframe»: федерация иногда выкладывает протокол позже (решение Влада, 24.11.2026).</summary>
+public static class NoLogligIframeRules
+{
+    /// <summary>Сколько дней после последнего дня старта «пока нет» становится «нет и не будет».</summary>
+    public const int FinalAfterDays = 7;
+
+    /// <summary>Последний день — больший из DateStart/DateEnd (у многодневки — конец); ровно 7 дней — уже «не будет».</summary>
+    public static bool IsFinal(DateTime dateStart, DateTime dateEnd, DateTime now)
+    {
+        var lastDay = (dateEnd > dateStart ? dateEnd : dateStart).Date;
+        return (now.Date - lastDay).TotalDays >= FinalAfterDays;
+    }
+}
+
+/// <summary>Тексты LastError «входящих», по которым админка отличает исходы (единственное место).</summary>
+public static class DiscoveryErrors
+{
+    /// <summary>Детали comp.asp прочитаны, loglig-iframe на странице нет.</summary>
+    public const string NoLogligIframe = "Результаты на странице не опубликованы (нет loglig-iframe).";
+}
+
 /// <summary>Строка отчёта батч-бэкфилла OrgCompId (CLI, см. Program.cs --backfill-discovery-orgcompid).</summary>
 public sealed record DiscoveryBackfillRow(
     int OrgCompId,

@@ -295,7 +295,7 @@
                 panel.querySelectorAll('.ck-caption').forEach(c => { c.textContent = c.dataset.default ?? ''; });
                 panel.querySelectorAll('.ck-pull-btn').forEach(b => b.classList.remove('hidden'));
                 // «Нет протокола»: подсветка снимается, копия в шаге 5 прячется (у «ждём протокол» её нет в .ck-noproto-step).
-                panel.querySelectorAll('.ck-noproto').forEach(b => b.classList.remove('ck-noproto-pulse'));
+                panel.querySelectorAll('.ck-noproto:not([data-keep-pulse])').forEach(b => b.classList.remove('ck-noproto-pulse'));
                 panel.querySelectorAll('.ck-noproto-step').forEach(b => b.classList.add('hidden'));
                 const chip = panel.querySelector('.ck-state-chip');
                 if (chip?.dataset.default !== undefined) chip.textContent = chip.dataset.default;

@@ -294,7 +294,10 @@
                                                     // У «ждём протокол» кнопка видна всегда; у остальных — скрыта, JS показывает её
                                                     // только при исходе «тянуть нечего: протокол пуст» (там же она подсвечивается).
                                                     var waiting = state == Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol;
-                                                    <button type="button" class="ck-noproto @(waiting ? "" : "ck-noproto-step hidden") @ghost" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
+                                                    // У исхода «нет loglig-iframe» кнопка мигает с самого открытия карточки (data-keep-pulse
+                                                    // — render() в JS не снимает подсветку, это не ход затягивания).
+                                                    var noIframe = s.NoLogligIframeFinal;
+                                                    <button type="button" class="ck-noproto @(waiting ? "" : "ck-noproto-step hidden") @(noIframe ? "ck-noproto-pulse" : "") @ghost" data-keep-pulse="@(noIframe ? "1" : null)" onclick="discEmptySource(@id, true)" title="Протокола нет: PDF пустой — тянуть нечего">Нет протокола</button>
                                                 }
                                                 if (empty && !hidden)
                                                 {
@@ -368,7 +371,20 @@
                             </div>
                             @if (no == 5)
                             {
-                                @if (!string.IsNullOrEmpty(s?.LastError))
+                                @if (s is { NoLogligIframe: true })
+                                {
+                                    @* Нет loglig-iframe: на странице федерации результатов нет — крупно и ярко; техпричина — второй, мелкой строкой. *@
+                                    if (s.NoLogligIframeFinal)
+                                    {
+                                        <div class="ck-noproto-never mt-1 text-[15px] font-bold text-admin-warning" dir="auto">Протокола нет и не будет</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="ck-noproto-soon mt-1 text-[14px] font-semibold text-admin-text" dir="auto">Протокола пока нет</div>
+                                    }
+                                    <div class="mt-0.5 text-[11px] text-admin-text-muted" dir="ltr" title="Ошибка последнего забора">@s.LastError</div>
+                                }
+                                else if (!string.IsNullOrEmpty(s?.LastError))
                                 {
                                     <div class="mt-0.5 text-[11px] text-admin-danger" dir="ltr" title="Ошибка последнего забора">@s!.LastError</div>
                                 }

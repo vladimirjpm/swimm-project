@@ -86,6 +86,19 @@ public sealed class UnifiedSiteInfo
     public int? LogligId { get; set; }
 
     /// <summary>
+    /// Явный признак исхода «на странице федерации нет loglig-iframe» (не сбой сети/таймаут/разбор).
+    /// Админка по нему пишет «Протокола нет и не будет» и мигает «Нет протокола».
+    /// </summary>
+    public bool NoLogligIframe => LogligId is null && LastError == DiscoveryErrors.NoLogligIframe;
+
+    /// <summary>
+    /// Вторая ступень: «нет loglig-iframe» И с последнего дня старта прошло не меньше
+    /// <see cref="NoLogligIframeRules.FinalAfterDays"/> дней — «Протокола нет и не будет» (ярко, кнопка
+    /// мигает). Раньше — «Протокола пока нет» (спокойно). Считает репозиторий списка.
+    /// </summary>
+    public bool NoLogligIframeFinal { get; set; }
+
+    /// <summary>
     /// Стартовый протокол уже затягивали — бейдж из журнала <c>Sys_StartListPulls</c>
     /// (<c>StartListBadgeRules</c>). null — ни разу. Заполняется только у строк текущей страницы.
     /// </summary>
