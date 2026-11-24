@@ -184,7 +184,7 @@ public class CompetitionDiscoveryService(
             row.Venue = details.Venue;
             row.LogligId = details.LogligId;
             row.LastError = details.LogligId is null
-                ? "Результаты на странице не опубликованы (нет loglig-iframe)."
+                ? DiscoveryErrors.NoLogligIframe
                 : null;
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or TaskCanceledException)

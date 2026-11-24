@@ -557,7 +557,7 @@ public sealed class StartListPullService : IStartListPullService
             discovered.Venue = details.Venue;
             discovered.LogligId = details.LogligId;
             discovered.LastError = details.LogligId is null
-                ? "На странице нет loglig-iframe (программа ещё не выложена)."
+                ? DiscoveryErrors.NoLogligIframe
                 : null;
             await _db.SaveChangesAsync(ct);
             return null;

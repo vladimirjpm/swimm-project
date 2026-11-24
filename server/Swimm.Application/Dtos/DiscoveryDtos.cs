@@ -51,6 +51,13 @@ public sealed record DiscoveredCompetitionDto(
     /// <summary>Языки успешно загруженных PDF: null | "he" | "en" | "he,en".</summary>
     string? Languages);
 
+/// <summary>Тексты LastError «входящих», по которым админка отличает исходы (единственное место).</summary>
+public static class DiscoveryErrors
+{
+    /// <summary>Детали comp.asp прочитаны, loglig-iframe на странице нет.</summary>
+    public const string NoLogligIframe = "Результаты на странице не опубликованы (нет loglig-iframe).";
+}
+
 /// <summary>Строка отчёта батч-бэкфилла OrgCompId (CLI, см. Program.cs --backfill-discovery-orgcompid).</summary>
 public sealed record DiscoveryBackfillRow(
     int OrgCompId,
