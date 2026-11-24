@@ -42,7 +42,8 @@ public interface ICompetitionAdminRepository
     Task<UnifiedCompetitionList> GetUnifiedAsync(
         string? search, string? categoryKey, int? season, string? stage, bool showSynthetic, int? month, int page, int pageSize,
         string? qualityFilter = null, string? kind = null, string? discipline = null,
-        string? state = null, DateOnly? today = null, bool unpaged = false);
+        string? state = null, DateOnly? today = null, bool unpaged = false,
+        bool decorate = true, IReadOnlySet<int>? splitsPendingOrgCompIds = null);
 
     /// <summary>Полные данные для формы Edit (включая URL-ы результатов). null — не найдено.</summary>
     Task<CompetitionEditDto?> GetByIdAsync(int id);

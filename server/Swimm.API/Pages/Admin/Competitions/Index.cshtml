@@ -323,6 +323,15 @@
         @* Снимает фильтр «здоровья» вместе со stage (алиасы ignored / discovery-new — это stage). *@
         <a href="@ListUrl(d => { d.Remove("filter"); d.Remove("stage"); })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
     </div>
+    @* Проверки со срезом (пишут не больше 50 находок): «С ошибками» видит только записанное. *@
+    @foreach (var tc in Model.TruncatedChecks)
+    {
+        var tcTitle = Model.CheckTitles.TryGetValue(tc.CheckId, out var tct) ? tct : tc.CheckId;
+        <div class="-mt-2 mb-3 px-1 text-[12px] text-admin-warning">
+            ⚠ проверка «@tcTitle» усечена: записано @tc.Shown из @tc.Total — список может быть неполным.
+            <a href="/Admin/Health#check-@tc.CheckId" class="text-admin-accent hover:underline">в Health ↗</a>
+        </div>
+    }
 }
 
 @{
@@ -576,16 +585,26 @@
                 + (st?.SuggestHide == true ? " Скрыть — кнопкой «Скрыть» в шапке панели справа; само ничего не закрывается." : ""));
         if (s?.StartList is { Stale: true } && st?.State is Swimm.Application.Mapping.CompetitionRowState.Ahead or Swimm.Application.Mapping.CompetitionRowState.Running)
             Add("bg-admin-warning/15 text-admin-warning", "обновить", "Стартовый протокол устарел: до старта мало дней, а забору больше суток");
-        // Открытые находки Health по старту и его строкам (без находок по пловцу) — CompetitionProblemRules.
+        // Открытые находки Health по старту, его строкам, эстафетам и событию (без находок по пловцу) —
+        // CompetitionProblemRules. Только записанные находки: проверки со срезом пишут не все.
         var (healthErr, healthWarn) = Swimm.Application.Mapping.CompetitionProblemRules.Totals(u.Health);
         if (healthErr > 0)
-            Add("bg-admin-danger/15 text-admin-danger", $"✕ {healthErr}", "Открытые ошибки Health:\n"
+            Add("bg-admin-danger/15 text-admin-danger", $"✕ {healthErr}", "Открытые ошибки Health (по записанным находкам):\n"
                 + Swimm.Application.Mapping.CompetitionProblemRules.Hint(u.Health, Swimm.Application.Mapping.CompetitionProblemRules.ErrorSeverity, Model.CheckTitles));
         if (healthWarn > 0)
-            Add("bg-admin-warning/15 text-admin-warning", $"⚠ {healthWarn}", "Открытые предупреждения Health:\n"
+            Add("bg-admin-warning/15 text-admin-warning", $"⚠ {healthWarn}", "Открытые предупреждения Health (по записанным находкам):\n"
                 + Swimm.Application.Mapping.CompetitionProblemRules.Hint(u.Health, Swimm.Application.Mapping.CompetitionProblemRules.WarningSeverity, Model.CheckTitles));
         if (SuspectOf(u) is > 0 and var n)
             Add("bg-admin-warning/15 text-admin-warning", $"⚑ {n}", $"Помеченных недостоверными строк: {n}");
+        // Причины «С ошибками», у которых своей пометки нет: «неполный» вне «ждём протокол · неполный»
+        // (Р114 у идущего старта) и несклеенные промежуточные — иначе строка в фильтре без метки.
+        var problem = Swimm.Application.Mapping.CompetitionProblemRules.From(u);
+        var incompleteShown = st is { State: Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol, Reason: Swimm.Application.Mapping.WaitingProtocolReason.Incomplete }
+            && s?.MissingSince == null;
+        if (problem.Incomplete && !incompleteShown)
+            Add("bg-admin-warning/15 text-admin-warning", "⏳", "Результаты неполные (Р114/Р115) — подробности в карточке, «Принять как есть» на «Изменить»");
+        if (problem.SplitsNeedRetry)
+            Add("bg-admin-warning/15 text-admin-warning", "⏱", "Промежуточные не доклеились — повторите кнопкой «Промежуточные» (шаг 9 в карточке)");
         if (s?.EmptySourceAt != null)
             Add("bg-white/[.08] text-admin-text-muted", "∅", "Протокола нет: PDF пустой или в нём одни неявки (NS) — тянуть нечего");
         if (u.Stage == CompetitionStage.Ignored)
@@ -735,7 +754,7 @@
             var splitPending = db != null && (comp?.OrgCompId ?? s?.OrgCompId) is int spOc && Model.SplitsPendingOrgCompIds.Contains(spOc);
             var splitCaption = db == null ? null
                 : Swimm.Application.Mapping.SplitAutoAttachRules.Caption(splitNote, comp?.HasSplits == true, splitPending);
-            var splitsRetry = !splitPending && splitNote is { } snr && Swimm.Application.Mapping.SplitAutoAttachRules.NeedsRetry(snr.Kind);
+            var splitsRetry = Swimm.Application.Mapping.SplitAutoAttachRules.DayNeedsRetry(splitNote, splitPending);
             // Строк в базе нет — проверять нечего: шаг 8 не «текущий».
             var input = baseInput with { QualityScanned = scanned != null || (db != null && results == 0), SuspectCount = suspects, Incomplete = incomplete != null, SplitsNeedRetry = splitsRetry };
             var none = Swimm.Application.Mapping.CompetitionChecklistRules.Build(input);

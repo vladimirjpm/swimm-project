@@ -27,17 +27,15 @@ public class IndexModel : PageModel
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<IndexModel> _logger;
     private readonly ISeriesAdminRepository _series;
-    private readonly ISplitAttachJournal? _splitJournal;
     private readonly IImportJobQueue? _jobs;
 
     public IndexModel(ICompetitionAdminRepository repo,
         IPointRulesAdminRepository rules, IAdminAuditService audit,
         IConfiguration config, IWebHostEnvironment env, ILogger<IndexModel> logger,
         ISeriesAdminRepository series, TimeProvider time,
-        ISplitAttachJournal? splitJournal = null, IImportJobQueue? jobs = null,
+        IImportJobQueue? jobs = null,
         IEnumerable<IDataCheck>? checks = null)
     {
-        _splitJournal = splitJournal;
         // Названия проверок Health — для подсказки значка и блока «Что не так»; id → заголовок.
         CheckTitles = (checks ?? []).GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First().Title);
         _jobs = jobs;
@@ -266,10 +264,16 @@ public class IndexModel : PageModel
         };
         // Выбраны сезон И месяц — месяц целиком, без пагинации; иначе (в т.ч. месяц за все годы
         // при season=all) — «p» по 20.
+        // «Доклейка идёт сейчас» — до запроса списка: правило «промежуточным нужен повтор»
+        // (SplitAutoAttachRules.DayNeedsRetry) одно на фильтр, значок, блок и шаг 9.
+        LoadSplitsPending();
         var list = await _repo.GetUnifiedAsync(Search, CategoryKey, Season, Stage, ShowSynthetic, Month,
             PageNumber, PageSize, QualityFilter, Kind, Discipline,
-            state: State, today: Today, unpaged: Unpaged);
+            state: State, today: Today, unpaged: Unpaged, splitsPendingOrgCompIds: SplitsPendingOrgCompIds);
         Result = list.Page;
+        // Журнал доклеек репозиторий уже прочитал (для «С ошибками» и значков) — второй раз не читаем.
+        SplitNotes = list.SplitNotes ?? new Dictionary<int, SplitAttachNote>();
+        TruncatedChecks = list.TruncatedChecks;
         MonthCounts = list.MonthCounts;
         MonthImported = list.MonthImported ?? new int[12];
         MonthNothingToPull = list.MonthNothingToPull ?? new int[12];
@@ -291,7 +295,6 @@ public class IndexModel : PageModel
         ClubRules = await _rules.GetAllAsync(PointRuleKind.Clubs);
         SwimmerRules = await _rules.GetAllAsync(PointRuleKind.Swimmers);
         SeriesWithPhrases = (await _series.GetAllAsync()).Where(x => !string.IsNullOrEmpty(x.MatchPhrases)).ToList();
-        await LoadSplitsAsync();
         return Page();
     }
 
@@ -301,22 +304,17 @@ public class IndexModel : PageModel
     /// <summary>compID, чья доклейка после импорта ещё идёт (очередь импорта в памяти этого процесса).</summary>
     public IReadOnlySet<int> SplitsPendingOrgCompIds { get; private set; } = new HashSet<int>();
 
+    /// <summary>Проверки Health со срезом находок — строка над списком при «С ошибками».</summary>
+    public IReadOnlyList<TruncatedCheckDto> TruncatedChecks { get; private set; } = [];
+
     /// <summary>
     /// Шаг 9 «После импорта»: итог автодоклейки переживает перезагрузку через аудит
-    /// (<c>competition.attach-splits</c>, пишется у автозапуска всегда — и при «нечего», и при сбое),
-    /// а «идёт сейчас» — из очереди импорта: страница перезагружается по Completed импорта, когда
-    /// доклейка за ним ещё качает loglig.
+    /// (<c>competition.attach-splits</c>; читает репозиторий вместе со списком), а «идёт сейчас» —
+    /// из очереди импорта: страница перезагружается по Completed импорта, когда доклейка за ним ещё
+    /// качает loglig.
     /// </summary>
-    private async Task LoadSplitsAsync()
+    private void LoadSplitsPending()
     {
-        if (_splitJournal != null)
-        {
-            var ids = Result.Items
-                .Where(u => u.Db != null)
-                .SelectMany(u => u.Db!.IsEvent ? u.Db.Days.Select(d => d.Id) : u.Db.Single != null ? new[] { u.Db.Single.Id } : Array.Empty<int>())
-                .ToList();
-            SplitNotes = await _splitJournal.GetLatestAsync(ids);
-        }
         if (_jobs != null)
             SplitsPendingOrgCompIds = _jobs.Snapshot()
                 .Where(j => j.OrgCompId != null && j.Splits is { State: "queued" or "running" })

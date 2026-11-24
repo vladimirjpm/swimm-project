@@ -117,11 +117,11 @@
         }
 
         @* «Что не так» — причины правила CompetitionProblemRules (то же, что значок строки и фильтр
-           «С ошибками»). Промежуточные — по шагу 9 областей: он уже учитывает доклейку, идущую сейчас.
+           «С ошибками»). Промежуточные — Row.SplitsNeedRetry: его считает репозиторий правилом
+           SplitAutoAttachRules.DayNeedsRetry с учётом доклейки, идущей сейчас, — тем же, что шаг 9.
            Нет причин — блока нет. *@
         @{
-            var splitsRetry = Model.Scopes.Any(sc => sc.Step(9).Status == Swimm.Application.Mapping.ChecklistStepStatus.Attention);
-            var problems = Swimm.Application.Mapping.CompetitionProblemRules.From(Model.Row) with { SplitsNeedRetry = splitsRetry };
+            var problems = Swimm.Application.Mapping.CompetitionProblemRules.From(Model.Row);
             var reasons = Swimm.Application.Mapping.CompetitionProblemRules.Reasons(problems);
         }
         @if (reasons.Count > 0)
@@ -141,9 +141,10 @@
                             <span class="font-semibold text-admin-text" title="@f.CheckId">@title:</span>
                             <span class="min-w-0 text-admin-text-muted" dir="auto">@f.Message</span>
                             <a href="/Admin/Health#check-@f.CheckId" class="whitespace-nowrap text-admin-accent hover:underline" title="Проверка «@title» на странице здоровья данных">в Health ↗</a>
-                            @if (!string.IsNullOrEmpty(f.Link))
+                            @* Только относительная ссылка админки: Link — данные, чужой адрес («//host», «https:») не рисуем. *@
+                            @if (Swimm.Application.Mapping.CompetitionProblemRules.AdminLinkOrNull(f.Link) is { } fixLink)
                             {
-                                <a href="@f.Link" class="whitespace-nowrap text-admin-accent hover:underline" title="Куда идти чинить — ссылка из находки">чинить ↗</a>
+                                <a href="@fixLink" class="whitespace-nowrap text-admin-accent hover:underline" title="Куда идти чинить — ссылка из находки">чинить ↗</a>
                             }
                         </li>
                     }

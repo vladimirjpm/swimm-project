@@ -893,35 +893,67 @@ no-org-comp-id|no-results` — новый доп-параметр `qualityFilter
 берут условие отсюда, своего не держат.
 
 **Что считает значок** («✕ N» красный — ошибки, «⚠ N» жёлтый — предупреждения; в `title` —
-«Название проверки — N» по строке): открытые (`Resolution IS NULL`) находки `Sys_DataCheckFindings`
-с `EntityType='Competition'` (EntityId = Id соревнования) и `'Result'` (через `Results.CompetitionId`).
-Принятые и Info не считаются. **Находки по пловцу (`'Swimmer'`) НЕ входят**: пловец плывёт во
-многих стартах, одна находка зажгла бы значок у каждого. У события — сумма по дням
-(`CompetitionProblemRules.Merge`). Названия проверок — из реестра `IDataCheck` (нет — id).
+«Название проверки — N» по строке, с пометкой «по записанным находкам»): открытые
+(`Resolution IS NULL`) находки `Sys_DataCheckFindings` с Severity Warning/Error. Принятые и Info не
+считаются. У события — сумма по дням плюс находки самого события (`CompetitionProblemRules.Merge`).
+Названия проверок — из реестра `IDataCheck` (нет — id). Какие `EntityType` относятся к старту
+(сверено по `Services/DataChecks/*` 24.11.2026):
 
-**Запрос** — `CompetitionAdminRepository.LoadHealthCountsAsync`: один на весь список, без N+1,
-`UNION ALL` двух веток + `GROUP BY (CompId, CheckId, Severity)`. План (локальная база, 24.11):
-обе ветки входят через частичный индекс `IX_Sys_DataCheckFindings_Open`, строка `Results`
-достаётся по `PK_Results` (Nested Loop, одна выборка на находку) — `Results` целиком не читается,
-цена растёт с числом открытых находок, а не строк результатов (0.9 мс на 42 находках). Тексты
-находок для блока — второй запрос только по строкам страницы (`AttachHealthFindingsAsync`,
-`EntityId/CompetitionId = ANY(@ids)`, до 8 на строку). Журнал доклеек промежуточных — у строк
-страницы, а при фильтре — у всех строк базы (один запрос по аудиту `competition.attach-splits`).
+| EntityType | Как привязан к строке | Проверки |
+|---|---|---|
+| `Competition` | EntityId = Id соревнования (дня) | `results.merged-sessions`, `results.official-club-points-mismatch`, `competitions.empty`, `competitions.no-club-point-rule`, `import.reconciliation-mismatch`, `entries.no-show-unmatched`, `series.*` |
+| `Result` | Results.Id → CompetitionId (по `PK_Results`) | `results.no-gender`, `results.exact-duplicate`, `results.fk-anomaly`, `results.relay-distance-without-relay`, `results.upsert-key-collision`, `relays.gender-conflict` |
+| `Relay` | Relays.Id → строка эстафеты `Results.RelayId` → CompetitionId (по `IX_Results_RelayId`) | `relays.empty` |
+| `CompetitionEvent` | EntityId = EventId → строка события | `competitions.duplicate-day` |
+| **не считаются:** `Swimmer` | пловец плывёт во многих стартах — одна находка зажгла бы значок у каждого | `swimmers.*`, `results.gender-vs-card` (пишет по пловцу) |
+| **не считаются:** `Club`, `Country`, `Check` | не про старт (`Check` — упавшая проверка) | `clubs.*`, `countries.duplicate` |
+
+Новая проверка с новым `EntityType` в значок не попадёт, пока его не добавят в
+`CompetitionAdminRepository.OpenHealthRows` и в эту таблицу.
+
+⚠ **Только записанные находки.** Почти каждая проверка пишет не больше 50 находок (`.Take(50)`),
+полное число — в `Sys_DataCheckStates.Total`. Старт, чья находка не попала в срез, остаётся без
+значка и вне фильтра. Поэтому при `?filter=problems` над списком строка на каждую срезанную
+проверку, у которой бывают находки про старт: «проверка «…» усечена: записано N из M — список
+может быть неполным» (`LoadTruncatedChecksAsync`, `UnifiedCompetitionList.TruncatedChecks`).
+Полное решение — агрегат по CompetitionId без среза прямо в проверке — отдельная задача, не сделано.
+
+**Запрос** — `CompetitionAdminRepository.LoadHealthCountsAsync` поверх `OpenHealthRows`: один на
+весь список, без N+1, `UNION ALL` четырёх веток + `GROUP BY (событие?, владелец, CheckId,
+Severity)`. План (локальная база, 24.11): каждая ветка входит через частичный индекс
+`IX_Sys_DataCheckFindings_Open`, строка `Results` достаётся по `PK_Results` (ветка `Result`) или
+`IX_Results_RelayId` (ветка `Relay`) — Nested Loop, одна выборка на находку, `Results` целиком не
+читается: цена растёт с числом открытых находок, а не строк результатов (0.9 мс на 42 находках).
+Трансляция проверена на Postgres тестом `CompetitionProblemsPgTests`. Тексты находок для блока —
+тот же `OpenHealthRows`, суженный до строк страницы (`ANY(@ids)`), до 8 на строку.
+
+**Журнал доклеек** (аудит `competition.attach-splits`) читается ОДИН раз за показ: репозиторий
+читает его для строк страницы (при фильтре — для всех) и отдаёт странице (`UnifiedCompetitionList.
+SplitNotes`) для подписи шага 9 — второго запроса нет. Берётся только последняя строка на день
+(`max(Id)` по EntityId, потом эти строки с JSON) — вся история с `DetailsJson` не тянется
+(`SplitAttachJournal.LatestAsync`). **Служебные вызовы** (`BulkPullService` — отбор пачки)
+передают `decorate: false`: ни находок, ни журнала, ни срезов.
+
+**Промежуточные — одно правило** `SplitAutoAttachRules.DayNeedsRetry(note, pending)`: последняя
+доклейка дня не удалась или частичная, И она не идёт прямо сейчас (compID дня в очереди импорта —
+страница передаёт `splitsPendingOrgCompIds` в репозиторий). По нему `Row.SplitsNeedRetry`
+(фильтр, значок, блок) и «!» шага 9 — пока доклейка идёт, строки нет ни в фильтре, ни в блоке.
 
 **Фильтр «С ошибками»** = `?filter=problems` — пункт в меню «Фильтры» (решение Влада 23.11:
 «фильтры — одной кнопкой»), рядом с ссылками results-auto. Это фильтр «здоровья данных», как
 `discovery-error` и прочие: жёлтая плашка «Активный фильтр … сбросить ✕», **по всем сезонам**
 (ссылка без `season`/`month`, как поиск), пагинация по 20, комбинируется с «Ждут / Впереди /
 Закрыто». Полосы сезонов и месяцев при нём считают только проблемные строки (так у всех `?filter=`).
+У строки, попавшей в фильтр без своей пометки, — чип «⏳» (неполный вне «ждём протокол · неполный»,
+например Р114 у идущего старта) или «⏱» (промежуточные не доклеились).
 
 **Блок «Что не так»** — в шапке карточки справа, под категориями (`_CompChecklist.cshtml`,
 `.ck-problems`): находки Health строками (текст, «в Health ↗» на `/Admin/Health#check-<id
-проверки>` — группа раскрывается и прокручивается, `health.js`; «чинить ↗» — `Link` находки),
+проверки>` — группа раскрывается и прокручивается, `health.js`; «чинить ↗» — `Link` находки, только относительный путь админки: `CompetitionProblemRules.AdminLinkOrNull`),
 «и ещё N — в Health ↗», если находок больше 8; «⚑ сомнительных строк: N» + кнопка «Качество»;
 «неполный: …» + «Принять как есть ↗» (одинаковый текст Р115 у всех дней — один раз);
-«промежуточные: не доклеились — повторите кнопкой «Промежуточные» (шаг 9)». Промежуточные в
-блоке — по шагу 9, он учитывает доклейку, идущую прямо сейчас (очередь импорта), фильтр её не
-видит. Нет причин — блока нет. Скриншоты — `docs/design-briefs/admin-competitions/problems-*.png`.
+«промежуточные: не доклеились — повторите кнопкой «Промежуточные» (шаг 9)» — по
+`Row.SplitsNeedRetry`, то же правило, что у фильтра. Нет причин — блока нет. Скриншоты — `docs/design-briefs/admin-competitions/problems-*.png`.
 
 ## «Результаты неполные» и «Принять как есть» (Р114, 22.11.2026)
 

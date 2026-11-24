@@ -39,7 +39,24 @@ public sealed record UnifiedCompetitionList(
     IReadOnlyList<Mapping.CompetitionStateCounts>? MonthStates = null,
     /// <summary>Состояния всего списка под текущими фильтрами (с месяцем), но БЕЗ фильтра
     /// <c>?state=</c> — числа переключателя «Все / Ждут / Впереди / Закрыто».</summary>
-    Mapping.CompetitionStateCounts? ListStates = null);
+    Mapping.CompetitionStateCounts? ListStates = null)
+{
+    /// <summary>
+    /// Итог последней доклейки промежуточных по id дня (аудит <c>competition.attach-splits</c>) — у
+    /// строк страницы (при фильтре «С ошибками» — у всех). Страница берёт отсюда подпись шага 9, а не
+    /// читает журнал второй раз. null — не читался (служебный вызов без украшений).
+    /// </summary>
+    public IReadOnlyDictionary<int, Abstractions.SplitAttachNote>? SplitNotes { get; init; }
+
+    /// <summary>
+    /// Проверки Health, записавшие не все находки (срез): при фильтре «С ошибками» список может быть
+    /// неполным — строка над списком. Пусто — срезанных нет или фильтр не задан.
+    /// </summary>
+    public IReadOnlyList<TruncatedCheckDto> TruncatedChecks { get; init; } = [];
+}
+
+/// <summary>Проверка Health, записавшая <paramref name="Shown"/> находок из <paramref name="Total"/> найденных.</summary>
+public sealed record TruncatedCheckDto(string CheckId, int Shown, int Total);
 
 /// <summary>
 /// Сезон (год окончания, 2026 = 25/26) со счётчиками. Три числа, а не два: «затянуто»,

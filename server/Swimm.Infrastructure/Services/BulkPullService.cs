@@ -127,7 +127,9 @@ public sealed class BulkPullService : IBulkPullService
             (sp.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow());
         var list = await repo.GetUnifiedAsync(null, null, season: null, stage: null, showSynthetic: true,
             month: null, page: 1, pageSize: 20, discipline: "all",
-            state: CompetitionStateFilters.Waiting, today: today, unpaged: true);
+            state: CompetitionStateFilters.Waiting, today: today, unpaged: true,
+            // Отбор пачки — без значков Health и журнала доклеек: им они не нужны.
+            decorate: false);
         return list.Page.Items.Where(BulkPullSelection.IsCandidate).Select(u => u.Site!.DiscoveredId).ToHashSet();
     }
 

@@ -102,6 +102,13 @@ public static class CompetitionProblemRules
             .ToList();
 
     /// <summary>
+    /// Ссылка «чинить ↗» находки — только относительный путь админки (<c>/Admin/…</c>, <c>/api/…</c>).
+    /// <c>Link</c> — данные, а не разметка: «//host», «https:», «javascript:» не рисуем (null).
+    /// </summary>
+    public static string? AdminLinkOrNull(string? link) =>
+        link is { Length: > 1 } l && l[0] == '/' && l[1] != '/' && l[1] != '\\' ? l : null;
+
+    /// <summary>
     /// Подсказка значка: «Название проверки — N» по строке на проверку нужной severity.
     /// Нет названия (проверку убрали из реестра) — id проверки.
     /// </summary>

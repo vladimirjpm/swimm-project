@@ -18,16 +18,35 @@ public class SplitAttachJournal(SwimmDbContext db) : ISplitAttachJournal
         IReadOnlyCollection<int> competitionIds, CancellationToken ct = default)
     {
         if (competitionIds.Count == 0) return new Dictionary<int, SplitAttachNote>();
-        var keys = competitionIds.Select(id => id.ToString()).Distinct().ToList();
+        return await LatestAsync(competitionIds.Select(id => id.ToString()).Distinct().ToList(), ct);
+    }
+
+    /// <summary>
+    /// Итог последней доклейки у ВСЕХ дней, у которых она была, — фильтр «С ошибками»
+    /// /Admin/Competitions смотрит все сезоны. Без списка id: длинный IN по тысячам дней не нужен,
+    /// строк этого аудита — по одной-две на затянутый день.
+    /// </summary>
+    public Task<Dictionary<int, SplitAttachNote>> GetLatestForAllAsync(CancellationToken ct = default) =>
+        LatestAsync(null, ct);
+
+    /// <summary>
+    /// Только последняя строка аудита на день (наибольший Id: аудит пишется по ходу дела, Id растёт
+    /// вместе с CreatedAt), и только у неё читается DetailsJson — вся история доклеек с JSON не тянется.
+    /// </summary>
+    private async Task<Dictionary<int, SplitAttachNote>> LatestAsync(List<string>? keys, CancellationToken ct)
+    {
+        var audits = db.AdminAudits.AsNoTracking()
+            .Where(a => a.Action == SplitAutoAttachRules.AuditAction && a.EntityType == "Competition" && a.EntityId != null);
+        if (keys != null) audits = audits.Where(a => keys.Contains(a.EntityId!));
+        var latestIds = audits.GroupBy(a => a.EntityId).Select(g => g.Max(a => a.Id));
 
         var rows = await db.AdminAudits.AsNoTracking()
-            .Where(a => a.Action == SplitAutoAttachRules.AuditAction && a.EntityType == "Competition"
-                        && a.EntityId != null && keys.Contains(a.EntityId))
-            .Select(a => new { a.Id, a.EntityId, a.CreatedAt, a.ActorName, a.Summary, a.DetailsJson })
+            .Where(a => latestIds.Contains(a.Id))
+            .Select(a => new { a.EntityId, a.CreatedAt, a.ActorName, a.Summary, a.DetailsJson })
             .ToListAsync(ct);
 
         var notes = new Dictionary<int, SplitAttachNote>();
-        foreach (var r in rows.GroupBy(r => r.EntityId!).Select(g => g.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).First()))
+        foreach (var r in rows)
         {
             if (!int.TryParse(r.EntityId, out var id)) continue;
             notes[id] = Parse(r.CreatedAt, r.ActorName, r.Summary, r.DetailsJson);

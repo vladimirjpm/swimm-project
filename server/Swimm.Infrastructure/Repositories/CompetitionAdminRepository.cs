@@ -71,7 +71,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
     public async Task<UnifiedCompetitionList> GetUnifiedAsync(
         string? search, string? categoryKey, int? season, string? stage, bool showSynthetic, int? month, int page, int pageSize,
         string? qualityFilter = null, string? kind = null, string? discipline = null,
-        string? state = null, DateOnly? today = null, bool unpaged = false)
+        string? state = null, DateOnly? today = null, bool unpaged = false,
+        bool decorate = true, IReadOnlySet<int>? splitsPendingOrgCompIds = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
@@ -190,16 +191,21 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             hiddenByDiscipline = before - unified.Count;
         }
 
-        // 2b-bis) Открытые находки Health по соревнованию и его строкам — одним запросом на весь
-        // список (значок строки и фильтр «С ошибками»). Находки по пловцу не входят.
-        var healthByComp = await LoadHealthCountsAsync();
-        if (healthByComp.Count > 0)
-            foreach (var u in unified)
-            {
-                var ids = CompIdsOf(u);
-                if (ids.Any(healthByComp.Contains))
-                    u.Health = CompetitionProblemRules.Merge(ids.SelectMany(id => healthByComp[id]));
-            }
+        // 2b-bis) Открытые находки Health по старту (соревнование, его строки и эстафеты, событие) —
+        // одним запросом на весь список: значок строки и фильтр «С ошибками». Находки по пловцу,
+        // клубу, стране не входят. Служебным вызовам (decorate: false — пачки) не нужно.
+        var problems = qualityFilter == CompetitionProblemRules.Filter;
+        if (decorate || problems)
+        {
+            var health = await LoadHealthCountsAsync();
+            if (health.Count > 0)
+                foreach (var u in unified)
+                {
+                    var keys = OwnersOf(u);
+                    if (keys.Any(health.Contains))
+                        u.Health = CompetitionProblemRules.Merge(keys.SelectMany(k => health[k]));
+                }
+        }
 
         // 2c) Признак «чемпионат Израиля» — по названию любой стороны строки (у входящих других
         // признаков нет). Считаем всегда: он и фильтр «Тип», и иконка 🏆 в списке.
@@ -236,11 +242,11 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
 
         // 3d) «С ошибками» (?filter=problems): правило — CompetitionProblemRules, после состояний
         // (Р115 читается из них). Промежуточные — по журналу доклеек у всех строк базы.
-        var splitsLoaded = false;
-        if (qualityFilter == CompetitionProblemRules.Filter)
+        IReadOnlyDictionary<int, SplitAttachNote>? splitNotes = null;
+        if (problems)
         {
-            await AttachSplitsRetryAsync(unified);
-            splitsLoaded = true;
+            splitNotes = await new SplitAttachJournal(_db).GetLatestForAllAsync();
+            ApplySplitsRetry(unified, splitNotes, splitsPendingOrgCompIds);
             unified = unified.Where(CompetitionProblemRules.HasProblem).ToList();
         }
 
@@ -288,47 +294,132 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         }
         var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         await AttachStartListBadgesAsync(pageItems);
-        if (!splitsLoaded) await AttachSplitsRetryAsync(pageItems);
-        await AttachHealthFindingsAsync(pageItems);
+        IReadOnlyList<TruncatedCheckDto> truncated = [];
+        if (decorate)
+        {
+            // Журнал доклеек — ОДИН запрос: при фильтре уже прочитан для всех, иначе — для строк
+            // страницы. Его же страница берёт для подписи шага 9 (UnifiedCompetitionList.SplitNotes).
+            if (splitNotes == null)
+            {
+                var ids = pageItems.SelectMany(CompIdsOf).Distinct().ToList();
+                splitNotes = ids.Count == 0 ? new Dictionary<int, SplitAttachNote>() : await new SplitAttachJournal(_db).GetLatestAsync(ids);
+                ApplySplitsRetry(pageItems, splitNotes, splitsPendingOrgCompIds);
+            }
+            await AttachHealthFindingsAsync(pageItems);
+            if (problems) truncated = await LoadTruncatedChecksAsync();
+        }
         return new UnifiedCompetitionList(
             new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts,
-            hiddenByDiscipline, monthImported, seasonCounts, monthNothingToPull, monthStates, listStates);
+            hiddenByDiscipline, monthImported, seasonCounts, monthNothingToPull, monthStates, listStates)
+        {
+            SplitNotes = splitNotes,
+            TruncatedChecks = truncated,
+        };
     }
 
     /// <summary>Id соревнований строки: одиночное — своё, событие — всех дней; строка «Входящих» — пусто.</summary>
     private static IReadOnlyList<int> CompIdsOf(UnifiedCompetitionRowDto u) =>
         u.Db == null ? [] : u.Db.Single != null ? [u.Db.Single.Id] : u.Db.Days.Select(d => d.Id).ToList();
 
+    /// <summary>
+    /// «Владельцы» находок строки: каждое соревнование (день) и, у события, само событие —
+    /// находка <c>CompetitionEvent</c> (EntityId = EventId) относится к строке события.
+    /// </summary>
+    private static IReadOnlyList<HealthOwner> OwnersOf(UnifiedCompetitionRowDto u)
+    {
+        var owners = CompIdsOf(u).Select(id => new HealthOwner(false, id)).ToList();
+        if (u.Db?.EventId is int ev) owners.Add(new HealthOwner(true, ev));
+        return owners;
+    }
+
+    /// <summary>Кому принадлежит находка: соревнованию (день) или событию.</summary>
+    private readonly record struct HealthOwner(bool IsEvent, int Id);
+
+    /// <summary>Строка находки, приведённая к «владельцу» — общая форма веток UNION ALL.</summary>
+    private sealed class HealthRow
+    {
+        public int Owner { get; init; }
+        public bool IsEvent { get; init; }
+        public int FindingId { get; init; }
+        public string CheckId { get; init; } = "";
+        public int Severity { get; init; }
+        public string Message { get; init; } = "";
+        public string? Link { get; init; }
+    }
+
+    // EntityType находок, которые относятся к старту (список с причинами — docs/admin-pages/competitions.md,
+    // «Проблемы старта»). Swimmer, Club, Country, Check — не про старт и не считаются.
     private const string HealthEntityCompetition = "Competition";
     private const string HealthEntityResult = "Result";
+    private const string HealthEntityRelay = "Relay";
+    private const string HealthEntityEvent = "CompetitionEvent";
 
-    private IQueryable<DataCheckFinding> OpenHealthFindings() =>
-        _db.DataCheckFindings.AsNoTracking()
+    /// <summary>
+    /// Открытые находки (Warning/Error) по старту — четыре ветки одним UNION ALL:
+    /// <c>Competition</c> (EntityId = Id соревнования), <c>Result</c> (Results.Id → CompetitionId, по
+    /// PK), <c>Relay</c> (Relays.Id → строка эстафеты Results.RelayId → CompetitionId, по индексу
+    /// IX_Results_RelayId), <c>CompetitionEvent</c> (EntityId = EventId — к строке события).
+    /// <paramref name="compIds"/>/<paramref name="eventIds"/> — сузить до строк страницы; null — все.
+    /// </summary>
+    private IQueryable<HealthRow> OpenHealthRows(List<int>? compIds = null, List<int>? eventIds = null)
+    {
+        var open = _db.DataCheckFindings.AsNoTracking()
             .Where(f => f.Resolution == null && f.EntityId != null
                         && f.Severity >= CompetitionProblemRules.WarningSeverity);
 
-    /// <summary>
-    /// Открытые находки Health (Warning/Error) в разбивке «соревнование → проверка, severity, N».
-    /// Две ветки одним запросом (UNION ALL): находки по соревнованию (EntityId = Id) и по строке
-    /// результата (EntityId = Results.Id → CompetitionId). Вход — частичный индекс открытых находок,
-    /// строки результатов достаются по первичному ключу: открытых находок — сотни, а не миллионы
-    /// строк Results (план запроса — docs/admin-pages/competitions.md, «Проблемы старта»).
-    /// </summary>
-    private async Task<ILookup<int, CompetitionHealthCount>> LoadHealthCountsAsync()
-    {
-        var open = OpenHealthFindings();
-        var direct = open
-            .Where(f => f.EntityType == HealthEntityCompetition)
-            .Select(f => new { CompId = f.EntityId!.Value, f.CheckId, f.Severity });
+        var direct = open.Where(f => f.EntityType == HealthEntityCompetition);
+        if (compIds != null) direct = direct.Where(f => compIds.Contains(f.EntityId!.Value));
+        var q = direct.Select(f => new HealthRow
+        {
+            Owner = f.EntityId!.Value, IsEvent = false, FindingId = f.Id, CheckId = f.CheckId,
+            Severity = f.Severity, Message = f.Message, Link = f.Link,
+        });
+
         var viaResult =
             from f in open.Where(f => f.EntityType == HealthEntityResult)
             join r in _db.Results on (long)f.EntityId!.Value equals r.Id
-            select new { CompId = r.CompetitionId, f.CheckId, f.Severity };
-        var rows = await direct.Concat(viaResult)
-            .GroupBy(x => new { x.CompId, x.CheckId, x.Severity })
-            .Select(g => new { g.Key.CompId, g.Key.CheckId, g.Key.Severity, Count = g.Count() })
+            select new { f, r.CompetitionId };
+        var viaRelay =
+            from f in open.Where(f => f.EntityType == HealthEntityRelay)
+            join r in _db.Results on f.EntityId equals r.RelayId
+            select new { f, r.CompetitionId };
+        foreach (var branch in new[] { viaResult, viaRelay })
+        {
+            var b = compIds == null ? branch : branch.Where(x => compIds.Contains(x.CompetitionId));
+            q = q.Concat(b.Select(x => new HealthRow
+            {
+                Owner = x.CompetitionId, IsEvent = false, FindingId = x.f.Id, CheckId = x.f.CheckId,
+                Severity = x.f.Severity, Message = x.f.Message, Link = x.f.Link,
+            }));
+        }
+
+        var ev = open.Where(f => f.EntityType == HealthEntityEvent);
+        if (compIds != null)
+        {
+            var evIds = eventIds ?? [];
+            ev = ev.Where(f => evIds.Contains(f.EntityId!.Value));
+        }
+        return q.Concat(ev.Select(f => new HealthRow
+        {
+            Owner = f.EntityId!.Value, IsEvent = true, FindingId = f.Id, CheckId = f.CheckId,
+            Severity = f.Severity, Message = f.Message, Link = f.Link,
+        }));
+    }
+
+    /// <summary>
+    /// Открытые находки по «владельцам» (соревнование / событие) в разбивке по проверке и severity —
+    /// один запрос на весь список. Вход каждой ветки — частичный индекс открытых находок; Results
+    /// достаётся по ключу (PK или IX_Results_RelayId), целиком не читается: цена растёт с числом
+    /// открытых находок, а не строк результатов (план — docs/admin-pages/competitions.md).
+    /// </summary>
+    private async Task<ILookup<HealthOwner, CompetitionHealthCount>> LoadHealthCountsAsync()
+    {
+        var rows = await OpenHealthRows()
+            .GroupBy(x => new { x.IsEvent, x.Owner, x.CheckId, x.Severity })
+            .Select(g => new { g.Key.IsEvent, g.Key.Owner, g.Key.CheckId, g.Key.Severity, Count = g.Count() })
             .ToListAsync();
-        return rows.ToLookup(r => r.CompId, r => new CompetitionHealthCount(r.CheckId, r.Severity, r.Count));
+        return rows.ToLookup(r => new HealthOwner(r.IsEvent, r.Owner),
+            r => new CompetitionHealthCount(r.CheckId, r.Severity, r.Count));
     }
 
     /// <summary>
@@ -340,40 +431,53 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var withHealth = rows.Where(r => r.Health.Count > 0).ToList();
         if (withHealth.Count == 0) return;
         var ids = withHealth.SelectMany(CompIdsOf).Distinct().ToList();
+        var events = withHealth.Select(r => r.Db?.EventId).OfType<int>().Distinct().ToList();
 
-        var open = OpenHealthFindings();
-        var direct = open
-            .Where(f => f.EntityType == HealthEntityCompetition && ids.Contains(f.EntityId!.Value))
-            .Select(f => new { CompId = f.EntityId!.Value, f.Id, f.CheckId, f.Severity, f.Message, f.Link });
-        var viaResult =
-            from f in open.Where(f => f.EntityType == HealthEntityResult)
-            join r in _db.Results on (long)f.EntityId!.Value equals r.Id
-            where ids.Contains(r.CompetitionId)
-            select new { CompId = r.CompetitionId, f.Id, f.CheckId, f.Severity, f.Message, f.Link };
-        var found = (await direct.Concat(viaResult).ToListAsync()).ToLookup(x => x.CompId);
-
+        var found = (await OpenHealthRows(ids, events).ToListAsync())
+            .ToLookup(x => new HealthOwner(x.IsEvent, x.Owner));
         foreach (var row in withHealth)
-            row.HealthFindings = CompIdsOf(row)
-                .SelectMany(id => found[id])
-                .OrderByDescending(x => x.Severity).ThenBy(x => x.CheckId, StringComparer.Ordinal).ThenBy(x => x.Id)
+            row.HealthFindings = OwnersOf(row)
+                .SelectMany(k => found[k])
+                .DistinctBy(x => x.FindingId)
+                .OrderByDescending(x => x.Severity).ThenBy(x => x.CheckId, StringComparer.Ordinal).ThenBy(x => x.FindingId)
                 .Take(CompetitionHealthFinding.PerRowLimit)
-                .Select(x => new CompetitionHealthFinding(x.Id, x.CheckId, x.Severity, x.Message, x.Link))
+                .Select(x => new CompetitionHealthFinding(x.FindingId, x.CheckId, x.Severity, x.Message, x.Link))
                 .ToList();
     }
 
     /// <summary>
-    /// «Промежуточные не доклеились» — по итогу последней доклейки каждого дня (журнал
-    /// <see cref="SplitAttachJournal"/>, тот же, что у шага 9). Доклейку, идущую прямо сейчас (очередь
-    /// импорта), здесь не видно — её учитывает страница.
+    /// «Промежуточные не доклеились» у строки — хоть одному дню нужен повтор по
+    /// <see cref="SplitAutoAttachRules.DayNeedsRetry"/> (с учётом доклейки, идущей прямо сейчас:
+    /// compID дня в очереди импорта). То же правило, что у шага 9 чек-листа.
     /// </summary>
-    private async Task AttachSplitsRetryAsync(IReadOnlyList<UnifiedCompetitionRowDto> rows)
+    private static void ApplySplitsRetry(IEnumerable<UnifiedCompetitionRowDto> rows,
+        IReadOnlyDictionary<int, SplitAttachNote> notes, IReadOnlySet<int>? pendingOrgCompIds)
     {
-        var ids = rows.SelectMany(CompIdsOf).Distinct().ToList();
-        if (ids.Count == 0) return;
-        var notes = await new SplitAttachJournal(_db).GetLatestAsync(ids);
         if (notes.Count == 0) return;
         foreach (var row in rows)
-            row.SplitsNeedRetry = CompIdsOf(row).Any(id => notes.TryGetValue(id, out var n) && SplitAutoAttachRules.NeedsRetry(n.Kind));
+        {
+            if (row.Db == null) continue;
+            var days = row.Db.Single != null ? [row.Db.Single] : row.Db.Days;
+            row.SplitsNeedRetry = days.Any(d => SplitAutoAttachRules.DayNeedsRetry(
+                notes.GetValueOrDefault(d.Id),
+                (d.OrgCompId ?? row.Site?.OrgCompId) is int oc && pendingOrgCompIds?.Contains(oc) == true));
+        }
+    }
+
+    /// <summary>
+    /// Проверки, записавшие не все находки (<c>Sys_DataCheckStates.Shown &lt; Total</c>, срез в 50),
+    /// у которых находки бывают про старт, — строка над списком при фильтре «С ошибками»: значок
+    /// и фильтр видят только записанное.
+    /// </summary>
+    private async Task<IReadOnlyList<TruncatedCheckDto>> LoadTruncatedChecksAsync()
+    {
+        var types = new[] { HealthEntityCompetition, HealthEntityResult, HealthEntityRelay, HealthEntityEvent };
+        return await _db.DataCheckStates.AsNoTracking()
+            .Where(s => !s.Failed && s.Shown < s.Total && s.Severity >= CompetitionProblemRules.WarningSeverity
+                        && _db.DataCheckFindings.Any(f => f.CheckId == s.CheckId && types.Contains(f.EntityType)))
+            .OrderBy(s => s.CheckId)
+            .Select(s => new TruncatedCheckDto(s.CheckId, s.Shown, s.Total))
+            .ToListAsync();
     }
 
     /// <summary>

@@ -128,6 +128,31 @@ public class CompetitionProblemRulesTests
         Assert.Equal(new CompetitionHealthCount("results.no-gender", 1, 10), merged[1]);
     }
 
+    [Theory]
+    [InlineData(SplitAutoKind.Failed, false, true)]
+    [InlineData(SplitAutoKind.Partial, false, true)]
+    [InlineData(SplitAutoKind.Failed, true, false)]   // доклейка идёт прямо сейчас — не проблема
+    [InlineData(SplitAutoKind.Attached, false, false)]
+    [InlineData(SplitAutoKind.NothingOnLoglig, false, false)]
+    public void DayNeedsRetry_FailedOrPartial_UnlessRunningNow(SplitAutoKind kind, bool pending, bool expected) =>
+        Assert.Equal(expected, SplitAutoAttachRules.DayNeedsRetry(
+            new Swimm.Application.Abstractions.SplitAttachNote(new System.DateTime(2026, 11, 24), true, kind, 0, 0, ""), pending));
+
+    [Fact]
+    public void DayNeedsRetry_NoNote_False() => Assert.False(SplitAutoAttachRules.DayNeedsRetry(null, false));
+
+    [Theory]
+    [InlineData("/Admin/Competitions?q=1", "/Admin/Competitions?q=1")]
+    [InlineData("/api/admin/x", "/api/admin/x")]
+    [InlineData("//evil.example/x", null)]
+    [InlineData("/\\evil.example", null)]
+    [InlineData("https://evil.example", null)]
+    [InlineData("javascript:alert(1)", null)]
+    [InlineData("/", null)]
+    [InlineData(null, null)]
+    public void AdminLinkOrNull_OnlyRelativeAdminPaths(string? link, string? expected) =>
+        Assert.Equal(expected, CompetitionProblemRules.AdminLinkOrNull(link));
+
     [Fact]
     public void Hint_UsesTitles_FallsBackToId()
     {
