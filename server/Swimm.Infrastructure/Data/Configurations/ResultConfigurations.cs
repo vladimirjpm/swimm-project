@@ -64,6 +64,12 @@ internal sealed class ResultRecordConfiguration : IEntityTypeConfiguration<Resul
             .HasDatabaseName("IX_Results_SuspectReason")
             .HasFilter("\"SuspectReason\" IS NOT NULL");
 
+        // Игрок loglig у строки (Р122): проверка «два игрока на одной карточке» группирует по
+        // соревнованию и пловцу только строки со значением — частичный индекс, index-only scan.
+        entity.HasIndex(r => new { r.CompetitionId, r.SwimmerId, r.LogligPlayerId })
+            .HasDatabaseName("IX_Results_LogligPlayer")
+            .HasFilter("\"LogligPlayerId\" IS NOT NULL");
+
         entity.HasCheckConstraint("CK_Results_Heat_NonNegative", "\"Heat\" >= 0");
         entity.HasCheckConstraint("CK_Results_Lane_NonNegative", "\"Lane\" >= 0");
         entity.HasCheckConstraint("CK_Results_InternationalPoints_NonNegative", "\"InternationalPoints\" >= 0");

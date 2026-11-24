@@ -269,6 +269,7 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, MergedClubStillUsedCheck>();
         services.AddScoped<IDataCheck, SwimmerTwoClubsInCompetitionCheck>();
         services.AddScoped<IDataCheck, SwimmerEnglishNameCheck>();
+        services.AddScoped<IDataCheck, SwimmerTwoLogligPlayersCheck>();
         services.AddScoped<IDataCheck, CompetitionWithoutClubPointRuleCheck>();
         services.AddScoped<IDataCheck, CountryDuplicateCheck>();
         services.AddScoped<IDataCheck, SeriesUnboundMatchCheck>();
@@ -383,6 +384,9 @@ public static class DependencyInjection
 
         // Штамповка loglig-id пловцам по протоколу соревнования (после импорта)
         services.AddScoped<ILogligStampService, LogligStampService>();
+
+        // Игрок loglig у каждой личной строки (Р122) — после импорта и CLI `--stamp-row-players`
+        services.AddScoped<ILogligRowPlayerService, LogligRowPlayerService>();
 
         // Привязка соревнования к его compID-источникам стартового протокола (админка).
         services.AddScoped<ICompetitionSourceAdminService, CompetitionSourceAdminService>();

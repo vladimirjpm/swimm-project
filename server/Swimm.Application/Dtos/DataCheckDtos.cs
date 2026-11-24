@@ -28,6 +28,14 @@ public static class DataCheckFixKinds
     public const string DedupIgnore = "dedup-ignore";
 
     /// <summary>
+    /// Не исправление, а составной ключ находки: «пловец (EntityId) в соревновании (FixEntityId)» —
+    /// находка `swimmers.two-loglig-players` (Р122). Без него находка держалась бы на одном пловце,
+    /// и «Принять как есть» для одного старта (дубль игрока на стороне loglig) навсегда глушило бы
+    /// ту же карточку в других — настоящее слияние там не всплыло бы. Кнопки у вида нет.
+    /// </summary>
+    public const string SwimmerInCompetition = "swimmer-in-competition";
+
+    /// <summary>
     /// Привязать правило клубных очков — находка `competitions.no-club-point-rule`.
     /// Правится селектом прямо в находке: заходить в карточку соревнования ради одного
     /// выбора незачем, а находок бывает десяток за раз.

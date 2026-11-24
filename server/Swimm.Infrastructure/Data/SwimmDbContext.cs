@@ -143,6 +143,7 @@ public class SwimmDbContext : DbContext
     public DbSet<SwimmerClubCandidate> SwimmerClubCandidates => Set<SwimmerClubCandidate>();
     /* Последний ответ карточки loglig про клуб пловца (Р112, Sys_) */
     public DbSet<SwimmerLogligClub> SwimmerLogligClubs => Set<SwimmerLogligClub>();
+    public DbSet<LogligPlayer> LogligPlayers => Set<LogligPlayer>();
 
     /* === Тренировки (приватные, Sys_) === */
     public DbSet<TrainingSession> TrainingSessions => Set<TrainingSession>();

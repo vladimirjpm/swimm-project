@@ -26,6 +26,7 @@ internal static class CliCommands
         (args => args.Contains("--pull-start-list"), StartListCli.PullStartListAsync),
         (args => args.Contains("--stitch-start-list"), StartListCli.StitchStartListAsync),
         (args => args.Contains("--stamp-loglig-ids"), LogligCli.StampLogligIdsAsync),
+        (args => args.Contains("--stamp-row-players"), LogligCli.StampRowPlayersAsync),
         (args => args.Contains("--verify-records"), RecordsCli.VerifyRecordsAsync),
         (args => args.Contains("--seed-records"), RecordsCli.SeedRecordsAsync),
         (args => args.Contains("--seed-dolphin-training"), SeedCli.SeedDolphinTrainingAsync),

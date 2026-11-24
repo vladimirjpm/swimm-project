@@ -1,4 +1,4 @@
-using System.Threading.Channels;
+using System.Collections.Concurrent;
 using Swimm.API.Services;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
@@ -16,7 +16,9 @@ namespace Swimm.API.BackgroundServices;
 /// <item>импорт — задача за задачей: импорт, статус «imported» строке входящих, проба клубного
 ///   зачёта (один запрос);</item>
 /// <item>шаги, которые ходят на loglig по запросу на заплыв/дисциплину, — доклейка промежуточных
-///   и штамповка loglig-id. Своя очередь с ОДНИМ читателем: на loglig всегда идёт один старт за
+///   и штамповка loglig-id, а за ними, отдельной очередью, игрок loglig у каждой строки (Р122):
+///   он самый долгий и идёт, только когда доклейки и штамповки всей пачки закончены и импортов в
+///   очереди нет, — шаг игроков одного старта не задерживает промежуточные следующего. Своя очередь с ОДНИМ читателем: на loglig всегда идёт один старт за
 ///   раз (пачка до 30 — не шквал запросов), а следующий импорт пачки их не ждёт.</item>
 /// </list>
 /// Все пост-шаги — только после импорта, который что-то записал (<see cref="ImportPostStepRules"/>):
@@ -29,10 +31,16 @@ public sealed class ImportBackgroundService : BackgroundService
     private readonly ILogger<ImportBackgroundService> _logger;
 
     /// <summary>Что сделать на loglig после импорта задачи <paramref name="JobId"/>.</summary>
-    internal sealed record LogligStep(Guid JobId, int OrgCompId, bool Splits, bool Stamp);
+    internal sealed record LogligStep(Guid JobId, int OrgCompId, bool Splits, bool Stamp, bool RowPlayers = false);
 
-    private readonly Channel<LogligStep> _logligSteps =
-        Channel.CreateUnbounded<LogligStep>(new UnboundedChannelOptions { SingleReader = true });
+    // Две очереди одного читателя: промежуточные + штамповка — первыми; игроки по строкам —
+    // когда первая пуста и импортов не осталось. Сигнал — на каждую постановку в любую из них.
+    private readonly ConcurrentQueue<LogligStep> _logligSteps = new();
+    private readonly ConcurrentQueue<LogligStep> _rowPlayerSteps = new();
+    private readonly SemaphoreSlim _stepSignal = new(0);
+
+    /// <summary>Как часто ждущие шаги игроков проверяют, кончилась ли пачка импортов.</summary>
+    internal static TimeSpan RowPlayersPoll { get; set; } = TimeSpan.FromSeconds(3);
 
     public ImportBackgroundService(
         IImportJobQueue queue,
@@ -54,6 +62,11 @@ public sealed class ImportBackgroundService : BackgroundService
         {
             await foreach (var (jobId, data, fileName, categoryKeys, eventOptions, discoveredId, orgCompId) in _queue.ConsumeAsync(stoppingToken))
             {
+                // «Импорт занят» — до конца постановки его шагов: шаг игроков прошлого старта не
+                // должен вклиниться между Completed и постановкой промежуточных этого.
+                Volatile.Write(ref _importBusy, 1);
+                try
+                {
                 _queue.SetRunning(jobId);
                 _logger.LogInformation("Import job {JobId} started: {FileName}", jobId, fileName);
 
@@ -90,6 +103,12 @@ public sealed class ImportBackgroundService : BackgroundService
                 {
                     _logger.LogWarning(ex, "Import job {JobId}: пост-шаги сорвались", jobId);
                 }
+                }
+                finally
+                {
+                    Volatile.Write(ref _importBusy, 0);
+                    _stepSignal.Release();
+                }
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -101,7 +120,7 @@ public sealed class ImportBackgroundService : BackgroundService
 
     /// <summary>
     /// Какие шаги loglig пойдут за этим импортом; при доклейке — сразу «в очереди» у задачи.
-    /// null — никаких: импорт ничего не записал, нет compID или оба тумблера выключены.
+    /// null — никаких: импорт ничего не записал, нет compID или все тумблеры выключены.
     /// Сбой чтения настроек импорт не роняет — шагов просто не будет.
     /// </summary>
     private LogligStep? PlanLogligStep(IServiceProvider sp, Guid jobId, ImportResult result, int? orgCompId)
@@ -112,9 +131,10 @@ public sealed class ImportBackgroundService : BackgroundService
             var settings = sp.GetRequiredService<ISettingsService>();
             var splits = settings.GetValue(SplitAutoAttachRules.SettingKey, true);
             var stamp = settings.GetValue("LogligStampOnImport", true);
-            if (!splits && !stamp) return null;
+            var rowPlayers = settings.GetValue(LogligRowPlayerRules.SettingKey, true);
+            if (!splits && !stamp && !rowPlayers) return null;
             if (splits) _queue.SetSplits(jobId, new ImportSplitsStatus { State = "queued" });
-            return new LogligStep(jobId, compId, splits, stamp);
+            return new LogligStep(jobId, compId, splits, stamp, rowPlayers);
         }
         catch (Exception ex)
         {
@@ -170,29 +190,66 @@ public sealed class ImportBackgroundService : BackgroundService
             _logger.LogWarning(ex, "Import job {JobId}: не удалось проверить клубный зачёт compID {OrgCompId}", jobId, compId);
         }
 
-        if (logligStep is not null && !_logligSteps.Writer.TryWrite(logligStep))
-            _queue.SetSplits(jobId, null);
+        if (logligStep is not null)
+        {
+            _logligSteps.Enqueue(logligStep);
+            _stepSignal.Release();
+        }
     }
 
     private async Task RunLogligStepsAsync(CancellationToken stoppingToken)
     {
         try
         {
-            await foreach (var step in _logligSteps.Reader.ReadAllAsync(stoppingToken))
+            while (true)
             {
-                try
+                stoppingToken.ThrowIfCancellationRequested();
+
+                if (_logligSteps.TryDequeue(out var step))
                 {
-                    await RunLogligStepAsync(step, stoppingToken);
+                    await GuardedAsync(step, () => RunLogligStepAsync(step, stoppingToken), stoppingToken);
+                    // Игроки этого старта — в свою очередь: дойдут, когда пачка закончится.
+                    if (step.RowPlayers) _rowPlayerSteps.Enqueue(step);
+                    continue;
                 }
-                catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+
+                if (!_rowPlayerSteps.IsEmpty && !ImportsPending() && _rowPlayerSteps.TryDequeue(out var rowStep))
                 {
-                    _logger.LogWarning(ex, "Import job {JobId}: шаги loglig сорвались", step.JobId);
+                    await GuardedAsync(rowStep, async () =>
+                    {
+                        await using var scope = _scopeFactory.CreateAsyncScope();
+                        await StampRowPlayersAsync(scope.ServiceProvider, rowStep, stoppingToken);
+                    }, stoppingToken);
+                    continue;
                 }
+
+                // Игроки ждут конца пачки — заглядываем периодически; иначе спим до постановки.
+                await _stepSignal.WaitAsync(
+                    _rowPlayerSteps.IsEmpty ? Timeout.InfiniteTimeSpan : RowPlayersPoll, stoppingToken);
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Штатная остановка хоста.
+        }
+    }
+
+    /// <summary>Идёт или ждёт хоть один импорт — пачка не кончилась, шагам игроков рано.</summary>
+    private bool ImportsPending() =>
+        Volatile.Read(ref _importBusy) == 1
+        || _queue.Snapshot().Any(s => s.State is ImportJobState.Queued or ImportJobState.Running);
+
+    private int _importBusy;
+
+    private async Task GuardedAsync(LogligStep step, Func<Task> run, CancellationToken stoppingToken)
+    {
+        try
+        {
+            await run();
+        }
+        catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Import job {JobId}: шаги loglig сорвались", step.JobId);
         }
     }
 
@@ -215,6 +272,42 @@ public sealed class ImportBackgroundService : BackgroundService
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             await StampLogligAsync(scope.ServiceProvider, step, stoppingToken);
+        }
+    }
+
+    // Игрок loglig у каждой личной строки (Р122, И-69): id со страницы дисциплины — по заплыву,
+    // дорожке и времени. Сам ничего не чинит: по этим id проверка Health находит карточку, в
+    // которой слиты два человека. Последним из шагов loglig — он самый долгий (все страницы
+    // дисциплин) и ничьего итога на странице не держит. Сбой — строка аудита и лог; данные
+    // доберёт следующий импорт или CLI `--stamp-row-players`.
+    //
+    // Тумблер перечитывается ЗДЕСЬ, а не только при постановке: шаг может простоять в очереди
+    // всю пачку, и выключатель обязан останавливать уже поставленные шаги.
+    private async Task StampRowPlayersAsync(IServiceProvider sp, LogligStep step, CancellationToken stoppingToken)
+    {
+        if (!sp.GetRequiredService<ISettingsService>().GetValue(LogligRowPlayerRules.SettingKey, true))
+        {
+            _logger.LogInformation("Import job {JobId}: игроки loglig по строкам compID {OrgCompId} — пропущено, шаг выключен в настройках",
+                step.JobId, step.OrgCompId);
+            return;
+        }
+
+        if (sp.GetService<ICurrentActor>() is HttpCurrentActor actor)
+            actor.BackgroundName = LogligRowPlayerRules.ActorName;
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        cts.CancelAfter(LogligRowPlayerRules.Timeout);
+        try
+        {
+            var report = await sp.GetRequiredService<ILogligRowPlayerService>()
+                .StampAsync(step.OrgCompId, "import", cts.Token, LogligRowPlayerRules.ReadBudget);
+            _logger.LogInformation("Import job {JobId}: игроки loglig по строкам compID {OrgCompId} — {Message}",
+                step.JobId, step.OrgCompId, report.Message);
+        }
+        catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Import job {JobId}: не удалось записать игроков loglig по строкам compID {OrgCompId}",
+                step.JobId, step.OrgCompId);
         }
     }
 

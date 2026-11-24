@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+<title>תוצאות - 100 חופשי גברים 12-99</title>
+<meta property="og:site_name" content="LogLig" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="תוצאות - 100 חופשי גברים 12-99" />
+<meta property="og:url" content="https://loglig.com:2053/LeagueTable/AthleticsDisciplineResults/41431?showCategories=True" />
+<meta property="og:image" content="https://loglig.com/Assets/Union/logo_10032020094946824.jpg" />
+    <meta name="description" content="גביע ארזי הלבנון | איגוד השחייה בישראל | 06/10/2023" />
+    <meta property="og:description" content="גביע ארזי הלבנון | איגוד השחייה בישראל | 06/10/2023" />
+<meta name="twitter:card" content="summary" />
+
+    <link href="/style/css?v=NcPC4kktwv43cYo6ETrb9sqhv-zBDYIz55Mp4WFnub81" rel="stylesheet"/>
+
+<link href="/Content/css/bootstrap-rtl.css" rel="stylesheet"/>
+    <script src="/Resources/Messages.js"></script>
+
+    <link href="/style/site?v=wTwbaWormSGo9UHM4vjVXdeWgaa7Vz5TOWJt3sVvEaU1" rel="stylesheet"/>
+
+    
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css" integrity="sha384-mzrmE5qonljUremFsqc01SB46JvROS7bZs3IO2EmfFsd15uHvIt+Y8vEf7N7fWAU" crossorigin="anonymous">
+
+    <script src="/Scripts/sweetalert.min.js"></script>
+    
+    <meta name="loglig-usage-page" content="p74ojjjsukcw" data-endpoint="/UsageBeacon/Collect" />
+    <script>/* LogLig usage tracking, Tier 2: browser load timings, JS errors, screen size, the page's interactive elements and their client-only uses,
+   linked to its usage row by the page key. ES5 only. Never throws, never blocks the page: one beacon after load, more when the page is hidden.
+   No page text, labels or typed input ever leaves the browser: element names come only from ids, data-usage, onclick function names and
+   allow-listed class tokens, under the same rules as UsageClientNames.Normalize on the server. */
+(function () {
+    'use strict';
+    try {
+        if (window.__logligUsageBeacon) {
+            return;
+        }
+        var meta = document.querySelector && document.querySelector('meta[name="loglig-usage-page"]');
+        var key = meta && meta.getAttribute('content');
+        if (!key || !/^p[0-9a-z]{11}$/.test(key) || !window.JSON) {
+            return;
+        }
+        window.__logligUsageBeacon = true;
+
+        var ENDPOINT = meta.getAttribute('data-endpoint') || '/UsageBeacon/Collect';
+        var MAX_ERRORS = 20;
+        var MAX_BODY = 30000;
+        var MAX_NAME = 80;
+        var MAX_INVENTORY = 400;
+        var MAX_ACTIONS = 100;
+        var MAX_COUNT = 1000;
+        var INPUT_WINDOW_MS = 1000;
+        var TABLE_REPEAT_MS = 2000;
+
+        var NAME_OK = /^[A-Za-z0-9_\-:>.#]+$/;
+        var PURE_NUMBER = /^[0-9]+$/;
+        var GUID_LIKE = /^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}/;
+        var ONCLICK_FUNCTION = /^\s*(?:javascript:)?\s*(?:return\s+)?([A-Za-z_][\w]*(?:\.[\w]+)*)\s*\(/;
+        var CLASS_TOKEN = /-icon$|^icon-|^fa-[a-z]|^glyphicon-[a-z]|^(close|x-editable|btn-danger|btn-primary|btn-success|btn-default|btn-warning|btn-info)$/;
+        var NOT_A_FUNCTION = /^(if|return|void|confirm|alert|this|event|function|new|typeof|jQuery.*|\$.*)$/;
+        var OPENER_TOGGLE = /^(tab|pill|modal|collapse|dropdown)$/;
+        var ICON_TOKEN = /-icon$|^icon-|^fa-[a-z]|^glyphicon-[a-z]/;
+        var MAX_ICON_SEARCH = 50;
+        var BUTTONS ='button, input[type=button], input[type=submit], .btn, [onclick]';
+        var EXCLUDED = '.multiselect-container, .multiselect, .chosen-container, .select2-container, .swal-overlay, .sweet-alert, .swal2-container';
+
+        var queue = [];
+        var seen = {};
+        var total = 0;
+        var timingSent = false;
+        var inventory = {};
+        var inventoryCount = 0;
+        var inventorySent = 0;
+        var actions = {};
+        var actionCount = 0;
+        var tableCounted = {};
+        var lastInput = null;
+        var jQueryHooked = false;
+        var userActed = false;
+
+        var now = function () {
+            return new Date().getTime();
+        };
+
+        var clean = function (url) {
+            return String(url || '').split('?')[0].split('#')[0].slice(0, 300);
+        };
+
+        // "TypeError: x is undefined" rather than only "x is undefined".
+        var describe = function (error, fallback) {
+            if (error && error.message) {
+                var name = error.name ? String(error.name) : '';
+                var message = String(error.message);
+                return name && message.indexOf(name) !== 0 ? name + ': ' + message : message;
+            }
+            return fallback;
+        };
+
+        var add = function (message, source, line, col, rejection) {
+            message = String(message || '').slice(0, 300);
+            if (!message) {
+                return;
+            }
+            source = clean(source);
+            var id = message + '|' + source + '|' + line;
+            if (seen.hasOwnProperty(id) && !seen[id].sent) {
+                seen[id].n++;
+                return;
+            }
+            // New, or already sent: a sent entry's later repeats go out as a new entry.
+            if (total >= MAX_ERRORS) {
+                return;
+            }
+            var entry = { m: message, s: source, l: +line || 0, c: +col || 0, r: rejection ? 1 : 0, n: 1 };
+            seen[id] = entry;
+            queue.push(entry);
+            total++;
+        };
+
+        var normalize = function (raw) {
+            if (typeof raw !== 'string' || !raw || !NAME_OK.test(raw) || PURE_NUMBER.test(raw) || GUID_LIKE.test(raw)) {
+                return null;
+            }
+            var name = raw.replace(/[0-9]+/g, '#');
+            return name.length <= MAX_NAME ? name : name.slice(0, MAX_NAME);
+        };
+
+        var attr = function (el, name) {
+            var value = el && el.getAttribute ? el.getAttribute(name) : null;
+            return value === null || value === undefined ? '' : String(value);
+        };
+
+        var asElement = function (node) {
+            return node && node.nodeType !== 1 ? node.parentNode : node;
+        };
+
+        var matches = function (el, selector) {
+            var fn = el.matches || el.msMatchesSelector || el.webkitMatchesSelector || el.mozMatchesSelector;
+            return !!fn && fn.call(el, selector);
+        };
+
+        var closest = function (el, selector) {
+            while (el && el.nodeType === 1) {
+                if (matches(el, selector)) {
+                    return el;
+                }
+                el = el.parentNode;
+            }
+            return null;
+        };
+
+        var excluded = function (el) {
+            return closest(el, EXCLUDED) !== null;
+        };
+
+        var isRealLink = function (el) {
+            if (String(el.tagName).toUpperCase() !== 'A') {
+                return false;
+            }
+            var href = attr(el, 'href').replace(/^\s+|\s+$/g, '');
+            return href !== '' && href.charAt(0) !== '#' && !/^javascript:/i.test(href);
+        };
+
+        // Openers are reported by the shown.bs.* event of what they open; tooltip/popover/button toggles stay buttons.
+        var isButtonLike = function (el) {
+            return !OPENER_TOGGLE.test(attr(el, 'data-toggle')) && !OPENER_TOGGLE.test(attr(el, 'data-bs-toggle')) && !isRealLink(el);
+        };
+
+        var classToken = function (el, allowed) {
+            var classes = attr(el, 'class').split(/\s+/);
+            for (var i = 0; i < classes.length; i++) {
+                if (classes[i] && allowed.test(classes[i]) && NAME_OK.test(classes[i])) {
+                    return classes[i];
+                }
+            }
+            return '';
+        };
+
+        var positionName = function (el) {
+            var ancestor = 'page';
+            for (var p = el.parentNode; p && p.nodeType === 1; p = p.parentNode) {
+                var id = attr(p, 'id');
+                if (id && normalize(id) !== null) {
+                    ancestor = id;
+                    break;
+                }
+            }
+            var token = classToken(el, CLASS_TOKEN);
+            if (!token && el.getElementsByTagName) {
+                var inner = el.getElementsByTagName('*');
+                for (var i = 0; !token && i < MAX_ICON_SEARCH && i < inner.length; i++) {
+                    token = classToken(inner[i], ICON_TOKEN);
+                }
+            }
+            return ancestor + '>' + (token || String(el.tagName || '').toLowerCase());
+        };
+
+        var elementName = function (el, button) {
+            var raw = attr(el, 'data-usage') || attr(el, 'id');
+            if (!raw && button) {
+                var match = ONCLICK_FUNCTION.exec(attr(el, 'onclick'));
+                if (match && !NOT_A_FUNCTION.test(match[1].split('.')[0])) {
+                    raw = match[1];
+                }
+            }
+            return normalize(raw || positionName(el));
+        };
+
+        var tabName = function (el) {
+            var target = attr(el, 'data-target') || attr(el, 'href');
+            var hash = target.indexOf('#');
+            return hash < 0 ? null : normalize(target.slice(hash + 1));
+        };
+
+        var remember = function (kind, name) {
+            if (name === null) {
+                return;
+            }
+            var id = kind + '\t' + name;
+            if (!inventory.hasOwnProperty(id)) {
+                inventory[id] = [kind, name];
+                inventoryCount++;
+            }
+        };
+
+        var each = function (selector, fn) {
+            var list = document.querySelectorAll(selector);
+            for (var i = 0; i < list.length; i++) {
+                try {
+                    fn(list[i]);
+                } catch (e) {
+                    // skip this element
+                }
+            }
+        };
+
+        var scan = function () {
+            if (!document.querySelectorAll) {
+                return;
+            }
+            var anyExcluded = document.querySelector(EXCLUDED) !== null;
+            var kept = function (el) {
+                return !anyExcluded || !excluded(el);
+            };
+            each('[data-toggle=tab],[data-toggle=pill]', function (el) {
+                if (kept(el)) {
+                    remember('tab', tabName(el));
+                }
+            });
+            each('.modal[id]', function (el) {
+                if (kept(el)) {
+                    remember('dialog', normalize(attr(el, 'id')));
+                }
+            });
+            each('.collapse[id]', function (el) {
+                if (kept(el)) {
+                    remember('collapse', normalize(attr(el, 'id')));
+                }
+            });
+            each('[data-toggle=dropdown]', function (el) {
+                if (kept(el)) {
+                    remember('dropdown', elementName(el, false));
+                }
+            });
+            var jq = window.jQuery;
+            var dataTable = jq && jq.fn && jq.fn.dataTable;
+            if (dataTable && dataTable.isDataTable) {
+                each('table', function (el) {
+                    if (kept(el) && dataTable.isDataTable(el)) {
+                        remember('table', normalize(attr(el, 'id')));
+                    }
+                });
+            }
+            each(BUTTONS, function (el) {
+                if (isButtonLike(el) && kept(el)) {
+                    remember('button', elementName(el, true));
+                }
+            });
+        };
+
+        var byKindThenName = function (a, b) {
+            if (a[0] !== b[0]) {
+                return a[0] < b[0] ? -1 : 1;
+            }
+            return a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0;
+        };
+
+        var inventoryList = function () {
+            var list = [];
+            for (var id in inventory) {
+                if (inventory.hasOwnProperty(id)) {
+                    list.push(inventory[id]);
+                }
+            }
+            list.sort(byKindThenName);
+            return list.length > MAX_INVENTORY ? list.slice(0, MAX_INVENTORY) : list;
+        };
+
+        var count = function (kind, name) {
+            if (name === null) {
+                return;
+            }
+            var id = kind + '\t' + name;
+            if (actions.hasOwnProperty(id)) {
+                if (actions[id][2] < MAX_COUNT) {
+                    actions[id][2]++;
+                }
+                return;
+            }
+            if (actionCount < MAX_ACTIONS) {
+                actions[id] = [kind, name, 1];
+                actionCount++;
+            }
+        };
+
+        var takeActions = function () {
+            var list = [];
+            for (var id in actions) {
+                if (actions.hasOwnProperty(id)) {
+                    list.push(actions[id]);
+                }
+            }
+            actions = {};
+            actionCount = 0;
+            return list;
+        };
+
+        var screenSize = function () {
+            var touch = false;
+            try {
+                touch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+            } catch (e) {
+                // no media queries
+            }
+            if (!touch && navigator.maxTouchPoints > 0) {
+                touch = true;
+            }
+            return { w: Math.round(window.innerWidth || 0), h: Math.round(window.innerHeight || 0), m: touch ? 1 : 0 };
+        };
+
+        // Search strings are compared here only, never sent.
+        var tableState = function (kind, settings) {
+            var parts = [];
+            var i;
+            if (kind === 'table.sort') {
+                var order = settings.aaSorting || [];
+                for (i = 0; i < order.length; i++) {
+                    parts.push(order[i] ? order[i][0] + ':' + order[i][1] : '');
+                }
+                return parts.join(',');
+            }
+            if (kind === 'table.search') {
+                var columns = settings.aoPreSearchCols || [];
+                parts.push(settings.oPreviousSearch ? settings.oPreviousSearch.sSearch : '');
+                for (i = 0; i < columns.length; i++) {
+                    parts.push(columns[i] ? columns[i].sSearch : '');
+                }
+                return parts.join('\u0001');
+            }
+            return String(settings._iDisplayStart);
+        };
+
+        var tableWrapper = function (settings) {
+            return settings.nTableWrapper || closest(settings.nTable, '.dataTables_wrapper');
+        };
+
+        // Snapshot the tables around a user's input before DataTables reacts, so a sort that also re-fires "search" counts only as a sort.
+        var noteInput = function (ev) {
+            if (ev.isTrusted === false) {
+                return;
+            }
+            if (ev.type === 'click' || ev.type === 'keydown') {
+                userActed = true;
+            }
+            var target = asElement(ev.target);
+            if (!target || target.nodeType !== 1 || !closest(target, '.dataTables_wrapper')) {
+                lastInput = null;
+                return;
+            }
+            var jq = window.jQuery;
+            var all = jq && jq.fn && jq.fn.dataTable && jq.fn.dataTable.settings;
+            var tables = [];
+            for (var i = 0; all && i < all.length; i++) {
+                var wrapper = tableWrapper(all[i]);
+                if (wrapper && wrapper.contains(target)) {
+                    tables.push({
+                        settings: all[i],
+                        state: {
+                            'table.sort': tableState('table.sort', all[i]),
+                            'table.search': tableState('table.search', all[i]),
+                            'table.page': tableState('table.page', all[i])
+                        }
+                    });
+                }
+            }
+            lastInput = { target: target, at: now(), tables: tables };
+        };
+
+        var onTable = function (kind, ev, settings) {
+            var table = settings && settings.nTable ? settings.nTable : ev.target;
+            if (!lastInput || !table || table.nodeType !== 1 || now() - lastInput.at > INPUT_WINDOW_MS) {
+                return;
+            }
+            var wrapper = settings ? tableWrapper(settings) : closest(table, '.dataTables_wrapper');
+            if (!wrapper || !wrapper.contains(lastInput.target) || excluded(table)) {
+                return;
+            }
+            for (var i = 0; i < lastInput.tables.length; i++) {
+                var snapshot = lastInput.tables[i];
+                if (snapshot.settings === settings) {
+                    var state = tableState(kind, settings);
+                    if (state === snapshot.state[kind]) {
+                        return;
+                    }
+                    snapshot.state[kind] = state;
+                }
+            }
+            var name = normalize(attr(table, 'id'));
+            var id = kind + '\t' + name;
+            if (name === null || (tableCounted.hasOwnProperty(id) && now() - tableCounted[id] < TABLE_REPEAT_MS)) {
+                return;
+            }
+            tableCounted[id] = now();
+            count(kind, name);
+        };
+
+        var onButtonClick = function (ev) {
+            if (ev.isTrusted === false) {
+                return;
+            }
+            var el = closest(asElement(ev.target), BUTTONS);
+            if (el && isButtonLike(el) && !excluded(el)) {
+                count('button', elementName(el, true));
+            }
+        };
+
+        var guarded = function (fn) {
+            return function () {
+                try {
+                    fn.apply(this, arguments);
+                } catch (e) {
+                    // ignore
+                }
+            };
+        };
+
+        var hookJQuery = function () {
+            var jq = window.jQuery;
+            if (jQueryHooked || !jq || !jq.fn || !jq.fn.on) {
+                return;
+            }
+            jQueryHooked = true;
+            var doc = jq(document);
+            // Tabs and dialogs that code opens on load are not uses; after the user's first input they are (click -> ajax -> .modal('show')).
+            doc.on('shown.bs.tab', guarded(function (ev) {
+                if (userActed && ev.target && !excluded(ev.target)) {
+                    count('tab', tabName(ev.target));
+                }
+            }));
+            doc.on('shown.bs.modal', guarded(function (ev) {
+                if (userActed && ev.target && !excluded(ev.target)) {
+                    count('dialog', normalize(attr(ev.target, 'id')));
+                }
+            }));
+            doc.on('shown.bs.collapse', guarded(function (ev) {
+                if (userActed && ev.target && !excluded(ev.target)) {
+                    count('collapse', normalize(attr(ev.target, 'id')));
+                }
+            }));
+            // Fired on the dropdown's parent; Bootstrap 3.4 puts the toggle on the event, 3.3 passes it as an argument.
+            doc.on('shown.bs.dropdown', guarded(function (ev, data) {
+                if (!userActed) {
+                    return;
+                }
+                var toggle = ev.relatedTarget || (data && data.relatedTarget);
+                if (!toggle && ev.target && ev.target.querySelector) {
+                    toggle = ev.target.querySelector('[data-toggle=dropdown]');
+                }
+                if (toggle && toggle.nodeType === 1 && !excluded(toggle)) {
+                    count('dropdown', elementName(toggle, false));
+                }
+            }));
+            doc.on('order.dt', guarded(function (ev, settings) {
+                onTable('table.sort', ev, settings);
+            }));
+            doc.on('search.dt', guarded(function (ev, settings) {
+                onTable('table.search', ev, settings);
+            }));
+            doc.on('page.dt', guarded(function (ev, settings) {
+                onTable('table.page', ev, settings);
+            }));
+        };
+
+        var send = function (payload) {
+            var body = JSON.stringify(payload);
+            while (body.length > MAX_BODY && payload.e && payload.e.length) {
+                payload.e.pop();
+                body = JSON.stringify(payload);
+            }
+            if (payload.e && !payload.e.length) {
+                delete payload.e;
+                body = JSON.stringify(payload);
+            }
+            if (body.length > MAX_BODY && payload.i) {
+                var over = body.length - MAX_BODY;
+                while (over > 0 && payload.i.length) {
+                    over -= JSON.stringify(payload.i.pop()).length + 1;
+                }
+                if (!payload.i.length) {
+                    delete payload.i;
+                }
+                body = JSON.stringify(payload);
+                while (body.length > MAX_BODY && payload.i && payload.i.length) {
+                    payload.i.pop();
+                    body = JSON.stringify(payload);
+                }
+            }
+            try {
+                if (navigator.sendBeacon && window.Blob && navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'text/plain' }))) {
+                    return;
+                }
+            } catch (e) {
+                // fall through to XHR
+            }
+            try {
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', ENDPOINT, true);
+                xhr.setRequestHeader('Content-Type', 'text/plain');
+                xhr.send(body);
+            } catch (e2) {
+                // best effort
+            }
+        };
+
+        var timing = function () {
+            var perf = window.performance;
+            var t = null;
+            if (!perf) {
+                return null;
+            }
+            // Measured from this page's own fetch, so a form POST and its redirect before it don't count.
+            if (perf.getEntriesByType) {
+                var nav = perf.getEntriesByType('navigation');
+                if (nav && nav.length) {
+                    var n = nav[0];
+                    var from = n.fetchStart || 0;
+                    t = { ttfb: n.responseStart - from, dom: n.domContentLoadedEventEnd - from, load: n.loadEventEnd - from };
+                }
+            }
+            if (!t && perf.timing && perf.timing.fetchStart) {
+                var o = perf.timing;
+                var start = o.fetchStart;
+                t = { ttfb: o.responseStart - start, dom: o.domContentLoadedEventEnd - start, load: o.loadEventEnd - start };
+            }
+            if (!t || !(t.load > 0)) {
+                return null;
+            }
+            return { ttfb: Math.round(t.ttfb), dom: Math.round(t.dom), load: Math.round(t.load) };
+        };
+
+        var flush = function () {
+            try {
+                var payload = { k: key };
+                if (!timingSent) {
+                    var t = timing();
+                    if (t) {
+                        payload.t = t;
+                        payload.s = screenSize();
+                        timingSent = true;
+                    }
+                }
+                if (queue.length) {
+                    payload.e = queue;
+                    queue = [];
+                }
+                try {
+                    scan();
+                } catch (e) {
+                    // send what was found
+                }
+                if (inventoryCount > inventorySent) {
+                    payload.i = inventoryList();
+                    inventorySent = inventoryCount;
+                }
+                var used = takeActions();
+                if (used.length) {
+                    payload.a = used;
+                }
+                if (payload.t || payload.e || payload.i || payload.a) {
+                    send(payload);
+                }
+                if (payload.e) {
+                    for (var i = 0; i < payload.e.length; i++) {
+                        payload.e[i].sent = true;
+                    }
+                }
+            } catch (e) {
+                // best effort
+            }
+        };
+
+        if (!window.addEventListener) {
+            return;
+        }
+
+        window.addEventListener('error', function (ev) {
+            try {
+                if (ev && ev.message) {
+                    add(describe(ev.error, ev.message), ev.filename, ev.lineno, ev.colno, false);
+                }
+            } catch (e) {
+                // ignore
+            }
+        });
+
+        window.addEventListener('unhandledrejection', function (ev) {
+            try {
+                var reason = ev && ev.reason;
+                add(describe(reason, String(reason)), reason && reason.fileName, 0, 0, true);
+            } catch (e) {
+                // ignore
+            }
+        });
+
+        document.addEventListener('click', guarded(function (ev) {
+            noteInput(ev);
+            onButtonClick(ev);
+        }), true);
+        var inputEvents = ['keydown', 'input', 'keyup', 'change'];
+        for (var inputIndex = 0; inputIndex < inputEvents.length; inputIndex++) {
+            document.addEventListener(inputEvents[inputIndex], guarded(noteInput), true);
+        }
+
+        var onReady = guarded(hookJQuery);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', onReady);
+        } else {
+            onReady();
+        }
+
+        var onLoad = function () {
+            onReady();
+            setTimeout(flush, 0);
+        };
+        if (document.readyState === 'complete') {
+            onLoad();
+        } else {
+            window.addEventListener('load', onLoad);
+        }
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') {
+                flush();
+            }
+        });
+        window.addEventListener('pagehide', flush);
+    } catch (e) {
+        // The beacon must never break a page.
+    }
+})();
+</script>
+
+</head>
+<body>
+    <div id="navbar" class="navbar-collapse">
+        <div class="flags">
+            <select id="front-language-select" class="form-control" style="max-width: 180px;">
+                <option value="he" selected>&#1506;&#1489;&#1512;&#1497;&#1514;</option>
+                <option value="en" >English</option>
+                <option value="uk" >&#1059;&#1082;&#1088;&#1072;&#1111;&#1085;&#1089;&#1100;&#1082;&#1080;&#1081;</option>
+                <option value="fr" >Fran&#231;ais</option>
+                <option value="es" >Espa&#241;ol</option>
+                <option value="ar" >&#1575;&#1604;&#1593;&#1585;&#1576;&#1610;&#1577;</option>
+            </select>
+        </div>
+    </div>
+    <div class="container body-content" style="max-width:1150px">
+        <div class="row">
+            <div class="col-sm-12" id="render-body">
+                
+
+<div class="modal-dialog modal-lg modal-result-custom-width">
+<div class="modal-content" style="padding: 18px;">
+    <div class="swimming-export-actions" style="display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=9453" method="post">            <button id="excelBtnExp" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                PDF
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="41431" /></form>
+<form action="/LeagueTable/ExportSwimmingDisciplineResults?leagueId=9453&amp;IsSplitResults=True" method="post">            <button id="excelBtnExpSplit" type="submit" class="allow-readonly btn btn-primary" style="margin-left:15px;">
+                <i class="glyphicon glyphicon-open"></i>
+                זמני ביניים
+                <i class="fa fa-spin fa-spinner exportLSloading"
+                   style="visibility: hidden;">
+                </i>
+            </button>
+<input data-val="true" data-val-number="The field DisciplineCompetitionId must be a number." data-val-required="השדה DisciplineCompetitionId נדרש." id="DisciplineCompetitionId" name="DisciplineCompetitionId" type="hidden" value="41431" /></form>    </div>
+<div class="print_id" id="print_id" data-print-title="">
+
+<style>
+    td, th {
+        text-align: center;
+    }
+    .modal-result-custom-width {
+        width: 100%;
+    }
+    .format6cell {
+        border: 1px solid #dddddd !important;
+        height: 35px;
+        min-width: 30px;
+        max-width: 30px;
+    }
+    .format6th {
+        min-width: 90px;
+        max-width: 90px;
+    }
+    @media screen and ( min-width: 1500px) {
+    .modal-result-custom-width {
+        max-width: 1500px;
+        width: 100%;
+    }
+    @page {size: auto; margin: 5mm;}
+    }
+    }
+
+            </style>
+<div class="main-title disciplines-title">
+    <table class="borderless disciplines-title" style="width: 100%;">
+        <tr>
+            <td style="vertical-align: middle; text-align: left;" colspan="3" rowspan="3">
+<img src="https://loglig.com/thumb/union/512/logo_10032020094946824.jpg" data-full-src="https://loglig.com/assets/union/logo_10032020094946824.jpg" class="img-circle keep-for-print" alt="" onerror="this.onerror=null;this.src=&#39;/content/img/fan-default.jpg&#39;" style="max-height:7rem;max-width:11rem;" />            </td>
+            <td style="text-align: right;" colspan="4">
+                <h3 style="margin-top: 0px; margin-bottom: 0px;">
+                    איגוד השחייה בישראל
+                </h3>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">
+                        גביע ארזי הלבנון - 06/10/2023
+                </h4>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="3" style="text-align:right;">
+                <h4 style="margin-top: 0px; margin-bottom: 0px;">100 חופשי -  גברים 12-99 - תוצאות</h4>
+            </td>
+        </tr>
+    </table>
+</div>
+<div class="table-responsive">
+    <table class="table res-table">
+        <thead>
+        <tr class="disciplines-title">
+            <th>מיקום</th>
+            <th>שם מלא</th>
+                            <th>שנת לידה</th>
+            <th>
+                אגודה
+            </th>
+                <th>מקצה</th>
+                    <th>מסלול</th>
+            <th style="text-align: center;">תוצאות</th>
+                            <th>ניקוד</th>
+
+                                </tr>
+        </thead>
+        <tbody>
+
+                <tr>
+                    <td>גמר ישיר</td>
+                </tr>
+                <tr>
+                        <td>1</td>
+                                        <td>
+                                <a href="/Players/Details/113277?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    לירון קלוגר
+                                </a>
+                    </td>
+                                            <td>
+2003                        </td>
+                    <td>
+מכבי קרית ביאליק                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+00:55.65                    </td>
+                                            <td style="direction: ltr;">
+                            523
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>2</td>
+                                        <td>
+                                <a href="/Players/Details/111977?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אורי לורבר
+                                </a>
+                    </td>
+                                            <td>
+2007                        </td>
+                    <td>
+הפועל עמק יזרעאל                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+00:58.12                    </td>
+                                            <td style="direction: ltr;">
+                            459
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>3</td>
+                                        <td>
+                                <a href="/Players/Details/237452?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אדם עלי
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+הפועל מ.א משגב                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+01:02.30                    </td>
+                                            <td style="direction: ltr;">
+                            372
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>4</td>
+                                        <td>
+                                <a href="/Players/Details/111500?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    שגיא סברדלוב
+                                </a>
+                    </td>
+                                            <td>
+2010                        </td>
+                    <td>
+הפועל מ.א משגב                    </td>
+                        <td>
+                            4
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+01:02.33                    </td>
+                                            <td style="direction: ltr;">
+                            372
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>5</td>
+                                        <td>
+                                <a href="/Players/Details/111950?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    נועם אופק
+                                </a>
+                    </td>
+                                            <td>
+2008                        </td>
+                    <td>
+הפועל עמק יזרעאל                    </td>
+                        <td>
+                            4
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+01:04.15                    </td>
+                                            <td style="direction: ltr;">
+                            341
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>6</td>
+                                        <td>
+                                <a href="/Players/Details/111496?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    בן לנדאו
+                                </a>
+                    </td>
+                                            <td>
+2010                        </td>
+                    <td>
+הפועל מ.א משגב                    </td>
+                        <td>
+                            4
+                        </td>
+                        <td>
+                            8
+                        </td>
+                    <td style="direction: ltr;">
+01:04.93                    </td>
+                                            <td style="direction: ltr;">
+                            329
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>7</td>
+                                        <td>
+                                <a href="/Players/Details/180501?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    חאלד  נאסר בשיר 
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            4
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+01:05.31                    </td>
+                                            <td style="direction: ltr;">
+                            323
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>8</td>
+                                        <td>
+                                <a href="/Players/Details/111476?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אבשלום גיל
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל מ.א משגב                    </td>
+                        <td>
+                            4
+                        </td>
+                        <td>
+                            1
+                        </td>
+                    <td style="direction: ltr;">
+01:07.41                    </td>
+                                            <td style="direction: ltr;">
+                            294
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>9</td>
+                                        <td>
+                                <a href="/Players/Details/160668?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    ויסאם מוחמד חאג
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל מ.א משגב                    </td>
+                        <td>
+                            4
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+01:08.40                    </td>
+                                            <td style="direction: ltr;">
+                            281
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>10</td>
+                                        <td>
+                                <a href="/Players/Details/176297?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    עומר באסם בשיר
+                                </a>
+                    </td>
+                                            <td>
+2012                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            4
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+01:09.76                    </td>
+                                            <td style="direction: ltr;">
+                            265
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>11</td>
+                                        <td>
+                                <a href="/Players/Details/109628?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    יונתן אלקלעי
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל עמק יזרעאל                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+01:11.37                    </td>
+                                            <td style="direction: ltr;">
+                            247
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>12</td>
+                                        <td>
+                                <a href="/Players/Details/161426?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    עותמאן סעיד דראושה
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+01:11.46                    </td>
+                                            <td style="direction: ltr;">
+                            247
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>13</td>
+                                        <td>
+                                <a href="/Players/Details/111994?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    ירדן צור יוסף
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל עמק יזרעאל                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+01:11.62                    </td>
+                                            <td style="direction: ltr;">
+                            245
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>14</td>
+                                        <td>
+                                <a href="/Players/Details/111505?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    נועם עוז
+                                </a>
+                    </td>
+                                            <td>
+2009                        </td>
+                    <td>
+הפועל מ.א משגב                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+01:12.30                    </td>
+                                            <td style="direction: ltr;">
+                            238
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>15</td>
+                                        <td>
+                                <a href="/Players/Details/230059?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    חאלד ערפאת דבאח 
+                                </a>
+                    </td>
+                                            <td>
+2008                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+01:13.02                    </td>
+                                            <td style="direction: ltr;">
+                            231
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>16</td>
+                                        <td>
+                                <a href="/Players/Details/179143?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    מוסטפא וליד יאסין 
+                                </a>
+                    </td>
+                                            <td>
+2008                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+01:13.15                    </td>
+                                            <td style="direction: ltr;">
+                            230
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>17</td>
+                                        <td>
+                                <a href="/Players/Details/182945?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    מוסטפא אחמד עאלם
+                                </a>
+                    </td>
+                                            <td>
+2008                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+01:13.50                    </td>
+                                            <td style="direction: ltr;">
+                            227
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>18</td>
+                                        <td>
+                                <a href="/Players/Details/240950?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    מוחמד  היתם  בדארנה 
+                                </a>
+                    </td>
+                                            <td>
+2008                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            1
+                        </td>
+                    <td style="direction: ltr;">
+01:14.65                    </td>
+                                            <td style="direction: ltr;">
+                            216
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>19</td>
+                                        <td>
+                                <a href="/Players/Details/240949?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    מחמוד היתם  בדארנה 
+                                </a>
+                    </td>
+                                            <td>
+2008                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            8
+                        </td>
+                    <td style="direction: ltr;">
+01:15.56                    </td>
+                                            <td style="direction: ltr;">
+                            208
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>20</td>
+                                        <td>
+                                <a href="/Players/Details/236135?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אגם מיכאלוביץ
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+הפועל בית איל                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            8
+                        </td>
+                    <td style="direction: ltr;">
+01:17.45                    </td>
+                                            <td style="direction: ltr;">
+                            194
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>21</td>
+                                        <td>
+                                <a href="/Players/Details/180402?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    פרג אקרם זבידאת
+                                </a>
+                    </td>
+                                            <td>
+2010                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+01:21.28                    </td>
+                                            <td style="direction: ltr;">
+                            167
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>22</td>
+                                        <td>
+                                <a href="/Players/Details/180429?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    עלי מוחמד נגידאת
+                                </a>
+                    </td>
+                                            <td>
+2012                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+01:22.16                    </td>
+                                            <td style="direction: ltr;">
+                            162
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>23</td>
+                                        <td>
+                                <a href="/Players/Details/230947?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    ירדן בן-פורת
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+הפועל עמק יזרעאל                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            3
+                        </td>
+                    <td style="direction: ltr;">
+01:24.15                    </td>
+                                            <td style="direction: ltr;">
+                            151
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>24</td>
+                                        <td>
+                                <a href="/Players/Details/178822?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    איתי סורס
+                                </a>
+                    </td>
+                                            <td>
+2012                        </td>
+                    <td>
+הפועל עמק יזרעאל                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            2
+                        </td>
+                    <td style="direction: ltr;">
+01:24.47                    </td>
+                                            <td style="direction: ltr;">
+                            149
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>25</td>
+                                        <td>
+                                <a href="/Players/Details/252143?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    מארק אוסטטנייגרוש
+                                </a>
+                    </td>
+                                            <td>
+2010                        </td>
+                    <td>
+הפועל אולימפ נתניה                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            6
+                        </td>
+                    <td style="direction: ltr;">
+01:28.63                    </td>
+                                            <td style="direction: ltr;">
+                            129
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>26</td>
+                                        <td>
+                                <a href="/Players/Details/228342?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    מקסים קסיאננקו
+                                </a>
+                    </td>
+                                            <td>
+2011                        </td>
+                    <td>
+הפועל אולימפ נתניה                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            5
+                        </td>
+                    <td style="direction: ltr;">
+01:31.45                    </td>
+                                            <td style="direction: ltr;">
+                            117
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>27</td>
+                                        <td>
+                                <a href="/Players/Details/180427?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אברהים עאדל ביטאר
+                                </a>
+                    </td>
+                                            <td>
+2012                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            3
+                        </td>
+                        <td>
+                            1
+                        </td>
+                    <td style="direction: ltr;">
+01:34.60                    </td>
+                                            <td style="direction: ltr;">
+                            106
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>28</td>
+                                        <td>
+                                <a href="/Players/Details/243560?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אנס חאלד זבידאת 
+                                </a>
+                    </td>
+                                            <td>
+2012                        </td>
+                    <td>
+הפועל לב הגליל סחנין                    </td>
+                        <td>
+                            1
+                        </td>
+                        <td>
+                            7
+                        </td>
+                    <td style="direction: ltr;">
+01:38.91                    </td>
+                                            <td style="direction: ltr;">
+                            93
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>29</td>
+                                        <td>
+                                <a href="/Players/Details/188610?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    עמית קרצ&#39;ון
+                                </a>
+                    </td>
+                                            <td>
+2012                        </td>
+                    <td>
+הפועל עמק יזרעאל                    </td>
+                        <td>
+                            2
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+DNS                    </td>
+                                            <td style="direction: ltr;">
+                            0
+                        </td>
+                                                                            </tr>
+                <tr>
+                        <td>29</td>
+                                        <td>
+                                <a href="/Players/Details/9684?seasonId=1533"
+                                   style="margin: 8px 0; padding: 2px 12px; color: #000080;" target="_blank">
+                                    אבישי דאודי
+                                </a>
+                    </td>
+                                            <td>
+2007                        </td>
+                    <td>
+הפועל עמק יזרעאל                    </td>
+                        <td>
+                            4
+                        </td>
+                        <td>
+                            4
+                        </td>
+                    <td style="direction: ltr;">
+DNS                    </td>
+                                            <td style="direction: ltr;">
+                            0
+                        </td>
+                                                                            </tr>
+        </tbody>
+    </table>
+</div>
+
+
+</div>
+
+
+
+</div>
+</div>
+
+
+
+            </div>
+        </div>
+        <footer style="margin-top: 5px; margin-left: 15px;">
+            <a href="https://loglig.com" style="color:#333333">
+                <div class="pull-left bot-title">Powered By</div>
+                <img src="/content/img/logo.png" class="pull-left bot-logo" alt="Powered By LogLig" />
+                <div class="clearfix"></div>
+            </a>
+        </footer>
+    </div>
+
+    <script src="/bundles/jquery?v=Wc4RAEumdPDf8Jyydt3C5wAbts7LJsFIjFtKQV1-0Rs1"></script>
+
+    <script src="/bundles/bootstrap?v=V_pN0RpLuiw5-I9jzrpkivcREDeKkccW_PY6pZ2LOG41"></script>
+
+    <script src="/Scripts/bootstrap-jquery3-modal-fix.js"></script>
+    <script src="/bundles/main?v=WGEYe5PuR-CJjUNsTuB9FvARWnHP-9omsadQbADdXGU1"></script>
+
+    <script src="/bundles/jquery-ui?v=nmuMA-O4C0zphhL2ApoyudBi4v4VCXr0cCFlFmBK2eU1"></script>
+
+    <script src="/Scripts/commonLib.js"></script>
+    <script>
+        $(function () {
+            frontLib.init();
+
+            $(document).off("change", "#front-language-select").on("change", "#front-language-select", function () {
+                var selectedLang = $(this).val();
+                var targetUrl = "/Common/SetCulture" + "?lang=" + encodeURIComponent(selectedLang);
+                window.location.href = targetUrl;
+            });
+        });
+    </script>
+    <script>window.LogLigImages = { base: 'https://loglig.com', ladder: [64,128,256,512,1024] };</script>
+    <script src="/Scripts/App/loglig-images.js?v=8df461975f68393"></script>
+    
+    <script type="text/javascript" src="/Scripts/App/PrintSchedule.js"></script>
+
+</body>
+</html>

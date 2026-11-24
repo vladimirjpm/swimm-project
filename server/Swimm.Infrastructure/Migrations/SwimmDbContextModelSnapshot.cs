@@ -2470,6 +2470,27 @@ namespace Swimm.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Swimm.Domain.Entities.LogligPlayer", b =>
+                {
+                    b.Property<int>("LogligId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("BirthYear")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("SeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("LogligId");
+
+                    b.ToTable("Sys_LogligPlayers", (string)null);
+                });
+
             modelBuilder.Entity("Swimm.Domain.Entities.MediaReport", b =>
                 {
                     b.Property<int>("Id")
@@ -3514,6 +3535,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("Lane")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("LogligPlayerId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Note")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -3599,6 +3623,10 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.HasIndex("CompetitionId", "CompetitionDate", "Position")
                         .IsDescending(false, true, false);
+
+                    b.HasIndex("CompetitionId", "SwimmerId", "LogligPlayerId")
+                        .HasDatabaseName("IX_Results_LogligPlayer")
+                        .HasFilter("\"LogligPlayerId\" IS NOT NULL");
 
                     b.HasIndex("CompetitionId", "StyleId", "Distance", "Gender");
 

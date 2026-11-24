@@ -68,7 +68,7 @@ API и записи данных порознь), память процесса,
 
   С К4б.6 — **служебные колонки** (§2.6): правка, задевшая только колонки реестра
   `CacheServiceColumns` (loglig-привязка `Swimmers.LogligId*`, `Competitions.QualityScannedAt`,
-  объединённые места `Results.CombinedPlace/IsBestResult/BestTimeMs`, `HubGroups.UpdatedAt`,
+  объединённые места `Results.CombinedPlace/IsBestResult/BestTimeMs`, игрок loglig у строки `Results.LogligPlayerId` (Р122), `HubGroups.UpdatedAt`,
   `Sys_AppUsers.UpdatedAt`), сбрасывает `col:T.C` на каждую колонку и, если таблица — корень,
   метку своей строки — без `table:T` и без меток корней по FK. Запись кэша носит `col:T.C`, если в
   её SQL названы и таблица, и колонка (так же, как метки таблиц); не носит лишь корень,

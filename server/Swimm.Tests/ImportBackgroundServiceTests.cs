@@ -26,6 +26,7 @@ public class ImportBackgroundServiceTests
         public readonly Mock<IImportService> Import = new();
         public readonly Mock<ISplitAutoAttachService> Splits = new();
         public readonly Mock<ILogligStampService> Stamp = new();
+        public readonly Mock<ILogligRowPlayerService> RowPlayers = new();
         public readonly Mock<ICompetitionDiscoveryService> Discovery = new();
         public readonly Mock<IOfficialClubStandingService> Standings = new();
         public readonly Dictionary<string, bool> Settings = new();
@@ -39,6 +40,8 @@ public class ImportBackgroundServiceTests
                 .ReturnsAsync(new SplitAutoOutcome(SplitAutoKind.Attached, 12, 8, "отчёт", [1, 2]));
             Stamp.Setup(s => s.StampFromProtocolAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new LogligStampReport(0, 0, 0, 0, [], "ok"));
+            RowPlayers.Setup(s => s.StampAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()))
+                .ReturnsAsync(new LogligRowPlayerReport(true, "ok"));
         }
 
         public IServiceProvider Services()
@@ -50,6 +53,7 @@ public class ImportBackgroundServiceTests
                 .AddScoped(_ => Import.Object)
                 .AddScoped(_ => Splits.Object)
                 .AddScoped(_ => Stamp.Object)
+                .AddScoped(_ => RowPlayers.Object)
                 .AddScoped(_ => Discovery.Object)
                 .AddScoped(_ => Standings.Object)
                 .AddSingleton(settings.Object)
@@ -80,7 +84,8 @@ public class ImportBackgroundServiceTests
                             await Task.Delay(150);
                             return s;
                         }
-                        if ((s.Splits is null || s.Splits.State == "done") && stampDone) return s;
+                        var rowPlayersDone = RowPlayers.Invocations.Count > 0 || !Settings.GetValueOrDefault(LogligRowPlayerRules.SettingKey, true);
+                        if ((s.Splits is null || s.Splits.State == "done") && stampDone && rowPlayersDone) return s;
                     }
                     await Task.Delay(20);
                 }
@@ -199,6 +204,116 @@ public class ImportBackgroundServiceTests
         w.Splits.Verify(s => s.AttachAfterImportAsync(It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
         w.Stamp.Verify(s => s.StampFromProtocolAsync(CompId, It.IsAny<CancellationToken>()), Times.Once);
         Assert.Null(status.Splits);
+    }
+
+    // Игрок loglig у строки (Р122) — третий шаг той же очереди, после штамповки; свой тумблер.
+    [Fact]
+    public async Task SuccessfulImport_StampsRowPlayers_AfterLogligIds()
+    {
+        var w = new World(Created(418));
+        var order = new List<string>();
+        w.Stamp.Setup(s => s.StampFromProtocolAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("stamp")).ReturnsAsync(new LogligStampReport(0, 0, 0, 0, [], "ok"));
+        w.RowPlayers.Setup(s => s.StampAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()))
+            .Callback(() => order.Add("row-players")).ReturnsAsync(new LogligRowPlayerReport(true, "ok"));
+
+        await w.RunAsync();
+
+        w.RowPlayers.Verify(s => s.StampAsync(CompId, "import", It.IsAny<CancellationToken>(), LogligRowPlayerRules.ReadBudget), Times.Once);
+        Assert.Equal(["stamp", "row-players"], order);
+    }
+
+    [Fact]
+    public async Task RowPlayersToggleOff_StepSkipped_OthersRun()
+    {
+        var w = new World(Created(418));
+        w.Settings[LogligRowPlayerRules.SettingKey] = false;
+
+        await w.RunAsync();
+
+        w.RowPlayers.Verify(s => s.StampAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()), Times.Never);
+        w.Stamp.Verify(s => s.StampFromProtocolAsync(CompId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // Тумблер перечитывается в начале самого шага: выключили, пока шаг стоял в очереди, — не идёт.
+    [Fact]
+    public async Task RowPlayersToggle_FlippedOffWhileQueued_StepDoesNotRun()
+    {
+        var w = new World(Created(418));
+        // Штамповка идёт перед шагом игроков — в этот момент и «выключаем».
+        w.Stamp.Setup(s => s.StampFromProtocolAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback(() => w.Settings[LogligRowPlayerRules.SettingKey] = false)
+            .ReturnsAsync(new LogligStampReport(0, 0, 0, 0, [], "ok"));
+
+        await w.RunAsync();
+        await Task.Delay(150);
+
+        w.RowPlayers.Verify(s => s.StampAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()), Times.Never);
+    }
+
+    // Пачка: шаги игроков идут ПОСЛЕ доклеек и штамповок всех стартов — долгий шаг одного старта
+    // не задерживает промежуточные следующего.
+    [Fact]
+    public async Task Batch_RowPlayers_RunAfterSplitsAndStampsOfEveryJob()
+    {
+        var w = new World(Created(10));
+        var order = new List<string>();
+        w.Splits.Setup(s => s.AttachAfterImportAsync(It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Callback((int id, Guid _, CancellationToken _) => { lock (order) order.Add($"splits:{id}"); })
+            .ReturnsAsync(new SplitAutoOutcome(SplitAutoKind.Attached, 1, 0, "отчёт", [1]));
+        w.RowPlayers.Setup(s => s.StampAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()))
+            .Callback((int id, string _, CancellationToken _, TimeSpan? _) => { lock (order) order.Add($"players:{id}"); })
+            .ReturnsAsync(new LogligRowPlayerReport(true, "ok"));
+        // Импорт идёт заметное время: первый старт успевает закончить свои промежуточные, пока
+        // второй ещё импортируется, — раньше в эту паузу вклинился бы шаг игроков.
+        w.Import.Setup(i => i.ImportAsync(It.IsAny<Stream>(), It.IsAny<string?>(),
+                It.IsAny<IReadOnlyCollection<string>?>(), It.IsAny<ImportEventOptions?>(), It.IsAny<int?>()))
+            .Returns(async () => { await Task.Delay(120); return Created(10); });
+
+        var sp = w.Services();
+        var service = new ImportBackgroundService(w.Queue, sp.GetRequiredService<IServiceScopeFactory>(),
+            NullLogger<ImportBackgroundService>.Instance);
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            foreach (var compId in new[] { 101, 102, 103 })
+                w.Queue.Enqueue(Encoding.UTF8.GetBytes("[]"), "f.json", null, null, null, compId);
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < deadline && w.RowPlayers.Invocations.Count < 3) await Task.Delay(20);
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+
+        Assert.Equal(6, order.Count);
+        Assert.All(order.Take(3), o => Assert.StartsWith("splits:", o));
+        Assert.Equal(["players:101", "players:102", "players:103"], order.Skip(3));
+    }
+
+    // Сбой шага импорт не роняет и остальным шагам не мешает.
+    [Fact]
+    public async Task RowPlayersThrows_ImportStaysCompleted()
+    {
+        var w = new World(Created(418));
+        w.RowPlayers.Setup(s => s.StampAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()))
+            .ThrowsAsync(new InvalidOperationException("сломалось"));
+
+        var status = await w.RunAsync();
+
+        Assert.Equal(ImportJobState.Completed, status.State);
+        Assert.Equal("attached", status.Splits!.Kind);
+    }
+
+    // Отказ импорта («Дубль», откат) — на loglig не ходим вовсе.
+    [Fact]
+    public async Task RejectedImport_NoRowPlayers()
+    {
+        var w = new World(new ImportResult { Message = "Дубль" });
+
+        await w.RunAsync();
+
+        w.RowPlayers.Verify(s => s.StampAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()), Times.Never);
     }
 
     // Файл с /Admin/Import — без compID: соревнование не найти, доклейка — кнопкой.

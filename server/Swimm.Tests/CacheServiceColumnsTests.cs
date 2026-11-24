@@ -429,7 +429,7 @@ public class CacheServiceColumnsTests
             Assert.Equal(["Competitions", "HubGroups", "Results", "Swimmers", "Sys_AppUsers"], byTable.Keys.Order());
             Assert.Equal(LogligColumns, byTable["Swimmers"]);
             Assert.Equal(["QualityScannedAt"], byTable["Competitions"]);
-            Assert.Equal(["CombinedPlace", "IsBestResult", "BestTimeMs"], byTable["Results"]);
+            Assert.Equal(["CombinedPlace", "IsBestResult", "BestTimeMs", "LogligPlayerId"], byTable["Results"]);
             Assert.Equal(["UpdatedAt"], byTable["HubGroups"]);
             Assert.Equal(["UpdatedAt"], byTable["Sys_AppUsers"]);
         }

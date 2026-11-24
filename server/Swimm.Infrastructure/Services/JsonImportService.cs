@@ -1778,6 +1778,13 @@ public class JsonImportService : IImportService
         old.OfficialClubPoints = incoming.OfficialClubPoints;
         old.Position = incoming.Position;
         old.PositionAgeGroup = incoming.PositionAgeGroup;
+        // Игрок loglig у строки (Р122) доказан заплывом, дорожкой и ВРЕМЕНЕМ: изменилось время или
+        // статус — доказательство устарело, id снимаем (его вернёт шаг после этого же импорта).
+        // Смена пловца — не повод: строка на странице loglig та же, и именно разницу «id прежний,
+        // карточка другая» ловит проверка swimmers.two-loglig-players.
+        if (old.TimeMillisecond != incoming.TimeMillisecond || old.TimeFail != incoming.TimeFail
+            || (old.TimeFailNote ?? "") != (incoming.TimeFailNote ?? ""))
+            old.LogligPlayerId = null;
         old.TimeMillisecond = incoming.TimeMillisecond;
         old.TimeOriginal = incoming.TimeOriginal;
         // Промежуточные приходят не из каждого источника (личные — только из пособытийных PDF

@@ -233,7 +233,7 @@ using (_read.CacheRows<HubGroup>(groupId, typeof(HubGroupMember), typeof(HubGrou
 - **Реестр** — рядом с корнями, свойства сущностей, имена колонок берутся из модели. Стартовый
   список: `Swimmers.LogligId`, `LogligIdStatus`, `LogligIdSource`, `LogligIdSuggestedByUserId`,
   `LogligIdSuggestedAt`, `LogligIdVerifiedAt`; `Competitions.QualityScannedAt`;
-  `Results.CombinedPlace`, `IsBestResult`, `BestTimeMs`; `HubGroups.UpdatedAt`;
+  `Results.CombinedPlace`, `IsBestResult`, `BestTimeMs`, `LogligPlayerId` (игрок loglig у строки, Р122 — с 24.11.2026); `HubGroups.UpdatedAt`;
   `Sys_AppUsers.UpdatedAt`. Окончательный — по журналу К4б.1: в реестр идёт колонка, чья запись
   часто выкидывает записи, которые её не читают. Свойство вне модели — исключение.
 - **Запись.** Изменённая строка, у которой ВСЕ изменённые свойства из реестра, даёт `col:T.C` на

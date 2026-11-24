@@ -45,6 +45,9 @@ public static class CacheServiceColumns
         (typeof(ResultRecord), nameof(ResultRecord.CombinedPlace)),
         (typeof(ResultRecord), nameof(ResultRecord.IsBestResult)),
         (typeof(ResultRecord), nameof(ResultRecord.BestTimeMs)),
+        // Игрок loglig у строки (Р122): пишет шаг после импорта сотнями строк, читает только
+        // проверка Health — без реестра каждый импорт дважды ронял бы всё, что собрано из Results.
+        (typeof(ResultRecord), nameof(ResultRecord.LogligPlayerId)),
         // «Обновлено»: TouchGroupAsync после каждой правки состава, вход через Google.
         (typeof(HubGroup), nameof(HubGroup.UpdatedAt)),
         (typeof(AppUser), nameof(AppUser.UpdatedAt)),
