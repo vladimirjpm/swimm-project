@@ -138,7 +138,7 @@ public class BulkPullServiceTests
         repo.Setup(r => r.GetUnifiedAsync(Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(), Moq.It.IsAny<int?>(),
                 Moq.It.IsAny<string?>(), Moq.It.IsAny<bool>(), Moq.It.IsAny<int?>(), Moq.It.IsAny<int>(), Moq.It.IsAny<int>(),
                 Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(), Moq.It.IsAny<string?>(),
-                Moq.It.IsAny<DateOnly?>(), Moq.It.IsAny<bool>()))
+                Moq.It.IsAny<DateOnly?>(), Moq.It.IsAny<bool>(), false, Moq.It.IsAny<IReadOnlySet<int>?>()))
             .ReturnsAsync(new UnifiedCompetitionList(new PagedResult<UnifiedCompetitionRowDto>(items, items.Count, 1, Math.Max(1, items.Count)),
                 new int[12], 0));
         return repo.Object;

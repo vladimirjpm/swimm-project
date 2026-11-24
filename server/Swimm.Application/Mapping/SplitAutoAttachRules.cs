@@ -86,6 +86,15 @@ public static class SplitAutoAttachRules
     /// <summary>Исход, после которого нужен повтор кнопкой: шаг 9 — «!».</summary>
     public static bool NeedsRetry(SplitAutoKind kind) => kind is SplitAutoKind.Failed or SplitAutoKind.Partial;
 
+    /// <summary>
+    /// Дню нужен повтор доклейки: последняя не удалась или прошла частично И доклейка не идёт прямо
+    /// сейчас (очередь импорта). Одно правило на шаг 9 чек-листа, значок строки, фильтр «С ошибками»
+    /// и блок «Что не так» /Admin/Competitions — иначе пока доклейка идёт, строка в фильтре была бы,
+    /// а в карточке причины нет.
+    /// </summary>
+    public static bool DayNeedsRetry(SplitAttachNote? note, bool pending) =>
+        !pending && note is { } n && NeedsRetry(n.Kind);
+
     /// <summary>Код исхода в DetailsJson аудита и в ответе статуса задачи.</summary>
     public static string Code(SplitAutoKind kind) => kind switch
     {

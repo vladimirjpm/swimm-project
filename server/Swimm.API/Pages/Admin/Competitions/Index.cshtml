@@ -221,6 +221,15 @@
                         <a class="ml-1 text-admin-accent hover:underline" href="@ListUrl(d => d["discipline"] = "all")">показать все ↗</a>
                     </div>
                 }
+                @* «С ошибками» (решение Влада 23.11: фильтры — одной кнопкой): старты с открытой находкой
+                   Health, «⚑», «неполный» или несклеенными промежуточными — CompetitionProblemRules.
+                   Как поиск — по всем сезонам (сезон и месяц сбрасываются), с пагинацией. *@
+                <a href="@Url.Page("Index", new { filter = Swimm.Application.Mapping.CompetitionProblemRules.Filter })"
+                   class="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] no-underline @(Model.QualityFilter == Swimm.Application.Mapping.CompetitionProblemRules.Filter ? "border-admin-danger/40 bg-admin-danger/10 text-admin-danger" : "border-admin-border text-admin-text hover:bg-admin-surface-hover")"
+                   title="Старты, у которых есть хоть одно: ошибка или предупреждение Health (по старту и его строкам, без находок по пловцу), сомнительные строки ⚑, «неполный» (Р114/Р115), промежуточные не доклеились. По всем сезонам.">
+                    <span class="font-bold text-admin-danger">✕</span> С ошибками
+                    <span class="ml-auto text-[11px] text-admin-text-muted">все сезоны</span>
+                </a>
                 @* Фильтр results-auto (П5): те же ссылки, что в блоке дашборда; сезон и месяц сбрасываются —
                    окно задачи (7 дней) короче любого из них. *@
                 <div class="text-[12px] text-admin-text-muted">
@@ -306,6 +315,7 @@
         "no-results" => "без результатов",
         Swimm.Application.Mapping.AutoPullFilters.Blocked => "results-auto: ждут тебя",
         Swimm.Application.Mapping.AutoPullFilters.WouldTake => "results-auto: взяла бы сама",
+        Swimm.Application.Mapping.CompetitionProblemRules.Filter => "с ошибками (Health, ⚑, неполный, промежуточные) — все сезоны",
         _ => Model.QualityFilter
     };
     <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 mb-4 flex items-center justify-between px-4 py-2 text-[13px]">
@@ -313,6 +323,15 @@
         @* Снимает фильтр «здоровья» вместе со stage (алиасы ignored / discovery-new — это stage). *@
         <a href="@ListUrl(d => { d.Remove("filter"); d.Remove("stage"); })" class="admin-btn admin-btn-ghost py-1 px-2.5">сбросить ✕</a>
     </div>
+    @* Проверки со срезом (пишут не больше 50 находок): «С ошибками» видит только записанное. *@
+    @foreach (var tc in Model.TruncatedChecks)
+    {
+        var tcTitle = Model.CheckTitles.TryGetValue(tc.CheckId, out var tct) ? tct : tc.CheckId;
+        <div class="-mt-2 mb-3 px-1 text-[12px] text-admin-warning">
+            ⚠ проверка «@tcTitle» усечена: записано @tc.Shown из @tc.Total — список может быть неполным.
+            <a href="/Admin/Health#check-@tc.CheckId" class="text-admin-accent hover:underline">в Health ↗</a>
+        </div>
+    }
 }
 
 @{
@@ -566,8 +585,26 @@
                 + (st?.SuggestHide == true ? " Скрыть — кнопкой «Скрыть» в шапке панели справа; само ничего не закрывается." : ""));
         if (s?.StartList is { Stale: true } && st?.State is Swimm.Application.Mapping.CompetitionRowState.Ahead or Swimm.Application.Mapping.CompetitionRowState.Running)
             Add("bg-admin-warning/15 text-admin-warning", "обновить", "Стартовый протокол устарел: до старта мало дней, а забору больше суток");
+        // Открытые находки Health по старту, его строкам, эстафетам и событию (без находок по пловцу) —
+        // CompetitionProblemRules. Только записанные находки: проверки со срезом пишут не все.
+        var (healthErr, healthWarn) = Swimm.Application.Mapping.CompetitionProblemRules.Totals(u.Health);
+        if (healthErr > 0)
+            Add("bg-admin-danger/15 text-admin-danger", $"✕ {healthErr}", "Открытые ошибки Health (по записанным находкам):\n"
+                + Swimm.Application.Mapping.CompetitionProblemRules.Hint(u.Health, Swimm.Application.Mapping.CompetitionProblemRules.ErrorSeverity, Model.CheckTitles));
+        if (healthWarn > 0)
+            Add("bg-admin-warning/15 text-admin-warning", $"⚠ {healthWarn}", "Открытые предупреждения Health (по записанным находкам):\n"
+                + Swimm.Application.Mapping.CompetitionProblemRules.Hint(u.Health, Swimm.Application.Mapping.CompetitionProblemRules.WarningSeverity, Model.CheckTitles));
         if (SuspectOf(u) is > 0 and var n)
             Add("bg-admin-warning/15 text-admin-warning", $"⚑ {n}", $"Помеченных недостоверными строк: {n}");
+        // Причины «С ошибками», у которых своей пометки нет: «неполный» вне «ждём протокол · неполный»
+        // (Р114 у идущего старта) и несклеенные промежуточные — иначе строка в фильтре без метки.
+        var problem = Swimm.Application.Mapping.CompetitionProblemRules.From(u);
+        var incompleteShown = st is { State: Swimm.Application.Mapping.CompetitionRowState.WaitingProtocol, Reason: Swimm.Application.Mapping.WaitingProtocolReason.Incomplete }
+            && s?.MissingSince == null;
+        if (problem.Incomplete && !incompleteShown)
+            Add("bg-admin-warning/15 text-admin-warning", "⏳", "Результаты неполные (Р114/Р115) — подробности в карточке, «Принять как есть» на «Изменить»");
+        if (problem.SplitsNeedRetry)
+            Add("bg-admin-warning/15 text-admin-warning", "⏱", "Промежуточные не доклеились — повторите кнопкой «Промежуточные» (шаг 9 в карточке)");
         if (s?.EmptySourceAt != null)
             Add("bg-white/[.08] text-admin-text-muted", "∅", "Протокола нет: PDF пустой или в нём одни неявки (NS) — тянуть нечего");
         if (u.Stage == CompetitionStage.Ignored)
@@ -683,7 +720,11 @@
         var days = st.FirstDay is { } f && st.LastDay is { } l ? l.DayNumber - f.DayNumber + 1 : 1;
         var hidden = s?.Status == "ignored" && db == null;
         var markedImported = s?.Status == "imported" && db == null;
-        var r115 = st is { PulledDays: int pd, SiteDays: int sd } ? $"Затянуто {pd} из {sd} {DaysWord(sd)} по сайту федерации" : null;
+        // Шаг 5 у недотянутой — с датами, каких дней нет (полное объяснение — блок «Что не так»).
+        var r115 = st is { PulledDays: int pd, SiteDays: int sd }
+            ? $"Затянуто {pd} из {sd} {DaysWord(sd)} по сайту федерации"
+              + (Swimm.Application.Mapping.IncompleteExplanationRules.MissingDatesShort(u) is { } miss ? $" — {miss}" : "")
+            : null;
         var baseInput = new Swimm.Application.Mapping.ChecklistInput(st.State, Imported: db != null,
             StartList: s?.StartList?.Kind, StartListStale: s?.StartList?.Stale == true,
             WarmUpDays: s?.WarmUpDays ?? 0, DayCount: days,
@@ -717,7 +758,7 @@
             var splitPending = db != null && (comp?.OrgCompId ?? s?.OrgCompId) is int spOc && Model.SplitsPendingOrgCompIds.Contains(spOc);
             var splitCaption = db == null ? null
                 : Swimm.Application.Mapping.SplitAutoAttachRules.Caption(splitNote, comp?.HasSplits == true, splitPending);
-            var splitsRetry = !splitPending && splitNote is { } snr && Swimm.Application.Mapping.SplitAutoAttachRules.NeedsRetry(snr.Kind);
+            var splitsRetry = Swimm.Application.Mapping.SplitAutoAttachRules.DayNeedsRetry(splitNote, splitPending);
             // Строк в базе нет — проверять нечего: шаг 8 не «текущий».
             var input = baseInput with { QualityScanned = scanned != null || (db != null && results == 0), SuspectCount = suspects, Incomplete = incomplete != null, SplitsNeedRetry = splitsRetry };
             var none = Swimm.Application.Mapping.CompetitionChecklistRules.Build(input);
@@ -837,7 +878,7 @@
         return new(u, key, RowName(u), PanelDate(st), StateText(st), StateChipCls(st), trophyHtml, chips, meta,
             headSteps, Phases(baseInput with { QualityScanned = scopes[0].QualityScannedAt != null, SuspectCount = scopes[0].SuspectCount, Incomplete = scopes[0].Incomplete != null }),
             scopes, auto, key == selKey,
-            head != null ? RowEditUrl(head.Id, key) : null, dayEdit, dayPublic, quick, cats);
+            head != null ? RowEditUrl(head.Id, key) : null, dayEdit, dayPublic, quick, cats, Model.CheckTitles);
     }
 }
 

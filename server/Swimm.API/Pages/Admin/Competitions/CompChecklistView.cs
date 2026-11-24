@@ -83,7 +83,9 @@ public sealed record CompChecklistView(
     // Форма быстрой правки (шаг 6 у строк в базе) и «Проверить регламент».
     IHtmlContent? QuickEdit,
     // Категории строки (чипы) — в шапке, как в прежней панели.
-    IHtmlContent? Categories)
+    IHtmlContent? Categories,
+    // Заголовки проверок Health по id — блок «Что не так» (нет — показываем id проверки).
+    IReadOnlyDictionary<string, string>? CheckTitles = null)
 {
     public UnifiedSiteInfo? Site => Row.Site;
 

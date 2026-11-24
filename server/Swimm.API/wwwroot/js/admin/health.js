@@ -152,7 +152,7 @@
         document.getElementById('groups').innerHTML = groups.map(g => {
             const [sevName, sevCls] = SEV[g.severity];
             const clean = g.openCount === 0 && g.acceptedCount === 0;
-            return `<details class="admin-card mb-2 px-4 py-3" ${g.openCount ? 'open' : ''}>
+            return `<details id="check-${esc(g.checkId)}" class="admin-card mb-2 px-4 py-3 scroll-mt-4" ${g.openCount ? 'open' : ''}>
                 <summary class="cursor-pointer select-none flex flex-wrap items-center gap-2">
                     <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${sevCls}">${sevName}</span>
                     <span class="font-semibold text-admin-text">${esc(g.title)}</span>
@@ -278,10 +278,25 @@
                     <td>${r.fixedCount}</td></tr>`).join('')}</tbody></table></div>`;
     }
 
+    // Ссылка «в Health ↗» из блока «Что не так» /Admin/Competitions ведёт на #check-<id проверки>:
+    // группа рисуется после загрузки, поэтому браузер сам к якорю не прокрутит — раскрываем и
+    // прокручиваем сами, один раз (повторный render после «Принять» страницу не дёргает).
+    let hashFocused = false;
+    function focusHashCheck() {
+        if (hashFocused || !location.hash.startsWith('#check-')) return;
+        hashFocused = true;
+        const el = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+        if (!el) return;
+        el.open = true;
+        el.classList.add('ring-1', 'ring-admin-accent');
+        el.scrollIntoView({ block: 'start' });
+    }
+
     function render(data) {
         renderSummary(data.groups);
         renderGroups(data.groups);
         renderHistory(data.history);
+        focusHashCheck();
         const last = data.history[0];
         document.getElementById('run-info').textContent = last
             ? `последний прогон: ${new Date(last.startedAt).toLocaleString('ru-RU')}`

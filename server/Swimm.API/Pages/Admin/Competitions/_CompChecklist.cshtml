@@ -116,6 +116,107 @@
             <div class="mt-1.5">@Model.Categories</div>
         }
 
+        @* «Что не так» — причины правила CompetitionProblemRules (то же, что значок строки и фильтр
+           «С ошибками»). Промежуточные — Row.SplitsNeedRetry: его считает репозиторий правилом
+           SplitAutoAttachRules.DayNeedsRetry с учётом доклейки, идущей сейчас, — тем же, что шаг 9.
+           Нет причин — блока нет. *@
+        @{
+            var problems = Swimm.Application.Mapping.CompetitionProblemRules.From(Model.Row);
+            var reasons = Swimm.Application.Mapping.CompetitionProblemRules.Reasons(problems);
+        }
+        @if (reasons.Count > 0)
+        {
+            var titles = Model.CheckTitles;
+            var shown = Model.Row.HealthFindings.Count;
+            var healthTotal = problems.HealthErrors + problems.HealthWarnings;
+            <section class="ck-problems mt-3 rounded-md border border-admin-danger/30 bg-admin-danger/5 px-3 py-2 text-[12.5px]" aria-label="Что не так">
+                <div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-admin-danger">Что не так</div>
+                <ul class="space-y-1">
+                    @foreach (var f in Model.Row.HealthFindings)
+                    {
+                        var err = f.Severity >= Swimm.Application.Mapping.CompetitionProblemRules.ErrorSeverity;
+                        var title = titles != null && titles.TryGetValue(f.CheckId, out var t) ? t : f.CheckId;
+                        <li class="flex flex-wrap items-baseline gap-x-1.5">
+                            <span class="inline-block shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold @(err ? "bg-admin-danger/15 text-admin-danger" : "bg-admin-warning/15 text-admin-warning")">@(err ? "✕ ошибка" : "⚠ предупр.")</span>
+                            <span class="font-semibold text-admin-text" title="@f.CheckId">@title:</span>
+                            <span class="min-w-0 text-admin-text-muted" dir="auto">@f.Message</span>
+                            <a href="/Admin/Health#check-@f.CheckId" class="whitespace-nowrap text-admin-accent hover:underline" title="Проверка «@title» на странице здоровья данных">в Health ↗</a>
+                            @* Только относительная ссылка админки: Link — данные, чужой адрес («//host», «https:») не рисуем. *@
+                            @if (Swimm.Application.Mapping.CompetitionProblemRules.AdminLinkOrNull(f.Link) is { } fixLink)
+                            {
+                                <a href="@fixLink" class="whitespace-nowrap text-admin-accent hover:underline" title="Куда идти чинить — ссылка из находки">чинить ↗</a>
+                            }
+                        </li>
+                    }
+                    @if (healthTotal > shown)
+                    {
+                        <li class="text-admin-text-muted">
+                            @(shown > 0 ? "и ещё" : "находок Health:") @(healthTotal - shown) — <a href="/Admin/Health" class="text-admin-accent hover:underline">в Health ↗</a>
+                        </li>
+                    }
+                    @if (problems.SuspectCount > 0)
+                    {
+                        <li class="flex flex-wrap items-center gap-x-1.5">
+                            <span class="inline-block rounded bg-admin-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-admin-warning">⚑ @problems.SuspectCount</span>
+                            <span class="text-admin-text">сомнительных строк: @problems.SuspectCount</span>
+                            <button type="button" class="@ghost quality-btn py-0.5 text-[12px]"
+                                    data-event-id="@(Model.IsEvent ? db!.EventId?.ToString() : null)"
+                                    data-competition-id="@(Model.IsEvent ? null : db?.Single?.Id.ToString())"
+                                    data-title="@Model.Name"
+                                    title="Открыть «Качество»: какие строки помечены и почему">Качество</button>
+                        </li>
+                    }
+                    @if (problems.Incomplete)
+                    {
+                        // Что именно не хватает (просьба Влада 24.11.2026) — IncompleteExplanationRules:
+                        // Р115 — даты по сайту, какие дни в базе и каких нет; Р114 — дисциплины без времён.
+                        // Читается без наведения мыши; подсказки — что это обычно значит и что делать.
+                        var explained = Swimm.Application.Mapping.IncompleteExplanationRules.For(Model.Row);
+                        var shownHints = new HashSet<string>();
+                        <li class="flex items-start gap-x-1.5">
+                            <span class="mt-0.5 inline-block shrink-0 rounded bg-admin-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-admin-warning">⏳</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="font-semibold text-admin-text">неполный — чего не хватает</div>
+                                @if (explained.Count == 0)
+                                {
+                                    <div class="text-admin-text-muted" dir="auto">@(firstScope.Incomplete ?? "протокол затянут не целиком")</div>
+                                }
+                                @foreach (var ex in explained)
+                                {
+                                    <div class="mt-0.5 text-admin-text" dir="auto">@ex.Headline</div>
+                                    @if (ex.Items.Count > 0)
+                                    {
+                                        <ul class="ml-4 list-disc text-admin-text-muted">
+                                            @foreach (var it in ex.Items)
+                                            {
+                                                <li dir="auto">@it</li>
+                                            }
+                                        </ul>
+                                    }
+                                    @foreach (var h in ex.Hints.Where(shownHints.Add))
+                                    {
+                                        <div class="mt-0.5 text-[11.5px] text-admin-text-muted">@h</div>
+                                    }
+                                }
+                                @if (Model.EditUrl != null)
+                                {
+                                    <a href="@Model.EditUrl" class="whitespace-nowrap text-admin-accent hover:underline"
+                                       title="Остального протокола не будет — снять долг на странице «Изменить» (блок «Принять как есть»)">Принять как есть ↗</a>
+                                }
+                            </div>
+                        </li>
+                    }
+                    @if (problems.SplitsNeedRetry)
+                    {
+                        <li class="flex flex-wrap items-baseline gap-x-1.5">
+                            <span class="inline-block rounded bg-admin-warning/15 px-1.5 py-0.5 text-[10px] font-bold text-admin-warning">⏱</span>
+                            <span class="text-admin-text">промежуточные: не доклеились — повторите кнопкой «Промежуточные» (шаг 9@(Model.IsEvent ? " у дня" : ""))</span>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+
         @* Многодневное событие: общая часть (всё событие) — над строкой дней; шаги 5–9 — у выбранного дня. *@
         @if (Model.IsEvent)
         {
