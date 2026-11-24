@@ -24,3 +24,32 @@ public class NoLogligIframeFlagTests
     public void False_WhenLogligIdAppeared() =>
         Assert.False(Site(123, DiscoveryErrors.NoLogligIframe).NoLogligIframe);
 }
+
+/// <summary>Две ступени: меньше 7 дней после последнего дня — «пока нет», 7 и больше — «не будет».</summary>
+public class NoLogligIframeRulesTests
+{
+    private static readonly DateTime Start = new(2026, 11, 21, 0, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public void Threshold_IsSevenDays() => Assert.Equal(7, NoLogligIframeRules.FinalAfterDays);
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(6, false)]   // день 6 — ещё «пока нет»
+    [InlineData(7, true)]    // ровно 7 — граница уже «не будет»
+    [InlineData(30, true)]
+    public void SingleDay_Boundary(int daysAfter, bool final) =>
+        Assert.Equal(final, NoLogligIframeRules.IsFinal(Start, Start, Start.AddDays(daysAfter).AddHours(15)));
+
+    [Fact]
+    public void MultiDay_CountsFromLastDay()
+    {
+        var end = Start.AddDays(2);
+        Assert.False(NoLogligIframeRules.IsFinal(Start, end, end.AddDays(6)));
+        Assert.True(NoLogligIframeRules.IsFinal(Start, end, end.AddDays(7)));
+    }
+
+    [Fact]
+    public void FutureStart_IsNotFinal() =>
+        Assert.False(NoLogligIframeRules.IsFinal(Start, Start, Start.AddDays(-3)));
+}

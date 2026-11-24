@@ -295,7 +295,11 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
 
         var now = DateTime.UtcNow;
         foreach (var site in rows.Select(r => r.Site).OfType<UnifiedSiteInfo>())
+        {
             site.StartList = StartListBadgeRules.Evaluate(byOrg[site.OrgCompId], site.DateStart, now);
+            site.NoLogligIframeFinal = site.NoLogligIframe
+                && NoLogligIframeRules.IsFinal(site.DateStart, site.DateEnd, now);
+        }
 
         // Разминка по дням (шаг 3 чек-листа панели) — тем же одним запросом на страницу. Ключ таблицы —
         // (OrgCompId, день), строка на день одна; но после переноса старта остаются дни по старым
