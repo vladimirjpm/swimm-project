@@ -488,6 +488,11 @@ public class JsonImportService : IImportService
             // ImportSwimmerResolver, один на импорт.
             // loglig — третье доказательство «того же клуба» на запасных путях (Р110), сеть только там.
             swimmers = await ImportSwimmerResolver.LoadAsync(_db, diagnosticLog, _loglig);
+            // Имена всего файла — заранее: два разных имени с одним скелетом в одном протоколе —
+            // два человека, «другое написание» между ними не применяется при любом порядке строк (Р121).
+            swimmers.NoteFileNames(items.SelectMany(i =>
+                (i.RelaySwimmers ?? []).Select(l => (l.LastName, l.FirstName, l.BirthYear))
+                    .Prepend((i.LastName, i.FirstName, i.BirthYear))));
 
             // Categories: Key → Category (для привязки соревнований к категориям на импорте).
             categoryCache = new Dictionary<string, Category>(StringComparer.OrdinalIgnoreCase);
