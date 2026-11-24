@@ -275,7 +275,7 @@
 
             function linesHtml(lines) {
                 return lines.map(l => `
-                    <li class="flex gap-2 ${l.state === 'fail' ? 'text-admin-danger' : l.state === 'wait' ? 'text-admin-text-muted' : 'text-admin-text'}"${l.splits ? ' data-splits-line' : ''}>
+                    <li class="flex gap-2 ${l.state === 'fail' ? 'text-admin-danger' : l.state === 'wait' ? 'text-admin-text-muted' : l.good ? 'text-admin-success font-semibold' : 'text-admin-text'}"${l.splits ? ' data-splits-line' : ''}>
                         <span class="w-3.5 shrink-0">${ICON[l.state] ?? ''}</span>
                         <span class="min-w-0">${l.text}</span>
                     </li>`).join('');
@@ -597,16 +597,21 @@
                     if (sp.state !== 'done') continue;
 
                     const failed = sp.kind === 'failed' || sp.kind === 'partial';
-                    const text = `промежуточные: ${sp.text ?? ''} · само после импорта`;
+                    // «Доклеено» — зелёным с ✓ и жирнее (Влад, 24.11.2026); то же рисует сервер после F5.
+                    const attached = sp.kind === 'attached';
+                    const text = `${attached ? '✓ Промежуточные' : 'промежуточные'}: ${sp.text ?? ''} · само после импорта`;
                     const panel = panelOf(d.discId);
                     panel?.querySelectorAll('.ck-step[data-step="9"] .ck-caption').forEach(c => {
                         c.textContent = text;
                         c.title = sp.message ?? '';
                         c.classList.toggle('text-admin-danger', failed);
+                        c.classList.toggle('text-admin-success', attached);
+                        c.classList.toggle('font-semibold', attached);
+                        c.classList.toggle('text-admin-text-muted', !failed && !attached);
                     });
                     if (failed) panel?.querySelectorAll('.ck-step[data-step="9"]').forEach(li => { li.dataset.status = 'attention'; });
                     document.querySelectorAll('[data-splits-line]').forEach(li => {
-                        li.outerHTML = linesHtml([{ step: 9, text: esc('Промежуточные: ' + (sp.text ?? '')), state: failed ? 'fail' : 'ok' }]);
+                        li.outerHTML = linesHtml([{ step: 9, text: esc('Промежуточные: ' + (sp.text ?? '')), state: failed ? 'fail' : 'ok', good: attached }]);
                     });
                     return;
                 }

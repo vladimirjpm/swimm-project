@@ -9,7 +9,7 @@ namespace Swimm.API.Pages.Admin.Competitions;
 /// в JS) и статус кружка по данным строки (<see cref="CompetitionChecklistRules"/>).
 /// </summary>
 public sealed record CompChecklistStep(int No, string Title, string Caption, ChecklistStepStatus Status,
-    string? CaptionTitle = null, bool CaptionDanger = false);
+    string? CaptionTitle = null, bool CaptionDanger = false, bool CaptionSuccess = false);
 
 /// <summary>
 /// Шаги 5–9 одной «области»: у одиночной строки она одна, у многодневного события — по дню
