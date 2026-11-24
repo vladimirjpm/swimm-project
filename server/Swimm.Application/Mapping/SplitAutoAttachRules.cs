@@ -133,19 +133,23 @@ public static class SplitAutoAttachRules
     /// Подпись шага 9 чек-листа: идёт сейчас (задача импорта ещё доклеивает) → итог последней
     /// доклейки дня из аудита → флаг <c>HasSplits</c> → null (подпись по умолчанию).
     /// </summary>
-    /// <returns>Текст, подсказка (полный отчёт), красная ли подпись.</returns>
-    public static (string Text, string? Title, bool Danger)? Caption(SplitAttachNote? note, bool hasSplits, bool pending)
+    /// <returns>
+    /// Текст, подсказка (полный отчёт), красная ли подпись, зелёная ли («доклеено» — Влад, 24.11.2026:
+    /// успех должен быть виден, поэтому «✓ Промежуточные: доклеено…» зелёным и жирнее обычной подписи).
+    /// </returns>
+    public static (string Text, string? Title, bool Danger, bool Success)? Caption(SplitAttachNote? note, bool hasSplits, bool pending)
     {
         if (pending)
             return ("промежуточные доклеиваются сами после импорта…",
-                "Доклейка идёт в фоне за импортом; итог появится здесь после перезагрузки страницы", false);
+                "Доклейка идёт в фоне за импортом; итог появится здесь после перезагрузки страницы", false, false);
         if (note is not null)
         {
             var when = $"{Constants.IsraelTime.ToLocal(note.At):dd.MM HH:mm}";
             var who = note.Auto ? "само после импорта" : "вручную";
-            return ($"промежуточные: {Text(note.Kind, note.SwimWrites, note.LegWrites)} · {who} {when}",
-                note.Summary, NeedsRetry(note.Kind));
+            var attached = note.Kind == SplitAutoKind.Attached;
+            return ($"{(attached ? "✓ Промежуточные" : "промежуточные")}: {Text(note.Kind, note.SwimWrites, note.LegWrites)} · {who} {when}",
+                note.Summary, NeedsRetry(note.Kind), attached);
         }
-        return hasSplits ? ("промежуточные есть", "Флаг «⏱ Есть промежуточные» у дня", false) : null;
+        return hasSplits ? ("промежуточные есть", "Флаг «⏱ Есть промежуточные» у дня", false, false) : null;
     }
 }

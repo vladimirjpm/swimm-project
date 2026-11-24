@@ -759,7 +759,7 @@
                 new(7, "Импорт", db != null ? "в базе" : "1–5 минут, в фоне", none[6]),
                 new(8, "Проверка качества", s8, none[7]),
                 splitCaption is { } sc9
-                    ? new(9, "После импорта", sc9.Text, none[8], sc9.Title, sc9.Danger)
+                    ? new(9, "После импорта", sc9.Text, none[8], sc9.Title, sc9.Danger, sc9.Success)
                     : new(9, "После импорта", "Синхр. языки · Loglig-id · Промежуточные", none[8]),
             };
             return new(day, label, steps, Phases(input), incomplete, results, scanned, suspects);

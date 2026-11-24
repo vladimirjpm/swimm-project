@@ -219,7 +219,9 @@
             }
             string Code(Swimm.Application.Mapping.ChecklistStepStatus x) => Swimm.Application.Mapping.CompetitionChecklistRules.Code(x);
             string CaptionCls(Swimm.API.Pages.Admin.Competitions.CompChecklistStep step) =>
-                step.CaptionDanger ? "text-admin-danger" : "text-admin-text-muted";
+                step.CaptionDanger ? "text-admin-danger"
+                : step.CaptionSuccess ? "text-admin-success font-semibold"
+                : "text-admin-text-muted";
         }
 
         @* Шаги 1–4 — общие. *@

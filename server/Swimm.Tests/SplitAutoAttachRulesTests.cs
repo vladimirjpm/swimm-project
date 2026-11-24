@@ -82,13 +82,20 @@ public class SplitAutoAttachRulesTests
 
         Assert.StartsWith("промежуточные доклеиваются сами", SplitAutoAttachRules.Caption(note, true, pending: true)!.Value.Text);
         var c = SplitAutoAttachRules.Caption(note, true, false)!.Value;
-        Assert.Equal("промежуточные: доклеено: личных 340, ног эстафет 48 · само после импорта 23.11 14:05", c.Text);
+        Assert.Equal("✓ Промежуточные: доклеено: личных 340, ног эстафет 48 · само после импорта 23.11 14:05", c.Text);
         Assert.Equal("отчёт", c.Title);
         Assert.False(c.Danger);
+        Assert.True(c.Success);
+
+        // Зелёное — только у «доклеено»: «нового нет» и «на loglig нет» остаются спокойными.
+        var nothing = SplitAutoAttachRules.Caption(note with { Kind = SplitAutoKind.NothingNew }, true, false)!.Value;
+        Assert.False(nothing.Success);
+        Assert.StartsWith("промежуточные: ", nothing.Text);
 
         var failed = SplitAutoAttachRules.Caption(note with { Kind = SplitAutoKind.Failed, Auto = false }, false, false)!.Value;
         Assert.Contains("не удалось — повторите кнопкой · вручную", failed.Text);
         Assert.True(failed.Danger);
+        Assert.False(failed.Success);
 
         Assert.Equal("промежуточные есть", SplitAutoAttachRules.Caption(null, true, false)!.Value.Text);
         Assert.Null(SplitAutoAttachRules.Caption(null, false, false));
