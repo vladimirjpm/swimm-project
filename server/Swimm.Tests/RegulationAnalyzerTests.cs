@@ -199,6 +199,27 @@ public class RegulationAnalyzerTests
         Assert.Contains("מסלולים", Assert.Single(findings, f => f.Flag == RegulationFlags.Pool).Quote);
     }
 
+    // «בריכת 25 מ'» без числа дорожек (Влад, 24.11.2026). «ההזדמנות האחרונה» 2023, loglig doc 1548 —
+    // сырой текст PdfPig: «'מ» уехало от числа.
+    [Theory]
+    [InlineData("וכמב תימואלה הכירבב םייקתת תורחתה  תכירב25 יראתב 'מםיכ  .12.202323-22 .", "25m")]
+    [InlineData("22-23.12.2023,    ,טייגניו ןוכמ תכירבב25   תכירבב םינמז תעיבקל הנורחא תונמדזה", "25m")]
+    [InlineData("התחרות תתקיים בבריכת 25 מ' במכון וינגייט", "25m")]
+    [InlineData("התחרות תתקיים בבריכת 50 מטר", "50m")]
+    public void PoolLength_FromPoolOfPhrase(string line, string expected)
+    {
+        var findings = RegulationAnalyzer.Find(line);
+        Assert.Equal(expected, RegulationAnalyzer.PoolTypeOf(findings));
+        Assert.Single(findings, f => f.Flag == RegulationFlags.Pool);
+    }
+
+    [Theory]
+    [InlineData("לדוג רדסב( 50  ,'מ2 )האלה ןכו האמל")]      // дистанция из того же регламента, не бассейн
+    [InlineData("בריכת 250 מטר")]                          // не 25: дальше цифра
+    [InlineData("בבריכת 25 מ' ובבריכת 50 מ'")]             // обе длины — не угадываем
+    public void PoolLength_PoolOfPhrase_NotGuessed(string line) =>
+        Assert.Null(RegulationAnalyzer.PoolTypeOf(RegulationAnalyzer.Find(line)));
+
     [Theory]
     [InlineData("מקצים: 50 מטר חופשי, 100 מטר גב")]          // дистанции программы, не бассейн
     [InlineData("150 מטר, 10 מסלולים")]                       // не 50: перед числом цифра

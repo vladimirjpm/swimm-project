@@ -76,11 +76,21 @@ public class RegulationAnalyzer : IRegulationAnalyzer
     /// loglig doc 3542 — длина не нашлась, автозабор ждал руками). Слово «дорожки» может
     /// уехать от числа: скобка ломает порядок, «50  ,'מ10 :םיאבה םיכיראתה ןיב ,)םילולסמ»
     /// (летние отборы 2026, takanon 3218) — поэтому до 50 символов, а не вплотную.
+    ///
+    /// Вторая формула — «בריכת 25 מ'» без дорожек (Влад, 24.11.2026): слово «бассейн» вплотную
+    /// перед числом само говорит, что это длина бассейна, а не дистанция. Живой случай —
+    /// «ההזדמנות האחרונה» 2023 (loglig 9816, doc 1548): «בבריכת 25 מ'», дорожек в регламенте нет,
+    /// пачка отвечала «длина бассейна не определена». В перевёрнутом тексте «'מ» уезжает от числа
+    /// на несколько слов («תכירב25 יראתב 'מםיכ», «תכירבב25   תכירבב םינמז…»), поэтому там метр не
+    /// требуется — хватает «תכירב» вплотную к числу. «בריכה 25» сюда не входит сознательно.
+    /// Формулы без дорожек идут ПОСЛЕ формул с дорожками и не дублируют уже найденное место.
     /// </summary>
-    private static readonly Regex[] PoolRx =
+    private static readonly (Regex Rx, bool Reversed)[] PoolRx =
     [
-        new(@"(?<!\d)(?<len>25|50)\s*(?:מטר|מ['׳])\s*[,\-–]?\s*\d{1,2}[^\n]{0,50}?מסלולים", RegexOptions.Compiled),
-        new(@"(?<!\d)(?<len>25|50)\s*,?\s*(?:רטמ|['׳]מ|מ\s*,\s*['׳])\s*\d{1,2}[^\n]{0,50}?םילולסמ", RegexOptions.Compiled),
+        (new(@"(?<!\d)(?<len>25|50)\s*(?:מטר|מ['׳])\s*[,\-–]?\s*\d{1,2}[^\n]{0,50}?מסלולים", RegexOptions.Compiled), false),
+        (new(@"(?<!\d)(?<len>25|50)\s*,?\s*(?:רטמ|['׳]מ|מ\s*,\s*['׳])\s*\d{1,2}[^\n]{0,50}?םילולסמ", RegexOptions.Compiled), true),
+        (new(@"בריכת\s*(?<len>25|50)(?!\d)\s*(?:מטר|מ['׳]?)", RegexOptions.Compiled), false),
+        (new(@"תכירבב?\s*(?<len>25|50)(?!\d)", RegexOptions.Compiled), true),
     ];
 
     /// <summary>
@@ -141,13 +151,18 @@ public class RegulationAnalyzer : IRegulationAnalyzer
 
             var reversed = Reverse(raw);
 
-            foreach (var rx in PoolRx)
+            var poolSpans = new List<(int Start, int End)>();
+            foreach (var (rx, isReversed) in PoolRx)
             foreach (Match match in rx.Matches(raw))
             {
+                // Одно место строки — одна находка: «בריכת 50 מטר, 10 מסלולים» ловят обе формулы.
+                if (poolSpans.Any(sp => match.Index < sp.End && sp.Start < match.Index + match.Length)) continue;
+                poolSpans.Add((match.Index, match.Index + match.Length));
+
                 var len = match.Groups["len"].Value + "m";
                 // Цитата — из развёрнутой строки, чтобы админ прочитал её по-человечески; у
                 // прямого текста — как есть.
-                var quote = rx == PoolRx[0]
+                var quote = !isReversed
                     ? QuoteAround(raw, match.Index, match.Length)
                     : DigitsForward(QuoteAround(reversed, raw.Length - match.Index - match.Length, match.Length));
                 if (seen.Add($"{RegulationFlags.Pool}|{len}|{quote}"))
