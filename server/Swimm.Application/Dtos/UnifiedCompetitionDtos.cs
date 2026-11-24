@@ -170,4 +170,34 @@ public sealed class UnifiedCompetitionRowDto
 
     /// <summary>Ключ строки (<c>?sel=</c>, раскрытие панели) — <see cref="Mapping.CompetitionRowKey"/>.</summary>
     public string Key => Mapping.CompetitionRowKey.Of(this);
+
+    /// <summary>
+    /// Открытые находки Health (Warning/Error) по соревнованию и его строкам — по проверкам, у события —
+    /// сумма по дням (<see cref="Mapping.CompetitionProblemRules.Merge"/>). Находки по пловцу не входят.
+    /// Репозиторий заполняет у всех строк (один запрос на список).
+    /// </summary>
+    public IReadOnlyList<CompetitionHealthCount> Health { get; set; } = [];
+
+    /// <summary>
+    /// Первые открытые находки Health строки (не больше <see cref="CompetitionHealthFinding.PerRowLimit"/>) —
+    /// текст для блока «Что не так». Только у строк страницы.
+    /// </summary>
+    public IReadOnlyList<CompetitionHealthFinding> HealthFindings { get; set; } = [];
+
+    /// <summary>
+    /// Последняя доклейка промежуточных хоть у одного дня не удалась или прошла частично
+    /// (<see cref="Mapping.SplitAutoAttachRules.NeedsRetry"/>). У строк страницы — всегда, у остальных —
+    /// только при фильтре «С ошибками».
+    /// </summary>
+    public bool SplitsNeedRetry { get; set; }
+}
+
+/// <summary>Открытых находок одной проверки одной severity у строки списка.</summary>
+public sealed record CompetitionHealthCount(string CheckId, int Severity, int Count);
+
+/// <summary>Открытая находка Health для блока «Что не так» карточки соревнования.</summary>
+public sealed record CompetitionHealthFinding(int Id, string CheckId, int Severity, string Message, string? Link)
+{
+    /// <summary>Сколько находок строки показывать текстом; остальное — числом и ссылкой в Health.</summary>
+    public const int PerRowLimit = 8;
 }

@@ -190,6 +190,17 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
             hiddenByDiscipline = before - unified.Count;
         }
 
+        // 2b-bis) Открытые находки Health по соревнованию и его строкам — одним запросом на весь
+        // список (значок строки и фильтр «С ошибками»). Находки по пловцу не входят.
+        var healthByComp = await LoadHealthCountsAsync();
+        if (healthByComp.Count > 0)
+            foreach (var u in unified)
+            {
+                var ids = CompIdsOf(u);
+                if (ids.Any(healthByComp.Contains))
+                    u.Health = CompetitionProblemRules.Merge(ids.SelectMany(id => healthByComp[id]));
+            }
+
         // 2c) Признак «чемпионат Израиля» — по названию любой стороны строки (у входящих других
         // признаков нет). Считаем всегда: он и фильтр «Тип», и иконка 🏆 в списке.
         foreach (var u in unified)
@@ -222,6 +233,16 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         // 3c) Рабочее состояние каждой строки (хэндофф «вариант E», раздел 2) — до всех счётчиков.
         foreach (var u in unified)
             u.Status = CompetitionRowStateRules.Evaluate(StateInput(u), day);
+
+        // 3d) «С ошибками» (?filter=problems): правило — CompetitionProblemRules, после состояний
+        // (Р115 читается из них). Промежуточные — по журналу доклеек у всех строк базы.
+        var splitsLoaded = false;
+        if (qualityFilter == CompetitionProblemRules.Filter)
+        {
+            await AttachSplitsRetryAsync(unified);
+            splitsLoaded = true;
+            unified = unified.Where(CompetitionProblemRules.HasProblem).ToList();
+        }
 
         // 4) Счётчики по сезонам — ДО фильтра по сезону, иначе на чипах остался бы один сезон.
         // ОДИН источник — состояния строк: «затянуто» и «тянуть нечего» старого счётчика — это
@@ -267,9 +288,92 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         }
         var pageItems = unified.Skip((page - 1) * pageSize).Take(pageSize).ToList();
         await AttachStartListBadgesAsync(pageItems);
+        if (!splitsLoaded) await AttachSplitsRetryAsync(pageItems);
+        await AttachHealthFindingsAsync(pageItems);
         return new UnifiedCompetitionList(
             new PagedResult<UnifiedCompetitionRowDto>(pageItems, total, page, pageSize), monthCounts,
             hiddenByDiscipline, monthImported, seasonCounts, monthNothingToPull, monthStates, listStates);
+    }
+
+    /// <summary>Id соревнований строки: одиночное — своё, событие — всех дней; строка «Входящих» — пусто.</summary>
+    private static IReadOnlyList<int> CompIdsOf(UnifiedCompetitionRowDto u) =>
+        u.Db == null ? [] : u.Db.Single != null ? [u.Db.Single.Id] : u.Db.Days.Select(d => d.Id).ToList();
+
+    private const string HealthEntityCompetition = "Competition";
+    private const string HealthEntityResult = "Result";
+
+    private IQueryable<DataCheckFinding> OpenHealthFindings() =>
+        _db.DataCheckFindings.AsNoTracking()
+            .Where(f => f.Resolution == null && f.EntityId != null
+                        && f.Severity >= CompetitionProblemRules.WarningSeverity);
+
+    /// <summary>
+    /// Открытые находки Health (Warning/Error) в разбивке «соревнование → проверка, severity, N».
+    /// Две ветки одним запросом (UNION ALL): находки по соревнованию (EntityId = Id) и по строке
+    /// результата (EntityId = Results.Id → CompetitionId). Вход — частичный индекс открытых находок,
+    /// строки результатов достаются по первичному ключу: открытых находок — сотни, а не миллионы
+    /// строк Results (план запроса — docs/admin-pages/competitions.md, «Проблемы старта»).
+    /// </summary>
+    private async Task<ILookup<int, CompetitionHealthCount>> LoadHealthCountsAsync()
+    {
+        var open = OpenHealthFindings();
+        var direct = open
+            .Where(f => f.EntityType == HealthEntityCompetition)
+            .Select(f => new { CompId = f.EntityId!.Value, f.CheckId, f.Severity });
+        var viaResult =
+            from f in open.Where(f => f.EntityType == HealthEntityResult)
+            join r in _db.Results on (long)f.EntityId!.Value equals r.Id
+            select new { CompId = r.CompetitionId, f.CheckId, f.Severity };
+        var rows = await direct.Concat(viaResult)
+            .GroupBy(x => new { x.CompId, x.CheckId, x.Severity })
+            .Select(g => new { g.Key.CompId, g.Key.CheckId, g.Key.Severity, Count = g.Count() })
+            .ToListAsync();
+        return rows.ToLookup(r => r.CompId, r => new CompetitionHealthCount(r.CheckId, r.Severity, r.Count));
+    }
+
+    /// <summary>
+    /// Тексты открытых находок для блока «Что не так» — только строкам страницы, одним запросом.
+    /// На строку — первые <see cref="CompetitionHealthFinding.PerRowLimit"/> (ошибки первыми).
+    /// </summary>
+    private async Task AttachHealthFindingsAsync(IReadOnlyList<UnifiedCompetitionRowDto> rows)
+    {
+        var withHealth = rows.Where(r => r.Health.Count > 0).ToList();
+        if (withHealth.Count == 0) return;
+        var ids = withHealth.SelectMany(CompIdsOf).Distinct().ToList();
+
+        var open = OpenHealthFindings();
+        var direct = open
+            .Where(f => f.EntityType == HealthEntityCompetition && ids.Contains(f.EntityId!.Value))
+            .Select(f => new { CompId = f.EntityId!.Value, f.Id, f.CheckId, f.Severity, f.Message, f.Link });
+        var viaResult =
+            from f in open.Where(f => f.EntityType == HealthEntityResult)
+            join r in _db.Results on (long)f.EntityId!.Value equals r.Id
+            where ids.Contains(r.CompetitionId)
+            select new { CompId = r.CompetitionId, f.Id, f.CheckId, f.Severity, f.Message, f.Link };
+        var found = (await direct.Concat(viaResult).ToListAsync()).ToLookup(x => x.CompId);
+
+        foreach (var row in withHealth)
+            row.HealthFindings = CompIdsOf(row)
+                .SelectMany(id => found[id])
+                .OrderByDescending(x => x.Severity).ThenBy(x => x.CheckId, StringComparer.Ordinal).ThenBy(x => x.Id)
+                .Take(CompetitionHealthFinding.PerRowLimit)
+                .Select(x => new CompetitionHealthFinding(x.Id, x.CheckId, x.Severity, x.Message, x.Link))
+                .ToList();
+    }
+
+    /// <summary>
+    /// «Промежуточные не доклеились» — по итогу последней доклейки каждого дня (журнал
+    /// <see cref="SplitAttachJournal"/>, тот же, что у шага 9). Доклейку, идущую прямо сейчас (очередь
+    /// импорта), здесь не видно — её учитывает страница.
+    /// </summary>
+    private async Task AttachSplitsRetryAsync(IReadOnlyList<UnifiedCompetitionRowDto> rows)
+    {
+        var ids = rows.SelectMany(CompIdsOf).Distinct().ToList();
+        if (ids.Count == 0) return;
+        var notes = await new SplitAttachJournal(_db).GetLatestAsync(ids);
+        if (notes.Count == 0) return;
+        foreach (var row in rows)
+            row.SplitsNeedRetry = CompIdsOf(row).Any(id => notes.TryGetValue(id, out var n) && SplitAutoAttachRules.NeedsRetry(n.Kind));
     }
 
     /// <summary>

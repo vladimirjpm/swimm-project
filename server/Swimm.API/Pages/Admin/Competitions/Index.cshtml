@@ -221,6 +221,15 @@
                         <a class="ml-1 text-admin-accent hover:underline" href="@ListUrl(d => d["discipline"] = "all")">показать все ↗</a>
                     </div>
                 }
+                @* «С ошибками» (решение Влада 23.11: фильтры — одной кнопкой): старты с открытой находкой
+                   Health, «⚑», «неполный» или несклеенными промежуточными — CompetitionProblemRules.
+                   Как поиск — по всем сезонам (сезон и месяц сбрасываются), с пагинацией. *@
+                <a href="@Url.Page("Index", new { filter = Swimm.Application.Mapping.CompetitionProblemRules.Filter })"
+                   class="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] no-underline @(Model.QualityFilter == Swimm.Application.Mapping.CompetitionProblemRules.Filter ? "border-admin-danger/40 bg-admin-danger/10 text-admin-danger" : "border-admin-border text-admin-text hover:bg-admin-surface-hover")"
+                   title="Старты, у которых есть хоть одно: ошибка или предупреждение Health (по старту и его строкам, без находок по пловцу), сомнительные строки ⚑, «неполный» (Р114/Р115), промежуточные не доклеились. По всем сезонам.">
+                    <span class="font-bold text-admin-danger">✕</span> С ошибками
+                    <span class="ml-auto text-[11px] text-admin-text-muted">все сезоны</span>
+                </a>
                 @* Фильтр results-auto (П5): те же ссылки, что в блоке дашборда; сезон и месяц сбрасываются —
                    окно задачи (7 дней) короче любого из них. *@
                 <div class="text-[12px] text-admin-text-muted">
@@ -306,6 +315,7 @@
         "no-results" => "без результатов",
         Swimm.Application.Mapping.AutoPullFilters.Blocked => "results-auto: ждут тебя",
         Swimm.Application.Mapping.AutoPullFilters.WouldTake => "results-auto: взяла бы сама",
+        Swimm.Application.Mapping.CompetitionProblemRules.Filter => "с ошибками (Health, ⚑, неполный, промежуточные) — все сезоны",
         _ => Model.QualityFilter
     };
     <div class="admin-card border-l-[3px] border-l-admin-warning bg-admin-warning/5 mb-4 flex items-center justify-between px-4 py-2 text-[13px]">
@@ -566,6 +576,14 @@
                 + (st?.SuggestHide == true ? " Скрыть — кнопкой «Скрыть» в шапке панели справа; само ничего не закрывается." : ""));
         if (s?.StartList is { Stale: true } && st?.State is Swimm.Application.Mapping.CompetitionRowState.Ahead or Swimm.Application.Mapping.CompetitionRowState.Running)
             Add("bg-admin-warning/15 text-admin-warning", "обновить", "Стартовый протокол устарел: до старта мало дней, а забору больше суток");
+        // Открытые находки Health по старту и его строкам (без находок по пловцу) — CompetitionProblemRules.
+        var (healthErr, healthWarn) = Swimm.Application.Mapping.CompetitionProblemRules.Totals(u.Health);
+        if (healthErr > 0)
+            Add("bg-admin-danger/15 text-admin-danger", $"✕ {healthErr}", "Открытые ошибки Health:\n"
+                + Swimm.Application.Mapping.CompetitionProblemRules.Hint(u.Health, Swimm.Application.Mapping.CompetitionProblemRules.ErrorSeverity, Model.CheckTitles));
+        if (healthWarn > 0)
+            Add("bg-admin-warning/15 text-admin-warning", $"⚠ {healthWarn}", "Открытые предупреждения Health:\n"
+                + Swimm.Application.Mapping.CompetitionProblemRules.Hint(u.Health, Swimm.Application.Mapping.CompetitionProblemRules.WarningSeverity, Model.CheckTitles));
         if (SuspectOf(u) is > 0 and var n)
             Add("bg-admin-warning/15 text-admin-warning", $"⚑ {n}", $"Помеченных недостоверными строк: {n}");
         if (s?.EmptySourceAt != null)
@@ -837,7 +855,7 @@
         return new(u, key, RowName(u), PanelDate(st), StateText(st), StateChipCls(st), trophyHtml, chips, meta,
             headSteps, Phases(baseInput with { QualityScanned = scopes[0].QualityScannedAt != null, SuspectCount = scopes[0].SuspectCount, Incomplete = scopes[0].Incomplete != null }),
             scopes, auto, key == selKey,
-            head != null ? RowEditUrl(head.Id, key) : null, dayEdit, dayPublic, quick, cats);
+            head != null ? RowEditUrl(head.Id, key) : null, dayEdit, dayPublic, quick, cats, Model.CheckTitles);
     }
 }
 

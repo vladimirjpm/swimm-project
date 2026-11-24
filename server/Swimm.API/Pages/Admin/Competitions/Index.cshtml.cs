@@ -34,9 +34,12 @@ public class IndexModel : PageModel
         IPointRulesAdminRepository rules, IAdminAuditService audit,
         IConfiguration config, IWebHostEnvironment env, ILogger<IndexModel> logger,
         ISeriesAdminRepository series, TimeProvider time,
-        ISplitAttachJournal? splitJournal = null, IImportJobQueue? jobs = null)
+        ISplitAttachJournal? splitJournal = null, IImportJobQueue? jobs = null,
+        IEnumerable<IDataCheck>? checks = null)
     {
         _splitJournal = splitJournal;
+        // Названия проверок Health — для подсказки значка и блока «Что не так»; id → заголовок.
+        CheckTitles = (checks ?? []).GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First().Title);
         _jobs = jobs;
         _time = time;
         _series = series;
@@ -47,6 +50,9 @@ public class IndexModel : PageModel
         _env = env;
         _logger = logger;
     }
+
+    /// <summary>Заголовки проверок Health по id (реестр <see cref="IDataCheck"/>); нет — показываем id.</summary>
+    public IReadOnlyDictionary<string, string> CheckTitles { get; }
 
     [BindProperty(SupportsGet = true, Name = "q")]
     public string? Search { get; set; }
@@ -252,6 +258,8 @@ public class IndexModel : PageModel
         QualityFilter = FilterAlias switch
         {
             "discovery-error" or "no-org-comp-id" or "no-results" => FilterAlias,
+            // «С ошибками»: находки Health, ⚑, неполный, промежуточные — CompetitionProblemRules.
+            CompetitionProblemRules.Filter => FilterAlias,
             // results-auto (П5): ссылка с дашборда «ждут тебя / взяла бы сама».
             Swimm.Application.Mapping.AutoPullFilters.Blocked or Swimm.Application.Mapping.AutoPullFilters.WouldTake => FilterAlias,
             _ => null
