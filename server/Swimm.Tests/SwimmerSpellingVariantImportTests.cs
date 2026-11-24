@@ -153,6 +153,200 @@ public class SwimmerSpellingVariantImportTests
         Assert.Equal(3, await db.Swimmers.CountAsync());
     }
 
+    // ── Р121 (И-69): два разных имени с одним скелетом в ОДНОМ файле — два человека ──
+
+    [Theory]
+    [InlineData("בדארנה", "מחמוד", "בדארנה", "מוחמד", false)]   // разные «ו/י» — два точных имени
+    [InlineData("יוקליס", "עמליה", "יוקלס", "עמליה", false)]
+    [InlineData("בן-בסט", "יובל", "בן בסט", "יובל", true)]       // пунктуация — одно
+    [InlineData("קליטצ׳וק", "ליאורה", "קליטצ'וק", "ליאורה", true)]
+    [InlineData("בן־בסט", "יובל", "בןבסט", "יובל", true)]
+    public void SpellingForms_ExactNameIgnoresOnlyPunctuation(
+        string lastA, string firstA, string lastB, string firstB, bool sameExact)
+    {
+        var a = ImportSwimmerResolver.SpellingForms(lastA, firstA, 2008)!.Value;
+        var b = ImportSwimmerResolver.SpellingForms(lastB, firstB, 2008)!.Value;
+        Assert.Equal(a.Key, b.Key);
+        Assert.Equal(sameExact, a.Exact == b.Exact);
+    }
+
+    private static object Brother(string first, int lane, string time, string club = "הפועל לב הגליל סחנין") => new
+    {
+        country = "ISR",
+        competition = "גביע ארזי הלבנון",
+        date = "06/10/2023",
+        event_style_name = "Freestyle",
+        event_style_len = "100",
+        event_style_gender = "male",
+        pool_type = "25m",
+        position = lane,
+        heat = 1,
+        lane,
+        last_name = "בדארנה",
+        first_name = first,
+        birth_year = 2008,
+        club,
+        time
+    };
+
+    /// <summary>Строки заплыва по карточкам: «имя → время».</summary>
+    private static async Task<Dictionary<string, string>> TimesByFirstNameAsync(SwimmDbContext db) =>
+        await db.Results.Include(r => r.Swimmer)
+            .ToDictionaryAsync(r => r.Swimmer!.FirstName, r => r.TimeOriginal ?? "");
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Brothers_InOneFile_AreTwoCards_AnyOrder(bool reversed)
+    {
+        // И-69: «מחמוד» и «מוחמד» בדארנה, оба 2008, один клуб; кандидат появляется в этом же импорте.
+        await using var db = CreateDb($"{nameof(Brothers_InOneFile_AreTwoCards_AnyOrder)}-{reversed}");
+        var rows = new[] { Brother("מחמוד", 8, "1:15.56"), Brother("מוחמד", 1, "1:14.65") };
+        if (reversed) Array.Reverse(rows);
+
+        var result = await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(rows));
+
+        Assert.Empty(result.ErrorMessages);
+        Assert.Equal(2, await db.Swimmers.CountAsync());
+        var times = await TimesByFirstNameAsync(db);
+        Assert.Equal(2, times.Count);
+        Assert.Contains("1:15.56", times["מחמוד"]);
+        Assert.Contains("1:14.65", times["מוחמד"]);
+        Assert.DoesNotContain(result.DiagnosticLog, l => l.StartsWith("Другое написание:"));
+        Assert.Contains(result.DiagnosticLog, l => l.StartsWith("Написание не применено:") && l.Contains("Р121"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Brothers_OneAlreadyInDb_SecondGetsOwnCard_AnyOrder(bool reversed)
+    {
+        // Карточка одного брата уже в базе с тем же клубом — прежде все три защиты Р79 были пройдены.
+        await using var db = CreateDb($"{nameof(Brothers_OneAlreadyInDb_SecondGetsOwnCard_AnyOrder)}-{reversed}");
+        var club = new Club { Name = "הפועל לב הגליל סחנין", NameEn = "" };
+        db.Add(club);
+        await db.SaveChangesAsync();
+        var mahmud = new Swimmer { LastName = "בדארנה", FirstName = "מחמוד", BirthYear = 2008, Gender = "male", ClubId = club.Id };
+        db.Add(mahmud);
+        await db.SaveChangesAsync();
+        var rows = new[] { Brother("מחמוד", 8, "1:15.56"), Brother("מוחמד", 1, "1:14.65") };
+        if (reversed) Array.Reverse(rows);
+
+        await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(rows));
+
+        Assert.Equal(2, await db.Swimmers.CountAsync());
+        var mine = await db.Results.Where(r => r.SwimmerId == mahmud.Id).ToListAsync();
+        Assert.Contains("1:15.56", Assert.Single(mine).TimeOriginal);
+    }
+
+    [Fact]
+    public async Task OneBrotherInFile_StillRecognisedBySpelling()
+    {
+        // Граница Р121: в файле ОДНО имя — правило Р79 действует как раньше (и по-прежнему может
+        // ошибиться; это ловит только сверка с игроками loglig, см. docs/data-integrity.md, И-69).
+        var (db, ukeles) = await SeedAsync(nameof(OneBrotherInFile_StillRecognisedBySpelling));
+        await using var _ = db;
+
+        await new JsonImportService(db, new NullCache())
+            .ImportAsync(ToStream(new[] { Item("יוקליס", "עמליה", "SWIM TLV") }));
+
+        Assert.Single(await db.Swimmers.ToListAsync());
+        Assert.Equal(ukeles.Id, (await db.Results.SingleAsync()).SwimmerId);
+    }
+
+    [Fact]
+    public async Task PunctuationOnly_InOneFile_IsStillOneCard()
+    {
+        // «בן-בסט» и «בן בסט» в одном файле — одно точное имя, страховка Р121 не мешает Р79.
+        await using var db = CreateDb(nameof(PunctuationOnly_InOneFile_IsStillOneCard));
+        var club = new Club { Name = "SWIM TLV", NameEn = "" };
+        db.Add(club);
+        await db.SaveChangesAsync();
+        var card = new Swimmer { LastName = "בן בסט", FirstName = "יובל", BirthYear = 2011, Gender = "female", ClubId = club.Id };
+        db.Add(card);
+        await db.SaveChangesAsync();
+
+        var result = await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(new[]
+        {
+            Item("בן-בסט", "יובל", "SWIM TLV", "0:24:00.00"),
+            Item("בן בסט", "יובל", "SWIM TLV", "0:25:00.00"),
+        }));
+
+        Assert.Single(await db.Swimmers.ToListAsync());
+        Assert.DoesNotContain(result.DiagnosticLog, l => l.StartsWith("Написание не применено:"));
+    }
+
+    [Fact]
+    public async Task PunctuationVariant_NextToBrotherInFile_StillGoesToOwnCard()
+    {
+        // В файле «מחמוד» (с дефисом в фамилии) и «מוחמד»; карточка «אבו עסב מחמוד» в базе. Страховка
+        // запрещает приравнять братьев, но не мешает узнать карточку с тем же точным именем.
+        await using var db = CreateDb(nameof(PunctuationVariant_NextToBrotherInFile_StillGoesToOwnCard));
+        var club = new Club { Name = "SWIM TLV", NameEn = "" };
+        db.Add(club);
+        await db.SaveChangesAsync();
+        var card = new Swimmer { LastName = "אבו עסב", FirstName = "מחמוד", BirthYear = 2011, Gender = "male", ClubId = club.Id };
+        db.Add(card);
+        await db.SaveChangesAsync();
+
+        await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(new[]
+        {
+            Item("אבו-עסב", "מוחמד", "SWIM TLV", "0:24:00.00"),
+            Item("אבו-עסב", "מחמוד", "SWIM TLV", "0:25:00.00"),
+        }));
+
+        Assert.Equal(2, await db.Swimmers.CountAsync());
+        var mine = await db.Results.Where(r => r.SwimmerId == card.Id).ToListAsync();
+        Assert.Contains("25:00", Assert.Single(mine).TimeOriginal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Brothers_OneOnlyAsRelayLeg_AreTwoCards(bool relayFirst)
+    {
+        // Один брат плывёт лично, второй есть только в составе эстафеты — имена ног тоже в проходе.
+        await using var db = CreateDb($"{nameof(Brothers_OneOnlyAsRelayLeg_AreTwoCards)}-{relayFirst}");
+        const string club = "הפועל לב הגליל סחנין";
+        object relay = new
+        {
+            country = "ISR",
+            competition = "גביע ארזי הלבנון",
+            date = "06/10/2023",
+            event_style_name = "Freestyle",
+            event_style_len = "4X50",
+            event_style_gender = "male",
+            pool_type = "25m",
+            position = 1,
+            heat = 1,
+            lane = 4,
+            last_name = "לוי",
+            first_name = "דן",
+            birth_year = 2008,
+            club,
+            time = "2:00.00",
+            is_relay = true,
+            relay_team_name = club,
+            relay_swimmers = new[]
+            {
+                new { order = 1, last_name = "לוי", first_name = "דן", birth_year = 2008 },
+                new { order = 2, last_name = "בדארנה", first_name = "מוחמד", birth_year = 2008 },
+            },
+        };
+        var rows = relayFirst
+            ? new[] { relay, Brother("מחמוד", 8, "1:15.56") }
+            : new[] { Brother("מחמוד", 8, "1:15.56"), relay };
+
+        await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(rows));
+
+        var badarna = await db.Swimmers.Where(s => s.LastName == "בדארנה").ToListAsync();
+        Assert.Equal(2, badarna.Count);
+        var leg = badarna.Single(s => s.FirstName == "מוחמד");
+        Assert.Contains(await db.RelayMembers.ToListAsync(), m => m.SwimmerId == leg.Id);
+        Assert.Equal(badarna.Single(s => s.FirstName == "מחמוד").Id,
+            (await db.Results.SingleAsync(r => r.RelayId == null)).SwimmerId);
+    }
+
     [Fact]
     public async Task RelayLeg_Variant_GoesToExistingCard()
     {

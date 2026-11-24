@@ -22,7 +22,8 @@ namespace Swimm.Infrastructure.Services;
 ///   <item>то же со сдвигом границы на шве «имя→фамилия» (<see cref="SwimmerFirstLastKey"/>, И-56);</item>
 ///   <item>имя латиницей в ивритском протоколе — по английским именам карточек;</item>
 ///   <item>точное совпадение в базе (карточка вне кэша);</item>
-///   <item>другое написание при том же клубе (<see cref="SwimmerSpellingKey"/>, Р79);</item>
+///   <item>другое написание при том же клубе (<see cref="SwimmerSpellingKey"/>, Р79) — кроме двух
+///     разных имён в одном файле (<see cref="NoteFileNames"/>, Р121);</item>
 ///   <item>год со сдвигом на сто лет при том же имени и клубе (<see cref="FindByCenturyShift"/>, Р104);</item>
 ///   <item>новая карточка.</item>
 /// </list>
@@ -44,6 +45,9 @@ internal sealed class ImportSwimmerResolver
     private readonly Dictionary<string, Swimmer?> _byFirstLast = new();
     // Фоллбек «то же имя другим написанием» (כתיב מלא/חסר) — см. SwimmerSpellingKey.
     private readonly Dictionary<string, List<Swimmer>> _bySpelling = new();
+    // Имена импортируемого файла: ключ написания → точные имена под ним (точное → как напечатано).
+    // Два точных имени под одним ключом — два человека, см. NoteFileNames (Р121).
+    private readonly Dictionary<string, Dictionary<string, string>> _fileSpellings = new();
 
     // Страж тёзок (инцидент И-11, docs/data-integrity.md). Ключ матчинга пловца —
     // «фамилия|имя|годРождения», без клуба и без внешнего id, поэтому два ребёнка-тёзки
@@ -434,15 +438,43 @@ internal sealed class ImportSwimmerResolver
     /// см. <see cref="FindBySpelling"/>: нужны ещё тот же клуб и единственный кандидат.
     /// null — в имени нет иврита (латиница так не пишется) или нет года.
     /// </summary>
-    internal static string? SwimmerSpellingKey(string? last, string? first, int? year)
+    internal static string? SwimmerSpellingKey(string? last, string? first, int? year) =>
+        SpellingForms(last, first, year)?.Key;
+
+    /// <summary>
+    /// Ключ написания и рядом — «точное имя»: то же полное имя, с которого снята ТОЛЬКО пунктуация
+    /// (дефис, макаф, пробел, апостроф, гереш), а «ו/י» оставлены. Два разных точных имени под одним
+    /// ключом — «מחמוד» и «מוחמד»; «בן-בסט» и «בן בסט» — одно точное имя (Р121, И-69).
+    /// </summary>
+    internal static (string Key, string Exact)? SpellingForms(string? last, string? first, int? year)
     {
         var full = $"{last} {first}";
         if (year is not > 0 || !full.Any(c => c is >= 'א' and <= 'ת')) return null;
 
-        var skeleton = new string(SwimmerDedupService.Normalize(full)
-            .Where(c => c is not ('י' or 'ו' or '-' or '־' or ' ' or '\'' or '"'))
+        var exact = new string(SwimmerDedupService.Normalize(full)
+            .Where(c => c is not ('-' or '־' or ' ' or '\'' or '"'))
             .ToArray());
-        return skeleton.Length == 0 ? null : $"{skeleton}|{year}";
+        var skeleton = new string(exact.Where(c => c is not ('י' or 'ו')).ToArray());
+        return skeleton.Length == 0 ? null : ($"{skeleton}|{year}", exact);
+    }
+
+    /// <summary>
+    /// Имена ВСЕГО импортируемого файла — до первой строки (Р121, И-69). Протокол печатает человека из
+    /// реестра одним написанием, поэтому два разных точных имени с одним скелетом и годом в одном
+    /// файле — два человека («מחמוד בדארנה» и «מוחמד בדארנה», братья 2008 г. р. из одного клуба), и
+    /// запасной путь «другое написание» (Р79) между ними не применяется. Предварительный проход нужен,
+    /// чтобы исход не зависел от порядка строк: без него первая строка успевала «узнать» в карточке
+    /// из базы другого брата раньше, чем импорт видел второе имя.
+    /// Личные строки и ноги эстафет вместе; имена без иврита и без года ключа не имеют.
+    /// </summary>
+    public void NoteFileNames(IEnumerable<(string? Last, string? First, int? Year)> names)
+    {
+        foreach (var (last, first, year) in names)
+        {
+            if (SpellingForms(last, first, year) is not var (key, exact)) continue;
+            if (!_fileSpellings.TryGetValue(key, out var forms)) _fileSpellings[key] = forms = new();
+            forms.TryAdd(exact, $"{last} {first}".Trim());
+        }
     }
 
     private static void AddBySpelling(Dictionary<string, List<Swimmer>> index, Swimmer swimmer)
@@ -457,7 +489,8 @@ internal sealed class ImportSwimmerResolver
 
     /// <summary>
     /// Карточка того же человека, записанного другим написанием (<see cref="SwimmerSpellingKey"/>):
-    /// тот же год, ТОТ ЖЕ КЛУБ и ровно один такой кандидат. «Тот же клуб» (Р110,
+    /// тот же год, ТОТ ЖЕ КЛУБ и ровно один такой кандидат; не применяется между двумя разными именами
+    /// одного файла (Р121, <see cref="NoteFileNames"/>). «Тот же клуб» (Р110,
     /// <see cref="ImportClubEvidence"/>) — клуб карточки, или любой клуб пловца за 2 последних сезона, или
     /// клуб на его карточке loglig: после Р98 карточка меняет клуб лишь с подтверждения loglig, и
     /// перешедший ребёнок с другим написанием иначе получал дубль. Иначе null — вызывающий заводит новую
@@ -465,8 +498,29 @@ internal sealed class ImportSwimmerResolver
     /// </summary>
     private async Task<Swimmer?> FindBySpellingAsync(string? last, string? first, int? year, Club? club)
     {
-        if (club is null || SwimmerSpellingKey(last, first, year) is not { } key) return null;
+        if (club is null || SpellingForms(last, first, year) is not var (key, exact)) return null;
         if (!_bySpelling.TryGetValue(key, out var candidates)) return null;
+
+        // Р121 (И-69): в этом же файле под тем же скелетом есть другое точное имя — это два человека.
+        // Кандидатом остаётся только карточка с ТЕМ ЖЕ точным именем (разница в одной пунктуации).
+        if (_fileSpellings.TryGetValue(key, out var inFile) && inFile.Count > 1)
+        {
+            var samePerson = candidates
+                .Where(c => SpellingForms(c.LastName, c.FirstName, c.BirthYear)?.Exact == exact)
+                .ToList();
+            if (samePerson.Count == 0)
+            {
+                var others = string.Join(", ", inFile.Where(f => f.Key != exact).Select(f => $"'{f.Value}'"));
+                var cards = string.Join(", ", candidates.Select(c => $"#{c.Id} '{c.LastName} {c.FirstName}'"));
+                _diagnosticLog.Add(
+                    $"Написание не применено: '{last} {first}' ({year}) не приравнен к {cards} — в этом же файле "
+                    + $"есть и другое имя с теми же согласными: {others}. Протокол печатает человека одним "
+                    + "написанием, значит это разные люди (Р121)");
+                return null;
+            }
+            candidates = samePerson;
+        }
+
         if (await _clubEvidence.PickAsync(candidates, club) is not { } match) return null;
 
         var found = match.Swimmer;
