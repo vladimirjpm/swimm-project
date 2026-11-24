@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Swimm.Domain;
 
 namespace Swimm.Application.Mapping;
 
@@ -7,10 +8,18 @@ namespace Swimm.Application.Mapping;
 /// <param name="Heat">Номер заплыва; 0 — не указан.</param>
 /// <param name="Printed">Время как напечатано; пусто/«0:00.00» — времени нет.</param>
 /// <param name="TimeFail">Признак парсера time_fail (NS/DNS/DQ… или строка без времени).</param>
-public sealed record ProgressRow(string Event, bool IsRelay, int Heat, string? Printed, bool TimeFail)
+/// <param name="FailNote">Что напечатано вместо времени (time_fail_note): «DNS», «DQ / SW 6.5», «NS»…
+/// Оба производителя строк (<see cref="CompetitionProgress.EvaluateJson"/> и импорт) его передают.</param>
+public sealed record ProgressRow(string Event, bool IsRelay, int Heat, string? Printed, bool TimeFail, string? FailNote = null)
 {
     /// <summary>Есть настоящее время: не time_fail и в строке есть ненулевая цифра (как в day-json.mjs).</summary>
     public bool HasTime => !TimeFail && Printed is not null && Printed.Any(c => c is >= '1' and <= '9');
+
+    /// <summary>
+    /// Вместо времени — отметка судьи (DNS/DQ/DNF, <see cref="StartStatus.IsOfficialMark"/>):
+    /// времени по строке не будет, ждать её нечего. «NS» и пустая графа — не отметка.
+    /// </summary>
+    public bool HasOfficialMark => StartStatus.IsOfficialMark(TimeFail, FailNote);
 }
 
 /// <summary>Сводка по одному событию протокола.</summary>
@@ -74,23 +83,42 @@ public sealed record CompetitionProgressSummary(IReadOnlyList<EventProgress> Eve
 ///
 /// Правило: событие проплыто, если в его ПОСЛЕДНЕМ заплыве (максимальный Heat) есть хоть одно
 /// время — эстафета с проплытым только первым заплывом проплытой не считается.
+///
+/// Р120 (23.11.2026): строки с отметкой судьи (DNS/DQ/DNF — <see cref="ProgressRow.HasOfficialMark"/>)
+/// в этом правиле не участвуют — по ним ждать нечего. «Последний заплыв» — последний среди
+/// остальных строк; если остальных нет (секция целиком из DNS/DQ/DNF), событие проплыто.
+/// Смешанный заплыв — часть строк с отметкой, часть пустые («NS» или ничего), времени нет —
+/// по-прежнему не проплыт: пустая строка значит «результат не внесён», а DNS организатор может
+/// проставить и заранее, до заплыва. Правило только снимает ложное «ждёт» и нового «ждёт» не
+/// даёт: событие со временем в последнем заплыве проплыто, как и раньше.
+/// Протокол, где неявка — каждая строка старта, — «∅ нет протокола» (Р116,
+/// <see cref="Validation.NoStartProtocol"/>): results-auto отсекает его раньше этой оценки.
+/// Страховка: в протоколе без единого времени отметки не засчитываются — прежнее правило.
 /// </summary>
 public static class CompetitionProgress
 {
     public static CompetitionProgressSummary Evaluate(IEnumerable<ProgressRow> rows)
     {
-        var events = rows
+        var all = rows.ToList();
+        // Страховка Р120 (ревью PR #275): отметки засчитываются, только если в протоколе есть хоть
+        // одно время. Протокол из одних отметок (все DNS и одна DQ; одни DNS импортом в обход
+        // превью — CLI --file/--repull) идёт прежним правилом: «не закончено», а не «закончено»
+        // при нуле времён. NoStartProtocol.AllNoStart такой протокол с DQ/DNF не ловит.
+        var marksCount = all.Any(r => r.HasTime);
+        var events = all
             .GroupBy(r => r.Event)
             .Select(g =>
             {
                 var list = g.ToList();
-                var lastHeat = list.Max(r => r.Heat);
+                var open = marksCount ? list.Where(r => !r.HasOfficialMark).ToList() : list;
+                var finished = open.Count == 0
+                    || open.Any(r => r.Heat == open.Max(o => o.Heat) && r.HasTime);
                 return new EventProgress(
                     g.Key,
                     list.Any(r => r.IsRelay),
                     list.Count,
                     list.Count(r => r.HasTime),
-                    list.Any(r => r.Heat == lastHeat && r.HasTime));
+                    finished);
             })
             .ToList();
         return new CompetitionProgressSummary(events);
@@ -112,10 +140,20 @@ public static class CompetitionProgress
                 o.TryGetProperty("is_relay", out var r) && r.ValueKind == JsonValueKind.True,
                 o.TryGetProperty("heat", out var h) && h.ValueKind == JsonValueKind.Number ? h.GetInt32() : 0,
                 Str(o, "time"),
-                o.TryGetProperty("time_fail", out var f) && f.ValueKind == JsonValueKind.True));
+                IsTrue(o, "time_fail"),
+                Str(o, "time_fail_note")));
         }
         return Evaluate(rows);
     }
+
+    // time_fail встречается и булевым, и строкой «"true"» (как в NoStartProtocol).
+    private static bool IsTrue(JsonElement o, string name) =>
+        o.TryGetProperty(name, out var v) && v.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.String => bool.TryParse(v.GetString(), out var b) && b,
+            _ => false,
+        };
 
     private static string? Str(JsonElement o, string name) =>
         o.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;

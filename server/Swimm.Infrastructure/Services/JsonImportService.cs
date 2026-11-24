@@ -793,7 +793,7 @@ public class JsonImportService : IImportService
             var eventName = string.IsNullOrWhiteSpace(item.Event) ? reconKey.EventKey : item.Event;
             if (!progressRows.TryGetValue(competition.Id, out var dayRows))
                 progressRows[competition.Id] = dayRows = [];
-            dayRows.Add(new ProgressRow(eventName, item.IsRelay == true, item.Heat ?? 0, item.Time, item.TimeFail));
+            dayRows.Add(new ProgressRow(eventName, item.IsRelay == true, item.Heat ?? 0, item.Time, item.TimeFail, item.TimeFailNote));
         }
 
         // 4. Club

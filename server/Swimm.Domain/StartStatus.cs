@@ -14,4 +14,23 @@ public static class StartStatus
 {
     public static bool IsNoStart(bool timeFail, string? failNote) =>
         timeFail && failNote?.Trim().ToUpperInvariant() is "NS" or "DNS";
+
+    /// <summary>
+    /// В графе результата стоит отметка судьи — <c>DNS</c>, <c>DQ…</c>/<c>DSQ</c>, <c>DNF…</c>
+    /// («DQ / SW 6.5», «DNF / SW 10.2»): заплыв был, по этой строке времени не будет никогда.
+    /// Нужно правилу «проплыто ли» (<c>CompetitionProgress</c>, Р120).
+    ///
+    /// ⚠ <c>NS</c> сюда НЕ входит, хотя для «стартовал ли» (<see cref="IsNoStart"/>) это неявка.
+    /// PDF loglig печатает «NS» в строке, по которой результат ещё не внесён: у неполного протокола
+    /// непроплытые события идут строками «NS» (comp 1768, забран 10.10.2026: 140 «NS», в свежем PDF
+    /// у 134 из них время), у непроведённого старта — все строки «0 NS» (14676, Р116). «DNS» же
+    /// вносит организатор (там же: одна строка стала «DNS»). Поэтому «NS» не доказывает, что заплыв
+    /// прошёл, а «DNS» доказывает.
+    /// </summary>
+    public static bool IsOfficialMark(bool timeFail, string? failNote)
+    {
+        if (!timeFail || string.IsNullOrWhiteSpace(failNote)) return false;
+        var head = failNote.Trim().Split([' ', '/'], 2, StringSplitOptions.RemoveEmptyEntries)[0].ToUpperInvariant();
+        return head is "DNS" or "DQ" or "DSQ" or "DNF";
+    }
 }
