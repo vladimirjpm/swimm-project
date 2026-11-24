@@ -108,7 +108,22 @@ public class CompetitionProgressTests
 
     [Fact]
     public void Section_of_only_DQ_and_DNF_is_finished() =>
-        Assert.True(CompetitionProgress.Evaluate([Marked("100 fly", 1, "DQ / SW 8.2"), Marked("100 fly", 1, "DNF")]).IsFinished);
+        Assert.True(CompetitionProgress.Evaluate([
+            Swam("50 free", 1), Marked("100 fly", 1, "DQ / SW 8.2"), Marked("100 fly", 1, "DNF"),
+        ]).IsFinished);
+
+    [Fact]
+    public void Protocol_of_only_marks_without_any_time_is_not_finished()
+    {
+        // Страховка ревью PR #275: все DNS и одна DQ — AllNoStart это не ловит (DQ — старт),
+        // а «закончено» при нуле времён было бы ложным. Прежнее правило: ни одно событие не проплыто.
+        var s = CompetitionProgress.Evaluate([
+            Marked("50 free", 1, "DNS"), Marked("50 free", 1, "DQ"), Marked("100 back", 1, "DNS"),
+        ]);
+        Assert.False(s.IsFinished);
+        Assert.Equal(2, s.Pending.Count);
+        Assert.Contains("50 free: ещё не плыли (0 из 2 со временем)", s.Pending);
+    }
 
     [Fact]
     public void Last_heat_of_only_marks_falls_back_to_previous_heat()

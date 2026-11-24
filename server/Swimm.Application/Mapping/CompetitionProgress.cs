@@ -93,17 +93,24 @@ public sealed record CompetitionProgressSummary(IReadOnlyList<EventProgress> Eve
 /// даёт: событие со временем в последнем заплыве проплыто, как и раньше.
 /// Протокол, где неявка — каждая строка старта, — «∅ нет протокола» (Р116,
 /// <see cref="Validation.NoStartProtocol"/>): results-auto отсекает его раньше этой оценки.
+/// Страховка: в протоколе без единого времени отметки не засчитываются — прежнее правило.
 /// </summary>
 public static class CompetitionProgress
 {
     public static CompetitionProgressSummary Evaluate(IEnumerable<ProgressRow> rows)
     {
-        var events = rows
+        var all = rows.ToList();
+        // Страховка Р120 (ревью PR #275): отметки засчитываются, только если в протоколе есть хоть
+        // одно время. Протокол из одних отметок (все DNS и одна DQ; одни DNS импортом в обход
+        // превью — CLI --file/--repull) идёт прежним правилом: «не закончено», а не «закончено»
+        // при нуле времён. NoStartProtocol.AllNoStart такой протокол с DQ/DNF не ловит.
+        var marksCount = all.Any(r => r.HasTime);
+        var events = all
             .GroupBy(r => r.Event)
             .Select(g =>
             {
                 var list = g.ToList();
-                var open = list.Where(r => !r.HasOfficialMark).ToList();
+                var open = marksCount ? list.Where(r => !r.HasOfficialMark).ToList() : list;
                 var finished = open.Count == 0
                     || open.Any(r => r.Heat == open.Max(o => o.Heat) && r.HasTime);
                 return new EventProgress(

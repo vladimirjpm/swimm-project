@@ -129,19 +129,40 @@ public class PartialResultsImportTests
         Assert.Equal(before, after);
     }
 
+    private static object Dns(string ev, string style, string last) => new
+    {
+        country = "ISR", competition = "utest ליגת חורף", date = "20/11/2026",
+        @event = ev, event_style_name = style, event_style_len = "50",
+        event_style_gender = "female", pool_type = "25m", position = 0, heat = 1, lane = 1,
+        last_name = last, first_name = "utest", birth_year = 2014, club = "utest club",
+        time = "", time_fail = true, time_fail_note = "DNS",
+    };
+
+    private static object Dns(string last) => Dns("50m Backstroke - GIRLS 12", "Backstroke", last);
+
+    [Fact]
+    public async Task Protocol_of_only_DNS_imported_without_preview_still_marks_the_day()
+    {
+        // Страховка ревью PR #275: CLI --file/--repull идут в обход превью (Р116 там не срабатывает).
+        // Протокол из одних DNS без единого времени — отметка «неполные», как до Р120.
+        await using var db = CreateDb(nameof(Protocol_of_only_DNS_imported_without_preview_still_marks_the_day));
+        object[] protocol =
+        [
+            Dns("50m Freestyle - GIRLS 12", "Freestyle", "אאא"), Dns("50m Freestyle - GIRLS 12", "Freestyle", "בבב"),
+            Dns("אאא"), Dns("בבב"),
+        ];
+
+        var result = await new JsonImportService(db, new NullCache()).ImportAsync(ToStream(protocol));
+        Assert.Empty(result.ErrorMessages);
+        var c = await db.Competitions.AsNoTracking().SingleAsync();
+        Assert.StartsWith("ждут 2 из 2 событий", c.PartialResults);
+    }
+
     [Fact]
     public async Task Section_of_only_DNS_does_not_mark_the_day()
     {
         // Р120 сквозь импорт (16926): секция «на спине» — у обеих «DNS», вольный со временем.
         await using var db = CreateDb(nameof(Section_of_only_DNS_does_not_mark_the_day));
-        object Dns(string last) => new
-        {
-            country = "ISR", competition = "utest ליגת חורף", date = "20/11/2026",
-            @event = "50m Backstroke - GIRLS 12", event_style_name = "Backstroke", event_style_len = "50",
-            event_style_gender = "female", pool_type = "25m", position = 0, heat = 1, lane = 1,
-            last_name = last, first_name = "utest", birth_year = 2014, club = "utest club",
-            time = "", time_fail = true, time_fail_note = "DNS",
-        };
         object[] protocol =
         [
             Row("50m Freestyle - GIRLS 12", "Freestyle", "אאא", "0:32.10", false),
