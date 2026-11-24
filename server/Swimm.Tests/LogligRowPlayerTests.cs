@@ -25,8 +25,26 @@ public class LogligRowPlayerTests
     private const int Mahmud = 240949, Muhammad = 240950;
     private const int CompId = 454, LogligCompetition = 9453, EventId = 41431;
 
-    private static LogligEventResults Page() => LogligEventResultsParser.Parse(File.ReadAllText(
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "Parsing", "loglig", "event-41431-100free-two-brothers.html")));
+    private static LogligEventResults Page(string file = "event-41431-100free-two-brothers.html") =>
+        LogligEventResultsParser.Parse(File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "Fixtures", "Parsing", "loglig", file)));
+
+    // Запасной источник — ПОЛНАЯ (не печатная) страница той же дисциплины, как её отдаёт сайт:
+    // с шапкой, меню и скриптами. Разбор обязан дать те же строки и тех же игроков.
+    [Fact]
+    public void Parser_FullPage_GivesSameRowsAndPlayers_AsModal()
+    {
+        var modal = Page();
+        var full = Page("event-41431-100free-two-brothers-fullpage.html");
+
+        Assert.Equal(modal.Rows.Count, full.Rows.Count);
+        Assert.Equal((modal.StyleName, modal.Distance, modal.Gender, modal.Date), (full.StyleName, full.Distance, full.Gender, full.Date));
+        Assert.Equal(
+            modal.Rows.Select(r => (r.PlayerId, r.Heat, r.Lane, r.Time)),
+            full.Rows.Select(r => (r.PlayerId, r.Heat, r.Lane, r.Time)));
+        Assert.Contains(full.Rows, r => r.PlayerId == Mahmud && r.Lane == 8);
+        Assert.Contains(full.Rows, r => r.PlayerId == Muhammad && r.Lane == 1);
+    }
 
     // ── Разбор ────────────────────────────────────────────────────────────────
 
@@ -149,6 +167,32 @@ public class LogligRowPlayerTests
         Assert.Empty(plan.Matches);
     }
 
+    // Прочитаны не все страницы — без времени не сводим: двойник мог остаться на непрочитанной.
+    [Fact]
+    public void Matcher_UntimedOff_LeavesNoTimeRowsAlone_ButPairsTimed()
+    {
+        var plan = LogligRowPlayerMatcher.Build(
+            [Src(1, 1, 4, null), Src(2, 2, 5, 60000), Src(3, 3, 3, 61000)],
+            [Ours(10, 1, 4, null), Ours(11, 2, 5, 60000), Ours(12, 3, 3, null)],
+            allowUntimed: false);
+
+        Assert.Equal(2, Assert.Single(plan.Matches).Value);
+        Assert.Equal(2, plan.SourceUnmatched);
+    }
+
+    // Одну нашу строку берут строка источника с датой и строка без даты: не доказана ни одна,
+    // и в счёт неоднозначных они входят ровно по разу.
+    [Fact]
+    public void Matcher_ContestedRow_CountsEachClaimantOnce()
+    {
+        var plan = LogligRowPlayerMatcher.Build(
+            [Src(1, 1, 4, 60000), Src(2, 1, 4, 60000, date: "")],
+            [Ours(10, 1, 4, 60000)]);
+
+        Assert.Empty(plan.Matches);
+        Assert.Equal((2, 0), (plan.Ambiguous, plan.SourceUnmatched));
+    }
+
     [Fact]
     public void Matcher_OtherDay_IsNotMatched()
     {
@@ -188,7 +232,7 @@ public class LogligRowPlayerTests
         db.Swimmers.Add(new Swimmer { Id = 3, LastName = "сосед", FirstName = "по заплыву", BirthYear = 2008 });
         db.Results.Add(Row(10, 1, 2, 8, "1:15.56"));
         db.Results.Add(Row(11, merged ? 1 : 2, 2, 1, "1:14.65"));
-        db.Results.Add(Row(12, 3, other.Heat, other.Lane, other.Time!.TrimStart('0')));
+        db.Results.Add(Row(12, 3, other.Heat, other.Lane, other.Time!));
         db.SaveChanges();
         db.ChangeTracker.Clear();
         return db;
@@ -313,6 +357,7 @@ public class LogligRowPlayerTests
         Assert.Equal(1, outcome.Total);
         var item = Assert.Single(outcome.Items);
         Assert.Equal(("Swimmer", 1), (item.EntityType, item.EntityId));
+        Assert.Equal((DataCheckFixKinds.SwimmerInCompetition, 1895), (item.FixKind, item.FixEntityId));
         Assert.Contains("240949", item.Message);
         Assert.Contains("240950", item.Message);
         Assert.Contains("מוחמד", item.Message);
@@ -335,23 +380,219 @@ public class LogligRowPlayerTests
         Assert.Empty((await new SwimmerTwoLogligPlayersCheck(db).RunAsync()).Items);
     }
 
-    // InMemory не показывает, переводится ли запрос в SQL (группировка с Min/Max по nullable):
-    // гоняем проверку на живом Postgres. Только чтение; нет базы или миграции — пропуск.
+    // ── Замечания ревью: непрочитанные страницы, время, запасная страница ─────
+
+    private const int OtherEvent = 41432;
+
+    private static LogligEventResultsDto RelayPage() =>
+        new("кубок", "06/10/2023", "Freestyle", "4X50", "male", "", true, []);
+
+    /// <summary>Страница 41431 плюс строка-неявка (заплыв 9, дорожка 9, игрок 777).</summary>
+    private static LogligEventResultsDto PageWithNoShow()
+    {
+        var dto = Dto(Page());
+        return dto with
+        {
+            Rows = [.. dto.Rows, new LogligResultRowDto(null, "", "", "неявка", 2008, "клуб", 9, 9, null, "NS", 0, null, null, null, 777)],
+        };
+    }
+
+    private static async Task AddNoShowRowAsync(SwimmDbContext db)
+    {
+        var row = Row(13, 3, 9, 9, "");
+        row.TimeMillisecond = null;
+        row.TimeFail = true;
+        row.TimeFailNote = "NS";
+        db.Results.Add(row);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+    }
+
+    [Fact]
+    public async Task Step_AllPagesRead_NoShowRowGetsItsPlayer()
+    {
+        using var db = Db();
+        await AddNoShowRowAsync(db);
+        var (service, provider, _) = Build(db);
+        provider.Setup(p => p.FetchEventResultsAsync(EventId, It.IsAny<CancellationToken>())).ReturnsAsync(PageWithNoShow());
+
+        var report = await service.StampAsync(CompId, "import");
+
+        Assert.False(report.Incomplete);
+        Assert.Equal(777, (await db.Results.AsNoTracking().SingleAsync(r => r.Id == 13)).LogligPlayerId);
+    }
+
+    // Таймаут HttpClient — TaskCanceledException при НЕотменённом токене: это «дисциплина не
+    // прочитана», а не срыв прогона. И раз прочитано не всё — строки без времени не сводим.
+    [Fact]
+    public async Task Step_PageTimeout_IsUnreadableDiscipline_TimedRowsWritten_NoShowRowsNot()
+    {
+        using var db = Db();
+        await AddNoShowRowAsync(db);
+        var (service, provider, audit) = Build(db);
+        provider.Setup(p => p.FetchEventIdsAsync(LogligCompetition, It.IsAny<CancellationToken>())).ReturnsAsync([EventId, OtherEvent]);
+        provider.Setup(p => p.FetchEventResultsAsync(EventId, It.IsAny<CancellationToken>())).ReturnsAsync(PageWithNoShow());
+        provider.Setup(p => p.FetchEventResultsAsync(OtherEvent, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout"));
+
+        var report = await service.StampAsync(CompId, "import");
+
+        Assert.True(report.Ok);
+        Assert.True(report.Incomplete);
+        Assert.Equal([OtherEvent], report.Unreadable);
+        Assert.Equal(3, report.Written);
+        var rows = await db.Results.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.LogligPlayerId);
+        Assert.Equal(Mahmud, rows[10]);
+        Assert.Null(rows[13]);
+        Assert.Contains("строки без времени не сопоставлялись", Assert.Single(audit).Summary);
+    }
+
+    // Отмена НАШЕГО токена (потолок, остановка процесса) — не «дисциплина не прочитана».
+    [Fact]
+    public async Task Step_OurCancellation_Propagates_WithAudit()
+    {
+        using var db = Db();
+        var (service, provider, audit) = Build(db);
+        using var cts = new CancellationTokenSource();
+        provider.Setup(p => p.FetchEventResultsAsync(EventId, It.IsAny<CancellationToken>()))
+            .Returns(async () => { await cts.CancelAsync(); throw new OperationCanceledException(cts.Token); });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.StampAsync(CompId, "import", cts.Token));
+
+        Assert.Contains("не удалось", Assert.Single(audit).Summary);
+    }
+
+    // Истёк бюджет чтения: прочитанное сопоставлено и записано, остаток посчитан — работа не потеряна.
+    [Fact]
+    public async Task Step_ReadBudgetExpired_SavesWhatWasRead_AndReportsTheRest()
+    {
+        using var db = Db();
+        var (service, provider, _) = Build(db);
+        provider.Setup(p => p.FetchEventIdsAsync(LogligCompetition, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([EventId, OtherEvent, OtherEvent + 1]);
+        provider.Setup(p => p.FetchEventResultsAsync(EventId, It.IsAny<CancellationToken>()))
+            .Returns(async () => { await Task.Delay(80); return Dto(Page()); });
+
+        var report = await service.StampAsync(CompId, "import", default, TimeSpan.FromMilliseconds(20));
+
+        Assert.True(report.Ok);
+        Assert.Equal((2, 3, true), (report.NotReached, report.Written, report.Incomplete));
+        Assert.Equal(Muhammad, (await db.Results.AsNoTracking().SingleAsync(r => r.Id == 11)).LogligPlayerId);
+        provider.Verify(p => p.FetchEventResultsAsync(OtherEvent, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // Запасная полная страница тоже без ссылок — вёрстка сменилась у обеих: второй раз не пробуем.
+    [Fact]
+    public async Task Step_FullPageAlsoWithoutLinks_IsTriedOnlyOnce()
+    {
+        using var db = Db();
+        var (service, provider, _) = Build(db, modalHasLinks: false);
+        provider.Setup(p => p.FetchEventIdsAsync(LogligCompetition, It.IsAny<CancellationToken>())).ReturnsAsync([EventId, OtherEvent]);
+        provider.Setup(p => p.FetchEventResultsAsync(OtherEvent, It.IsAny<CancellationToken>())).ReturnsAsync(Dto(Page(), withLinks: false));
+        provider.Setup(p => p.FetchEventResultsFullPageAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Dto(Page(), withLinks: false));
+
+        var report = await service.StampAsync(CompId, "import");
+
+        provider.Verify(p => p.FetchEventResultsFullPageAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal((0, 4), (report.Matched, report.Requests));   // список + 2 страницы + 1 запасная
+        Assert.True(report.NoLink > 0);
+    }
+
+    // ── Проверка: многодневка и ключ находки ──────────────────────────────────
+
+    /// <summary>Событие из двух дней; у карточки #1 в день 1 строка одного игрока, в день 2 — другого.</summary>
+    private static SwimmDbContext MultiDayDb()
+    {
+        var db = new SwimmDbContext(new DbContextOptionsBuilder<SwimmDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+        db.CompetitionEvents.Add(new CompetitionEvent { Id = 7, Name = "чемпионат" });
+        db.Competitions.Add(new Competition { Id = 21, EventId = 7, OrgCompId = 500, Name = "чемпионат", Date = "01/02/2026", PoolType = "50m" });
+        db.Competitions.Add(new Competition { Id = 22, EventId = 7, Name = "чемпионат", Date = "02/02/2026", PoolType = "50m" });
+        db.Competitions.Add(new Competition { Id = 30, Name = "кубок", Date = "09/03/2026", PoolType = "25m" });
+        db.Styles.Add(new Style { Id = 1, Name = "Freestyle" });
+        db.Clubs.Add(new Club { Id = 1, Name = "клуб", NameEn = "" });
+        db.Swimmers.Add(new Swimmer { Id = 1, LastName = "בדארנה", FirstName = "מחמוד", BirthYear = 2008 });
+        db.LogligPlayers.Add(new LogligPlayer { LogligId = Mahmud, FullName = "מחמוד היתם בדארנה", SeenAt = DateTime.UtcNow });
+        db.LogligPlayers.Add(new LogligPlayer { LogligId = Muhammad, FullName = "מוחמד היתם בדארנה", SeenAt = DateTime.UtcNow });
+        db.SaveChanges();
+        return db;
+    }
+
+    private static ResultRecord PlayerRow(long id, int competitionId, int player, int lane) => new()
+    {
+        Id = id, CompetitionId = competitionId, SwimmerId = 1, ClubId = 1, StyleId = 1,
+        CompetitionDate = new DateTime(2026, 2, 1), Distance = "100", Gender = "male",
+        Heat = 2, Lane = lane, TimeOriginal = "1:15.56", TimeMillisecond = 75560, LogligPlayerId = player,
+    };
+
+    // Братья плыли в РАЗНЫЕ дни одного события: по дню у карточки один игрок, по событию — два.
+    [Fact]
+    public async Task Check_BrothersOnDifferentDaysOfOneEvent_IsOneFindingForTheEvent()
+    {
+        using var db = MultiDayDb();
+        db.Results.AddRange(PlayerRow(1, 21, Mahmud, 8), PlayerRow(2, 22, Muhammad, 1));
+        await db.SaveChangesAsync();
+
+        var outcome = await new SwimmerTwoLogligPlayersCheck(db).RunAsync();
+
+        Assert.Equal(1, outcome.Total);
+        var item = Assert.Single(outcome.Items);
+        Assert.Equal((1, 21), (item.EntityId, item.FixEntityId));   // пловец + первый день события
+        Assert.Contains("дни #21, #22", item.Message);
+        Assert.Contains("день #21 100 Freestyle з.2 д.8", item.Details);
+        Assert.Contains("день #22 100 Freestyle з.2 д.1", item.Details);
+    }
+
+    // Один игрок в одном старте и другой — в ДРУГОМ соревновании: это не находка (у loglig бывают
+    // дубли игрока, а сезон от сезона запись могли завести заново).
+    [Fact]
+    public async Task Check_DifferentPlayersInDifferentCompetitions_IsClean()
+    {
+        using var db = MultiDayDb();
+        db.Results.AddRange(PlayerRow(1, 21, Mahmud, 8), PlayerRow(2, 30, Muhammad, 1));
+        await db.SaveChangesAsync();
+
+        Assert.Empty((await new SwimmerTwoLogligPlayersCheck(db).RunAsync()).Items);
+    }
+
+    // Ключ находки — пловец + соревнование: «принято» в одном старте не глушит ту же карточку в другом.
+    [Fact]
+    public async Task Finding_AcceptedInOneCompetition_StillOpensInAnother()
+    {
+        using var db = MultiDayDb();
+        db.Results.AddRange(PlayerRow(1, 21, Mahmud, 8), PlayerRow(2, 21, Muhammad, 1));
+        await db.SaveChangesAsync();
+        var runner = new DataCheckRunner(db, [new SwimmerTwoLogligPlayersCheck(db)]);
+        await runner.RunAllAsync("test");
+        var first = await db.DataCheckFindings.SingleAsync();
+        Assert.True(await runner.AcceptAsync(first.Id, "один человек, две записи на loglig"));
+
+        // Позже та же карточка получает строки двух игроков в другом соревновании.
+        db.Results.AddRange(PlayerRow(3, 30, Mahmud, 8), PlayerRow(4, 30, Muhammad, 1));
+        await db.SaveChangesAsync();
+        await runner.RunAllAsync("test");
+
+        var findings = await db.DataCheckFindings.AsNoTracking().OrderBy(f => f.FixEntityId).ToListAsync();
+        Assert.Equal([21, 30], findings.Select(f => f.FixEntityId));
+        Assert.Equal(DataCheckResolutions.Accepted, findings[0].Resolution);
+        Assert.Null(findings[1].Resolution);
+    }
+
+    // InMemory не показывает, переводится ли запрос в SQL (группировка с COALESCE и Min/Max по
+    // nullable): гоняем проверку на живом Postgres. Только чтение. Пропуск — если базы нет или в
+    // ней ещё нет миграции; на мигрированной базе любая ошибка SQL — падение теста.
     [Fact]
     public async Task Check_TranslatesToSql_OnLivePostgres()
     {
         await using var db = new SwimmDbContext(new DbContextOptionsBuilder<SwimmDbContext>()
             .UseNpgsql("Host=localhost;Port=5445;Database=swimm;Username=swimm;Password=swimm_local_dev").Options);
         try { if (!await db.Database.CanConnectAsync()) return; } catch { return; }
+        if (!(await db.Database.GetAppliedMigrationsAsync()).Any(m => m.EndsWith("_ResultLogligPlayer", StringComparison.Ordinal)))
+            return;
 
-        try
-        {
-            var outcome = await new SwimmerTwoLogligPlayersCheck(db).RunAsync();
-            Assert.True(outcome.Total >= outcome.Items.Count);
-        }
-        catch (Npgsql.PostgresException ex) when (ex.SqlState is "42703" or "42P01")
-        {
-            // База без миграции ResultLogligPlayer — проверять не на чем.
-        }
+        var outcome = await new SwimmerTwoLogligPlayersCheck(db).RunAsync();
+
+        Assert.True(outcome.Total >= outcome.Items.Count);
     }
 }

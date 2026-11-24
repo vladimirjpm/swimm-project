@@ -45,7 +45,14 @@ public static class LogligRowPlayerMatcher
 {
     private const string AnyDay = "*";
 
-    public static RowPlayerPlan Build(IReadOnlyList<RowPlayerFromSource> source, IReadOnlyList<RowPlayerInDb> db)
+    /// <param name="allowUntimed">
+    /// false — шаг «без времени» не выполняется. Так надо, когда прочитаны НЕ ВСЕ страницы
+    /// соревнования: строка без времени опознаётся только заплывом и дорожкой, а её двойник из
+    /// непрочитанной дисциплины другого возраста (те же заплыв 1, дорожка 4) остался бы невидим —
+    /// и id чужого игрока лёг бы на чужую DNS-строку. Со временем такой риск закрывает само время.
+    /// </param>
+    public static RowPlayerPlan Build(
+        IReadOnlyList<RowPlayerFromSource> source, IReadOnlyList<RowPlayerInDb> db, bool allowUntimed = true)
     {
         var matches = new Dictionary<long, int>();
         var contested = new HashSet<long>();
@@ -80,22 +87,25 @@ public static class LogligRowPlayerMatcher
                 if (!withTime && first.TimeMs is not null && ours[0].TimeMs is not null) { unmatched++; continue; }
 
                 var id = ours[0].ResultId;
-                if (matches.Remove(id) || contested.Contains(id))
+                if (matches.Remove(id))
                 {
-                    // Одну нашу строку взяли два ключа (строка источника с датой и без неё).
+                    // Одну нашу строку взяли два ключа (строка источника с датой и без неё):
+                    // не доказана ни одна — и прежняя пара, и эта.
                     contested.Add(id);
-                    ambiguous++;
+                    ambiguous += 2;
                     continue;
                 }
+                if (contested.Contains(id)) { ambiguous++; continue; }
                 matches[id] = first.PlayerId;
             }
             return rest;
         }
 
         var afterTimed = Step(source.Where(s => s.TimeMs is not null), withTime: true);
-        var left = Step(source.Where(s => s.TimeMs is null).Concat(afterTimed), withTime: false);
+        var untimed = source.Where(s => s.TimeMs is null).Concat(afterTimed).ToList();
+        var left = allowUntimed ? Step(untimed, withTime: false) : untimed;
 
-        return new RowPlayerPlan(matches, ambiguous + contested.Count, unmatched + left.Count);
+        return new RowPlayerPlan(matches, ambiguous, unmatched + left.Count);
     }
 }
 
@@ -111,6 +121,15 @@ public static class LogligRowPlayerRules
     /// <summary>Актор автозапуска после импорта.</summary>
     public const string ActorName = "auto:import";
 
-    /// <summary>Потолок одного прогона: чемпионат — под сотню страниц с паузой 2 с.</summary>
-    public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(15);
+    /// <summary>
+    /// Сколько прогон после импорта ЧИТАЕТ страницы. Страница — около 2 с (пауза провайдера;
+    /// замер 24.11.2026: 21 запрос за 40 с — docs/data-integrity.md, Р122): лига в 20 дисциплин —
+    /// ~40 с, чемпионат в 150–250 — 5–8,5 мин; бюджета хватает примерно на 600 страниц. По истечении чтение останавливается, а всё
+    /// прочитанное сопоставляется и записывается — работа не теряется; остаток добирает CLI
+    /// (у него бюджета нет).
+    /// </summary>
+    public static readonly TimeSpan ReadBudget = TimeSpan.FromMinutes(20);
+
+    /// <summary>Жёсткий потолок прогона после импорта: бюджет чтения + запас на последнюю страницу и запись.</summary>
+    public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(25);
 }

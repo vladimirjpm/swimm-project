@@ -424,7 +424,7 @@ public class DataCheckRunner(
         Key(f.CheckId, f.EntityType, f.EntityId, f.FixKind, f.FixEntityId);
 
     private static string Key(string checkId, string entityType, int? entityId, string? fixKind, int? fixEntityId) =>
-        fixKind == DataCheckFixKinds.DedupIgnore
+        fixKind is DataCheckFixKinds.DedupIgnore or DataCheckFixKinds.SwimmerInCompetition
             ? $"{checkId}|{entityType}|{entityId}|{fixEntityId}"
             : $"{checkId}|{entityType}|{entityId}";
 

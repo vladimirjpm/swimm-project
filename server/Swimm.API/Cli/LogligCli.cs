@@ -79,7 +79,7 @@ internal static class LogligCli
         foreach (var id in compIds)
         {
             var report = await svc.StampAsync(id, "cli");
-            Console.WriteLine($"compID {id}: {(report.Ok ? "" : "НЕ УДАЛОСЬ — ")}{report.Message} [запросов {report.Requests}]");
+            Console.WriteLine($"compID {id}: {(report.Ok ? "" : "НЕ УДАЛОСЬ — ")}{report.Message}");
             cards += report.TwoPlayerCards;
             requests += report.Requests;
         }
