@@ -43,7 +43,8 @@ public class AdminSettingsServiceTests
         // + StartListIntervalHours (свой шаг обхода стартовых протоколов, П3, 2026-11-20)
         // + ResultsAutoMode/ResultsAutoEnabled/ResultsAutoIntervalHours (results-auto, П5, 2026-11-20)
         // + SplitAttachOnImport (доклейка промежуточных сама после импорта, 2026-11-23)
-        Assert.Equal(43, all.Count);
+        // + LogligRowPlayersOnImport (игрок loglig у строки после импорта, Р122, 2026-11-24)
+        Assert.Equal(44, all.Count);
     }
 
     [Fact]

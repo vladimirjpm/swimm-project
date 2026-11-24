@@ -34,6 +34,10 @@ public sealed record LogligRelayLeg(int? LogligId, string FullName);
 /// карточки в ячейке имени («אדם קלר, ירון בבאי, …»); у старых страниц (2025, 82438) там только
 /// клуб — тогда пусто. У личных строк всегда пусто.
 /// </param>
+/// <param name="PlayerId">
+/// Игрок loglig личной строки — id из ссылки <c>/Players/Details/{id}</c> в ячейке имени (Р122).
+/// null — имя напечатано без ссылки; у эстафет всегда null (их игроки — в <paramref name="Legs"/>).
+/// </param>
 public sealed record LogligResultRow(
     int? Position,
     string Round,
@@ -48,7 +52,8 @@ public sealed record LogligResultRow(
     int InternationalPoints,
     int? PersonalPoints,
     int? ClubPoints,
-    IReadOnlyList<LogligRelayLeg>? Legs = null);
+    IReadOnlyList<LogligRelayLeg>? Legs = null,
+    int? PlayerId = null);
 
 /// <summary>Одно событие loglig целиком: шапка дисциплины + строки всех его секций.</summary>
 public sealed record LogligEventResults(
@@ -116,7 +121,9 @@ public static partial class LogligEventResultsParser
             var row = ParseRow(cells, round, category,
                 hasBirthYear: hasBirthYear, hasPersonalPoints: pointColumns >= 2);
             if (row is null) continue;
-            if (isRelay) row = row with { Legs = ParseLegs(rawCells[1]) };
+            row = isRelay
+                ? row with { Legs = ParseLegs(rawCells[1]) }
+                : row with { PlayerId = ParsePlayerId(rawCells[1]) };
             rows.Add(row);
         }
 
@@ -136,6 +143,20 @@ public static partial class LogligEventResultsParser
             .Where(l => l.FullName.Length > 0)
             .ToList();
         return legs.Count > 0 ? legs : null;
+    }
+
+    /// <summary>
+    /// Игрок личной строки: единственная ссылка на карточку в ячейке имени. Две разные ссылки в
+    /// одной ячейке у личной строки — не то, что мы умеем читать: null, без догадок.
+    /// </summary>
+    private static int? ParsePlayerId(string rawCell)
+    {
+        var ids = LegLinkRx().Matches(rawCell)
+            .Select(m => int.TryParse(m.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? id : 0)
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+        return ids.Count == 1 ? ids[0] : null;
     }
 
     private static bool IsBirthYear(string cell) =>

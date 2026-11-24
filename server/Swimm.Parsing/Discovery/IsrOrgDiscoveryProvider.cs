@@ -40,6 +40,13 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
     private const string EventResultsUrlTemplate =
         "https://loglig.com:2053/LeagueTable/AthleticsDisciplineResults/{0}?isModal=True&showCategories=True";
 
+    /// <summary>
+    /// Та же страница события целиком (без <c>isModal</c>) — запасной источник ссылок на игроков
+    /// (Р122): печатная версия одно время печатала имена без ссылок.
+    /// </summary>
+    private const string EventResultsFullPageUrlTemplate =
+        "https://loglig.com:2053/LeagueTable/AthleticsDisciplineResults/{0}?showCategories=True";
+
     /// <summary>Стартовый протокол одного заплыва. Языка у вьюхи нет: <c>culture</c> и
     /// <c>Accept-Language</c> она игнорирует, имена всегда на иврите (проверено 27.08.2026).</summary>
     private const string StartListUrlTemplate =
@@ -142,11 +149,17 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
         return ids;
     }
 
-    public async Task<LogligEventResultsDto> FetchEventResultsAsync(int eventId, CancellationToken ct = default)
+    public Task<LogligEventResultsDto> FetchEventResultsAsync(int eventId, CancellationToken ct = default) =>
+        FetchEventResultsAsync(EventResultsUrlTemplate, eventId, $"loglig-event-{eventId}", ct);
+
+    public Task<LogligEventResultsDto> FetchEventResultsFullPageAsync(int eventId, CancellationToken ct = default) =>
+        FetchEventResultsAsync(EventResultsFullPageUrlTemplate, eventId, $"loglig-event-full-{eventId}", ct);
+
+    private async Task<LogligEventResultsDto> FetchEventResultsAsync(
+        string urlTemplate, int eventId, string snapshotName, CancellationToken ct)
     {
         var html = await GetStringAsync(
-            string.Format(CultureInfo.InvariantCulture, EventResultsUrlTemplate, eventId),
-            $"loglig-event-{eventId}", ct);
+            string.Format(CultureInfo.InvariantCulture, urlTemplate, eventId), snapshotName, ct);
 
         var ev = Parsers.Loglig.LogligEventResultsParser.Parse(html);
         return new LogligEventResultsDto(
@@ -154,7 +167,8 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
             ev.Rows.Select(r => new LogligResultRowDto(
                 r.Position, r.Round, r.Category, r.FullName, r.BirthYear, r.Club, r.Heat, r.Lane,
                 r.Time, r.FailNote, r.InternationalPoints, r.PersonalPoints, r.ClubPoints,
-                r.Legs?.Select(l => new LogligRelayLegDto(l.LogligId, l.FullName)).ToList())).ToList());
+                r.Legs?.Select(l => new LogligRelayLegDto(l.LogligId, l.FullName)).ToList(),
+                r.PlayerId)).ToList());
     }
 
     public async Task<IReadOnlyList<LogligDisciplineGridRowDto>> FetchDisciplineGridAsync(

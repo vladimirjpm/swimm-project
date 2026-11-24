@@ -64,3 +64,11 @@ internal sealed class SwimmerLogligClubConfiguration : IEntityTypeConfiguration<
     public void Configure(EntityTypeBuilder<SwimmerLogligClub> entity) =>
         entity.ToTable("Sys_SwimmerLogligClubs");
 }
+
+// Игроки loglig, встреченные на страницах дисциплин (Р122) — Sys_-таблица, БЕЗ grant swimm_ro,
+// ключ — id игрока на loglig, FK нет. Читается пачкой по id — индекс не нужен.
+internal sealed class LogligPlayerConfiguration : IEntityTypeConfiguration<LogligPlayer>
+{
+    public void Configure(EntityTypeBuilder<LogligPlayer> entity) =>
+        entity.ToTable("Sys_LogligPlayers");
+}

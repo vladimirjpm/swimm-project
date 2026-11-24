@@ -26,6 +26,69 @@ internal static class LogligCli
         return;
     }
 
+    // Игрок loglig у каждой личной строки (Р122, И-69) — дозаполнение уже затянутых стартов:
+    //   dotnet run -- --stamp-row-players <compID>
+    //   dotnet run -- --stamp-row-players --season <год окончания сезона> [--limit <N>]
+    // compID — isr.org.il. На импорте шаг идёт сам (настройка LogligRowPlayersOnImport). Пишет только
+    // Results.LogligPlayerId доказанным парам «заплыв + дорожка + время» и имена игроков в
+    // Sys_LogligPlayers; пловцов и строки не трогает. Находки — /Admin/Health (--check-data).
+    // Запрос на дисциплину с паузой 2 с: один чемпионат — минуты, сезон (--season 2026 = 2025/26) —
+    // часы; --limit ограничивает число соревнований за запуск, уже пройденные пропускаются.
+    internal static async Task StampRowPlayersAsync(WebApplication app, string[] args)
+    {
+        int? Arg(string flag)
+        {
+            var i = Array.IndexOf(args, flag) + 1;
+            return i > 0 && i < args.Length && int.TryParse(args[i], out var v) ? v : null;
+        }
+
+        var compId = Arg("--stamp-row-players");
+        var season = Arg("--season");
+        if (compId is null && season is null)
+        {
+            Console.Error.WriteLine(
+                "Usage: dotnet run -- --stamp-row-players <compID> | --stamp-row-players --season <год окончания сезона> [--limit <N>]");
+            Environment.Exit(1);
+            return;
+        }
+
+        using var scope = app.Services.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<ILogligRowPlayerService>();
+
+        List<int> compIds;
+        if (compId is int one) compIds = [one];
+        else
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Swimm.Infrastructure.Data.SwimmDbContext>();
+            // Сезон — с 1 сентября по 31 августа; только затянутые старты с loglig-id, где ещё
+            // ни у одной личной строки нет игрока (пройденные повторно не опрашиваем).
+            var from = new DateTime(season!.Value - 1, 9, 1);
+            var to = new DateTime(season.Value, 9, 1);
+            compIds = await db.DiscoveredCompetitions.AsNoTracking()
+                .Where(d => d.LogligId != null && d.DateStart >= from && d.DateStart < to)
+                .Where(d => db.Results.Any(r => r.Competition!.OrgCompId == d.OrgCompId && r.RelayId == null))
+                .Where(d => !db.Results.Any(r => r.Competition!.OrgCompId == d.OrgCompId && r.LogligPlayerId != null))
+                .OrderBy(d => d.DateStart)
+                .Select(d => d.OrgCompId)
+                .Take(Arg("--limit") ?? int.MaxValue)
+                .ToListAsync();
+            Console.WriteLine($"Сезон {season - 1}/{season}: соревнований к прогону {compIds.Count}");
+        }
+
+        int cards = 0, requests = 0;
+        foreach (var id in compIds)
+        {
+            var report = await svc.StampAsync(id, "cli");
+            Console.WriteLine($"compID {id}: {(report.Ok ? "" : "НЕ УДАЛОСЬ — ")}{report.Message} [запросов {report.Requests}]");
+            cards += report.TwoPlayerCards;
+            requests += report.Requests;
+        }
+        if (compIds.Count > 1)
+            Console.WriteLine($"\nИтог: соревнований {compIds.Count}, запросов к loglig {requests}, карточек с двумя игроками {cards}");
+        if (cards > 0)
+            Console.WriteLine("Раскладка «строка → игрок» — /Admin/Health, проверка «Два игрока loglig на одной карточке» (после --check-data).");
+    }
+
     // Доклейка промежуточных БЕЗ переимпорта — основной путь получать промежуточные
     // (решение Влада 20.09.2026, docs/plans/splits-attach-without-repull-plan.md):
     //   dotnet run -- --attach-splits <competitionId> [--loglig <id>] [--dry-run]

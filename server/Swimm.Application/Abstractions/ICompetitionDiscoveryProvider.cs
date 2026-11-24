@@ -42,6 +42,13 @@ public interface ICompetitionDiscoveryProvider
     Task<LogligEventResultsDto> FetchEventResultsAsync(int eventId, CancellationToken ct = default);
 
     /// <summary>
+    /// То же событие с полной (не печатной) страницы — запасной источник id игроков по строкам
+    /// (Р122), когда печатная версия напечатала имена без ссылок. По умолчанию — печатная.
+    /// </summary>
+    Task<LogligEventResultsDto> FetchEventResultsFullPageAsync(int eventId, CancellationToken ct = default) =>
+        FetchEventResultsAsync(eventId, ct);
+
+    /// <summary>
     /// Сетка заплывов дня (та же страница AthleticsDisciplines, что у <see cref="FetchEventIdsAsync"/>,
     /// но разобранная целиком): программа, категории, ВРЕМЯ СТАРТА каждого заплыва и счётчики
     /// «записалось / участвует».
