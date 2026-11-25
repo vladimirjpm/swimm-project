@@ -20,19 +20,45 @@ namespace Swimm.Tests;
 
 /// <summary>
 /// Р123: эндпоинты кнопок карточки — <c>POST api/admin/programme-check/{id}/check|split</c>.
-/// Antiforgery проверяется настоящим конвейером MVC на TestServer (админ вошёл, токена нет → 400);
-/// отказ и успех — прямым вызовом контроллера.
+/// Antiforgery и роль проверяются настоящим конвейером MVC на TestServer; отказ и успех — прямым
+/// вызовом контроллера. Аудит пишет сервис (<c>ProgrammeCheckServiceTests</c>).
 /// </summary>
 public class ProgrammeCheckAdminControllerTests
 {
-    private sealed class AdminAuth(IOptionsMonitor<AuthenticationSchemeOptions> o, ILoggerFactory l, UrlEncoder e)
+    private sealed class RoleAuth(IOptionsMonitor<AuthenticationSchemeOptions> o, ILoggerFactory l, UrlEncoder e)
         : AuthenticationHandler<AuthenticationSchemeOptions>(o, l, e)
     {
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var id = new ClaimsIdentity([new Claim(ClaimTypes.Name, "utest-admin"), new Claim(ClaimTypes.Role, "Admin")], "test");
+            var role = Request.Headers["X-Test-Role"].ToString();
+            var id = new ClaimsIdentity([new Claim(ClaimTypes.Name, "utest"), new Claim(ClaimTypes.Role, role)], "test");
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(id), "test")));
         }
+    }
+
+    private static async Task<WebApplication> StartAsync(IProgrammeCheckService service)
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        builder.WebHost.UseTestServer();
+        builder.Services.AddControllersWithViews().AddApplicationPart(typeof(ProgrammeCheckAdminController).Assembly);
+        builder.Services.AddAntiforgery(o => o.HeaderName = "X-XSRF-TOKEN");
+        builder.Services.AddAuthentication("test").AddScheme<AuthenticationSchemeOptions, RoleAuth>("test", _ => { });
+        builder.Services.AddAuthorization();
+        builder.Services.AddSingleton(service);
+        var app = builder.Build();
+        app.UseRouting();
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.MapControllers();
+        await app.StartAsync();
+        return app;
+    }
+
+    private static Task<HttpResponseMessage> PostAsync(WebApplication app, string action, string role)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/programme-check/7/{action}");
+        req.Headers.Add("X-Test-Role", role);
+        return app.GetTestClient().SendAsync(req);
     }
 
     [Theory]
@@ -41,63 +67,72 @@ public class ProgrammeCheckAdminControllerTests
     public async Task Post_WithoutAntiforgeryToken_Rejected_ServiceNotCalled(string action)
     {
         var service = new Mock<IProgrammeCheckService>(MockBehavior.Strict);
-        var audit = new Mock<IAdminAuditService>(MockBehavior.Strict);
+        await using var app = await StartAsync(service.Object);
 
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
-        builder.WebHost.UseTestServer();
-        builder.Services.AddControllersWithViews().AddApplicationPart(typeof(ProgrammeCheckAdminController).Assembly);
-        builder.Services.AddAntiforgery(o => o.HeaderName = "X-XSRF-TOKEN");
-        builder.Services.AddAuthentication("test").AddScheme<AuthenticationSchemeOptions, AdminAuth>("test", _ => { });
-        builder.Services.AddAuthorization();
-        builder.Services.AddSingleton(service.Object);
-        builder.Services.AddSingleton(audit.Object);
-        await using var app = builder.Build();
-        app.UseRouting();
-        app.UseAuthentication();
-        app.UseAuthorization();
-        app.MapControllers();
-        await app.StartAsync();
-
-        var res = await app.GetTestClient().PostAsync($"/api/admin/programme-check/7/{action}", null);
+        var res = await PostAsync(app, action, "Admin");
 
         Assert.True(res.StatusCode == HttpStatusCode.BadRequest, await res.Content.ReadAsStringAsync());
         service.VerifyNoOtherCalls();
-        audit.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData("check")]
+    [InlineData("split")]
+    public async Task Post_NotAdmin_Forbidden_ServiceNotCalled(string action)
+    {
+        var service = new Mock<IProgrammeCheckService>(MockBehavior.Strict);
+        await using var app = await StartAsync(service.Object);
+
+        var res = await PostAsync(app, action, "User");
+
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+        service.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public async Task Split_Refused_Conflict_NoAudit()
+    public async Task Split_Refused_Conflict_PassesFingerprint()
     {
         var service = new Mock<IProgrammeCheckService>();
-        service.Setup(s => s.SplitAsync(7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ProgrammeSplitOutcome.Refused("у 40 строк нет однозначного дня — всё или ничего"));
-        var audit = new Mock<IAdminAuditService>(MockBehavior.Strict);
+        service.Setup(s => s.SplitAsync(7, "2025-03-28=1072;2025-03-29=1618", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ProgrammeSplitOutcome.Refused("план изменился — проверьте ещё раз"));
 
-        var result = await new ProgrammeCheckAdminController(service.Object, audit.Object).Split(7, CancellationToken.None);
+        var result = await new ProgrammeCheckAdminController(service.Object)
+            .Split(7, new("2025-03-28=1072;2025-03-29=1618"), CancellationToken.None);
 
         var conflict = Assert.IsType<ConflictObjectResult>(result);
-        Assert.Contains("нет однозначного дня", Json(conflict.Value).GetProperty("error").GetString());
-        audit.VerifyNoOtherCalls();
+        Assert.Contains("план изменился", Json(conflict.Value).GetProperty("error").GetString());
     }
 
-    [Fact]
-    public async Task Split_Success_AuditedAsSplitDays()
-    {
-        var report = new CompetitionDaySplitReport(1665, "אליפות עמק חפר", 12160,
-            [new(new DateOnly(2025, 3, 28), 1, 1700, false, 1072, 0), new(new DateOnly(2025, 3, 29), 2, 1665, true, 1618, 0)],
-            new Dictionary<string, int>(), null, true, 40);
-        var service = new Mock<IProgrammeCheckService>();
-        service.Setup(s => s.SplitAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(new ProgrammeSplitOutcome(null, report));
-        var audit = new Mock<IAdminAuditService>();
+    private static CompetitionDaySplitReport Report() => new(1665, "אליפות עמק חפר", 12160,
+        [new(new DateOnly(2025, 3, 28), 1, 1700, false, 1072, 0), new(new DateOnly(2025, 3, 29), 2, 1665, true, 1618, 0)],
+        new Dictionary<string, int>(), null, true, 40);
 
-        var result = await new ProgrammeCheckAdminController(service.Object, audit.Object).Split(7, CancellationToken.None);
+    [Fact]
+    public async Task Split_Success_Message()
+    {
+        var service = new Mock<IProgrammeCheckService>();
+        service.Setup(s => s.SplitAsync(7, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProgrammeSplitOutcome(null, Report()));
+
+        var result = await new ProgrammeCheckAdminController(service.Object).Split(7, new("x"), CancellationToken.None);
 
         var json = Json(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Equal(40, json.GetProperty("eventId").GetInt32());
         Assert.Contains("день 1 28/03/2025 #1700 — 1072 строк", json.GetProperty("message").GetString());
-        audit.Verify(a => a.LogAsync("competition.split-days", "Competition", "1665",
-            It.Is<string>(d => d.Contains("событие #40") && d.Contains("discovery #7")),
-            It.IsAny<object?>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("recalcError").ValueKind);
+    }
+
+    [Fact]
+    public async Task Split_AppliedButRecalcFailed_SaysSo()
+    {
+        var service = new Mock<IProgrammeCheckService>();
+        service.Setup(s => s.SplitAsync(7, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProgrammeSplitOutcome(null, Report(), "timeout"));
+
+        var result = await new ProgrammeCheckAdminController(service.Object).Split(7, new("x"), CancellationToken.None);
+
+        var json = Json(Assert.IsType<OkObjectResult>(result).Value);
+        Assert.Contains("ПЕРЕСЧЁТ НЕ ЗАВЕРШЁН", json.GetProperty("message").GetString());
     }
 
     [Fact]
@@ -108,7 +143,7 @@ public class ProgrammeCheckAdminControllerTests
             ProgrammeVerdictKind.OnlyKnownDays, "В привязанной программе loglig только те дни", [], "h", null, null, false,
             AcceptWarning: "день, похоже, есть на loglig", Candidates: [new(11590, "תחרות", [new DateOnly(2024, 12, 7)])]));
 
-        var result = await new ProgrammeCheckAdminController(service.Object, Mock.Of<IAdminAuditService>()).Check(7, CancellationToken.None);
+        var result = await new ProgrammeCheckAdminController(service.Object).Check(7, CancellationToken.None);
 
         var json = Json(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Equal("OnlyKnownDays", json.GetProperty("kind").GetString());
@@ -118,7 +153,7 @@ public class ProgrammeCheckAdminControllerTests
         Assert.False(cand.TryGetProperty("url", out _)); // только номер — адрес собирает клиент
         Assert.False(json.GetProperty("acceptPrimary").GetBoolean());
         Assert.False(json.GetProperty("canSplit").GetBoolean());
-        foreach (var p in new[] { "headline", "lines", "hint", "splitCompetitionId", "splitBlocked", "acceptWarning" })
+        foreach (var p in new[] { "headline", "lines", "hint", "splitCompetitionId", "splitBlocked", "acceptWarning", "planFingerprint" })
             Assert.True(json.TryGetProperty(p, out _), p);
     }
 

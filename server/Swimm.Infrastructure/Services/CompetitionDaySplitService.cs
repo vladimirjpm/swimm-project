@@ -91,7 +91,9 @@ public sealed class CompetitionDaySplitService(
         if (!apply)
             return new CompetitionDaySplitReport(comp.Id, comp.Name, resolved, days, unresolved, null, false, null);
 
-        var (eventId, applied) = await ApplyAsync(comp.Id, plan, keep, reuseEvent, ct);
+        var (eventId, applied, raced) = await ApplyAsync(comp.Id, plan, keep, reuseEvent, ct);
+        if (raced != null)
+            return CompetitionDaySplitReport.Refused(comp.Id, comp.Name, resolved, raced);
 
         // Производные величины — по дню (клубный зачёт строится на день; объединённые места и
         // пара-очки пересчёт сам берёт по всему событию).
@@ -101,13 +103,32 @@ public sealed class CompetitionDaySplitService(
         return new CompetitionDaySplitReport(comp.Id, comp.Name, resolved, applied, unresolved, null, true, eventId);
     }
 
-    private async Task<(int EventId, List<CompetitionDaySplitDay> Days)> ApplyAsync(
+    /// <summary>
+    /// Класс advisory-блокировки деления (Р123): два «Разделить» по одному соревнованию (две вкладки,
+    /// кнопка + CLI) встают в очередь, второй видит изменившийся EventId и отказывает.
+    /// </summary>
+    private const int SplitLockClass = 0x53504c44; // "SPLD"
+
+    private async Task<(int EventId, List<CompetitionDaySplitDay> Days, string? Raced)> ApplyAsync(
         int competitionId, DayPlan plan, DateOnly keep, int? reuseEvent, CancellationToken ct)
     {
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
             await using var tx = await db.Database.BeginTransactionAsync(ct);
+            if (db.Database.IsNpgsql())
+                await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({SplitLockClass}, {competitionId})", ct);
+            // Под блокировкой — EventId из базы, а не из плана: пока строили план, соседний вызов
+            // (или импорт) мог уже поделить или собрать соревнование. Изменился — откат, отказ.
+            var currentEvent = await db.Competitions.AsNoTracking()
+                .Where(c => c.Id == competitionId).Select(c => c.EventId).FirstAsync(ct);
+            if (currentEvent != reuseEvent)
+                return (0, [], $"пока строился план, соревнование изменилось (событие {(reuseEvent?.ToString() ?? "—")} → {(currentEvent?.ToString() ?? "—")}) — проверьте ещё раз");
+            // Событие из одного дня (Маккабиада-мастерс #1482) деление переиспользует — EventId после
+            // него тот же, поэтому смотрим ещё и на соседние дни: появились — уже поделено.
+            if (currentEvent is int sameEvent
+                && await db.Competitions.AnyAsync(c => c.EventId == sameEvent && c.Id != competitionId, ct))
+                return (0, [], $"пока строился план, в событии #{sameEvent} появились другие дни — уже поделено, проверьте ещё раз");
 
             var comp = await db.Competitions.FirstAsync(c => c.Id == competitionId, ct);
             CompetitionEvent ev;
@@ -186,7 +207,7 @@ public sealed class CompetitionDaySplitService(
             }
 
             await tx.CommitAsync(ct);
-            return (ev.Id, result);
+            return (ev.Id, result, (string?)null);
         });
     }
 

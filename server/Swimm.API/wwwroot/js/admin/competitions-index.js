@@ -1434,6 +1434,7 @@
                 try {
                     const v = await apiJson(`${PROGRAMME_API}/${id}/check`, { method: 'POST' });
                     box.dataset.plan = (v.lines ?? []).join('\n');
+                    box.dataset.fingerprint = v.planFingerprint ?? '';
                     q('.ck-days-headline').textContent = v.headline;
                     const lines = q('.ck-days-lines');
                     lines.replaceChildren(...(v.lines ?? []).map(t => { const e = document.createElement('li'); e.textContent = t; return e; }));
@@ -1476,13 +1477,17 @@
                 if (!confirm(`Разделить по дням?\n\n${plan}\n\nСтроки переедут в свои дни (Id те же), заведётся событие, дни пересчитаются. Одна транзакция: всё или ничего.`)) return;
                 btn.disabled = true; btn.textContent = 'Делю…';
                 try {
-                    const r = await apiJson(`${PROGRAMME_API}/${box.dataset.discId}/split`, { method: 'POST' });
-                    toast(r.message, 4000);
+                    // Отпечаток плана, который видел админ: сервер сверит с новым dry-run (изменился — 409).
+                    const r = await apiJson(`${PROGRAMME_API}/${box.dataset.discId}/split`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ planFingerprint: box.dataset.fingerprint ?? '' })
+                    });
+                    toast(r.message, r.recalcError ? 10000 : 4000);
                     box.querySelector('.ck-days-hint').textContent = r.message;
                     // Строка теперь — событие (ключ e<id>, был c<id>): выбираем его, иначе карточка не откроется.
                     const u = new URL(location.href);
                     if (r.eventId) u.searchParams.set('sel', 'e' + r.eventId);
-                    setTimeout(() => { location.href = u.toString(); }, 1500); // дать прочитать итог
+                    setTimeout(() => { location.href = u.toString(); }, r.recalcError ? 6000 : 1500); // дать прочитать итог
                 } catch (e) {
                     btn.disabled = false; btn.textContent = 'Разделить по дням';
                     toast(e.message, 6000);

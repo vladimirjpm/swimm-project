@@ -31,7 +31,8 @@ public sealed record ProgrammeNeighbour(int LogligId, string Title, IReadOnlyLis
 /// кнопки нет, хотя дни склеены; <paramref name="AcceptPrimary"/> — «Принять как есть» основным действием;
 /// <paramref name="AcceptWarning"/> — предупреждение у «Принять как есть» (день, похоже, есть на loglig);
 /// <paramref name="Candidates"/> — соседи-кандидаты в недостающий день; <paramref name="Similar"/> —
-/// то же название, но дата не подходит (одной строкой в подсказке).
+/// то же название, но дата не подходит (одной строкой в подсказке); <paramref name="PlanFingerprint"/> —
+/// отпечаток плана, который видел админ («дата=строк;…»): «Разделить» сверяет его с новым dry-run.
 /// </summary>
 public sealed record ProgrammeCheckVerdict(
     ProgrammeVerdictKind Kind,
@@ -43,7 +44,8 @@ public sealed record ProgrammeCheckVerdict(
     bool AcceptPrimary,
     string? AcceptWarning = null,
     IReadOnlyList<ProgrammeNeighbour>? Candidates = null,
-    IReadOnlyList<ProgrammeNeighbour>? Similar = null)
+    IReadOnlyList<ProgrammeNeighbour>? Similar = null,
+    string? PlanFingerprint = null)
 {
     public bool CanSplit => SplitCompetitionId != null;
 }
@@ -129,7 +131,7 @@ public static class ProgrammeCheckRules
 
         var notInDb = prog.Except(db).ToList();
         if (notInDb.Count > 0)
-            return MissingFromDb(x, prog, db, notInDb, Day, Days);
+            return MissingFromDb(x, prog, db, notInDb, Day, Days, Span);
 
         var missing = SiteDays(x.SiteStart, x.SiteEnd).Except(db).ToList();
         var headline = $"В привязанной программе loglig {x.LogligId} только те дни, что уже есть в базе: {Span(prog, Day)}"
@@ -161,7 +163,7 @@ public static class ProgrammeCheckRules
                 + (x.BoundTitle == null && x.Neighbours != null ? " (не прочитан заголовок привязанного соревнования)" : "")
                 + " — убедитесь, что недостающего дня нет на loglig отдельным соревнованием."
             : x.NeighboursFailed > 0
-                ? $"{x.NeighboursFailed} из {x.NeighboursFailed + x.Neighbours.Count} соседних номеров loglig не ответили — проверьте их вручную."
+                ? $"{x.NeighboursFailed} из {NeighbourIds(x.LogligId!.Value).Count} соседних номеров loglig не ответили — проверьте их вручную."
                 : null;
         if (unchecked_ != null)
             return new ProgrammeCheckVerdict(ProgrammeVerdictKind.OnlyKnownDays, headline, lines,
@@ -196,12 +198,31 @@ public static class ProgrammeCheckRules
         return (candidates, similar);
     }
 
+    /// <summary>Отпечаток плана деления: дата и число строк каждого дня по порядку.</summary>
+    public static string Fingerprint(IEnumerable<CompetitionDaySplitDay> days) =>
+        string.Join(";", days.OrderBy(d => d.Date).Select(d =>
+            $"{d.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}={d.Rows.ToString(CultureInfo.InvariantCulture)}"));
+
     private static ProgrammeCheckVerdict MissingFromDb(ProgrammeCheckInput x, List<DateOnly> prog, List<DateOnly> db,
-        List<DateOnly> notInDb, Func<DateOnly, string> Day, Func<IEnumerable<DateOnly>, string> Days)
+        List<DateOnly> notInDb, Func<DateOnly, string> Day, Func<IEnumerable<DateOnly>, string> Days,
+        Func<IReadOnlyList<DateOnly>, Func<DateOnly, string>, string> Span)
     {
         var plan = x.SplitPlan;
         if (plan is { Refusal: null, Days.Count: > 1 })
         {
+            // Кнопка — только если каждый день плана внутри дат федерации и у федерации есть дни,
+            // которых нет в базе (Р115). Иначе опечатка в дате дисциплины на loglig завела бы лишний
+            // день, а настоящий недостающий остался бы недостающим (ревью PR #283).
+            var siteDays = SiteDays(x.SiteStart, x.SiteEnd);
+            var outside = plan.Days.Select(d => d.Date).Where(d => !siteDays.Contains(d)).Distinct().Order().ToList();
+            var siteGap = siteDays.Except(db).Any();
+            string? blocked = outside.Count > 0
+                ? $"Разделить нельзя: дата программы {Days(outside)} вне дат федерации ({Span(siteDays, Day)}) — похоже на ошибку "
+                  + "в программе loglig. Проверьте глазами; если дата верна — делите руками (CLI --split-days)."
+                : !siteGap
+                    ? "Разделить нельзя: у федерации нет дней, которых не было бы в базе, — долга Р115 нет."
+                    : null;
+
             var lines = plan.Days.Select(d =>
                 $"день {d.DayNumber} {Day(d.Date)}: {d.Rows} {Plural(d.Rows, "строка", "строки", "строк")}"
                 + (d.Media > 0 ? $" (медиа {d.Media})" : "")
@@ -212,7 +233,8 @@ public static class ProgrammeCheckRules
                 lines,
                 "«Разделить по дням» перенесёт строки (их Id те же — медиа, пометки и промежуточные едут с ними), "
                 + "заведёт событие и пересчитает оба дня. Одна транзакция: всё или ничего.",
-                plan.CompetitionId, null, AcceptPrimary: false);
+                blocked == null ? plan.CompetitionId : null, blocked, AcceptPrimary: false,
+                PlanFingerprint: blocked == null ? Fingerprint(plan.Days) : null);
         }
         if (plan is { Unresolved.Count: > 0 })
         {
@@ -227,12 +249,16 @@ public static class ProgrammeCheckRules
                 + "Дисциплина на двух датах (отборы и финал в разные дни) или её нет в программе — делите руками (CLI --split-days, docs/plans/multiday-split-plan.md).",
                 AcceptPrimary: false);
         }
+        // Сюда попадают: отказ деления («остальные дни лежат не здесь», дата соревнования не совпала
+        // с днём программы) или в базе уже несколько дней. «Перезатянуть» тут вреден: строки дня,
+        // скорее всего, уже есть — отдельным соревнованием или внутри другого дня, и перезалив даст дубль.
         return new ProgrammeCheckVerdict(ProgrammeVerdictKind.DayNotPulled,
-            $"В программе loglig {x.LogligId} есть {Days(notInDb)}, а в базе этого дня нет"
+            $"В программе loglig {x.LogligId} есть {Days(notInDb)}, а в базе у старта этого дня нет"
             + (plan?.Refusal is { } why ? $"; разделить имеющийся день нельзя: {why}." : "."),
             [],
-            "Строк этого дня в базе нет — протокол дня не затянут. «Перезатянуть», когда федерация выложит протокол; "
-            + "дня не будет — «Принять как есть».",
+            "Возможно, день уже есть отдельным соревнованием, не собранным в событие, или склеен внутри события — "
+            + "проверьте «дни есть, события нет» (CLI --collapsed-days, сбор — --join-days). "
+            + "«Перезатянуть» не поможет: получится дубль.",
             null, null, AcceptPrimary: false);
     }
 

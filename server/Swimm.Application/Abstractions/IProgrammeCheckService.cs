@@ -14,14 +14,17 @@ public interface IProgrammeCheckService
     Task<ProgrammeCheckVerdict> CheckAsync(int discoveryId, CancellationToken ct = default);
 
     /// <summary>
-    /// «Разделить по дням»: заново та же проверка; только при вердикте «дни склеены» без помех —
-    /// деление в режиме записи (как CLI <c>--split-days --apply</c>). Иначе — отказ с причиной.
+    /// «Разделить по дням»: заново та же проверка; только при вердикте «дни склеены» без помех и
+    /// при том же плане, что видел админ (<paramref name="planFingerprint"/>, <see cref="ProgrammeCheckVerdict.PlanFingerprint"/>),
+    /// — деление в режиме записи (как CLI <c>--split-days --apply</c>) и аудит <c>competition.split-days</c>.
+    /// Иначе — отказ с причиной. После начала записи токен запроса не учитывается.
     /// </summary>
-    Task<ProgrammeSplitOutcome> SplitAsync(int discoveryId, CancellationToken ct = default);
+    Task<ProgrammeSplitOutcome> SplitAsync(int discoveryId, string? planFingerprint, CancellationToken ct = default);
 }
 
 /// <param name="Refusal">Почему не делили; null — поделено (<paramref name="Report"/>).</param>
-public sealed record ProgrammeSplitOutcome(string? Refusal, CompetitionDaySplitReport? Report)
+/// <param name="RecalcError">Деление записано, но пересчёт дней после commit упал — его надо повторить.</param>
+public sealed record ProgrammeSplitOutcome(string? Refusal, CompetitionDaySplitReport? Report, string? RecalcError = null)
 {
     public static ProgrammeSplitOutcome Refused(string why) => new(why, null);
 }

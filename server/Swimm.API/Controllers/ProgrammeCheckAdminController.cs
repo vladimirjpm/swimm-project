@@ -15,7 +15,7 @@ namespace Swimm.API.Controllers;
 [Route("api/admin/programme-check")]
 [Authorize(Roles = "Admin")]
 [AutoValidateAntiforgeryToken]
-public class ProgrammeCheckAdminController(IProgrammeCheckService service, IAdminAuditService audit) : ControllerBase
+public class ProgrammeCheckAdminController(IProgrammeCheckService service) : ControllerBase
 {
     [HttpPost("{discoveryId:int}/check")]
     public async Task<IActionResult> Check(int discoveryId, CancellationToken ct)
@@ -32,6 +32,7 @@ public class ProgrammeCheckAdminController(IProgrammeCheckService service, IAdmi
             splitBlocked = v.SplitBlocked,
             acceptPrimary = v.AcceptPrimary,
             acceptWarning = v.AcceptWarning,
+            planFingerprint = v.PlanFingerprint,
             // Наружу — только int-номер loglig; адрес страницы собирает клиент из своей константы.
             candidates = (v.Candidates ?? []).Select(c => new
             {
@@ -42,23 +43,29 @@ public class ProgrammeCheckAdminController(IProgrammeCheckService service, IAdmi
         });
     }
 
+    /// <summary>Тело «Разделить»: отпечаток плана, который видел админ (из ответа check).</summary>
+    public sealed record SplitRequest(string? PlanFingerprint);
+
+    /// <summary>
+    /// Запись и аудит — в сервисе (аудит пишется всегда, когда деление применено, даже если
+    /// пересчёт после commit упал). Отказ — 409 с причиной.
+    /// </summary>
     [HttpPost("{discoveryId:int}/split")]
-    public async Task<IActionResult> Split(int discoveryId, CancellationToken ct)
+    public async Task<IActionResult> Split(int discoveryId, [FromBody] SplitRequest? request, CancellationToken ct)
     {
-        var outcome = await service.SplitAsync(discoveryId, ct);
+        var outcome = await service.SplitAsync(discoveryId, request?.PlanFingerprint, ct);
         if (outcome.Refusal != null || outcome.Report is not { } r)
             return Conflict(new { error = $"Не разделено: {outcome.Refusal ?? "деление не применено"}" });
 
         var days = string.Join("; ", r.Days.Select(d =>
             $"день {d.DayNumber} {d.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)} #{d.CompetitionId} — {d.Rows} строк"));
-        // Тот же вид записи, что у CLI --split-days --apply (MultidayCli), плюс откуда нажато.
-        await audit.LogAsync("competition.split-days", "Competition", r.CompetitionId.ToString(CultureInfo.InvariantCulture),
-            $"Многодневка разделена по дням (loglig {r.LogligId}): событие #{r.EventId}, {days} — кнопка карточки /Admin/Competitions (discovery #{discoveryId})");
-
         return Ok(new
         {
             eventId = r.EventId,
-            message = $"Разделено: событие #{r.EventId}; {days}. Дни пересчитаны.",
+            recalcError = outcome.RecalcError,
+            message = outcome.RecalcError == null
+                ? $"Разделено: событие #{r.EventId}; {days}. Дни пересчитаны."
+                : $"Разделено: событие #{r.EventId}; {days}. ПЕРЕСЧЁТ НЕ ЗАВЕРШЁН ({outcome.RecalcError}) — пересчитайте дни.",
         });
     }
 }

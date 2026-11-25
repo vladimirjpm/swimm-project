@@ -69,8 +69,49 @@ public class ProgrammeCheckRulesTests
 
         Assert.Equal(ProgrammeVerdictKind.DayNotPulled, v.Kind);
         Assert.False(v.CanSplit);
-        Assert.Contains("есть 28.03, а в базе этого дня нет", v.Headline);
+        Assert.Contains("есть 28.03, а в базе у старта этого дня нет", v.Headline);
         Assert.Contains("остальные дни лежат не здесь", v.Headline);
+        // Не «Перезатянуть» — перезалив дал бы дубль.
+        Assert.Contains("дни есть, события нет", v.Hint);
+        Assert.Contains("получится дубль", v.Hint);
+    }
+
+    [Fact]
+    public void Collapsed_PlanDateOutsideFederation_NoButton()
+    {
+        DateOnly d28 = D(2025, 3, 28), d29 = D(2025, 3, 29), d30 = D(2025, 3, 30);
+        var plan = Plan(new(d29, 1, 1665, true, 1618, 0), new(d30, 2, null, false, 1072, 0));
+
+        var v = ProgrammeCheckRules.Verdict(new(d28, d29, [d29], 12160, [d29, d30], SplitPlan: plan));
+
+        Assert.Equal(ProgrammeVerdictKind.Collapsed, v.Kind);
+        Assert.False(v.CanSplit);
+        Assert.Null(v.PlanFingerprint);
+        Assert.Contains("дата программы 30.03 вне дат федерации (28–29.03)", v.SplitBlocked);
+    }
+
+    [Fact]
+    public void Collapsed_FederationHasNoMissingDay_NoButton()
+    {
+        DateOnly d29 = D(2025, 3, 29), d30 = D(2025, 3, 30);
+        var plan = Plan(new(d29, 1, 1665, true, 1618, 0), new(d30, 2, null, false, 1072, 0));
+
+        // Однодневный старт по федерации (29.03), а в сетке loglig «лишняя» дата — Р115 нет.
+        var v = ProgrammeCheckRules.Verdict(new(d29, d29, [d29], 12160, [d29, d30], SplitPlan: plan));
+
+        Assert.False(v.CanSplit);
+        Assert.NotNull(v.SplitBlocked);
+    }
+
+    [Fact]
+    public void Collapsed_Fingerprint_DatesAndRows()
+    {
+        DateOnly d28 = D(2025, 3, 28), d29 = D(2025, 3, 29);
+        var plan = Plan(new(d29, 2, 1665, true, 1618, 3), new(d28, 1, null, false, 1072, 0));
+
+        var v = ProgrammeCheckRules.Verdict(new(d28, d29, [d29], 12160, [d28, d29], SplitPlan: plan));
+
+        Assert.Equal("2025-03-28=1072;2025-03-29=1618", v.PlanFingerprint);
     }
 
     // ── (б+в): в привязанной программе только дни из базы — решает поиск соседей ──
@@ -150,7 +191,7 @@ public class ProgrammeCheckRulesTests
         Assert.False(noSearch.AcceptPrimary);
         Assert.Contains("проверить не удалось", noSearch.Hint);
         Assert.False(someFailed.AcceptPrimary);
-        Assert.Contains("2 из 2 соседних номеров loglig не ответили", someFailed.Hint);
+        Assert.Contains("2 из 6 соседних номеров loglig не ответили", someFailed.Hint);
     }
 
     [Fact]
@@ -166,6 +207,9 @@ public class ProgrammeCheckRulesTests
     [InlineData("הזדמנות אחרונה 2023 יום ו' - 22/12/2023", "הזדמנות אחרונה 2023")]
     [InlineData("גביע  ״השרון״ שבת", "גביע השרון")]
     [InlineData("ליגה סבב שני - 01/02/2025", "ליגה סבב שני")]
+    [InlineData("אליפות המחוז בשבת 7.12.24", "אליפות המחוז")]
+    [InlineData("אליפות המחוז ביום שישי - 06/12/2024", "אליפות המחוז")]
+    [InlineData("אליפות המחוז וביום שבת", "אליפות המחוז")]
     public void Normalize_DropsWeekdayDatesQuotes(string title, string expected) =>
         Assert.Equal(expected, LogligTitleRules.Normalize(title));
 

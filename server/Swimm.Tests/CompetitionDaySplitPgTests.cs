@@ -104,4 +104,76 @@ public class CompetitionDaySplitPgTests
             if (eventId is int e) await clean.CompetitionEvents.Where(x => x.Id == e).ExecuteDeleteAsync();
         }
     }
+
+    /// <summary>
+    /// Р123 (ревью PR #283): два «Разделить» одновременно (две вкладки, кнопка + CLI) — второй ждёт
+    /// advisory-блокировку, видит изменившийся EventId и отказывает; ровно одно событие и один новый
+    /// день. Повтор после успеха — отказ, база не меняется.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)] // событие из одного дня: деление переиспользует его, EventId не меняется
+    public async Task Split_TwiceConcurrently_OneApplies_OtherRefused_RepeatRefused(bool singleDayEvent)
+    {
+        await using var db = TryCreate();
+        if (db == null) return; // PG недоступен — пропуск
+
+        var tag = $"pg-race-{Guid.NewGuid():N}"[..20];
+        var orgCompId = 900_000_000 + Random.Shared.Next(1, 99_999_999);
+        var free = await db.Styles.FirstAsync(s => s.Name == "freestyle");
+        var swimmerId = await db.Swimmers.Select(s => s.Id).FirstAsync();
+        var clubId = await db.Clubs.Select(c => c.Id).FirstAsync();
+
+        var comp = new Competition { Name = tag, Date = "04/01/2099", PoolType = "25", OrgCompId = orgCompId };
+        if (singleDayEvent)
+        {
+            var single = new CompetitionEvent { Name = tag, OrgCompId = orgCompId, StartDate = new DateOnly(2099, 1, 4), EndDate = new DateOnly(2099, 1, 4) };
+            db.CompetitionEvents.Add(single);
+            await db.SaveChangesAsync();
+            comp.EventId = single.Id;
+            comp.DayNumber = 1;
+        }
+        db.Competitions.Add(comp);
+        await db.SaveChangesAsync();
+        try
+        {
+            ResultRecord Row(string distance) => new()
+            {
+                CompetitionId = comp.Id, SwimmerId = swimmerId, ClubId = clubId, StyleId = free.Id,
+                Distance = distance, Gender = "female", CompetitionDate = new DateTime(2099, 1, 4),
+            };
+            db.Results.AddRange(Row("400"), Row("100"));
+            await db.SaveChangesAsync();
+            var dates = new FixedDates(new DisciplineDates(
+            [
+                (new DisciplineDayKey("freestyle", "400", "female"), new DateOnly(2099, 1, 3)),
+                (new DisciplineDayKey("freestyle", "100", "female"), new DateOnly(2099, 1, 4)),
+            ]));
+
+            await using var a = TryCreate()!;
+            await using var b = TryCreate()!;
+            var reports = await Task.WhenAll(
+                new CompetitionDaySplitService(a, dates, new NoRecalc()).SplitAsync(comp.Id, 1, apply: true),
+                new CompetitionDaySplitService(b, dates, new NoRecalc()).SplitAsync(comp.Id, 1, apply: true));
+
+            Assert.Single(reports, r => r.Applied);
+            Assert.Single(reports, r => r.Refusal != null);
+
+            await using var c = TryCreate()!;
+            var repeat = await new CompetitionDaySplitService(c, dates, new NoRecalc()).SplitAsync(comp.Id, 1, apply: true);
+            Assert.NotNull(repeat.Refusal);
+
+            await using var check = TryCreate()!;
+            Assert.Equal(1, await check.CompetitionEvents.CountAsync(e => e.OrgCompId == orgCompId));
+            Assert.Equal(2, await check.Competitions.CountAsync(x => x.Name == tag));
+        }
+        finally
+        {
+            await using var clean = TryCreate()!;
+            var ids = await clean.Competitions.Where(x => x.Name == tag).Select(x => x.Id).ToListAsync();
+            await clean.Results.Where(r => ids.Contains(r.CompetitionId)).ExecuteDeleteAsync();
+            await clean.Competitions.Where(x => ids.Contains(x.Id)).ExecuteDeleteAsync();
+            await clean.CompetitionEvents.Where(e => e.OrgCompId == orgCompId).ExecuteDeleteAsync();
+        }
+    }
 }
