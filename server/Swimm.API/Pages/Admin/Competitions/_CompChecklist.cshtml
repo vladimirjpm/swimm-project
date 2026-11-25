@@ -198,10 +198,40 @@
                                         <div class="mt-0.5 text-[11.5px] text-admin-text-muted">@h</div>
                                     }
                                 }
+                                @* Р123: у Р115 — сверка с программой loglig по клику (сеть только тут, не при
+                                   открытии карточки). Вердикт и кнопки рисует competitions-index.js в готовые
+                                   узлы ниже (классы — здесь, чтобы их видел сборщик Tailwind). *@
+                                @if (id != null && Swimm.Application.Mapping.IncompleteExplanationRules.MissingDatesShort(Model.Row) != null)
+                                {
+                                    <div class="ck-days-check mt-1.5" data-disc-id="@id">
+                                        <button type="button" class="@ghost ck-days-btn py-0.5 text-[12px]" onclick="daysCheck(this)"
+                                                title="Сравнить даты программы на loglig с днями в базе: дни склеены, программа короче записи федерации или день лежит отдельно">Проверить, чего не хватает</button>
+                                        <div class="ck-days-out mt-1.5 hidden rounded-md border border-admin-border bg-admin-surface px-2.5 py-1.5">
+                                            <div class="ck-days-headline text-admin-text" dir="auto"></div>
+                                            <ul class="ck-days-lines ml-4 list-disc tabular-nums text-admin-text-muted"></ul>
+                                            <div class="ck-days-hint mt-0.5 text-[11.5px] text-admin-text-muted"></div>
+                                            <div class="ck-days-links mt-0.5 flex flex-wrap gap-x-3 text-[12px]"></div>
+                                            <div class="ck-days-blocked mt-0.5 hidden text-[11.5px] text-admin-warning"></div>
+                                            <div class="ck-days-actions mt-1.5 flex flex-wrap items-center gap-2">
+                                                <button type="button" class="ck-days-split admin-btn admin-btn-primary hidden px-2.5 py-1 text-[12px]" onclick="daysSplit(this)"
+                                                        title="Перенести строки в свои дни: событие + новый день, пересчёт; одна транзакция">Разделить по дням</button>
+                                                @if (Model.EditUrl != null)
+                                                {
+                                                    <a href="@Model.EditUrl" class="ck-days-accept admin-btn admin-btn-primary hidden px-2.5 py-1 text-[12px] no-underline"
+                                                       title="Других дней не будет — снять долг на странице «Изменить» (блок «Принять как есть»)">Принять как есть ↗</a>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
                                 @if (Model.EditUrl != null)
                                 {
-                                    <a href="@Model.EditUrl" class="whitespace-nowrap text-admin-accent hover:underline"
-                                       title="Остального протокола не будет — снять долг на странице «Изменить» (блок «Принять как есть»)">Принять как есть ↗</a>
+                                    <div class="ck-accept-row">
+                                        <a href="@Model.EditUrl" class="whitespace-nowrap text-admin-accent hover:underline"
+                                           title="Остального протокола не будет — снять долг на странице «Изменить» (блок «Принять как есть»)">Принять как есть ↗</a>
+                                        <span class="ck-accept-note hidden text-[11.5px] text-admin-text-muted">— закроет долг, но дни останутся склеенными</span>
+                                        <span class="ck-accept-warning hidden text-[11.5px] text-admin-warning"></span>
+                                    </div>
                                 }
                             </div>
                         </li>

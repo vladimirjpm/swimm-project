@@ -200,6 +200,19 @@ public static partial class LogligStartListParser
         return (competition, date, discipline);
     }
 
+    /// <summary>
+    /// Заголовок соревнования с ПОЛНОЙ страницы <c>AthleticsDisciplines/{id}</c>
+    /// (<c>&lt;h3 class="main-title disciplines-title"&gt;</c>; у частичной вьюхи с фильтром дат его нет).
+    /// Текст без тегов, сущности раскодированы, пробелы схлопнуты; нет заголовка — null (Р123).
+    /// </summary>
+    public static string? ParseCompetitionTitle(string html)
+    {
+        var m = CompetitionTitleRx().Match(html);
+        if (!m.Success) return null;
+        var text = Clean(m.Groups[1].Value);
+        return text.Length == 0 ? null : text;
+    }
+
     // ── Сетка заплывов дня ───────────────────────────────────────────────────
 
     /// <summary>
@@ -428,6 +441,9 @@ public static partial class LogligStartListParser
     private const string NoTimeMarker = "NT";
     private const string HeatColumnHeader = "מקצה";
     private const string BirthYearHeader = "שנת לידה";
+
+    [GeneratedRegex("""<h3[^>]*class="[^"]*\bdisciplines-title\b[^"]*"[^>]*>(.*?)</h3>""", RegexOptions.Singleline)]
+    private static partial Regex CompetitionTitleRx();
 
     [GeneratedRegex("""<h4[^>]*class="disciplines-title"[^>]*>(.*?)</h4>""", RegexOptions.Singleline)]
     private static partial Regex TitleRx();

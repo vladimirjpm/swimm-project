@@ -64,3 +64,12 @@ public sealed record LogligDisciplineGridRowDto(
     DateTime? StartAtLocal,
     int Registered,
     int Participants);
+
+/// <summary>
+/// Сводка соревнования loglig с полной страницы <c>AthleticsDisciplines/{id}</c> — заголовок и даты
+/// дисциплин одним запросом (Р123, поиск соседнего соревнования-дня).
+/// </summary>
+/// <param name="Title">Заголовок страницы как есть (HTML-сущности раскодированы), напр.
+/// «תחרות חלופית ל"מילניום" יום שבת 7.12.24 - 07/12/2024».</param>
+/// <param name="Dates">Даты дисциплин сетки (без фильтра дат loglig может показать не все — хватает и одной).</param>
+public sealed record LogligCompetitionSummaryDto(int LogligId, string Title, IReadOnlyList<DateOnly> Dates);

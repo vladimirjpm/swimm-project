@@ -1421,6 +1421,79 @@
                 } catch (e) { toast('Ошибка: ' + e.message); }
             };
 
+            // Р123: «Проверить, чего не хватает» у Р115 — программа loglig ↔ дни в базе. Сеть только
+            // по клику. Узлы ответа готовы в _CompChecklist.cshtml; здесь только текст и hidden.
+            const PROGRAMME_API = '/api/admin/programme-check';
+            const LOGLIG_COMPETITION_URL = 'https://loglig.com:2053/LeagueTable/AthleticsDisciplines/';
+            window.daysCheck = async function (btn) {
+                const box = btn.closest('.ck-days-check');
+                const id = box.dataset.discId;
+                const q = (sel) => box.querySelector(sel);
+                const li = box.closest('li');
+                btn.disabled = true; btn.textContent = 'Проверяю программу loglig…';
+                try {
+                    const v = await apiJson(`${PROGRAMME_API}/${id}/check`, { method: 'POST' });
+                    box.dataset.plan = (v.lines ?? []).join('\n');
+                    box.dataset.fingerprint = v.planFingerprint ?? '';
+                    q('.ck-days-headline').textContent = v.headline;
+                    const lines = q('.ck-days-lines');
+                    lines.replaceChildren(...(v.lines ?? []).map(t => { const e = document.createElement('li'); e.textContent = t; return e; }));
+                    q('.ck-days-hint').textContent = v.hint ?? '';
+                    // Кандидаты в недостающий день — ссылкой на loglig; адрес — из своей константы,
+                    // с сервера приходит только int-номер.
+                    q('.ck-days-links').replaceChildren(...(v.candidates ?? [])
+                        .filter(c => Number.isInteger(c.logligId))
+                        .map(c => {
+                            const a = document.createElement('a');
+                            a.className = 'whitespace-nowrap text-admin-accent hover:underline';
+                            a.href = LOGLIG_COMPETITION_URL + c.logligId;
+                            a.target = '_blank'; a.rel = 'noopener';
+                            a.textContent = `loglig № ${c.logligId} (${(c.dates ?? []).join(', ')}) ↗`;
+                            return a;
+                        }));
+                    const warn = li?.querySelector('.ck-accept-warning');
+                    if (warn) { warn.textContent = v.acceptWarning ? '— ' + v.acceptWarning : ''; warn.classList.toggle('hidden', !v.acceptWarning); }
+                    const blocked = q('.ck-days-blocked');
+                    blocked.textContent = v.splitBlocked ?? '';
+                    blocked.classList.toggle('hidden', !v.splitBlocked);
+                    q('.ck-days-split').classList.toggle('hidden', !v.canSplit);
+                    q('.ck-days-accept')?.classList.toggle('hidden', !v.acceptPrimary);
+                    // (а) склеены — обычная ссылка «Принять как есть» остаётся, но с оговоркой;
+                    // (б) — она же основным действием в ответе, нижняя ссылка не нужна.
+                    li?.querySelector('.ck-accept-note')?.classList.toggle('hidden', v.kind !== 'Collapsed');
+                    li?.querySelector('.ck-accept-row')?.classList.toggle('hidden', !!v.acceptPrimary);
+                    q('.ck-days-out').classList.remove('hidden');
+                    btn.textContent = 'Проверить ещё раз';
+                } catch (e) {
+                    btn.textContent = 'Проверить, чего не хватает';
+                    toast('Ошибка проверки: ' + e.message, 5000);
+                }
+                btn.disabled = false;
+            };
+
+            window.daysSplit = async function (btn) {
+                const box = btn.closest('.ck-days-check');
+                const plan = box.dataset.plan ?? '';
+                if (!confirm(`Разделить по дням?\n\n${plan}\n\nСтроки переедут в свои дни (Id те же), заведётся событие, дни пересчитаются. Одна транзакция: всё или ничего.`)) return;
+                btn.disabled = true; btn.textContent = 'Делю…';
+                try {
+                    // Отпечаток плана, который видел админ: сервер сверит с новым dry-run (изменился — 409).
+                    const r = await apiJson(`${PROGRAMME_API}/${box.dataset.discId}/split`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ planFingerprint: box.dataset.fingerprint ?? '' })
+                    });
+                    toast(r.message, r.recalcError ? 10000 : 4000);
+                    box.querySelector('.ck-days-hint').textContent = r.message;
+                    // Строка теперь — событие (ключ e<id>, был c<id>): выбираем его, иначе карточка не откроется.
+                    const u = new URL(location.href);
+                    if (r.eventId) u.searchParams.set('sel', 'e' + r.eventId);
+                    setTimeout(() => { location.href = u.toString(); }, r.recalcError ? 6000 : 1500); // дать прочитать итог
+                } catch (e) {
+                    btn.disabled = false; btn.textContent = 'Разделить по дням';
+                    toast(e.message, 6000);
+                }
+            };
+
             window.discSyncLangs = async function (id, btn) {
                 const name = discName(id);
                 if (btn) { btn.disabled = true; btn.textContent = 'Синхронизирую…'; }
