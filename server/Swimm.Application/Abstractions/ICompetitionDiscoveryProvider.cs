@@ -61,6 +61,14 @@ public interface ICompetitionDiscoveryProvider
         int logligId, CancellationToken ct = default);
 
     /// <summary>
+    /// Заголовок и даты дисциплин соревнования loglig — один запрос полной страницы
+    /// <c>AthleticsDisciplines/{id}</c> (Р123: поиск соседнего соревнования-дня). null — страницы
+    /// нет или заголовка на ней нет (номер пустой).
+    /// </summary>
+    Task<LogligCompetitionSummaryDto?> FetchCompetitionSummaryAsync(int logligId, CancellationToken ct = default) =>
+        throw new NotSupportedException("Сводка соревнования loglig этим провайдером не поддерживается.");
+
+    /// <summary>
     /// Стартовый протокол одного заплыва: кто, в каком заплыве, на какой дорожке и во сколько.
     /// Пустой список строк — законный ответ (в заплыв никто не записался), в отличие от
     /// <see cref="FetchEventIdsAsync"/>, где ноль означает сломанную вёрстку.

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Swimm.Application.Dtos;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Mapping;
 using Swimm.Domain.Entities;
@@ -69,8 +71,9 @@ public class ProgrammeCheckServiceTests
         (new DisciplineDayKey("butterfly", "200", "female"), Day2),
     ]);
 
-    private static ProgrammeCheckService Service(SwimmDbContext db, IDisciplineDateSource dates) =>
-        new(db, dates, new CompetitionDaySplitService(db, dates, new NoRecalc()), NullLogger<ProgrammeCheckService>.Instance);
+    private static ProgrammeCheckService Service(SwimmDbContext db, IDisciplineDateSource dates, ICompetitionDiscoveryProvider? loglig = null) =>
+        new(db, dates, new CompetitionDaySplitService(db, dates, new NoRecalc()),
+            loglig ?? new Mock<ICompetitionDiscoveryProvider>(MockBehavior.Strict).Object, NullLogger<ProgrammeCheckService>.Instance);
 
     [Fact]
     public async Task Check_Collapsed_ShowsDryRunPlan_WritesNothing()
@@ -150,5 +153,40 @@ public class ProgrammeCheckServiceTests
 
         Assert.Equal(ProgrammeVerdictKind.None, v.Kind);
         Assert.Contains("loglig не ответил", v.Headline);
+    }
+
+    [Fact]
+    public async Task Check_OnlyKnownDays_SearchesSixNeighbours_FindsSaturday()
+    {
+        var (db, discId, _) = await SeedAsync(nameof(Check_OnlyKnownDays_SearchesSixNeighbours_FindsSaturday));
+        await using var _db = db;
+        // База и программа — только 29.03 (как пятница 6611); федерация 28–29.03 → недостающий 28.03.
+        var oneDay = new DisciplineDates(
+        [
+            (new DisciplineDayKey("freestyle", "400", "female"), Day2),
+            (new DisciplineDayKey("butterfly", "200", "female"), Day2),
+        ]);
+        var asked = new List<int>();
+        var loglig = new Mock<ICompetitionDiscoveryProvider>();
+        loglig.Setup(p => p.FetchCompetitionSummaryAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns((int id, CancellationToken _) =>
+            {
+                asked.Add(id);
+                return id switch
+                {
+                    12160 => Task.FromResult<LogligCompetitionSummaryDto?>(new(id, "אליפות עמק חפר יום שבת 29.3.25 - 29/03/2025", [Day2])),
+                    12161 => Task.FromResult<LogligCompetitionSummaryDto?>(new(id, "אליפות עמק חפר יום שישי 28.3.25 - 28/03/2025", [Day1])),
+                    12162 => Task.FromResult<LogligCompetitionSummaryDto?>(new(id, "אליפות עמק חפר יום שישי - 10/03/2025", [])),
+                    _ => throw new HttpRequestException("404", null, System.Net.HttpStatusCode.NotFound),
+                };
+            });
+
+        var v = await Service(db, new FakeDates(() => oneDay), loglig.Object).CheckAsync(discId);
+
+        Assert.Equal(ProgrammeVerdictKind.OnlyKnownDays, v.Kind);
+        Assert.Equal([12160, 12157, 12158, 12159, 12161, 12162, 12163], asked);
+        Assert.Equal(12161, Assert.Single(v.Candidates!).LogligId);
+        Assert.Equal(12162, Assert.Single(v.Similar!).LogligId);
+        Assert.False(v.AcceptPrimary);
     }
 }

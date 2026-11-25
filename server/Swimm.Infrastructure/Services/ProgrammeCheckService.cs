@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 
@@ -17,6 +18,7 @@ public sealed class ProgrammeCheckService(
     SwimmDbContext db,
     IDisciplineDateSource dateSource,
     ICompetitionDaySplitService splitter,
+    ICompetitionDiscoveryProvider loglig,
     ILogger<ProgrammeCheckService> logger) : IProgrammeCheckService
 {
     private const string DateFormat = "dd/MM/yyyy";
@@ -68,10 +70,58 @@ public sealed class ProgrammeCheckService(
         if (error == null && days.Count == 1 && ProgrammeCheckRules.NeedsSplitPlan(dbDays, programme))
             plan = await splitter.SplitAsync(days[0].Id, row.LogligId, apply: false, ct);
 
+        var siteStart = DateOnly.FromDateTime(row.DateStart);
+        var siteEnd = DateOnly.FromDateTime(row.DateEnd);
+        string? boundTitle = null;
+        List<LogligCompetitionSummaryDto>? neighbours = null;
+        var failed = 0;
+        if (error == null && row.LogligId is int bound
+            && ProgrammeCheckRules.NeedsNeighbourSearch(siteStart, siteEnd, dbDays, programme))
+            (boundTitle, neighbours, failed) = await SearchNeighboursAsync(bound, discoveryId, ct);
+
         var verdict = ProgrammeCheckRules.Verdict(new ProgrammeCheckInput(
-            DateOnly.FromDateTime(row.DateStart), DateOnly.FromDateTime(row.DateEnd), dbDays,
-            row.LogligId, programme, error, plan));
+            siteStart, siteEnd, dbDays, row.LogligId, programme, error, plan, boundTitle, neighbours, failed));
         return (verdict, row.LogligId);
+    }
+
+    /// <summary>
+    /// Р123: заголовок привязанного соревнования и соседи ±3 (6 запросов) — по одному, с обычной
+    /// паузой провайдера (вежливый режим). Пустой номер (страницы нет) — не ошибка; сбой — считается.
+    /// </summary>
+    private async Task<(string? BoundTitle, List<LogligCompetitionSummaryDto>? Neighbours, int Failed)> SearchNeighboursAsync(
+        int bound, int discoveryId, CancellationToken ct)
+    {
+        string? boundTitle;
+        try
+        {
+            boundTitle = (await loglig.FetchCompetitionSummaryAsync(bound, ct))?.Title;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Заголовок loglig {LogligId} (discovery #{DiscoveryId}) не получен", bound, discoveryId);
+            return (null, null, 0);
+        }
+        if (boundTitle == null) return (null, [], 0);
+
+        var found = new List<LogligCompetitionSummaryDto>();
+        var failed = 0;
+        foreach (var id in ProgrammeCheckRules.NeighbourIds(bound))
+        {
+            try
+            {
+                if (await loglig.FetchCompetitionSummaryAsync(id, ct) is { } summary) found.Add(summary);
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // номера нет — законный ответ
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                logger.LogInformation(ex, "Сосед loglig {LogligId} (discovery #{DiscoveryId}) не прочитан", id, discoveryId);
+                failed++;
+            }
+        }
+        return (boundTitle, found, failed);
     }
 
     private static DateOnly? ParseDate(string? date) =>

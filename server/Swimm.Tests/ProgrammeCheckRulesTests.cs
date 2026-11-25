@@ -1,4 +1,5 @@
 using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
 using Swimm.Application.Mapping;
 using Xunit;
 
@@ -72,33 +73,107 @@ public class ProgrammeCheckRulesTests
         Assert.Contains("остальные дни лежат не здесь", v.Headline);
     }
 
+    // ── (б+в): в привязанной программе только дни из базы — решает поиск соседей ──
+
+    private static LogligCompetitionSummaryDto Summary(int id, string title, params DateOnly[] dates) => new(id, title, dates);
+
+    private const string Millennium6 = "תחרות חלופית ל&quot;מילניום&quot; יום שישי 6.12.24 - 06/12/2024";
+
     [Fact]
-    public void Maccabiah_16723_ProgrammeNarrowerThanFederation_AcceptPrimary()
+    public void Maccabiah_16723_NoCandidates_AcceptPrimary()
     {
         DateOnly d5 = D(2026, 7, 5), d6 = D(2026, 7, 6), d7 = D(2026, 7, 7), d10 = D(2026, 7, 10);
+        Assert.True(ProgrammeCheckRules.NeedsNeighbourSearch(d5, d10, [d5, d6, d7], [d5, d6, d7]));
 
-        var v = ProgrammeCheckRules.Verdict(new(d5, d10, [d5, d6, d7], 12327, [d5, d6, d7]));
+        var v = ProgrammeCheckRules.Verdict(new(d5, d10, [d5, d6, d7], 12327, [d5, d6, d7],
+            BoundTitle: "מכביה 2026 - שחייה - 05/07/2026",
+            Neighbours: [Summary(12325, "ליגת מאסטרס מחוז מרכז - 04/07/2026", D(2026, 7, 4)), Summary(12329, "גביע הנוער - 09/07/2026", D(2026, 7, 9))]));
 
-        Assert.Equal(ProgrammeVerdictKind.ProgrammeNarrower, v.Kind);
+        Assert.Equal(ProgrammeVerdictKind.OnlyKnownDays, v.Kind);
         Assert.True(v.AcceptPrimary);
+        Assert.Null(v.AcceptWarning);
+        Assert.Empty(v.Candidates!);
         Assert.False(v.CanSplit);
-        Assert.StartsWith("Программа на loglig — только 05–07.07, все эти дни в базе. Даты федерации шире (например, даты всех Игр)", v.Headline);
-        Assert.Contains("08.07, 09.07, 10.07 в программе нет", v.Headline);
+        Assert.StartsWith("В привязанной программе loglig 12327 только те дни, что уже есть в базе: 05–07.07", v.Headline);
+        Assert.Contains("как у Маккабиады — даты всех Игр", v.Hint);
     }
 
     [Fact]
-    public void Comp488_OneDayProgramme_DayElsewhere_HintWithoutButton()
+    public void Comp6611_Candidate11590_And11589RejectedByDate()
+    {
+        DateOnly fri = D(2024, 12, 6), sat = D(2024, 12, 7);
+
+        var v = ProgrammeCheckRules.Verdict(new(fri, sat, [fri], 11588, [fri],
+            BoundTitle: Millennium6,
+            Neighbours:
+            [
+                Summary(11589, "\tתחרות חלופית ל&quot;מילניום&quot; יום שבת 7.12.24 - 24/11/2024"),
+                Summary(11590, "תחרות חלופית ל\"מילניום\" יום שבת 7.12.24 - 07/12/2024", sat),
+                Summary(11591, "אליפות מחוז צפון - 08/12/2024", D(2024, 12, 8)),
+            ]));
+
+        Assert.Equal(ProgrammeVerdictKind.OnlyKnownDays, v.Kind);
+        Assert.False(v.AcceptPrimary);
+        Assert.NotNull(v.AcceptWarning);
+        Assert.Equal([11590], v.Candidates!.Select(c => c.LogligId));
+        Assert.Equal([11589], v.Similar!.Select(c => c.LogligId));
+        Assert.Contains("день 07.12 лежит на loglig отдельным соревнованием № 11590", v.Hint);
+        Assert.Contains("docs/pull-to-prod.md", v.Hint);
+        Assert.Contains("Похожее, но дата не подходит: № 11589", Assert.Single(v.Lines));
+        Assert.Contains("24.11", v.Lines[0]);
+    }
+
+    [Fact]
+    public void Comp488_Candidate9817()
     {
         DateOnly fri = D(2023, 12, 22), sat = D(2023, 12, 23);
 
-        var v = ProgrammeCheckRules.Verdict(new(fri, sat, [fri], 9816, [fri]));
+        var v = ProgrammeCheckRules.Verdict(new(fri, sat, [fri], 9816, [fri],
+            BoundTitle: "הזדמנות אחרונה 2023 יום שישי - 22/12/2023",
+            Neighbours: [Summary(9817, "הזדמנות אחרונה 2023 יום שבת - 23/12/2023", sat)]));
 
-        Assert.Equal(ProgrammeVerdictKind.DayElsewhere, v.Kind);
-        Assert.False(v.CanSplit);
+        Assert.Equal(ProgrammeVerdictKind.OnlyKnownDays, v.Kind);
+        Assert.Equal(9817, Assert.Single(v.Candidates!).LogligId);
         Assert.False(v.AcceptPrimary);
-        Assert.Contains("23.12 нет ни в базе, ни в программе", v.Headline);
-        Assert.Contains("compID 488 — суббота в loglig 9817 при привязанном 9816", v.Hint);
-        Assert.Contains("docs/pull-to-prod.md", v.Hint);
+        Assert.Contains("Нет ни в базе, ни в программе: 23.12.", v.Headline);
+    }
+
+    [Fact]
+    public void NeighboursNotChecked_AcceptNotPrimary()
+    {
+        DateOnly fri = D(2024, 12, 6), sat = D(2024, 12, 7);
+
+        var noSearch = ProgrammeCheckRules.Verdict(new(fri, sat, [fri], 11588, [fri]));
+        var someFailed = ProgrammeCheckRules.Verdict(new(fri, sat, [fri], 11588, [fri],
+            BoundTitle: Millennium6, Neighbours: [], NeighboursFailed: 2));
+
+        Assert.False(noSearch.AcceptPrimary);
+        Assert.Contains("проверить не удалось", noSearch.Hint);
+        Assert.False(someFailed.AcceptPrimary);
+        Assert.Contains("2 из 2 соседних номеров loglig не ответили", someFailed.Hint);
+    }
+
+    [Fact]
+    public void NeighbourIds_PlusMinusThree_NotSelf_Positive()
+    {
+        Assert.Equal([11585, 11586, 11587, 11589, 11590, 11591], ProgrammeCheckRules.NeighbourIds(11588));
+        Assert.Equal([1, 3, 4, 5], ProgrammeCheckRules.NeighbourIds(2));
+    }
+
+    [Theory]
+    [InlineData("תחרות חלופית ל&quot;מילניום&quot; יום שישי 6.12.24 - 06/12/2024", "תחרות חלופית למילניום")]
+    [InlineData("\tתחרות חלופית ל\"מילניום\" יום שבת 7.12.24 - 24/11/2024", "תחרות חלופית למילניום")]
+    [InlineData("הזדמנות אחרונה 2023 יום ו' - 22/12/2023", "הזדמנות אחרונה 2023")]
+    [InlineData("גביע  ״השרון״ שבת", "גביע השרון")]
+    [InlineData("ליגה סבב שני - 01/02/2025", "ליגה סבב שני")]
+    public void Normalize_DropsWeekdayDatesQuotes(string title, string expected) =>
+        Assert.Equal(expected, LogligTitleRules.Normalize(title));
+
+    [Fact]
+    public void TitleDate_FromTail()
+    {
+        Assert.Equal(D(2024, 11, 24), LogligTitleRules.TitleDate("תחרות חלופית ל&quot;מילניום&quot; יום שבת 7.12.24 - 24/11/2024"));
+        Assert.Null(LogligTitleRules.TitleDate("בלי תאריך"));
     }
 
     [Theory]

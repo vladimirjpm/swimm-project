@@ -31,6 +31,14 @@ public class ProgrammeCheckAdminController(IProgrammeCheckService service, IAdmi
             splitCompetitionId = v.SplitCompetitionId,
             splitBlocked = v.SplitBlocked,
             acceptPrimary = v.AcceptPrimary,
+            acceptWarning = v.AcceptWarning,
+            // Наружу — только int-номер loglig; адрес страницы собирает клиент из своей константы.
+            candidates = (v.Candidates ?? []).Select(c => new
+            {
+                logligId = c.LogligId,
+                title = c.Title,
+                dates = c.Dates.Select(d => d.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)).ToList(),
+            }),
         });
     }
 

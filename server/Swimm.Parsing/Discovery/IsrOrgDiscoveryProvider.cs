@@ -35,6 +35,9 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
     private const string EventListUrlTemplate =
         "https://loglig.com:2053/LeagueTable/AthleticsDisciplines/{0}?dateFilter=%D7%94%D7%9B%D7%9C";
 
+    /// <summary>Полная страница соревнования — с заголовком (Р123, <see cref="FetchCompetitionSummaryAsync"/>).</summary>
+    private const string CompetitionPageUrlTemplate = "https://loglig.com:2053/LeagueTable/AthleticsDisciplines/{0}";
+
     /// <summary>Результаты одного события. showCategories=True добавляет подзаголовки секций
     /// («גמר ישיר - בנות 14»), из которых берётся раунд и категория.</summary>
     private const string EventResultsUrlTemplate =
@@ -188,6 +191,26 @@ public partial class IsrOrgDiscoveryProvider : ICompetitionDiscoveryProvider
             r.DisciplineId, r.EventNumber, r.DisciplineRaw, r.Category, r.StyleName, r.Distance,
             r.Gender, r.AgeBand, r.IsRelay, r.MinTime, r.StartAtLocal, r.Registered, r.Participants))
             .ToList();
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Полная страница без фильтра дат: заголовок есть только на ней. Сетка там может быть урезана
+    /// фильтром loglig по умолчанию — для поиска соседа хватает и одной даты; запасная дата —
+    /// хвост заголовка («… - 07/12/2024»), его разбирает правило в Application.
+    /// </remarks>
+    public async Task<LogligCompetitionSummaryDto?> FetchCompetitionSummaryAsync(int logligId, CancellationToken ct = default)
+    {
+        var html = await GetStringAsync(
+            string.Format(CultureInfo.InvariantCulture, CompetitionPageUrlTemplate, logligId),
+            $"loglig-summary-{logligId}", ct);
+        var title = Parsers.Loglig.LogligStartListParser.ParseCompetitionTitle(html);
+        if (title == null) return null;
+        var dates = Parsers.Loglig.LogligStartListParser.ParseDisciplineGrid(html)
+            .Where(r => r.StartAtLocal != null)
+            .Select(r => DateOnly.FromDateTime(r.StartAtLocal!.Value))
+            .Distinct().Order().ToList();
+        return new LogligCompetitionSummaryDto(logligId, title, dates);
     }
 
     public async Task<LogligStartListDto> FetchStartListAsync(int disciplineId, CancellationToken ct = default)

@@ -105,15 +105,20 @@ public class ProgrammeCheckAdminControllerTests
     {
         var service = new Mock<IProgrammeCheckService>();
         service.Setup(s => s.CheckAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(new ProgrammeCheckVerdict(
-            ProgrammeVerdictKind.ProgrammeNarrower, "Программа на loglig — только 05–07.07", [], "h", null, null, true));
+            ProgrammeVerdictKind.OnlyKnownDays, "В привязанной программе loglig только те дни", [], "h", null, null, false,
+            AcceptWarning: "день, похоже, есть на loglig", Candidates: [new(11590, "תחרות", [new DateOnly(2024, 12, 7)])]));
 
         var result = await new ProgrammeCheckAdminController(service.Object, Mock.Of<IAdminAuditService>()).Check(7, CancellationToken.None);
 
         var json = Json(Assert.IsType<OkObjectResult>(result).Value);
-        Assert.Equal("ProgrammeNarrower", json.GetProperty("kind").GetString());
-        Assert.True(json.GetProperty("acceptPrimary").GetBoolean());
+        Assert.Equal("OnlyKnownDays", json.GetProperty("kind").GetString());
+        var cand = json.GetProperty("candidates")[0];
+        Assert.Equal(11590, cand.GetProperty("logligId").GetInt32());
+        Assert.Equal("07.12.2024", cand.GetProperty("dates")[0].GetString());
+        Assert.False(cand.TryGetProperty("url", out _)); // только номер — адрес собирает клиент
+        Assert.False(json.GetProperty("acceptPrimary").GetBoolean());
         Assert.False(json.GetProperty("canSplit").GetBoolean());
-        foreach (var p in new[] { "headline", "lines", "hint", "splitCompetitionId", "splitBlocked" })
+        foreach (var p in new[] { "headline", "lines", "hint", "splitCompetitionId", "splitBlocked", "acceptWarning" })
             Assert.True(json.TryGetProperty(p, out _), p);
     }
 

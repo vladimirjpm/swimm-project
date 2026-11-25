@@ -1424,6 +1424,7 @@
             // Р123: «Проверить, чего не хватает» у Р115 — программа loglig ↔ дни в базе. Сеть только
             // по клику. Узлы ответа готовы в _CompChecklist.cshtml; здесь только текст и hidden.
             const PROGRAMME_API = '/api/admin/programme-check';
+            const LOGLIG_COMPETITION_URL = 'https://loglig.com:2053/LeagueTable/AthleticsDisciplines/';
             window.daysCheck = async function (btn) {
                 const box = btn.closest('.ck-days-check');
                 const id = box.dataset.discId;
@@ -1437,6 +1438,20 @@
                     const lines = q('.ck-days-lines');
                     lines.replaceChildren(...(v.lines ?? []).map(t => { const e = document.createElement('li'); e.textContent = t; return e; }));
                     q('.ck-days-hint').textContent = v.hint ?? '';
+                    // Кандидаты в недостающий день — ссылкой на loglig; адрес — из своей константы,
+                    // с сервера приходит только int-номер.
+                    q('.ck-days-links').replaceChildren(...(v.candidates ?? [])
+                        .filter(c => Number.isInteger(c.logligId))
+                        .map(c => {
+                            const a = document.createElement('a');
+                            a.className = 'whitespace-nowrap text-admin-accent hover:underline';
+                            a.href = LOGLIG_COMPETITION_URL + c.logligId;
+                            a.target = '_blank'; a.rel = 'noopener';
+                            a.textContent = `loglig № ${c.logligId} (${(c.dates ?? []).join(', ')}) ↗`;
+                            return a;
+                        }));
+                    const warn = li?.querySelector('.ck-accept-warning');
+                    if (warn) { warn.textContent = v.acceptWarning ? '— ' + v.acceptWarning : ''; warn.classList.toggle('hidden', !v.acceptWarning); }
                     const blocked = q('.ck-days-blocked');
                     blocked.textContent = v.splitBlocked ?? '';
                     blocked.classList.toggle('hidden', !v.splitBlocked);
