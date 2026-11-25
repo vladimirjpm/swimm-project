@@ -27,6 +27,9 @@ public interface ILogligCardGenderService
     /// </summary>
     Task<LogligCardGenderReport?> FillFromFindingsAsync(CancellationToken ct = default);
 
+    /// <summary>Итог последнего нажатия кнопки (журнал аудита); null — кнопку ещё не нажимали.</summary>
+    Task<LogligGenderButtonRun?> LastButtonRunAsync(CancellationToken ct = default);
+
     /// <summary>После импорта: пловцы соревнования с этим compID isr.org.il.</summary>
     Task<LogligCardGenderReport> FillAfterImportAsync(int orgCompId, CancellationToken ct = default);
 
@@ -69,8 +72,14 @@ public sealed record LogligGenderConfirmResult(string Gender, int Rows, int Reca
 /// <param name="DbFailed">Сбой записи на пловце — остальные не пострадали.</param>
 /// <param name="Interrupted">Прогон прерван по времени; обработано <paramref name="Reached"/> из <paramref name="Candidates"/>.</param>
 /// <param name="Notes">Строки про несовпавших, неоткрывшихся и ждущих проверки — кого смотреть руками.</param>
+/// <param name="ReviewIdentity">Из <paramref name="Review"/>: личность не подтверждена заплывом.</param>
+/// <param name="ReviewImpact">Из <paramref name="Review"/>: есть серьёзные последствия (у пловца могут быть обе причины).</param>
 public sealed record LogligCardGenderReport(
     int Candidates, int Set, int Rows, int CardWithoutGender, int Failed, int Mismatch,
     int NotVerified, int OverLimit, int Requests, int FromCache, int AlreadyKnown,
     string Message, IReadOnlyList<string> Notes,
-    int Review = 0, int DbFailed = 0, bool Interrupted = false, int Reached = 0);
+    int Review = 0, int DbFailed = 0, bool Interrupted = false, int Reached = 0,
+    int ReviewIdentity = 0, int ReviewImpact = 0);
+
+/// <summary>Итог прошлого нажатия кнопки «взять пол с карточек loglig» — из журнала аудита.</summary>
+public sealed record LogligGenderButtonRun(DateTime At, string By, string Message, IReadOnlyList<string> Notes);

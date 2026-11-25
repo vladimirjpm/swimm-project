@@ -16,7 +16,9 @@ namespace Swimm.Infrastructure.Services;
 ///
 /// Что считается ТОЧНО — тем же кодом, что и на сайте, на строках в памяти с подставленным полом:
 /// карточки Overview соревнования (New records, Best swim ♂/♀, Most decorated, High Point, Top
-/// clubs, награды серии) — <see cref="IGenderOverviewPreview"/>; объединённые места —
+/// clubs, награды серии) — <see cref="IGenderOverviewPreview"/>, для каждого вида, который
+/// показывает сайт (событие, каждый затронутый день многодневки, оба положения тоггла Combine All
+/// Results), и для соревнований, где пловец только в эстафете; объединённые места —
 /// <see cref="CombinedPlaceCalculator"/>; пара-очки — <see cref="ParaPointsDetector"/>; топ
 /// Season best страны — запрос с теми же отборами, что у витрины.
 ///
@@ -65,15 +67,28 @@ public sealed class GenderImpactService(
                 + " — карточка loglig или привязка могут быть ошибочны"));
 
         var empty = swims.Where(s => IsEmpty(s.Gender)).ToList();
-        if (empty.Count == 0) return new GenderImpact(items);
 
-        foreach (var scope in empty.GroupBy(s => s.EventId ?? -s.CompetitionId))
+        // Соревнования, где пловец плыл в эстафете: пол ноги в Most decorated берётся с карточки
+        // пловца (OverviewData: Gender = m.Swimmer.Gender), а запись ставит его глобально — эти
+        // соревнования меняются, даже если личных строк без пола в них нет (смешанная эстафета
+        // пол пловцу не даёт).
+        var relayDays = await db.Results.AsNoTracking()
+            .Where(r => r.RelayId != null && db.RelayMembers.Any(m => m.RelayId == r.RelayId && m.SwimmerId == swimmerId))
+            .Select(r => new { r.CompetitionId, r.Competition!.EventId, r.Competition.Name, r.Competition.Date })
+            .Distinct().ToListAsync(ct);
+
+        var scopes = empty.Select(s => (Key: s.EventId ?? -s.CompetitionId, s.CompetitionId, s.CompetitionName, s.CompetitionDate))
+            .Concat(relayDays.Select(r => (Key: r.EventId ?? -r.CompetitionId, r.CompetitionId, CompetitionName: r.Name, CompetitionDate: r.Date)))
+            .GroupBy(s => s.Key);
+
+        foreach (var scope in scopes)
         {
             var head = scope.First();
             var name = $"«{head.CompetitionName}» ({head.CompetitionDate})";
             try
             {
-                await AssessScopeAsync(swimmerId, gender, scope.Key, scope.ToList(), name, items, ct);
+                await AssessScopeAsync(swimmerId, gender, scope.Key, empty.Where(s => (s.EventId ?? -s.CompetitionId) == scope.Key).ToList(),
+                    scope.Select(s => s.CompetitionId).ToHashSet(), name, items, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -82,21 +97,48 @@ public sealed class GenderImpactService(
             }
         }
 
-        await AssessSeasonBestAsync(swimmerId, swimmer.BirthYear, gender, empty, items, ct);
+        if (empty.Count > 0)
+            await AssessSeasonBestAsync(swimmerId, swimmer.BirthYear, gender, empty, items, ct);
         return new GenderImpact(items);
     }
 
-    private async Task AssessScopeAsync(int swimmerId, string gender, int scopeKey, List<Swim> empty, string name,
-        List<GenderImpactItem> items, CancellationToken ct)
+    /// <param name="touchedDays">Дни области, где у пловца есть строки без пола или эстафета.</param>
+    private async Task AssessScopeAsync(int swimmerId, string gender, int scopeKey, List<Swim> empty,
+        IReadOnlySet<int> touchedDays, string name, List<GenderImpactItem> items, CancellationToken ct)
     {
-        var filter = scopeKey > 0 ? new ResultFilter { EventId = scopeKey } : new ResultFilter { CompetitionId = -scopeKey };
-        var preview = await overview.PreviewAsync(filter, swimmerId, gender);
-        if (preview is not null)
-            items.AddRange(GenderImpactRules.CompareOverviews(preview.Before, preview.After, name));
+        var days = scopeKey > 0
+            ? await db.Competitions.AsNoTracking().Where(c => c.EventId == scopeKey)
+                .Select(c => new { c.Id, c.Date, c.ShowCombineAllResults }).ToListAsync(ct)
+            : await db.Competitions.AsNoTracking().Where(c => c.Id == -scopeKey)
+                .Select(c => new { c.Id, c.Date, c.ShowCombineAllResults }).ToListAsync(ct);
+        var competitionIds = days.Select(d => d.Id).ToList();
 
-        var competitionIds = scopeKey > 0
-            ? await db.Competitions.AsNoTracking().Where(c => c.EventId == scopeKey).Select(c => c.Id).ToListAsync(ct)
-            : [-scopeKey];
+        // Overview, которые показывает сайт: событие целиком и — у многодневки — каждый день
+        // отдельно (переключатель дней: /api/competition-overview?competitionId=<день>, свои Best
+        // swim, Most decorated, High Point, клубы). Лидер дня может смениться, когда у события
+        // целиком ничего не меняется. У соревнований с Combine All Results — оба режима тоггла:
+        // в combined медаль и очки считаются по объединённому месту. Объединённые места берутся из
+        // базы как есть; если пол их меняет — это ловит проверка ниже, и случай уходит человеку.
+        var views = new List<(ResultFilter Filter, string Name)>
+        {
+            (scopeKey > 0 ? new ResultFilter { EventId = scopeKey } : new ResultFilter { CompetitionId = -scopeKey }, name),
+        };
+        if (scopeKey > 0 && days.Count > 1)
+            views.AddRange(days.Where(d => touchedDays.Contains(d.Id)).OrderBy(d => d.Id)
+                .Select(d => (new ResultFilter { CompetitionId = d.Id }, $"{name}, день {d.Date}")));
+        if (days.Any(d => d.ShowCombineAllResults))
+            views.AddRange(views.ToList().Select(v => (
+                new ResultFilter { EventId = v.Filter.EventId, CompetitionId = v.Filter.CompetitionId, Combined = true },
+                $"{v.Name} [Combine All Results]")));
+
+        foreach (var (filter, viewName) in views)
+        {
+            var preview = await overview.PreviewAsync(filter, swimmerId, gender);
+            if (preview is not null)
+                items.AddRange(GenderImpactRules.CompareOverviews(preview.Before, preview.After, viewName));
+        }
+
+        if (empty.Count == 0) return;   // только эстафеты: строки не меняются, остальное считать нечего
         var emptyIds = empty.Select(s => s.Id).ToHashSet();
 
         var rows = await db.Results.AsNoTracking()

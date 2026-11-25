@@ -128,11 +128,11 @@ public class GenderImpactTests
         }
 
         public ResultRecord AddRow(Swimmer s, string gender, int timeMs, int? position = null, int points = 0,
-            string? category = "mix-shabbat")
+            string? category = "mix-shabbat", Competition? comp = null)
         {
             var r = new ResultRecord
             {
-                CompetitionId = Comp.Id, SwimmerId = s.Id, ClubId = Club.Id, StyleId = Style.Id,
+                CompetitionId = (comp ?? Comp).Id, SwimmerId = s.Id, ClubId = Club.Id, StyleId = Style.Id,
                 Distance = "50", Gender = gender, CompetitionDate = Date, TimeOriginal = "x", TimeMillisecond = timeMs,
                 Position = position, InternationalPoints = points, EventCategory = category,
                 AgeGroup = "12", EventStyleAge = "12",
@@ -289,5 +289,87 @@ public class GenderImpactTests
 
         Assert.DoesNotContain((await With(2025).AssessAsync(me.Id, "male")).Serious, i => i.Code == GenderImpactRules.SeasonBest);
         Assert.Contains((await With(2026).AssessAsync(me.Id, "male")).Serious, i => i.Code == GenderImpactRules.SeasonBest);
+    }
+
+    // Ревью PR #286, дыра 1: у многодневки сайт показывает и обзор ДНЯ. Лидер Most decorated ♂
+    // события не меняется (у Y два золота), а в обзоре второго дня мужских медалей не было — X
+    // станет его лидером. Без расчёта по дню пол записался бы сам.
+    [Fact]
+    public async Task MultiDayEvent_DayOverviewChange_IsSerious_EvenWhenEventOverviewIsSame()
+    {
+        var w = await SeedAsync(nameof(MultiDayEvent_DayOverviewChange_IsSerious_EvenWhenEventOverviewIsSame));
+        var evt = new CompetitionEvent { Name = "Meet" };
+        w.Db.Add(evt);
+        await w.Db.SaveChangesAsync();
+        w.Comp.EventId = evt.Id;
+        var day2 = new Competition
+        {
+            Name = "Meet", Country = w.Comp.Country, Date = "22/11/2026", PoolType = "25m", EventId = evt.Id,
+        };
+        w.Db.Add(day2);
+        await w.Db.SaveChangesAsync();
+
+        w.AddFasterPeers();
+        var y = w.AddSwimmer("male");
+        w.AddRow(y, "male", 30000, position: 1, category: null);
+        w.AddRow(y, "male", 31000, position: 1, category: "13");
+        var me = w.AddSwimmer(null);
+        w.AddRow(me, "", 45000, position: 1, comp: day2);
+        await w.Db.SaveChangesAsync();
+
+        var impact = await w.Service().AssessAsync(me.Id, "male");
+
+        Assert.Contains(impact.Serious, i => i.Code == GenderImpactRules.Medals && i.Text.Contains("день 22/11/2026"));
+        Assert.DoesNotContain(impact.Serious, i => i.Code == GenderImpactRules.Medals && !i.Text.Contains("день"));
+    }
+
+    // Дыра 2: медаль в смешанной эстафете другого соревнования. Личных строк без пола там нет,
+    // но пол ноги в Most decorated берётся у пловца — после записи X войдёт в мужской список.
+    [Fact]
+    public async Task RelayMedal_InCompetitionWithoutEmptyPersonalRows_IsSerious()
+    {
+        var w = await SeedAsync(nameof(RelayMedal_InCompetitionWithoutEmptyPersonalRows_IsSerious));
+        w.AddFasterPeers();
+        var me = w.AddSwimmer(null);
+        w.AddRow(me, "", 45000);   // в своём соревновании последствий нет
+
+        var other = new Competition { Name = "Relays", Country = w.Comp.Country, Date = "28/11/2026", PoolType = "25m" };
+        var relay = new Relay { TeamName = "Alpha A", SwimmersName = "x" };
+        w.Db.AddRange(other, relay);
+        await w.Db.SaveChangesAsync();
+        var anchor = w.AddSwimmer("female");
+        w.Db.Results.Add(new ResultRecord
+        {
+            CompetitionId = other.Id, SwimmerId = anchor.Id, ClubId = w.Club.Id, StyleId = w.Style.Id, RelayId = relay.Id,
+            Distance = "4x50", Gender = "mixed", CompetitionDate = Date, TimeOriginal = "x", TimeMillisecond = 120000,
+            Position = 1, AgeGroup = "12", EventStyleAge = "12",
+        });
+        w.Db.AddRange(new RelayMember { RelayId = relay.Id, SwimmerId = anchor.Id, LegOrder = 1 },
+            new RelayMember { RelayId = relay.Id, SwimmerId = me.Id, LegOrder = 2 });
+        await w.Db.SaveChangesAsync();
+
+        var impact = await w.Service().AssessAsync(me.Id, "male");
+
+        Assert.Contains(impact.Serious, i => i.Code == GenderImpactRules.Medals && i.Text.Contains("«Relays»"));
+    }
+
+    // Дыра 3: Combine All Results, объединённое место не меняется (пловец один в своей группе),
+    // но в режиме combined медаль считается по нему: 4-е в заплыве, 1-е объединённое — золото ♂
+    // появится только при включённом тоггле.
+    [Fact]
+    public async Task CombinedToggleView_MedalByCombinedPlace_IsSerious()
+    {
+        var w = await SeedAsync(nameof(CombinedToggleView_MedalByCombinedPlace_IsSerious), combined: true);
+        w.AddFasterPeers();
+        var me = w.AddSwimmer(null);
+        var row = w.AddRow(me, "", 45000, position: 4);
+        row.CombinedPlace = 1;
+        await w.Db.SaveChangesAsync();
+
+        var impact = await w.Service().AssessAsync(me.Id, "male");
+
+        Assert.DoesNotContain(impact.Serious, i => i.Code == GenderImpactRules.CombinedPlace);
+        Assert.DoesNotContain(impact.Serious, i => i.Code == GenderImpactRules.Medals && !i.Text.Contains("[Combine All Results]"));
+        Assert.Contains(impact.Serious, i => i.Code == GenderImpactRules.Medals && i.Text.Contains("[Combine All Results]"));
     }
 }

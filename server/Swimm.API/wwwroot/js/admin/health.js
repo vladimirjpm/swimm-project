@@ -136,7 +136,54 @@
                     проставить всем по полу пловца</button>
                 <button id="btn-gender-loglig" class="admin-btn admin-btn-ghost py-1 px-2 text-[12px]"
                     title="Пловцам без пола с подтверждённым loglig-id — пол с их карточки loglig (имя и год должны совпасть). Запрос на пловца, до 30 за нажатие (не дольше 2,5 мин); проставленный пол не трогает; случаи с серьёзными последствиями уходят в «Пол с loglig ждёт ручной проверки»">
-                    взять пол с карточек loglig</button></div>`;
+                    взять пол с карточек loglig</button>
+                <button id="btn-gender-loglig-last" class="admin-btn admin-btn-ghost py-1 px-1.5 text-[12px]"
+                    title="Итог прошлого нажатия «взять пол с карточек loglig» — кто, когда, что вышло и кого смотреть руками">ⓘ</button></div>
+                <div id="gender-loglig-run-slot">${genderLogligRunBox()}</div>`;
+    }
+
+    // Итог кнопки «взять пол с карточек loglig» не пропадает вместе с тостом (просьба Влада
+    // 25.11.2026): блок под кнопкой живёт до ✕ и переживает перерисовку списка; после
+    // перезагрузки страницы тот же итог достаёт значок ⓘ — из журнала аудита.
+    let genderLogligRun = null;
+
+    function genderLogligRunBox() {
+        const r = genderLogligRun;
+        if (!r) return '';
+        const at = r.at ? new Date(r.at).toLocaleString('ru-RU') : '';
+        const notes = r.notes?.length
+            ? `<details class="mt-1"><summary class="cursor-pointer text-admin-text-muted">кого смотреть руками — ${r.notes.length}</summary>
+                <ul class="mt-1 list-disc pl-5">${r.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>`
+            : '';
+        return `<div class="mt-2 rounded border border-admin-border bg-admin-surface-hover px-3 py-2 text-[12px]">
+                <div class="flex items-start gap-2">
+                    <div class="flex-1">
+                        <div class="text-[11px] text-admin-text-muted">Пол с карточек loglig — ${esc(at)}${r.by ? ` · ${esc(r.by)}` : ''}</div>
+                        <div class="text-admin-text">${esc(r.message)}</div>
+                    </div>
+                    <button id="btn-gender-loglig-run-close" class="text-admin-text-muted hover:text-admin-text" title="Скрыть">✕</button>
+                </div>
+                ${notes}
+            </div>`;
+    }
+
+    function showGenderLogligRun() {
+        const slot = document.getElementById('gender-loglig-run-slot');
+        if (!slot) return;
+        slot.innerHTML = genderLogligRunBox();
+        const close = document.getElementById('btn-gender-loglig-run-close');
+        if (close) close.addEventListener('click', () => { genderLogligRun = null; showGenderLogligRun(); });
+    }
+
+    async function showLastGenderLogligRun(btn) {
+        btn.disabled = true;
+        try {
+            const run = await api(`${API}/fix-gender-from-loglig/last`);
+            if (!run) { toast('Кнопку «взять пол с карточек loglig» ещё не нажимали'); return; }
+            genderLogligRun = run;
+            showGenderLogligRun();
+        } catch (e) { toast('Ошибка: ' + e.message, 6000); }
+        finally { btn.disabled = false; }
     }
 
     // Р126: автоматика пол не проставила — есть серьёзные последствия или личность не подтверждена
@@ -177,6 +224,12 @@
         btn.textContent = 'иду по карточкам loglig…';
         try {
             const res = await api(`${API}/fix-gender-from-loglig`, { method: 'POST' });
+            genderLogligRun = {
+                at: new Date().toISOString(),
+                message: res.message + (res.alreadyKnown ? ` У ${res.alreadyKnown} пол уже известен — «проставить всем по полу пловца».` : ''),
+                notes: res.notes ?? [],
+            };
+            showGenderLogligRun();
             // Проставлено или кто-то ушёл на ручную проверку — список находок изменился, гоним проверки.
             if (res.set || res.review) {
                 const data = await api(`${API}/run`, { method: 'POST' });
@@ -188,7 +241,11 @@
                 toast(res.message + (res.alreadyKnown ? ` У ${res.alreadyKnown} пол уже известен — «проставить всем по полу пловца».` : ''), 12000);
             }
             if (res.notes?.length) console.info('Пол с карточек loglig — кого смотреть руками:\n' + res.notes.join('\n'));
-        } catch (e) { btn.disabled = false; btn.textContent = prev; toast('Ошибка: ' + e.message, 6000); }
+        } catch (e) {
+            btn.disabled = false; btn.textContent = prev; toast('Ошибка: ' + e.message, 6000);
+            genderLogligRun = { at: new Date().toISOString(), message: 'Ошибка: ' + e.message, notes: [] };
+            showGenderLogligRun();
+        }
     }
 
     async function fixGenderAll(btn) {
@@ -247,6 +304,9 @@
             b.addEventListener('click', () => confirmLogligGender(b)));
         const fromLoglig = document.getElementById('btn-gender-loglig');
         if (fromLoglig) fromLoglig.addEventListener('click', () => fixGenderFromLoglig(fromLoglig));
+        const lastLoglig = document.getElementById('btn-gender-loglig-last');
+        if (lastLoglig) lastLoglig.addEventListener('click', () => showLastGenderLogligRun(lastLoglig));
+        showGenderLogligRun();   // блок пережил перерисовку — повесить ✕ заново
     }
 
     // Имя субъекта отдельной кнопкой: его копируют, чтобы найти пловца в интернете.

@@ -301,7 +301,8 @@ public class LogligCardGenderServiceTests
 
         Assert.Equal(0, report.Set);
         Assert.Equal(1, report.Review);
-        Assert.Contains("ждут ручной проверки — 1", report.Message);
+        Assert.Equal(1, report.ReviewIdentity);
+        Assert.Contains("ждут ручной проверки — 1, потому что личность не подтверждена: на карточке loglig нет ни одного заплыва пловца", report.Message);
         Assert.Null((await w.Db.Swimmers.FindAsync(1))!.Gender);
 
         var review = Assert.Single(await w.Finder().GetPendingAsync());
@@ -341,6 +342,8 @@ public class LogligCardGenderServiceTests
 
         Assert.Equal(1, report.Set);
         Assert.Equal(1, report.Review);
+        Assert.Equal(1, report.ReviewImpact);
+        Assert.Equal(0, report.ReviewIdentity);
         Assert.Contains("проставлен 1", report.Message);
         Assert.Contains("ждут ручной проверки — 1", report.Message);
         Assert.Null((await w.Db.Swimmers.FindAsync(1))!.Gender);
@@ -559,6 +562,46 @@ public class LogligCardGenderServiceTests
 
         Assert.Equal(409, Assert.IsType<ConflictObjectResult>(result).StatusCode);
         audit.VerifyNoOtherCalls();
+    }
+
+    // Итог нажатия не пропадает с тостом (Влад, 25.11.2026): значок ⓘ берёт последнюю строку аудита.
+    [Fact]
+    public async Task LastButtonRun_IsTheLatestAuditLine_WithItsNotes()
+    {
+        var w = await SeedAsync(nameof(LastButtonRun_IsTheLatestAuditLine_WithItsNotes), new());
+        Assert.Null(await w.Service().LastButtonRunAsync());
+
+        w.Db.AdminAudits.AddRange(
+            new AdminAudit { Action = LogligCardGenderRule.ButtonAuditAction, EntityType = "DataCheckFinding", ActorName = "vlad",
+                Summary = "старый", CreatedAt = new DateTime(2026, 11, 24, 10, 0, 0, DateTimeKind.Utc) },
+            new AdminAudit { Action = LogligCardGenderRule.ButtonAuditAction, EntityType = "DataCheckFinding", ActorName = "vlad",
+                Summary = "свежий", DetailsJson = """{"Review":1,"Notes":["#1 טל כהן: ждёт ручной проверки"]}""",
+                CreatedAt = new DateTime(2026, 11, 25, 14, 0, 0, DateTimeKind.Utc) },
+            new AdminAudit { Action = "datacheck.accept", EntityType = "DataCheckFinding", ActorName = "vlad",
+                Summary = "чужое", CreatedAt = new DateTime(2026, 11, 26, 9, 0, 0, DateTimeKind.Utc) });
+        await w.Db.SaveChangesAsync();
+
+        var run = (await w.Service().LastButtonRunAsync())!;
+
+        Assert.Equal("свежий", run.Message);
+        Assert.Equal("vlad", run.By);
+        Assert.Equal(["#1 טל כהן: ждёт ручной проверки"], run.Notes);
+    }
+
+    [Fact]
+    public async Task LastButtonRun_Endpoint_204WhenNeverPressed_OkOtherwise()
+    {
+        var service = new Mock<ILogligCardGenderService>();
+        var controller = new DataChecksAdminController(Mock.Of<IDataCheckRunner>(), Mock.Of<IAdminAuditService>(), service.Object);
+        Assert.Equal("fix-gender-from-loglig/last", typeof(DataChecksAdminController)
+            .GetMethod(nameof(DataChecksAdminController.LastFixGenderFromLoglig))!.GetCustomAttribute<HttpGetAttribute>()!.Template);
+
+        Assert.IsType<NoContentResult>(await controller.LastFixGenderFromLoglig(CancellationToken.None));
+
+        service.Setup(s => s.LastButtonRunAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LogligGenderButtonRun(DateTime.UtcNow, "vlad", "итог", []));
+        Assert.Equal("итог", Assert.IsType<LogligGenderButtonRun>(
+            Assert.IsType<OkObjectResult>(await controller.LastFixGenderFromLoglig(CancellationToken.None)).Value).Message);
     }
 
     [Fact]
