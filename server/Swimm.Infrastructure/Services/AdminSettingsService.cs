@@ -213,6 +213,13 @@ public class AdminSettingsService : ISettingsService, IReloadableSettings
                 "только там, где включены фоновые расписания (ProdAdmin)"),
             new("RecordsCheckIntervalHours", "24", "int", "admin",
                 "Интервал проверки источников рекордов в часах (минимум 1)"),
+            // Автосклейка надёжных двойников по неявкам стартового протокола (решение Влада 25.11.2026).
+            new(Swimm.Application.Abstractions.NoShowTwinMergeRules.SettingKey, "true", "bool", "admin",
+                "После импорта и сшивки стартового протокола склеивать «двойника» неявки: в заплыве и " +
+                "дорожке заявки плыл тот же пловец под второй карточкой. Только если год совпал, имя то же " +
+                "или одно полнее другого (опечатка — человеку), клуб тот же и loglig-id ровно у одной " +
+                "карточки (она и остаётся). Аудит swimmer.auto-merge-noshow-twin; остальное — в Health, " +
+                "«Заявки без результата»"),
             // Сверка смены клуба пловца с loglig (Р98, §6 swimmer-club-change-plan, 18.11.2026).
             new("SwimmerClubCheckEnabled", "true", "bool", "admin",
                 "Сверка кандидатов на смену клуба пловца с карточкой loglig: true — фоновый джоб " +

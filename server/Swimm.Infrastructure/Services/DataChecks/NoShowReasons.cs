@@ -40,6 +40,15 @@ public static class NoShowReasons
         _ => "дорожка пуста — честная неявка",
     };
 
+    /// <summary>
+    /// Честный случай — смотреть нечего: неявка настоящая (пусто, замена в эстафете, посев
+    /// переставили) или результат есть, просто сшивка его не взяла. Соревнование, где ВСЕ
+    /// неявки честные, проверка принимает сама (решение Влада 25.11.2026). Двойник, тёзка и
+    /// «другой без заявки» (замена или ошибка имени в протоколе) — человеку.
+    /// </summary>
+    public static bool IsHonest(Kind kind) =>
+        kind is Kind.Empty or Kind.RelaySubstitution or Kind.LaneTakenSeed or Kind.SwamElsewhere;
+
     /// <summary>Пловец карточки (заявки или строки результата).</summary>
     public sealed record Person(int Id, string LastName, string FirstName, int BirthYear, int? LogligId, int? ClubId)
     {
@@ -117,6 +126,34 @@ public static class NoShowReasons
             ? $"; год расходится: у заявки {e.Swimmer.BirthYear}, у второй карточки {other.BirthYear}"
             : "";
         return new(Kind.Twin, $"{where} тот же пловец под второй карточкой {who} — двойник, склеить{year}");
+    }
+
+    /// <summary>
+    /// Двойник, которого можно склеить БЕЗ человека (решение Влада 25.11.2026). Все условия сразу:
+    /// личная заявка, в её заплыве и дорожке (своего пола) ровно один «он же» под другой карточкой;
+    /// год рождения совпал; имя то же или одно полнее другого (ליבמן מילי ⊂ ליבמן מילי אריאל), а
+    /// опечатка в буквах — уже человеку; клуб строки — клуб заявки, и клубы карточек не спорят;
+    /// loglig-id ровно у одной из двух карточек — она и остаётся (у обеих — это тёзки, ни у одной —
+    /// не на что опереться). Возвращает (остаётся, уходит) или null.
+    /// </summary>
+    public static (int Canonical, int Duplicate)? ReliableTwin(Entry e, IReadOnlyList<LaneRow> lane, IReadOnlyList<OwnRow> own)
+    {
+        if (e.IsRelay || own.Count > 0) return null;
+        var same = lane.Where(r => SameGenderHeat(e.Gender, r.Gender) && r.Swimmer.Id != e.Swimmer.Id
+                                   && SameName(e.Swimmer, r.Swimmer)).ToList();
+        if (same.Count != 1) return null;
+
+        var row = same[0];
+        var other = row.Swimmer;
+        if (other.BirthYear != e.Swimmer.BirthYear) return null;
+        var ta = Tokens(e.Swimmer);
+        var tb = Tokens(other);
+        if (!ta.All(tb.Contains) && !tb.All(ta.Contains)) return null;
+        if (row.RowClubId != e.ClubId) return null;
+        if (e.Swimmer.ClubId is int a && other.ClubId is int b && a != b) return null;
+        if ((e.Swimmer.LogligId is null) == (other.LogligId is null)) return null;
+
+        return e.Swimmer.LogligId is not null ? (e.Swimmer.Id, other.Id) : (other.Id, e.Swimmer.Id);
     }
 
     private static bool SameGenderHeat(string? entry, string? row) =>

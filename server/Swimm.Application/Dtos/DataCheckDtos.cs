@@ -59,6 +59,13 @@ public static class DataCheckResolutions
 
     /// <summary>Принята как есть: неустранимо (ошибка источника, особенность данных).</summary>
     public const string Accepted = "accepted";
+
+    /// <summary>
+    /// Начало примечания находки, принятой САМОЙ проверкой (<see cref="DataCheckItem.AutoAccept"/>).
+    /// По нему реестр отличает своё решение от решения человека: своё снимает, когда находка
+    /// перестала быть «честной», человеческое — никогда.
+    /// </summary>
+    public const string AutoNotePrefix = "автоматически: ";
 }
 
 /// <summary>
@@ -78,10 +85,16 @@ public static class DataCheckResolutions
 /// </param>
 /// <param name="FixKind">Код точечного исправления из списка находок (напр. <c>swimmer-gender</c>).</param>
 /// <param name="FixEntityId">Id сущности, к которой применяется исправление.</param>
+/// <param name="AutoAccept">
+/// Не null — проверка сама уверена, что смотреть нечего, и принимает находку с этим примечанием
+/// (решение Влада 25.11.2026: «Заявки без результата», где все неявки честные). Реестр ставит
+/// «Принято» с примечанием <see cref="DataCheckResolutions.AutoNotePrefix"/> + текст; стал null —
+/// своё решение снимает. Принятое человеком не трогает.
+/// </param>
 public sealed record DataCheckItem(
     string EntityType, int? EntityId, string Message, string? Details = null, string? Link = null,
     string? PublicLink = null, string? SubjectName = null,
-    string? FixKind = null, int? FixEntityId = null);
+    string? FixKind = null, int? FixEntityId = null, string? AutoAccept = null);
 
 /// <summary>Результат одной проверки: сколько всего и что именно (список капнут).</summary>
 public sealed record DataCheckOutcome(int Total, IReadOnlyList<DataCheckItem> Items)

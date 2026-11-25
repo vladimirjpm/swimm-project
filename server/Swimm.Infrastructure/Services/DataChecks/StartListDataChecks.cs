@@ -69,9 +69,21 @@ public sealed class NoShowUnmatchedCheck(SwimmDbContext db) : IDataCheck
                 $"{c.CompName}: без результата {c.NoShow} из {totals.GetValueOrDefault(c.CompetitionId ?? 0, c.NoShow)}",
                 Details(c.OrgCompId, reasons.GetValueOrDefault(c.CompetitionId ?? 0, [])),
                 $"/Admin/Competitions?q={c.OrgCompId}",
-                PublicRoutes.Competition(c.CompetitionId ?? 0)))
+                PublicRoutes.Competition(c.CompetitionId ?? 0),
+                AutoAccept: AutoAcceptNote(c.NoShow, reasons.GetValueOrDefault(c.CompetitionId ?? 0, []))))
             .ToList());
     }
+
+    /// <summary>
+    /// Все неявки соревнования честные (<see cref="NoShowReasons.IsHonest"/>) — находку принимает
+    /// сама проверка с этой причиной (решение Влада 25.11.2026); список по заявкам остаётся в Details.
+    /// Хоть одна нечестная или причин меньше, чем неявок, — null: смотрит человек.
+    /// </summary>
+    internal static string? AutoAcceptNote(int noShow, IReadOnlyList<(string Line, NoShowReasons.Kind Kind)> reasons) =>
+        reasons.Count > 0 && reasons.Count == noShow && reasons.All(r => NoShowReasons.IsHonest(r.Kind))
+            ? "все неявки честные — " + string.Join(", ", reasons.GroupBy(r => r.Kind).OrderBy(g => g.Key)
+                .Select(g => $"{NoShowReasons.Label(g.Key)} — {g.Count()}"))
+            : null;
 
     /// <summary>Потолок колонки <c>Sys_DataCheckFindings.Details</c>.</summary>
     private const int DetailsMax = 4000;
@@ -103,78 +115,9 @@ public sealed class NoShowUnmatchedCheck(SwimmDbContext db) : IDataCheck
 
     /// <summary>Причина на каждую неявку соревнований-дней <paramref name="competitionIds"/> — по базе, без сети.</summary>
     private async Task<Dictionary<int, List<(string Line, NoShowReasons.Kind Kind)>>> ReasonsAsync(
-        List<int> competitionIds, CancellationToken ct)
-    {
-        var entries = await db.CompetitionEntries.AsNoTracking()
-            .Where(e => e.Status == CompetitionEntryStatus.NoShow && e.CompetitionId != null
-                        && competitionIds.Contains(e.CompetitionId.Value))
-            .Select(e => new
-            {
-                CompetitionId = e.CompetitionId!.Value, e.SwimmerId, e.ClubId, e.StyleId, Style = e.Style.Name,
-                e.Distance, e.Gender, e.Heat, e.Lane,
-                Swimmer = new NoShowReasons.Person(e.SwimmerId, e.Swimmer.LastName, e.Swimmer.FirstName,
-                    e.Swimmer.BirthYear, e.Swimmer.LogligId, e.Swimmer.ClubId),
-            })
-            .ToListAsync(ct);
-        if (entries.Count == 0) return [];
+        List<int> competitionIds, CancellationToken ct) =>
+        (await NoShowCases.LoadAsync(db, competitionIds, ct))
+            .GroupBy(c => c.CompetitionId)
+            .ToDictionary(g => g.Key, g => g.Select(c => (c.Line, c.Reason.Kind)).ToList());
 
-        var styleIds = entries.Select(e => e.StyleId).Distinct().ToList();
-        var ownEntries = (await db.CompetitionEntries.AsNoTracking()
-                .Where(e => e.CompetitionId != null && competitionIds.Contains(e.CompetitionId.Value) && styleIds.Contains(e.StyleId))
-                .Select(e => new { CompetitionId = e.CompetitionId!.Value, e.SwimmerId, e.StyleId, e.Distance })
-                .ToListAsync(ct))
-            .Select(e => (e.CompetitionId, e.SwimmerId, e.StyleId, e.Distance))
-            .ToHashSet();
-
-        var rows = await db.Results.AsNoTracking()
-            .Where(r => competitionIds.Contains(r.CompetitionId) && styleIds.Contains(r.StyleId))
-            .Select(r => new
-            {
-                r.CompetitionId, r.StyleId, r.Distance, r.Heat, r.Lane, r.SwimmerId, r.ClubId, r.Gender,
-                r.TimeOriginal, r.RelayId,
-                Swimmer = new NoShowReasons.Person(r.SwimmerId, r.Swimmer.LastName, r.Swimmer.FirstName,
-                    r.Swimmer.BirthYear, r.Swimmer.LogligId, r.Swimmer.ClubId),
-            })
-            .ToListAsync(ct);
-
-        var relayIds = rows.Where(r => r.RelayId != null).Select(r => r.RelayId!.Value).Distinct().ToList();
-        var members = (await db.RelayMembers.AsNoTracking()
-                .Where(m => relayIds.Contains(m.RelayId))
-                .OrderBy(m => m.LegOrder)
-                .Select(m => new
-                {
-                    m.RelayId,
-                    Swimmer = new NoShowReasons.Person(m.SwimmerId, m.Swimmer.LastName, m.Swimmer.FirstName,
-                        m.Swimmer.BirthYear, m.Swimmer.LogligId, m.Swimmer.ClubId),
-                })
-                .ToListAsync(ct))
-            .ToLookup(m => m.RelayId, m => m.Swimmer);
-
-        var byLane = rows.ToLookup(r => (r.CompetitionId, r.StyleId, r.Distance, r.Heat, r.Lane));
-        var byOwn = rows.Where(r => r.RelayId == null).ToLookup(r => (r.CompetitionId, r.StyleId, r.Distance, r.SwimmerId));
-
-        return entries
-            .OrderBy(e => e.Distance).ThenBy(e => e.Style).ThenBy(e => e.Heat).ThenBy(e => e.Lane)
-            .GroupBy(e => e.CompetitionId)
-            .ToDictionary(g => g.Key, g => g.Select(e =>
-            {
-                var isRelay = e.Distance.Contains('x', StringComparison.OrdinalIgnoreCase);
-                var lane = byLane[(e.CompetitionId, e.StyleId, e.Distance, e.Heat, e.Lane)]
-                    .Where(r => (r.RelayId != null) == isRelay)
-                    .Select(r => new NoShowReasons.LaneRow(r.Swimmer, r.ClubId, r.Gender, r.TimeOriginal,
-                        ownEntries.Contains((e.CompetitionId, r.SwimmerId, e.StyleId, e.Distance)),
-                        r.RelayId is int id ? members[id].ToList() : []))
-                    .ToList();
-                var own = isRelay
-                    ? []
-                    : byOwn[(e.CompetitionId, e.StyleId, e.Distance, e.SwimmerId)]
-                        .Where(r => r.Heat != e.Heat || r.Lane != e.Lane)
-                        .Select(r => new NoShowReasons.OwnRow(r.Heat, r.Lane, r.TimeOriginal))
-                        .ToList();
-                var reason = NoShowReasons.Classify(
-                    new NoShowReasons.Entry(e.Swimmer, e.ClubId, e.Gender, isRelay, e.Heat, e.Lane), lane, own);
-                return ($"#{e.SwimmerId} {e.Swimmer.Name} ({e.Swimmer.BirthYear}), {e.Distance} {e.Style}, "
-                        + $"заплыв {e.Heat}, дорожка {e.Lane}: {reason.Text}", reason.Kind);
-            }).ToList());
-    }
 }
