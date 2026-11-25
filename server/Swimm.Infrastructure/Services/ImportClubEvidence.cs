@@ -123,7 +123,7 @@ internal sealed class ImportClubEvidence(SwimmDbContext db, ILogligClient? logli
         if (string.IsNullOrWhiteSpace(club)) club = null;
         // Как у сверки кандидатов: пишется только открывшаяся карточка (в том числе без клуба).
         if (card is not null)
-            await SwimmerLogligClubStore.UpsertAsync(db, swimmerId, logligId, club, DateTime.UtcNow, CancellationToken.None);
+            await SwimmerLogligClubStore.UpsertAsync(db, swimmerId, logligId, club, DateTime.UtcNow, CancellationToken.None, card);
         return _logligAnswers[logligId] = club;
     }
 

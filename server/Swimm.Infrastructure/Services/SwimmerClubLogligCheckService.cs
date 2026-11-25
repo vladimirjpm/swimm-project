@@ -126,7 +126,7 @@ public sealed class SwimmerClubLogligCheckService(
                     requests++;
                     answer = card is null ? new LogligClubAnswer(false, null) : new LogligClubAnswer(true, card.ClubName?.Trim());
                     if (apply && card is not null)
-                        await SwimmerLogligClubStore.UpsertAsync(db, item.SwimmerId, lid, Clip(answer.ClubName), DateTime.UtcNow, ct);
+                        await SwimmerLogligClubStore.UpsertAsync(db, item.SwimmerId, lid, Clip(answer.ClubName), DateTime.UtcNow, ct, card);
                 }
             }
 

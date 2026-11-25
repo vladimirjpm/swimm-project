@@ -126,9 +126,34 @@
     // пол неизвестен и у пловца, останутся в списке.
     function bulkGenderButton(g) {
         if (g.checkId !== 'results.no-gender' || !g.openCount) return '';
-        return `<div class="mt-2"><button id="btn-gender-all" class="admin-btn admin-btn-ghost py-1 px-2 text-[12px]"
+        return `<div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <button id="btn-gender-all" class="admin-btn admin-btn-ghost py-1 px-2 text-[12px]"
                     title="Дописать пол в строки тех находок, где пол пловца уже известен">
-                    проставить всем по полу пловца</button></div>`;
+                    проставить всем по полу пловца</button>
+                <button id="btn-gender-loglig" class="admin-btn admin-btn-ghost py-1 px-2 text-[12px]"
+                    title="Пловцам без пола с подтверждённым loglig-id — пол с их карточки loglig (имя и год должны совпасть). Запрос на пловца, до 60 за нажатие; проставленный пол не трогает">
+                    взять пол с карточек loglig</button></div>`;
+    }
+
+    // Пол неизвестен и у пловца, но рядом подтверждённый loglig-id — на его карточке пол
+    // напечатан (Р125). Сервер идёт по карточкам по одной, поэтому нажатие длится: ~1–2 с на пловца.
+    async function fixGenderFromLoglig(btn) {
+        btn.disabled = true;
+        const prev = btn.textContent;
+        btn.textContent = 'иду по карточкам loglig…';
+        try {
+            const res = await api(`${API}/fix-gender-from-loglig`, { method: 'POST' });
+            if (res.set) {
+                const data = await api(`${API}/run`, { method: 'POST' });
+                render(data);
+                toast(`${res.message} Закрыто находок: ${data.run.fixedCount}`, 12000);
+            } else {
+                btn.disabled = false;
+                btn.textContent = prev;
+                toast(res.message + (res.alreadyKnown ? ` У ${res.alreadyKnown} пол уже известен — «проставить всем по полу пловца».` : ''), 12000);
+            }
+            if (res.notes?.length) console.info('Пол с карточек loglig — кого смотреть руками:\n' + res.notes.join('\n'));
+        } catch (e) { btn.disabled = false; btn.textContent = prev; toast('Ошибка: ' + e.message, 6000); }
     }
 
     async function fixGenderAll(btn) {
@@ -183,6 +208,8 @@
             b.addEventListener('click', () => setLoglig(b)));
         const bulk = document.getElementById('btn-gender-all');
         if (bulk) bulk.addEventListener('click', () => fixGenderAll(bulk));
+        const fromLoglig = document.getElementById('btn-gender-loglig');
+        if (fromLoglig) fromLoglig.addEventListener('click', () => fixGenderFromLoglig(fromLoglig));
     }
 
     // Имя субъекта отдельной кнопкой: его копируют, чтобы найти пловца в интернете.

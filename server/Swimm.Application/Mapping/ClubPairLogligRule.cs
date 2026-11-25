@@ -22,7 +22,10 @@ public static class ClubPairLogligVerdicts
 }
 
 /// <summary>Последний удачный ответ карточки loglig (<c>Sys_SwimmerLogligClubs</c>).</summary>
-public sealed record StoredLogligClub(int LogligId, string? ClubName, DateTime CheckedAt);
+/// <param name="CardName">Имя с карточки; null — ответ записан до Р125, для пола не годится.</param>
+/// <param name="Gender">Пол с карточки (<c>male</c>/<c>female</c>); null — на карточке его нет.</param>
+public sealed record StoredLogligClub(int LogligId, string? ClubName, DateTime CheckedAt,
+    string? CardName = null, int? CardBirthYear = null, string? Gender = null);
 
 /// <summary>
 /// Что знает loglig про общих пловцов пары клубов-кандидатов в дубли (Р112, /Admin/Clubs,

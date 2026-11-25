@@ -12,8 +12,31 @@ namespace Swimm.API.Controllers;
 [Route("api/admin/data-checks")]
 [Authorize(Roles = "Admin")]
 [AutoValidateAntiforgeryToken]
-public class DataChecksAdminController(IDataCheckRunner runner, IAdminAuditService audit) : ControllerBase
+public class DataChecksAdminController(
+    IDataCheckRunner runner, IAdminAuditService audit, ILogligCardGenderService logligGender) : ControllerBase
 {
+    /// <summary>
+    /// Р125: взять пол с карточек loglig пловцам открытых находок `results.no-gender` — тем, у
+    /// кого он пуст, loglig-id подтверждён, а имя и год карточки совпали. Идёт последовательно, с
+    /// паузой и потолком запросов; непустой пол не трогает. На каждого пловца сервис пишет свою
+    /// строку аудита (`swimmer.gender-from-loglig`), здесь — итог нажатия.
+    /// </summary>
+    [HttpPost("fix-gender-from-loglig")]
+    public async Task<IActionResult> FixGenderFromLoglig(CancellationToken ct)
+    {
+        var report = await logligGender.FillFromFindingsAsync(ct);
+
+        await audit.LogAsync("datacheck.fix-gender-from-loglig", "DataCheckFinding", null,
+            "Пол с карточек loglig по находкам «Результаты без пола»: " + report.Message,
+            new
+            {
+                report.Candidates, report.Set, report.Rows, report.CardWithoutGender, report.Failed,
+                report.Mismatch, report.NotVerified, report.OverLimit, report.Requests, report.FromCache,
+            }, ct);
+
+        return Ok(report);
+    }
+
     /// <summary>Текущие находки по проверкам + история прогонов.</summary>
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken ct)

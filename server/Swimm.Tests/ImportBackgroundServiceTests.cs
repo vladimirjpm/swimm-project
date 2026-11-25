@@ -27,6 +27,7 @@ public class ImportBackgroundServiceTests
         public readonly Mock<ISplitAutoAttachService> Splits = new();
         public readonly Mock<ILogligStampService> Stamp = new();
         public readonly Mock<ILogligRowPlayerService> RowPlayers = new();
+        public readonly Mock<ILogligCardGenderService> Genders = new();
         public readonly Mock<ICompetitionDiscoveryService> Discovery = new();
         public readonly Mock<IOfficialClubStandingService> Standings = new();
         public readonly Mock<ISiblingDayPullService> Siblings = new();
@@ -49,6 +50,9 @@ public class ImportBackgroundServiceTests
                 .ReturnsAsync(new LogligStampReport(0, 0, 0, 0, [], "ok"));
             RowPlayers.Setup(s => s.StampDayAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()))
                 .ReturnsAsync(new LogligRowPlayerReport(true, "ok"));
+            var genderReport = new LogligCardGenderReport(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "ok", []);
+            Genders.Setup(s => s.FillAfterImportAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(genderReport);
+            Genders.Setup(s => s.FillDayAfterImportAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(genderReport);
         }
 
         public IServiceProvider Services()
@@ -61,6 +65,7 @@ public class ImportBackgroundServiceTests
                 .AddScoped(_ => Splits.Object)
                 .AddScoped(_ => Stamp.Object)
                 .AddScoped(_ => RowPlayers.Object)
+                .AddScoped(_ => Genders.Object)
                 .AddScoped(_ => Discovery.Object)
                 .AddScoped(_ => Standings.Object)
                 .AddScoped(_ => Siblings.Object)
@@ -94,7 +99,8 @@ public class ImportBackgroundServiceTests
                             return s;
                         }
                         var rowPlayersDone = RowPlayers.Invocations.Count > 0 || !Settings.GetValueOrDefault(LogligRowPlayerRules.SettingKey, true);
-                        if ((s.Splits is null || s.Splits.State == "done") && stampDone && rowPlayersDone) return s;
+                        var genderDone = Genders.Invocations.Count > 0 || !Settings.GetValueOrDefault(LogligCardGenderRule.SettingKey, true);
+                        if ((s.Splits is null || s.Splits.State == "done") && stampDone && rowPlayersDone && genderDone) return s;
                     }
                     await Task.Delay(20);
                 }
@@ -370,6 +376,66 @@ public class ImportBackgroundServiceTests
         Assert.Equal(1, maxInFlight);
     }
 
+    // ── Р125: пол пловцам без пола — с карточек loglig, сразу за штамповкой loglig-id ──
+
+    [Fact]
+    public async Task SuccessfulImport_FillsGenderFromLogligCards_AfterStamp()
+    {
+        var w = new World(Created(13));
+        var order = new List<string>();
+        w.Stamp.Setup(s => s.StampFromProtocolAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("stamp")).ReturnsAsync(new LogligStampReport(0, 0, 0, 0, [], "ok"));
+        w.Genders.Setup(s => s.FillAfterImportAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("gender"))
+            .ReturnsAsync(new LogligCardGenderReport(12, 12, 13, 0, 0, 0, 0, 0, 12, 0, 0, "ok", []));
+
+        await w.RunAsync();
+
+        w.Genders.Verify(s => s.FillAfterImportAsync(CompId, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(["stamp", "gender"], order);
+    }
+
+    [Fact]
+    public async Task GenderToggleOff_StepSkipped_OthersRun()
+    {
+        var w = new World(Created(13));
+        w.Settings[LogligCardGenderRule.SettingKey] = false;
+
+        await w.RunAsync();
+
+        w.Genders.Verify(s => s.FillAfterImportAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        w.Stamp.Verify(s => s.StampFromProtocolAsync(CompId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // Выключили, пока шаг стоял в очереди за штамповкой, — не идёт.
+    [Fact]
+    public async Task GenderToggle_FlippedOffWhileQueued_StepDoesNotRun()
+    {
+        var w = new World(Created(13));
+        w.Stamp.Setup(s => s.StampFromProtocolAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback(() => w.Settings[LogligCardGenderRule.SettingKey] = false)
+            .ReturnsAsync(new LogligStampReport(0, 0, 0, 0, [], "ok"));
+
+        await w.RunAsync();
+        await Task.Delay(150);
+
+        w.Genders.Verify(s => s.FillAfterImportAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RejectedImport_NoGenderStep_AndGenderFailureKeepsImportCompleted()
+    {
+        var refused = new World(new ImportResult { Message = "Дубль" });
+        await refused.RunAsync();
+        refused.Genders.Verify(s => s.FillAfterImportAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var w = new World(Created(13));
+        w.Genders.Setup(s => s.FillAfterImportAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("loglig лёг"));
+        var status = await w.RunAsync();
+        Assert.Equal(ImportJobState.Completed, status.State);
+    }
+
     // ── Р124: день-сосед («Затянуть этот день») ──────────────────────────────
 
     private static readonly SiblingDayTarget Sibling = new(155, 6611, 11590, 1858, null, "תחרות", "07/12/2024", "vlad@test");
@@ -389,6 +455,7 @@ public class ImportBackgroundServiceTests
         w.Splits.Verify(s => s.AttachDayAfterImportAsync(2101, 11590, status.JobId, It.IsAny<CancellationToken>()), Times.Once);
         w.Stamp.Verify(s => s.StampDayFromProtocolAsync(2101, 11590, It.IsAny<CancellationToken>()), Times.Once);
         w.RowPlayers.Verify(s => s.StampDayAsync(2101, 11590, "import", It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()), Times.Once);
+        w.Genders.Verify(s => s.FillDayAfterImportAsync(2101, It.IsAny<CancellationToken>()), Times.Once);
         // По compID записи федерации (номер другого дня) — ничего.
         w.Splits.Verify(s => s.AttachAfterImportAsync(It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
         w.Discovery.Verify(d => d.SetStatusAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
