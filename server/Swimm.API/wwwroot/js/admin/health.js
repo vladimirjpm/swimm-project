@@ -138,7 +138,7 @@
                     title="Пловцам без пола с подтверждённым loglig-id — пол с их карточки loglig (имя и год должны совпасть). Запрос на пловца, до 30 за нажатие (не дольше 2,5 мин); проставленный пол не трогает; случаи с серьёзными последствиями уходят в «Пол с loglig ждёт ручной проверки»">
                     взять пол с карточек loglig</button>
                 <button id="btn-gender-loglig-last" class="admin-btn admin-btn-ghost py-1 px-1.5 text-[12px]"
-                    title="Итог прошлого нажатия «взять пол с карточек loglig» — кто, когда, что вышло и кого смотреть руками">ⓘ</button></div>
+                    title="Итог прошлого нажатия «взять пол с карточек loglig» — кто, когда, что вышло и причина по каждому пловцу">ⓘ</button></div>
                 <div id="gender-loglig-run-slot">${genderLogligRunBox()}</div>`;
     }
 
@@ -151,10 +151,14 @@
         const r = genderLogligRun;
         if (!r) return '';
         const at = r.at ? new Date(r.at).toLocaleString('ru-RU') : '';
+        // Причина на каждого пловца — раскрывающимся списком (Влад, 25.11.2026: «как таг details»).
+        // Нажатия до 25.11 вечера списка в аудите не хранят — тогда честная подсказка.
         const notes = r.notes?.length
-            ? `<details class="mt-1"><summary class="cursor-pointer text-admin-text-muted">кого смотреть руками — ${r.notes.length}</summary>
+            ? `<details class="mt-1"><summary class="cursor-pointer text-admin-text-muted">причина по каждому пловцу — ${r.notes.length}</summary>
                 <ul class="mt-1 list-disc pl-5">${r.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>`
-            : '';
+            : (/ждут ручной проверки|не совпали|не открылась|пола нет/.test(r.message ?? '')
+                ? `<div class="mt-1 text-[11px] text-admin-text-muted">Причины по каждому пловцу у этого нажатия не сохранены (оно было до 25.11.2026) — нажмите кнопку ещё раз.</div>`
+                : '');
         return `<div class="mt-2 rounded border border-admin-border bg-admin-surface-hover px-3 py-2 text-[12px]">
                 <div class="flex items-start gap-2">
                     <div class="flex-1">
@@ -240,7 +244,7 @@
                 btn.textContent = prev;
                 toast(res.message + (res.alreadyKnown ? ` У ${res.alreadyKnown} пол уже известен — «проставить всем по полу пловца».` : ''), 12000);
             }
-            if (res.notes?.length) console.info('Пол с карточек loglig — кого смотреть руками:\n' + res.notes.join('\n'));
+            if (res.notes?.length) console.info('Пол с карточек loglig — причина по каждому пловцу:\n' + res.notes.join('\n'));
         } catch (e) {
             btn.disabled = false; btn.textContent = prev; toast('Ошибка: ' + e.message, 6000);
             genderLogligRun = { at: new Date().toISOString(), message: 'Ошибка: ' + e.message, notes: [] };

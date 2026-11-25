@@ -216,7 +216,7 @@ public sealed class LogligCardGenderService(
             t.Review++;
             if (reasons.Any(r => r.Code == GenderImpactRules.IdentityUnconfirmed)) t.ReviewIdentity++;
             if (reasons.Any(r => r.Code != GenderImpactRules.IdentityUnconfirmed)) t.ReviewImpact++;
-            t.Notes.Add($"#{s.Id} {s.Name}: ждёт ручной проверки — " + string.Join("; ", reasons.Select(r => r.Text)));
+            t.Notes.Add($"#{s.Id} {s.Name} ({s.BirthYear}) — ждёт ручной проверки: " + string.Join("; ", reasons.Select(r => r.Text)));
             return;
         }
 
