@@ -1748,6 +1748,7 @@ public class JsonImportService : IImportService
                 DataCheckErrors = dataCheckErrors,
                 DataCheckWarnings = dataCheckWarnings,
                 SuspectFlagged = suspectFlagged,
+                CompetitionIds = touchedCompetitionKeys.Select(k => competitionCache[k].Id).Where(id => id != 0).Distinct().ToList(),
                 Message = message
             };
         }

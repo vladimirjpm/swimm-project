@@ -27,6 +27,22 @@ public static partial class LogligTitleRules
         return SpaceRx().Replace(s, " ").Trim();
     }
 
+    /// <summary>
+    /// Общее имя дней для события (Р124): без дня недели, дат и висящих тире, но с кавычками —
+    /// «תחרות חלופית ל"מילניום" יום שישי 6.12.24» → «תחרות חלופית ל"מילניום"». Так же руками
+    /// назвали событие 488 (#65). Пусто — исходное имя как есть.
+    /// </summary>
+    public static string CommonName(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return "";
+        var s = WebUtility.HtmlDecode(title);
+        s = DateRx().Replace(s, " ");
+        s = WeekdayRx().Replace(s, " ");
+        s = DashRx().Replace(s, " ");
+        s = SpaceRx().Replace(s, " ").Trim();
+        return s.Length > 0 ? s : title.Trim();
+    }
+
     /// <summary>Дата в хвосте заголовка loglig («… - 07/12/2024») — дата соревнования; нет — null.</summary>
     public static DateOnly? TitleDate(string? title)
     {

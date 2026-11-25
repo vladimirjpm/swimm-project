@@ -65,6 +65,19 @@ public class SplitAutoAttachService : ISplitAutoAttachService
             string.Join(" | ", messages), touched);
     }
 
+    /// <inheritdoc />
+    public async Task<SplitAutoOutcome> AttachDayAfterImportAsync(int competitionId, int logligId, Guid jobId, CancellationToken ct = default)
+    {
+        // Только этот день (onlyDays) и номер соседа: прогон по событию взял бы и лежащий день,
+        // а его протокол — другое соревнование loglig.
+        var (run, kind) = await RunAsync(competitionId, logligId, [competitionId], ct);
+        var result = run.Result;
+        var touched = await RecordAsync(run, kind, [competitionId], auto: true,
+            new { JobId = jobId, CompetitionId = competitionId, SiblingLogligId = logligId });
+        return new SplitAutoOutcome(SplitAutoAttachRules.Combine([kind]), result.Report.SwimWrites,
+            result.Report.LegWrites, result.Message, touched);
+    }
+
     public async Task<SplitButtonRun> AttachByButtonAsync(int competitionId, int? logligId, CancellationToken ct = default)
     {
         var (run, kind) = await RunAsync(competitionId, logligId, onlyDays: null, ct);

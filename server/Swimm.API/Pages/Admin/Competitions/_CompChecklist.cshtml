@@ -215,12 +215,18 @@
                                             <div class="ck-days-actions mt-1.5 flex flex-wrap items-center gap-2">
                                                 <button type="button" class="ck-days-split admin-btn admin-btn-primary hidden px-2.5 py-1 text-[12px]" onclick="daysSplit(this)"
                                                         title="Перенести строки в свои дни: событие + новый день, пересчёт; одна транзакция">Разделить по дням</button>
+                                                @* Р124: день лежит на loglig отдельным соревнованием — только у единственного кандидата.
+                                                   Клик — тот же шаг 6 (превью), что у «Затянуть», но для номера соседа. *@
+                                                <button type="button" class="ck-days-pull admin-btn admin-btn-primary hidden px-2.5 py-1 text-[12px]" onclick="siblingPull(this)"
+                                                        title="Скачать результаты недостающего дня и добавить их в это соревнование — сначала превью, запись по кнопке">Затянуть этот день</button>
                                                 @if (Model.EditUrl != null)
                                                 {
                                                     <a href="@Model.EditUrl" class="ck-days-accept admin-btn admin-btn-primary hidden px-2.5 py-1 text-[12px] no-underline"
                                                        title="Других дней не будет — снять долг на странице «Изменить» (блок «Принять как есть»)">Принять как есть ↗</a>
                                                 }
                                             </div>
+                                            @* Р124: что сделает «Затянуть …» — простыми словами (текст — MissingDayTexts.PullNote). *@
+                                            <div class="ck-days-pull-note mt-1 hidden text-[11.5px] text-admin-text-muted"></div>
                                         </div>
                                     </div>
                                 }

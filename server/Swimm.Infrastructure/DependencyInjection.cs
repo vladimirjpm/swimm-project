@@ -187,6 +187,8 @@ public static class DependencyInjection
         services.AddScoped<ICollapsedDaysReviewService, CollapsedDaysReviewService>();
         // «Проверить, чего не хватает» у Р115 — программа loglig ↔ дни в базе (Р123).
         services.AddScoped<IProgrammeCheckService, ProgrammeCheckService>();
+        // Р124: «Затянуть этот день» — день старта, лежащий на loglig отдельным соревнованием.
+        services.AddScoped<ISiblingDayPullService, SiblingDayPullService>();
         // Сбор отдельных соревнований в событие — «дни есть, события нет» (там же, М4).
         services.AddScoped<ICompetitionDayJoinService, CompetitionDayJoinService>();
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();

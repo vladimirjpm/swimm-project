@@ -52,7 +52,9 @@ public class PreviewRecordCheckService : IPreviewRecordCheckService
         // Сезон ЭТОГО соревнования: карточка с сезоном из конфига показала бы другой год —
         // и ссылка «посмотреть глазами» вела бы не туда (пример Влада: seasonId=1605).
         var discoveredRow = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == entry.DiscoveredId);
-        var seasonId = discoveredRow?.LogligId is int compLogligId
+        // Р124: у разбора соседа-дня протокол — соседа, а не привязанного номера.
+        var protocolLogligId = entry.SiblingLogligId ?? discoveredRow?.LogligId;
+        var seasonId = protocolLogligId is int compLogligId
             ? await _loglig.GetCompetitionSeasonIdAsync(compLogligId, ct)
             : null;
 
@@ -68,7 +70,7 @@ public class PreviewRecordCheckService : IPreviewRecordCheckService
         // Id прямо из протокола: на странице заплыва loglig имя — ссылка на карточку. Это
         // работает и для пловца, которого в нашей базе ещё нет (соревнование не импортировано),
         // и избавляет от ручного ввода id для тех, кто есть, но не привязан.
-        var fromProtocol = await LoadProtocolIdsAsync(discoveredRow?.LogligId, swims, ct);
+        var fromProtocol = await LoadProtocolIdsAsync(protocolLogligId, swims, ct);
 
         // Мировые рекорды — проверка, которой loglig не нужен: время быстрее рекорда — ошибка
         // протокола, с чем бы оно ни совпадало (И-40).

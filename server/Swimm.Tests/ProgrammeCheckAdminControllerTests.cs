@@ -36,7 +36,7 @@ public class ProgrammeCheckAdminControllerTests
         }
     }
 
-    private static async Task<WebApplication> StartAsync(IProgrammeCheckService service)
+    private static async Task<WebApplication> StartAsync(IProgrammeCheckService service, ISiblingDayPullService? siblings = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.WebHost.UseTestServer();
@@ -45,6 +45,7 @@ public class ProgrammeCheckAdminControllerTests
         builder.Services.AddAuthentication("test").AddScheme<AuthenticationSchemeOptions, RoleAuth>("test", _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton(service);
+        builder.Services.AddSingleton(siblings ?? new Mock<ISiblingDayPullService>(MockBehavior.Strict).Object);
         var app = builder.Build();
         app.UseRouting();
         app.UseAuthentication();
@@ -64,29 +65,37 @@ public class ProgrammeCheckAdminControllerTests
     [Theory]
     [InlineData("check")]
     [InlineData("split")]
+    [InlineData("sibling-preview")]
+    [InlineData("sibling-import")]
     public async Task Post_WithoutAntiforgeryToken_Rejected_ServiceNotCalled(string action)
     {
         var service = new Mock<IProgrammeCheckService>(MockBehavior.Strict);
-        await using var app = await StartAsync(service.Object);
+        var siblings = new Mock<ISiblingDayPullService>(MockBehavior.Strict);
+        await using var app = await StartAsync(service.Object, siblings.Object);
 
         var res = await PostAsync(app, action, "Admin");
 
         Assert.True(res.StatusCode == HttpStatusCode.BadRequest, await res.Content.ReadAsStringAsync());
         service.VerifyNoOtherCalls();
+        siblings.VerifyNoOtherCalls();
     }
 
     [Theory]
     [InlineData("check")]
     [InlineData("split")]
+    [InlineData("sibling-preview")]
+    [InlineData("sibling-import")]
     public async Task Post_NotAdmin_Forbidden_ServiceNotCalled(string action)
     {
         var service = new Mock<IProgrammeCheckService>(MockBehavior.Strict);
-        await using var app = await StartAsync(service.Object);
+        var siblings = new Mock<ISiblingDayPullService>(MockBehavior.Strict);
+        await using var app = await StartAsync(service.Object, siblings.Object);
 
         var res = await PostAsync(app, action, "User");
 
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
         service.VerifyNoOtherCalls();
+        siblings.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -96,7 +105,7 @@ public class ProgrammeCheckAdminControllerTests
         service.Setup(s => s.SplitAsync(7, "2025-03-28=1072;2025-03-29=1618", It.IsAny<CancellationToken>()))
             .ReturnsAsync(ProgrammeSplitOutcome.Refused("план изменился — проверьте ещё раз"));
 
-        var result = await new ProgrammeCheckAdminController(service.Object)
+        var result = await new ProgrammeCheckAdminController(service.Object, Mock.Of<ISiblingDayPullService>())
             .Split(7, new("2025-03-28=1072;2025-03-29=1618"), CancellationToken.None);
 
         var conflict = Assert.IsType<ConflictObjectResult>(result);
@@ -114,7 +123,7 @@ public class ProgrammeCheckAdminControllerTests
         service.Setup(s => s.SplitAsync(7, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProgrammeSplitOutcome(null, Report()));
 
-        var result = await new ProgrammeCheckAdminController(service.Object).Split(7, new("x"), CancellationToken.None);
+        var result = await new ProgrammeCheckAdminController(service.Object, Mock.Of<ISiblingDayPullService>()).Split(7, new("x"), CancellationToken.None);
 
         var json = Json(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Equal(40, json.GetProperty("eventId").GetInt32());
@@ -129,7 +138,7 @@ public class ProgrammeCheckAdminControllerTests
         service.Setup(s => s.SplitAsync(7, It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProgrammeSplitOutcome(null, Report(), "timeout"));
 
-        var result = await new ProgrammeCheckAdminController(service.Object).Split(7, new("x"), CancellationToken.None);
+        var result = await new ProgrammeCheckAdminController(service.Object, Mock.Of<ISiblingDayPullService>()).Split(7, new("x"), CancellationToken.None);
 
         var json = Json(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Contains("ПЕРЕСЧЁТ НЕ ЗАВЕРШЁН", json.GetProperty("message").GetString());
@@ -143,7 +152,7 @@ public class ProgrammeCheckAdminControllerTests
             ProgrammeVerdictKind.OnlyKnownDays, "В привязанной программе loglig только те дни", [], "h", null, null, false,
             AcceptWarning: "день, похоже, есть на loglig", Candidates: [new(11590, "תחרות", [new DateOnly(2024, 12, 7)])]));
 
-        var result = await new ProgrammeCheckAdminController(service.Object).Check(7, CancellationToken.None);
+        var result = await new ProgrammeCheckAdminController(service.Object, Mock.Of<ISiblingDayPullService>()).Check(7, CancellationToken.None);
 
         var json = Json(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Equal("OnlyKnownDays", json.GetProperty("kind").GetString());
@@ -155,6 +164,64 @@ public class ProgrammeCheckAdminControllerTests
         Assert.False(json.GetProperty("canSplit").GetBoolean());
         foreach (var p in new[] { "headline", "lines", "hint", "splitCompetitionId", "splitBlocked", "acceptWarning", "planFingerprint" })
             Assert.True(json.TryGetProperty(p, out _), p);
+    }
+
+    [Fact]
+    public async Task Check_OneCandidate_PullCandidate_SeveralCandidates_None()
+    {
+        ProgrammeCheckVerdict V(params ProgrammeNeighbour[] c) => new(ProgrammeVerdictKind.OnlyKnownDays, "h", [], "x", null, null, false,
+            Candidates: c);
+        var one = new Mock<IProgrammeCheckService>();
+        one.Setup(s => s.CheckAsync(7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(V(new ProgrammeNeighbour(11590, "t", [new DateOnly(2024, 12, 7)])));
+        var two = new Mock<IProgrammeCheckService>();
+        two.Setup(s => s.CheckAsync(7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(V(new ProgrammeNeighbour(11590, "t", [new DateOnly(2024, 12, 7)]), new ProgrammeNeighbour(11591, "t", [new DateOnly(2024, 12, 7)])));
+
+        var a = Json(Assert.IsType<OkObjectResult>(await new ProgrammeCheckAdminController(one.Object, Mock.Of<ISiblingDayPullService>())
+            .Check(7, CancellationToken.None)).Value);
+        var b = Json(Assert.IsType<OkObjectResult>(await new ProgrammeCheckAdminController(two.Object, Mock.Of<ISiblingDayPullService>())
+            .Check(7, CancellationToken.None)).Value);
+
+        Assert.Equal(11590, a.GetProperty("pullCandidate").GetInt32());
+        Assert.Equal(JsonValueKind.Null, b.GetProperty("pullCandidate").ValueKind);
+    }
+
+    private static SiblingDayImportRequest ImportRequest() =>
+        new(Guid.NewGuid(), 11590, null, "תחרות חלופית ל\"מילניום\"", "25m", false, false, false, false, null);
+
+    [Fact]
+    public async Task SiblingImport_Refused_Conflict()
+    {
+        var siblings = new Mock<ISiblingDayPullService>();
+        siblings.Setup(s => s.ImportAsync(7, It.IsAny<SiblingDayImportRequest>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(SiblingDayEnqueue.Refused("этот день уже затягивается — дождитесь конца"));
+        var controller = new ProgrammeCheckAdminController(Mock.Of<IProgrammeCheckService>(), siblings.Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() },
+        };
+
+        var result = await controller.SiblingImport(7, ImportRequest(), CancellationToken.None);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result);
+        Assert.Contains("уже затягивается", Json(conflict.Value).GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task SiblingImport_Queued_Accepted()
+    {
+        var job = Guid.NewGuid();
+        var siblings = new Mock<ISiblingDayPullService>();
+        siblings.Setup(s => s.ImportAsync(7, It.IsAny<SiblingDayImportRequest>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SiblingDayEnqueue(null, job, null, "תחרות"));
+        var controller = new ProgrammeCheckAdminController(Mock.Of<IProgrammeCheckService>(), siblings.Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() },
+        };
+
+        var result = await controller.SiblingImport(7, ImportRequest(), CancellationToken.None);
+
+        Assert.Equal(job, Json(Assert.IsType<AcceptedResult>(result).Value).GetProperty("jobId").GetGuid());
     }
 
     private static JsonElement Json(object? value) =>

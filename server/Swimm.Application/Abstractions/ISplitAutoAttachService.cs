@@ -29,6 +29,12 @@ public interface ISplitAutoAttachService
     Task<SplitAutoOutcome> AttachAfterImportAsync(int orgCompId, Guid jobId, CancellationToken ct = default);
 
     /// <summary>
+    /// Р124: сама после импорта дня-соседа — только день <paramref name="competitionId"/> и протокол
+    /// соревнования loglig <paramref name="logligId"/> (у записи федерации номер другого дня).
+    /// </summary>
+    Task<SplitAutoOutcome> AttachDayAfterImportAsync(int competitionId, int logligId, Guid jobId, CancellationToken ct = default);
+
+    /// <summary>
     /// Боевой прогон кнопки «Промежуточные»: как раньше — по всем дням события, но итог пишется в
     /// аудит ВСЕГДА и каждому дню (актор — админ), чтобы шаг 9 показывал последний исход, а не
     /// застрявшее «не удалось» автозапуска. Сухой прогон сюда не ходит.

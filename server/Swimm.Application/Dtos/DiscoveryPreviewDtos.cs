@@ -76,10 +76,15 @@ public sealed record CompetitionFlagSuggestion(
 /// Р119: находка «свёрнутый протокол» этого превью. Галочку обхода сервер принимает, только
 /// если блок у этого превью был: согласие дают на показанный админу блок, а не вслепую.
 /// </param>
+/// <param name="SiblingLogligId">
+/// Р124: разбор протокола соседа-дня (не привязанного к записи федерации номера loglig). Такой разбор
+/// импортирует только «Затянуть этот день»: обычный импорт строки входящих его отвергает.
+/// </param>
 public sealed record DiscoveryPreviewEntry(
     ParsedCompetition Parsed, string FileName, int DiscoveredId, OfficialClubStandingProbe? ClubStanding,
     ImportRecordPreviewDto? Records = null,
-    Validation.CollapsedProtocolFinding? CollapsedProtocol = null);
+    Validation.CollapsedProtocolFinding? CollapsedProtocol = null,
+    int? SiblingLogligId = null);
 
 /// <summary>Скачанный протокол одной строки входящих. <c>Pdf</c> = null — см. <c>Error</c>.</summary>
 public sealed record DiscoveryProtocolPdf(byte[]? Pdf, string FileName, string? Error);

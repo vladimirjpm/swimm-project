@@ -200,8 +200,13 @@ public class DiscoveryAdminController : ControllerBase
     {
         var p = await _previews.PreviewAsync(id, ct);
         if (p.Error != null) return BadRequest(new { error = p.Error });
+        return Ok(PreviewResponse(p));
+    }
 
-        return Ok(new
+    /// <summary>Ответ превью — один на «Затянуть» и «Затянуть этот день» (Р124): одна разметка шага 6.</summary>
+    internal static object PreviewResponse(DiscoveryPreviewResult p)
+    {
+        return new
         {
             previewId = p.PreviewId,
             format = p.Parsed!.Format,
@@ -221,7 +226,7 @@ public class DiscoveryAdminController : ControllerBase
             collapsedProtocol = p.CollapsedProtocol is { } c
                 ? new { message = c.Message, fileDate = c.FileDate, fileRows = c.FileRows, otherDaysRows = c.OtherDaysRows, days = c.Days }
                 : null
-        });
+        };
     }
 
     public sealed record EmptySourceRequest(bool Empty);
@@ -462,6 +467,11 @@ public class DiscoveryAdminController : ControllerBase
         var entry = _previews.GetEntry(request.PreviewId);
         if (entry == null)
             return NotFound(new { error = $"Превью не найдено или истекло ({_previews.EntryLifetime.TotalMinutes:0} мин)" });
+
+        // Р124: разбор соседа-дня — не протокол этой строки. Обычный импорт положил бы его с compID
+        // записи федерации; его импортирует только «Затянуть этот день» (свои перепроверки).
+        if (entry.SiblingLogligId is int sibling)
+            return BadRequest(new { error = $"Это превью дня-соседа loglig № {sibling} — импортируйте его кнопкой «Импортировать» в блоке «Затянуть этот день»." });
 
         _previews.RemoveEntry(request.PreviewId);
 

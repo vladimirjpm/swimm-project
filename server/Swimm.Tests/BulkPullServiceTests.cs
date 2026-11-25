@@ -49,6 +49,9 @@ public class BulkPullServiceTests
 
         public TimeSpan EntryLifetime => TimeSpan.FromMinutes(60);
 
+        public Task<DiscoveryPreviewResult> PreviewSiblingAsync(int discoveredId, int siblingLogligId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<DiscoveryPreviewResult> PreviewAsync(int discoveredId, CancellationToken ct = default)
         {
             Pulled.Add(discoveredId);

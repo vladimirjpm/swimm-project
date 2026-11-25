@@ -45,7 +45,9 @@ public sealed record ProgrammeCheckVerdict(
     string? AcceptWarning = null,
     IReadOnlyList<ProgrammeNeighbour>? Candidates = null,
     IReadOnlyList<ProgrammeNeighbour>? Similar = null,
-    string? PlanFingerprint = null)
+    string? PlanFingerprint = null,
+    string? PullLabel = null,
+    string? PullNote = null)
 {
     public bool CanSplit => SplitCompetitionId != null;
 }
@@ -146,11 +148,19 @@ public static class ProgrammeCheckRules
             })) + ".";
         var lines = similarLine == null ? new List<string>() : [similarLine];
 
+        // Р124: один кандидат — простыми словами (просьба Влада 25.11.2026) и кнопка «Затянуть …».
+        if (candidates is [{ Dates: [var day] } only])
+            return new ProgrammeCheckVerdict(ProgrammeVerdictKind.OnlyKnownDays,
+                MissingDayTexts.FoundHeadline(db, day), [], MissingDayTexts.FoundText(db, day), null, null,
+                AcceptPrimary: false, AcceptWarning: MissingDayTexts.AcceptWarning(db, day),
+                Candidates: candidates, Similar: similar,
+                PullLabel: MissingDayTexts.PullButton(db, day), PullNote: MissingDayTexts.PullNote(db, day));
+
         if (candidates.Count > 0)
         {
             var hint = string.Join(" ", candidates.Select(c =>
                 $"Похоже, {Plural(c.Dates.Count, "день", "дни", "дни")} {Days(c.Dates)} {(c.Dates.Count == 1 ? "лежит" : "лежат")} на loglig отдельным соревнованием № {c.LogligId} «{c.Title}»."))
-                + " Затяните его вторым днём — docs/pull-to-prod.md.";
+                + " Таких соревнований несколько — какое из них недостающий день, решите сами и затяните вручную: docs/pull-to-prod.md.";
             return new ProgrammeCheckVerdict(ProgrammeVerdictKind.OnlyKnownDays, headline, lines, hint, null, null,
                 AcceptPrimary: false,
                 AcceptWarning: "день, похоже, есть на loglig — «Принять как есть» закроет долг, и этот день не будет затянут",
@@ -169,9 +179,8 @@ public static class ProgrammeCheckRules
             return new ProgrammeCheckVerdict(ProgrammeVerdictKind.OnlyKnownDays, headline, lines,
                 unchecked_ + " Если дня нет — «Принять как есть».", null, null, AcceptPrimary: false, Similar: similar);
 
-        return new ProgrammeCheckVerdict(ProgrammeVerdictKind.OnlyKnownDays, headline, lines,
-            $"Соседние номера loglig (±{NeighbourRadius}) недостающего дня не содержат. Скорее всего, даты федерации шире "
-            + "плавания (как у Маккабиады — даты всех Игр): дотягивать нечего, «Принять как есть» закроет долг.",
+        // Соседи ±{NeighbourRadius} недостающего дня не дали — даты федерации шире плавания (Маккабиада).
+        return new ProgrammeCheckVerdict(ProgrammeVerdictKind.OnlyKnownDays, MissingDayTexts.NothingToPull, lines, null,
             null, null, AcceptPrimary: true, Candidates: [], Similar: similar);
     }
 
@@ -189,8 +198,7 @@ public static class ProgrammeCheckRules
         foreach (var n in neighbours.OrderBy(n => n.LogligId))
         {
             if (LogligTitleRules.Normalize(n.Title) != key) continue;
-            IReadOnlyList<DateOnly> dates = n.Dates.Count > 0 ? n.Dates.Distinct().Order().ToList()
-                : LogligTitleRules.TitleDate(n.Title) is { } td ? [td] : [];
+            var dates = NeighbourDates(n);
             var item = new ProgrammeNeighbour(n.LogligId, n.Title, dates);
             if (dates.Count > 0 && dates.All(missing.Contains)) candidates.Add(item);
             else similar.Add(item);
@@ -227,12 +235,16 @@ public static class ProgrammeCheckRules
                 $"день {d.DayNumber} {Day(d.Date)}: {d.Rows} {Plural(d.Rows, "строка", "строки", "строк")}"
                 + (d.Media > 0 ? $" (медиа {d.Media})" : "")
                 + (d.Existing ? $" — остаётся #{plan.CompetitionId}" : " — новое соревнование")).ToList();
+            // Кнопка есть — простыми словами (Влад 25.11.2026); нет — по-прежнему с причиной.
             return new ProgrammeCheckVerdict(ProgrammeVerdictKind.Collapsed,
-                $"Дни склеены: по программе loglig {x.LogligId} старт идёт {Days(prog)}, а в базе всё лежит днём {Days(db)}. "
-                + $"Строки {Days(notInDb)} — в нём, их можно перенести в свой день.",
+                blocked == null
+                    ? MissingDayTexts.CollapsedHeadline(plan.Days.Select(d => d.Date).Distinct().Count())
+                    : $"Дни склеены: по программе loglig {x.LogligId} старт идёт {Days(prog)}, а в базе всё лежит днём {Days(db)}. "
+                      + $"Строки {Days(notInDb)} — в нём, их можно перенести в свой день.",
                 lines,
-                "«Разделить по дням» перенесёт строки (их Id те же — медиа, пометки и промежуточные едут с ними), "
-                + "заведёт событие и пересчитает оба дня. Одна транзакция: всё или ничего.",
+                blocked == null
+                    ? MissingDayTexts.CollapsedHint(plan.Days.Select(d => d.Date))
+                    : "«Разделить по дням» перенесёт строки в свои дни и заведёт событие; одна транзакция: всё или ничего.",
                 blocked == null ? plan.CompetitionId : null, blocked, AcceptPrimary: false,
                 PlanFingerprint: blocked == null ? Fingerprint(plan.Days) : null);
         }
@@ -261,6 +273,22 @@ public static class ProgrammeCheckRules
             + "«Перезатянуть» не поможет: получится дубль.",
             null, null, AcceptPrimary: false);
     }
+
+    /// <summary>Даты соседа: даты дисциплин, иначе дата из хвоста заголовка; нет ни того, ни другого — пусто.</summary>
+    public static IReadOnlyList<DateOnly> NeighbourDates(LogligCompetitionSummaryDto n) =>
+        n.Dates.Count > 0 ? n.Dates.Distinct().Order().ToList()
+            : LogligTitleRules.TitleDate(n.Title) is { } td ? [td] : [];
+
+    /// <summary>Дни федерации (DateStart..DateEnd), которых нет в базе, — недостающие дни Р115.</summary>
+    public static IReadOnlyList<DateOnly> MissingSiteDays(DateOnly siteStart, DateOnly siteEnd, IReadOnlyList<DateOnly> dbDays) =>
+        SiteDays(siteStart, siteEnd).Except(dbDays).ToList();
+
+    /// <summary>
+    /// Кнопка «Затянуть этот день» (Р124): только у вердикта (б+в) с ОДНИМ кандидатом — его номер.
+    /// Несколько кандидатов — какой из них день, решает человек: подсказка перечисляет, кнопки нет.
+    /// </summary>
+    public static int? PullCandidate(ProgrammeCheckVerdict v) =>
+        v.Kind == ProgrammeVerdictKind.OnlyKnownDays && v.Candidates is [{ Dates.Count: 1 } only] ? only.LogligId : null;
 
     private static List<DateOnly> SiteDays(DateOnly start, DateOnly end) =>
         Enumerable.Range(0, Math.Max(0, end.DayNumber - start.DayNumber) + 1).Select(start.AddDays).ToList();

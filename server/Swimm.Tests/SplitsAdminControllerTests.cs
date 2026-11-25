@@ -38,6 +38,9 @@ public class SplitsAdminControllerTests
     {
         public (int Id, int? Loglig)? Called { get; private set; }
 
+        public Task<SplitAutoOutcome> AttachDayAfterImportAsync(int competitionId, int logligId, Guid jobId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<SplitAutoOutcome> AttachAfterImportAsync(int orgCompId, Guid jobId, CancellationToken ct = default) =>
             throw new NotSupportedException();
 

@@ -29,7 +29,8 @@ public class ProgrammeCheckRulesTests
         Assert.Equal(1665, v.SplitCompetitionId);
         Assert.False(v.AcceptPrimary);
         Assert.Equal(["день 1 28.03: 1072 строки — новое соревнование", "день 2 29.03: 1618 строк (медиа 3) — остаётся #1665"], v.Lines);
-        Assert.Contains("Строки 28.03 — в нём", v.Headline);
+        Assert.Equal("Оба дня у нас есть, но записаны одной датой.", v.Headline);
+        Assert.Contains("заплывы 28.03 и 29.03 разойдутся по своим дням", v.Hint);
     }
 
     [Fact]
@@ -135,8 +136,8 @@ public class ProgrammeCheckRulesTests
         Assert.Null(v.AcceptWarning);
         Assert.Empty(v.Candidates!);
         Assert.False(v.CanSplit);
-        Assert.StartsWith("В привязанной программе loglig 12327 только те дни, что уже есть в базе: 05–07.07", v.Headline);
-        Assert.Contains("как у Маккабиады — даты всех Игр", v.Hint);
+        Assert.Equal(MissingDayTexts.NothingToPull, v.Headline);
+        Assert.Contains("Нажмите «Принять как есть»", v.Headline);
     }
 
     [Fact]
@@ -158,10 +159,12 @@ public class ProgrammeCheckRulesTests
         Assert.NotNull(v.AcceptWarning);
         Assert.Equal([11590], v.Candidates!.Select(c => c.LogligId));
         Assert.Equal([11589], v.Similar!.Select(c => c.LogligId));
-        Assert.Contains("день 07.12 лежит на loglig отдельным соревнованием № 11590", v.Hint);
-        Assert.Contains("docs/pull-to-prod.md", v.Hint);
-        Assert.Contains("Похожее, но дата не подходит: № 11589", Assert.Single(v.Lines));
-        Assert.Contains("24.11", v.Lines[0]);
+        // Один кандидат — простыми словами и кнопка (Влад 25.11.2026); черновик 11589 в текст не идёт.
+        Assert.Equal("Второй день есть у федерации, но у нас его нет", v.Headline);
+        Assert.Contains("Суббота 07.12 нашлась отдельно", v.Hint);
+        Assert.Equal("Затянуть субботу 07.12", v.PullLabel);
+        Assert.Contains("Не нажимайте, пока не затянули субботу", v.AcceptWarning);
+        Assert.Empty(v.Lines);
     }
 
     [Fact]
@@ -176,7 +179,8 @@ public class ProgrammeCheckRulesTests
         Assert.Equal(ProgrammeVerdictKind.OnlyKnownDays, v.Kind);
         Assert.Equal(9817, Assert.Single(v.Candidates!).LogligId);
         Assert.False(v.AcceptPrimary);
-        Assert.Contains("Нет ни в базе, ни в программе: 23.12.", v.Headline);
+        Assert.Equal("Затянуть субботу 23.12", v.PullLabel);
+        Assert.Contains("У нас в базе только пятница 22.12", v.Hint);
     }
 
     [Fact]

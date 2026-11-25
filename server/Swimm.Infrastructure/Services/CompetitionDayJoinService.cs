@@ -19,14 +19,15 @@ public sealed class CompetitionDayJoinService(
     private const string DateFormat = "dd/MM/yyyy";
 
     public async Task<CompetitionDayJoinReport> JoinAsync(
-        IReadOnlyList<int> competitionIds, bool apply, CancellationToken ct = default)
+        IReadOnlyList<int> competitionIds, bool apply, CancellationToken ct = default, string? eventName = null)
     {
+        eventName = string.IsNullOrWhiteSpace(eventName) ? null : eventName.Trim();
         var ids = competitionIds.Distinct().ToList();
         if (ids.Count < 2)
             return CompetitionDayJoinReport.Refused("", "нужно минимум два соревнования");
 
         var comps = await db.Competitions.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync(ct);
-        var name = comps.FirstOrDefault()?.Name ?? "";
+        var name = eventName ?? comps.FirstOrDefault()?.Name ?? "";
         var missing = ids.Except(comps.Select(c => c.Id)).ToList();
         if (missing.Count > 0)
             return CompetitionDayJoinReport.Refused(name, $"не найдены: {string.Join(", ", missing.Select(id => $"#{id}"))}");
@@ -36,7 +37,8 @@ public sealed class CompetitionDayJoinService(
 
         // Один старт — одно имя и один бассейн; иначе это разные соревнования, и собирать их
         // в событие — решение не для команды.
-        if (comps.Select(c => c.Name.Trim()).Distinct().Count() > 1)
+        // Общее имя, подтверждённое человеком (Р124), — его решение, что это один старт.
+        if (eventName == null && comps.Select(c => c.Name.Trim()).Distinct().Count() > 1)
             return CompetitionDayJoinReport.Refused(name, "у соревнований разные имена: " +
                 string.Join(" / ", comps.Select(c => $"#{c.Id} «{c.Name}»")));
         if (comps.Select(c => c.PoolType).Distinct().Count() > 1)
@@ -119,6 +121,7 @@ public sealed class CompetitionDayJoinService(
                 comp.EventId = ev.Id;
                 comp.DayNumber = day.DayNumber;
                 comp.SubName ??= comp.Name;
+                comp.Name = name; // без eventName имена и так равны
             }
             await db.SaveChangesAsync(ct);
 

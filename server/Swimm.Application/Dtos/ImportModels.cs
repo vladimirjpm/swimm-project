@@ -86,7 +86,15 @@ public sealed record ImportEventOptions(
     /// (день соседнего compID без штампа в общем событии). Пачка, results-auto, эстафеты
     /// loglig и CLI <c>--repull</c> флаг не ставят никогда.
     /// </summary>
-    bool AllowCollapsedProtocol = false);
+    bool AllowCollapsedProtocol = false,
+
+    /// <summary>
+    /// Р124: импорт дня, который лежит на loglig отдельным соревнованием («Затянуть этот день»).
+    /// Сам импорт поле не читает — его читает фон после импорта: собрать дни в событие, аудит,
+    /// промежуточные и id игроков loglig по номеру СОСЕДА (у записи федерации — номер другого дня).
+    /// Ставит только <c>ISiblingDayPullService.ImportAsync</c>.
+    /// </summary>
+    Abstractions.SiblingDayTarget? SiblingDay = null);
 
 public class ImportResult
 {
@@ -133,6 +141,15 @@ public class ImportResult
     /// у заплыва, который бьёт рекорд. 0 — обычный случай.
     /// </summary>
     public int SuspectFlagged { get; set; }
+
+    /// <summary>Соревнования (дни), которых коснулся импорт, — по ним фон находит новый день (Р124).</summary>
+    public List<int> CompetitionIds { get; set; } = [];
+
+    /// <summary>Итог шага фона сразу после импорта (Р124: день собран в событие) — строкой в панели; null — шага не было.</summary>
+    public string? FollowUp { get; set; }
+
+    /// <summary>Событие, в которое лёг день (Р124), — панель выбирает его строку после перезагрузки.</summary>
+    public int? FollowUpEventId { get; set; }
 }
 
 /// <summary>Существующее (по ключу (Name|SubName)|Date|PoolType) соревнование, найденное для дня из превью.</summary>

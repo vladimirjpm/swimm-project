@@ -22,6 +22,12 @@ public interface ILogligStampService
     Task<LogligStampReport> StampFromProtocolAsync(int orgCompId, CancellationToken ct = default);
 
     /// <summary>
+    /// Р124: пловцы одного дня <paramref name="competitionId"/> по протоколу соревнования loglig
+    /// <paramref name="logligId"/> — дня, который лежит на loglig отдельным соревнованием.
+    /// </summary>
+    Task<LogligStampReport> StampDayFromProtocolAsync(int competitionId, int logligId, CancellationToken ct = default);
+
+    /// <summary>
     /// Разовый проход по ВСЕМ импортированным соревнованиям, у которых есть loglig-id
     /// (CLI: <c>--stamp-loglig-ids</c>). Соревнования без единого непривязанного пловца
     /// пропускаются, не заглядывая на сайт: смысл прохода — добрать долги, а не перечитать

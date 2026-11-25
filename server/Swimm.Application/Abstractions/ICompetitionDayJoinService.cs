@@ -14,8 +14,13 @@ public interface ICompetitionDayJoinService
 {
     /// <param name="competitionIds">Дни одного старта, в любом порядке (порядок дней — по дате).</param>
     /// <param name="apply">false — только план (по умолчанию в CLI).</param>
+    /// <param name="eventName">
+    /// Р124: общее имя события, которое человек подтвердил в превью («Затянуть этот день»). Задано —
+    /// дни с РАЗНЫМИ именами собираются (у дней-соседей loglig в имени день недели и дата), каждый
+    /// получает это имя, исходное уходит в <c>SubName</c>; null — как раньше: имена обязаны совпадать.
+    /// </param>
     Task<CompetitionDayJoinReport> JoinAsync(
-        IReadOnlyList<int> competitionIds, bool apply, CancellationToken ct = default);
+        IReadOnlyList<int> competitionIds, bool apply, CancellationToken ct = default, string? eventName = null);
 }
 
 /// <summary>Итог сбора.</summary>
