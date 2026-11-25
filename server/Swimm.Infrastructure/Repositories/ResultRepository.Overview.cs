@@ -53,31 +53,12 @@ public partial class ResultRepository
         // Any, а не All: если у многодневного события наградной хотя бы один день, медали есть.
         var hasAwards = data.Competitions.Values.Any(c => c.IsAward);
 
-        // ♂/♀ (design_handoff вариант 4) — тот же выбор с фильтром по полу.
-        var bestSwim = BestSwimOf(data, rows);
-        var bestSwimMale = BestSwimOf(data, rows.Where(r => r.Gender == "male"));
-        var bestSwimFemale = BestSwimOf(data, rows.Where(r => r.Gender == "female"));
-
-        var medalRows = BuildMedalRows(data, filter);
-        var topMedalists = BuildMedalists(medalRows, null);
-        var topMedalistsMale = BuildMedalists(medalRows, "male");
-        var topMedalistsFemale = BuildMedalists(medalRows, "female");
-
-        var highPointAwards = await LoadHighPointAwardsAsync(data, filter);
-        var officialAwards = await LoadOfficialAwardsAsync(data, filter, days);
-
-        // Клубный зачёт — тот же расчёт, что у /api/club-summary (BuildClubSummary), по общим
-        // строкам; по полу — подвыборка строк. Значения в Results.Gender —
-        // "male"/"female" (плюс "mixed" у эстафет и "none"), НЕ "M"/"F"; у Swimmer.Gender
-        // те же "male"/"female" (сверено по базе 10.10.2026).
         var clubRules = await LoadClubRulesAsync();
-        var (topClubs, topClubsMen, topClubsWomen) = await BuildOverviewClubSummariesAsync(data, filter, clubRules);
+        var cards = await BuildGenderCardsAsync(data, filter, days, clubRules);
         var appliedRules = BuildAppliedClubRules(data, clubRules);
         var clubPointsVerified = ClubPointsVerifiedOf(data);
         var clubPointsUnofficial = IsClubPointsUnofficial(data);
         var clubPointsMismatchNote = await LoadClubPointsMismatchNoteAsync(data, clubPointsVerified);
-
-        var newRecords = await DetectNewRecordsAsync(data);
 
         // Клубы, напечатанные в протоколе под прежним названием (Р97): карточки показывают
         // напечатанное, «now: …» — по этой карте.
@@ -101,22 +82,22 @@ public partial class ResultRepository
             },
             HasAwards = hasAwards,
             Days = days,
-            BestSwim = bestSwim,
-            BestSwimMale = bestSwimMale,
-            BestSwimFemale = bestSwimFemale,
-            TopClubs = topClubs,
+            BestSwim = cards.BestSwim,
+            BestSwimMale = cards.BestSwimMale,
+            BestSwimFemale = cards.BestSwimFemale,
+            TopClubs = cards.TopClubs,
             ClubPointsRules = appliedRules,
             ClubPointsVerified = clubPointsVerified,
             ClubPointsMismatchNote = clubPointsMismatchNote,
             ClubPointsUnofficial = clubPointsUnofficial,
-            TopClubsMen = topClubsMen,
-            TopClubsWomen = topClubsWomen,
-            TopMedalists = topMedalists,
-            TopMedalistsMale = topMedalistsMale,
-            TopMedalistsFemale = topMedalistsFemale,
-            HighPointAwards = highPointAwards,
-            OfficialAwards = officialAwards,
-            Records = newRecords,
+            TopClubsMen = cards.TopClubsMen,
+            TopClubsWomen = cards.TopClubsWomen,
+            TopMedalists = cards.TopMedalists,
+            TopMedalistsMale = cards.TopMedalistsMale,
+            TopMedalistsFemale = cards.TopMedalistsFemale,
+            HighPointAwards = cards.HighPointAwards,
+            OfficialAwards = cards.OfficialAwards,
+            Records = cards.Records,
             ClubNow = clubNow,
         };
 

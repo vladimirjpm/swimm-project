@@ -20,6 +20,14 @@ public static class DataCheckFixKinds
     public const string SwimmerGenderAlign = "swimmer-gender-align";
 
     /// <summary>
+    /// Пол с карточки loglig ждёт решения человека — находка `swimmers.gender-from-loglig-review`
+    /// (Р126): автоматика не проставила, потому что есть серьёзные последствия или личность не
+    /// подтверждена заплывами. Кнопка «Проставить» пишет пол с карточки осознанно; «Оставить как
+    /// есть» — обычное «Принять».
+    /// </summary>
+    public const string SwimmerGenderLogligReview = "swimmer-gender-loglig";
+
+    /// <summary>
     /// Пара дедупа: «Принять как есть» на такой находке означает «это не дубли, а тёзки»
     /// и пишет пару в `Sys_DedupIgnoredPairs` — тот же список, что заводит ✕ на
     /// /Admin/Swimmers. Иначе механизма было бы два: находка принята, а в списке дублей

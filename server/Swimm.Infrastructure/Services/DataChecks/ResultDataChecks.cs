@@ -244,6 +244,43 @@ public sealed class GenderVsLogligCheck(SwimmDbContext db) : IDataCheck
     }
 }
 
+/// <summary>
+/// Р126: пол с карточки loglig ждёт решения человека. Автоматика (кнопка «взять пол с карточек
+/// loglig», шаг после импорта) такие случаи пропускает: проставление изменило бы что-то серьёзное
+/// (<see cref="GenderImpactRules"/>) либо заплывами не подтверждено, что карточка — того же
+/// человека. Сеть не трогает: считает по сохранённым ответам карточек и текущей базе, поэтому
+/// перечень последствий всегда свежий.
+/// </summary>
+public sealed class GenderFromLogligReviewCheck(LogligGenderReviewFinder genders) : IDataCheck
+{
+    public string Id => "swimmers.gender-from-loglig-review";
+    public string Title => "Пол с loglig ждёт ручной проверки";
+    public string Description =>
+        "У пловца пол не указан, а на его карточке loglig он есть — но сам сайт его не проставил: " +
+        "от этого изменился бы рекорд, место, медаль, очки или топ (перечень — в находке), либо " +
+        "не удалось подтвердить заплывами, что карточка loglig — того же человека. «Проставить» — " +
+        "записать пол с карточки осознанно (в журнале останется «подтвердил человек», производные " +
+        "величины соревнований пересчитаются); «Оставить как есть» — пол остаётся пустым.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Warning;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        var reviews = await genders.GetPendingAsync(ct);
+        return new DataCheckOutcome(reviews.Count, reviews
+            .Take(50)
+            .Select(r => new DataCheckItem(
+                "Swimmer", r.SwimmerId,
+                GenderImpactRules.ReviewMessage(r.SwimmerName, r.BirthYear, r.Gender, r.Reasons.Count),
+                GenderImpactRules.ReviewDetails(r.LogligId, r.Reasons),
+                $"/Admin/Swimmers/Edit?id={r.SwimmerId}",
+                PublicRoutes.Swimmer(r.SwimmerId),
+                SubjectName: r.SwimmerName,
+                FixKind: DataCheckFixKinds.SwimmerGenderLogligReview,
+                FixEntityId: r.SwimmerId))
+            .ToList());
+    }
+}
+
 /// <summary>FK-аномалии: результат ссылается на несуществующего пловца или клуб.</summary>
 public sealed class FkAnomalyCheck(IDataQualityService quality) : IDataCheck
 {

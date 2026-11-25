@@ -24,16 +24,21 @@ internal static class SwimmerLogligClubStore
         return await db.SwimmerLogligClubs.AsNoTracking()
             .Where(x => ids.Contains(x.SwimmerId))
             .ToDictionaryAsync(x => x.SwimmerId,
-                x => new StoredLogligClub(x.LogligId, x.ClubName, x.CheckedAt, x.CardName, x.CardBirthYear, x.Gender), ct);
+                x => new StoredLogligClub(x.LogligId, x.ClubName, x.CheckedAt, x.CardName, x.CardBirthYear,
+                    x.Gender, x.ResultsMatched), ct);
     }
 
     /// <param name="card">
     /// Сама карточка — из неё в строку уходят имя, год и пол (Р125). null — «кто на карточке»
     /// стирается: ответ нового визита не должен донашивать имя и пол старого.
     /// </param>
+    /// <param name="resultsMatched">
+    /// Нашёлся ли на карточке заплыв пловца (Р126). null — вызывающий не сверял: прежнее значение
+    /// остаётся, если loglig-id тот же (сверка клуба не должна стирать то, что узнал шаг пола).
+    /// </param>
     public static async Task UpsertAsync(
         SwimmDbContext db, int swimmerId, int logligId, string? clubName, DateTime checkedAt, CancellationToken ct,
-        LogligPlayerCard? card = null)
+        LogligPlayerCard? card = null, bool? resultsMatched = null)
     {
         var row = await db.SwimmerLogligClubs.FindAsync([swimmerId], ct);
         if (row is null)
@@ -41,6 +46,7 @@ internal static class SwimmerLogligClubStore
             row = new SwimmerLogligClub { SwimmerId = swimmerId };
             db.SwimmerLogligClubs.Add(row);
         }
+        row.ResultsMatched = resultsMatched ?? (row.LogligId == logligId && card is not null ? row.ResultsMatched : null);
         row.LogligId = logligId;
         row.ClubName = clubName is { Length: > 200 } ? clubName[..200] : clubName;
         row.CheckedAt = checkedAt;

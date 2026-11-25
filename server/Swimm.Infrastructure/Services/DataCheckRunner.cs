@@ -158,7 +158,8 @@ public class DataCheckRunner(
         // поправил, а список показывает старое.
         var subjectIds = findings
             .Where(f => (f.FixKind == DataCheckFixKinds.SwimmerGender
-                         || f.FixKind == DataCheckFixKinds.SwimmerGenderAlign)
+                         || f.FixKind == DataCheckFixKinds.SwimmerGenderAlign
+                         || f.FixKind == DataCheckFixKinds.SwimmerGenderLogligReview)
                         && f.FixEntityId != null)
             .Select(f => f.FixEntityId!.Value)
             .Distinct()
@@ -305,6 +306,45 @@ public class DataCheckRunner(
         var swimmer = await db.Swimmers.FirstOrDefaultAsync(s => s.Id == swimmerId, ct);
         if (swimmer is null) return null;
 
+        return await WriteGenderAsync(swimmer, gender, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<int?> SetSwimmerGenderIfEmptyAsync(int swimmerId, string gender, CancellationToken ct = default)
+    {
+        if (gender is not ("male" or "female")) return null;
+
+        // InMemory (тесты): блокировок нет — свежее чтение и запись подряд.
+        if (!db.Database.IsRelational())
+        {
+            var s = await db.Swimmers.FirstOrDefaultAsync(x => x.Id == swimmerId, ct);
+            if (s is null) return null;
+            await db.Entry(s).ReloadAsync(ct);
+            return string.IsNullOrWhiteSpace(s.Gender) ? await WriteGenderAsync(s, gender, ct) : null;
+        }
+
+        // Строка пловца блокируется (FOR UPDATE) и перечитывается ВНУТРИ транзакции: пол, который
+        // успел проставить импорт (EnrichSwimmerFromResult) или человек, виден и не перезаписывается.
+        // Через стратегию выполнения — у контекста включены повторы, свои транзакции иначе запрещены.
+        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            var s = await db.Swimmers
+                .FromSqlInterpolated($"SELECT * FROM \"Swimmers\" WHERE \"Id\" = {swimmerId} FOR UPDATE")
+                .FirstOrDefaultAsync(ct);
+            if (s is null) return (int?)null;
+            await db.Entry(s).ReloadAsync(ct);
+            if (!string.IsNullOrWhiteSpace(s.Gender)) return null;
+
+            var rows = await WriteGenderAsync(s, gender, ct);
+            await tx.CommitAsync(ct);
+            return rows;
+        });
+    }
+
+    private async Task<int> WriteGenderAsync(Swimmer swimmer, string gender, CancellationToken ct)
+    {
+        var swimmerId = swimmer.Id;
         swimmer.Gender = gender;
 
         // И строки этого пловца, у которых пола нет: проверка смотрит именно на них, а

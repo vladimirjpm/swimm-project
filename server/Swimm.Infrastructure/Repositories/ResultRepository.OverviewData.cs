@@ -49,7 +49,8 @@ public partial class ResultRepository
         public string? RelayTeamName { get; init; }
         public string StyleName { get; init; } = "";
         public string Distance { get; init; } = "";
-        public string Gender { get; init; } = "";
+        /// <summary>set — только для сухого расчёта «что изменится, если проставить пол» (Р126).</summary>
+        public string Gender { get; set; } = "";
         public string AgeGroup { get; init; } = "";
         public string EventStyleAge { get; init; } = "";
         public DateTime CompetitionDate { get; init; }
@@ -104,7 +105,7 @@ public partial class ResultRepository
         public string LastName { get; init; } = "";
         public string FirstNameEn { get; init; } = "";
         public string LastNameEn { get; init; } = "";
-        public string? Gender { get; init; }
+        public string? Gender { get; set; }
         public int BirthYear { get; init; }
     }
 

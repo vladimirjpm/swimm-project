@@ -16,7 +16,8 @@ namespace Swimm.API.BackgroundServices;
 /// <item>импорт — задача за задачей: импорт, статус «imported» строке входящих, проба клубного
 ///   зачёта (один запрос);</item>
 /// <item>шаги, которые ходят на loglig по запросу на заплыв/дисциплину, — доклейка промежуточных
-///   и штамповка loglig-id (и сразу за ней — пол пловцам без пола с их карточек, Р125), а за ними, отдельной очередью, игрок loglig у каждой строки (Р122):
+///   и штамповка loglig-id, а за ними, отдельной очередью, игрок loglig у каждой строки (Р122)
+///   и пол пловцам без пола с их карточек loglig (Р125):
 ///   он самый долгий и идёт, только когда доклейки и штамповки всей пачки закончены и импортов в
 ///   очереди нет, — шаг игроков одного старта не задерживает промежуточные следующего. Своя очередь с ОДНИМ читателем: на loglig всегда идёт один старт за
 ///   раз (пачка до 30 — не шквал запросов), а следующий импорт пачки их не ждёт.</item>
@@ -32,7 +33,7 @@ public sealed class ImportBackgroundService : BackgroundService
 
     /// <summary>Что сделать на loglig после импорта задачи <paramref name="JobId"/>.</summary>
     /// <param name="DayId">Р124: день-сосед — шаги только по нему и по <paramref name="LogligId"/> (номер соседа, а не записи федерации).</param>
-    /// <param name="Gender">Р125: пол пловцам без пола — с их карточек loglig (после штамповки loglig-id).</param>
+    /// <param name="Gender">Р125: пол пловцам без пола — с их карточек loglig; во второй очереди, после игроков по строкам.</param>
     internal sealed record LogligStep(Guid JobId, int OrgCompId, bool Splits, bool Stamp, bool RowPlayers = false,
         int? DayId = null, int? LogligId = null, bool Gender = false);
 
@@ -275,17 +276,27 @@ public sealed class ImportBackgroundService : BackgroundService
                 {
                     await GuardedAsync(step, () => RunLogligStepAsync(step, stoppingToken), stoppingToken);
                     // Игроки этого старта — в свою очередь: дойдут, когда пачка закончится.
-                    if (step.RowPlayers) _rowPlayerSteps.Enqueue(step);
+                    // Пол с карточек loglig (Р125) — туда же: шаг не должен задерживать промежуточные
+                    // следующего старта, а строкам к тому времени уже записан игрок loglig (Р122) —
+                    // это подтверждение, что карточка — того же человека.
+                    if (step.RowPlayers || step.Gender) _rowPlayerSteps.Enqueue(step);
                     continue;
                 }
 
                 if (!_rowPlayerSteps.IsEmpty && !ImportsPending() && _rowPlayerSteps.TryDequeue(out var rowStep))
                 {
-                    await GuardedAsync(rowStep, async () =>
-                    {
-                        await using var scope = _scopeFactory.CreateAsyncScope();
-                        await StampRowPlayersAsync(scope.ServiceProvider, rowStep, stoppingToken);
-                    }, stoppingToken);
+                    if (rowStep.RowPlayers)
+                        await GuardedAsync(rowStep, async () =>
+                        {
+                            await using var scope = _scopeFactory.CreateAsyncScope();
+                            await StampRowPlayersAsync(scope.ServiceProvider, rowStep, stoppingToken);
+                        }, stoppingToken);
+                    if (rowStep.Gender)
+                        await GuardedAsync(rowStep, async () =>
+                        {
+                            await using var scope = _scopeFactory.CreateAsyncScope();
+                            await FillGenderAsync(scope.ServiceProvider, rowStep, stoppingToken);
+                        }, stoppingToken);
                     continue;
                 }
 
@@ -339,17 +350,13 @@ public sealed class ImportBackgroundService : BackgroundService
             await using var scope = _scopeFactory.CreateAsyncScope();
             await StampLogligAsync(scope.ServiceProvider, step, stoppingToken);
         }
-        // После штамповки: новый пловец получает подтверждённый loglig-id именно на ней.
-        if (step.Gender)
-        {
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            await FillGenderAsync(scope.ServiceProvider, step, stoppingToken);
-        }
     }
 
     // Пол пловцам без пола — с их карточек loglig (Р125): смешанный заплыв не печатает пол в
     // шапке, и находка «Результаты без пола» висела до ручного клика при подтверждённом loglig-id.
-    // Запрос на пловца с паузой, потолок LogligCardGenderRule.MaxRequestsPerImport; обычно таких
+    // Во второй очереди, за игроками по строкам (Р122). Запрос на пловца с паузой, потолок
+    // LogligCardGenderRule.MaxRequestsPerImport; случаи с серьёзными последствиями (Р126) шаг не
+    // пишет — они уходят в находку ручной проверки. Обычно таких
     // пловцов единицы. Тумблер перечитывается здесь: шаг мог простоять в очереди всю пачку.
     // Сбой — лог; пол доберёт следующий импорт или кнопка в /Admin/Health.
     private async Task FillGenderAsync(IServiceProvider sp, LogligStep step, CancellationToken stoppingToken)

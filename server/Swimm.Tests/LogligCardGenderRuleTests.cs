@@ -141,4 +141,57 @@ public class LogligCardGenderRuleTests
         Assert.DoesNotContain("потолка", text);
         Assert.Contains("Запросов к loglig 11", text);
     }
+
+    // ── Р126: вторые ворота — личность по заплыву и серьёзные последствия ────────────────
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void IdentityConfirmedBySwim_AndNoConsequences_NoReview(bool onCard, bool rowPlayer)
+    {
+        Assert.Empty(LogligCardGenderRule.ReviewReasons(onCard, rowPlayer, GenderImpact.None));
+    }
+
+    [Fact]
+    public void NameAndYearOnly_IsNotEnough_GoesToReview()
+    {
+        var reason = Assert.Single(LogligCardGenderRule.ReviewReasons(false, false, GenderImpact.None));
+        Assert.Equal(GenderImpactRules.IdentityUnconfirmed, reason.Code);
+        Assert.Contains("не смогли подтвердить, что это тот же человек", reason.Text);
+    }
+
+    [Fact]
+    public void SeriousConsequences_GoToReview_EvenWithConfirmedIdentity()
+    {
+        var impact = new GenderImpact([new GenderImpactItem(GenderImpactRules.Record, "появится рекорд")]);
+        Assert.Equal([GenderImpactRules.Record],
+            LogligCardGenderRule.ReviewReasons(true, true, impact).Select(r => r.Code));
+    }
+
+    // Ответ, записанный сверкой клуба (про заплывы неизвестно), для решения о поле не годится —
+    // если только строка пловца не несёт этого же игрока loglig.
+    [Fact]
+    public void CacheDecides_OnlyWhenIdentityEvidenceIsKnown()
+    {
+        var now = new DateTime(2026, 11, 25, 12, 0, 0, DateTimeKind.Utc);
+        var unknown = new StoredLogligClub(7, "клуб", now.AddHours(-3), "имя", 2012, "male");
+
+        Assert.False(LogligCardGenderRule.CacheDecides(now, unknown, 7, rowPlayerMatched: false));
+        Assert.True(LogligCardGenderRule.CacheDecides(now, unknown, 7, rowPlayerMatched: true));
+        Assert.True(LogligCardGenderRule.CacheDecides(now, unknown with { ResultsMatched = false }, 7, false));
+        Assert.True(LogligCardGenderRule.CacheDecides(now, unknown with { ResultsMatched = true }, 7, false));
+        Assert.False(LogligCardGenderRule.CacheDecides(now, unknown with { ResultsMatched = true }, 8, true));
+    }
+
+    [Fact]
+    public void Summary_ReportsReview_AndHonestPartialRun()
+    {
+        var text = LogligCardGenderRule.Summary(12, 5, 6, 0, 0, 0, 0, 0, 7, 0, review: 3, dbFailed: 1, reached: 9);
+
+        Assert.Contains("время вышло, дошли до 9 из 12 — нажмите ещё раз", text);
+        Assert.Contains("проставлен 5", text);
+        Assert.Contains("ждут ручной проверки — 3", text);
+        Assert.Contains("сбой записи — 1", text);
+    }
 }

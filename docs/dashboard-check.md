@@ -108,6 +108,7 @@ FROM "Sys_DataCheckStates" s WHERE s."Total" > 0 OR s."Failed" ORDER BY s."Sever
 |---|---|
 | `clubs.dedup-sure`, `swimmers.dedup-sure` | пары с именами и числом результатов; для клубов same-name — вывод `$PROD --merge-same-name-clubs` (dry-run). Склейка — на «да»: `--merge-same-name-clubs --apply` или `/Admin/Clubs` / `/Admin/Swimmers` |
 | `results.no-gender` | с Р125 пол берётся с карточки loglig сам после импорта; для оставшихся с подтверждённым loglig-id — кнопка «взять пол с карточек loglig» на `/Admin/Health`. Человеку — только те, у кого loglig-id нет или карточка не подошла: имя, ссылка на loglig-карточку, пол кнопкой ♂/♀ |
+| `swimmers.gender-from-loglig-review` | имя, что говорит loglig и перечень последствий из `Details`; «Проставить» меняет рекорды/места/топы — только на «да» Влада по каждому пловцу; без «да» не трогать |
 | `swimmers.gender-vs-loglig` | «у нас X, на loglig Y» + обе ссылки; сам не чинит — пол пловцу правит человек, либо «Принять» |
 | `results.gender-vs-card` | расклад «в карточке X, заплывов Y из Z» из `Message`; ⚠ «Выровнять пол» переписывает протокол — только на «да» |
 | `results.exact-duplicate`, `results.merged-sessions`, `import.reconciliation-mismatch` (Error) | соревнование, что не сошлось; путь лечения по [data-integrity.md](data-integrity.md) (обычно переимпорт); `--repull` — только на «да», по [pull-to-prod.md](pull-to-prod.md) |

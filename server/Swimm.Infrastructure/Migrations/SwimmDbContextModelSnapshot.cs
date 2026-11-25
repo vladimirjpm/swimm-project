@@ -4153,6 +4153,9 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("LogligId")
                         .HasColumnType("integer");
 
+                    b.Property<bool?>("ResultsMatched")
+                        .HasColumnType("boolean");
+
                     b.HasKey("SwimmerId");
 
                     b.ToTable("Sys_SwimmerLogligClubs", (string)null);

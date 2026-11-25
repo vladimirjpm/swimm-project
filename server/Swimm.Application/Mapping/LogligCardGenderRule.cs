@@ -63,8 +63,17 @@ public static class LogligCardGenderRule
     /// <summary>Потолок запросов карточек на один импорт (запрос ≈ 1–2 с; пауза между ними 1 с).</summary>
     public const int MaxRequestsPerImport = 40;
 
-    /// <summary>Потолок запросов на одно нажатие кнопки в Health; остаток — повторным нажатием.</summary>
-    public const int MaxRequestsPerButton = 60;
+    /// <summary>
+    /// Потолок запросов на одно нажатие кнопки в Health; остаток — повторным нажатием. Вместе с
+    /// <see cref="ButtonTimeout"/> держит нажатие далеко от лимита запроса Azure (230 с).
+    /// </summary>
+    public const int MaxRequestsPerButton = 30;
+
+    /// <summary>Сколько одно нажатие кнопки идёт по карточкам; не успело — честный итог «дошли до N из M».</summary>
+    public static readonly TimeSpan ButtonTimeout = TimeSpan.FromSeconds(150);
+
+    /// <summary>Действие аудита, когда пол с карточки подтвердил человек (находка ручной проверки).</summary>
+    public const string ConfirmAuditAction = "swimmer.gender-from-loglig-confirmed";
 
     /// <summary>Жёсткий потолок шага после импорта.</summary>
     public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(5);
@@ -117,14 +126,49 @@ public static class LogligCardGenderRule
     public static bool CacheValid(DateTime now, StoredLogligClub? stored, int logligId) =>
         stored is { CardName: not null } && stored.LogligId == logligId && now - stored.CheckedAt < CacheTtl;
 
+
+    /// <summary>
+    /// Р126, вторые ворота — уже после (а)–(г): причины, по которым пол НЕ пишется автоматически, а
+    /// уходит человеку. Пусто — писать можно.
+    /// • Личность: имени и года мало («טל כהן» — двуполое имя, тёзки среди детей). Нужен хоть один
+    ///   заплыв пловца на этой карточке (<paramref name="cardResultsMatched"/>) либо строка
+    ///   пловца, у которой игрок loglig со страницы дисциплины — этот же id (<paramref name="rowPlayerMatched"/>, Р122).
+    /// • Серьёзные последствия (<see cref="GenderImpactRules"/>).
+    /// </summary>
+    public static IReadOnlyList<GenderImpactItem> ReviewReasons(
+        bool cardResultsMatched, bool rowPlayerMatched, GenderImpact impact)
+    {
+        var reasons = new List<GenderImpactItem>();
+        if (!cardResultsMatched && !rowPlayerMatched)
+            reasons.Add(new(GenderImpactRules.IdentityUnconfirmed,
+                "не смогли подтвердить, что это тот же человек: имя и год совпали, но ни один заплыв "
+                + "пловца на карточке loglig не найден"));
+        reasons.AddRange(impact.Serious);
+        return reasons;
+    }
+
+    /// <summary>
+    /// Годится ли сохранённый ответ для решения о поле: свежий (<see cref="CacheValid"/>) и про
+    /// совпадение заплывов уже известно — либо из карточки, либо по строкам (Р122). Иначе
+    /// карточку открываем заново: в общем месте результатов карточки нет.
+    /// </summary>
+    public static bool CacheDecides(DateTime now, StoredLogligClub? stored, int logligId, bool rowPlayerMatched) =>
+        CacheValid(now, stored, logligId) && (rowPlayerMatched || stored!.ResultsMatched is not null);
+
     /// <summary>Итог прогона одной строкой — для тоста кнопки, лога и аудита.</summary>
     public static string Summary(
         int candidates, int set, int rows, int cardWithoutGender, int failed, int mismatch,
-        int notVerified, int overLimit, int requests, int fromCache)
+        int notVerified, int overLimit, int requests, int fromCache,
+        int review = 0, int dbFailed = 0, int reached = -1)
     {
         if (candidates == 0) return "Пловцов без пола нет — брать с loglig нечего.";
 
         var parts = new List<string> { $"проставлен {set} (строк результата {rows})" };
+        if (review > 0) parts.Add($"ждут ручной проверки — {review}");
+        if (dbFailed > 0) parts.Add($"сбой записи — {dbFailed}");
+        // Прервано по времени: честно — докуда дошли.
+        if (reached >= 0 && reached < candidates)
+            parts.Insert(0, $"время вышло, дошли до {reached} из {candidates} — нажмите ещё раз");
         if (cardWithoutGender > 0) parts.Add($"на карточке пола нет — {cardWithoutGender}");
         if (mismatch > 0) parts.Add($"имя или год карточки не совпали — {mismatch}");
         if (failed > 0) parts.Add($"карточка не открылась — {failed}");

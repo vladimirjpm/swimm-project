@@ -29,6 +29,12 @@ namespace Swimm.Infrastructure.Migrations
                 type: "character varying(10)",
                 maxLength: 10,
                 nullable: true);
+
+            migrationBuilder.AddColumn<bool>(
+                name: "ResultsMatched",
+                table: "Sys_SwimmerLogligClubs",
+                type: "boolean",
+                nullable: true);
         }
 
         /// <inheritdoc />
@@ -44,6 +50,10 @@ namespace Swimm.Infrastructure.Migrations
 
             migrationBuilder.DropColumn(
                 name: "Gender",
+                table: "Sys_SwimmerLogligClubs");
+
+            migrationBuilder.DropColumn(
+                name: "ResultsMatched",
                 table: "Sys_SwimmerLogligClubs");
         }
     }

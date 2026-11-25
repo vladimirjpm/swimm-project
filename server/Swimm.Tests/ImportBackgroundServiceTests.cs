@@ -379,12 +379,14 @@ public class ImportBackgroundServiceTests
     // ── Р125: пол пловцам без пола — с карточек loglig, сразу за штамповкой loglig-id ──
 
     [Fact]
-    public async Task SuccessfulImport_FillsGenderFromLogligCards_AfterStamp()
+    public async Task SuccessfulImport_FillsGenderFromLogligCards_AfterStampAndRowPlayers()
     {
         var w = new World(Created(13));
         var order = new List<string>();
         w.Stamp.Setup(s => s.StampFromProtocolAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Callback(() => order.Add("stamp")).ReturnsAsync(new LogligStampReport(0, 0, 0, 0, [], "ok"));
+        w.RowPlayers.Setup(s => s.StampAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()))
+            .Callback(() => order.Add("row-players")).ReturnsAsync(new LogligRowPlayerReport(true, "ok"));
         w.Genders.Setup(s => s.FillAfterImportAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .Callback(() => order.Add("gender"))
             .ReturnsAsync(new LogligCardGenderReport(12, 12, 13, 0, 0, 0, 0, 0, 12, 0, 0, "ok", []));
@@ -392,7 +394,8 @@ public class ImportBackgroundServiceTests
         await w.RunAsync();
 
         w.Genders.Verify(s => s.FillAfterImportAsync(CompId, It.IsAny<CancellationToken>()), Times.Once);
-        Assert.Equal(["stamp", "gender"], order);
+        // Вторая очередь, после игроков по строкам: к этому времени у строк есть игрок loglig (Р122).
+        Assert.Equal(["stamp", "row-players", "gender"], order);
     }
 
     [Fact]

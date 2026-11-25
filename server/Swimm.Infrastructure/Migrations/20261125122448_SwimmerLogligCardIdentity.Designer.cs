@@ -12,7 +12,7 @@ using Swimm.Infrastructure.Data;
 namespace Swimm.Infrastructure.Migrations
 {
     [DbContext(typeof(SwimmDbContext))]
-    [Migration("20261125114052_SwimmerLogligCardIdentity")]
+    [Migration("20261125122448_SwimmerLogligCardIdentity")]
     partial class SwimmerLogligCardIdentity
     {
         /// <inheritdoc />
@@ -4155,6 +4155,9 @@ namespace Swimm.Infrastructure.Migrations
 
                     b.Property<int>("LogligId")
                         .HasColumnType("integer");
+
+                    b.Property<bool?>("ResultsMatched")
+                        .HasColumnType("boolean");
 
                     b.HasKey("SwimmerId");
 

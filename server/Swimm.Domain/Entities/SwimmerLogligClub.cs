@@ -49,4 +49,10 @@ public class SwimmerLogligClub
     /// <summary>Пол с карточки (чип «מגדר»): <c>male</c> / <c>female</c>; null — на карточке его нет.</summary>
     [MaxLength(10)]
     public string? Gender { get; set; }
+
+    /// <summary>
+    /// Нашёлся ли на карточке хоть один заплыв пловца (дата + дистанция + время) — подтверждение,
+    /// что карточка про того же человека (Р126). null — не сверяли (ответ записала сверка клуба).
+    /// </summary>
+    public bool? ResultsMatched { get; set; }
 }
