@@ -425,7 +425,8 @@
             const importBusy = () => flow != null && (flow.phase === 'importing' || flow.queuing === true);
 
             /// «Затянуть» / «Перезатянуть». false — нельзя: идёт импорт (любой строки) или разбор этой же.
-            function start(discId, name, repull) {
+            /// sibling — Р124 «Затянуть этот день»: { logligId } соседа; тот же ход, тот же шаг 6.
+            function start(discId, name, repull, sibling) {
                 // Пачка (этап 5): два импорта одного старта одновременно быть не должно.
                 const byBulk = window.bulkPull?.blocks(discId);
                 if (byBulk) {
@@ -442,9 +443,10 @@
                 }
                 flow = {
                     discId: String(discId), name, repull: !!repull, org: window.__DISC?.[discId]?.orgCompId ?? null,
-                    phase: 'parsing', startedAt: Date.now(), lines: [], captions: {},
+                    phase: 'parsing', startedAt: Date.now(), lines: [], captions: {}, sibling: sibling ?? null,
                 };
-                step(5, repull ? 'Скачиваю протокол заново и разбираю…' : 'Скачиваю PDF с isr.org.il и разбираю…');
+                step(5, sibling ? `Проверяю соседа loglig № ${esc(sibling.logligId)} и разбираю его протокол…`
+                    : repull ? 'Скачиваю протокол заново и разбираю…' : 'Скачиваю PDF с isr.org.il и разбираю…');
                 pinSelection(discId);
                 commit();
                 return true;
@@ -557,11 +559,18 @@
                             suspect: r.suspectFlagged ?? 0,
                             // Автодоклейка промежуточных идёт ПОСЛЕ completed — после reload ждём её
                             // по тому же job'у (watchSplits), итог — у шага 9.
-                            jobId, splits: s.splits ?? null
+                            jobId, splits: s.splits ?? null,
+                            // Р124: «Затянуть этот день» — день собран в событие (или почему нет).
+                            followUp: r.followUp ?? null
                         });
                         finish('ok', 'Готово. Обновляю таблицу…', 7);
                         flow = null; save(); // итог уже в DONE_KEY
-                        setTimeout(() => location.reload(), 700);
+                        // День собран в событие — строка теперь событие (ключ e<id>): выбираем его, иначе карточка не откроется.
+                        if (r.followUpEventId) {
+                            const u = new URL(location.href);
+                            u.searchParams.set('sel', 'e' + r.followUpEventId);
+                            setTimeout(() => { location.href = u.toString(); }, 700);
+                        } else setTimeout(() => location.reload(), 700);
                         return;
                     }
                     if (s.state === 'failed') {
@@ -624,6 +633,7 @@
                 if (d.errors) lines.push({ step: 7, text: `ошибок ${d.errors}`, state: 'fail' });
                 // Сверка с файлом важнее счётчиков: она отвечает на вопрос «легло ли верно».
                 if (d.recon) lines.push({ step: 7, text: esc(d.recon), state: d.reconBad ? 'fail' : 'ok' });
+                if (d.followUp) lines.push({ step: 7, text: esc(d.followUp), state: d.followUp.startsWith('⚠') ? 'fail' : 'ok' });
                 // Пометки из превью: молча применённая пометка так же плоха, как молча потерянная.
                 if (d.suspect) lines.push({ step: 8, text: `Помечено сомнительными: ${d.suspect} (в рекорды не идут)`, state: 'ok' });
                 if (d.checks) lines.push({ step: 8, text: esc(d.checks), state: d.checkErr ? 'fail' : (d.checkWarn ? 'wait' : 'ok') });
@@ -674,7 +684,9 @@
 
                 if (flow.phase === 'parsing') {
                     // Запрос разбора оборвала перезагрузка — запускаем его заново (это только превью).
-                    if (Date.now() - (flow.startedAt ?? 0) < RESTART_PARSE_MS && typeof window.discPreview === 'function') {
+                    if (Date.now() - (flow.startedAt ?? 0) < RESTART_PARSE_MS && flow.sibling && typeof window.siblingPullRestart === 'function') {
+                        window.siblingPullRestart(flow);
+                    } else if (Date.now() - (flow.startedAt ?? 0) < RESTART_PARSE_MS && typeof window.discPreview === 'function') {
                         window.discPreview(flow.discId, flow.repull, true);
                     } else { flow = null; save(); }
                     return;
@@ -1445,10 +1457,10 @@
                         .filter(c => Number.isInteger(c.logligId))
                         .map(c => {
                             const a = document.createElement('a');
-                            a.className = 'whitespace-nowrap text-admin-accent hover:underline';
+                            a.className = 'text-[11.5px] text-admin-accent hover:underline';
                             a.href = LOGLIG_COMPETITION_URL + c.logligId;
                             a.target = '_blank'; a.rel = 'noopener';
-                            a.textContent = `loglig № ${c.logligId} (${(c.dates ?? []).join(', ')}) ↗`;
+                            a.textContent = `loglig № ${c.logligId} «${c.title}» ↗`;
                             return a;
                         }));
                     const warn = li?.querySelector('.ck-accept-warning');
@@ -1457,6 +1469,16 @@
                     blocked.textContent = v.splitBlocked ?? '';
                     blocked.classList.toggle('hidden', !v.splitBlocked);
                     q('.ck-days-split').classList.toggle('hidden', !v.canSplit);
+                    // Р124: «Затянуть этот день» — только у единственного кандидата (номер — int с сервера).
+                    const pull = q('.ck-days-pull');
+                    const cand = Number.isInteger(v.pullCandidate) ? v.pullCandidate : null;
+                    box.dataset.pullCandidate = cand ?? '';
+                    pull.classList.toggle('hidden', cand == null);
+                    // Подпись кнопки и пояснение под ней — простыми словами с сервера (MissingDayTexts).
+                    if (cand != null) pull.textContent = v.pullLabel ?? `Затянуть этот день`;
+                    const note = q('.ck-days-pull-note');
+                    note.textContent = cand != null ? (v.pullNote ?? '') : '';
+                    note.classList.toggle('hidden', cand == null);
                     q('.ck-days-accept')?.classList.toggle('hidden', !v.acceptPrimary);
                     // (а) склеены — обычная ссылка «Принять как есть» остаётся, но с оговоркой;
                     // (б) — она же основным действием в ответе, нижняя ссылка не нужна.
@@ -1537,6 +1559,81 @@
                 }
             };
 
+            // Р124: «Затянуть этот день» — день старта лежит на loglig отдельным соревнованием-соседом
+            // (кандидат проверки «Проверить, чего не хватает»). Тот же ход pullFlow и тот же шаг 6, что у
+            // «Затянуть»; отличие — превью и импорт идут через programme-check, а блок #preview-sibling
+            // говорит, куда ляжет день. Значения по умолчанию (флаги, категории, бассейн) — от лежащего дня,
+            // их подставил сервер. Сервер при «Импортировать» перепроверяет всё сам.
+            async function siblingPreview(id, logligId, restarted) {
+                const name = discName(id);
+                if (!pullFlow.start(id, name, false, { logligId })) return;
+                preview = null;
+                document.getElementById('preview-error').classList.add('hidden');
+                const token = pullFlow.current().startedAt;
+                if (restarted) {
+                    pullFlow.current().lines.unshift({ step: 5, state: 'wait', text: 'Разбор прервала перезагрузка страницы — запускаю заново.' });
+                    pullFlow.commit();
+                }
+                try {
+                    const r = await apiJson(`${PROGRAMME_API}/${id}/sibling-preview`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ logligId })
+                    });
+                    if (!pullFlow.isActive(id, token)) return;
+                    const p = r.preview;
+                    p.sibling = r.sibling; // едет с ходом в sessionStorage — F5 соберёт блок заново
+                    preview = { previewId: p.previewId, id, name, existingCompetitionId: null, needsPool: true, collapsed: null, sibling: r.sibling };
+                    pullFlow.previewReady(p);
+                    await showPreview(p, name, false);
+                    updateRemaining();
+                    document.getElementById('preview-box').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } catch (e) {
+                    if (pullFlow.isActive(id, token)) pullFlow.parseFailed(e.message);
+                }
+            }
+            window.siblingPull = (btn) => {
+                const box = btn.closest('.ck-days-check');
+                const logligId = Number(box.dataset.pullCandidate);
+                if (!Number.isInteger(logligId) || logligId <= 0) return;
+                siblingPreview(box.dataset.discId, logligId, false);
+            };
+            window.siblingPullRestart = (f) => siblingPreview(f.discId, f.sibling.logligId, true);
+
+            // Блок «куда ляжет день» и правки шага 6 под соседа; у обычного превью — всё как было.
+            function applySibling(p) {
+                const s = p.sibling ?? null;
+                const box = document.getElementById('preview-sibling');
+                box.classList.toggle('hidden', !s);
+                document.getElementById('event-block').classList.toggle('hidden', !!s);
+                document.getElementById('preview-sibling-summary').classList.toggle('hidden', !s);
+                if (!s) return;
+                // Тексты — с сервера (MissingDayTexts), здесь только подстановка живого выбора.
+                document.getElementById('preview-sibling-msg').textContent = s.defaultsNote ?? '';
+                const ev = document.getElementById('preview-sibling-event');
+                ev.classList.toggle('hidden', !!s.eventId);
+                document.getElementById('sibling-event-name').value = s.eventId ? '' : (s.suggestedEventName ?? '');
+                const poolBox = document.getElementById('preview-sibling-pool');
+                // Бассейн как у затянутого дня при другом регламенте и «сверить заплывы нечем» — одним блоком.
+                const warnings = [s.poolConflictNote, s.overlapNote].filter(Boolean);
+                poolBox.classList.toggle('hidden', !warnings.length);
+                poolBox.textContent = warnings.join(' ');
+                if (s.pointRuleClubsId) document.getElementById('preview-rule-clubs').value = String(s.pointRuleClubsId);
+                renderSiblingSummary();
+            }
+            // «Будет добавлен второй день: суббота 07.12.2024, 1784 строки, бассейн 25 м. …» — бассейн и имя живые.
+            function renderSiblingSummary() {
+                const s = preview?.sibling;
+                const box = document.getElementById('preview-sibling-summary');
+                if (!s?.summaryTemplate) { box.textContent = ''; return; }
+                const pool = document.getElementById('flag-pool').value;
+                const name = s.eventId ? (s.eventName ?? '') : document.getElementById('sibling-event-name').value.trim();
+                box.textContent = s.summaryTemplate
+                    .replace('{pool}', () => (pool ? pool.replace('m', '') + ' м' : 'не выбран'))
+                    .replace('{name}', () => name || '…'); // функцией — «$&» в имени не подставится
+            }
+            document.getElementById('flag-pool').addEventListener('change', renderSiblingSummary);
+            document.getElementById('sibling-event-name').addEventListener('input', renderSiblingSummary);
+
             // Превью после F5: ответ разбора сохранён в pullFlow, на сервере оно живёт 60 минут по
             // previewId — собираем блок заново и возвращаем выбор, сделанный в нём до перезагрузки.
             // «Импортировать» погашена, пока выбор не вернулся: иначе в окне ожидания списков событий и
@@ -1547,7 +1644,8 @@
                 syncImportButton();
                 preview = { previewId: f.p.previewId, id: Number(f.discId), name: f.name,
                     existingCompetitionId: f.p.existingCompetitionId ?? null, needsPool: needsPool(f.p),
-                    collapsed: f.p.collapsedProtocol ?? null };
+                    collapsed: f.p.collapsedProtocol ?? null, sibling: f.p.sibling ?? null };
+                if (preview.sibling) preview.needsPool = true;
                 await showPreview(f.p, f.name, f.repull);
                 const restored = applyForm(f.form);
                 updateRemaining();
@@ -1595,7 +1693,7 @@
             // Выбор в превью (бассейн, флаги, категории, правило, событие, перезапись, «сомнительные»)
             // — в pullFlow, чтобы F5 его не терял.
             const FORM_IDS = ['flag-pool', 'flag-award', 'flag-championship', 'flag-masters', 'flag-club-off',
-                'preview-rule-clubs', 'event-select', 'event-name', 'overwrite-existing-cb', 'delete-missing-cb'];
+                'preview-rule-clubs', 'event-select', 'event-name', 'overwrite-existing-cb', 'delete-missing-cb', 'sibling-event-name'];
             function captureForm() {
                 const form = { cats: [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value),
                     suspect: [...document.querySelectorAll('.suspect-flag:checked')].map(i => i.value) };
@@ -2061,6 +2159,8 @@
                     ).join('');
                 } catch { /* категории опциональны */ }
 
+                // Р124: у дня-соседа — блок «куда ляжет день» вместо выбора события; у обычного — прячется.
+                applySibling(p);
             }
 
             // Штамповка loglig-id по протоколу уже импортированного соревнования. Идёт по
@@ -2312,11 +2412,39 @@
                     return;
                 }
                 const discId = preview.id;
+                const sib = preview.sibling;
+                if (sib && !sib.eventId && !document.getElementById('sibling-event-name').value.trim()) {
+                    alert('Впиши общее название события — оба дня получат его.');
+                    document.getElementById('sibling-event-name').focus();
+                    return;
+                }
                 if (!pullFlow.beginImport(discId)) return;
                 const categoryKeys = [...document.querySelectorAll('.disc-cat:checked')].map(i => i.value);
                 const eventChoice = document.getElementById('event-select').value;
+                const suspectFlags = () => [...document.querySelectorAll('.suspect-flag:checked')]
+                    .map(i => ({ rowIndex: Number(i.value), note: i.dataset.note || null }));
+                // Р124: день-сосед — свой эндпоинт (сервер перепроверяет кандидата, дату, пересечение и
+                // параллельный импорт); событие решает сервер: лежащего дня или новое с этим именем.
+                const send = sib
+                    ? apiJson(`${PROGRAMME_API}/${discId}/sibling-import`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            previewId: preview.previewId,
+                            logligId: sib.logligId,
+                            categoryKeys: categoryKeys.length ? categoryKeys : null,
+                            eventName: sib.eventId ? null : document.getElementById('sibling-event-name').value.trim(),
+                            poolType: document.getElementById('flag-pool').value || null,
+                            isAward: document.getElementById('flag-award').checked,
+                            isChampionship: document.getElementById('flag-championship').checked,
+                            isMasters: document.getElementById('flag-masters').checked,
+                            clubPointsDisabled: document.getElementById('flag-club-off').checked,
+                            pointRuleClubsId: Number(document.getElementById('preview-rule-clubs').value) || null,
+                            suspectFlags: suspectFlags()
+                        })
+                    })
+                    : null;
                 try {
-                    const r = await apiJson(`${API}/import`, {
+                    const r = send ? await send : await apiJson(`${API}/import`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             previewId: preview.previewId,

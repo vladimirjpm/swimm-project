@@ -17,14 +17,32 @@ public sealed class LogligRowPlayerService(
     IAdminAuditService audit,
     ILogger<LogligRowPlayerService> logger) : ILogligRowPlayerService
 {
-    public async Task<LogligRowPlayerReport> StampAsync(
-        int orgCompId, string trigger, CancellationToken ct = default, TimeSpan? readBudget = null)
+    public Task<LogligRowPlayerReport> StampAsync(
+        int orgCompId, string trigger, CancellationToken ct = default, TimeSpan? readBudget = null) =>
+        GuardedAsync(orgCompId, null, () => RunAsync(orgCompId, readBudget, ct), trigger, ct);
+
+    /// <inheritdoc />
+    public async Task<LogligRowPlayerReport> StampDayAsync(
+        int competitionId, int logligId, string trigger, CancellationToken ct = default, TimeSpan? readBudget = null)
+    {
+        var day = await db.Competitions.AsNoTracking().Where(c => c.Id == competitionId)
+            .Select(c => new { c.Id, c.Date, c.OrgCompId, EventOrg = c.Event != null ? c.Event.OrgCompId : null })
+            .FirstOrDefaultAsync(ct);
+        var org = day?.OrgCompId ?? day?.EventOrg ?? 0;
+        return await GuardedAsync(org, competitionId, async () => day == null
+            ? (new LogligRowPlayerReport(false, $"соревнования #{competitionId} нет"), (int?)null)
+            : await RunCoreAsync(logligId, [day.Id], day.Date, $"переимпорт дня #{competitionId} (у --stamp-row-players по compID — номер другого дня, loglig {logligId} он не видит)", readBudget, ct),
+            trigger, ct);
+    }
+
+    private async Task<LogligRowPlayerReport> GuardedAsync(int orgCompId, int? headDayHint,
+        Func<Task<(LogligRowPlayerReport Report, int? HeadDay)>> run, string trigger, CancellationToken ct)
     {
         LogligRowPlayerReport report;
-        int? headDay = null;
+        int? headDay = headDayHint;
         try
         {
-            (report, headDay) = await RunAsync(orgCompId, readBudget, ct);
+            (report, headDay) = await run();
         }
         catch (Exception ex)
         {
@@ -58,9 +76,15 @@ public sealed class LogligRowPlayerService(
             .ToList();
         if (days.Count == 0)
             return (new(false, $"дней с compID {orgCompId} в базе нет — сверять не с чем"), null);
-        var dayIds = days.Select(d => d.Id).ToList();
+        return await RunCoreAsync(competitionLogligId, days.Select(d => d.Id).ToList(),
+            days.Count == 1 ? days[0].Date : "", "--stamp-row-players " + orgCompId, readBudget, ct);
+    }
+
+    /// <summary>Прогон по дням <paramref name="dayIds"/> со страницами соревнования loglig <paramref name="competitionLogligId"/>.</summary>
+    private async Task<(LogligRowPlayerReport Report, int? HeadDay)> RunCoreAsync(int competitionLogligId,
+        List<int> dayIds, string singleDayDate, string retryHint, TimeSpan? readBudget, CancellationToken ct)
+    {
         var headDay = dayIds.Min();
-        var singleDayDate = days.Count == 1 ? days[0].Date : "";
 
         var read = await ReadPagesAsync(competitionLogligId, singleDayDate, readBudget, ct);
 
@@ -108,7 +132,7 @@ public sealed class LogligRowPlayerService(
             (read.NoLink > 0 ? $", без ссылки на игрока {read.NoLink}" : "") +
             (read.Unreadable.Count > 0 ? $", не прочитано дисциплин {read.Unreadable.Count}" : "") +
             (read.NotReached > 0 ? $", не дошли до {read.NotReached} дисциплин (истекло время чтения)" : "") +
-            (complete ? "" : " — строки без времени не сопоставлялись, повторите: --stamp-row-players " + orgCompId) +
+            (complete ? "" : " — строки без времени не сопоставлялись, повторите: " + retryHint) +
             $"; {read.Requests} запросов за {read.Elapsed.TotalSeconds:0} с" +
             (twoPlayerCards > 0 ? $". ⚠ Карточек с двумя игроками loglig: {twoPlayerCards} — см. /Admin/Health" : "");
 

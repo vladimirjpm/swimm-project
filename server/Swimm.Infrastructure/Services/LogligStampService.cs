@@ -50,8 +50,17 @@ public class LogligStampService : ILogligStampService
             return Empty("У соревнования нет loglig-id — брать участников неоткуда.");
 
         // Пловцы ИМЕННО этого соревнования: чужих трогать не за что.
-        var swimmers = await _db.Results.AsNoTracking()
-            .Where(r => r.Competition!.OrgCompId == orgCompId)
+        return await StampCoreAsync(competitionLogligId,
+            _db.Results.AsNoTracking().Where(r => r.Competition!.OrgCompId == orgCompId), ct);
+    }
+
+    /// <inheritdoc />
+    public Task<LogligStampReport> StampDayFromProtocolAsync(int competitionId, int logligId, CancellationToken ct = default) =>
+        StampCoreAsync(logligId, _db.Results.AsNoTracking().Where(r => r.CompetitionId == competitionId), ct);
+
+    private async Task<LogligStampReport> StampCoreAsync(int competitionLogligId, IQueryable<Swimm.Domain.Entities.ResultRecord> results, CancellationToken ct)
+    {
+        var swimmers = await results
             .Select(r => r.Swimmer)
             .Distinct()
             .Select(s => new { s.Id, s.FirstName, s.LastName, s.BirthYear, s.LogligId })
@@ -145,7 +154,7 @@ public class LogligStampService : ILogligStampService
             {
                 // Гонка за уникальным индексом LogligId: сохранить пачкой не вышло — честно
                 // сообщаем, а не делаем вид, что привязали.
-                _logger.LogWarning(ex, "Штамповка loglig-id: конфликт уникальности (compID {OrgCompId})", orgCompId);
+                _logger.LogWarning(ex, "Штамповка loglig-id: конфликт уникальности (loglig {LogligId})", competitionLogligId);
                 return new LogligStampReport(swimmers.Count, alreadyLinked, 0, notFound,
                     [.. skipped, "Конфликт уникальности loglig-id — привязки не сохранены"],
                     "Штамповка не сохранилась: конфликт уникальности loglig-id.");

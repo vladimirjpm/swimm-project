@@ -11,6 +11,17 @@
 <div id="preview-box" class="mt-2 hidden rounded-md border border-admin-accent/40 p-4">
     @* «Распознано результатов: N» и дни файла («<соревнование> — <дата> (N)»). *@
     <div id="preview-summary" class="mb-3 text-[13px] text-admin-text-muted"></div>
+    @* Р124: «Затянуть этот день» — день лежит на loglig отдельным соревнованием. Куда ляжет, общее имя
+       события (лежащий день одиночный) и расхождение бассейна. У обычного «Затянуть» скрыт. *@
+    <div id="preview-sibling" class="mb-3 hidden rounded-md border border-admin-accent/40 bg-admin-accent/15 p-3 text-[13px]">
+        <div id="preview-sibling-msg" class="text-admin-text" dir="auto"></div>
+        <div id="preview-sibling-event" class="mt-2 hidden">
+            <div class="@label">Событие из обоих дней — общее название</div>
+            <input type="text" id="sibling-event-name" class="admin-input w-full rounded-md px-3 py-2 text-[13px]" dir="auto" maxlength="200" />
+            <div class="mt-1 text-[11.5px] text-admin-text-muted">Оба дня получат это имя; исходные названия станут подзаголовками дней (как у события 488 #65).</div>
+        </div>
+        <div id="preview-sibling-pool" class="mt-2 hidden font-semibold text-admin-warning"></div>
+    </div>
     <div id="preview-warnings" class="mb-3 hidden rounded-md border border-admin-danger/40 bg-admin-danger/10 p-3 text-[12.5px]"></div>
     @* Р119: протокол свёрнут в одну дату поверх уже затянутых дней — «Импортировать» заблокирована,
        пока админ не отметит «Я проверил» (решение Влада 23.11: правило может ошибиться — например,
@@ -126,6 +137,8 @@
         <div id="overwrite-delete-warning" class="hidden mt-2 text-[13px] text-admin-danger border-l-[3px] border-l-admin-danger bg-admin-danger/5 rounded-md py-2 px-3"></div>
     </div>
 
+    @* Р124: что будет записано — «Будет добавлен второй день: суббота 07.12.2024, N строк, бассейн 25 м…». *@
+    <div id="preview-sibling-summary" class="mb-2 hidden text-[13px] font-semibold text-admin-text" dir="auto"></div>
     <div class="flex flex-wrap items-center gap-3">
         <button id="btn-import" class="admin-btn admin-btn-primary cursor-pointer">Импортировать</button>
         <button id="btn-cancel-preview" class="admin-btn admin-btn-ghost">Отмена</button>

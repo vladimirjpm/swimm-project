@@ -19,14 +19,15 @@ public sealed class CompetitionDayJoinService(
     private const string DateFormat = "dd/MM/yyyy";
 
     public async Task<CompetitionDayJoinReport> JoinAsync(
-        IReadOnlyList<int> competitionIds, bool apply, CancellationToken ct = default)
+        IReadOnlyList<int> competitionIds, bool apply, CancellationToken ct = default, string? eventName = null)
     {
+        eventName = string.IsNullOrWhiteSpace(eventName) ? null : eventName.Trim();
         var ids = competitionIds.Distinct().ToList();
         if (ids.Count < 2)
             return CompetitionDayJoinReport.Refused("", "нужно минимум два соревнования");
 
         var comps = await db.Competitions.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync(ct);
-        var name = comps.FirstOrDefault()?.Name ?? "";
+        var name = eventName ?? comps.FirstOrDefault()?.Name ?? "";
         var missing = ids.Except(comps.Select(c => c.Id)).ToList();
         if (missing.Count > 0)
             return CompetitionDayJoinReport.Refused(name, $"не найдены: {string.Join(", ", missing.Select(id => $"#{id}"))}");
@@ -36,7 +37,8 @@ public sealed class CompetitionDayJoinService(
 
         // Один старт — одно имя и один бассейн; иначе это разные соревнования, и собирать их
         // в событие — решение не для команды.
-        if (comps.Select(c => c.Name.Trim()).Distinct().Count() > 1)
+        // Общее имя, подтверждённое человеком (Р124), — его решение, что это один старт.
+        if (eventName == null && comps.Select(c => c.Name.Trim()).Distinct().Count() > 1)
             return CompetitionDayJoinReport.Refused(name, "у соревнований разные имена: " +
                 string.Join(" / ", comps.Select(c => $"#{c.Id} «{c.Name}»")));
         if (comps.Select(c => c.PoolType).Distinct().Count() > 1)
@@ -85,6 +87,8 @@ public sealed class CompetitionDayJoinService(
             return new CompetitionDayJoinReport(name, orgCompId, days, differences, null, false, null);
 
         var eventId = await ApplyAsync(name, orgCompId, days, ct);
+        if (eventId is not int)
+            return CompetitionDayJoinReport.Refused(name, "пока готовился сбор, один из дней уже попал в событие (деление, сбор или «Затянуть этот день» рядом) — проверьте ещё раз");
 
         // Зачёт события строится по всем дням и ложится на первый; объединённые места и
         // пара-очки пересчёт берёт по событию сам.
@@ -94,12 +98,18 @@ public sealed class CompetitionDayJoinService(
         return new CompetitionDayJoinReport(name, orgCompId, days, differences, null, true, eventId);
     }
 
-    private async Task<int> ApplyAsync(string name, int? orgCompId, IReadOnlyList<CompetitionDayJoinDay> days, CancellationToken ct)
+    /// <returns>Id события; null — под замком оказалось, что день уже в событии (гонка).</returns>
+    private async Task<int?> ApplyAsync(string name, int? orgCompId, IReadOnlyList<CompetitionDayJoinDay> days, CancellationToken ct)
     {
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
             await using var tx = await db.Database.BeginTransactionAsync(ct);
+            // Тот же замок, что у деления и «Затянуть этот день» (Р123/Р124); под ним — EventId из базы.
+            var lockIds = days.Select(d => d.CompetitionId).ToArray();
+            await CompetitionDayLock.AcquireAsync(db, lockIds, ct);
+            if (await db.Competitions.AsNoTracking().AnyAsync(c => lockIds.Contains(c.Id) && c.EventId != null, ct))
+                return (int?)null;
 
             var ev = new CompetitionEvent
             {
@@ -119,11 +129,12 @@ public sealed class CompetitionDayJoinService(
                 comp.EventId = ev.Id;
                 comp.DayNumber = day.DayNumber;
                 comp.SubName ??= comp.Name;
+                comp.Name = name; // без eventName имена и так равны
             }
             await db.SaveChangesAsync(ct);
 
             await tx.CommitAsync(ct);
-            return ev.Id;
+            return (int?)ev.Id;
         });
     }
 

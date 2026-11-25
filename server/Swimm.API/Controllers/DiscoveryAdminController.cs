@@ -200,28 +200,7 @@ public class DiscoveryAdminController : ControllerBase
     {
         var p = await _previews.PreviewAsync(id, ct);
         if (p.Error != null) return BadRequest(new { error = p.Error });
-
-        return Ok(new
-        {
-            previewId = p.PreviewId,
-            format = p.Parsed!.Format,
-            resultCount = p.Parsed.ResultCount,
-            competitions = p.Parsed.Competitions,
-            warnings = p.Parsed.Warnings,
-            languages = p.Languages,
-            existingCompetitionId = p.ExistingCompetitionId,
-            existingCompetitions = p.ExistingCompetitions,
-            recordPreview = p.RecordPreview,
-            officialClubStanding = StandingResponse(p.ClubStanding, p.Parsed),
-            // Флаги соревнования (медали, чемпионат, мастерс, «зачёт не ведётся», бассейн)
-            // с обоснованиями. Предложение — галочки в превью изменяемы.
-            flags = p.Flags,
-            // Р119: протокол свёрнут в одну дату и покрывает уже затянутые дни — «Импортировать»
-            // заблокирована (и сервер такой импорт откатит).
-            collapsedProtocol = p.CollapsedProtocol is { } c
-                ? new { message = c.Message, fileDate = c.FileDate, fileRows = c.FileRows, otherDaysRows = c.OtherDaysRows, days = c.Days }
-                : null
-        });
+        return Ok(DiscoveryPreviewResponse.Build(p));
     }
 
     public sealed record EmptySourceRequest(bool Empty);
@@ -463,6 +442,11 @@ public class DiscoveryAdminController : ControllerBase
         if (entry == null)
             return NotFound(new { error = $"Превью не найдено или истекло ({_previews.EntryLifetime.TotalMinutes:0} мин)" });
 
+        // Р124: разбор соседа-дня — не протокол этой строки. Обычный импорт положил бы его с compID
+        // записи федерации; его импортирует только «Затянуть этот день» (свои перепроверки).
+        if (entry.SiblingLogligId is int sibling)
+            return BadRequest(new { error = $"Это превью дня-соседа loglig № {sibling} — импортируйте его кнопкой «Импортировать» в блоке «Затянуть этот день»." });
+
         _previews.RemoveEntry(request.PreviewId);
 
         // Правило клубных очков приезжает из превью: там оно подставлено по шкале
@@ -518,56 +502,6 @@ public class DiscoveryAdminController : ControllerBase
     }
 
     /// <summary>
-    /// Ответ превью про клубный зачёт. Когда зачёт есть, а правила под его шкалу нет, отдаём
-    /// заготовку для кнопки «Завести правило»: имя версии по конвенции и саму шкалу — админ
-    /// видит, что именно заведёт, и правит имя, если нужно.
-    /// </summary>
-    private static object StandingResponse(OfficialClubStandingProbe? probe, ParsedCompetition parsed)
-    {
-        if (probe is null)
-            return new
-            {
-                known = false, hasStanding = false, ruleId = (int?)null, ruleVersion = (string?)null,
-                canCreateRule = false, suggestedVersion = (string?)null,
-                message = "Про официальный клубный зачёт ничего сказать нельзя: нет loglig-id или сайт недоступен."
-            };
-
-        var scale = probe.Scale.OrderBy(p => p.Key).ToList();
-        var canCreateRule = probe.HasStanding && probe.MatchedRuleId is null && scale.Count > 0;
-
-        return new
-        {
-            known = true,
-            hasStanding = probe.HasStanding,
-            ruleId = probe.MatchedRuleId,
-            ruleVersion = probe.MatchedRuleVersion,
-            scale = scale.Select(p => new { place = p.Key, points = p.Value }),
-            canCreateRule,
-            suggestedVersion = canCreateRule ? SuggestRuleVersion(scale, parsed) : null,
-            message = probe.Message
-        };
-    }
-
-    /// <summary>
-    /// Имя версии по конвенции проекта — «(очки за 1 место)pt.(мест)pl.(год)»
-    /// (docs/admin-pages/pointsrules.md): в выпадашке привязки сразу видно шкалу, а не только дату.
-    /// </summary>
-    private static string SuggestRuleVersion(
-        IReadOnlyList<KeyValuePair<int, int>> scale, ParsedCompetition parsed)
-    {
-        var top = scale[0].Value;
-        var places = scale[^1].Key;
-        var year = ParseCompetitionYear(parsed) ?? DateTime.UtcNow.Year;
-        return $"{top}pt.{places}pl.{year}";
-    }
-
-    private static int? ParseCompetitionYear(ParsedCompetition parsed) =>
-        DateOnly.TryParseExact(parsed.Competitions.FirstOrDefault()?.Date, "dd/MM/yyyy",
-            CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)
-            ? d.Year
-            : null;
-
-    /// <summary>
     /// Завести правило клубных очков по шкале официального зачёта — прямо из превью, без
     /// похода в /Admin/PointsRules и повторного затягивания.
     ///
@@ -590,10 +524,10 @@ public class DiscoveryAdminController : ControllerBase
 
         var scale = probe.Scale.OrderBy(p => p.Key).ToList();
         var version = string.IsNullOrWhiteSpace(request.Version)
-            ? SuggestRuleVersion(scale, entry.Parsed)
+            ? DiscoveryPreviewResponse.SuggestRuleVersion(scale, entry.Parsed)
             : request.Version.Trim();
 
-        var year = ParseCompetitionYear(entry.Parsed);
+        var year = DiscoveryPreviewResponse.ParseCompetitionYear(entry.Parsed);
         var name = entry.Parsed.Competitions.FirstOrDefault()?.Competition;
 
         var input = new PointRuleInputDto

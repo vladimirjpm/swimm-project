@@ -31,7 +31,9 @@ public sealed class ImportBackgroundService : BackgroundService
     private readonly ILogger<ImportBackgroundService> _logger;
 
     /// <summary>Что сделать на loglig после импорта задачи <paramref name="JobId"/>.</summary>
-    internal sealed record LogligStep(Guid JobId, int OrgCompId, bool Splits, bool Stamp, bool RowPlayers = false);
+    /// <param name="DayId">Р124: день-сосед — шаги только по нему и по <paramref name="LogligId"/> (номер соседа, а не записи федерации).</param>
+    internal sealed record LogligStep(Guid JobId, int OrgCompId, bool Splits, bool Stamp, bool RowPlayers = false,
+        int? DayId = null, int? LogligId = null);
 
     // Две очереди одного читателя: промежуточные + штамповка — первыми; игроки по строкам —
     // когда первая пуста и импортов не осталось. Сигнал — на каждую постановку в любую из них.
@@ -80,9 +82,19 @@ public sealed class ImportBackgroundService : BackgroundService
                     using var stream = new MemoryStream(data, writable: false);
                     result = await importService.ImportAsync(stream, fileName, categoryKeys, eventOptions, orgCompId);
 
+                    // Р124: день-сосед — собрать в событие и аудит ДО Completed: панель по Completed
+                    // перезагружается и должна увидеть уже собранное событие.
+                    var sibling = eventOptions?.SiblingDay is { } target
+                        ? await CompleteSiblingDayAsync(scope.ServiceProvider, jobId, target, result)
+                        : null;
+
                     // «Доклейка в очереди» — ДО Completed: страница перезагружается по Completed и
                     // должна уже видеть, что за импортом идёт доклейка (иначе шаг 9 молчит).
-                    logligStep = PlanLogligStep(scope.ServiceProvider, jobId, result, orgCompId);
+                    logligStep = sibling is { CompetitionId: int dayId }
+                        ? PlanLogligStep(scope.ServiceProvider, jobId, result, eventOptions!.SiblingDay!.OrgCompId) is { } s
+                            ? s with { DayId = dayId, LogligId = eventOptions.SiblingDay.LogligId }
+                            : null
+                        : PlanLogligStep(scope.ServiceProvider, jobId, result, orgCompId);
                     _queue.SetCompleted(jobId, result);
                     _logger.LogInformation("Import job {JobId} completed: {Created} created, {Errors} errors",
                         jobId, result.Created, result.Errors);
@@ -91,6 +103,9 @@ public sealed class ImportBackgroundService : BackgroundService
                 {
                     _queue.SetFailed(jobId, ex.Message);
                     _logger.LogError(ex, "Import job {JobId} failed", jobId);
+                    // Р124: день-сосед — аудит «не записан» и снять замок «день затягивается».
+                    if (eventOptions?.SiblingDay is { } failedSibling)
+                        await SiblingImportFailedAsync(scope.ServiceProvider, jobId, failedSibling, ex.Message);
                     continue;
                 }
 
@@ -115,6 +130,45 @@ public sealed class ImportBackgroundService : BackgroundService
         {
             // Штатная остановка хоста: ReadAllAsync бросает OperationCanceledException при отмене токена.
             // Это не ошибка — просто выходим из цикла.
+        }
+    }
+
+    private async Task SiblingImportFailedAsync(IServiceProvider sp, Guid jobId, SiblingDayTarget target, string error)
+    {
+        try
+        {
+            if (sp.GetService<ICurrentActor>() is HttpCurrentActor actor) actor.BackgroundName = "auto:pull-sibling-day";
+            await sp.GetRequiredService<ISiblingDayPullService>().ImportFailedAsync(target, error);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Import job {JobId}: аудит упавшего дня-соседа не записан", jobId);
+        }
+    }
+
+    /// <summary>
+    /// Р124: после импорта дня-соседа — сбор в событие и аудит (<see cref="ISiblingDayPullService.CompleteAsync"/>).
+    /// Итог — строкой <see cref="ImportResult.FollowUp"/> (её покажет панель) и в журнал задачи.
+    /// Сбой не меняет итог импорта: день записан, собрать его можно руками (--join-days).
+    /// </summary>
+    private async Task<SiblingDayCompletion?> CompleteSiblingDayAsync(IServiceProvider sp, Guid jobId,
+        SiblingDayTarget target, ImportResult result)
+    {
+        if (sp.GetService<ICurrentActor>() is HttpCurrentActor actor)
+            actor.BackgroundName = "auto:pull-sibling-day";
+        try
+        {
+            var done = await sp.GetRequiredService<ISiblingDayPullService>().CompleteAsync(target, result);
+            result.FollowUp = done.Message;
+            result.FollowUpEventId = done.EventId;
+            result.DiagnosticLog.Add("Р124: " + done.Message);
+            return done;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Import job {JobId}: день-сосед loglig {LogligId} — сбор в событие сорвался", jobId, target.LogligId);
+            result.FollowUp = $"⚠ День записан, но сбор в событие сорвался: {ex.Message}. Соберите руками (--join-days).";
+            return null;
         }
     }
 
@@ -171,8 +225,18 @@ public sealed class ImportBackgroundService : BackgroundService
             }
         }
 
+        // Р124: день-сосед идёт без compID (штамп у лежащего дня), его шаги loglig — по дню и номеру соседа.
+        if (orgCompId is not int compId)
+        {
+            if (logligStep is { DayId: not null })
+            {
+                _logligSteps.Enqueue(logligStep);
+                _stepSignal.Release();
+            }
+            return;
+        }
+
         // Шаги ниже знают соревнование по compID: файл с /Admin/Import (без compID) их не получает.
-        if (orgCompId is not int compId) return;
 
         // Есть ли у соревнования ОФИЦИАЛЬНЫЙ клубный зачёт (דירוג מועדונים). Знать это
         // нужно сразу: без него наши клубные очки не с чем сверять, а с ним расхождение
@@ -299,8 +363,10 @@ public sealed class ImportBackgroundService : BackgroundService
         cts.CancelAfter(LogligRowPlayerRules.Timeout);
         try
         {
-            var report = await sp.GetRequiredService<ILogligRowPlayerService>()
-                .StampAsync(step.OrgCompId, "import", cts.Token, LogligRowPlayerRules.ReadBudget);
+            var players = sp.GetRequiredService<ILogligRowPlayerService>();
+            var report = step is { DayId: int day, LogligId: int lg }
+                ? await players.StampDayAsync(day, lg, "import", cts.Token, LogligRowPlayerRules.ReadBudget)
+                : await players.StampAsync(step.OrgCompId, "import", cts.Token, LogligRowPlayerRules.ReadBudget);
             _logger.LogInformation("Import job {JobId}: игроки loglig по строкам compID {OrgCompId} — {Message}",
                 step.JobId, step.OrgCompId, report.Message);
         }
@@ -326,8 +392,10 @@ public sealed class ImportBackgroundService : BackgroundService
         cts.CancelAfter(SplitAutoAttachRules.Timeout);
         try
         {
-            var outcome = await sp.GetRequiredService<ISplitAutoAttachService>()
-                .AttachAfterImportAsync(step.OrgCompId, step.JobId, cts.Token);
+            var attach = sp.GetRequiredService<ISplitAutoAttachService>();
+            var outcome = step is { DayId: int day, LogligId: int lg }
+                ? await attach.AttachDayAfterImportAsync(day, lg, step.JobId, cts.Token)
+                : await attach.AttachAfterImportAsync(step.OrgCompId, step.JobId, cts.Token);
             _queue.SetSplits(step.JobId, new ImportSplitsStatus
             {
                 State = "done",
@@ -364,7 +432,9 @@ public sealed class ImportBackgroundService : BackgroundService
         try
         {
             var stamper = sp.GetRequiredService<ILogligStampService>();
-            var report = await stamper.StampFromProtocolAsync(step.OrgCompId, stoppingToken);
+            var report = step is { DayId: int day, LogligId: int lg }
+                ? await stamper.StampDayFromProtocolAsync(day, lg, stoppingToken)
+                : await stamper.StampFromProtocolAsync(step.OrgCompId, stoppingToken);
             _logger.LogInformation("Import job {JobId}: loglig-id compID {OrgCompId} — {Message}",
                 step.JobId, step.OrgCompId, report.Message);
             foreach (var skip in report.Skipped.Take(20))

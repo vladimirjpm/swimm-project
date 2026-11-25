@@ -81,10 +81,19 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     public void RemoveEntry(Guid previewId) => _cache.Remove(CacheKey(previewId));
 
     /// <inheritdoc />
-    public async Task<DiscoveryPreviewResult> PreviewAsync(int discoveredId, CancellationToken ct = default)
+    public Task<DiscoveryPreviewResult> PreviewAsync(int discoveredId, CancellationToken ct = default) =>
+        PreviewCoreAsync(discoveredId, sibling: null, ct);
+
+    /// <inheritdoc />
+    public Task<DiscoveryPreviewResult> PreviewSiblingAsync(int discoveredId, int siblingLogligId, CancellationToken ct = default) =>
+        PreviewCoreAsync(discoveredId, siblingLogligId, ct);
+
+    /// <param name="sibling">Р124: номер loglig соседа-дня вместо привязанного; null — обычное «Затянуть».
+    /// У соседа запись федерации не трогается (пометка «нет протокола», языки — про её протокол).</param>
+    private async Task<DiscoveryPreviewResult> PreviewCoreAsync(int discoveredId, int? sibling, CancellationToken ct)
     {
-        var (pdfHe, fileNameHe, errorHe) = await FetchPdfAsync(discoveredId, "he", refreshIfMissing: true, ct);
-        var (pdfEn, fileNameEn, _) = await FetchPdfAsync(discoveredId, "en", refreshIfMissing: false, ct);
+        var (pdfHe, fileNameHe, errorHe) = await FetchPdfAsync(discoveredId, "he", refreshIfMissing: sibling == null, ct, sibling);
+        var (pdfEn, fileNameEn, _) = await FetchPdfAsync(discoveredId, "en", refreshIfMissing: false, ct, sibling);
         if (pdfHe is null && pdfEn is null)
             return DiscoveryPreviewResult.Failed(errorHe ?? "Протокол недоступен");
 
@@ -125,7 +134,7 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
             // «No competitions found in PDF» = у соревнования нет протокола (страница пустая).
             // Это не сбой, который стоит повторить, а факт «тянуть нечего» — помечаем строку,
             // чтобы её не пробовали затянуть снова и снова.
-            if (LooksLikeEmptySource(ex.Message))
+            if (sibling == null && LooksLikeEmptySource(ex.Message))
                 await _discovery.SetEmptySourceAsync(discoveredId, true, "auto", ct);
             return DiscoveryPreviewResult.Failed(ex.Message);
         }
@@ -146,22 +155,25 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
         // сама, когда при следующем «Затянуть» в файле появится хоть одно время.
         if (NoStartProtocol.AllNoStart(parsed.ResultsJson))
         {
-            await _discovery.SetEmptySourceAsync(discoveredId, true, "auto", ct);
+            if (sibling == null) await _discovery.SetEmptySourceAsync(discoveredId, true, "auto", ct);
             return DiscoveryPreviewResult.Failed(NoStartProtocol.Message(parsed.ResultCount));
         }
 
         // Разобралось — значит протокол всё-таки есть: снимаем прежнюю пометку «пусто»
         // (файл могли выложить позже, и строка не должна оставаться зачёркнутой навсегда).
-        await _discovery.SetEmptySourceAsync(discoveredId, false, "auto", ct);
-        await _discovery.AddLanguagesAsync(discoveredId, languages, ct);
+        if (sibling == null)
+        {
+            await _discovery.SetEmptySourceAsync(discoveredId, false, "auto", ct);
+            await _discovery.AddLanguagesAsync(discoveredId, languages, ct);
+        }
 
-        parsed = await AddRelaySplitsAsync(discoveredId, parsed, ct);
-        parsed = await FixCollapsedDaysAsync(discoveredId, parsed, ct);
+        parsed = await AddRelaySplitsAsync(discoveredId, parsed, ct, sibling);
+        parsed = await FixCollapsedDaysAsync(discoveredId, parsed, ct, sibling);
 
         // Официальный клубный зачёт: есть ли он и по какой шкале. Кладём В КЭШ вместе с превью —
         // из него потом заводится правило кнопкой, и второй поход в loglig (десяток запросов
         // ради той же шкалы) был бы лишним.
-        var standingProbe = await ProbeClubStandingAsync(discoveredId, ct);
+        var standingProbe = await ProbeClubStandingAsync(discoveredId, ct, sibling);
 
         // compID строки «Входящих» — то же сопоставление, что сделает импорт (Р118): без него
         // превью не узнаёт затянутый день с разошедшимся именем/бассейном, «Перезатянуть» не
@@ -176,7 +188,9 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
 
         // Р119: протокол свёрнут в одну дату, а дни этого compID уже затянуты другими датами (путь Б
         // по дням, e62) — импорт положил бы те же строки ещё раз. Тем же правилом, что импорт.
-        var collapsed = orgCompId is int coc
+        // У соседа-дня (Р124) правило не считается: файл не из протокола этого compID, его одна дата —
+        // законный недостающий день; дубль ловит сверка заплывов в SiblingDayPullService.
+        var collapsed = sibling == null && orgCompId is int coc
             ? await CollapsedProtocolGuard.DetectAsync(
                 _db, coc, parsed.Competitions.Select(c => c.Date), parsed.ResultCount, ct)
             : null;
@@ -187,10 +201,10 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
 
         var previewId = Guid.NewGuid();
         _cache.Set(CacheKey(previewId),
-            new DiscoveryPreviewEntry(parsed, primaryName, discoveredId, standingProbe, recordPreview, collapsed),
+            new DiscoveryPreviewEntry(parsed, primaryName, discoveredId, standingProbe, recordPreview, collapsed, sibling),
             EntryLifetime);
 
-        var flags = await SuggestFlagsAsync(discoveredId, parsed, standingProbe, ct);
+        var flags = await SuggestFlagsAsync(discoveredId, parsed, standingProbe, ct, sibling);
 
         return new DiscoveryPreviewResult(
             previewId, parsed, languages, existingCompetitionId, existingMatches, recordPreview,
@@ -203,11 +217,11 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     /// остальных стартах лишние десятки запросов к loglig ради пустых PDF не нужны.
     /// Сбой не роняет превью — протокол затягивается как раньше, причина уходит в предупреждения.
     /// </summary>
-    private async Task<ParsedCompetition> AddRelaySplitsAsync(int discoveredId, ParsedCompetition parsed, CancellationToken ct)
+    private async Task<ParsedCompetition> AddRelaySplitsAsync(int discoveredId, ParsedCompetition parsed, CancellationToken ct, int? sibling = null)
     {
         var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
         // Имя ИЛИ галка соревнования в базе: у возрастных чемпионатов «ישראל» в имени нет.
-        if (row?.LogligId is not int logligId
+        if (row == null || (sibling ?? row.LogligId) is not int logligId
             || !await CompetitionAdminRepository.ShouldFetchSplitsAsync(_db, row.Name, row.OrgCompId, ct))
             return parsed;
         if (!parsed.ResultsJson.Contains("\"is_relay\":true", StringComparison.Ordinal))
@@ -231,15 +245,17 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     /// второй день отдельным соревнованием, а строки первого дня в старом задвоит — говорим об
     /// этом прямо в предупреждениях: сначала <c>--split-days</c>.
     /// </summary>
-    private async Task<ParsedCompetition> FixCollapsedDaysAsync(int discoveredId, ParsedCompetition parsed, CancellationToken ct)
+    private async Task<ParsedCompetition> FixCollapsedDaysAsync(int discoveredId, ParsedCompetition parsed, CancellationToken ct, int? sibling = null)
     {
         var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
-        if (row?.LogligId is not int logligId
+        if (row == null || (sibling ?? row.LogligId) is not int logligId
             || !await CompetitionAdminRepository.ShouldFetchSplitsAsync(_db, row.Name, row.OrgCompId, ct))
             return parsed;
 
         var fixedParsed = await _collapsedDays.FixAsync(logligId, parsed, ct);
-        if (fixedParsed.Competitions.Count < 2) return fixedParsed;
+        // Сосед-день (Р124) — один день по определению: несколько дат отвергнет его сервис, а
+        // подсказка «сначала --split-days» про протокол записи федерации тут неверна.
+        if (fixedParsed.Competitions.Count < 2 || sibling != null) return fixedParsed;
 
         var days = await CompetitionIdentity.ResolveDaysAsync(_db, row.OrgCompId, ct);
         if (days is [{ EventId: null } single])
@@ -262,13 +278,13 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     /// забывали. Сбой любого источника не роняет превью — флаг просто останется снятым.
     /// </summary>
     private async Task<CompetitionFlagSuggestion> SuggestFlagsAsync(
-        int discoveredId, ParsedCompetition parsed, OfficialClubStandingProbe? standing, CancellationToken ct)
+        int discoveredId, ParsedCompetition parsed, OfficialClubStandingProbe? standing, CancellationToken ct, int? sibling = null)
     {
         var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
         var reasons = new Dictionary<string, string>();
 
         RegulationFetchDto? regulation = null;
-        if (row?.LogligId is int logligId)
+        if ((sibling ?? row?.LogligId) is int logligId)
         {
             try
             {
@@ -354,10 +370,10 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     /// Официальный клубный зачёт соревнования. Сбой проверки превью не роняет: затянуть
     /// протокол важнее, чем узнать про зачёт — вернём «не проверено».
     /// </summary>
-    private async Task<OfficialClubStandingProbe?> ProbeClubStandingAsync(int discoveredId, CancellationToken ct)
+    private async Task<OfficialClubStandingProbe?> ProbeClubStandingAsync(int discoveredId, CancellationToken ct, int? sibling = null)
     {
         var row = (await _discovery.GetAllAsync(ct)).FirstOrDefault(d => d.Id == discoveredId);
-        if (row?.LogligId is not int logligId) return null;
+        if ((sibling ?? row?.LogligId) is not int logligId) return null;
 
         try
         {
@@ -379,13 +395,13 @@ public class DiscoveryPreviewService : IDiscoveryPreviewService
     }
 
     private async Task<(byte[]? pdf, string fileName, string? error)> FetchPdfAsync(
-        int id, string language, bool refreshIfMissing, CancellationToken ct)
+        int id, string language, bool refreshIfMissing, CancellationToken ct, int? sibling = null)
     {
         var all = await _discovery.GetAllAsync(ct);
         var row = all.FirstOrDefault(d => d.Id == id);
         if (row is null) return (null, "", "Запись не найдена");
 
-        var logligId = row.LogligId;
+        var logligId = sibling ?? row.LogligId;
         if (logligId is null)
         {
             if (!refreshIfMissing)

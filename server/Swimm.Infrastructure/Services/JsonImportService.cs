@@ -1748,6 +1748,7 @@ public class JsonImportService : IImportService
                 DataCheckErrors = dataCheckErrors,
                 DataCheckWarnings = dataCheckWarnings,
                 SuspectFlagged = suspectFlagged,
+                CompetitionIds = touchedCompetitionKeys.Select(k => competitionCache[k].Id).Where(id => id != 0).Distinct().ToList(),
                 Message = message
             };
         }
@@ -2539,7 +2540,7 @@ public class JsonImportService : IImportService
     /// Часовая форма приходит с длинных дистанций (3 км) — без неё такие результаты легли бы
     /// в БД с пустым TimeMillisecond и выпали из рекордов, PB и сортировок.
     /// </summary>
-    private static int? ParseTimeToMs(string? time)
+    internal static int? ParseTimeToMs(string? time)
     {
         if (string.IsNullOrWhiteSpace(time)) return null;
 

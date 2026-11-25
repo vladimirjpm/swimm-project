@@ -24,6 +24,13 @@ public interface ILogligRowPlayerService
     /// </param>
     Task<LogligRowPlayerReport> StampAsync(
         int orgCompId, string trigger, CancellationToken ct = default, TimeSpan? readBudget = null);
+
+    /// <summary>
+    /// Р124: один день <paramref name="competitionId"/> со страницами соревнования loglig <paramref name="logligId"/> —
+    /// день, который лежит на loglig отдельным соревнованием (у записи федерации номер другого дня).
+    /// </summary>
+    Task<LogligRowPlayerReport> StampDayAsync(
+        int competitionId, int logligId, string trigger, CancellationToken ct = default, TimeSpan? readBudget = null);
 }
 
 /// <summary>Итог прогона шага «игрок loglig у строки».</summary>

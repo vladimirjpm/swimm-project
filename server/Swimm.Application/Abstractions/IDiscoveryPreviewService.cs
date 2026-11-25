@@ -14,6 +14,14 @@ public interface IDiscoveryPreviewService
     /// <summary>Затянуть и разобрать; ошибка отдаётся полем <c>Error</c>, исключений не кидает.</summary>
     Task<DiscoveryPreviewResult> PreviewAsync(int discoveredId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Р124: тот же разбор, но протокола соседа-дня <paramref name="siblingLogligId"/> (день старта
+    /// лежит на loglig отдельным соревнованием). Запись федерации не трогается (пометки «нет
+    /// протокола», языки); регламент, зачёт и промежуточные — по номеру соседа. Р119 не считается:
+    /// файл не из протокола этого compID — его заменяет сверка заплывов в <see cref="ISiblingDayPullService"/>.
+    /// </summary>
+    Task<DiscoveryPreviewResult> PreviewSiblingAsync(int discoveredId, int siblingLogligId, CancellationToken ct = default);
+
     /// <summary>Достать отложенный разбор (для импорта / заведения правила очков).</summary>
     DiscoveryPreviewEntry? GetEntry(Guid previewId);
 
