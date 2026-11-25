@@ -180,7 +180,9 @@ public class AdminSettingsService : ISettingsService, IReloadableSettings
                 "Идёт в фоне за импортом, по одному соревнованию; запрос на дисциплину (у чемпионата " +
                 "~2.5 мин). Выключается, если сайт лежит или пачка большая — тогда кнопкой в шаге 9"),
             // Пол пловца с карточки loglig (Р125) — закрывает «Результаты без пола» без кликов.
-            new(Swimm.Application.Mapping.LogligCardGenderRule.SettingKey, "true", "bool", "admin",
+            // По умолчанию ВЫКЛ (решение Влада 25.11.2026): включить после независимого ревью
+            // расчёта последствий (GenderImpactService); до того — кнопка в /Admin/Health.
+            new(Swimm.Application.Mapping.LogligCardGenderRule.SettingKey, "false", "bool", "admin",
                 "После импорта брать пол с карточки loglig тем пловцам соревнования, у кого он пуст " +
                 "(смешанный заплыв не печатает пол в шапке). Только при подтверждённом loglig-id, " +
                 "совпавших имени и годе рождения; уже проставленный пол не трогает. Серьёзные случаи " +
