@@ -153,12 +153,12 @@ public class LogligCardGenderRuleTests
         Assert.Empty(LogligCardGenderRule.ReviewReasons(onCard, rowPlayer, GenderImpact.None));
     }
 
+    // Р127 (Влад, 25.11.2026): требование заплыва снято — подтверждённого id, имени и года хватает.
+    // Было NameAndYearOnly_IsNotEnough_GoesToReview; код требования закомментирован в правиле.
     [Fact]
-    public void NameAndYearOnly_IsNotEnough_GoesToReview()
+    public void NameAndYearOnly_IsEnough_NoSwimRequired()
     {
-        var reason = Assert.Single(LogligCardGenderRule.ReviewReasons(false, false, GenderImpact.None));
-        Assert.Equal(GenderImpactRules.IdentityUnconfirmed, reason.Code);
-        Assert.Contains("не смогли подтвердить, что это тот же человек", reason.Text);
+        Assert.Empty(LogligCardGenderRule.ReviewReasons(false, false, GenderImpact.None));
     }
 
     [Fact]
@@ -169,16 +169,17 @@ public class LogligCardGenderRuleTests
             LogligCardGenderRule.ReviewReasons(true, true, impact).Select(r => r.Code));
     }
 
-    // Ответ, записанный сверкой клуба (про заплывы неизвестно), для решения о поле не годится —
-    // если только строка пловца не несёт этого же игрока loglig.
+    // Р127: без требования заплыва годится любой свежий ответ с тем же id — в том числе записанный
+    // сверкой клуба, где про заплывы неизвестно (раньше такой карточку открывал заново).
     [Fact]
-    public void CacheDecides_OnlyWhenIdentityEvidenceIsKnown()
+    public void CacheDecides_AnyFreshAnswerOfSameId()
     {
         var now = new DateTime(2026, 11, 25, 12, 0, 0, DateTimeKind.Utc);
         var unknown = new StoredLogligClub(7, "клуб", now.AddHours(-3), "имя", 2012, "male");
 
-        Assert.False(LogligCardGenderRule.CacheDecides(now, unknown, 7, rowPlayerMatched: false));
+        Assert.True(LogligCardGenderRule.CacheDecides(now, unknown, 7, rowPlayerMatched: false));
         Assert.True(LogligCardGenderRule.CacheDecides(now, unknown, 7, rowPlayerMatched: true));
+        Assert.False(LogligCardGenderRule.CacheDecides(now.AddDays(2), unknown, 7, rowPlayerMatched: true));
         Assert.True(LogligCardGenderRule.CacheDecides(now, unknown with { ResultsMatched = false }, 7, false));
         Assert.True(LogligCardGenderRule.CacheDecides(now, unknown with { ResultsMatched = true }, 7, false));
         Assert.False(LogligCardGenderRule.CacheDecides(now, unknown with { ResultsMatched = true }, 8, true));

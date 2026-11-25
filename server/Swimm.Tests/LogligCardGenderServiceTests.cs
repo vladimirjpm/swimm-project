@@ -232,11 +232,11 @@ public class LogligCardGenderServiceTests
         Assert.Equal(5, await w.Db.Swimmers.CountAsync(s => s.Gender == null));
     }
 
-    // Суточный ответ из общего места: в сеть второй раз не идём — но только если про заплывы уже известно.
+    // Суточный ответ из общего места с именем карточки: в сеть второй раз не идём.
     [Fact]
-    public async Task FreshStoredAnswer_IsUsedWithoutNetwork_OnlyWhenIdentityIsKnown()
+    public async Task FreshStoredAnswer_IsUsedWithoutNetwork()
     {
-        var w = await SeedAsync(nameof(FreshStoredAnswer_IsUsedWithoutNetwork_OnlyWhenIdentityIsKnown),
+        var w = await SeedAsync(nameof(FreshStoredAnswer_IsUsedWithoutNetwork),
             new() { [302] = Card("אביה מזרחי", 2012, "F"), [304] = Card("רוני כץ", 2016, "F") },
             (1, "נועה", "גלסברג", 2017, null, 301, "Verified"),
             (2, "אביה", "מזרחי", 2012, null, 302, "Verified"),
@@ -251,7 +251,8 @@ public class LogligCardGenderServiceTests
             },
             // Ответ до Р125 (без имени) — для пола не годится: карточку открываем заново.
             new SwimmerLogligClub { SwimmerId = 3, LogligId = 303, ClubName = "X", CheckedAt = at },
-            // Ответ записала сверка клуба: имя и пол есть, а заплывы не сверялись — открываем заново.
+            // Ответ записала сверка клуба: имя и пол есть, заплывы не сверялись — с Р127 этого хватает,
+            // в сеть не идём (раньше карточку открывали заново).
             new SwimmerLogligClub
             {
                 SwimmerId = 4, LogligId = 304, ClubName = "X", CheckedAt = at,
@@ -261,8 +262,8 @@ public class LogligCardGenderServiceTests
 
         var report = await w.Service().FillDayAfterImportAsync(w.CompId);
 
-        Assert.Equal([302, 303, 304], w.Loglig.Calls);
-        Assert.Equal(1, report.FromCache);
+        Assert.Equal([302, 303], w.Loglig.Calls);
+        Assert.Equal(2, report.FromCache);
         Assert.Equal(3, report.Set);
         Assert.Equal(1, report.Failed); // 303 не открылась
         Assert.Equal("female", (await w.Db.Swimmers.FindAsync(1))!.Gender);
@@ -288,25 +289,23 @@ public class LogligCardGenderServiceTests
         Assert.Null((await w.Db.Swimmers.FindAsync(2))!.Gender);
     }
 
-    // ── Р126: тот же человек — нужен заплыв, а не только имя и год ───────────────────────
+    // ── Р127 (было Р126): заплыв на карточке для пола больше не нужен ────────────────────
+    // Влад, 25.11.2026: подтверждённого loglig-id, имени и года хватает (comp 1896, #65205 —
+    // старта нет на карточке ни в одном сезоне). Требование закомментировано в LogligCardGenderRule.
 
     [Fact]
-    public async Task NameAndYearOnly_NoSwimOnCard_GoesToManualReview_NotWritten()
+    public async Task NameAndYearOnly_NoSwimOnCard_IsWritten()
     {
-        var w = await SeedAsync(nameof(NameAndYearOnly_NoSwimOnCard_GoesToManualReview_NotWritten),
+        var w = await SeedAsync(nameof(NameAndYearOnly_NoSwimOnCard_IsWritten),
             new() { [501] = Card("טל כהן", 2012, "M", swam: false) },
             (1, "טל", "כהן", 2012, null, 501, "Verified"));
 
         var report = (await w.Service().FillFromFindingsAsync())!;
 
-        Assert.Equal(0, report.Set);
-        Assert.Equal(1, report.Review);
-        Assert.Equal(1, report.ReviewIdentity);
-        Assert.Contains("ждут ручной проверки — 1, потому что личность не подтверждена: на карточке loglig нет ни одного заплыва пловца", report.Message);
-        Assert.Null((await w.Db.Swimmers.FindAsync(1))!.Gender);
-
-        var review = Assert.Single(await w.Finder().GetPendingAsync());
-        Assert.Equal(GenderImpactRules.IdentityUnconfirmed, Assert.Single(review.Reasons).Code);
+        Assert.Equal(1, report.Set);
+        Assert.Equal(0, report.Review);
+        Assert.Equal("male", (await w.Db.Swimmers.FindAsync(1))!.Gender);
+        Assert.Empty(await w.Finder().GetPendingAsync());
     }
 
     // Игрок loglig у строки пловца (Р122) — тот же id: это он плыл, карточке верим и без её списка заплывов.
