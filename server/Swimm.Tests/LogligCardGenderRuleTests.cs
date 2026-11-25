@@ -194,4 +194,26 @@ public class LogligCardGenderRuleTests
         Assert.Contains("ждут ручной проверки — 3", text);
         Assert.Contains("сбой записи — 1", text);
     }
+
+    // Влад 25.11.2026 (comp 1896): «ждут ручной проверки — 12» без причины непонятно — пишем, почему.
+    [Fact]
+    public void Summary_SaysWhyReview_IdentityOnly()
+    {
+        var text = LogligCardGenderRule.Summary(12, 0, 0, 0, 0, 0, 0, 0, 0, 12, review: 12, reviewIdentity: 12);
+
+        Assert.Contains("ждут ручной проверки — 12, потому что личность не подтверждена: "
+                        + "на карточке loglig нет ни одного заплыва пловца", text);
+    }
+
+    [Fact]
+    public void Summary_SaysWhyReview_ImpactOnly_AndBothReasons()
+    {
+        var impact = LogligCardGenderRule.Summary(5, 0, 0, 0, 0, 0, 0, 0, 5, 0, review: 2, reviewImpact: 2);
+        Assert.Contains("ждут ручной проверки — 2, потому что изменилось бы серьёзное", impact);
+
+        // 4 на проверке: у 3 личность, у 2 последствия — у одного обе причины.
+        var both = LogligCardGenderRule.Summary(5, 1, 1, 0, 0, 0, 0, 0, 5, 0, review: 4, reviewIdentity: 3, reviewImpact: 2);
+        Assert.Contains("ждут ручной проверки — 4 (личность не подтверждена: на карточке loglig нет ни одного заплыва пловца — 3, "
+                        + "изменилось бы серьёзное (рекорд, место, медаль, очки или топ) — 2; у части — обе причины)", both);
+    }
 }

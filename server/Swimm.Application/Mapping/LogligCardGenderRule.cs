@@ -48,7 +48,7 @@ public sealed record CardGenderAnswer(IReadOnlyCollection<string> NameTokens, in
 /// </summary>
 public static class LogligCardGenderRule
 {
-    /// <summary>Тумблер шага после импорта (/Admin/Settings), по умолчанию включён.</summary>
+    /// <summary>Тумблер шага после импорта (/Admin/Settings), по умолчанию выключен (до ревью расчёта последствий).</summary>
     public const string SettingKey = "LogligGenderOnImport";
 
     /// <summary>Действие в журнале аудита — строка на каждого пловца, которому проставлен пол.</summary>
@@ -74,6 +74,18 @@ public static class LogligCardGenderRule
 
     /// <summary>Действие аудита, когда пол с карточки подтвердил человек (находка ручной проверки).</summary>
     public const string ConfirmAuditAction = "swimmer.gender-from-loglig-confirmed";
+
+    /// <summary>
+    /// Действие аудита на каждое нажатие кнопки «взять пол с карточек loglig» в /Admin/Health. По
+    /// последней такой строке страница показывает итог прошлого нажатия (значок ⓘ у кнопки).
+    /// </summary>
+    public const string ButtonAuditAction = "datacheck.fix-gender-from-loglig";
+
+    /// <summary>Причина ручной проверки «личность не подтверждена» — словами для итога кнопки.</summary>
+    public const string IdentityUnconfirmedWhy = "личность не подтверждена: на карточке loglig нет ни одного заплыва пловца";
+
+    /// <summary>Причина ручной проверки «серьёзные последствия» — словами для итога кнопки.</summary>
+    public const string ImpactWhy = "изменилось бы серьёзное (рекорд, место, медаль, очки или топ)";
 
     /// <summary>Жёсткий потолок шага после импорта.</summary>
     public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(5);
@@ -159,12 +171,12 @@ public static class LogligCardGenderRule
     public static string Summary(
         int candidates, int set, int rows, int cardWithoutGender, int failed, int mismatch,
         int notVerified, int overLimit, int requests, int fromCache,
-        int review = 0, int dbFailed = 0, int reached = -1)
+        int review = 0, int dbFailed = 0, int reached = -1, int reviewIdentity = 0, int reviewImpact = 0)
     {
         if (candidates == 0) return "Пловцов без пола нет — брать с loglig нечего.";
 
         var parts = new List<string> { $"проставлен {set} (строк результата {rows})" };
-        if (review > 0) parts.Add($"ждут ручной проверки — {review}");
+        if (review > 0) parts.Add(ReviewPart(review, reviewIdentity, reviewImpact));
         if (dbFailed > 0) parts.Add($"сбой записи — {dbFailed}");
         // Прервано по времени: честно — докуда дошли.
         if (reached >= 0 && reached < candidates)
@@ -176,5 +188,21 @@ public static class LogligCardGenderRule
         if (overLimit > 0) parts.Add($"не дошли из-за потолка запросов — {overLimit}, повторите");
         return $"Пловцов без пола {candidates}: {string.Join("; ", parts)}. "
                + $"Запросов к loglig {requests}, из суточного ответа {fromCache}.";
+    }
+
+    /// <summary>
+    /// «Ждут ручной проверки» с причиной словами (просьба Влада 25.11.2026: из одного числа не
+    /// понять, почему не проставлено). У пловца могут быть обе причины — тогда он в обоих числах.
+    /// </summary>
+    private static string ReviewPart(int review, int identity, int impact)
+    {
+        var head = $"ждут ручной проверки — {review}";
+        if (identity == review && impact == 0) return $"{head}, потому что {IdentityUnconfirmedWhy}";
+        if (impact == review && identity == 0) return $"{head}, потому что {ImpactWhy}";
+        var why = new List<string>();
+        if (identity > 0) why.Add($"{IdentityUnconfirmedWhy} — {identity}");
+        if (impact > 0) why.Add($"{ImpactWhy} — {impact}");
+        if (why.Count == 0) return head;
+        return $"{head} ({string.Join(", ", why)}{(identity + impact > review ? "; у части — обе причины" : "")})";
     }
 }

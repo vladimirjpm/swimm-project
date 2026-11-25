@@ -93,7 +93,8 @@ public sealed class LogligCardGenderService(
 
     private sealed class Tally
     {
-        public int Set, Rows, NoGender, Failed, Mismatch, NotVerified, OverLimit, Requests, FromCache, Review, DbFailed, Reached;
+        public int Set, Rows, NoGender, Failed, Mismatch, NotVerified, OverLimit, Requests, FromCache, Review, DbFailed, Reached,
+            ReviewIdentity, ReviewImpact;
         public readonly List<string> Notes = [];
     }
 
@@ -134,11 +135,13 @@ public sealed class LogligCardGenderService(
         }
 
         var message = LogligCardGenderRule.Summary(swimmers.Count, t.Set, t.Rows, t.NoGender, t.Failed, t.Mismatch,
-            t.NotVerified, t.OverLimit, t.Requests, t.FromCache, t.Review, t.DbFailed, interrupted ? t.Reached : -1);
+            t.NotVerified, t.OverLimit, t.Requests, t.FromCache, t.Review, t.DbFailed, interrupted ? t.Reached : -1,
+            t.ReviewIdentity, t.ReviewImpact);
         if (t.Requests > 0 || t.Set > 0 || t.Review > 0)
             logger.LogInformation("Пол с карточек loglig ({Trigger}): {Message}", trigger, message);
         return new LogligCardGenderReport(swimmers.Count, t.Set, t.Rows, t.NoGender, t.Failed, t.Mismatch, t.NotVerified,
-            t.OverLimit, t.Requests, t.FromCache, alreadyKnown, message, t.Notes, t.Review, t.DbFailed, interrupted, t.Reached);
+            t.OverLimit, t.Requests, t.FromCache, alreadyKnown, message, t.Notes, t.Review, t.DbFailed, interrupted, t.Reached,
+            t.ReviewIdentity, t.ReviewImpact);
     }
 
     private async Task ProcessAsync(GenderCandidate s, StoredLogligClub? answer, string trigger, int maxRequests, object? extra,
@@ -211,6 +214,8 @@ public sealed class LogligCardGenderService(
         if (reasons.Count > 0)
         {
             t.Review++;
+            if (reasons.Any(r => r.Code == GenderImpactRules.IdentityUnconfirmed)) t.ReviewIdentity++;
+            if (reasons.Any(r => r.Code != GenderImpactRules.IdentityUnconfirmed)) t.ReviewImpact++;
             t.Notes.Add($"#{s.Id} {s.Name}: ждёт ручной проверки — " + string.Join("; ", reasons.Select(r => r.Text)));
             return;
         }
@@ -236,6 +241,32 @@ public sealed class LogligCardGenderService(
                 FromCache = cached,
                 Extra = extra,
             }, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Итог прошлого нажатия — строка аудита <see cref="LogligCardGenderRule.ButtonAuditAction"/>
+    /// (её пишет контроллер в любом исходе). Список «кого смотреть руками» — из её деталей.
+    /// </summary>
+    public async Task<LogligGenderButtonRun?> LastButtonRunAsync(CancellationToken ct = default)
+    {
+        var row = await db.AdminAudits.AsNoTracking()
+            .Where(a => a.Action == LogligCardGenderRule.ButtonAuditAction)
+            .OrderByDescending(a => a.CreatedAt).ThenByDescending(a => a.Id)
+            .Select(a => new { a.CreatedAt, a.ActorName, a.Summary, a.DetailsJson })
+            .FirstOrDefaultAsync(ct);
+        if (row is null) return null;
+
+        var notes = new List<string>();
+        try
+        {
+            if (row.DetailsJson is not null
+                && System.Text.Json.JsonDocument.Parse(row.DetailsJson).RootElement is { ValueKind: System.Text.Json.JsonValueKind.Object } root
+                && root.TryGetProperty("Notes", out var list) && list.ValueKind == System.Text.Json.JsonValueKind.Array)
+                notes.AddRange(list.EnumerateArray().Select(n => n.GetString()).OfType<string>());
+        }
+        catch (System.Text.Json.JsonException) { /* старая строка без списка — показываем только итог */ }
+
+        return new LogligGenderButtonRun(DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc), row.ActorName, row.Summary, notes);
     }
 
     public async Task<LogligGenderConfirmResult?> ConfirmFindingAsync(int findingId, CancellationToken ct = default)

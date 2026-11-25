@@ -49,7 +49,7 @@ public class DataChecksAdminController(
         {
             // Итог нажатия — в любом исходе: успех, обрыв по времени, исключение.
             if (report is not null || failure is not null)
-                await audit.LogAsync("datacheck.fix-gender-from-loglig", "DataCheckFinding", null,
+                await audit.LogAsync(LogligCardGenderRule.ButtonAuditAction, "DataCheckFinding", null,
                     "Пол с карточек loglig по находкам «Результаты без пола»: "
                     + (report?.Message ?? $"прогон сорвался — {failure}"),
                     report is null ? new { Failure = failure } : new
@@ -57,9 +57,20 @@ public class DataChecksAdminController(
                         report.Candidates, report.Set, report.Rows, report.Review, report.CardWithoutGender,
                         report.Failed, report.DbFailed, report.Mismatch, report.NotVerified, report.OverLimit,
                         report.Requests, report.FromCache, report.Interrupted, report.Reached,
+                        report.ReviewIdentity, report.ReviewImpact,
+                        // «Кого смотреть руками» — по ним значок ⓘ у кнопки покажет прошлый итог целиком.
+                        report.Notes,
                     }, CancellationToken.None);
         }
     }
+
+    /// <summary>
+    /// Итог прошлого нажатия «взять пол с карточек loglig» — чтобы он не пропадал вместе с
+    /// тостом (просьба Влада 25.11.2026): значок ⓘ у кнопки. 204 — кнопку ещё не нажимали.
+    /// </summary>
+    [HttpGet("fix-gender-from-loglig/last")]
+    public async Task<IActionResult> LastFixGenderFromLoglig(CancellationToken ct)
+        => await logligGender.LastButtonRunAsync(ct) is { } run ? Ok(run) : NoContent();
 
     /// <summary>
     /// Р126: «Проставить» в находке `swimmers.gender-from-loglig-review` — человек видел
