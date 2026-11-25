@@ -80,7 +80,8 @@ public class DataCheckFinding
     [Required, MaxLength(500)]
     public string Message { get; set; } = string.Empty;
 
-    [MaxLength(1000)]
+    /// <summary>4000 — с 25.11.2026: «Заявки без результата» пишут сюда причину на каждую заявку (до ~20 строк).</summary>
+    [MaxLength(4000)]
     public string? Details { get; set; }
 
     /// <summary>Куда идти чинить — относительная ссылка админки.</summary>
