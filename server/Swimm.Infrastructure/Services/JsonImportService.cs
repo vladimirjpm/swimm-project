@@ -20,6 +20,7 @@ namespace Swimm.Infrastructure.Services;
 public class JsonImportService : IImportService
 {
     private readonly SwimmDbContext _db;
+    private readonly INoShowTwinMergeService? _twinMerge;
     private readonly ICompetitionRecalculationService? _recalc;
     private readonly ICacheService _cache;
     private readonly IDataCheckRunner? _checks;
@@ -76,9 +77,11 @@ public class JsonImportService : IImportService
         IRelayLegCleanupService? legCleanup = null,
         ISeriesBinder? seriesBinder = null,
         ISwimmerClubRefreshService? clubRefresh = null,
-        ILogligClient? loglig = null)
+        ILogligClient? loglig = null,
+        INoShowTwinMergeService? twinMerge = null)
     {
         _db    = db;
+        _twinMerge = twinMerge;
         _cache = cache;
         _recalc = recalc;
         _checks = checks;
@@ -150,6 +153,7 @@ public class JsonImportService : IImportService
     {
         private readonly JsonImportService _svc;
         private readonly SwimmDbContext _db;
+        private readonly INoShowTwinMergeService? _twinMerge;
         private readonly ICompetitionRecalculationService? _recalc;
         private readonly ICacheService _cache;
         private readonly IDataCheckRunner? _checks;
@@ -240,6 +244,7 @@ public class JsonImportService : IImportService
         {
             _svc = svc;
             _db = svc._db;
+            _twinMerge = svc._twinMerge;
             _recalc = svc._recalc;
             _cache = svc._cache;
             _checks = svc._checks;
@@ -1621,6 +1626,30 @@ public class JsonImportService : IImportService
                     var touchedIds = touchedCompetitionKeys
                         .Select(k => competitionCache[k].Id).Distinct().ToList();
                     var stitched = await _stitch.StitchCompetitionsAsync(touchedIds);
+
+                    // Надёжные двойники неявок (решение Влада 25.11.2026): заявка на карточке с
+                    // loglig-id, а результат «его же» — на свежей карточке. Склеили — сшиваем заново,
+                    // чтобы неявка стала «проплыл». Свой try/catch: сбой склейки не отменяет сшивку.
+                    if (_twinMerge is not null && stitched.Any(s => s.NoShow > 0))
+                    {
+                        try
+                        {
+                            _db.ChangeTracker.Clear();
+                            var twins = await _twinMerge.MergeAsync(touchedIds);
+                            if (twins.Merged.Count > 0)
+                            {
+                                diagnosticLog.Add($"Склеены двойники по неявкам ({twins.Merged.Count}): {string.Join(", ", twins.Merged)}");
+                                _db.ChangeTracker.Clear();
+                                stitched = await _stitch.StitchCompetitionsAsync(touchedIds);
+                            }
+                            if (twins.Skipped.Count > 0)
+                                diagnosticLog.Add($"Двойники по неявкам не склеены ({twins.Skipped.Count}): {string.Join("; ", twins.Skipped)}");
+                        }
+                        catch (Exception ex)
+                        {
+                            diagnosticLog.Add($"Автосклейка двойников по неявкам не выполнена ({ex.GetType().Name}: {ex.Message}). Импорт сохранён.");
+                        }
+                    }
 
                     foreach (var s in stitched.Where(s => s.Entries > 0))
                         diagnosticLog.Add(

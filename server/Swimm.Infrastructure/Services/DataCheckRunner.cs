@@ -93,10 +93,11 @@ public class DataCheckRunner(
                     existing.FixKind = item.FixKind;
                     existing.FixEntityId = item.FixEntityId;
                     existing.Severity = (int)check.Severity;
+                    ApplyAutoAccept(existing, item.AutoAccept, run.StartedAt);
                 }
                 else
                 {
-                    db.DataCheckFindings.Add(new DataCheckFinding
+                    var created = new DataCheckFinding
                     {
                         CheckId = check.Id,
                         Severity = (int)check.Severity,
@@ -111,7 +112,9 @@ public class DataCheckRunner(
                         FixEntityId = item.FixEntityId,
                         FirstSeenAt = run.StartedAt,
                         LastSeenAt = run.StartedAt
-                    });
+                    };
+                    ApplyAutoAccept(created, item.AutoAccept, run.StartedAt);
+                    db.DataCheckFindings.Add(created);
                 }
 
                 switch (check.Severity)
@@ -262,6 +265,32 @@ public class DataCheckRunner(
             .ToList();
 
         return (lastRun is null ? null : ToDto(lastRun), states);
+    }
+
+    /// <summary>
+    /// Решение самой проверки (<see cref="DataCheckItem.AutoAccept"/>): открытую находку принимает
+    /// с примечанием «автоматически: …» и обновляет его, пока находка честная; стала нечестной —
+    /// своё «Принято» снимает, и находка снова открыта. Принятое человеком не трогает никогда.
+    /// </summary>
+    internal static void ApplyAutoAccept(DataCheckFinding f, string? autoAccept, DateTime at)
+    {
+        var auto = f.Resolution == DataCheckResolutions.Accepted
+                   && f.Note?.StartsWith(DataCheckResolutions.AutoNotePrefix, StringComparison.Ordinal) == true;
+        if (autoAccept is not null)
+        {
+            if (f.Resolution is not null && !auto) return;
+            var note = DataCheckResolutions.AutoNotePrefix + autoAccept;
+            if (note.Length > 500) note = note[..500];
+            if (f.Resolution is null) f.ResolvedAt = at;
+            f.Resolution = DataCheckResolutions.Accepted;
+            f.Note = note;
+        }
+        else if (auto)
+        {
+            f.Resolution = null;
+            f.ResolvedAt = null;
+            f.Note = null;
+        }
     }
 
     public async Task<bool> AcceptAsync(int findingId, string? note, CancellationToken ct = default)

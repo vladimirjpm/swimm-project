@@ -45,7 +45,8 @@ public class AdminSettingsServiceTests
         // + SplitAttachOnImport (доклейка промежуточных сама после импорта, 2026-11-23)
         // + LogligRowPlayersOnImport (игрок loglig у строки после импорта, Р122, 2026-11-24)
         // + LogligGenderOnImport (пол с карточки loglig после импорта, Р125, 2026-11-25)
-        Assert.Equal(45, all.Count);
+        // + NoShowTwinAutoMerge (автосклейка двойников по неявкам, 25.11.2026)
+        Assert.Equal(46, all.Count);
     }
 
     [Fact]

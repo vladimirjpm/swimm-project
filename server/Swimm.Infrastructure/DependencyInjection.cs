@@ -372,6 +372,8 @@ public static class DependencyInjection
         services.AddScoped<IResultsAutoWaitingQuery, ResultsAutoWaitingQuery>();
         services.AddScoped<IStartListPullService, StartListPullService>();
         services.AddScoped<IStartListStitchService, StartListStitchService>();
+        // Автосклейка надёжных двойников по неявкам (25.11.2026) — шаг импорта после сшивки.
+        services.AddScoped<INoShowTwinMergeService, NoShowTwinMergeService>();
         services.AddScoped<IStartListScheduleService, StartListScheduleService>();
         // Справка о старте: разминка руками + переопределение флага «чемпионат» (Т1)
         services.AddScoped<IMeetInfoAdminService, MeetInfoAdminService>();
