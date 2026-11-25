@@ -61,13 +61,120 @@ public sealed class NoShowUnmatchedCheck(SwimmDbContext db) : IDataCheck
             .Select(g => new { CompetitionId = g.Key, Total = g.Count() })
             .ToDictionaryAsync(x => x.CompetitionId!.Value, x => x.Total, ct);
 
+        var reasons = await ReasonsAsync(byCompetition.Select(c => c.CompetitionId!.Value).ToList(), ct);
+
         return new DataCheckOutcome(total, byCompetition
             .Select(c => new DataCheckItem(
                 "Competition", c.CompetitionId ?? 0,
                 $"{c.CompName}: без результата {c.NoShow} из {totals.GetValueOrDefault(c.CompetitionId ?? 0, c.NoShow)}",
-                $"compID {c.OrgCompId}",
+                Details(c.OrgCompId, reasons.GetValueOrDefault(c.CompetitionId ?? 0, [])),
                 $"/Admin/Competitions?q={c.OrgCompId}",
                 PublicRoutes.Competition(c.CompetitionId ?? 0)))
             .ToList());
+    }
+
+    /// <summary>Потолок колонки <c>Sys_DataCheckFindings.Details</c>.</summary>
+    private const int DetailsMax = 4000;
+
+    /// <summary>
+    /// Первая строка — compID и сводка по случаям; дальше строка на заявку (страница прячет их под
+    /// «причина по каждой заявке»). Не влезло в колонку — честное «… ещё N».
+    /// </summary>
+    internal static string Details(int orgCompId, IReadOnlyList<(string Line, NoShowReasons.Kind Kind)> reasons)
+    {
+        if (reasons.Count == 0) return $"compID {orgCompId}";
+        var head = $"compID {orgCompId} · " + string.Join(", ", reasons.GroupBy(r => r.Kind).OrderBy(g => g.Key)
+            .Select(g => $"{NoShowReasons.Label(g.Key)} — {g.Count()}"));
+
+        var text = new System.Text.StringBuilder(head);
+        for (var i = 0; i < reasons.Count; i++)
+        {
+            var line = "\n" + reasons[i].Line;
+            var tail = $"\n… ещё {reasons.Count - i}";
+            if (text.Length + line.Length + (i < reasons.Count - 1 ? tail.Length : 0) > DetailsMax)
+            {
+                text.Append(tail);
+                break;
+            }
+            text.Append(line);
+        }
+        return text.Length <= DetailsMax ? text.ToString() : text.ToString()[..DetailsMax];
+    }
+
+    /// <summary>Причина на каждую неявку соревнований-дней <paramref name="competitionIds"/> — по базе, без сети.</summary>
+    private async Task<Dictionary<int, List<(string Line, NoShowReasons.Kind Kind)>>> ReasonsAsync(
+        List<int> competitionIds, CancellationToken ct)
+    {
+        var entries = await db.CompetitionEntries.AsNoTracking()
+            .Where(e => e.Status == CompetitionEntryStatus.NoShow && e.CompetitionId != null
+                        && competitionIds.Contains(e.CompetitionId.Value))
+            .Select(e => new
+            {
+                CompetitionId = e.CompetitionId!.Value, e.SwimmerId, e.ClubId, e.StyleId, Style = e.Style.Name,
+                e.Distance, e.Gender, e.Heat, e.Lane,
+                Swimmer = new NoShowReasons.Person(e.SwimmerId, e.Swimmer.LastName, e.Swimmer.FirstName,
+                    e.Swimmer.BirthYear, e.Swimmer.LogligId, e.Swimmer.ClubId),
+            })
+            .ToListAsync(ct);
+        if (entries.Count == 0) return [];
+
+        var styleIds = entries.Select(e => e.StyleId).Distinct().ToList();
+        var ownEntries = (await db.CompetitionEntries.AsNoTracking()
+                .Where(e => e.CompetitionId != null && competitionIds.Contains(e.CompetitionId.Value) && styleIds.Contains(e.StyleId))
+                .Select(e => new { CompetitionId = e.CompetitionId!.Value, e.SwimmerId, e.StyleId, e.Distance })
+                .ToListAsync(ct))
+            .Select(e => (e.CompetitionId, e.SwimmerId, e.StyleId, e.Distance))
+            .ToHashSet();
+
+        var rows = await db.Results.AsNoTracking()
+            .Where(r => competitionIds.Contains(r.CompetitionId) && styleIds.Contains(r.StyleId))
+            .Select(r => new
+            {
+                r.CompetitionId, r.StyleId, r.Distance, r.Heat, r.Lane, r.SwimmerId, r.ClubId, r.Gender,
+                r.TimeOriginal, r.RelayId,
+                Swimmer = new NoShowReasons.Person(r.SwimmerId, r.Swimmer.LastName, r.Swimmer.FirstName,
+                    r.Swimmer.BirthYear, r.Swimmer.LogligId, r.Swimmer.ClubId),
+            })
+            .ToListAsync(ct);
+
+        var relayIds = rows.Where(r => r.RelayId != null).Select(r => r.RelayId!.Value).Distinct().ToList();
+        var members = (await db.RelayMembers.AsNoTracking()
+                .Where(m => relayIds.Contains(m.RelayId))
+                .OrderBy(m => m.LegOrder)
+                .Select(m => new
+                {
+                    m.RelayId,
+                    Swimmer = new NoShowReasons.Person(m.SwimmerId, m.Swimmer.LastName, m.Swimmer.FirstName,
+                        m.Swimmer.BirthYear, m.Swimmer.LogligId, m.Swimmer.ClubId),
+                })
+                .ToListAsync(ct))
+            .ToLookup(m => m.RelayId, m => m.Swimmer);
+
+        var byLane = rows.ToLookup(r => (r.CompetitionId, r.StyleId, r.Distance, r.Heat, r.Lane));
+        var byOwn = rows.Where(r => r.RelayId == null).ToLookup(r => (r.CompetitionId, r.StyleId, r.Distance, r.SwimmerId));
+
+        return entries
+            .OrderBy(e => e.Distance).ThenBy(e => e.Style).ThenBy(e => e.Heat).ThenBy(e => e.Lane)
+            .GroupBy(e => e.CompetitionId)
+            .ToDictionary(g => g.Key, g => g.Select(e =>
+            {
+                var isRelay = e.Distance.Contains('x', StringComparison.OrdinalIgnoreCase);
+                var lane = byLane[(e.CompetitionId, e.StyleId, e.Distance, e.Heat, e.Lane)]
+                    .Where(r => (r.RelayId != null) == isRelay)
+                    .Select(r => new NoShowReasons.LaneRow(r.Swimmer, r.ClubId, r.Gender, r.TimeOriginal,
+                        ownEntries.Contains((e.CompetitionId, r.SwimmerId, e.StyleId, e.Distance)),
+                        r.RelayId is int id ? members[id].ToList() : []))
+                    .ToList();
+                var own = isRelay
+                    ? []
+                    : byOwn[(e.CompetitionId, e.StyleId, e.Distance, e.SwimmerId)]
+                        .Where(r => r.Heat != e.Heat || r.Lane != e.Lane)
+                        .Select(r => new NoShowReasons.OwnRow(r.Heat, r.Lane, r.TimeOriginal))
+                        .ToList();
+                var reason = NoShowReasons.Classify(
+                    new NoShowReasons.Entry(e.Swimmer, e.ClubId, e.Gender, isRelay, e.Heat, e.Lane), lane, own);
+                return ($"#{e.SwimmerId} {e.Swimmer.Name} ({e.Swimmer.BirthYear}), {e.Distance} {e.Style}, "
+                        + $"заплыв {e.Heat}, дорожка {e.Lane}: {reason.Text}", reason.Kind);
+            }).ToList());
     }
 }

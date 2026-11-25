@@ -36,11 +36,30 @@
                 <div class="text-xl font-bold text-admin-text-muted">${accepted}</div></div>`;
     }
 
+    // Пояснение находки: первая строка видна, остальные (причина на каждую заявку у
+    // «Заявки без результата», Влад 25.11.2026) — раскрывающимся списком.
+    function findingDetails(details) {
+        if (!details) return '';
+        const [head, ...rest] = details.split('\n');
+        const first = `<div class="text-[11px] text-admin-text-muted">${esc(head)}</div>`;
+        if (!rest.length) return first;
+        return first + `<details class="text-[11px] text-admin-text-muted">
+                <summary class="cursor-pointer">причина по каждой заявке — ${rest.filter(l => !l.startsWith('…')).length}</summary>
+                <ul class="mt-1 list-disc pl-5">${rest.map(l => `<li>${isolateHebrew(esc(l))}</li>`).join('')}</ul></details>`;
+    }
+
+    // Имя на иврите посреди русской строки разворачивает соседние цифры и скобки
+    // («#5877 רגב פלג (2016), 4X50» → «רגב פלג #5877 4 ,(2016)X50»). <bdi> изолирует каждый
+    // ивритский кусок. Вход — уже экранированный текст.
+    function isolateHebrew(html) {
+        return html.replace(/[֐-׿][֐-׿\s׳״'\-]*[֐-׿׳]|[֐-׿]/g, m => `<bdi>${m}</bdi>`);
+    }
+
     function findingRow(f) {
         const accepted = f.resolution === 'accepted';
         return `<tr class="${accepted ? 'opacity-60' : ''}">
             <td class="align-top">${f.link ? `<a href="${esc(f.link)}" class="text-admin-accent hover:underline">${esc(f.message)}</a>` : esc(f.message)}
-                ${f.details ? `<div class="text-[11px] text-admin-text-muted">${esc(f.details)}</div>` : ''}
+                ${findingDetails(f.details)}
                 ${f.subjectName ? `<div class="mt-1 flex items-center gap-1.5">
                     <code class="rounded bg-white/[.06] px-1.5 py-0.5 text-[12px]" dir="auto">${esc(f.subjectName)}</code>
                     <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-copy"

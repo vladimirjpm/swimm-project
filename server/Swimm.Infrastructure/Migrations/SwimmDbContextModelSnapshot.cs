@@ -1097,8 +1097,8 @@ namespace Swimm.Infrastructure.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.Property<string>("Details")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
 
                     b.Property<int?>("EntityId")
                         .HasColumnType("integer");
