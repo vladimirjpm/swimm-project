@@ -65,33 +65,7 @@ public class RegulationAnalyzer : IRegulationAnalyzer
     private static readonly Regex ChampionshipVeto =
         new(@"להתכונן|להתחדד|לקראת|הכנה|זהות|זהה|בהתאם", RegexOptions.Compiled);
 
-    /// <summary>
-    /// Длина бассейна: число, «метр» и СРАЗУ число дорожек — «בריכת מכבי - 25 מ', 8 מסלולים».
-    /// Дорожки обязательны: без них «50 מטר» — это дистанция заплыва из программы, а не бассейн.
-    /// Перевёрнутую строку PDF федерации ловит второй вариант прямо в сыром тексте: цифры
-    /// PdfPig там отдаёт в нормальном порядке, а слова — задом наперёд («50 ,רטמ10 .םילולסמ»);
-    /// разворот всей строки перевернул бы сами цифры (50 → 05). «מ'» там читается как «'מ»
-    /// («50 ,'מ  10  םילולסמ» — лига длинных бассейнов, takanon 14575), а бывает и с запятой,
-    /// вставшей между буквой и апострофом: «25 מ,' 5  םילולסמ» (DUAL MEET Рамат-Ган 20.11.2026,
-    /// loglig doc 3542 — длина не нашлась, автозабор ждал руками). Слово «дорожки» может
-    /// уехать от числа: скобка ломает порядок, «50  ,'מ10 :םיאבה םיכיראתה ןיב ,)םילולסמ»
-    /// (летние отборы 2026, takanon 3218) — поэтому до 50 символов, а не вплотную.
-    ///
-    /// Вторая формула — «בריכת 25 מ'» без дорожек (Влад, 24.11.2026): слово «бассейн» вплотную
-    /// перед числом само говорит, что это длина бассейна, а не дистанция. Живой случай —
-    /// «ההזדמנות האחרונה» 2023 (loglig 9816, doc 1548): «בבריכת 25 מ'», дорожек в регламенте нет,
-    /// пачка отвечала «длина бассейна не определена». В перевёрнутом тексте «'מ» уезжает от числа
-    /// на несколько слов («תכירב25 יראתב 'מםיכ», «תכירבב25   תכירבב םינמז…»), поэтому там метр не
-    /// требуется — хватает «תכירב» вплотную к числу. «בריכה 25» сюда не входит сознательно.
-    /// Формулы без дорожек идут ПОСЛЕ формул с дорожками и не дублируют уже найденное место.
-    /// </summary>
-    private static readonly (Regex Rx, bool Reversed)[] PoolRx =
-    [
-        (new(@"(?<!\d)(?<len>25|50)\s*(?:מטר|מ['׳])\s*[,\-–]?\s*\d{1,2}[^\n]{0,50}?מסלולים", RegexOptions.Compiled), false),
-        (new(@"(?<!\d)(?<len>25|50)\s*,?\s*(?:רטמ|['׳]מ|מ\s*,\s*['׳])\s*\d{1,2}[^\n]{0,50}?םילולסמ", RegexOptions.Compiled), true),
-        (new(@"בריכת\s*(?<len>25|50)(?!\d)\s*(?:מטר|מ['׳]?)", RegexOptions.Compiled), false),
-        (new(@"תכירבב?\s*(?<len>25|50)(?!\d)", RegexOptions.Compiled), true),
-    ];
+    // Длина бассейна — отдельный класс со всеми вариантами записи: PoolLengthFinder.
 
     /// <summary>
     /// Сколько символов вокруг находки смотрит вето. Не вся строка: PdfPig отдаёт страницу
@@ -144,30 +118,25 @@ public class RegulationAnalyzer : IRegulationAnalyzer
         var perFlag = new Dictionary<string, int>();
         var seen = new HashSet<string>();
 
+        // Бассейн — первым и по всему тексту сразу: PoolLengthFinder сам решает, какие находки
+        // считать (слабые «фразы о месте» отбрасываются, если есть надёжные).
+        foreach (var (poolLine, hit) in PoolLengthFinder.Find(text))
+        {
+            // Цитата — из развёрнутой строки, чтобы админ прочитал её по-человечески; у
+            // прямого текста — как есть.
+            var quote = !hit.Reversed
+                ? QuoteAround(poolLine, hit.Index, hit.MatchLength)
+                : DigitsForward(QuoteAround(Reverse(poolLine), poolLine.Length - hit.Index - hit.MatchLength, hit.MatchLength));
+            if (seen.Add($"{RegulationFlags.Pool}|{hit.Length}|{quote}"))
+                findings.Add(new RegulationFindingDto(RegulationFlags.Pool, hit.Length, quote));
+        }
+
         foreach (var line in text.Split('\n'))
         {
             var raw = line.Trim();
             if (raw.Length == 0) continue;
 
             var reversed = Reverse(raw);
-
-            var poolSpans = new List<(int Start, int End)>();
-            foreach (var (rx, isReversed) in PoolRx)
-            foreach (Match match in rx.Matches(raw))
-            {
-                // Одно место строки — одна находка: «בריכת 50 מטר, 10 מסלולים» ловят обе формулы.
-                if (poolSpans.Any(sp => match.Index < sp.End && sp.Start < match.Index + match.Length)) continue;
-                poolSpans.Add((match.Index, match.Index + match.Length));
-
-                var len = match.Groups["len"].Value + "m";
-                // Цитата — из развёрнутой строки, чтобы админ прочитал её по-человечески; у
-                // прямого текста — как есть.
-                var quote = !isReversed
-                    ? QuoteAround(raw, match.Index, match.Length)
-                    : DigitsForward(QuoteAround(reversed, raw.Length - match.Index - match.Length, match.Length));
-                if (seen.Add($"{RegulationFlags.Pool}|{len}|{quote}"))
-                    findings.Add(new RegulationFindingDto(RegulationFlags.Pool, len, quote));
-            }
 
             foreach (var (rx, flag, label) in Markers)
             {
