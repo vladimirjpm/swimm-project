@@ -107,7 +107,7 @@ public sealed class CompetitionDaySplitService(
     /// Класс advisory-блокировки деления (Р123): два «Разделить» по одному соревнованию (две вкладки,
     /// кнопка + CLI) встают в очередь, второй видит изменившийся EventId и отказывает.
     /// </summary>
-    private const int SplitLockClass = 0x53504c44; // "SPLD"
+    private const int SplitLockClass = CompetitionDayLock.Class; // "SPLD", общий со сбором и Р124
 
     private async Task<(int EventId, List<CompetitionDaySplitDay> Days, string? Raced)> ApplyAsync(
         int competitionId, DayPlan plan, DateOnly keep, int? reuseEvent, CancellationToken ct)

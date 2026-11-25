@@ -29,6 +29,7 @@ public class ImportBackgroundServiceTests
         public readonly Mock<ILogligRowPlayerService> RowPlayers = new();
         public readonly Mock<ICompetitionDiscoveryService> Discovery = new();
         public readonly Mock<IOfficialClubStandingService> Standings = new();
+        public readonly Mock<ISiblingDayPullService> Siblings = new();
         public readonly Dictionary<string, bool> Settings = new();
 
         public World(ImportResult result)
@@ -41,6 +42,12 @@ public class ImportBackgroundServiceTests
             Stamp.Setup(s => s.StampFromProtocolAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new LogligStampReport(0, 0, 0, 0, [], "ok"));
             RowPlayers.Setup(s => s.StampAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()))
+                .ReturnsAsync(new LogligRowPlayerReport(true, "ok"));
+            Splits.Setup(s => s.AttachDayAfterImportAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new SplitAutoOutcome(SplitAutoKind.Attached, 3, 0, "отчёт дня", [2101]));
+            Stamp.Setup(s => s.StampDayFromProtocolAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new LogligStampReport(0, 0, 0, 0, [], "ok"));
+            RowPlayers.Setup(s => s.StampDayAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()))
                 .ReturnsAsync(new LogligRowPlayerReport(true, "ok"));
         }
 
@@ -56,12 +63,13 @@ public class ImportBackgroundServiceTests
                 .AddScoped(_ => RowPlayers.Object)
                 .AddScoped(_ => Discovery.Object)
                 .AddScoped(_ => Standings.Object)
+                .AddScoped(_ => Siblings.Object)
                 .AddSingleton(settings.Object)
                 .BuildServiceProvider();
         }
 
         /// <summary>Поставить задачу, прогнать службу и дождаться конца пост-шагов.</summary>
-        public async Task<ImportJobStatus> RunAsync(int? orgCompId = CompId, int? discoveredId = 7)
+        public async Task<ImportJobStatus> RunAsync(int? orgCompId = CompId, int? discoveredId = 7, ImportEventOptions? options = null)
         {
             var sp = Services();
             var service = new ImportBackgroundService(Queue, sp.GetRequiredService<IServiceScopeFactory>(),
@@ -69,14 +77,15 @@ public class ImportBackgroundServiceTests
             await service.StartAsync(CancellationToken.None);
             try
             {
-                var jobId = Queue.Enqueue(Encoding.UTF8.GetBytes("[]"), "f.json", null, null, discoveredId, orgCompId);
+                var jobId = Queue.Enqueue(Encoding.UTF8.GetBytes("[]"), "f.json", null, options, discoveredId, orgCompId);
                 var deadline = DateTime.UtcNow.AddSeconds(10);
                 while (DateTime.UtcNow < deadline)
                 {
                     var s = Queue.GetStatus(jobId)!;
                     if (s.State is ImportJobState.Completed or ImportJobState.Failed)
                     {
-                        var logligSteps = orgCompId != null && s.Result != null && ImportPostStepRules.Succeeded(s.Result);
+                        var logligSteps = (orgCompId != null || options?.SiblingDay != null) && s.Result != null && ImportPostStepRules.Succeeded(s.Result)
+                            && (options?.SiblingDay == null || s.Result.FollowUp?.StartsWith("Готово") == true);
                         var stampDone = Stamp.Invocations.Count > 0 || !Settings.GetValueOrDefault("LogligStampOnImport", true);
                         if (!logligSteps)
                         {
@@ -359,5 +368,56 @@ public class ImportBackgroundServiceTests
 
         Assert.All(jobs, j => Assert.Equal("done", w.Queue.GetStatus(j)!.Splits!.State));
         Assert.Equal(1, maxInFlight);
+    }
+
+    // ── Р124: день-сосед («Затянуть этот день») ──────────────────────────────
+
+    private static readonly SiblingDayTarget Sibling = new(155, 6611, 11590, 1858, null, "תחרות", "07/12/2024", "vlad@test");
+
+    [Fact]
+    public async Task SiblingDay_NoCompId_StepsPlannedByNewDayAndSiblingNumber()
+    {
+        var w = new World(Created(1784));
+        w.Siblings.Setup(s => s.CompleteAsync(Sibling, It.IsAny<ImportResult>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SiblingDayCompletion(2101, 143, true, "Готово. Теперь у соревнования два дня: 06.12 (1555 строк) и 07.12 (1784 строки)."));
+
+        var status = await w.RunAsync(orgCompId: null, discoveredId: null, new ImportEventOptions(null, null, SiblingDay: Sibling));
+
+        Assert.Equal(ImportJobState.Completed, status.State);
+        Assert.StartsWith("Готово", status.Result!.FollowUp);
+        Assert.Equal(143, status.Result.FollowUpEventId);
+        w.Splits.Verify(s => s.AttachDayAfterImportAsync(2101, 11590, status.JobId, It.IsAny<CancellationToken>()), Times.Once);
+        w.Stamp.Verify(s => s.StampDayFromProtocolAsync(2101, 11590, It.IsAny<CancellationToken>()), Times.Once);
+        w.RowPlayers.Verify(s => s.StampDayAsync(2101, 11590, "import", It.IsAny<CancellationToken>(), It.IsAny<TimeSpan?>()), Times.Once);
+        // По compID записи федерации (номер другого дня) — ничего.
+        w.Splits.Verify(s => s.AttachAfterImportAsync(It.IsAny<int>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        w.Discovery.Verify(d => d.SetStatusAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SiblingDay_CompleteThrows_ImportStaysCompleted_FollowUpSaysSo()
+    {
+        var w = new World(Created(1784));
+        w.Siblings.Setup(s => s.CompleteAsync(It.IsAny<SiblingDayTarget>(), It.IsAny<ImportResult>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("boom"));
+
+        var status = await w.RunAsync(orgCompId: null, discoveredId: null, new ImportEventOptions(null, null, SiblingDay: Sibling));
+
+        Assert.Equal(ImportJobState.Completed, status.State);
+        Assert.Contains("сбор в событие сорвался", status.Result!.FollowUp);
+    }
+
+    [Fact]
+    public async Task SiblingDay_ImportThrows_FailureAudited()
+    {
+        var w = new World(Created(1));
+        w.Import.Setup(i => i.ImportAsync(It.IsAny<Stream>(), It.IsAny<string?>(),
+                It.IsAny<IReadOnlyCollection<string>?>(), It.IsAny<ImportEventOptions?>(), It.IsAny<int?>()))
+            .ThrowsAsync(new InvalidOperationException("db down"));
+
+        var status = await w.RunAsync(orgCompId: null, discoveredId: null, new ImportEventOptions(null, null, SiblingDay: Sibling));
+
+        Assert.Equal(ImportJobState.Failed, status.State);
+        w.Siblings.Verify(s => s.ImportFailedAsync(Sibling, "db down"), Times.Once);
     }
 }

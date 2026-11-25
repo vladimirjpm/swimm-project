@@ -94,7 +94,7 @@ public sealed record ImportEventOptions(
     /// промежуточные и id игроков loglig по номеру СОСЕДА (у записи федерации — номер другого дня).
     /// Ставит только <c>ISiblingDayPullService.ImportAsync</c>.
     /// </summary>
-    Abstractions.SiblingDayTarget? SiblingDay = null);
+    SiblingDayTarget? SiblingDay = null);
 
 public class ImportResult
 {

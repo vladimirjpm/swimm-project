@@ -9,6 +9,16 @@ namespace Swimm.Application.Mapping;
 /// дисциплина (стиль + дистанция), заплыв и дорожка. Совпадение у многих строк значит, что
 /// «другой день» — на деле тот же протокол (Р124).
 /// </summary>
+/// <summary>Личная строка для сверки: ключи обоих способов и день (у строк базы).</summary>
+public sealed record SiblingSwim(string Person, int BirthYear, string Style, string Distance, int Heat, int Lane, int? TimeMs,
+    DateOnly? Day = null);
+
+/// <summary>Каким ключом сверяли: заплыв+дорожка, время, нечем.</summary>
+public enum OverlapBy { HeatLane, Time, None }
+
+/// <summary>Итог сверки: совпавшие строки файла, личных строк в файле и день, где лежат совпавшие (если один).</summary>
+public sealed record OverlapResult(OverlapBy By, IReadOnlyList<SiblingSwim> Matched, int FileRows, DateOnly? InDay);
+
 public sealed record SiblingSwimKey(string Person, int BirthYear, string Style, string Distance, int Heat, int Lane);
 
 /// <summary>
@@ -93,17 +103,53 @@ public static class SiblingDayRules
     }
 
     /// <summary>
-    /// Отказ по пересечению: совпало не меньше <see cref="OverlapMinRows"/> и не меньше
-    /// <see cref="OverlapShare"/> личных строк файла. null — дни разные.
+    /// Сверка «тот же ли это протокол» с запасным ключом. Если у большинства личных строк файла есть заплыв
+    /// и дорожка — ключ «человек + дисциплина + заплыв + дорожка»; иначе (протокол без заплывов и дорожек) —
+    /// «человек + дисциплина + время»; нет и времени — сверять нечем (<see cref="OverlapBy.None"/>, превью
+    /// предупреждает, запись не блокирует: решает человек, глядя на дату и строки).
     /// </summary>
+    public static OverlapResult OverlapCheck(IReadOnlyList<SiblingSwim> file, IReadOnlyList<SiblingSwim> db)
+    {
+        var people = file.Where(r => r.Person.Length > 0).ToList();
+        if (people.Count == 0) return new(OverlapBy.None, [], file.Count, null);
+
+        static bool HeatLane(SiblingSwim r) => r.Heat > 0 && r.Lane > 0;
+        static bool Timed(SiblingSwim r) => r.TimeMs is > 0;
+        OverlapBy by = people.Count(HeatLane) * 2 >= people.Count ? OverlapBy.HeatLane
+            : people.Count(Timed) * 2 >= people.Count ? OverlapBy.Time
+            : OverlapBy.None;
+        if (by == OverlapBy.None) return new(OverlapBy.None, [], file.Count, null);
+
+        Func<SiblingSwim, bool> usable = by == OverlapBy.HeatLane ? HeatLane : Timed;
+        Func<SiblingSwim, object> key = by == OverlapBy.HeatLane
+            ? r => (r.Person, r.BirthYear, r.Style, r.Distance, r.Heat, r.Lane)
+            : r => (r.Person, r.BirthYear, r.Style, r.Distance, r.TimeMs);
+        var dbByKey = db.Where(r => r.Person.Length > 0 && usable(r)).GroupBy(key).ToDictionary(g => g.Key, g => g.ToList());
+        var matched = people.Where(usable).DistinctBy(key).Where(r => dbByKey.ContainsKey(key(r))).ToList();
+        var days = matched.SelectMany(r => dbByKey[key(r)]).Select(r => r.Day).OfType<DateOnly>().Distinct().ToList();
+        return new(by, matched, file.Count, days.Count == 1 ? days[0] : null);
+    }
+
+    /// <summary>
+    /// Отказ по пересечению: совпало не меньше <see cref="OverlapMinRows"/> и не меньше
+    /// <see cref="OverlapShare"/> личных строк файла. null — дни разные (или сверять было нечем).
+    /// </summary>
+    public static string? OverlapRefusal(OverlapResult r) =>
+        r.By == OverlapBy.None ? null
+            : OverlapRefusal(r.Matched.Count, r.FileRows, r.InDay,
+                r.By == OverlapBy.HeatLane ? "тот же пловец, дисциплина, заплыв и дорожка" : "тот же пловец, дисциплина и время");
+
     /// <param name="inDay">День, где лежат совпавшие заплывы (если он один) — «уже есть в пятнице 06.12».</param>
-    public static string? OverlapRefusal(IReadOnlyList<SiblingSwimKey> overlap, int fileIndividualRows, DateOnly? inDay = null)
+    public static string? OverlapRefusal(IReadOnlyList<SiblingSwimKey> overlap, int fileIndividualRows, DateOnly? inDay = null) =>
+        OverlapRefusal(overlap.Count, fileIndividualRows, inDay, "тот же пловец, дисциплина, заплыв и дорожка");
+
+    private static string? OverlapRefusal(int matched, int fileIndividualRows, DateOnly? inDay, string how)
     {
         var threshold = Math.Max(OverlapMinRows, (int)Math.Ceiling(fileIndividualRows * OverlapShare));
-        if (overlap.Count < threshold) return null;
+        if (matched < threshold) return null;
         var where = inDay is { } d ? $"в {MissingDayTexts.Prep(d)} {MissingDayTexts.Day(d)}" : "в днях, что у нас уже есть";
         return $"эти заплывы уже есть {where} — похоже, это тот же протокол, а не другой день "
-            + $"(совпало {overlap.Count} из {fileIndividualRows}: тот же пловец, дисциплина, заплыв и дорожка)";
+            + $"(совпало {matched} из {fileIndividualRows}: {how})";
     }
 
     /// <summary>Ключ человека: фамилия и имя без пробелов, знаков и регистра.</summary>
@@ -116,9 +162,9 @@ public static class SiblingDayRules
     }
 
     /// <summary>
-    /// Бассейн по умолчанию — от лежащего дня. Регламент кандидата говорит другое — не подставляем
-    /// ни то, ни другое: <c>Conflict</c>, человек выбирает сам (И-30: регламент бывает неверен, но
-    /// и лежащий день могли затянуть с умолчанием парсера).
+    /// Бассейн по умолчанию — от лежащего дня. Регламент кандидата говорит другое — подставляем всё равно
+    /// длину лежащего дня (у дней события она одна, сервер примет только её) и поднимаем <c>Conflict</c>:
+    /// превью прямо говорит, что если неверен лежащий день — сначала исправить его (И-30).
     /// </summary>
     public static (string? Pool, bool Conflict) DefaultPool(string? existingPool, string? regulationPool)
     {
@@ -126,7 +172,7 @@ public static class SiblingDayRules
         var regulation = NormalizePool(regulationPool);
         if (existing == null) return (regulation, false);
         if (regulation == null || regulation == existing) return (existing, false);
-        return (null, true);
+        return (existing, true); // сервер примет только длину лежащего дня — её и подставляем, с предупреждением
     }
 
     public static string? NormalizePool(string? pool)

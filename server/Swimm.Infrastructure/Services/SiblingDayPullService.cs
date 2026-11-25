@@ -71,7 +71,8 @@ public sealed class SiblingDayPullService(
         var date = p.Parsed.Competitions[0].Date.Trim();
         var existing = await LoadExistingDayAsync(start, date, ct);
         var (pool, conflict) = SiblingDayRules.DefaultPool(existing.Day.PoolType, p.Flags?.PoolType);
-        var overlapRows = (await OverlapAsync(start, p.Parsed.ResultsJson, ct)).Overlap.Count;
+        var overlapCheck = await OverlapAsync(start, p.Parsed.ResultsJson, ct);
+        var overlapRows = overlapCheck.Matched.Count;
         var eventName = existing.Day.EventId is int ev
             ? await db.CompetitionEvents.AsNoTracking().Where(e => e.Id == ev).Select(e => e.Name).FirstOrDefaultAsync(ct)
             : null;
@@ -86,7 +87,9 @@ public sealed class SiblingDayPullService(
             MissingDayTexts.ImportSummaryTemplate(start.DbDays, ParseDate(date) ?? default, p.Parsed.ResultCount,
                 nameEditable: existing.Day.EventId == null),
             MissingDayTexts.DefaultsNote(ParseDate(existing.Day.Date) ?? default),
-            conflict ? MissingDayTexts.PoolConflict(ParseDate(existing.Day.Date) ?? default, existing.Day.PoolType, p.Flags?.PoolType) : null);
+            conflict ? MissingDayTexts.PoolConflict(ParseDate(existing.Day.Date) ?? default, existing.Day.PoolType,
+                ParseDate(date) ?? default, p.Flags?.PoolType, start.DbDays) : null,
+            overlapCheck.By == OverlapBy.None ? MissingDayTexts.OverlapNotChecked : null);
         return new SiblingDayPreview(null, p with { Flags = DefaultsFromDay(p.Flags, existing, pool, conflict) }, context);
     }
 
@@ -115,30 +118,24 @@ public sealed class SiblingDayPullService(
                 && jobs.GetStatus(pendingJob) is { State: ImportJobState.Queued or ImportJobState.Running })
                 return SiblingDayEnqueue.Refused("этот день уже затягивается — дождитесь конца");
 
-            // База могла измениться, пока шли запросы: перечитываем всё под шлюзом.
-            start = await LoadStartAsync(discoveryId, ct);
-            if (start.Refusal != null) return SiblingDayEnqueue.Refused(start.Refusal);
-            var dates = entry.Parsed.Competitions.Select(c => c.Date).ToList();
-            var refusal = SiblingDayRules.FileDateRefusal(dates, ProgrammeCheckRules.NeighbourDates(candidate!), start.Missing, start.DbDays)
-                          ?? await DayInDbRefusalAsync(entry.Parsed, ct)
-                          ?? await OverlapRefusalAsync(start, entry.Parsed.ResultsJson, ct);
-            if (refusal != null) return SiblingDayEnqueue.Refused(refusal);
-
-            var date = dates[0]!.Trim();
-            var existing = await LoadExistingDayAsync(start, date, ct);
-            var existingPool = SiblingDayRules.NormalizePool(existing.Day.PoolType);
-            if (existingPool != null && existingPool != pool)
-                return SiblingDayEnqueue.Refused(
-                    $"у дня {existing.Day.Date} бассейн {MissingDayTexts.Pool(existingPool)}, а вы выбрали {MissingDayTexts.Pool(pool)} — у дней одного "
-                    + "соревнования бассейн один. Если ошибся уже затянутый день — сначала поправьте его через «Изменить».");
-
-            string? newEventName = null;
-            if (existing.Day.EventId == null)
+            // База могла измениться, пока шли запросы: перечитываем всё под шлюзом И под общим замком дня
+            // (деление, сбор, --join-days ждут, пока идут проверки). Замок — в транзакции через стратегию
+            // повторов; ставим задачу уже после commit, чтобы повтор транзакции не поставил её дважды.
+            var lockIds = start.Days.Select(d => d.Id).ToList();
+            var strategy = db.Database.CreateExecutionStrategy();
+            var plan = await strategy.ExecuteAsync(async () =>
             {
-                newEventName = request.EventName?.Trim();
-                if (string.IsNullOrEmpty(newEventName)) return SiblingDayEnqueue.Refused("впишите название соревнования — общее для всех дней");
-                if (newEventName.Length > 200) return SiblingDayEnqueue.Refused("название длиннее 200 символов — сократите");
-            }
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
+                await CompetitionDayLock.AcquireAsync(db, lockIds, ct);
+                var checkedPlan = await CheckUnderLockAsync(discoveryId, entry, candidate!, pool, request, ct);
+                await tx.CommitAsync(ct);
+                return checkedPlan;
+            });
+            if (plan.Refusal != null) return SiblingDayEnqueue.Refused(plan.Refusal);
+            start = plan.Start!;
+            var existing = plan.Existing!;
+            var date = plan.Date!;
+            var newEventName = plan.NewEventName;
 
             var target = new SiblingDayTarget(discoveryId, start.OrgCompId, request.LogligId, existing.Day.Id,
                 existing.Day.EventId, newEventName, date, actor);
@@ -182,52 +179,183 @@ public sealed class SiblingDayPullService(
         }
     }
 
+    private sealed record CheckedPlan(string? Refusal, Start? Start = null, ExistingDay? Existing = null,
+        string? Date = null, string? NewEventName = null);
+
+    /// <summary>Перепроверки записи — под шлюзом и общим замком дня: дата, «дня нет», пересечение, бассейн, имя.</summary>
+    private async Task<CheckedPlan> CheckUnderLockAsync(int discoveryId, DiscoveryPreviewEntry entry,
+        LogligCompetitionSummaryDto candidate, string pool, SiblingDayImportRequest request, CancellationToken ct)
+    {
+        var start = await LoadStartAsync(discoveryId, ct);
+        if (start.Refusal != null) return new(start.Refusal);
+        var dates = entry.Parsed.Competitions.Select(c => c.Date).ToList();
+        var refusal = SiblingDayRules.FileDateRefusal(dates, ProgrammeCheckRules.NeighbourDates(candidate), start.Missing, start.DbDays)
+                      ?? await DayInDbRefusalAsync(entry.Parsed, ct)
+                      ?? await OverlapRefusalAsync(start, entry.Parsed.ResultsJson, ct);
+        if (refusal != null) return new(refusal);
+
+        var date = dates[0]!.Trim();
+        var existing = await LoadExistingDayAsync(start, date, ct);
+        var existingPool = SiblingDayRules.NormalizePool(existing.Day.PoolType);
+        if (existingPool != null && existingPool != pool)
+            return new(MissingDayTexts.PoolMismatch(ParseDate(existing.Day.Date) ?? default, existingPool,
+                ParseDate(date) ?? default, pool, start.DbDays));
+
+        string? newEventName = null;
+        if (existing.Day.EventId == null)
+        {
+            newEventName = request.EventName?.Trim();
+            if (string.IsNullOrEmpty(newEventName)) return new("впишите название соревнования — общее для всех дней");
+            if (newEventName.Length > 200) return new("название длиннее 200 символов — сократите");
+        }
+        return new(null, start, existing, date, newEventName);
+    }
+
+    /// <remarks>
+    /// Не бросает: любой исход — строка аудита и текст для человека. Новый день ищется ДО сбора, и
+    /// его номер уходит наружу при любом исходе сбора — фон планирует по нему шаги loglig. Сбор и
+    /// перенумерация дней — под общим замком дня (<see cref="CompetitionDayLock"/>, как деление):
+    /// задача могла простоять в очереди за пачкой, поэтому лежащий день и дата перечитываются.
+    /// </remarks>
     public async Task<SiblingDayCompletion> CompleteAsync(SiblingDayTarget target, ImportResult result, CancellationToken ct = default)
     {
+        var newDate = ParseDate(target.Date) ?? default;
         try
         {
             if (!ImportPostStepRules.Succeeded(result))
-                return new SiblingDayCompletion(null, null, false, "день не записан — событие не собиралось");
-
-            var newDay = await db.Competitions.AsNoTracking()
-                .Where(c => result.CompetitionIds.Contains(c.Id) && c.Id != target.ExistingCompetitionId && c.Date == target.Date)
-                .Select(c => new { c.Id, c.EventId })
-                .FirstOrDefaultAsync(CancellationToken.None);
-            if (newDay == null)
                 return await FinishAsync(target, new SiblingDayCompletion(null, null, false,
-                    $"⚠ День {target.Date} записан, но найти его после записи не вышло — дни не собраны. Попросите агента проверить."),
-                    "новый день среди записанных импортом не найден");
+                        MissingDayTexts.NotImported(newDate, FirstLine(result))),
+                    $"импорт ничего не записал: {FirstLine(result)}");
 
-            var newDate = ParseDate(target.Date) ?? default;
-            var existingDates = (await db.Competitions.AsNoTracking().Where(c => c.Id == target.ExistingCompetitionId)
-                .Select(c => c.Date).ToListAsync(CancellationToken.None)).Select(ParseDate).OfType<DateOnly>().ToList();
-
-            if (target.EventId is int ev)
-                return await FinishAsync(target, newDay.EventId == ev
-                    ? new SiblingDayCompletion(newDay.Id, ev, true, await DoneTextAsync(ev))
-                    : new SiblingDayCompletion(newDay.Id, newDay.EventId, false,
-                        MissingDayTexts.NotJoined(newDate, existingDates, $"день не попал в событие #{ev}",
-                            $"проверить события #{ev} и дня #{newDay.Id}")),
-                    $"новый день #{newDay.Id}, событие #{ev}");
-
-            // Лежащий день одиночный: собираем штатным сбором (как --join-days у 488) с общим именем.
-            var join = await joiner.JoinAsync([target.ExistingCompetitionId, newDay.Id], apply: true,
-                CancellationToken.None, target.NewEventName);
-            return await FinishAsync(target, join.Applied
-                ? new SiblingDayCompletion(newDay.Id, join.EventId, true, await DoneTextAsync(join.EventId!.Value))
-                : new SiblingDayCompletion(newDay.Id, null, false,
-                    MissingDayTexts.NotJoined(newDate, existingDates, join.Refusal ?? "сбор отказал",
-                        $"--join-days {target.ExistingCompetitionId},{newDay.Id} --apply")),
-                join.Applied
-                    ? $"событие #{join.EventId} «{join.Name}»: " + string.Join(", ", join.Days.Select(d => $"день {d.DayNumber} — #{d.CompetitionId} ({Fmt(d.Date)})"))
-                      + (join.Differences.Count > 0 ? ". Расходятся настройки: " + string.Join("; ", join.Differences) : "")
-                    : $"новый день #{newDay.Id} в событие не собран: {join.Refusal}");
+            int? newDayId = null;
+            try
+            {
+                newDayId = await db.Competitions.AsNoTracking()
+                    .Where(c => result.CompetitionIds.Contains(c.Id) && c.Id != target.ExistingCompetitionId && c.Date == target.Date)
+                    .Select(c => (int?)c.Id).FirstOrDefaultAsync(CancellationToken.None);
+                if (newDayId is not int dayId)
+                    return await FinishAsync(target, new SiblingDayCompletion(null, null, false,
+                            MissingDayTexts.NotFoundAfterImport(newDate)),
+                        "новый день среди записанных импортом не найден");
+                return await PlaceAsync(target, dayId, newDate);
+            }
+            catch (Exception ex)
+            {
+                // Сбор мог успеть записаться (исключение — в пересчёте после commit): смотрим базу.
+                db.ChangeTracker.Clear();
+                logger.LogWarning(ex, "Р124: compID {OrgCompId}, loglig {LogligId} — завершение сорвалось", target.OrgCompId, target.LogligId);
+                var state = newDayId is int id
+                    ? await db.Competitions.AsNoTracking().Where(c => c.Id == id || c.Id == target.ExistingCompetitionId)
+                        .Select(c => new { c.Id, c.EventId }).ToListAsync(CancellationToken.None)
+                    : [];
+                var newEvent = state.FirstOrDefault(s => s.Id == newDayId)?.EventId;
+                var together = newEvent != null && state.Count == 2 && state.All(s => s.EventId == newEvent);
+                var existingDates = await ExistingDatesAsync(target);
+                return await FinishAsync(target, new SiblingDayCompletion(newDayId, newEvent, together,
+                        together
+                            ? MissingDayTexts.JoinedButRecalcFailed(newDate,
+                                "--recalc-competition " + string.Join(" и --recalc-competition ", state.Select(s => s.Id).Order()))
+                            : MissingDayTexts.NotJoined(newDate, existingDates, ex.Message, JoinCommand(target, newDayId))),
+                    $"завершение сорвалось ({ex.Message}); новый день #{newDayId?.ToString(CultureInfo.InvariantCulture) ?? "—"}, "
+                    + $"событие {newEvent?.ToString(CultureInfo.InvariantCulture) ?? "—"}");
+            }
         }
         finally
         {
             Pending.TryRemove(target.OrgCompId, out _);
         }
     }
+
+    /// <inheritdoc />
+    public async Task ImportFailedAsync(SiblingDayTarget target, string error)
+    {
+        Pending.TryRemove(target.OrgCompId, out _);
+        await FinishAsync(target, new SiblingDayCompletion(null, null, false,
+                MissingDayTexts.NotImported(ParseDate(target.Date) ?? default, error)),
+            $"задача импорта упала: {error}");
+    }
+
+    /// <summary>День записан — положить его к лежащему: в его событие (перенумеровать по дате) или собрать оба.</summary>
+    private async Task<SiblingDayCompletion> PlaceAsync(SiblingDayTarget target, int newDayId, DateOnly newDate)
+    {
+        var existing = await db.Competitions.AsNoTracking().Where(c => c.Id == target.ExistingCompetitionId)
+            .Select(c => new { c.EventId, c.Date }).FirstOrDefaultAsync(CancellationToken.None);
+        var newDayEvent = await db.Competitions.AsNoTracking().Where(c => c.Id == newDayId)
+            .Select(c => c.EventId).FirstAsync(CancellationToken.None);
+        var existingDates = await ExistingDatesAsync(target);
+
+        if (target.EventId is int ev)
+        {
+            if (newDayEvent != ev)
+                return await FinishAsync(target, new SiblingDayCompletion(newDayId, newDayEvent, false,
+                        MissingDayTexts.NotJoined(newDate, existingDates, $"день не попал в событие #{ev}",
+                            $"проверить событие #{ev} и день #{newDayId}")),
+                    $"новый день #{newDayId} не в событии #{ev}");
+            await RenumberDaysAsync(ev);
+            return await FinishAsync(target, new SiblingDayCompletion(newDayId, ev, true, await DoneTextAsync(ev)),
+                $"новый день #{newDayId} в событии #{ev}, дни перенумерованы по дате");
+        }
+
+        // Задача могла простоять в очереди: лежащий день тем временем попал в событие, удалён или эта
+        // дата появилась у старта другим путём — тогда не собираем, а говорим как есть.
+        string? changed = existing == null ? $"день #{target.ExistingCompetitionId} удалён"
+            : existing.EventId is int now ? $"день {existing.Date} тем временем попал в событие #{now}"
+            : await db.Competitions.AsNoTracking().AnyAsync(c => c.Id != newDayId && c.Id != target.ExistingCompetitionId
+                    && c.Date == target.Date
+                    && (c.OrgCompId == target.OrgCompId || (c.Event != null && c.Event.OrgCompId == target.OrgCompId)),
+                CancellationToken.None)
+                ? $"у старта уже есть другой день {target.Date}"
+                : null;
+        if (changed != null)
+            return await FinishAsync(target, new SiblingDayCompletion(newDayId, null, false,
+                    MissingDayTexts.NotJoined(newDate, existingDates, changed, JoinCommand(target, newDayId))),
+                $"новый день #{newDayId} не собран: {changed}");
+
+        // Лежащий день одиночный: штатный сбор (как --join-days у 488) с общим именем; замок — внутри.
+        var join = await joiner.JoinAsync([target.ExistingCompetitionId, newDayId], apply: true,
+            CancellationToken.None, target.NewEventName);
+        return await FinishAsync(target, join.Applied
+                ? new SiblingDayCompletion(newDayId, join.EventId, true, await DoneTextAsync(join.EventId!.Value))
+                : new SiblingDayCompletion(newDayId, null, false,
+                    MissingDayTexts.NotJoined(newDate, existingDates, join.Refusal ?? "сбор отказал", JoinCommand(target, newDayId))),
+            join.Applied
+                ? $"событие #{join.EventId} «{join.Name}»: " + string.Join(", ", join.Days.Select(d => $"день {d.DayNumber} — #{d.CompetitionId} ({Fmt(d.Date)})"))
+                  + (join.Differences.Count > 0 ? ". Расходятся настройки: " + string.Join("; ", join.Differences) : "")
+                : $"новый день #{newDayId} в событие не собран: {join.Refusal}");
+    }
+
+    /// <summary>
+    /// Импорт в событие даёт новому дню номер max+1, а недостающий день бывает и раньше лежащих —
+    /// номера дней события выстраиваются по дате (как у сбора). Под общим замком дня.
+    /// </summary>
+    private async Task RenumberDaysAsync(int eventId)
+    {
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(CancellationToken.None);
+            var ids = await db.Competitions.Where(c => c.EventId == eventId).Select(c => c.Id).ToListAsync(CancellationToken.None);
+            await CompetitionDayLock.AcquireAsync(db, ids, CancellationToken.None);
+            var days = await db.Competitions.Where(c => c.EventId == eventId).ToListAsync(CancellationToken.None);
+            var n = 1;
+            foreach (var d in days.OrderBy(d => ParseDate(d.Date) ?? DateOnly.MaxValue).ThenBy(d => d.Id))
+                d.DayNumber = n++;
+            await db.SaveChangesAsync(CancellationToken.None);
+            await tx.CommitAsync(CancellationToken.None);
+        });
+    }
+
+    private async Task<List<DateOnly>> ExistingDatesAsync(SiblingDayTarget target) =>
+        (await db.Competitions.AsNoTracking().Where(c => c.Id == target.ExistingCompetitionId)
+            .Select(c => c.Date).ToListAsync(CancellationToken.None)).Select(ParseDate).OfType<DateOnly>().ToList();
+
+    /// <summary>Подсказка «доделать руками»: сбор с тем же общим именем, что видел человек.</summary>
+    internal static string JoinCommand(SiblingDayTarget t, int? newDayId) =>
+        $"--join-days {t.ExistingCompetitionId},{newDayId?.ToString(CultureInfo.InvariantCulture) ?? "<новый день>"}"
+        + (t.NewEventName is { } name ? $" --name \"{name.Replace("\"", "\\\"")}\"" : "") + " --apply";
+
+    private static string FirstLine(ImportResult r) =>
+        (r.ErrorMessages.FirstOrDefault() ?? r.Message ?? "").Split('\n')[0].Trim() is { Length: > 0 } s ? s : "причина неизвестна";
 
     /// <summary>«Готово. Теперь у соревнования два дня: 06.12 (1555 строк) и 07.12 (1784 строки).»</summary>
     private async Task<string> DoneTextAsync(int eventId)
@@ -347,7 +475,7 @@ public sealed class SiblingDayPullService(
             ["isMasters"] = $"{from}: {(d.IsMasters ? "да" : "нет")}",
             ["clubPointsDisabled"] = $"{from}: {(d.ClubPointsDisabled ? "да" : "нет")}",
             ["poolType"] = conflict
-                ? $"⚠ расходится: у лежащего дня #{d.Id} — {d.PoolType}, регламент соседа — {f?.PoolType}. Выберите сами"
+                ? $"⚠ как у дня {d.Date} ({d.PoolType}), хотя регламент нового дня — {f?.PoolType}"
                 : SiblingDayRules.NormalizePool(d.PoolType) != null ? $"{from}: {d.PoolType}" : f?.Reasons.GetValueOrDefault("poolType") ?? "не задан",
         };
         if (e.CategoryKeys.Count > 0) reasons["categories"] = $"{from}: {string.Join(", ", e.CategoryKeys)}";
@@ -358,33 +486,34 @@ public sealed class SiblingDayPullService(
 
     // ── Пересечение заплывов ─────────────────────────────────────────────────
 
-    private async Task<string?> OverlapRefusalAsync(Start start, string resultsJson, CancellationToken ct)
-    {
-        var (overlap, fileRows, inDay) = await OverlapAsync(start, resultsJson, ct);
-        return SiblingDayRules.OverlapRefusal(overlap, fileRows, inDay);
-    }
+    private async Task<string?> OverlapRefusalAsync(Start start, string resultsJson, CancellationToken ct) =>
+        SiblingDayRules.OverlapRefusal(await OverlapAsync(start, resultsJson, ct));
 
-    /// <summary>Личные строки файла против личных строк всех дней старта — тем же ключом.</summary>
-    /// <returns>Совпавшие ключи, личных строк файла и день, где лежат совпавшие (если он один).</returns>
-    private async Task<(IReadOnlyList<SiblingSwimKey> Overlap, int FileRows, DateOnly? InDay)> OverlapAsync(
-        Start start, string resultsJson, CancellationToken ct)
+    /// <summary>
+    /// Личные строки файла против личных строк всех дней старта (<see cref="SiblingDayRules.OverlapCheck"/>:
+    /// заплыв+дорожка, без них — время, нет и времени — сверять нечем).
+    /// </summary>
+    private async Task<OverlapResult> OverlapAsync(Start start, string resultsJson, CancellationToken ct)
     {
         var file = JsonImportService.DeserializeResultItems(resultsJson)
             .Where(i => i.IsRelay != true)
-            .Select(i => new SiblingSwimKey(SiblingDayRules.Person(i.LastName, i.FirstName), i.BirthYear ?? 0,
-                JsonImportService.NormalizeStyleName(i.EventStyleName), (i.EventStyleLen ?? "").Trim(), i.Heat ?? 0, i.Lane ?? 0))
+            .Select(i => new SiblingSwim(SiblingDayRules.Person(i.LastName, i.FirstName), i.BirthYear ?? 0,
+                JsonImportService.NormalizeStyleName(i.EventStyleName), (i.EventStyleLen ?? "").Trim(), i.Heat ?? 0, i.Lane ?? 0,
+                i.TimeFail ? null : JsonImportService.ParseTimeToMs(i.Time)))
             .ToList();
         var dayIds = start.Days.Select(d => d.Id).ToList();
         var inDb = await db.Results.AsNoTracking()
             .Where(r => dayIds.Contains(r.CompetitionId) && r.RelayId == null)
-            .Select(r => new { r.Swimmer!.LastName, r.Swimmer.FirstName, r.Swimmer.BirthYear, Style = r.Style!.Name, r.Distance, r.Heat, r.Lane, r.CompetitionDate })
+            .Select(r => new
+            {
+                r.Swimmer!.LastName, r.Swimmer.FirstName, r.Swimmer.BirthYear, Style = r.Style!.Name, r.Distance, r.Heat, r.Lane,
+                r.CompetitionDate, r.TimeMillisecond, r.TimeFail,
+            })
             .ToListAsync(ct);
-        var keyed = inDb.Select(r => (Key: new SiblingSwimKey(SiblingDayRules.Person(r.LastName, r.FirstName), r.BirthYear,
-            r.Style, r.Distance.Trim(), r.Heat, r.Lane), Day: DateOnly.FromDateTime(r.CompetitionDate))).ToList();
-        var overlap = SiblingDayRules.Overlap(file, keyed.Select(k => k.Key));
-        var hit = overlap.ToHashSet();
-        var days = keyed.Where(k => hit.Contains(k.Key)).Select(k => k.Day).Distinct().ToList();
-        return (overlap, file.Count, days.Count == 1 ? days[0] : null);
+        var dbRows = inDb.Select(r => new SiblingSwim(SiblingDayRules.Person(r.LastName, r.FirstName), r.BirthYear,
+                r.Style, r.Distance.Trim(), r.Heat, r.Lane, r.TimeFail ? null : r.TimeMillisecond, DateOnly.FromDateTime(r.CompetitionDate)))
+            .ToList();
+        return SiblingDayRules.OverlapCheck(file, dbRows);
     }
 
     private static string Fmt(DateOnly d) => d.ToString(DateFormat, CultureInfo.InvariantCulture);

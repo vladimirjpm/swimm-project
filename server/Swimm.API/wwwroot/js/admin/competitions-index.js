@@ -1613,8 +1613,10 @@
                 ev.classList.toggle('hidden', !!s.eventId);
                 document.getElementById('sibling-event-name').value = s.eventId ? '' : (s.suggestedEventName ?? '');
                 const poolBox = document.getElementById('preview-sibling-pool');
-                poolBox.classList.toggle('hidden', !s.poolConflictNote);
-                poolBox.textContent = s.poolConflictNote ?? '';
+                // Бассейн как у затянутого дня при другом регламенте и «сверить заплывы нечем» — одним блоком.
+                const warnings = [s.poolConflictNote, s.overlapNote].filter(Boolean);
+                poolBox.classList.toggle('hidden', !warnings.length);
+                poolBox.textContent = warnings.join(' ');
                 if (s.pointRuleClubsId) document.getElementById('preview-rule-clubs').value = String(s.pointRuleClubsId);
                 renderSiblingSummary();
             }
@@ -1626,8 +1628,8 @@
                 const pool = document.getElementById('flag-pool').value;
                 const name = s.eventId ? (s.eventName ?? '') : document.getElementById('sibling-event-name').value.trim();
                 box.textContent = s.summaryTemplate
-                    .replace('{pool}', pool ? pool.replace('m', '') + ' м' : 'не выбран')
-                    .replace('{name}', name || '…');
+                    .replace('{pool}', () => (pool ? pool.replace('m', '') + ' м' : 'не выбран'))
+                    .replace('{name}', () => name || '…'); // функцией — «$&» в имени не подставится
             }
             document.getElementById('flag-pool').addEventListener('change', renderSiblingSummary);
             document.getElementById('sibling-event-name').addEventListener('input', renderSiblingSummary);

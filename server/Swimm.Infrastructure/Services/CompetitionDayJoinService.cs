@@ -87,6 +87,8 @@ public sealed class CompetitionDayJoinService(
             return new CompetitionDayJoinReport(name, orgCompId, days, differences, null, false, null);
 
         var eventId = await ApplyAsync(name, orgCompId, days, ct);
+        if (eventId is not int)
+            return CompetitionDayJoinReport.Refused(name, "пока готовился сбор, один из дней уже попал в событие (деление, сбор или «Затянуть этот день» рядом) — проверьте ещё раз");
 
         // Зачёт события строится по всем дням и ложится на первый; объединённые места и
         // пара-очки пересчёт берёт по событию сам.
@@ -96,12 +98,18 @@ public sealed class CompetitionDayJoinService(
         return new CompetitionDayJoinReport(name, orgCompId, days, differences, null, true, eventId);
     }
 
-    private async Task<int> ApplyAsync(string name, int? orgCompId, IReadOnlyList<CompetitionDayJoinDay> days, CancellationToken ct)
+    /// <returns>Id события; null — под замком оказалось, что день уже в событии (гонка).</returns>
+    private async Task<int?> ApplyAsync(string name, int? orgCompId, IReadOnlyList<CompetitionDayJoinDay> days, CancellationToken ct)
     {
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
             await using var tx = await db.Database.BeginTransactionAsync(ct);
+            // Тот же замок, что у деления и «Затянуть этот день» (Р123/Р124); под ним — EventId из базы.
+            var lockIds = days.Select(d => d.CompetitionId).ToArray();
+            await CompetitionDayLock.AcquireAsync(db, lockIds, ct);
+            if (await db.Competitions.AsNoTracking().AnyAsync(c => lockIds.Contains(c.Id) && c.EventId != null, ct))
+                return (int?)null;
 
             var ev = new CompetitionEvent
             {
@@ -126,7 +134,7 @@ public sealed class CompetitionDayJoinService(
             await db.SaveChangesAsync(ct);
 
             await tx.CommitAsync(ct);
-            return ev.Id;
+            return (int?)ev.Id;
         });
     }
 

@@ -108,7 +108,7 @@ public class SiblingDayRulesTests
     [InlineData("25m", null, "25m", false)]
     [InlineData("25m", "25m", "25m", false)]
     [InlineData(null, "50m", "50m", false)]
-    [InlineData("25", "50m", null, true)]
+    [InlineData("25", "50m", "25m", true)]
     [InlineData(null, null, null, false)]
     public void DefaultPool_FromExistingDay_ConflictWithRegulation_NoDefault(string? existing, string? regulation,
         string? pool, bool conflict) =>

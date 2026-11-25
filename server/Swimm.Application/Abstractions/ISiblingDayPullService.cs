@@ -29,25 +29,14 @@ public interface ISiblingDayPullService
 
     /// <summary>
     /// После импорта (фон, петля импорта): найти новый день, собрать в событие (одиночный
-    /// лежащий день — <see cref="ICompetitionDayJoinService"/> с общим именем), записать аудит.
+    /// лежащий день — <see cref="ICompetitionDayJoinService"/> с общим именем), записать аудит. Не бросает:
+    /// любой исход — аудит и текст; <see cref="SiblingDayCompletion.CompetitionId"/> — новый день, если он записан.
     /// </summary>
     Task<SiblingDayCompletion> CompleteAsync(SiblingDayTarget target, ImportResult result, CancellationToken ct = default);
-}
 
-/// <summary>
-/// Что фон делает после импорта дня-соседа — едет в <see cref="ImportEventOptions.SiblingDay"/>.
-/// <paramref name="EventId"/> — событие лежащего дня (импорт сам кладёт день в него); null —
-/// лежащий день одиночный, после импорта дни собираются в событие <paramref name="NewEventName"/>.
-/// </summary>
-public sealed record SiblingDayTarget(
-    int DiscoveryId,
-    int OrgCompId,
-    int LogligId,
-    int ExistingCompetitionId,
-    int? EventId,
-    string? NewEventName,
-    string Date,
-    string Actor);
+    /// <summary>Задача импорта упала исключением — аудит и снять замок «день затягивается».</summary>
+    Task ImportFailedAsync(SiblingDayTarget target, string error);
+}
 
 /// <summary>Превью: <paramref name="Refusal"/> — почему нельзя; иначе разбор и контекст дня.</summary>
 public sealed record SiblingDayPreview(string? Refusal, DiscoveryPreviewResult? Preview, SiblingDayContext? Context)
@@ -79,7 +68,8 @@ public sealed record SiblingDayContext(
     int OverlapRows,
     string SummaryTemplate,
     string DefaultsNote,
-    string? PoolConflictNote);
+    string? PoolConflictNote,
+    string? OverlapNote = null);
 
 /// <summary>Тело «Импортировать» дня-соседа: то, что видел и поправил человек в превью.</summary>
 public sealed record SiblingDayImportRequest(

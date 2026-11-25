@@ -142,10 +142,38 @@ public static class MissingDayTexts
     public static string DefaultsNote(DateOnly existingDay) =>
         $"Бассейн, флаги и категории взяты как у уже затянутого дня {Day(existingDay)} — поправьте, если нужно.";
 
-    /// <summary>Длина бассейна у затянутого дня и в регламенте разная — выбирает человек.</summary>
-    public static string PoolConflict(DateOnly existingDay, string? existingPool, string? regulationPool) =>
-        $"⚠ Бассейн не ясен: у дня {Day(existingDay)} — {Pool(existingPool)}, а в положении соревнования — {Pool(regulationPool)}. "
-        + "Выберите сами — без этого запись не начнётся.";
+    /// <summary>«пятницы» / «дня 06.12» — кто это, в родительном падеже.</summary>
+    private static string Whose(DateOnly d, bool byWeekday) => byWeekday ? Gen(d) : $"дня {Day(d)}";
+
+    /// <summary>
+    /// Бассейн у затянутого дня и в регламенте нового разный: «У пятницы в базе 25 м, а в регламенте
+    /// субботы 50 м. Мы добавим субботу только с тем же бассейном, что у пятницы. Если у пятницы бассейн
+    /// записан неверно — сначала исправьте его через «Изменить».» Сервер примет только длину затянутого дня.
+    /// </summary>
+    public static string PoolConflict(DateOnly existingDay, string? existingPool, DateOnly newDay, string? regulationPool,
+        IReadOnlyList<DateOnly> dbDays)
+    {
+        var w = ByWeekday(Position(dbDays, newDay).Total);
+        var newAcc = w ? Acc(newDay) : $"день {Day(newDay)}";
+        return $"⚠ У {Whose(existingDay, w)} в базе {Pool(existingPool)}, а в регламенте {Whose(newDay, w)} {Pool(regulationPool)}. "
+            + $"Мы добавим {newAcc} только с тем же бассейном, что у {Whose(existingDay, w)}. "
+            + $"Если у {Whose(existingDay, w)} бассейн записан неверно — сначала исправьте его через «Изменить».";
+    }
+
+    /// <summary>Отказ записи: выбран бассейн не как у затянутого дня.</summary>
+    public static string PoolMismatch(DateOnly existingDay, string existingPool, DateOnly newDay, string chosenPool,
+        IReadOnlyList<DateOnly> dbDays)
+    {
+        var w = ByWeekday(Position(dbDays, newDay).Total);
+        var newAcc = w ? Acc(newDay) : $"день {Day(newDay)}";
+        return $"у {Whose(existingDay, w)} в базе {Pool(existingPool)}, а выбрано {Pool(chosenPool)}. Мы добавляем {newAcc} только с тем же "
+            + $"бассейном, что у {Whose(existingDay, w)}. Если у {Whose(existingDay, w)} бассейн записан неверно — сначала исправьте его через «Изменить»";
+    }
+
+    /// <summary>В протоколе нет ни заплывов с дорожками, ни времени — сверку «тот же протокол?» сделать нечем.</summary>
+    public const string OverlapNotChecked =
+        "⚠ Не смогли проверить, что это другой день, а не тот же протокол: в файле нет заплывов и дорожек. "
+        + "Посмотрите дату и строки сами.";
 
     /// <summary>«25 м» / «не выбран».</summary>
     public static string Pool(string? pool) => SiblingDayRules.NormalizePool(pool) is { } p ? p.TrimEnd('m') + " м" : "не выбран";
@@ -163,6 +191,18 @@ public static class MissingDayTexts
     public static string NotJoined(DateOnly day, IReadOnlyList<DateOnly> dbDays, string why, string joinCommand) =>
         $"⚠ День {Day(day)} записан, но отдельным соревнованием — присоединить его к "
         + $"{List(dbDays.Distinct().Order().Select(Day))} не вышло ({why}). Попросите агента собрать дни: {joinCommand}.";
+
+    /// <summary>Импорт дня ничего не записал (отказ, откат, задача упала).</summary>
+    public static string NotImported(DateOnly day, string why) =>
+        $"⚠ Не получилось: результаты {Day(day)} не записаны ({why}). Соревнование осталось как было — можно нажать кнопку ещё раз.";
+
+    /// <summary>Импорт прошёл, но новый день потом не нашёлся.</summary>
+    public static string NotFoundAfterImport(DateOnly day) =>
+        $"⚠ Результаты {Day(day)} записаны, но найти новый день после записи не вышло — дни не соединены. Попросите агента проверить.";
+
+    /// <summary>Дни соединены, но пересчёт мест и очков после этого сорвался.</summary>
+    public static string JoinedButRecalcFailed(DateOnly day, string recalcCommand) =>
+        $"⚠ День {Day(day)} добавлен в соревнование, но пересчёт мест и очков не завершился. Попросите агента пересчитать дни: {recalcCommand}.";
 
     /// <summary>Отказ — одним предложением: «Не получилось: …».</summary>
     public static string Refused(string why) => $"Не получилось: {why}";

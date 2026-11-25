@@ -61,7 +61,7 @@ public class ProgrammeCheckAdminController(IProgrammeCheckService service, ISibl
         var r = await siblings.PreviewAsync(discoveryId, request.LogligId, ct);
         if (r.Refusal != null || r.Preview is not { } p || r.Context is not { } c)
             return Conflict(new { error = MissingDayTexts.Refused(r.Refusal ?? "причина неизвестна") });
-        return Ok(new { preview = DiscoveryAdminController.PreviewResponse(p), sibling = c });
+        return Ok(new { preview = DiscoveryPreviewResponse.Build(p), sibling = c });
     }
 
     /// <summary>

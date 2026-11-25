@@ -146,16 +146,17 @@ public class SiblingDayPullServiceTests
     }
 
     [Fact]
-    public async Task Preview_PoolDiffersFromRegulation_NotSubstituted_Conflict()
+    public async Task Preview_PoolDiffersFromRegulation_ExistingDayPool_SaidPlainly()
     {
-        var c = await SeedAsync(nameof(Preview_PoolDiffersFromRegulation_NotSubstituted_Conflict));
+        var c = await SeedAsync(nameof(Preview_PoolDiffersFromRegulation_ExistingDayPool_SaidPlainly));
         ParsedSaturday(c, OtherSwims(), regulationPool: "50m");
 
         var r = await c.Service().PreviewAsync(c.DiscoveryId, 11590);
 
         Assert.True(r.Context!.PoolConflict);
-        Assert.Null(r.Preview!.Flags!.PoolType);
-        Assert.Contains("расходится", r.Preview.Flags.Reasons["poolType"]);
+        Assert.Equal("25m", r.Preview!.Flags!.PoolType); // сервер примет только длину лежащего дня
+        Assert.Equal("⚠ У пятницы в базе 25 м, а в регламенте субботы 50 м. Мы добавим субботу только с тем же бассейном, что у пятницы. "
+            + "Если у пятницы бассейн записан неверно — сначала исправьте его через «Изменить».", r.Context.PoolConflictNote);
     }
 
     [Fact]
@@ -287,7 +288,8 @@ public class SiblingDayPullServiceTests
 
         var r = await c.Service().ImportAsync(c.DiscoveryId, Request(id, pool: "50m"), "vlad@test");
 
-        Assert.Contains("у дней одного соревнования бассейн один", r.Refusal);
+        Assert.Equal("у пятницы в базе 25 м, а выбрано 50 м. Мы добавляем субботу только с тем же бассейном, что у пятницы. "
+            + "Если у пятницы бассейн записан неверно — сначала исправьте его через «Изменить»", r.Refusal);
     }
 
     [Fact]
@@ -400,5 +402,140 @@ public class SiblingDayPullServiceTests
 
         Assert.Null(done.CompetitionId);
         c.Join.VerifyNoOtherCalls();
+    }
+
+    // ── Сбои завершения (ревью PR #284) ──────────────────────────────────────
+
+    private async Task<Competition> SaturdayAsync(Ctx c, int? eventId = null, int? dayNumber = null)
+    {
+        var sat = new Competition { Name = "x", Date = "07/12/2024", PoolType = "25m", EventId = eventId, DayNumber = dayNumber };
+        c.Db.Competitions.Add(sat);
+        await c.Db.SaveChangesAsync();
+        return sat;
+    }
+
+    private static void AuditOnce(Ctx c, string contains) =>
+        c.Audit.Verify(a => a.LogAsync(SiblingDayPullService.AuditAction, "Competition", It.IsAny<string?>(),
+            It.Is<string>(s => s.Contains(contains)), It.IsAny<object?>(), It.IsAny<CancellationToken>()), Times.Once);
+
+    [Fact]
+    public async Task Complete_JoinThrowsAfterCommit_JoinedButRecalcFailed_DayStillReturned_Audited()
+    {
+        var c = await SeedAsync(nameof(Complete_JoinThrowsAfterCommit_JoinedButRecalcFailed_DayStillReturned_Audited));
+        var sat = await SaturdayAsync(c);
+        c.Join.Setup(j => j.JoinAsync(It.IsAny<IReadOnlyList<int>>(), true, It.IsAny<CancellationToken>(), It.IsAny<string?>()))
+            .Returns(async () =>
+            {
+                // Сбор записан, пересчёт после commit упал.
+                var ev = new CompetitionEvent { Name = "e" };
+                c.Db.CompetitionEvents.Add(ev);
+                await c.Db.SaveChangesAsync();
+                foreach (var day in c.Db.Competitions) day.EventId = ev.Id;
+                await c.Db.SaveChangesAsync();
+                throw new TimeoutException("пересчёт: таймаут");
+            });
+
+        var done = await c.Service().CompleteAsync(Target(c), new ImportResult { Created = 1, CompetitionIds = [sat.Id] });
+
+        Assert.True(done.Joined);
+        Assert.Equal(sat.Id, done.CompetitionId); // фон по нему запланирует шаги loglig
+        Assert.StartsWith("⚠ День 07.12 добавлен в соревнование, но пересчёт мест и очков не завершился", done.Message);
+        AuditOnce(c, "завершение сорвалось");
+    }
+
+    [Fact]
+    public async Task Complete_JoinThrowsBeforeWrite_NotJoined_HintHasName_Audited()
+    {
+        var c = await SeedAsync(nameof(Complete_JoinThrowsBeforeWrite_NotJoined_HintHasName_Audited));
+        var sat = await SaturdayAsync(c);
+        c.Join.Setup(j => j.JoinAsync(It.IsAny<IReadOnlyList<int>>(), true, It.IsAny<CancellationToken>(), It.IsAny<string?>()))
+            .ThrowsAsync(new InvalidOperationException("база недоступна"));
+
+        var done = await c.Service().CompleteAsync(Target(c), new ImportResult { Created = 1, CompetitionIds = [sat.Id] });
+
+        Assert.False(done.Joined);
+        Assert.Equal(sat.Id, done.CompetitionId);
+        Assert.Contains($"--join-days {c.FridayId},{sat.Id} --name \"תחרות חלופית ל\\\"מילניום\\\"\" --apply", done.Message);
+        AuditOnce(c, "завершение сорвалось");
+    }
+
+    [Fact]
+    public async Task Complete_ImportWroteNothing_Audited()
+    {
+        var c = await SeedAsync(nameof(Complete_ImportWroteNothing_Audited));
+
+        var done = await c.Service().CompleteAsync(Target(c), new ImportResult { Created = 0, Message = "Дубль" });
+
+        Assert.Contains("не записаны", done.Message);
+        AuditOnce(c, "импорт ничего не записал");
+    }
+
+    [Fact]
+    public async Task ImportFailed_Audited_AndReleasesTheDay()
+    {
+        SiblingDayPullService.ResetPendingForTests();
+        var c = await SeedAsync(nameof(ImportFailed_Audited_AndReleasesTheDay));
+        var id = ParsedSaturday(c, OtherSwims());
+        Assert.Null((await c.Service().ImportAsync(c.DiscoveryId, Request(id), "a@test")).Refusal);
+
+        await c.Service().ImportFailedAsync(Assert.Single(c.Queue.Jobs).Options!.SiblingDay!, "OutOfMemory");
+
+        AuditOnce(c, "задача импорта упала");
+        // Замок снят: следующий клик не получит «уже затягивается» (статус задачи в фейке — Queued).
+        var again = ParsedSaturday(c, OtherSwims());
+        Assert.Null((await c.Service().ImportAsync(c.DiscoveryId, Request(again), "a@test")).Refusal);
+    }
+
+    [Fact]
+    public async Task Complete_ExistingDayGotEventWhileQueued_NotJoined_SaysWhy()
+    {
+        var c = await SeedAsync(nameof(Complete_ExistingDayGotEventWhileQueued_NotJoined_SaysWhy));
+        var sat = await SaturdayAsync(c);
+        var ev = new CompetitionEvent { Name = "e" };
+        c.Db.CompetitionEvents.Add(ev);
+        await c.Db.SaveChangesAsync();
+        c.Db.Competitions.Single(x => x.Id == c.FridayId).EventId = ev.Id;
+        await c.Db.SaveChangesAsync();
+
+        var done = await c.Service().CompleteAsync(Target(c), new ImportResult { Created = 1, CompetitionIds = [sat.Id] });
+
+        Assert.False(done.Joined);
+        Assert.Contains("тем временем попал в событие", done.Message);
+        c.Join.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Complete_IntoEvent_EarlierDay_RenumberedByDate()
+    {
+        var c = await SeedAsync(nameof(Complete_IntoEvent_EarlierDay_RenumberedByDate));
+        var ev = new CompetitionEvent { Name = "e" };
+        c.Db.CompetitionEvents.Add(ev);
+        await c.Db.SaveChangesAsync();
+        // Лежит суббота (день 1); затянули пятницу — импорт дал ей номер max+1 = 2.
+        var fri = c.Db.Competitions.Single(x => x.Id == c.FridayId);
+        fri.Date = "07/12/2024"; fri.EventId = ev.Id; fri.DayNumber = 1;
+        var earlier = new Competition { Name = "e", Date = "05/12/2024", PoolType = "25m", EventId = ev.Id, DayNumber = 2 };
+        c.Db.Competitions.Add(earlier);
+        await c.Db.SaveChangesAsync();
+
+        var target = new SiblingDayTarget(c.DiscoveryId, 6611, 11590, c.FridayId, ev.Id, null, "05/12/2024", "vlad@test");
+        var done = await c.Service().CompleteAsync(target, new ImportResult { Created = 1, CompetitionIds = [earlier.Id] });
+
+        Assert.True(done.Joined);
+        c.Db.ChangeTracker.Clear();
+        Assert.Equal(1, c.Db.Competitions.Single(x => x.Id == earlier.Id).DayNumber);
+        Assert.Equal(2, c.Db.Competitions.Single(x => x.Id == c.FridayId).DayNumber);
+    }
+
+    [Fact]
+    public async Task Preview_NoHeatsNoTimes_WarnsPlainly_DoesNotRefuse()
+    {
+        var c = await SeedAsync(nameof(Preview_NoHeatsNoTimes_WarnsPlainly_DoesNotRefuse));
+        ParsedSaturday(c, Json(("כהן", "דנה", 0, 0, "freestyle"), ("לוי", "נועה", 0, 0, "freestyle")));
+
+        var r = await c.Service().PreviewAsync(c.DiscoveryId, 11590);
+
+        Assert.Null(r.Refusal);
+        Assert.Equal(MissingDayTexts.OverlapNotChecked, r.Context!.OverlapNote);
     }
 }

@@ -103,6 +103,9 @@ public sealed class ImportBackgroundService : BackgroundService
                 {
                     _queue.SetFailed(jobId, ex.Message);
                     _logger.LogError(ex, "Import job {JobId} failed", jobId);
+                    // Р124: день-сосед — аудит «не записан» и снять замок «день затягивается».
+                    if (eventOptions?.SiblingDay is { } failedSibling)
+                        await SiblingImportFailedAsync(scope.ServiceProvider, jobId, failedSibling, ex.Message);
                     continue;
                 }
 
@@ -127,6 +130,19 @@ public sealed class ImportBackgroundService : BackgroundService
         {
             // Штатная остановка хоста: ReadAllAsync бросает OperationCanceledException при отмене токена.
             // Это не ошибка — просто выходим из цикла.
+        }
+    }
+
+    private async Task SiblingImportFailedAsync(IServiceProvider sp, Guid jobId, SiblingDayTarget target, string error)
+    {
+        try
+        {
+            if (sp.GetService<ICurrentActor>() is HttpCurrentActor actor) actor.BackgroundName = "auto:pull-sibling-day";
+            await sp.GetRequiredService<ISiblingDayPullService>().ImportFailedAsync(target, error);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Import job {JobId}: аудит упавшего дня-соседа не записан", jobId);
         }
     }
 

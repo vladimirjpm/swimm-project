@@ -56,9 +56,20 @@ internal static class MultidayCli
     }
 
     // Сбор отдельных соревнований в многодневное событие (docs/plans/multiday-split-plan.md, М4):
-    //   dotnet run -- --join-days <id>,<id>[,<id>…] [--apply]
+    //   dotnet run -- --join-days <id>,<id>[,<id>…] [--name "<общее имя>"] [--apply]
+    // --name (Р124): дни с разными именами (дни-соседи loglig: день недели и дата в имени) получают
+    // общее имя, исходное уходит в SubName — так «Затянуть этот день» доделывается руками.
     // Обратное к --split-days: дни уже лежат порознь (импорт разложил по датам), события нет.
     // Строки не двигаются; настройки дней не выравниваются — расхождения только печатаются.
+    /// <summary>Значение <c>--name</c> у <c>--join-days</c>; нет или пусто — null (имена дней обязаны совпадать).</summary>
+    internal static string? JoinName(string[] args)
+    {
+        var i = Array.IndexOf(args, "--name");
+        return i >= 0 && i + 1 < args.Length && !string.IsNullOrWhiteSpace(args[i + 1]) && !args[i + 1].StartsWith("--", StringComparison.Ordinal)
+            ? args[i + 1].Trim()
+            : null;
+    }
+
     internal static async Task JoinDaysAsync(WebApplication app, string[] args)
     {
         var joinIndex = Array.IndexOf(args, "--join-days") + 1;
@@ -68,7 +79,7 @@ internal static class MultidayCli
             : [];
         if (joinIds.Count < 2 || joinIds.Contains(0))
         {
-            Console.Error.WriteLine("Usage: dotnet run -- --join-days <id>,<id>[,<id>…] [--apply]");
+            Console.Error.WriteLine("Usage: dotnet run -- --join-days <id>,<id>[,<id>…] [--name \"<общее имя>\"] [--apply]");
             Environment.Exit(1);
             return;
         }
@@ -76,7 +87,7 @@ internal static class MultidayCli
         var joinApply = args.Contains("--apply");
         using var scope = app.Services.CreateScope();
         var joiner = scope.ServiceProvider.GetRequiredService<ICompetitionDayJoinService>();
-        var join = await joiner.JoinAsync(joinIds, joinApply);
+        var join = await joiner.JoinAsync(joinIds, joinApply, CancellationToken.None, JoinName(args));
 
         Console.WriteLine($"«{join.Name}», compID {join.OrgCompId?.ToString() ?? "—"}");
         foreach (var day in join.Days)
