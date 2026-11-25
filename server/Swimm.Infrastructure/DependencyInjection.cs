@@ -185,6 +185,8 @@ public static class DependencyInjection
         services.AddScoped<ICompetitionDaySplitService, CompetitionDaySplitService>();
         // Обзор: кто ещё схлопнут и чьи дни не собраны в событие (multiday-split-plan, М4).
         services.AddScoped<ICollapsedDaysReviewService, CollapsedDaysReviewService>();
+        // «Проверить, чего не хватает» у Р115 — программа loglig ↔ дни в базе (Р123).
+        services.AddScoped<IProgrammeCheckService, ProgrammeCheckService>();
         // Сбор отдельных соревнований в событие — «дни есть, события нет» (там же, М4).
         services.AddScoped<ICompetitionDayJoinService, CompetitionDayJoinService>();
         services.AddScoped<IClubAdminRepository, ClubAdminRepository>();
