@@ -4132,6 +4132,13 @@ namespace Swimm.Infrastructure.Migrations
                     b.Property<int>("SwimmerId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("CardBirthYear")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CardName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<DateTime>("CheckedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -4139,8 +4146,15 @@ namespace Swimm.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("Gender")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<int>("LogligId")
                         .HasColumnType("integer");
+
+                    b.Property<bool?>("ResultsMatched")
+                        .HasColumnType("boolean");
 
                     b.HasKey("SwimmerId");
 

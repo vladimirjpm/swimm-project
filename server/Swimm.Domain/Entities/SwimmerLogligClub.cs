@@ -33,4 +33,26 @@ public class SwimmerLogligClub
 
     /// <summary>Когда карточку открывали (UTC).</summary>
     public DateTime CheckedAt { get; set; }
+
+    /* === Кто на карточке (Р125): по этим полям пол с карточки сверяют и пишут пловцу === */
+
+    /// <summary>
+    /// Имя, как напечатано в заголовке карточки. null — ответ записан до Р125 (или без карточки):
+    /// для пола такой ответ свежим не считается, карточку откроют заново.
+    /// </summary>
+    [MaxLength(200)]
+    public string? CardName { get; set; }
+
+    /// <summary>Год рождения с карточки (чип «שנת לידה»); null — не напечатан.</summary>
+    public int? CardBirthYear { get; set; }
+
+    /// <summary>Пол с карточки (чип «מגדר»): <c>male</c> / <c>female</c>; null — на карточке его нет.</summary>
+    [MaxLength(10)]
+    public string? Gender { get; set; }
+
+    /// <summary>
+    /// Нашёлся ли на карточке хоть один заплыв пловца (дата + дистанция + время) — подтверждение,
+    /// что карточка про того же человека (Р126). null — не сверяли (ответ записала сверка клуба).
+    /// </summary>
+    public bool? ResultsMatched { get; set; }
 }

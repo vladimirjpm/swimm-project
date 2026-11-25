@@ -48,6 +48,7 @@
                     ${f.fixKind === 'swimmer-gender' || f.fixKind === 'swimmer-gender-align' ? renderFixControls(f) : ''}
                 </div>` : ''}
                 ${f.fixKind === 'competition-club-rule' ? renderClubRule(f) : ''}
+                ${f.fixKind === 'swimmer-gender-loglig' && !accepted ? renderLogligGenderReview(f) : ''}
                 ${accepted && f.note ? `<div class="text-[11px] text-admin-text-muted">принято: ${esc(f.note)}</div>` : ''}</td>
             <td class="align-top whitespace-nowrap text-[11px] text-admin-text-muted">
                 ${f.publicLink ? `<a href="${esc(PUBLIC_BASE + f.publicLink)}" target="_blank" rel="noopener"
@@ -64,7 +65,10 @@
                         // Sys_DedupIgnoredPairs и пропадёт и здесь, и в списке дублей.
                         ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}"
                                    title="Не дубли, а тёзки — развязать пару навсегда">Не дубли</button>`
-                        : `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}">Принять</button>`}
+                        : f.fixKind === 'swimmer-gender-loglig'
+                            ? `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}"
+                                       title="Пол остаётся пустым; находка больше не считается проблемой">Оставить как есть</button>`
+                            : `<button class="admin-btn admin-btn-ghost py-1 px-2 finding-accept" data-id="${f.id}">Принять</button>`}
             </td></tr>`;
     }
 
@@ -126,9 +130,65 @@
     // пол неизвестен и у пловца, останутся в списке.
     function bulkGenderButton(g) {
         if (g.checkId !== 'results.no-gender' || !g.openCount) return '';
-        return `<div class="mt-2"><button id="btn-gender-all" class="admin-btn admin-btn-ghost py-1 px-2 text-[12px]"
+        return `<div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <button id="btn-gender-all" class="admin-btn admin-btn-ghost py-1 px-2 text-[12px]"
                     title="Дописать пол в строки тех находок, где пол пловца уже известен">
-                    проставить всем по полу пловца</button></div>`;
+                    проставить всем по полу пловца</button>
+                <button id="btn-gender-loglig" class="admin-btn admin-btn-ghost py-1 px-2 text-[12px]"
+                    title="Пловцам без пола с подтверждённым loglig-id — пол с их карточки loglig (имя и год должны совпасть). Запрос на пловца, до 30 за нажатие (не дольше 2,5 мин); проставленный пол не трогает; случаи с серьёзными последствиями уходят в «Пол с loglig ждёт ручной проверки»">
+                    взять пол с карточек loglig</button></div>`;
+    }
+
+    // Р126: автоматика пол не проставила — есть серьёзные последствия или личность не подтверждена
+    // заплывами. Перечень последствий — в details находки; «Проставить» пишет пол с карточки
+    // loglig осознанно (сервер берёт его из сохранённой карточки, не от страницы).
+    function renderLogligGenderReview(f) {
+        return `<div class="mt-1 flex items-center gap-1.5">
+            <button class="admin-btn admin-btn-ghost py-0.5 px-1.5 text-[11px] finding-gender-confirm" data-id="${f.id}"
+                    title="Записать пол с карточки loglig пловцу и его строкам без пола. В журнале останется «подтвердил человек»">
+                Проставить</button>
+            ${f.subjectLogligId
+                ? `<a href="https://loglig.com:2053/Players/Details/${f.subjectLogligId}" target="_blank" rel="noopener"
+                       class="text-[11px] text-admin-accent hover:underline">карточка loglig ↗</a>` : ''}
+        </div>`;
+    }
+
+    async function confirmLogligGender(btn) {
+        const ok = await adminConfirm({
+            title: 'Проставить пол с карточки loglig?',
+            message: 'Последствия перечислены в находке: рекорды, места, медали, очки или топы изменятся. Действие запишется в журнал как подтверждённое человеком.',
+            confirmText: 'Проставить',
+        });
+        if (!ok) return;
+        btn.disabled = true;
+        try {
+            const res = await api(`${API}/${btn.dataset.id}/confirm-gender-from-loglig`, { method: 'POST' });
+            const data = await api(`${API}/run`, { method: 'POST' });
+            render(data);
+            toast(`Пол проставлен, строк дописано: ${res.rows}; соревнований пересчитано: ${res.recalculated}`, 8000);
+        } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
+    }
+
+    // Пол неизвестен и у пловца, но рядом подтверждённый loglig-id — на его карточке пол
+    // напечатан (Р125). Сервер идёт по карточкам по одной, поэтому нажатие длится: ~1–2 с на пловца.
+    async function fixGenderFromLoglig(btn) {
+        btn.disabled = true;
+        const prev = btn.textContent;
+        btn.textContent = 'иду по карточкам loglig…';
+        try {
+            const res = await api(`${API}/fix-gender-from-loglig`, { method: 'POST' });
+            // Проставлено или кто-то ушёл на ручную проверку — список находок изменился, гоним проверки.
+            if (res.set || res.review) {
+                const data = await api(`${API}/run`, { method: 'POST' });
+                render(data);
+                toast(`${res.message} Закрыто находок: ${data.run.fixedCount}`, 12000);
+            } else {
+                btn.disabled = false;
+                btn.textContent = prev;
+                toast(res.message + (res.alreadyKnown ? ` У ${res.alreadyKnown} пол уже известен — «проставить всем по полу пловца».` : ''), 12000);
+            }
+            if (res.notes?.length) console.info('Пол с карточек loglig — кого смотреть руками:\n' + res.notes.join('\n'));
+        } catch (e) { btn.disabled = false; btn.textContent = prev; toast('Ошибка: ' + e.message, 6000); }
     }
 
     async function fixGenderAll(btn) {
@@ -183,6 +243,10 @@
             b.addEventListener('click', () => setLoglig(b)));
         const bulk = document.getElementById('btn-gender-all');
         if (bulk) bulk.addEventListener('click', () => fixGenderAll(bulk));
+        document.querySelectorAll('.finding-gender-confirm').forEach(b =>
+            b.addEventListener('click', () => confirmLogligGender(b)));
+        const fromLoglig = document.getElementById('btn-gender-loglig');
+        if (fromLoglig) fromLoglig.addEventListener('click', () => fixGenderFromLoglig(fromLoglig));
     }
 
     // Имя субъекта отдельной кнопкой: его копируют, чтобы найти пловца в интернете.

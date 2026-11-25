@@ -81,6 +81,14 @@ public interface IDataCheckRunner
     Task<int?> SetSwimmerGenderAsync(int swimmerId, string gender, CancellationToken ct = default);
 
     /// <summary>
+    /// То же действие, но ТОЛЬКО если пол у пловца пуст в момент записи (Р125): строка пловца
+    /// блокируется и перечитывается, поэтому пол, который между чтением и записью проставил импорт
+    /// или человек, не перезаписывается. Возвращает число дописанных строк результата; null —
+    /// пловца нет, пол неверный или пол у пловца уже стоит (ничего не записано).
+    /// </summary>
+    Task<int?> SetSwimmerGenderIfEmptyAsync(int swimmerId, string gender, CancellationToken ct = default);
+
+    /// <summary>
     /// Выровнять пол пловца по находке `results.gender-vs-card`: ставит выбранный пол в
     /// карточку И приводит к нему ВСЕ его личные строки. Эстафеты не трогает — там пол
     /// команды, а не человека. Возвращает число поправленных строк; null — находка не

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swimm.Application.Abstractions;
+using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 
 namespace Swimm.API.Controllers;
 
@@ -12,8 +14,68 @@ namespace Swimm.API.Controllers;
 [Route("api/admin/data-checks")]
 [Authorize(Roles = "Admin")]
 [AutoValidateAntiforgeryToken]
-public class DataChecksAdminController(IDataCheckRunner runner, IAdminAuditService audit) : ControllerBase
+public class DataChecksAdminController(
+    IDataCheckRunner runner, IAdminAuditService audit, ILogligCardGenderService logligGender) : ControllerBase
 {
+    /// <summary>
+    /// Р125: взять пол с карточек loglig пловцам открытых находок `results.no-gender` — тем, у
+    /// кого он пуст, loglig-id подтверждён, а имя и год карточки совпали. Случаи с серьёзными
+    /// последствиями (Р126) пропускает — они уходят в находку ручной проверки.
+    ///
+    /// Идёт не дольше <see cref="LogligCardGenderRule.ButtonTimeout"/> (у Azure потолок запроса
+    /// 230 с) и отвечает честным итогом «дошли до N из M». Токен запроса сюда НЕ передаётся:
+    /// закрытая вкладка не должна оборвать прогон без итоговой строки аудита. Второе нажатие, пока
+    /// идёт первое (или шаг импорта), — 409.
+    /// </summary>
+    [HttpPost("fix-gender-from-loglig")]
+    public async Task<IActionResult> FixGenderFromLoglig()
+    {
+        using var cts = new CancellationTokenSource(LogligCardGenderRule.ButtonTimeout);
+        LogligCardGenderReport? report = null;
+        string? failure = null;
+        try
+        {
+            report = await logligGender.FillFromFindingsAsync(cts.Token);
+            if (report is null)
+                return Conflict(new { error = "По карточкам loglig уже идёт другой прогон — дождитесь его и нажмите ещё раз" });
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            failure = ex.Message;
+            throw;
+        }
+        finally
+        {
+            // Итог нажатия — в любом исходе: успех, обрыв по времени, исключение.
+            if (report is not null || failure is not null)
+                await audit.LogAsync("datacheck.fix-gender-from-loglig", "DataCheckFinding", null,
+                    "Пол с карточек loglig по находкам «Результаты без пола»: "
+                    + (report?.Message ?? $"прогон сорвался — {failure}"),
+                    report is null ? new { Failure = failure } : new
+                    {
+                        report.Candidates, report.Set, report.Rows, report.Review, report.CardWithoutGender,
+                        report.Failed, report.DbFailed, report.Mismatch, report.NotVerified, report.OverLimit,
+                        report.Requests, report.FromCache, report.Interrupted, report.Reached,
+                    }, CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// Р126: «Проставить» в находке `swimmers.gender-from-loglig-review` — человек видел
+    /// последствия и согласен. Пол берётся с сохранённой карточки loglig, не от клиента; аудит
+    /// (`swimmer.gender-from-loglig-confirmed`, «подтвердил человек») пишет сервис.
+    /// </summary>
+    [HttpPost("{id:int}/confirm-gender-from-loglig")]
+    public async Task<IActionResult> ConfirmGenderFromLoglig(int id, CancellationToken ct)
+    {
+        var result = await logligGender.ConfirmFindingAsync(id, ct);
+        if (result is null)
+            return BadRequest(new { error = "Проставлять нечего: находка не та, пол уже стоит, карточки loglig нет или loglig-id сменился. Прогони проверки" });
+
+        return Ok(result);
+    }
+
     /// <summary>Текущие находки по проверкам + история прогонов.</summary>
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken ct)

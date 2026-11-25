@@ -258,6 +258,8 @@ public static class DependencyInjection
         services.AddScoped<IDataCheck, ReconciliationMismatchCheck>();
         services.AddScoped<IDataCheck, NoGenderCheck>();
         services.AddScoped<IDataCheck, GenderVsCardCheck>();
+        services.AddScoped<IDataCheck, GenderVsLogligCheck>();
+        services.AddScoped<IDataCheck, GenderFromLogligReviewCheck>();
         services.AddScoped<IDataCheck, EmptyRelayCheck>();
         services.AddScoped<IDataCheck, MergedSessionsCheck>();
         services.AddScoped<IDataCheck, OfficialClubPointsMismatchCheck>();
@@ -391,6 +393,14 @@ public static class DependencyInjection
 
         // Игрок loglig у каждой личной строки (Р122) — после импорта и CLI `--stamp-row-players`
         services.AddScoped<ILogligRowPlayerService, LogligRowPlayerService>();
+
+        // Пол пловца с карточки loglig, когда у нас он пуст (Р125) — после импорта и кнопкой в Health
+        services.AddScoped<ILogligCardGenderService, LogligCardGenderService>();
+        services.AddSingleton<LogligCardGenderGate>();
+        services.AddScoped<LogligGenderReviewFinder>();
+        // Р126: сухой расчёт последствий проставления пола — карточки Overview считает сам ResultRepository.
+        services.AddScoped<IGenderImpactService, GenderImpactService>();
+        services.AddScoped<IGenderOverviewPreview>(sp => (Swimm.Infrastructure.Repositories.ResultRepository)sp.GetRequiredService<IResultRepository>());
 
         // Привязка соревнования к его compID-источникам стартового протокола (админка).
         services.AddScoped<ICompetitionSourceAdminService, CompetitionSourceAdminService>();

@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Swimm.Application.Abstractions;
 using Swimm.Application.Dtos;
+using Swimm.Application.Mapping;
 using Swimm.Infrastructure.Data;
 
 namespace Swimm.Infrastructure.Services.DataChecks;
@@ -80,7 +81,8 @@ public sealed class NoGenderCheck(IDataQualityService quality) : IDataCheck
     public string Title => "Результаты без пола";
     public string Description =>
         "Смешанный заплыв («שומרי שבת») не даёт пола в шапке, а у пловца он неизвестен. " +
-        "Проставь пол пловцу и переимпортируй протокол.";
+        "Кнопка «взять пол с карточек loglig» ставит его сама тем, у кого loglig-id подтверждён " +
+        "(после импорта это происходит автоматически, Р125); остальным — кнопками ♂/♀.";
     public DataCheckSeverity Severity => DataCheckSeverity.Warning;
 
     public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
@@ -182,6 +184,101 @@ public sealed class GenderVsCardCheck(SwimmDbContext db) : IDataCheck
         "f" => "female",
         var g => g,
     };
+}
+
+/// <summary>
+/// Пол в карточке пловца против пола на его карточке loglig (Р125). Сеть не трогает: сравнивает с
+/// последним ответом карточки из общего места <c>Sys_SwimmerLogligClubs</c> (его пишут сверка клуба,
+/// кнопки /Admin/Clubs, импорт и шаг «пол с карточек loglig»).
+///
+/// Только показывает. Пустой пол берёт с loglig <c>LogligCardGenderService</c>, а УЖЕ проставленный
+/// не перезаписывает никто: расхождение значит либо ошибку у нас, либо ошибку в регистрации на
+/// loglig, либо чужую карточку под этим loglig-id — решает человек. Соседняя
+/// <see cref="GenderVsCardCheck"/> — про другое: строки результатов против НАШЕЙ карточки.
+/// </summary>
+public sealed class GenderVsLogligCheck(SwimmDbContext db) : IDataCheck
+{
+    public string Id => "swimmers.gender-vs-loglig";
+    public string Title => "Пол пловца против карточки loglig";
+    public string Description =>
+        "У пловца пол в нашей карточке не тот, что на его карточке loglig (подтверждённый loglig-id, " +
+        "имя и год совпали). Сам ничего не чинит и на loglig не ходит — сравнивает с последним " +
+        "сохранённым ответом карточки. Открой обе карточки: ошибка у нас — поправь пол пловцу; " +
+        "ошибка на loglig или привязан чужой loglig-id — «Принять» либо отвязать.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Warning;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        var pairs = await (
+            from c in db.SwimmerLogligClubs.AsNoTracking()
+            join s in db.Swimmers.AsNoTracking() on c.SwimmerId equals s.Id
+            where c.Gender != null && c.CardName != null
+                  && s.LogligIdStatus == "Verified" && s.LogligId == c.LogligId
+                  && s.Gender != null && s.Gender != ""
+            select new
+            {
+                s.Id, s.FirstName, s.LastName, s.BirthYear, s.Gender,
+                c.LogligId, CardGender = c.Gender, c.CardName, c.CardBirthYear,
+            }).ToListAsync(ct);
+
+        var conflicts = pairs
+            .Where(p => LogligCardGenderRule.ToSwimmerGender(p.Gender) is { } ours && ours != p.CardGender)
+            // Чужая карточка под этим id — другая болезнь; здесь только «тот же человек, пол разный».
+            .Where(p => LogligCardGenderRule.SamePerson(
+                new CardGenderSwimmer(null, p.LogligId, "Verified",
+                    LogligClient.NameTokens($"{p.FirstName} {p.LastName}"), p.BirthYear),
+                new CardGenderAnswer(LogligClient.NameTokens(p.CardName!), p.CardBirthYear, p.CardGender)))
+            .OrderBy(p => p.Id)
+            .ToList();
+
+        return new DataCheckOutcome(conflicts.Count, conflicts
+            .Take(50)
+            .Select(p => new DataCheckItem(
+                "Swimmer", p.Id,
+                $"{(p.LastName + " " + p.FirstName).Trim()} ({p.BirthYear}): у нас {p.Gender}, на loglig {p.CardGender}",
+                $"карточка loglig #{p.LogligId} «{p.CardName}» — https://loglig.com:2053/Players/Details/{p.LogligId}",
+                $"/Admin/Swimmers/Edit?id={p.Id}",
+                PublicRoutes.Swimmer(p.Id),
+                SubjectName: (p.LastName + " " + p.FirstName).Trim()))
+            .ToList());
+    }
+}
+
+/// <summary>
+/// Р126: пол с карточки loglig ждёт решения человека. Автоматика (кнопка «взять пол с карточек
+/// loglig», шаг после импорта) такие случаи пропускает: проставление изменило бы что-то серьёзное
+/// (<see cref="GenderImpactRules"/>) либо заплывами не подтверждено, что карточка — того же
+/// человека. Сеть не трогает: считает по сохранённым ответам карточек и текущей базе, поэтому
+/// перечень последствий всегда свежий.
+/// </summary>
+public sealed class GenderFromLogligReviewCheck(LogligGenderReviewFinder genders) : IDataCheck
+{
+    public string Id => "swimmers.gender-from-loglig-review";
+    public string Title => "Пол с loglig ждёт ручной проверки";
+    public string Description =>
+        "У пловца пол не указан, а на его карточке loglig он есть — но сам сайт его не проставил: " +
+        "от этого изменился бы рекорд, место, медаль, очки или топ (перечень — в находке), либо " +
+        "не удалось подтвердить заплывами, что карточка loglig — того же человека. «Проставить» — " +
+        "записать пол с карточки осознанно (в журнале останется «подтвердил человек», производные " +
+        "величины соревнований пересчитаются); «Оставить как есть» — пол остаётся пустым.";
+    public DataCheckSeverity Severity => DataCheckSeverity.Warning;
+
+    public async Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
+    {
+        var reviews = await genders.GetPendingAsync(ct);
+        return new DataCheckOutcome(reviews.Count, reviews
+            .Take(50)
+            .Select(r => new DataCheckItem(
+                "Swimmer", r.SwimmerId,
+                GenderImpactRules.ReviewMessage(r.SwimmerName, r.BirthYear, r.Gender, r.Reasons.Count),
+                GenderImpactRules.ReviewDetails(r.LogligId, r.Reasons),
+                $"/Admin/Swimmers/Edit?id={r.SwimmerId}",
+                PublicRoutes.Swimmer(r.SwimmerId),
+                SubjectName: r.SwimmerName,
+                FixKind: DataCheckFixKinds.SwimmerGenderLogligReview,
+                FixEntityId: r.SwimmerId))
+            .ToList());
+    }
 }
 
 /// <summary>FK-аномалии: результат ссылается на несуществующего пловца или клуб.</summary>

@@ -73,9 +73,10 @@ public sealed class ClubPairLogligService(
                 {
                     var at = DateTime.UtcNow;
                     var club = card.ClubName?.Trim();
-                    await SwimmerLogligClubStore.UpsertAsync(db, id, lid, club, at, ct);
+                    await SwimmerLogligClubStore.UpsertAsync(db, id, lid, club, at, ct, card);
                     await db.SaveChangesAsync(ct);
-                    stored[id] = new StoredLogligClub(lid, club, at);
+                    stored[id] = new StoredLogligClub(lid, club, at, card.FullName, card.BirthYear,
+                        LogligCardGenderRule.ToSwimmerGender(card.Gender));
                 }
                 status.SwimmersDone++;
             }

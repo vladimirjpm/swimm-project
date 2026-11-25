@@ -44,7 +44,8 @@ public class AdminSettingsServiceTests
         // + ResultsAutoMode/ResultsAutoEnabled/ResultsAutoIntervalHours (results-auto, П5, 2026-11-20)
         // + SplitAttachOnImport (доклейка промежуточных сама после импорта, 2026-11-23)
         // + LogligRowPlayersOnImport (игрок loglig у строки после импорта, Р122, 2026-11-24)
-        Assert.Equal(44, all.Count);
+        // + LogligGenderOnImport (пол с карточки loglig после импорта, Р125, 2026-11-25)
+        Assert.Equal(45, all.Count);
     }
 
     [Fact]
