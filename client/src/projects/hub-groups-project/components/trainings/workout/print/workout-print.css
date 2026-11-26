@@ -1,0 +1,105 @@
+/*
+ * Печать листа workout (Ш2, docs/plans/workout-print-plan.md §2 Р1, §3.2, §3.7, §9).
+ * Здесь только механика: размер листа, его цвета и «печатается только лист». Вид листа
+ * (шрифты, кубы, стрелки) — у самого вида (`views/*`), всё под `.wprint-sheet`.
+ *
+ * Классы-контракт для окна предпросмотра (Ш4) внутри `#wprint-root` (корень — `print-mode.ts`):
+ *   .wprint-sheet   — лист A4. При печати остаётся как есть, ровно на странице.
+ *   .wprint-noprint — всё, что не печатается (кнопки, подписи, предупреждение, фон-затемнение).
+ *   .wprint-stage   — обёртка листа для масштаба на экране (`transform: scale`); при печати
+ *                     масштаб снимается. Обёртку можно звать как угодно — правило ниже снимает
+ *                     позиционирование, масштаб и отступы со ВСЕХ предков листа внутри корня;
+ *                     класс нужен только для читаемости разметки.
+ *
+ * Размер листа — в мм, а не 794×1123 px: A4 = 793.7×1122.5 CSS px, и 1123 px на полпикселя
+ * длиннее страницы — Chrome добавляет пустой второй лист. Подгонка (Ш3) меряет по фактической
+ * ширине `.wprint-sheet`, так что на экране и в печати ширина одна и та же.
+ */
+
+.wprint-sheet {
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  position: relative;
+  /* Лист всегда белый с чёрным — в любой теме сайта (deep, light/dark) и в тёмном режиме ОС. */
+  background: #fff;
+  color: #000;
+  color-scheme: light;
+  forced-color-adjust: none;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.wprint-sheet[data-orientation='landscape'] {
+  width: 297mm;
+  height: 210mm;
+}
+
+@media print {
+  /* Страница: без полей, белая, без прокрутки и высоты экрана (min-height: 100vh и т. п.). */
+  html.wprint-on,
+  html.wprint-on body {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: #fff !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
+  /* Всё, кроме корня печати. Корень — прямой ребёнок body, иначе ушёл бы вместе с предком. */
+  html.wprint-on body > :not(#wprint-root) {
+    display: none !important;
+  }
+
+  /* Хром окна предпросмотра. */
+  html.wprint-on #wprint-root .wprint-noprint {
+    display: none !important;
+  }
+
+  /*
+   * Корень и все предки листа: окно на экране — fixed, по центру, с масштабом и прокруткой.
+   * В печати fixed повторяется на каждой странице, transform уменьшает лист, overflow режет —
+   * всё это снимаем. `:not(лист, его потомки, хром)` не трогает сам лист.
+   */
+  html.wprint-on #wprint-root,
+  html.wprint-on #wprint-root :not(.wprint-sheet, .wprint-sheet *, .wprint-noprint) {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    zoom: 1 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  html.wprint-on .wprint-sheet {
+    margin: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    border: 0 !important;
+    transform: none !important;
+    break-inside: avoid;
+    break-after: avoid;
+    page-break-inside: avoid;
+    page-break-after: avoid;
+  }
+}
