@@ -133,6 +133,65 @@ public class WorkoutTests
         Assert.Equal(["Set 1", "Set 2", "Set 3"], WorkoutRules.ForLevel(workout, Adv)!.Sets.Select(s => s.Title));
     }
 
+    // ── Метка «главный сет» (docs/plans/workout-print-plan.md, §3.1) ───────
+
+    /// <summary>Два сета для всех (первый главный) и сет «только Advanced», тоже главный.</summary>
+    private static WorkoutDto WithMain() => new()
+    {
+        Sets =
+        [
+            new WorkoutSetDto { Title = "מרכזי", Main = true, Lines = [Line(4, 100, (Adv, "1:40"), (Int, "1:50"))] },
+            new WorkoutSetDto { Title = "חימום", Lines = [Line(2, 100, (Adv, "1:50"), (Int, "2:00"))] },
+            new WorkoutSetDto { Title = "רק רמה 4+5", LevelIds = [Adv], Main = true, Lines = [Line(2, 100, (Adv, "1:50"))] },
+        ],
+    };
+
+    [Fact]
+    public void Normalize_KeepsMain_SeveralAllowed()
+    {
+        var (w, error) = WorkoutRules.Normalize(WithMain());
+
+        Assert.Null(error);
+        Assert.Equal([true, false, true], w!.Sets.Select(s => s.Main));
+    }
+
+    [Fact]
+    public void ForLevel_CarriesMainToLevelVersion_LevelWithoutMainSetGetsNone()
+    {
+        // Advanced плывёт оба главных сета, Intermediate — только первый.
+        Assert.Equal([true, false, true], WorkoutRules.ForLevel(WithMain(), Adv)!.Sets.Select(s => s.Main));
+        Assert.Equal([true, false], WorkoutRules.ForLevel(WithMain(), Int)!.Sets.Select(s => s.Main));
+
+        // Дорожка без уровня: главный сет виден (он для всех), метка доезжает.
+        Assert.Equal([true, false], WorkoutRules.ForLevel(WithMain(), null)!.Sets.Select(s => s.Main));
+
+        // Уровень, не плывущий ни одного главного сета, видит версию без главного.
+        var onlyAdvMain = new WorkoutDto
+        {
+            Sets =
+            [
+                new WorkoutSetDto { Title = "обычный", Lines = [Line(1, 100, (Adv, "1:40"), (Int, "1:50"))] },
+                new WorkoutSetDto { Title = "главный Adv", LevelIds = [Adv], Main = true, Lines = [Line(1, 100, (Adv, "1:40"))] },
+            ],
+        };
+        Assert.All(WorkoutRules.ForLevel(onlyAdvMain, Int)!.Sets, s => Assert.False(s.Main));
+    }
+
+    [Fact]
+    public void Main_FalseNotWritten_OldJsonReadsAsFalse_TrueRoundTrips()
+    {
+        var plain = WorkoutRules.Serialize(Sample());
+        Assert.DoesNotContain("\"main\"", plain);
+
+        // Документ, сохранённый до появления поля, читается как «не главный».
+        var old = """{"note":null,"sets":[{"title":"סט","repeat":1,"level_ids":null,"lines":[]}]}""";
+        Assert.False(WorkoutRules.Parse(old)!.Sets[0].Main);
+
+        var stored = WorkoutRules.Serialize(WithMain());
+        Assert.Contains("\"main\":true", stored);
+        Assert.Equal([true, false, true], WorkoutRules.Parse(stored)!.Sets.Select(s => s.Main));
+    }
+
     [Fact]
     public void LaneView_LevelWorkout_OnlyOnViewersLane()
     {
