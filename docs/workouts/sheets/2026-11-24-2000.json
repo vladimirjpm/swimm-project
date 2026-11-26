@@ -1,0 +1,343 @@
+{
+  "note": null,
+  "sets": [
+    {
+      "title": null,
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 1,
+          "distance": 200,
+          "text": "חימום חופשי",
+          "intensity": null,
+          "per_level": null
+        }
+      ]
+    },
+    {
+      "title": "זומרס",
+      "repeat": 4,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 2,
+          "distance": 25,
+          "text": "חתירה בלי נשימה",
+          "intensity": null,
+          "per_level": null
+        },
+        {
+          "reps": 1,
+          "distance": 50,
+          "text": "רגליים",
+          "intensity": null,
+          "per_level": null
+        },
+        {
+          "reps": 1,
+          "distance": 50,
+          "text": "מעורב",
+          "intensity": null,
+          "per_level": null
+        }
+      ]
+    },
+    {
+      "title": "כפות",
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 4,
+          "distance": 50,
+          "text": "(25 תחושת מים + 25 מלא) אפשר שנורקל",
+          "intensity": null,
+          "per_level": {
+            "36": {
+              "send_off": "rest :10",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :10",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :10",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :10",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 1,
+          "distance": 400,
+          "text": "(75 חתירה + 25 חזה)",
+          "intensity": null,
+          "per_level": null
+        }
+      ]
+    },
+    {
+      "title": "מרכזי",
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 1,
+          "distance": 100,
+          "text": "",
+          "intensity": "1V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :20",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 2,
+          "distance": 100,
+          "text": "",
+          "intensity": "3V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :30",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 2,
+          "distance": 50,
+          "text": "",
+          "intensity": "1V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :20",
+              "reps": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": null,
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 1,
+          "distance": 100,
+          "text": "",
+          "intensity": "2V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :20",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 2,
+          "distance": 50,
+          "text": "",
+          "intensity": "4V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :30",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 2,
+          "distance": 50,
+          "text": "",
+          "intensity": "1V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :20",
+              "reps": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": null,
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 1,
+          "distance": 100,
+          "text": "",
+          "intensity": "3V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :30",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 2,
+          "distance": 25,
+          "text": "",
+          "intensity": "5V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :30",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 2,
+          "distance": 50,
+          "text": "",
+          "intensity": "1V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :20",
+              "reps": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": null,
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 1,
+          "distance": 50,
+          "text": "קל",
+          "intensity": null,
+          "per_level": null
+        },
+        {
+          "reps": 1,
+          "distance": null,
+          "text": "זינוקיםכיפרים",
+          "intensity": null,
+          "per_level": null
+        }
+      ]
+    }
+  ]
+}
