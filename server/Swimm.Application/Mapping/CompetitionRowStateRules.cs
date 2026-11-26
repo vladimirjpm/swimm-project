@@ -85,6 +85,8 @@ public static class CompetitionStateFilters
 /// базе её нет — закрыл человек, тянуть не нужно.</param>
 /// <param name="MissingSinceDay">Местный день, с которого строки нет в списке isr.org.il
 /// (<c>MissingSince</c>, ставит суточный забор); null — на месте.</param>
+/// <param name="TwinInDb">Дубль страницы федерации: строка с тем же <c>LogligId</c> уже в базе
+/// (<see cref="DiscoveryLogligTwinRule"/>) — затянута вместе с ней, закрыто без импорта.</param>
 public sealed record CompetitionRowStateInput(
     CompetitionStage Stage,
     DateOnly? FirstDay,
@@ -97,7 +99,8 @@ public sealed record CompetitionRowStateInput(
     DateOnly? MissingSinceDay = null,
     int DbDayCount = 0,
     int? SiteDayCount = null,
-    bool MissingDaysAccepted = false);
+    bool MissingDaysAccepted = false,
+    bool TwinInDb = false);
 // DbDayCount — разных дней старта в базе (одиночное — 1, событие — его дни; 0 — строки базы нет).
 // SiteDayCount — дней в диапазоне сайта (DateStart..DateEnd строки «Входящих»); null — сайта нет.
 // MissingDaysAccepted — «затянуто меньше дней, чем по сайту» принято как есть на Edit.
@@ -108,7 +111,7 @@ public sealed record CompetitionRowStateInput(
 /// <param name="DayCount">M — дней по датам старта; у однодневного 1.</param>
 /// <param name="NeedsYou">«ждёт тебя» — вердикт blocked (жёлтая пометка).</param>
 /// <param name="ParseFailed">«сбой разбора» — вердикт failed (красная пометка).</param>
-/// <param name="NothingToPull">Закрыто без импорта: скрыто, «∅» или «✓ имп.» вручную — серый цвет вместо зелёного.</param>
+/// <param name="NothingToPull">Закрыто без импорта: скрыто, «∅», «✓ имп.» вручную или дубль по loglig — серый цвет вместо зелёного.</param>
 /// <param name="FirstDay">Первый день старта — для «впереди: через N дней».</param>
 /// <param name="LastDay">Последний день — по нему строки «ждёт затягивания» группируются в блоки дней.</param>
 /// <param name="MissingDays">Сколько дней строки нет на сайте федерации (от <c>MissingSince</c>); null — на месте.</param>
@@ -228,7 +231,7 @@ public static class CompetitionRowStateRules
     /// Состояние строки на день <paramref name="today"/> (местная дата Израиля).
     ///
     /// Порядок:
-    /// 1. Скрыто, «∅» → закрыто (серое). Строка базы → закрыто, кроме видимой отметки
+    /// 1. Скрыто, «∅», «✓ имп.», дубль по loglig → закрыто (серое). Строка базы → закрыто, кроме видимой отметки
     ///    «результаты неполные»: такая проходит по датам дальше, как строка с сайта.
     ///    И кроме многодневки, затянутой по дням, пока её последний день (по сайту) не прошёл:
     ///    это «идёт», после — закрыто (решение Влада 23.11.2026).
@@ -280,7 +283,7 @@ public static class CompetitionRowStateRules
                         with { PulledDays = input.DbDayCount, SiteDays = input.SiteDayCount };
                 return Make(CompetitionRowState.Closed);
             }
-            case CompetitionStage.OnSite when input.NoProtocolMark || input.MarkedImported:
+            case CompetitionStage.OnSite when input.NoProtocolMark || input.MarkedImported || input.TwinInDb:
                 return Make(CompetitionRowState.Closed, nothing: true);
         }
 

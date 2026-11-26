@@ -103,6 +103,13 @@ public sealed class UnifiedSiteInfo
     public int? LogligId { get; set; }
 
     /// <summary>
+    /// Дубль страницы федерации: compID строки, которая уже в базе с тем же <see cref="LogligId"/>
+    /// (<c>DiscoveryLogligTwinRule</c>, решение Влада 26.11.2026). Стоит — строка закрыта сама
+    /// («дубль N»), тянуть нечего. null — не дубль.
+    /// </summary>
+    public int? TwinOfOrgCompId { get; set; }
+
+    /// <summary>
     /// Явный признак исхода «на странице федерации нет loglig-iframe» (не сбой сети/таймаут/разбор).
     /// Админка по нему пишет «Протокола нет и не будет» и мигает «Нет протокола».
     /// </summary>
@@ -194,6 +201,13 @@ public sealed class UnifiedCompetitionRowDto
     /// Репозиторий заполняет у всех строк (один запрос на список).
     /// </summary>
     public IReadOnlyList<CompetitionHealthCount> Health { get; set; } = [];
+
+    /// <summary>
+    /// Последний импорт в базу (UTC) по журналу <c>Sys_ImportHistory</c>: у события — самый свежий
+    /// среди дней. Чип «✓ затянуто ДД.ММ» у закрытой строки базы (решение Влада 26.11.2026).
+    /// null — записи нет (старые импорты CLI) или строки базы нет. Заполняется при decorate.
+    /// </summary>
+    public DateTime? LastImportedAt { get; set; }
 
     /// <summary>
     /// Первые открытые находки Health строки (не больше <see cref="CompetitionHealthFinding.PerRowLimit"/>) —
