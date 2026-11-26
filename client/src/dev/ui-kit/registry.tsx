@@ -14,6 +14,7 @@ import UI_SwimmStyleIcon, {
   SWIM_ICON_SIZES,
   type SwimIconSize,
 } from '../../projects/components/mix/swimm-style-icon/swimm-style-icon';
+import PrintStubPreview from './print-stub-preview';
 
 interface PropCommon {
   name: string;
@@ -246,6 +247,21 @@ export const COMPONENTS: ComponentEntry[] = [
         className={v.className}
       />
     ),
+  },
+  {
+    id: 'workout-print-stub',
+    name: 'WorkoutPrintSession',
+    file: 'src/projects/hub-groups-project/components/trainings/workout/print/use-print-session.ts',
+    summary:
+      'Механика печати листа workout (Ш2): портал в body, в печать идёт только лист, @page A4 без полей. Лист — заглушка до Ш3.',
+    notes: [
+      'Open print preview → Print → «Сохранить как PDF»: одна страница, только лист, без колонтитулов (адрес, дата), метки углов TL/TR/BL/BR на месте.',
+      'Close → Ctrl+P: страница печатается как раньше — класс wprint-on и <style id="wprint-page"> убраны.',
+      'Режим dark: лист остаётся белым с чёрным.',
+    ],
+    defaultWidth: 0,
+    props: [],
+    render: () => <PrintStubPreview />,
   },
 ];
 
