@@ -45,6 +45,35 @@
   .admin-btn-ghost {
     @apply border-admin-border text-admin-text-muted hover:bg-admin-surface-hover hover:text-admin-text;
   }
+  /* «Обрати внимание, но не удаление»: оранжевый, как плашки предупреждений. Сделан по образцу
+     danger, чтобы рядом с красным текстом предупреждения действие не путалось с ним. */
+  .admin-btn-warning {
+    @apply bg-admin-warning/15 text-admin-warning border-admin-warning/40 hover:bg-admin-warning/25;
+  }
+
+  /* Тумблер «пометить сомнительным» в превью импорта (/Admin/Competitions, renderRecordPreview
+     в competitions-index.js). Это <label> с настоящим чекбоксом .suspect-flag внутри — чекбокс
+     читают captureForm/«Применить», поэтому он остаётся. Был серым текстом и терялся под
+     красным вердиктом loglig (26.11.2026); теперь кнопка admin-btn-warning, а отмеченная —
+     залита целиком, чтобы выбор был виден издалека. */
+  .btn-mark-suspect {
+    @apply px-2.5 py-1 text-[11.5px];
+  }
+  .btn-mark-suspect:has(input:checked) {
+    @apply border-admin-warning bg-admin-warning text-[#2b1a00] hover:bg-admin-warning;
+  }
+  .btn-mark-suspect:has(input:focus-visible) {
+    @apply ring-2 ring-admin-warning/50;
+  }
+  /* Клик ничего не отправляет — пометка уезжает с «Импортировать». Отмеченная кнопка говорит
+     это словами: иначе нажатие выглядело так, будто ничего не произошло. */
+  .btn-mark-suspect .when-on,
+  .btn-mark-suspect:has(input:checked) .when-off {
+    display: none;
+  }
+  .btn-mark-suspect:has(input:checked) .when-on {
+    display: inline;
+  }
 
   /* Колесико загрузки — одно на всю админку (было вписано руками в Import и на дашборде).
      Цвет — текущий цвет текста (border-current), размер правится утилитой: size-5. */
