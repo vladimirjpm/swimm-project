@@ -51,10 +51,18 @@ public class TrainingRsvpService : ITrainingRsvpService
         var now = Now(nowLocal);
         if (schedule == null) return null;
         var occurrence = await FindOccurrenceAsync(hubGroupId, schedule, date, start);
-        if (!TrainingRsvpRules.IsViewable(occurrence, now, isManager)) return null;
+        // Прошедшее участнику (решение Влада 26.11.2026): весь опубликованный план — все дорожки и
+        // workout каждого уровня. Глубже недели — только если план опубликован; права на запись те же.
+        var memberPast = !isManager && TrainingRsvpRules.IsMemberPast(occurrence, now);
+        if (!TrainingRsvpRules.IsViewable(occurrence, now, isManager)
+            && !(memberPast && await HasPublishedPlanAsync(hubGroupId, date, start))) return null;
 
-        return await BuildAsync(hubGroupId, schedule, occurrence!, viewerUserId, isManager, now);
+        return await BuildAsync(hubGroupId, schedule, occurrence!, viewerUserId, isManager, now, memberPast);
     }
+
+    private Task<bool> HasPublishedPlanAsync(int hubGroupId, DateOnly date, string start) =>
+        _db.LanePlans.AnyAsync(p => p.HubGroupId == hubGroupId && p.Date == date && p.Start == start
+                                    && p.Status == LanePlanStatus.Published);
 
     public async Task<List<NextTrainingDto>?> GetNextAsync(int hubGroupId, DateTime? nowLocal = null)
     {
@@ -126,6 +134,31 @@ public class TrainingRsvpService : ITrainingRsvpService
                 Maybe = Count(o.Date, o.Start, "maybe"),
                 No = Count(o.Date, o.Start, "no"),
             })
+            .ToList();
+    }
+
+    public async Task<List<PastTrainingDto>?> GetMemberPastAsync(int hubGroupId, DateTime? nowLocal = null)
+    {
+        var schedule = await ScheduleAsync(hubGroupId);
+        if (schedule == null) return null;
+
+        var now = Now(nowLocal);
+        var today = DateOnly.FromDateTime(now);
+        var first = today.AddDays(-TrainingRsvpRules.PastDaysBack);
+        var oneOffs = await OneOffsAsync(hubGroupId, first, today);
+        var cancellations = await CancellationsAsync(hubGroupId, first, today);
+
+        // Только опубликованные планы занятия (CF5: ключ — дата + начало). План дня без занятия (архив
+        // до CF5, Start null) участнику не открыть — вид занятия ищет план по началу, — его нет и здесь.
+        var plans = await _db.LanePlans.AsNoTracking()
+            .Where(p => p.HubGroupId == hubGroupId && p.Date >= first && p.Date <= today
+                        && p.Status == LanePlanStatus.Published && p.Start != null)
+            .Select(p => new { p.Date, p.Start })
+            .ToListAsync();
+
+        return TrainingOccurrences.Past(schedule, oneOffs, cancellations,
+                plans.Select(p => (p.Date, p.Start!)), [], now)
+            .Select(o => new PastTrainingDto { Session = ToDto(o, schedule) })
             .ToList();
     }
 
@@ -367,13 +400,19 @@ public class TrainingRsvpService : ITrainingRsvpService
     /// Вид по дорожкам (Ш3.2): кем каждый пришедший стоит (<see cref="HubGroupPersonResolver"/>),
     /// его уровень (пловца, иначе аккаунта), порядок состава — и чистая раскладка
     /// <see cref="TrainingLaneView"/>. Только в этом личном ответе: имена и ответы — приватные.
+    ///
+    /// Прошедшее участнику (<paramref name="memberPast"/>, решение Влада 26.11.2026) — история, а не
+    /// прогноз: только опубликованный план (раскладки на лету нет), workout уровня на КАЖДОЙ дорожке, а
+    /// зритель стоит на своей дорожке плана, даже если не отвечал. Остальные в бассейне — как всегда,
+    /// по ответам, имена — по «Who's coming».
     /// </summary>
     private async Task<TrainingLaneViewDto?> BuildLaneViewAsync(int hubGroupId, GroupTrainingSchedule schedule,
         DateOnly date, string start, IReadOnlyDictionary<int, (string Name, string? Gender)> members,
         IReadOnlyDictionary<int, int?> resolved, IReadOnlyDictionary<int, HubGroupTrainingRsvp> answers,
-        IReadOnlyDictionary<int, HubGroupTrainingRsvp> swimmerAnswers, int viewerUserId, bool isManager)
+        IReadOnlyDictionary<int, HubGroupTrainingRsvp> swimmerAnswers, int viewerUserId, bool isManager,
+        bool memberPast = false)
     {
-        var mode = schedule.EffectiveLaneView;
+        var mode = memberPast ? GroupLaneView.Plan : schedule.EffectiveLaneView;
         if (mode == GroupLaneView.Off) return null;
 
         var plan = await _db.LanePlans.AsNoTracking()
@@ -467,6 +506,24 @@ public class TrainingRsvpService : ITrainingRsvpService
                     at.i, 1);
             }));
 
+        // Прошедшее: зритель, которого план поставил на дорожку, виден на ней и без ответа — «своя
+        // дорожка подсвечена, если был в плане». Ответа нет — `answer` пустой (кружок без пунктира).
+        if (memberPast && plan != null && pool.All(p => p.UserId != viewerUserId)
+            && members.TryGetValue(viewerUserId, out var viewer)
+            && resolved.GetValueOrDefault(viewerUserId) is int viewerSid
+            && plan.Swimmers.Any(s => s.SwimmerId == viewerSid && s.LaneNo != null)
+            && rosterAt.TryGetValue(viewerSid, out var viewerAt))
+        {
+            answers.TryGetValue(viewerUserId, out var viewerAnswer);
+            pool.Add(new TrainingLaneView.Person(
+                viewerUserId, viewerSid,
+                string.IsNullOrEmpty(viewerAt.r.Name) ? viewerAt.r.NameEn : viewerAt.r.Name,
+                viewerAt.r.Gender ?? viewer.Gender,
+                viewerAnswer?.Answer ?? "", null,
+                swimmerLevels.TryGetValue(viewerSid, out var vl) ? vl : accountLevels.TryGetValue(viewerUserId, out var val) ? val : null,
+                viewerAt.i, claims.GetValueOrDefault(viewerSid, 1)));
+        }
+
         var planModel = plan == null ? null : new TrainingLaneView.Plan(
             plan.LaneCount,
             plan.Lanes.Select(l => new TrainingLaneView.PlanLane(l.LaneNo, l.LevelId, l.Workout)).ToList(),
@@ -475,7 +532,7 @@ public class TrainingRsvpService : ITrainingRsvpService
 
         var namesVisible = isManager || schedule.EffectiveWhoIsComing == GroupWhoIsComing.Members;
         return TrainingLaneView.Build(mode, planModel, schedule.UsualLanes, lastPlanLanes, levels, pool,
-            viewerUserId, namesVisible, workoutOnEveryLane: isManager);
+            viewerUserId, namesVisible, workoutOnEveryLane: isManager || memberPast);
     }
 
     /// <summary>Убрать строку ответа за пловца, которым стоит аккаунт, на это занятие.</summary>
@@ -551,8 +608,13 @@ public class TrainingRsvpService : ITrainingRsvpService
         _ => notTraining ? 5 : onBreak ? 4 : 3,
     };
 
+    /// <param name="memberPast">
+    /// Прошедшее занятие глазами участника (<see cref="TrainingRsvpRules.IsMemberPast"/>): вид по
+    /// дорожкам — только опубликованный план, workout на каждой дорожке, своя дорожка — по плану.
+    /// </param>
     private async Task<TrainingRsvpDto> BuildAsync(int hubGroupId, GroupTrainingSchedule schedule,
-        TrainingOccurrences.Occurrence occurrence, int viewerUserId, bool isManager, DateTime now)
+        TrainingOccurrences.Occurrence occurrence, int viewerUserId, bool isManager, DateTime now,
+        bool memberPast = false)
     {
         var date = occurrence.Date;
         var start = occurrence.Start;
@@ -623,7 +685,7 @@ public class TrainingRsvpService : ITrainingRsvpService
 
         var laneView = await BuildLaneViewAsync(hubGroupId, schedule, date, start,
             members.ToDictionary(m => m.UserId, m => (m.Name, m.Gender)), resolved, answers, swimmerAnswers,
-            viewerUserId, isManager);
+            viewerUserId, isManager, memberPast);
 
         var dto = new TrainingRsvpDto
         {

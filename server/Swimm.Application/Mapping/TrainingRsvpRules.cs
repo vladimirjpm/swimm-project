@@ -64,7 +64,8 @@ public static class TrainingRsvpRules
     /// [сегодня − <see cref="ManagerDaysBack"/>; сегодня + <see cref="DaysAhead"/>]. Отменённое
     /// смотреть можно: ответы при отмене не удаляются, а тренеру нужно видеть, что отменил.
     /// Управляющий видит прошедшие глубже — на <see cref="PastDaysBack"/> дней (CF9, список «Past»);
-    /// отмена и возврат занятия зовут без флага и остаются в окне правки.
+    /// отмена и возврат занятия зовут без флага и остаются в окне правки. Участнику прошедшее глубже
+    /// недели — отдельное правило <see cref="IsMemberPast"/> (26.11.2026), а не этот флаг.
     /// </summary>
     public static bool IsViewable(TrainingOccurrences.Occurrence? occurrence, DateTime nowLocal, bool isManager = false)
     {
@@ -72,6 +73,26 @@ public static class TrainingRsvpRules
         var today = DateOnly.FromDateTime(nowLocal);
         var back = isManager ? PastDaysBack : ManagerDaysBack;
         return occurrence.Date >= today.AddDays(-back) && occurrence.Date <= today.AddDays(DaysAhead);
+    }
+
+    /// <summary>
+    /// Занятие уже началось — «прошедшее» (то же правило «начавшееся — не ближайшее», что у
+    /// <see cref="TrainingOccurrences.Past"/> и <see cref="TrainingOccurrences.Upcoming"/>).
+    /// </summary>
+    public static bool HasStarted(TrainingOccurrences.Occurrence occurrence, DateTime nowLocal) =>
+        nowLocal >= occurrence.Date.ToDateTime(TimeOnly.ParseExact(occurrence.Start, "HH:mm", CultureInfo.InvariantCulture));
+
+    /// <summary>
+    /// Прошедшее занятие глазами УЧАСТНИКА (решение Влада 26.11.2026, отменяет «участнику прошедших
+    /// не показываем» CF9 — docs/plans/trainings-coach-flow-plan.md): оно началось и лежит не глубже
+    /// <see cref="PastDaysBack"/> дней — того же окна, что у списка «Past» тренера. Только смотреть:
+    /// окно правки (<see cref="EditBlockReason"/>) не меняется. Глубже недели (<see cref="IsViewable"/>)
+    /// занятие открывается участнику только с ОПУБЛИКОВАННЫМ планом дорожек — это проверяет сервис.
+    /// </summary>
+    public static bool IsMemberPast(TrainingOccurrences.Occurrence? occurrence, DateTime nowLocal)
+    {
+        if (occurrence == null || !HasStarted(occurrence, nowLocal)) return false;
+        return occurrence.Date >= DateOnly.FromDateTime(nowLocal).AddDays(-PastDaysBack);
     }
 
     /// <summary>

@@ -371,14 +371,15 @@ export interface NextTraining {
 
 /**
  * Прошедшее занятие в списке «Past» тренера (CF9 docs/plans/trainings-coach-flow-plan.md) —
- * `GET /api/hub-groups/{id}/past-trainings`, только управляющему. Счётчики — сколько ответило;
- * знаменателя нет: состав группы с тех пор мог поменяться.
+ * `GET /api/hub-groups/{id}/past-trainings`. Управляющему — занятия с ответами или планом и счётчики
+ * (сколько ответило; знаменателя нет: состав группы с тех пор мог поменяться). Участнику (решение Влада
+ * 26.11.2026) — только занятия с опубликованным планом и БЕЗ счётчиков: `yes / maybe / no` нет.
  */
 export interface PastTraining {
   session: NextTraining;
-  yes: number;
-  maybe: number;
-  no: number;
+  yes?: number;
+  maybe?: number;
+  no?: number;
 }
 
 /**
@@ -819,8 +820,11 @@ export interface TrainingLanePerson {
   swimmer_id: number | null;
   name: string | null;
   gender: 'male' | 'female' | null;
-  /** «не уверен» тоже занимает место — рисуется пунктиром. */
-  answer: 'yes' | 'maybe';
+  /**
+   * «не уверен» тоже занимает место — рисуется пунктиром. Пусто — зритель на своей дорожке
+   * прошедшего занятия, на которое не отвечал (стоит по плану, 26.11.2026).
+   */
+  answer: 'yes' | 'maybe' | '';
   note?: RsvpNote | null;
   is_me: boolean;
   /** Сколько аккаунтов называют себя этим пловцом; 2+ — «2 claim». */
@@ -834,7 +838,8 @@ export interface TrainingLane {
   workout?: string | null;
   /**
    * Workout занятия в версии уровня этой дорожки (CF6) — только на своей дорожке зрителя: сеты его
-   * уровня, в ячейках — только его время. null — нет.
+   * уровня, в ячейках — только его время. null — нет. Управляющему и участнику на ПРОШЕДШЕМ
+   * занятии (26.11.2026) — на каждой дорожке.
    */
   level_workout?: Workout | null;
   people: TrainingLanePerson[];

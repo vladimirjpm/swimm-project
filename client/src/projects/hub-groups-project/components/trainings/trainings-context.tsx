@@ -112,7 +112,8 @@ export interface TrainingsTabState {
   setLanesDirty: (dirty: boolean) => void;
   /**
    * Занятие, открытое на рабочем столе тренера (`?session=<id>`, CF1 плана trainings-coach-flow);
-   * `null` — тренер видит список занятий. У участника всегда `null`.
+   * `null` — тренер видит список занятий. У участника — только прошедшее из его списка «Past»
+   * (26.11.2026): вид «только смотреть» вместо видов Next / Trainings / Lanes.
    */
   deskSession: NextTraining | null;
   /**
@@ -126,7 +127,10 @@ export interface TrainingsTabState {
    * прошедшего не знает.
    */
   selectedRoll: TrainingRsvpState | null;
-  /** Прошедшие занятия с данными — список «Past» тренера (CF9); участнику `list` всегда `null`. */
+  /**
+   * Прошедшие занятия — список «Past» (CF9): тренеру — с данными и счётчиками, участнику (26.11.2026) —
+   * с опубликованным планом, без счётчиков.
+   */
   past: PastTrainingsState;
   /** Открыть рабочий стол занятия (кнопка Open карточки списка). */
   openDesk: (sessionId: string) => void;
@@ -267,9 +271,12 @@ export function TrainingsTabProvider({
   const openDesk = useCallback((id: string) => leaveDesk(id), [leaveDesk]);
   const closeDesk = useCallback(() => leaveDesk(null), [leaveDesk]);
   const deskIndex = manages && deskId ? upcomingIds.findIndex((s) => s.id === deskId) : -1;
-  // Не среди ближайших — может быть прошедшим из списка «Past» (CF9).
-  const past = usePastTrainings(group.id, manages);
-  const pastDesk = manages && deskId && deskIndex < 0
+  // Не среди ближайших — может быть прошедшим из списка «Past» (CF9). С 26.11.2026 (решение Влада)
+  // «Past» есть и у участника: таб рисуется только своим, поэтому список грузится всегда; участнику
+  // сервер отдаёт занятия с опубликованным планом, без счётчиков. Открытое прошедшее у участника —
+  // тот же `?session=`, только вместо стола тренера — вид «только смотреть» (`member-past-session`).
+  const past = usePastTrainings(group.id, true);
+  const pastDesk = deskId && deskIndex < 0
     ? past.list?.find((p) => p.session.id === deskId)?.session ?? null
     : null;
   const deskSession = deskIndex >= 0 ? upcomingIds[deskIndex] : pastDesk;
@@ -380,7 +387,9 @@ export function TrainingsTabProvider({
   // Гашение «нового» — один раз за монтирование таба (флаги в ref), не на каждое переключение видов.
   // Лента на экране: телефон — вид Trainings, десктоп — правая колонка (всё, кроме Lanes).
   // Тренеру лента стоит под списком занятий (CF1) — видна, пока не открыт рабочий стол.
-  const feedShown = manages ? deskSession == null : isDesktop ? view !== 'lanes' : view === 'trainings';
+  const feedShown = manages || deskSession != null
+    ? deskSession == null
+    : isDesktop ? view !== 'lanes' : view === 'trainings';
   const newMedia = sessions.data?.new_media_count ?? 0;
   const feedSeenSent = useRef(false);
   const { markSeen: markFeedSeen } = sessions;
@@ -438,7 +447,7 @@ export function TrainingsTabProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `upcomingIds` пересоздаётся на каждый рендер; ключ — состав id
   }, [rsvp, slot0, slot1, slot2, slot3, slot4, slot5, sharedId, upcomingIds.map((s) => s.id).join(',')]);
   // Ответы прошедшего на столе (CF9) — свой экземпляр: среди слотов ближайших его нет.
-  const pastRoll = useTrainingRsvp(group.id, deskIsPast ? deskSession?.id : undefined, manages);
+  const pastRoll = useTrainingRsvp(group.id, deskIsPast ? deskSession?.id : undefined, true);
   const selectedRoll = deskIsPast ? pastRoll : upcoming[rollIndex] ?? null;
 
   const value = useMemo<TrainingsTabState>(() => ({

@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import type { PastTraining } from '../../../types';
 
 /**
- * Прошедшие занятия с ответами или планом дорожек — список «Past» тренера (CF9,
- * docs/plans/trainings-coach-flow-plan.md): `GET /api/hub-groups/{id}/past-trainings`. Сервер
- * отдаёт их только управляющему, за `TrainingRsvpRules.PastDaysBack` дней, сначала новые.
- * Данные личные — без кэша. Грузит контекст таба (`trainings-context.tsx`), не секция.
+ * Прошедшие занятия — список «Past» (CF9, docs/plans/trainings-coach-flow-plan.md):
+ * `GET /api/hub-groups/{id}/past-trainings`, за `TrainingRsvpRules.PastDaysBack` дней, сначала новые.
+ * Управляющему — занятия с ответами или планом дорожек и счётчики ответов; участнику (решение Влада
+ * 26.11.2026) — только с опубликованным планом, без счётчиков. Данные личные — без кэша. Грузит
+ * контекст таба (`trainings-context.tsx`), не секция.
  */
 export interface PastTrainingsState {
-  /** `null` — ещё не пришли, не управляющий или ошибка (список тогда просто не рисуется). */
+  /** `null` — ещё не пришли, выключено или ошибка (список тогда просто не рисуется). */
   list: PastTraining[] | null;
   reload: () => void;
 }

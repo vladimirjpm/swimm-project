@@ -7,10 +7,14 @@ import { formatSheetDate } from '../sheets/link-helpers';
 import { useTrainingsTab } from '../trainings-context';
 
 /**
- * Список «Past» тренера под карточками Upcoming (CF9, docs/plans/trainings-coach-flow-plan.md):
- * прошедшие занятия, по которым есть ответы или план дорожек, сначала новые. Open открывает тот же
- * рабочий стол занятия (`openDesk` → `?session=<id>`), что и у ближайших: перекличка, дорожки,
- * workout. Править прошедшее сервер даёт неделю (`ManagerDaysBack`), смотреть — дольше.
+ * Список «Past» (CF9, docs/plans/trainings-coach-flow-plan.md): прошедшие занятия, сначала новые.
+ * Open открывает занятие по `?session=<id>` (`openDesk`).
+ *
+ * - Тренер — под карточками Upcoming: занятия с ответами или планом, строкой ниже — счётчики ответов
+ *   и статус плана; Open — его рабочий стол. Править прошедшее сервер даёт неделю (`ManagerDaysBack`).
+ * - Участник (решение Влада 26.11.2026; и режим «👁 View» тренера) — в виде Next: только занятия с
+ *   опубликованным планом, без счётчиков и без статуса плана (он всегда «published»); Open — вид
+ *   «только смотреть» (`sections/member-past-session-section.tsx`).
  *
  * Пусто или список не пришёл — секции нет (у новой группы прошлого ещё нет).
  */
@@ -19,18 +23,21 @@ import { useTrainingsTab } from '../trainings-context';
 const SHOWN = 5;
 
 function answersLabel(p: PastTraining): React.ReactNode {
-  if (p.yes + p.maybe + p.no === 0) return <span style={{ color: 'var(--t-text-3)' }}>No answers</span>;
+  const yes = p.yes ?? 0;
+  const maybe = p.maybe ?? 0;
+  const no = p.no ?? 0;
+  if (yes + maybe + no === 0) return <span style={{ color: 'var(--t-text-3)' }}>No answers</span>;
   return (
     <span className="hp-mono">
-      <span style={{ color: 'var(--deep-live)' }}>{p.yes}</span> going
-      {p.maybe > 0 && <> · <span style={{ color: 'var(--deep-gold)' }}>{p.maybe}</span> maybe</>}
-      {p.no > 0 && <> · <span style={{ color: 'var(--deep-danger)' }}>{p.no}</span> out</>}
+      <span style={{ color: 'var(--deep-live)' }}>{yes}</span> going
+      {maybe > 0 && <> · <span style={{ color: 'var(--deep-gold)' }}>{maybe}</span> maybe</>}
+      {no > 0 && <> · <span style={{ color: 'var(--deep-danger)' }}>{no}</span> out</>}
     </span>
   );
 }
 
 function PastRow({ item }: { item: PastTraining }) {
-  const { lanePlans, openDesk } = useTrainingsTab();
+  const { lanePlans, openDesk, manages } = useTrainingsTab();
   const s = item.session;
   const plan = lanePlans?.find((p) => p.session_id === s.id) ?? null;
 
@@ -46,10 +53,12 @@ function PastRow({ item }: { item: PastTraining }) {
           <SessionTag session={s} className="max-w-full" />
           {s.cancelled && <CancelledPill />}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[12px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
-          {answersLabel(item)}
-          {lanePlans != null && <PlanPill state={plan ? plan.status : 'none'} />}
-        </div>
+        {manages && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[12px] font-extrabold" style={{ color: 'var(--deep-text)' }}>
+            {answersLabel(item)}
+            {lanePlans != null && <PlanPill state={plan ? plan.status : 'none'} />}
+          </div>
+        )}
       </div>
       {s.id && (
         <button
@@ -65,15 +74,20 @@ function PastRow({ item }: { item: PastTraining }) {
   );
 }
 
-function PastSessions() {
-  const { past } = useTrainingsTab();
+/** `className` — отступ сверху: у тренера список стоит под карточками (`mt-4`), у участника — секцией. */
+function PastSessions({ className = 'mt-4' }: { className?: string }) {
+  const { past, lanePreview, lanePlans } = useTrainingsTab();
   const [all, setAll] = useState(false);
-  const list = past.list;
+  // «👁 View» тренера: сервер отдал ему свой список (черновики, занятия только с ответами) — оставляем
+  // то, что увидит участник: занятия с опубликованным планом.
+  const list = lanePreview
+    ? past.list?.filter((p) => lanePlans?.some((lp) => lp.session_id === p.session.id && lp.status === 'published')) ?? null
+    : past.list;
   if (!list || list.length === 0) return null;
   const shown = all ? list : list.slice(0, SHOWN);
 
   return (
-    <div className="mt-4">
+    <div className={className} data-section="past-sessions">
       <div className="mb-2 text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
         Past
       </div>

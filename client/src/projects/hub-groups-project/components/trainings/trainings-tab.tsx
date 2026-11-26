@@ -3,7 +3,8 @@ import type { TrainingRsvpState } from '../../use-training-rsvp';
 import type { HubGroupDetails } from '../../types';
 import { TrainingsTabProvider, useTrainingsTab } from './trainings-context';
 import {
-  COACH_DESK_SECTIONS, COACH_LIST_SECTIONS, LANES_SECTIONS, NEXT_SECTIONS, SectionList, TRAININGS_SECTIONS, VIEW_SECTIONS,
+  COACH_DESK_SECTIONS, COACH_LIST_SECTIONS, LANES_SECTIONS, MEMBER_PAST_SECTIONS, NEXT_SECTIONS, SectionList,
+  TRAININGS_SECTIONS, VIEW_SECTIONS,
 } from './trainings-sections';
 import TrainingsSegments from './trainings-segments';
 import type { TrainingMarks } from './use-training-marks';
@@ -22,6 +23,9 @@ import { TrainingsSheetHost } from './trainings-sheets';
  *
  * Управляющий (docs/plans/trainings-coach-flow-plan.md, CF1): видов нет — список занятий
  * (`coach-sessions` + лента) и рабочий стол одного занятия (`coach-desk`, `?session=<id>`).
+ *
+ * Участник (26.11.2026): в Next — список «Past» прошедших с опубликованным планом; Open — вид
+ * «только смотреть» того же `?session=<id>` (`member-past-session`): все дорожки, workout всех уровней.
  *
  * Раскладка участника:
  * - телефон — переключатель `Next · Trainings · Lanes` (`?view=`, старое `sessions` → Next);
@@ -70,6 +74,9 @@ function TrainingsLayout() {
 
   // Тренер: список занятий → рабочий стол занятия (CF1), на обеих ширинах; видов у него нет.
   if (manages) return <SectionList sections={deskSession ? COACH_DESK_SECTIONS : COACH_LIST_SECTIONS} />;
+
+  // Участник открыл прошедшее из «Past» (26.11.2026) — вид «только смотреть», без сегментов и колонок.
+  if (deskSession) return <SectionList sections={MEMBER_PAST_SECTIONS} />;
 
   if (!isDesktop) {
     return (

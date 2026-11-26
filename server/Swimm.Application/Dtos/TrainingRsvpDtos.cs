@@ -312,6 +312,7 @@ public sealed class TrainingLaneDto
     /// <summary>
     /// Workout занятия в версии уровня этой дорожки (CF6, §5.5 плана trainings-coach-flow) — только
     /// на дорожке, где стоит сам зритель (<c>is_me</c>): сеты его уровня и его времена. null — нет.
+    /// Управляющему и участнику на ПРОШЕДШЕМ занятии (решение 26.11.2026) — на каждой дорожке.
     /// </summary>
     [JsonPropertyName("level_workout")]
     public WorkoutDto? LevelWorkout { get; set; }
@@ -338,7 +339,10 @@ public sealed class TrainingLanePersonDto
     [JsonPropertyName("gender")]
     public string? Gender { get; set; }
 
-    /// <summary>yes | maybe.</summary>
+    /// <summary>
+    /// yes | maybe. Пусто — зритель на своей дорожке ПРОШЕДШЕГО занятия, на которое не отвечал
+    /// (стоит по плану, решение 26.11.2026).
+    /// </summary>
     [JsonPropertyName("answer")]
     public string Answer { get; set; } = "";
 
@@ -409,6 +413,9 @@ public sealed class TrainingRsvpSaveResult
 /// <c>GET /api/hub-groups/{id}/past-trainings</c>. Только управляющему, без кэша. Занятие — та же
 /// форма, что у ближайших (его <c>id</c> открывает ответы), плюс сколько ответило: знаменателя нет —
 /// состав группы с тех пор мог поменяться.
+///
+/// Участнику (решение Влада 26.11.2026) — тот же список, но только занятия с опубликованным планом и
+/// БЕЗ счётчиков: <c>yes / maybe / no</c> в ответе нет (null).
 /// </summary>
 public sealed class PastTrainingDto
 {
@@ -416,11 +423,14 @@ public sealed class PastTrainingDto
     public NextTrainingDto Session { get; set; } = new();
 
     [JsonPropertyName("yes")]
-    public int Yes { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Yes { get; set; }
 
     [JsonPropertyName("maybe")]
-    public int Maybe { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Maybe { get; set; }
 
     [JsonPropertyName("no")]
-    public int No { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? No { get; set; }
 }
