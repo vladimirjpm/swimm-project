@@ -1,0 +1,253 @@
+{
+  "note": null,
+  "sets": [
+    {
+      "title": null,
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 3,
+          "distance": 100,
+          "text": "50 חתירה + 50 גב",
+          "intensity": null,
+          "per_level": {
+            "36": {
+              "send_off": "rest :10",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :10",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :10",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :10",
+              "reps": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "שנורקל",
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 1,
+          "distance": 50,
+          "text": "כלב קטן",
+          "intensity": null,
+          "per_level": {
+            "36": {
+              "send_off": "rest :10",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :10",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :10",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :10",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 1,
+          "distance": 100,
+          "text": "כלב גדול",
+          "intensity": null,
+          "per_level": {
+            "36": {
+              "send_off": "rest :15",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :15",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :15",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :15",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 1,
+          "distance": 150,
+          "text": "ידיים רפויות",
+          "intensity": null,
+          "per_level": {
+            "36": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :20",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 1,
+          "distance": 200,
+          "text": "חתירה ארוך",
+          "intensity": null,
+          "per_level": null
+        }
+      ]
+    },
+    {
+      "title": "כפות",
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 8,
+          "distance": 50,
+          "text": "חתירה: 4 כפות אמות, 4 כפות רגיל, הכל 2V",
+          "intensity": "2V",
+          "per_level": {
+            "36": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :20",
+              "reps": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": "מרכזי · סט שני עם זומרס",
+      "repeat": 2,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 1,
+          "distance": 200,
+          "text": "חתירה",
+          "intensity": "2V",
+          "per_level": null
+        },
+        {
+          "reps": 2,
+          "distance": 100,
+          "text": "חתירה 1-3V, 1-1V",
+          "intensity": null,
+          "per_level": {
+            "36": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :20",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :20",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 2,
+          "distance": 50,
+          "text": "1-4V, 1-1V",
+          "intensity": null,
+          "per_level": {
+            "36": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :30",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :30",
+              "reps": null
+            }
+          }
+        },
+        {
+          "reps": 2,
+          "distance": 25,
+          "text": "1 חזק ללא נשימה, 1 קל על הגב",
+          "intensity": null,
+          "per_level": {
+            "36": {
+              "send_off": "rest :15",
+              "reps": null
+            },
+            "37": {
+              "send_off": "rest :15",
+              "reps": null
+            },
+            "38": {
+              "send_off": "rest :15",
+              "reps": null
+            },
+            "39": {
+              "send_off": "rest :15",
+              "reps": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "title": null,
+      "repeat": 1,
+      "level_ids": null,
+      "lines": [
+        {
+          "reps": 1,
+          "distance": 200,
+          "text": "שחרור",
+          "intensity": null,
+          "per_level": null
+        }
+      ]
+    }
+  ]
+}
