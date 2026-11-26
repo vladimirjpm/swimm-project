@@ -4,7 +4,8 @@
  * (шрифты, кубы, стрелки) — у самого вида (`views/*`), всё под `.wprint-sheet`.
  *
  * Классы-контракт для окна предпросмотра (Ш4) внутри `#wprint-root` (корень — `print-mode.ts`):
- *   .wprint-sheet   — лист A4. При печати остаётся как есть, ровно на странице.
+ *   .wprint-sheet   — лист A4 = одна напечатанная страница. Листов может быть несколько — братьями
+ *                     в одном контейнере; между ними разрыв страницы (правило в конце @media print).
  *   .wprint-noprint — всё, что не печатается (кнопки, подписи, предупреждение, фон-затемнение).
  *   .wprint-stage   — обёртка листа для масштаба на экране (`transform: scale`); при печати
  *                     масштаб снимается. Обёртку можно звать как угодно — правило ниже снимает
@@ -91,6 +92,10 @@
     visibility: visible !important;
   }
 
+  /*
+   * Лист = страница. Листов у вида может быть несколько (братья в одном контейнере): после каждого,
+   * кроме последнего, — разрыв страницы; после последнего разрыва нет, иначе Chrome добавит пустую.
+   */
   html.wprint-on .wprint-sheet {
     margin: 0 !important;
     box-shadow: none !important;
@@ -98,8 +103,18 @@
     border: 0 !important;
     transform: none !important;
     break-inside: avoid;
-    break-after: avoid;
     page-break-inside: avoid;
-    page-break-after: avoid;
+    break-after: page;
+    page-break-after: always;
   }
+
+  html.wprint-on .wprint-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
+
+/* Предпросмотр: тень у каждого листа стопки (при печати её снимает правило выше). */
+.wprint-pages > .wprint-sheet {
+  box-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
 }
