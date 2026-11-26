@@ -15,6 +15,7 @@ import UI_SwimmStyleIcon, {
   type SwimIconSize,
 } from '../../projects/components/mix/swimm-style-icon/swimm-style-icon';
 import PrintStubPreview from './print-stub-preview';
+import PrintLargePreview, { PRINT_FIXTURES } from './print-large-preview';
 
 interface PropCommon {
   name: string;
@@ -262,6 +263,29 @@ export const COMPONENTS: ComponentEntry[] = [
     defaultWidth: 0,
     props: [],
     render: () => <PrintStubPreview />,
+  },
+  {
+    id: 'workout-print-large',
+    name: 'LARGE_VIEW',
+    file: 'src/projects/hub-groups-project/components/trainings/workout/print/views/large-view.tsx',
+    summary:
+      'Вид печати large (Ш3): один уровень на одном листе A4 максимально крупным шрифтом — «главный справа» или кубы змейкой со стрелками.',
+    notes: [
+      'Фикстуры — листы тренера из docs/workouts/sheets/ (Intermediate) и искусственные длинные; подпись над листом — выбранная раскладка и кегль.',
+      'Open print preview → Print → «Сохранить как PDF»: ровно одна страница, только лист.',
+      '224 lines — не влезает и на полу 8 pt: красная плашка в предпросмотре, в печать не идёт.',
+    ],
+    defaultWidth: 0,
+    props: [
+      {
+        name: 'fixture',
+        kind: 'enum',
+        def: 'mid-main',
+        options: Object.keys(PRINT_FIXTURES),
+        labels: Object.fromEntries(Object.entries(PRINT_FIXTURES).map(([k, f]) => [k, f.label])),
+      },
+    ],
+    render: (v) => <PrintLargePreview fixture={v.fixture} />,
   },
 ];
 

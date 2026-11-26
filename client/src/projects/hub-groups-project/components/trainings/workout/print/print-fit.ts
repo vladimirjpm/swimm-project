@@ -88,9 +88,14 @@ export interface CubesFit extends FitResult {
   columns: CubeColumns;
 }
 
-/** Из подгонки при k = 1, 2, 3 — самый крупный шрифт; при равенстве — меньше k (шире кубы). */
+/**
+ * Из подгонки при k = 1, 2, 3 — самый крупный шрифт; при равенстве — меньше k (шире кубы).
+ * Не влезло ни при каком k (все на полу) — больше k: при k = 3 обрезано меньше всего (§3.5).
+ */
 export function pickCubeColumns(fits: CubesFit[]): CubesFit {
-  return fits.reduce((best, f) => (f.size > best.size || (f.size === best.size && f.columns < best.columns) ? f : best));
+  if (fits.every((f) => f.overflow)) return fits.reduce((best, f) => (f.columns > best.columns ? f : best));
+  const fitting = fits.filter((f) => !f.overflow);
+  return fitting.reduce((best, f) => (f.size > best.size || (f.size === best.size && f.columns < best.columns) ? f : best));
 }
 
 export type LayoutChoice =
