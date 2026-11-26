@@ -1746,10 +1746,15 @@
                 poolHint.textContent = f.p.existingCompetitionId
                     ? 'в файле есть новый день — выбери бассейн (существующим дням он не меняется)'
                     : 'выбери — без бассейна импорт не начнётся';
-                const recs = new Set((f.p.recordPreview?.rows ?? []).map(r => r.rowIndex)).size;
+                // Помеченные «сомнительным» заплывы из «осталось» уходят: решение по ним принято.
+                // Раньше подпись не менялась от галочки, и казалось, что галочка не сработала
+                // (26.11.2026). Сама пометка ничего не шлёт — ляжет при «Импортировать».
+                const flagged = document.querySelectorAll('#preview-records .suspect-flag:checked').length;
+                const recs = new Set((f.p.recordPreview?.rows ?? []).map(r => r.rowIndex)).size - flagged;
                 const left = [];
                 if (!pool && needsPool(f.p)) left.push('бассейн');
-                if (recs) left.push(`${recs} ${recs % 10 === 1 && recs % 100 !== 11 ? 'рекорд' : recs % 10 >= 2 && recs % 10 <= 4 && (recs % 100 < 12 || recs % 100 > 14) ? 'рекорда' : 'рекордов'}`);
+                if (recs > 0) left.push(`${recs} ${recs % 10 === 1 && recs % 100 !== 11 ? 'рекорд' : recs % 10 >= 2 && recs % 10 <= 4 && (recs % 100 < 12 || recs % 100 > 14) ? 'рекорда' : 'рекордов'}`);
+                const flaggedNote = flagged ? ` · помечено сомнительными: ${flagged} — пометка ляжет при «Импортировать»` : '';
                 if (collapsedBlocked()) {
                     pullFlow.setCaption(6, 'импорт заблокирован: протокол свёрнут в одну дату, эти результаты уже затянуты днями события');
                     return;
@@ -1760,7 +1765,7 @@
                     ? (f.p.existingCompetitionId ? ' · перезапись существующих результатов уже включена'
                         : ' · совпадения с существующим соревнованием НЕ найдено — импорт создаст новое, проверь дату и название')
                     : '';
-                pullFlow.setCaption(6, (left.length ? `осталось: ${left.join(' и ')}` : 'всё выбрано — нажми «Импортировать»') + note);
+                pullFlow.setCaption(6, (left.length ? `осталось: ${left.join(' и ')}` : 'всё выбрано — нажми «Импортировать»') + flaggedNote + note);
             }
 
             document.getElementById('preview-box').addEventListener('change', () => {
@@ -1828,10 +1833,14 @@
                             + `<div class="mt-0.5 space-y-0.5 text-[11.5px]">${recs}</div>`
                             + `<div class="mt-1.5 border-t border-admin-border pt-1.5">`
                             // Вид — .btn-mark-suspect (Styles/admin.css): кнопка-тумблер, внутри
-                            // чекбокс .suspect-flag, его читают captureForm и «Применить».
+                            // чекбокс .suspect-flag, его читают captureForm и «Импортировать».
+                            // Клик ничего не шлёт: пометка уезжает с импортом, поэтому отмеченная
+                            // кнопка так и говорит (.when-on / .when-off переключает CSS).
                             + `<label class="admin-btn admin-btn-warning btn-mark-suspect">`
                             + `<input type="checkbox" class="suspect-flag cursor-pointer accent-admin-warning" value="${s.rowIndex}"`
-                            + ` data-note="${esc(suspectNote(g))}"> ⚑ пометить сомнительным</label>`
+                            + ` data-note="${esc(suspectNote(g))}">`
+                            + `<span class="when-off">⚑ пометить сомнительным</span>`
+                            + `<span class="when-on">⚑ помечен — ляжет при «Импортировать»</span></label>`
                             // Сюда приезжает вердикт по карточке loglig (или поле для привязки
                             // id и пола, если пловец ещё не привязан) — см. loadRecordCheck.
                             + `<div class="record-check mt-1 text-[11.5px]" data-row="${s.rowIndex}" data-name="${esc(s.swimmerName)}"></div>`

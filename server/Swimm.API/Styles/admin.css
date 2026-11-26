@@ -65,6 +65,15 @@
   .btn-mark-suspect:has(input:focus-visible) {
     @apply ring-2 ring-admin-warning/50;
   }
+  /* Клик ничего не отправляет — пометка уезжает с «Импортировать». Отмеченная кнопка говорит
+     это словами: иначе нажатие выглядело так, будто ничего не произошло. */
+  .btn-mark-suspect .when-on,
+  .btn-mark-suspect:has(input:checked) .when-off {
+    display: none;
+  }
+  .btn-mark-suspect:has(input:checked) .when-on {
+    display: inline;
+  }
 
   /* Колесико загрузки — одно на всю админку (было вписано руками в Import и на дашборде).
      Цвет — текущий цвет текста (border-current), размер правится утилитой: size-5. */
