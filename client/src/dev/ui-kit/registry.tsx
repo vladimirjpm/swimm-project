@@ -15,6 +15,7 @@ import UI_SwimmStyleIcon, {
   type SwimIconSize,
 } from '../../projects/components/mix/swimm-style-icon/swimm-style-icon';
 import PrintLargePreview, { PRINT_FIXTURES } from './print-large-preview';
+import PrintDemoViews, { DEMO_PRINT_VIEWS } from './print-demo-views';
 
 interface PropCommon {
   name: string;
@@ -270,6 +271,23 @@ export const COMPONENTS: ComponentEntry[] = [
       },
     ],
     render: (v) => <PrintLargePreview fixture={v.fixture} />,
+  },
+  {
+    id: 'workout-print-dialog',
+    name: 'WorkoutPrintDialog',
+    file: 'src/projects/hub-groups-project/components/trainings/workout/print/workout-print-dialog.tsx',
+    summary:
+      'Окно печати workout на реестре ПРИМЕРОВ видов (print-demo-views.tsx): сегмент выбора вида и вид в два листа «Large + notes» (duplex).',
+    notes: [
+      'Сегмент Large · Large + notes появляется сам, потому что в реестре два вида.',
+      'Large + notes: в предпросмотре два листа стопкой, подпись «… · 2 pages» и подсказка про «Print on both sides».',
+      'Print → «Сохранить как PDF»: ровно две страницы, без пустой третьей.',
+    ],
+    defaultWidth: 0,
+    props: [
+      { name: 'view', kind: 'enum', def: 'large-notes', options: Object.keys(DEMO_PRINT_VIEWS) },
+    ],
+    render: (v) => <PrintDemoViews view={v.view} />,
   },
 ];
 

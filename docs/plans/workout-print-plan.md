@@ -302,36 +302,46 @@ searchFontSize: наибольший f из [F_FLOOR, F_MAX] с шагом 0.5 p
 
 ## 4. Шов под будущие виды
 
+Обновлено 26.11.2026 после Ш3+Ш4 (PR «динамичный шов»): вид может печатать несколько листов,
+окно само показывает выбор вида, вид может быть доступен не для каждого workout.
+
 ```ts
 // workout/print/print-types.ts
-/** Что печатаем — не зависит от места кнопки и от вида. */
-export interface WorkoutPrintSource {
-  workout: Workout;            // уже версия уровня (level_workout / workoutForLevel), один уровень (В1)
-  levelId: number | null;
-  level: { rank: number; name: string } | null;
-  groupName: string;
-  // дата/время занятия — не нужны виду large (В5); добавятся, когда понадобятся другому виду
-}
-export type WorkoutPrintViewId = 'large';     // потом: 'all-levels', 'compact', 'two-up', 'card'…
+export interface WorkoutPrintSource { workout; levelId; level; groupName; setNumbers? } // что печатаем
 export interface WorkoutPrintView {
-  id: WorkoutPrintViewId;
-  label: string;                               // английский: 'Large'
-  orientation: 'portrait' | 'landscape';       // large — portrait (В4)
-  /** Лист вида; раскладку и подгонку вид делает сам (через общий useSheetFit или свою). */
-  Sheet: React.FC<{ source: WorkoutPrintSource }>;
+  id: string;                                  // = ключ в PRINT_VIEWS
+  label: string;                               // английский, подпись сегмента: 'Large'
+  orientation: 'portrait' | 'landscape';       // одна на все листы вида (@page один на печать)
+  /** Листы вида: каждый .wprint-sheet = одна страница; сколько угодно, братьями, без обёрток. */
+  Sheet: React.FC<{ source: WorkoutPrintSource; onFit?: (fit: PrintSheetFit) => void }>;
+  duplex?: boolean;                            // подсказка «включите двустороннюю печать»
+  available?: (source: WorkoutPrintSource) => boolean; // нет — годится всегда
 }
 // workout/print/print-views.ts
-export const PRINT_VIEWS: Record<WorkoutPrintViewId, WorkoutPrintView> = { large: LARGE_VIEW };
+export const PRINT_VIEWS = { large: LARGE_VIEW } satisfies Record<string, WorkoutPrintView>;
+export type WorkoutPrintViewId = keyof typeof PRINT_VIEWS;
 export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
 ```
 
-- **Где выбор:** в окне предпросмотра, сегментом `View` (тот же `SegmentBar`, что в превью тренера).
-  Пока вид один — сегмента нет. Последний выбор — в `localStorage` (`swimm.workoutPrint.view`).
-- Новый вид = файл `views/<id>-view.tsx` + строка в `PRINT_VIEWS`; кнопки и окно не меняются.
-  «Один лист», две раскладки, «R:» — свойства вида `large`, не общего шва. Кубы и стрелки
-  (`PrintSetCube`, `PrintArrow`) — общие детали, другой вид может их взять.
-- Вид «все уровни» (тренеру — лист на каждый уровень) получит `Workout` целиком: на этот случай в
-  `WorkoutPrintSource` потом добавится необязательное `allLevels`, без ломки `large`.
+- **Новый вид = файл `views/<id>-view.tsx` + строка в `PRINT_VIEWS`.** Убрать вид — убрать строку.
+  Порядок строк = порядок сегментов. Окно, кнопка, механика печати не меняются.
+- **Выбор вида** — в окне предпросмотра сегментом (рецепт `.deep-seg`), сам, когда годных видов
+  больше одного (`availableViews` / `pickView` в `print-view-pick.ts`). Запоминать выбор в
+  `localStorage` — когда видов станет два и Влад захочет.
+- **Несколько листов**: вид рисует несколько `.wprint-sheet` подряд. `workout-print.css` ставит разрыв
+  страницы после каждого, кроме последнего (иначе Chrome добавит пустую). Окно показывает листы
+  стопкой (масштаб по одному листу, дальше прокрутка) и пишет «N pages».
+- **Двусторонняя печать** (`duplex: true`): включить её страница не может — это настройка диалога
+  печати / принтера; окно только подсказывает «turn on “Print on both sides”». Чётность листов
+  (нечётный — пустой оборот) — забота вида.
+- **Правила подгонки** («один лист», две раскладки, порог 14 pt, «R:») — свойства вида `large`
+  (`print-fit.ts`, `views/large-*`), не общего шва; другой вид берёт свои. Кубы и стрелки
+  (`PrintSetCube`, `PrintArrow`) — общие детали.
+- **Образец вида в два листа** — стенд ui-kit `workout-print-dialog` (`src/dev/ui-kit/print-demo-views.tsx`):
+  «Large + notes» (лицо — `large`, оборот — лист заметок, `duplex`). Проверено: PDF — ровно 2 страницы,
+  `large` — ровно 1.
+- Вид «все уровни» (тренеру — лист на каждый уровень) получит `Workout` целиком: в
+  `WorkoutPrintSource` добавится необязательное `allLevels`, `available` спрячет вид, где уровень один.
 
 Раскладка файлов (правило «чистый код мелкими файлами»), всё в
 `client/src/projects/hub-groups-project/components/trainings/workout/print/`:
@@ -343,9 +353,10 @@ export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
 | `print-fit.ts` | чистое: `searchFontSize`, `chooseLayout`, `cubeGrid`, константы `F_FLOOR/F_READABLE/F_MAX`, размеры A4 и колонок |
 | `use-sheet-fit.ts` | DOM: скрытый замер обеих раскладок, `fonts.ready`, вызов `print-fit`, флаг «не влезло на полу» |
 | `print-mode.ts` | `<html>.wprint-on`, вставка/уборка `@page`, `afterprint` |
-| `workout-print-dialog.tsx` | окно предпросмотра: лист в масштабе (`transform: scale`), выбранная раскладка и размер, предупреждение, `Print`, `Close`, позже `View` |
+| `workout-print-dialog.tsx` | окно предпросмотра: лист в масштабе (`transform: scale`), выбранная раскладка и размер, предупреждение, `Print`, `Close`; сегмент видов (когда годных больше одного), листы вида стопкой, подсказка duplex |
 | `print-button.tsx` | кнопка `Print` (телефон — значок с `aria-label="Print workout"`) |
 | `print-views.ts` | реестр видов |
+| `print-view-pick.ts` | чистое: годные виды для workout (`available`) и выбранный вид |
 | `views/large-view.tsx`, `views/large-main-layout.tsx`, `views/large-cubes-layout.tsx` | вид `large` и его раскладки |
 | `parts/print-set-cube.tsx`, `parts/print-arrow.tsx`, `parts/print-intensity.tsx` | куб сета, SVG-стрелка, чип нагрузки контуром |
 | `workout-print.css` | `@media print` и стили листа, всё под `.wprint` |
