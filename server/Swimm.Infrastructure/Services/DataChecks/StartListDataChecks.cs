@@ -37,7 +37,10 @@ public sealed class NoShowUnmatchedCheck(SwimmDbContext db) : IDataCheck
         var q = db.CompetitionEntries.AsNoTracking()
             .Where(e => e.Status == CompetitionEntryStatus.NoShow && e.CompetitionId != null);
 
-        var total = await q.CountAsync(ct);
+        // Total — в соревнованиях, как и находки (одна находка = одно соревнование), а не в
+        // заявках: из Total вычитаются принятые находки, и 44 заявки − 7 принятых соревнований
+        // дали дашборду 37 «открытых» при нуле в Health (26.11). Сколько заявок — в тексте находки.
+        var total = await q.Select(e => e.CompetitionId).Distinct().CountAsync(ct);
         if (total == 0) return DataCheckOutcome.Empty;
 
         // Группируем по соревнованию: пятьдесят строк «Иванов не приплыл» человеку

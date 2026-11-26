@@ -97,9 +97,35 @@ public sealed record DataCheckItem(
     string? FixKind = null, int? FixEntityId = null, string? AutoAccept = null);
 
 /// <summary>Результат одной проверки: сколько всего и что именно (список капнут).</summary>
+/// <param name="Total">
+/// Полное число находок — В ТЕХ ЖЕ ЕДИНИЦАХ, что <paramref name="Items"/>: одна единица = одна
+/// находка. Проверка, которая группирует (неявки по соревнованию, а не по заявке), считает
+/// группы, а не то, что внутри них: из <c>Total</c> вычитаются принятые находки
+/// (<see cref="DataCheckOpenCount"/>), и разные единицы дают открытые из ничего — 26.11
+/// дашборд показал 37 предупреждений «44 заявки − 7 принятых соревнований» при нуле в Health.
+/// </param>
 public sealed record DataCheckOutcome(int Total, IReadOnlyList<DataCheckItem> Items)
 {
     public static DataCheckOutcome Empty { get; } = new(0, []);
+}
+
+/// <summary>
+/// ЕДИНСТВЕННОЕ правило «сколько у проверки открыто». Им считают и /Admin/Health
+/// (<see cref="DataCheckGroupDto.OpenCount"/>), и дашборд с итогом импорта
+/// (<see cref="DataCheckStateDto.Open"/>) — раньше у них были две свои формулы, и числа разошлись.
+/// </summary>
+public static class DataCheckOpenCount
+{
+    /// <param name="total">Полное число с последнего прогона; null — проверка ещё не гонялась.</param>
+    /// <param name="openListed">Открытых находок в записанном списке (он капнут на 50).</param>
+    /// <param name="accepted">Принятых как есть — закрытое решение, а не работа.</param>
+    /// <remarks>
+    /// Полное минус принятые: список обрезан, и по нему одному большая проверка показала бы 50
+    /// вместо тысяч. Но не меньше открытых в списке — то, что человек видит списком, число не
+    /// может отрицать.
+    /// </remarks>
+    public static int Of(int? total, int openListed, int accepted) =>
+        total is null ? openListed : Math.Max(openListed, total.Value - accepted);
 }
 
 /// <summary>Прогон реестра.</summary>
@@ -138,6 +164,7 @@ public sealed record DataCheckFindingDto(
 /// (50 на проверку), поэтому <c>Total</c> может быть больше, чем <c>Findings.Count</c>;
 /// null — проверка ещё ни разу не гонялась.
 /// </param>
+/// <param name="OpenCount">Сколько открыто — по общему правилу <see cref="DataCheckOpenCount"/>, как у дашборда.</param>
 public sealed record DataCheckGroupDto(
     string CheckId, string Title, string Description, DataCheckSeverity Severity,
     int OpenCount, int AcceptedCount, IReadOnlyList<DataCheckFindingDto> Findings,
@@ -152,10 +179,11 @@ public sealed record DataCheckGroupDto(
 /// иначе дашборд считал бы работой то, по чему решение уже принято, и расходился бы с
 /// /Admin/Health, где принятые в «открытых» не значатся.
 /// </param>
+/// <param name="OpenListed">Открытых находок в записанном списке — нужен общему правилу подсчёта.</param>
 public sealed record DataCheckStateDto(
     string CheckId, DataCheckSeverity Severity, int Total, int Shown, bool Failed,
-    int LastRunId, DateTime LastRunAt, int Accepted = 0)
+    int LastRunId, DateTime LastRunAt, int Accepted = 0, int OpenListed = 0)
 {
-    /// <summary>Сколько ещё требует разбора. Не отрицательное: принятых не может быть больше найденного.</summary>
-    public int Open => Math.Max(0, Total - Accepted);
+    /// <summary>Сколько ещё требует разбора — по общему правилу, тем же, что у /Admin/Health.</summary>
+    public int Open => DataCheckOpenCount.Of(Total, OpenListed, Accepted);
 }

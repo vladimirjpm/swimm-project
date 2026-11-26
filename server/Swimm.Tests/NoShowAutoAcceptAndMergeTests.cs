@@ -176,6 +176,36 @@ public class NoShowAutoAcceptAndMergeTests
         return new World { Db = db };
     }
 
+    /// <summary>
+    /// Total — в соревнованиях, как и находки, а не в заявках: из Total вычитаются принятые
+    /// находки, и «44 заявки − 7 принятых соревнований» дали дашборду 37 открытых при нуле в Health.
+    /// </summary>
+    [Fact]
+    public async Task Check_TotalCountsCompetitions_NotEntries()
+    {
+        var w = await SeedAsync(nameof(Check_TotalCountsCompetitions_NotEntries));
+        w.Db.CompetitionEntries.AddRange(
+            new CompetitionEntry
+            {
+                Id = 2, OrgCompId = 16903, CompetitionId = 1896, CompDate = new DateTime(2026, 11, 20), CompName = "Meet",
+                SwimmerId = 65092, ClubId = 506, StyleId = 1, Distance = "100", Gender = "female", Heat = 1, Lane = 4,
+                Status = CompetitionEntryStatus.NoShow,
+            },
+            new CompetitionEntry
+            {
+                Id = 3, OrgCompId = 16903, CompetitionId = 1896, CompDate = new DateTime(2026, 11, 20), CompName = "Meet",
+                SwimmerId = 65092, ClubId = 506, StyleId = 1, Distance = "200", Gender = "female", Heat = 1, Lane = 5,
+                Status = CompetitionEntryStatus.NoShow,
+            });
+        await w.Db.SaveChangesAsync();
+
+        var outcome = await new NoShowUnmatchedCheck(w.Db).RunAsync();
+
+        var item = Assert.Single(outcome.Items);
+        Assert.Equal(1, outcome.Total);
+        Assert.Contains("без результата 3 из 3", item.Message);
+    }
+
     private static SwimmerMergeReport Report(bool dry, string status, params string[] conflicts)
     {
         var r = new SwimmerMergeReport { DryRun = dry };

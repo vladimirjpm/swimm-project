@@ -33,12 +33,51 @@ public class DataCheckRunnerTests
 
         public List<DataCheckItem> Items { get; } = [];
         public bool Throws { get; set; }
+        /// <summary>Полное число, если список «капнут» (больше, чем Items).</summary>
+        public int? Total { get; set; }
 
         public Task<DataCheckOutcome> RunAsync(CancellationToken ct = default)
         {
             if (Throws) throw new InvalidOperationException("проверка сломалась");
-            return Task.FromResult(new DataCheckOutcome(Items.Count, Items.ToList()));
+            return Task.FromResult(new DataCheckOutcome(Total ?? Items.Count, Items.ToList()));
         }
+    }
+
+    // ── Одно правило «сколько открыто» для /Admin/Health и дашборда ─────────────────────
+
+    [Theory]
+    [InlineData(null, 3, 1, 3)]   // не гонялась — только список
+    [InlineData(7, 0, 7, 0)]      // всё принято — ноль
+    [InlineData(120, 50, 2, 118)] // список капнут — полное минус принятые
+    [InlineData(5, 5, 3, 5)]      // открытые в списке число не отрицает
+    public void OpenCount_OneRule(int? total, int openListed, int accepted, int expected) =>
+        Assert.Equal(expected, DataCheckOpenCount.Of(total, openListed, accepted));
+
+    /// <summary>
+    /// Health (GetCurrentAsync) и дашборд (GetStateAsync) на одних данных дают одно число:
+    /// 26.11 они разошлись — 0 в Health и 37 предупреждений на дашборде.
+    /// </summary>
+    [Theory]
+    [InlineData(2, null, 0)] // всё как есть
+    [InlineData(2, null, 2)] // всё принято
+    [InlineData(3, 120, 1)]  // капнутый список, одна принята
+    public async Task OpenCount_HealthAndDashboardAgree(int listed, int? total, int acceptCount)
+    {
+        await using var db = CreateDb($"{nameof(OpenCount_HealthAndDashboardAgree)}-{listed}-{total}-{acceptCount}");
+        var check = new FakeCheck("test.check", DataCheckSeverity.Warning) { Total = total };
+        for (var i = 1; i <= listed; i++) check.Items.Add(Item(i));
+        var runner = new DataCheckRunner(db, [check]);
+        await runner.RunAllAsync("manual");
+
+        foreach (var f in (await db.DataCheckFindings.ToListAsync()).Take(acceptCount))
+            await runner.AcceptAsync(f.Id, "не чиним");
+
+        var health = Assert.Single(await runner.GetCurrentAsync());
+        var (_, states) = await runner.GetStateAsync();
+        var dashboard = Assert.Single(states);
+
+        Assert.Equal(health.OpenCount, dashboard.Open);
+        Assert.Equal((total ?? listed) - acceptCount, health.OpenCount);
     }
 
     private static DataCheckItem Item(int id, string message = "находка") =>
