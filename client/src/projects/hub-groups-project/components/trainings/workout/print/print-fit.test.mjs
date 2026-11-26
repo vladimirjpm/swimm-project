@@ -106,6 +106,14 @@ test('pickCubeColumns: самый крупный шрифт; при равенс
   assert.equal(pickCubeColumns([cubes(20, 1), cubes(24, 2), cubes(24, 3)]).columns, 2);
 });
 
+test('pickCubeColumns: не влезло нигде — k = 3 (обрезано меньше всего); влезло хоть где-то — он, а не пол', () => {
+  const floor = (k) => cubes(10.7, k, true);
+  assert.deepEqual(pickCubeColumns([floor(1), floor(2), floor(3)]), floor(3));
+  assert.equal(pickCubeColumns([floor(1), floor(2)]).columns, 2);
+  assert.equal(pickCubeColumns([floor(1), floor(2), cubes(10.7, 3)]).columns, 3);
+  assert.equal(pickCubeColumns([floor(1), cubes(11, 2), cubes(12, 3)]).columns, 3);
+});
+
 test('layoutCaption: подписи предпросмотра', () => {
   assert.equal(layoutCaption({ layout: 'main', size: 37.5, overflow: false }), 'Main on the right · 28 pt');
   assert.equal(layoutCaption({ layout: 'cubes', size: 29.5, overflow: false, columns: 3 }), 'Blocks · 3 per row · 22 pt');

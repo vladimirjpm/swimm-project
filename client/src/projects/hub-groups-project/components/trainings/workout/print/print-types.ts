@@ -35,8 +35,19 @@ export interface WorkoutPrintView {
   label: string;
   /** large — portrait (В4). */
   orientation: 'portrait' | 'landscape';
-  /** Лист вида; раскладку и подгонку вид делает сам. */
-  Sheet: FC<{ source: WorkoutPrintSource }>;
+  /**
+   * Лист вида; раскладку и подгонку вид делает сам. `onFit` — итог подгонки для окна предпросмотра
+   * (подпись «Main on the right · 28 pt», предупреждение «не влезло»); звать необязательно.
+   */
+  Sheet: FC<{ source: WorkoutPrintSource; onFit?: (fit: PrintSheetFit) => void }>;
+}
+
+/** Итог подгонки листа (§3.5) — для подписи и предупреждения в окне предпросмотра. */
+export interface PrintSheetFit {
+  /** «Main on the right · 28 pt» / «Blocks · 3 per row · 22 pt». */
+  caption: string;
+  /** Не влезло и на полу шрифта: низ листа обрезан (В13). */
+  overflow: boolean;
 }
 
 // ── Модель листа (`print-sheet-model.ts`) ───────────────────────────────────────
