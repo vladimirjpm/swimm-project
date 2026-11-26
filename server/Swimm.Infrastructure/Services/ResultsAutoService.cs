@@ -54,6 +54,11 @@ public sealed class ResultsAutoService(
             .Select(d => new { d.Id, d.Discipline, d.EmptySourceAt, d.EmptySourceBy, d.MissingSince, d.AutoPullCheckedAt, d.AutoPullVerdict })
             .ToDictionaryAsync(d => d.Id, ct);
 
+        // Дубль страницы федерации (тот же LogligId, что у строки в базе) затянут вместе с ней —
+        // тянуть его второй раз нельзя (DiscoveryLogligTwinRule, решение Влада 26.11.2026).
+        var twinOf = DiscoveryLogligTwinRule.TwinOf(rows.Select(r => new DiscoveryLogligTwinRule.Row(
+            r.Id, r.OrgCompId, r.LogligId, r.DateStart, r.DateEnd, InDb: r.MatchedCompetitionId is not null)));
+
         var candidates = rows
             .Where(r => state.ContainsKey(r.Id))
             .Select(r =>
@@ -61,7 +66,7 @@ public sealed class ResultsAutoService(
                 var s = state[r.Id];
                 return new ResultsAutoCandidate(
                     r.Id, r.Name, r.Status, s.Discipline, r.LogligId, r.DateStart, r.DateEnd,
-                    AlreadyInDb: r.MatchedCompetitionId is not null,
+                    AlreadyInDb: r.MatchedCompetitionId is not null || twinOf.ContainsKey(r.Id),
                     // «Нет протокола» от разбора («auto») перепроверяем — файл выкладывают позже;
                     // поставленную человеком пометку — нет.
                     ManualEmpty: s.EmptySourceAt is not null && s.EmptySourceBy != "auto",

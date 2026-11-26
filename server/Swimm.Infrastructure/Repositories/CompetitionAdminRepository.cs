@@ -114,6 +114,18 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
         var unified = new List<UnifiedCompetitionRowDto>(dbRows.Count + discovered.Count);
         var overlaidRows = new HashSet<CompetitionRowDto>();
 
+        int? CompIdOf(DiscoveredCompetition d) =>
+            compByOrgCompId.TryGetValue(d.OrgCompId, out var byOrg)
+                ? byOrg
+                : matches.GetValueOrDefault(d.Id)?.CompetitionId;
+
+        // Дубль страницы федерации: тот же LogligId, что у строки, уже лежащей в базе, —
+        // затянут вместе с ней (решение Влада 26.11.2026). «В базе» — тем же резолвом, что ниже, но
+        // без фильтров списка: близнец, скрытый поиском, всё равно в базе.
+        var twinOf = DiscoveryLogligTwinRule.TwinOf(discovered.Select(d => new DiscoveryLogligTwinRule.Row(
+            d.Id, d.OrgCompId, d.LogligId, d.DateStart, d.DateEnd,
+            InDb: CompIdOf(d) is not null)));
+
         foreach (var d in discovered)
         {
             var site = new UnifiedSiteInfo
@@ -125,13 +137,12 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 AutoPullVerdict = d.AutoPullVerdict, AutoPullBlockedReason = d.AutoPullBlockedReason,
                 AutoPullCheckedAt = d.AutoPullCheckedAt, AutoPullPoolType = d.AutoPullPoolType,
                 PreviousDateStart = d.PreviousDateStart, MissingSince = d.MissingSince,
-                DiscoveredAt = d.DiscoveredAt
+                DiscoveredAt = d.DiscoveredAt,
+                TwinOfOrgCompId = twinOf.TryGetValue(d.Id, out var twin) ? twin : null
             };
 
             // Резолв к соревнованию: OrgCompId штампован → он; иначе матч по имени+дате.
-            int? compId = compByOrgCompId.TryGetValue(d.OrgCompId, out var byOrg)
-                ? byOrg
-                : matches.GetValueOrDefault(d.Id)?.CompetitionId;
+            int? compId = CompIdOf(d);
 
             if (compId is int cid && rowByCompId.TryGetValue(cid, out var row))
             {
@@ -205,6 +216,21 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                     if (keys.Any(health.Contains))
                         u.Health = CompetitionProblemRules.Merge(keys.SelectMany(k => health[k]));
                 }
+        }
+
+        // 2b-ter) Когда строку затянули — чип «✓ затянуто ДД.ММ» (решение Влада 26.11.2026).
+        // Одним запросом по журналу импортов; у события — самый свежий день.
+        if (decorate)
+        {
+            var imported = await _db.ImportHistory.AsNoTracking()
+                .GroupBy(h => h.CompetitionId)
+                .Select(g => new { CompetitionId = g.Key, At = g.Max(h => h.ImportDate) })
+                .ToDictionaryAsync(x => x.CompetitionId, x => x.At);
+            foreach (var u in unified.Where(u => u.Db != null))
+            {
+                var ids = u.Db!.Single != null ? [u.Db.Single.Id] : u.Db.Days.Select(d => d.Id);
+                u.LastImportedAt = ids.Select(id => imported.TryGetValue(id, out var at) ? at : (DateTime?)null).Max();
+            }
         }
 
         // 2c) Признак «чемпионат Израиля» — по названию любой стороны строки (у входящих других
@@ -590,7 +616,8 @@ public class CompetitionAdminRepository : ICompetitionAdminRepository
                 : null,
             DbDayCount: dbDays,
             SiteDayCount: siteDays,
-            MissingDaysAccepted: missingDaysAccepted);
+            MissingDaysAccepted: missingDaysAccepted,
+            TwinInDb: u.Db == null && u.Site?.TwinOfOrgCompId != null);
     }
 
     private static DateOnly? ParseDbDate(string? s) =>

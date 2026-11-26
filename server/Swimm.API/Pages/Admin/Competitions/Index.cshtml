@@ -565,6 +565,19 @@
         void Add(string cls, string text, string? title = null) =>
             sb.Append($"<span class=\"{chip} {cls}\"{(title == null ? "" : $" title=\"{System.Net.WebUtility.HtmlEncode(title)}\"")}>{System.Net.WebUtility.HtmlEncode(text)}</span>");
 
+        // «Затянуто и закрыто» — зелёный чип с датой импорта (решение Влада 26.11.2026). Класс
+        // pulled-badge — тот же, что ставит JS сразу после импорта, чтобы чипов не стало два.
+        if (st is { State: Swimm.Application.Mapping.CompetitionRowState.Closed, NothingToPull: false } && u.Db != null)
+            Add("pulled-badge bg-admin-success/15 text-admin-success",
+                u.LastImportedAt is { } imp ? $"✓ затянуто {Swimm.Application.Constants.IsraelTime.ToLocal(imp):dd.MM}" : "✓ затянуто",
+                u.LastImportedAt is { } imp2
+                    ? $"Результаты в базе, старт закрыт. Последний импорт — {Swimm.Application.Constants.IsraelTime.ToLocal(imp2):dd.MM.yyyy HH:mm}"
+                    : "Результаты в базе, старт закрыт. Даты импорта в журнале нет (старый импорт)");
+        // Дубль страницы федерации (тот же loglig, что у строки в базе) — закрыт сам.
+        if (u.Db == null && s?.TwinOfOrgCompId is int twin)
+            Add("bg-white/[.08] text-admin-text-muted", $"дубль {twin}",
+                $"Страница федерации ведёт на то же соревнование loglig ({s.LogligId}), что compID {twin}, — протокол затянут вместе с ним. Тянуть нечего");
+
         if (st?.State == Swimm.Application.Mapping.CompetitionRowState.Running)
             Add("bg-admin-accent/15 text-admin-accent", StateText(st));
         // У пропавшей с сайта причину «ждём протокол» не печатаем: «пропал …» объясняет больше,
@@ -773,6 +786,8 @@
                 }
                 if (hidden) return ("скрыто", "Строка скрыта — в долг не идёт. «Вернуть» — снова в работу", false);
                 if (markedImported) return ("помечено импортированным (вручную)", "«✓ имп.»: строка закрыта без импорта", false);
+                if (s?.TwinOfOrgCompId is int tw) return ($"дубль compID {tw} — тот же loglig уже затянут",
+                    $"Страница федерации ведёт на то же соревнование loglig ({s.LogligId}), что compID {tw}: протокол затянут вместе с ним", false);
                 if (s?.EmptySourceAt is { } ea) return ($"протокола нет · с {Swimm.Application.Constants.IsraelTime.ToLocal(ea):dd.MM.yyyy}", "PDF пустой или в нём одни неявки (NS) — тянуть нечего", false);
                 return st.State switch
                 {

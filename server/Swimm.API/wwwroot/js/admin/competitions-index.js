@@ -656,9 +656,11 @@
                     // Итог — под шагом 7 «Импорт»; у события — в общей части панели (тянулись все дни).
                     const ol = panel.querySelector('.ck-event-flow .ck-log') ?? stepOf(panel, 7)?.querySelector('.ck-log');
                     if (ol) { ol.innerHTML = title + linesHtml(lines); ol.classList.remove('hidden'); }
+                    // Сервер после reload уже рисует «✓ затянуто ДД.ММ» (тот же класс pulled-badge);
+                    // этот — запасной, если строка ещё не перерисована.
                     if (!row.querySelector('.pulled-badge'))
-                        row.querySelector('.row-marks')?.insertAdjacentHTML('beforeend',
-                            '<span class="pulled-badge inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase bg-admin-success/20 text-admin-success">затянуто</span>');
+                        row.querySelector('.row-marks')?.insertAdjacentHTML('afterbegin',
+                            '<span class="pulled-badge inline-block whitespace-nowrap py-0.5 px-1.5 rounded text-[10px] font-bold bg-admin-success/15 text-admin-success">✓ затянуто</span>');
                     row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     return;
                 }
