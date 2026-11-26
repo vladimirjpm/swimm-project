@@ -77,10 +77,14 @@ public class DataCheckRunner(
             state.LastRunId = run.Id;
             state.LastRunAt = run.StartedAt;
 
+            // Счётчики прогона — ОТКРЫТЫЕ, по общему правилу (DataCheckOpenCount), как у Health и
+            // дашборда: «предупреждений 39» в истории при нуле открытых пугало зря (26.11).
+            int openListed = 0, acceptedListed = 0;
             foreach (var item in outcome.Items)
             {
                 var key = Key(check.Id, item.EntityType, item.EntityId, item.FixKind, item.FixEntityId);
                 if (!seen.Add(key)) continue;
+                DataCheckFinding finding;
 
                 if (storedByKey.TryGetValue(key, out var existing))
                 {
@@ -94,6 +98,7 @@ public class DataCheckRunner(
                     existing.FixEntityId = item.FixEntityId;
                     existing.Severity = (int)check.Severity;
                     ApplyAutoAccept(existing, item.AutoAccept, run.StartedAt);
+                    finding = existing;
                 }
                 else
                 {
@@ -115,14 +120,19 @@ public class DataCheckRunner(
                     };
                     ApplyAutoAccept(created, item.AutoAccept, run.StartedAt);
                     db.DataCheckFindings.Add(created);
+                    finding = created;
                 }
 
-                switch (check.Severity)
-                {
-                    case DataCheckSeverity.Error: errors++; break;
-                    case DataCheckSeverity.Warning: warnings++; break;
-                    default: infos++; break;
-                }
+                if (finding.Resolution == null) openListed++;
+                else if (finding.Resolution == DataCheckResolutions.Accepted) acceptedListed++;
+            }
+
+            var open = DataCheckOpenCount.Of(outcome.Total, openListed, acceptedListed);
+            switch (check.Severity)
+            {
+                case DataCheckSeverity.Error: errors += open; break;
+                case DataCheckSeverity.Warning: warnings += open; break;
+                default: infos += open; break;
             }
         }
 

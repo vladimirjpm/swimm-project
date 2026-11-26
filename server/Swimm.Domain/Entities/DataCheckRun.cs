@@ -17,8 +17,15 @@ public class DataCheckRun
     [Required, MaxLength(20)]
     public string Trigger { get; set; } = "manual";
 
+    /// <summary>
+    /// ОТКРЫТЫХ находок по серьёзности после прогона — по общему правилу DataCheckOpenCount,
+    /// как у /Admin/Health и дашборда (принятые как есть не в счёт, капнутый список — полным числом).
+    /// До 26.11.2026 здесь лежало всё найденное, включая принятые: старые строки истории — в том смысле.
+    /// </summary>
     public int ErrorCount { get; set; }
+    /// <inheritdoc cref="ErrorCount"/>
     public int WarningCount { get; set; }
+    /// <inheritdoc cref="ErrorCount"/>
     public int InfoCount { get; set; }
 
     /// <summary>Находок, исчезнувших с прошлого прогона (данные починены).</summary>

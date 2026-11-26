@@ -17,7 +17,7 @@ internal static class DataChecksCli
 
         // Триггер отдельный от кнопки: в истории видно, откуда прогон (manual / cli / import).
         var run = await runner.RunAllAsync("cli");
-        Console.WriteLine($"Прогон #{run.Id}: ошибок {run.ErrorCount}, предупреждений {run.WarningCount}, " +
+        Console.WriteLine($"Прогон #{run.Id} — открыто: ошибок {run.ErrorCount}, предупреждений {run.WarningCount}, " +
                           $"инфо {run.InfoCount}, закрыто {run.FixedCount}\n");
 
         foreach (var g in await runner.GetCurrentAsync())
