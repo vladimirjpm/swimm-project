@@ -316,17 +316,25 @@
     function groupCard(g) {
             const [sevName, sevCls] = SEV[g.severity];
             const clean = g.openCount === 0 && g.acceptedCount === 0;
+            // Без открытых находок (и не упала) серьёзность не главное — главное, что всё в порядке
+            // (Влад, 26.11.2026: яркое «Предупреждение» у чистой проверки бросается в глаза).
+            // Чистая — зелёная ✓, «только принятые» — серая ✓ с числом; название приглушено.
+            const quiet = !(g.openCount > 0 || g.failed);
+            const mark = !quiet
+                ? `<span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${sevCls}">${sevName}</span>`
+                : clean
+                    ? `<span class="text-[15px] font-bold leading-none text-admin-success" title="Чисто — находок нет">✓</span>`
+                    : `<span class="text-[15px] font-bold leading-none text-admin-text-muted" title="Открытых нет — только принятые как есть">✓</span>`;
             return `<details id="check-${esc(g.checkId)}" class="admin-card mb-2 px-4 py-3 scroll-mt-4" ${g.openCount ? 'open' : ''}>
                 <summary class="cursor-pointer select-none flex flex-wrap items-center gap-2">
-                    <span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${sevCls}">${sevName}</span>
-                    <span class="font-semibold text-admin-text">${esc(g.title)}</span>
-                    <span class="${g.openCount ? 'font-bold text-admin-text' : 'text-admin-text-muted'}">${g.openCount}</span>
-                    ${g.acceptedCount ? `<span class="text-[11px] text-admin-text-muted">+${g.acceptedCount} принято</span>` : ''}
+                    ${mark}
+                    <span class="font-semibold ${quiet ? 'text-admin-text-muted' : 'text-admin-text'}">${esc(g.title)}</span>
+                    ${quiet ? '' : `<span class="font-bold text-admin-text">${g.openCount}</span>`}
+                    ${g.acceptedCount ? `<span class="text-[11px] text-admin-text-muted">${quiet ? '' : '+'}${g.acceptedCount} принято</span>` : ''}
                     ${g.total != null && g.total > g.findings.length
                         ? `<span class="text-[11px] text-admin-warning" title="Список находок обрезан — полное число известно из последнего прогона">показано ${g.findings.length} из ${g.total}</span>`
                         : ''}
                     ${g.failed ? '<span class="text-[11px] text-admin-danger">проверка упала</span>' : ''}
-                    ${clean ? '<span class="text-[11px] text-admin-success">чисто</span>' : ''}
                     <code class="ml-auto text-[10px] text-admin-text-muted/70">${esc(g.checkId)}</code>
                 </summary>
                 <div class="mt-2 text-[12px]">${esc(g.description)}</div>
