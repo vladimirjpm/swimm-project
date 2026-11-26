@@ -39,6 +39,14 @@ public interface ITrainingRsvpService
     Task<List<PastTrainingDto>?> GetPastAsync(int hubGroupId, DateTime? nowLocal = null);
 
     /// <summary>
+    /// Список «Past» УЧАСТНИКА (решение Влада 26.11.2026): прошедшие занятия с ОПУБЛИКОВАННЫМ планом
+    /// дорожек за те же <c>TrainingRsvpRules.PastDaysBack</c> дней, сначала новые; без счётчиков
+    /// ответов (<c>Yes / Maybe / No</c> — null). Черновики и занятия только с ответами — не здесь.
+    /// Null — группы нет.
+    /// </summary>
+    Task<List<PastTrainingDto>?> GetMemberPastAsync(int hubGroupId, DateTime? nowLocal = null);
+
+    /// <summary>
     /// Отменить занятие (Р9) — «в этот вторник тренировки нет». Право (управляющий) проверяет
     /// контроллер. Занятие должно существовать и лежать в окне ответов (400 «There is no such
     /// training.»); повторная отмена — успех, причина обновляется. Ответы не удаляются.

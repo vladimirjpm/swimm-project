@@ -4,6 +4,8 @@ import CoachDeskSection from './sections/coach-desk-section';
 import CoachSessionsSection from './sections/coach-sessions-section';
 import LanePlanSection from './sections/lane-plan-section';
 import MemberNextSection from './sections/member-next-section';
+import MemberPastSection from './sections/member-past-section';
+import MemberPastSessionSection from './sections/member-past-session-section';
 import TrainingFeedSection from './sections/training-feed-section';
 
 /**
@@ -25,9 +27,21 @@ export interface TrainingsSectionDef {
   Component: React.ComponentType;
 }
 
-/** Next участника: ближайшие занятия (Т5). На десктопе — левая колонка. */
+/**
+ * Next участника: ближайшие занятия (Т5), под ними — прошедшие с опубликованным планом (26.11.2026).
+ * На десктопе — левая колонка.
+ */
 export const NEXT_SECTIONS: TrainingsSectionDef[] = [
   { id: 'member-next', Component: MemberNextSection },
+  { id: 'member-past', Component: MemberPastSection },
+];
+
+/**
+ * Участник открыл прошедшее из «Past» (`?session=<id>`, 26.11.2026): вид «только смотреть» вместо
+ * видов — на обеих ширинах, во всю ширину.
+ */
+export const MEMBER_PAST_SECTIONS: TrainingsSectionDef[] = [
+  { id: 'member-past-session', Component: MemberPastSessionSection },
 ];
 
 /** Trainings: лента тренировок (Т4). На десктопе — правая колонка. */

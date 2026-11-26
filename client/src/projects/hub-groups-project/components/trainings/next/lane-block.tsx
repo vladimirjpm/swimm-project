@@ -31,7 +31,7 @@ import { levelColor } from '../../level-color';
  * Номер «своей» дорожки экрана: участнику — где он стоит (`is_me`); управляющему в режиме «👁 View» —
  * выбранная в ряду дорожек (`lane-preview-picker.tsx`).
  */
-function useMyLaneNo(lanes: TrainingLane[]): number | null {
+export function useMyLaneNo(lanes: TrainingLane[]): number | null {
   const { lanePreview, previewLane } = useTrainingsTab();
   return lanePreview ? previewLaneNo(lanes, previewLane) : ownLaneNo(lanes);
 }
@@ -136,8 +136,11 @@ export function NextHeader({
   );
 }
 
-/** Своя версия workout (CF6): «Your workout · 2.1 km», сеты и времена своего уровня. */
-export function YourWorkout({ lane }: { lane: TrainingLane }) {
+/**
+ * Своя версия workout (CF6): «Your workout · 2.1 km», сеты и времена своего уровня. `title` — у
+ * прошедшего занятия (26.11.2026) та же карточка показывает и чужие уровни: «Workout».
+ */
+export function YourWorkout({ lane, title = 'Your workout' }: { lane: TrainingLane; title?: string }) {
   const { group } = useTrainingsTab();
   const workout = lane.level_workout;
   if (!hasWorkout(workout)) return null;
@@ -151,7 +154,7 @@ export function YourWorkout({ lane }: { lane: TrainingLane }) {
     >
       <div className="flex items-center justify-between gap-3">
         <span className="flex min-w-0 items-center gap-2">
-          <span className="flex-none text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>Your workout</span>
+          <span className="flex-none text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>{title}</span>
           {lane.level && <LevelTag level={lane.level} full />}
         </span>
         <span className="flex flex-none items-center gap-2.5">
@@ -241,28 +244,30 @@ function MiniRow({
 /**
  * Мини-бассейн телефона: вся «вода» — кнопка «Open lanes». `footer` (вид тренера, Т6) — подвал
  * внутри той же рамки, но ВНЕ кнопки: в нём свои кнопки («Lanes ›»), вложить их в «Open lanes» нельзя.
+ * `past` (прошедшее участника, 26.11.2026) — только картинка: доска Lanes для истории не нужна.
  */
-export function MiniPool({ r, footer }: { r: TrainingRsvp; footer?: React.ReactNode }) {
+export function MiniPool({ r, footer, past = false }: { r: TrainingRsvp; footer?: React.ReactNode; past?: boolean }) {
   const { openLanes } = useTrainingsTab();
   const view = r.lane_view;
   const myNo = useMyLaneNo(view?.lanes ?? []);
   if (!view) return null;
   const open = () => openLanes(r.session_id);
   const water = view.source === 'water';
+  const button = past ? {} : {
+    role: 'button',
+    tabIndex: 0,
+    'aria-label': 'Open lanes',
+    onClick: open,
+    onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } },
+    className: 'cursor-pointer',
+  };
 
   return (
     <div
       className="overflow-hidden rounded-[12px] border"
       style={{ borderColor: 'var(--deep-pool-border)', background: 'var(--deep-pool-water)' }}
     >
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="Open lanes"
-        onClick={open}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
-        className="cursor-pointer"
-      >
+      <div {...button}>
         {water ? (
           <MiniRow label="pool" people={view.lanes.flatMap((l) => l.people)} mine={false} first />
         ) : (
@@ -349,8 +354,10 @@ function FullRow({
  * Полный бассейн десктопа: подпись источника + «Lanes ›» сверху, дорожки сеткой.
  * `coach` (Т6): без своей шапки (над бассейном у тренера строка статуса плана и «✎ Edit lanes»)
  * и без колонки YOU / подсветки «моей» дорожки.
+ * `past` (прошедшее участника, 26.11.2026): без «Lanes ›» и без своего workout внизу — workout всех
+ * уровней рисует сам вид прошедшего (`past/past-level-workouts.tsx`).
  */
-export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolean }) {
+export function FullPool({ r, coach = false, past = false }: { r: TrainingRsvp; coach?: boolean; past?: boolean }) {
   const { openLanes, marks } = useTrainingsTab();
   const view = r.lane_view;
   const myNo = useMyLaneNo(view?.lanes ?? []);
@@ -366,7 +373,7 @@ export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolea
             {/* Вид строится только по опубликованному плану — «published» зелёным, как в макете. */}
             {view.source === 'plan' && <> · <span style={{ color: 'var(--deep-live)' }}>published</span></>}
           </span>
-          <button
+          {!past && <button
             type="button"
             onClick={() => openLanes(r.session_id)}
             className="inline-flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-[12px] font-extrabold"
@@ -374,7 +381,7 @@ export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolea
           >
             Lanes ›
             {marks.lanes && <MarkDot mark={{ ...marks.lanes, count: undefined }} />}
-          </button>
+          </button>}
         </div>
       )}
       <div
@@ -416,7 +423,7 @@ export function FullPool({ r, coach = false }: { r: TrainingRsvp; coach?: boolea
           </div>
         )}
       </div>
-      {!coach && !water && (() => {
+      {!coach && !past && !water && (() => {
         const mine = laneByNo(view.lanes, myNo);
         return mine ? <YourWorkout lane={mine} /> : null;
       })()}
