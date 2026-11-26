@@ -225,10 +225,11 @@ public class DataCheckRunner(
             {
                 var items = byCheck.GetValueOrDefault(c.Id, []);
                 var state = states.GetValueOrDefault(c.Id);
+                var accepted = items.Count(f => f.Resolution == DataCheckResolutions.Accepted);
                 return new DataCheckGroupDto(
                     c.Id, c.Title, c.Description, c.Severity,
-                    items.Count(f => f.Resolution == null),
-                    items.Count(f => f.Resolution == DataCheckResolutions.Accepted),
+                    DataCheckOpenCount.Of(state?.Total, items.Count(f => f.Resolution == null), accepted),
+                    accepted,
                     items.Select(f => ToDto(f, subjects, resultGenders, clubRules, orgCompIds)).ToList(),
                     state?.Total, state?.LastRunAt, state?.Failed ?? false);
             })
@@ -252,16 +253,25 @@ public class DataCheckRunner(
         // Принятые находки состояние не знает (оно про «что нашла проверка»), а потребителю
         // нужно «что ещё требует работы» — иначе решения Р16-типа («не чиним») висели бы
         // в счётчиках вечно.
-        var accepted = await db.DataCheckFindings.AsNoTracking()
-            .Where(f => f.Resolution == DataCheckResolutions.Accepted)
+        // Принятые и открытые из списка — то же, из чего /Admin/Health считает свои числа
+        // (GetCurrentAsync): правило одно, DataCheckOpenCount, и входы у него одинаковые.
+        var listed = await db.DataCheckFindings.AsNoTracking()
+            .Where(f => f.Resolution == null || f.Resolution == DataCheckResolutions.Accepted)
             .GroupBy(f => f.CheckId)
-            .Select(g => new { CheckId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.CheckId, x => x.Count, ct);
+            .Select(g => new
+            {
+                CheckId = g.Key,
+                Accepted = g.Count(f => f.Resolution == DataCheckResolutions.Accepted),
+                Open = g.Count(f => f.Resolution == null)
+            })
+            .ToDictionaryAsync(x => x.CheckId, ct);
 
         var states = (await db.DataCheckStates.AsNoTracking().ToListAsync(ct))
             .Select(s => new DataCheckStateDto(
                 s.CheckId, (DataCheckSeverity)s.Severity, s.Total, s.Shown, s.Failed,
-                s.LastRunId, s.LastRunAt, accepted.GetValueOrDefault(s.CheckId)))
+                s.LastRunId, s.LastRunAt,
+                listed.GetValueOrDefault(s.CheckId)?.Accepted ?? 0,
+                listed.GetValueOrDefault(s.CheckId)?.Open ?? 0))
             .ToList();
 
         return (lastRun is null ? null : ToDto(lastRun), states);
