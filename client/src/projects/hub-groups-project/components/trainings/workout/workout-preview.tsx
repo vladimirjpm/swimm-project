@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { LanePlan, Workout } from '../../../types';
+import { useTrainingsTab } from '../trainings-context';
 import { SegmentBar } from '../trainings-segments';
+import { PrintButton } from './print/print-button';
 import { levelAbbr } from './workout-format';
 import { setSwumBy, workoutForLevel } from './workout-for-level';
 import type { WorkoutLevel } from './workout-level-tag';
@@ -16,6 +18,7 @@ function WorkoutPreview({ workout, levels, plan }: {
   levels: WorkoutLevel[];
   plan: LanePlan | null;
 }) {
+  const { group } = useTrainingsTab();
   const [picked, setPicked] = useState<number | null>(null);
   const levelId = picked != null && levels.some((l) => l.id === picked) ? picked : levels[0]?.id ?? null;
   const level = levels.find((l) => l.id === levelId) ?? null;
@@ -28,8 +31,22 @@ function WorkoutPreview({ workout, levels, plan }: {
 
   return (
     <div className="flex min-w-0 flex-col gap-3 rounded-[14px] p-3.5" style={{ background: 'var(--deep-card-bg-row)', border: '1px solid var(--deep-card-border)' }}>
-      <div className="text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
-        Preview · what a lane gets
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
+          Preview · what a lane gets
+        </span>
+        {version && (
+          <PrintButton
+            source={{
+              workout: version,
+              levelId,
+              level: level ? { rank: level.rank, name: level.name } : null,
+              groupName: group.name,
+              // Номера сетов — как у тренера: уровень, пропускающий сет, видит дырку в нумерации (план §3.2).
+              setNumbers: workout.sets.map((_, i) => i + 1).filter((_, i) => setSwumBy(workout.sets[i], levelId)),
+            }}
+          />
+        )}
       </div>
       {levels.length > 1 && (
         <SegmentBar

@@ -11,6 +11,7 @@ import { CancelledPill } from './session-tag';
 import { hasWorkout } from '../workout/workout-for-level';
 import WorkoutLevelView from '../workout/workout-level-view';
 import { formatKm, levelMeters } from '../workout/workout-totals';
+import { PrintButton } from '../workout/print/print-button';
 import { ownLaneNo, previewLaneNo } from './lane-preview';
 import { LevelTag } from '../workout/workout-level-tag';
 import { levelColor } from '../../level-color';
@@ -137,6 +138,7 @@ export function NextHeader({
 
 /** Своя версия workout (CF6): «Your workout · 2.1 km», сеты и времена своего уровня. */
 export function YourWorkout({ lane }: { lane: TrainingLane }) {
+  const { group } = useTrainingsTab();
   const workout = lane.level_workout;
   if (!hasWorkout(workout)) return null;
   const levelId = lane.level?.id ?? null;
@@ -152,8 +154,18 @@ export function YourWorkout({ lane }: { lane: TrainingLane }) {
           <span className="flex-none text-[13px] font-extrabold" style={{ color: 'var(--deep-text)' }}>Your workout</span>
           {lane.level && <LevelTag level={lane.level} full />}
         </span>
-        <span className="text-[11px] font-bold" style={{ color: 'var(--t-text-3)' }}>
-          <span className="hp-mono text-[12.5px] font-extrabold" style={{ color: 'var(--deep-text)' }}>{formatKm(levelMeters(workout, levelId))}</span> · send-off
+        <span className="flex flex-none items-center gap-2.5">
+          <span className="text-[11px] font-bold" style={{ color: 'var(--t-text-3)' }}>
+            <span className="hp-mono text-[12.5px] font-extrabold" style={{ color: 'var(--deep-text)' }}>{formatKm(levelMeters(workout, levelId))}</span> · send-off
+          </span>
+          <PrintButton
+            source={{
+              workout,
+              levelId,
+              level: lane.level ? { rank: lane.level.rank, name: lane.level.name } : null,
+              groupName: group.name,
+            }}
+          />
         </span>
       </div>
       <WorkoutLevelView workout={workout} levelId={levelId} />
