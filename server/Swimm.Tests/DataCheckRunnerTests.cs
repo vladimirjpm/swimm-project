@@ -43,6 +43,33 @@ public class DataCheckRunnerTests
         }
     }
 
+    /// <summary>
+    /// Счётчики прогона (история на /Admin/Health) — открытые, тем же правилом: 26.11 история
+    /// писала «предупреждений 39» при нуле открытых, потому что считала и принятые.
+    /// </summary>
+    [Fact]
+    public async Task Run_CountsOpenOnly_SameRuleAsHealth()
+    {
+        await using var db = CreateDb(nameof(Run_CountsOpenOnly_SameRuleAsHealth));
+        var warn = new FakeCheck("test.warn", DataCheckSeverity.Warning);
+        warn.Items.Add(Item(1));
+        warn.Items.Add(Item(2));
+        var capped = new FakeCheck("test.capped") { Total = 120 };
+        capped.Items.Add(Item(3));
+        var runner = new DataCheckRunner(db, [warn, capped]);
+        await runner.RunAllAsync("manual");
+
+        foreach (var f in await db.DataCheckFindings.Where(f => f.CheckId == "test.warn").ToListAsync())
+            await runner.AcceptAsync(f.Id, "не чиним");
+
+        var run = await runner.RunAllAsync("manual");
+
+        Assert.Equal(0, run.WarningCount);   // оба приняты
+        Assert.Equal(120, run.ErrorCount);   // капнутый список — полным числом
+        var health = await runner.GetCurrentAsync();
+        Assert.Equal(health.Where(g => g.Severity == DataCheckSeverity.Error).Sum(g => g.OpenCount), run.ErrorCount);
+    }
+
     // ── Одно правило «сколько открыто» для /Admin/Health и дашборда ─────────────────────
 
     [Theory]

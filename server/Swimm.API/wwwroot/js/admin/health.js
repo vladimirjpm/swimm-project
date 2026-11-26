@@ -451,7 +451,7 @@
         document.getElementById('history').innerHTML = history.length === 0
             ? '<div class="italic">Прогонов ещё не было.</div>'
             : `<div class="overflow-x-auto"><table class="admin-table">
-                <thead><tr><th>Когда</th><th>Кто запустил</th><th>Ошибки</th><th>Предупр.</th><th>Инфо</th><th>Закрыто</th></tr></thead>
+                <thead><tr title="Открытые находки после прогона — принятые как есть не в счёт. Прогоны до 26.11.2026 считали всё найденное, включая принятые."><th>Когда</th><th>Кто запустил</th><th>Открыто: ошибки</th><th>Предупр.</th><th>Инфо</th><th>Закрыто</th></tr></thead>
                 <tbody>${history.map(r => `<tr>
                     <td class="whitespace-nowrap">${new Date(r.startedAt).toLocaleString('ru-RU')}</td>
                     <td>${esc(r.trigger)}</td>
@@ -515,7 +515,7 @@
             const data = await api(`${API}/run`, { method: 'POST' });
             render(data);
             const r = data.run;
-            toast(`Прогон завершён: ошибок ${r.errorCount}, предупреждений ${r.warningCount}, закрыто ${r.fixedCount}`, 5000);
+            toast(`Прогон завершён — открыто: ошибок ${r.errorCount}, предупреждений ${r.warningCount}; закрыто ${r.fixedCount}`, 5000);
         } catch (e) {
             toast('Ошибка прогона: ' + e.message, 6000);
         } finally { btn.disabled = false; }
