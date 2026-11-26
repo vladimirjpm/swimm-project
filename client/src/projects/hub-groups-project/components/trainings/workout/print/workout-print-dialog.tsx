@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDeepThemeClass } from '../../../../../components/deep/use-deep-theme-class';
 import { DEFAULT_PRINT_VIEW, PRINT_VIEWS } from './print-views';
 import { previewScale, sheetSize } from './print-preview-scale';
-import { PrintStatusContext, type PrintSheetStatus } from './print-sheet-status';
-import type { WorkoutPrintSource } from './print-types';
+import type { PrintSheetFit, WorkoutPrintSource } from './print-types';
 import { usePrintSession } from './use-print-session';
 
 /**
@@ -18,7 +17,7 @@ export function WorkoutPrintDialog({ source, onClose }: { source: WorkoutPrintSo
   const themeClass = useDeepThemeClass();
   const view = PRINT_VIEWS[DEFAULT_PRINT_VIEW];
   const { root, print } = usePrintSession(view.orientation);
-  const [status, setStatus] = useState<PrintSheetStatus | null>(null);
+  const [status, setStatus] = useState<PrintSheetFit | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLButtonElement>(null);
   const [avail, setAvail] = useState({ w: 0, h: 0 });
@@ -59,7 +58,6 @@ export function WorkoutPrintDialog({ source, onClose }: { source: WorkoutPrintSo
 
   useEffect(() => { if (root) printRef.current?.focus(); }, [root]);
 
-  const report = useCallback((s: PrintSheetStatus | null) => setStatus(s), []);
   if (!root) return null;
 
   const k = previewScale(avail.w, avail.h, view.orientation);
@@ -111,9 +109,8 @@ export function WorkoutPrintDialog({ source, onClose }: { source: WorkoutPrintSo
       <div ref={stageRef} className="wprint-stage min-h-0 flex-1 overflow-auto p-3.5" style={{ background: 'var(--deep-seg-track)' }}>
         <div className="mx-auto" style={{ width: size.width * k, height: size.height * k, boxShadow: '0 2px 18px rgba(0,0,0,.35)' }}>
           <div style={{ width: size.width, height: size.height, transform: `scale(${k})`, transformOrigin: 'top left' }}>
-            <PrintStatusContext.Provider value={report}>
-              <Sheet source={source} />
-            </PrintStatusContext.Provider>
+            {/* `onFit` — итог подгонки вида: подпись раскладки и кегля, «не влезло» (план §3.5). */}
+            <Sheet source={source} onFit={setStatus} />
           </div>
         </div>
       </div>
