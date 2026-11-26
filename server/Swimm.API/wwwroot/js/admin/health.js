@@ -288,8 +288,32 @@
         } catch (e) { btn.disabled = false; toast('Ошибка: ' + e.message, 6000); }
     }
 
+    // Проверки без открытых находок (чистые и «только принятые») — одним свёрнутым блоком внизу
+    // (просьба Влада 26.11.2026: «скрой этот див если ошибок нет»). Наверху — только то, на что
+    // смотреть; упавшая проверка тоже наверху. Раскрыт ли блок — помним между перерисовками.
     function renderGroups(groups) {
-        document.getElementById('groups').innerHTML = groups.map(g => {
+        const host = document.getElementById('groups');
+        const quietWasOpen = host.querySelector('#quiet-checks')?.open ?? false;
+        const loud = groups.filter(g => g.openCount > 0 || g.failed);
+        const quiet = groups.filter(g => !(g.openCount > 0 || g.failed));
+        const acceptedOnly = quiet.filter(g => g.acceptedCount > 0).length;
+
+        host.innerHTML = (loud.length
+                ? loud.map(groupCard).join('')
+                : `<div class="admin-card mb-2 px-4 py-3 text-[13px] text-admin-success">Открытых находок нет — смотреть нечего</div>`)
+            + (quiet.length
+                ? `<details id="quiet-checks" class="mb-2" ${quietWasOpen ? 'open' : ''}>
+                    <summary class="cursor-pointer select-none py-2 text-[12px] text-admin-text-muted">
+                        Без открытых находок — ${quiet.length}
+                        (чисто ${quiet.length - acceptedOnly}${acceptedOnly ? `, только принятые ${acceptedOnly}` : ''})
+                    </summary>
+                    ${quiet.map(groupCard).join('')}
+                </details>`
+                : '');
+        wireGroups();
+    }
+
+    function groupCard(g) {
             const [sevName, sevCls] = SEV[g.severity];
             const clean = g.openCount === 0 && g.acceptedCount === 0;
             return `<details id="check-${esc(g.checkId)}" class="admin-card mb-2 px-4 py-3 scroll-mt-4" ${g.openCount ? 'open' : ''}>
@@ -310,8 +334,10 @@
                 ${g.findings.length ? `<div class="overflow-x-auto mt-2"><table class="admin-table w-full">
                     <tbody>${g.findings.map(findingRow).join('')}</tbody></table></div>` : ''}
             </details>`;
-        }).join('');
+    }
 
+    // Кнопки находок — после каждой перерисовки списка.
+    function wireGroups() {
         document.querySelectorAll('.finding-accept').forEach(b => b.addEventListener('click', () => accept(b.dataset.id)));
         document.querySelectorAll('.finding-reopen').forEach(b => b.addEventListener('click', () => reopen(b.dataset.id)));
         document.querySelectorAll('.finding-copy').forEach(b => b.addEventListener('click', () => copyName(b)));
@@ -434,6 +460,8 @@
         hashFocused = true;
         const el = document.getElementById(decodeURIComponent(location.hash.slice(1)));
         if (!el) return;
+        const quiet = el.closest('#quiet-checks');   // ссылка на проверку в свёрнутом блоке
+        if (quiet) quiet.open = true;
         el.open = true;
         el.classList.add('ring-1', 'ring-admin-accent');
         el.scrollIntoView({ block: 'start' });
