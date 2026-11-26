@@ -1827,9 +1827,11 @@
                             + `<div class="font-semibold text-admin-text"><span class="font-normal text-admin-text-muted">проплыл:</span> <bdi>${esc(s.swimmerName)}</bdi> · ${esc(s.distance)} ${esc(s.styleName)} · <b>${esc(s.time)}</b></div>`
                             + `<div class="mt-0.5 space-y-0.5 text-[11.5px]">${recs}</div>`
                             + `<div class="mt-1.5 border-t border-admin-border pt-1.5">`
-                            + `<label class="flex items-center gap-1.5 cursor-pointer text-admin-text-muted">`
-                            + `<input type="checkbox" class="suspect-flag cursor-pointer" value="${s.rowIndex}"`
-                            + ` data-note="${esc(suspectNote(g))}"> пометить сомнительным</label>`
+                            // Вид — .btn-mark-suspect (Styles/admin.css): кнопка-тумблер, внутри
+                            // чекбокс .suspect-flag, его читают captureForm и «Применить».
+                            + `<label class="admin-btn admin-btn-warning btn-mark-suspect">`
+                            + `<input type="checkbox" class="suspect-flag cursor-pointer accent-admin-warning" value="${s.rowIndex}"`
+                            + ` data-note="${esc(suspectNote(g))}"> ⚑ пометить сомнительным</label>`
                             // Сюда приезжает вердикт по карточке loglig (или поле для привязки
                             // id и пола, если пловец ещё не привязан) — см. loadRecordCheck.
                             + `<div class="record-check mt-1 text-[11.5px]" data-row="${s.rowIndex}" data-name="${esc(s.swimmerName)}"></div>`
