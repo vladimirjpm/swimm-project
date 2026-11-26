@@ -137,6 +137,15 @@ test('версия уровня: сет без названия — «Set N» п
   assert.equal(workoutForLevel(sheet1, ADV).sets[0].title, 'Warm-up', 'своё название не трогаем');
 });
 
+test('версия уровня сохраняет main: у плывущих главных метка есть, у уровня без главного — нет', () => {
+  const set = (levelIds, main) => ({ title: null, repeat: 1, level_ids: levelIds, ...(main ? { main: true } : {}), lines: [line(1, 100, 'x')] });
+  const w = { note: null, sets: [set(null, true), set(null, false), set([ADV], true)] };
+  assert.deepEqual(workoutForLevel(w, ADV).sets.map((s) => !!s.main), [true, false, true]);
+  assert.deepEqual(workoutForLevel(w, INT).sets.map((s) => !!s.main), [true, false]);
+  const onlyAdvMain = { note: null, sets: [set(null, false), set([ADV], true)] };
+  assert.ok(workoutForLevel(onlyAdvMain, INT).sets.every((s) => !s.main), 'уровень без главного сета видит версию без метки');
+});
+
 test('нагрузка → чипы шкалы V0–V5', () => {
   assert.deepEqual(intensityKeys('3V'), ['v3']);
   assert.deepEqual(intensityKeys('V4'), ['v4']);

@@ -54,9 +54,19 @@ function SetBlock({ set, levelId, first }: { set: WorkoutSet; levelId: number | 
       style={first ? undefined : { borderColor: 'var(--deep-divider)' }}
     >
       <header className="flex items-baseline justify-between gap-3">
-        <span dir="auto" className="min-w-0 truncate text-[12px] font-extrabold" style={{ color: 'var(--deep-accent)' }} title={set.title ?? undefined}>
-          {set.repeat > 1 && <bdi dir="ltr" className="hp-mono">{set.repeat}× </bdi>}
-          {set.title}
+        <span className="flex min-w-0 items-baseline gap-1.5">
+          <span dir="auto" className="min-w-0 truncate text-[12px] font-extrabold" style={{ color: 'var(--deep-accent)' }} title={set.title ?? undefined}>
+            {set.repeat > 1 && <bdi dir="ltr" className="hp-mono">{set.repeat}× </bdi>}
+            {set.title}
+          </span>
+          {set.main && (
+            <span
+              className="flex-none rounded-full border px-1.5 text-[9.5px] font-extrabold uppercase leading-[15px] tracking-[.07em]"
+              style={{ color: 'var(--deep-accent)', borderColor: 'var(--deep-accent)' }}
+            >
+              Main
+            </span>
+          )}
         </span>
         {meters > 0 && (
           <span className="hp-mono flex-none text-[11px] font-extrabold" style={{ color: 'var(--t-text-3)' }}>{formatMeters(meters)}</span>

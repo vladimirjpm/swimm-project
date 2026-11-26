@@ -31,6 +31,15 @@ public sealed class WorkoutSetDto
     [JsonPropertyName("level_ids")]
     public List<int>? LevelIds { get; set; }
 
+    /// <summary>
+    /// Главный сет (תרגיל מרכזי) — его отмечает тренер галочкой «Main set»; главных может быть несколько.
+    /// При <c>false</c> в JSON не пишется: старые документы без поля читаются как false и не меняются
+    /// от пересохранения (docs/plans/workout-print-plan.md, §3.1).
+    /// </summary>
+    [JsonPropertyName("main")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Main { get; set; }
+
     [JsonPropertyName("lines")]
     public List<WorkoutLineDto> Lines { get; set; } = [];
 }

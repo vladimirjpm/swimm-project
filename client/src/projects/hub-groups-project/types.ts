@@ -716,6 +716,8 @@ export interface WorkoutSet {
   repeat: number;
   /** null — сет плывут все уровни; список — только названные. */
   level_ids?: number[] | null;
+  /** Главный сет (תרגיל מרכזי): отмечает тренер галочкой «Main set»; главных может быть несколько. */
+  main?: boolean;
   lines: WorkoutLine[];
 }
 

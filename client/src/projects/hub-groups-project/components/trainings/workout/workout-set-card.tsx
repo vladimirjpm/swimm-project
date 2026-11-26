@@ -123,6 +123,17 @@ function WorkoutSetCard({
             style={{ paddingInline: 4 }}
           />
         </label>
+        <label className="flex flex-none cursor-pointer items-center gap-1 text-[11.5px] font-bold" style={{ color: 'var(--t-text-3)' }} title="Mark the key set of the workout (it is highlighted on the print sheet)">
+          <input
+            type="checkbox"
+            checked={!!set.main}
+            // false не храним: снятая галочка = поля нет, как у документов до появления метки.
+            onChange={(e) => onChange({ ...set, main: e.target.checked || undefined })}
+            className="h-3.5 w-3.5 flex-none cursor-pointer"
+            style={{ accentColor: 'var(--deep-ow)' }}
+          />
+          Main set
+        </label>
         <span className="hp-mono flex-none text-[12.5px] font-extrabold" style={{ color: 'var(--deep-text)' }}>{metersText}</span>
         <span className="ml-auto flex flex-none items-center gap-1">
           <button

@@ -56,6 +56,7 @@ public static class WorkoutRules
                 Repeat = set.Repeat,
                 // Пустой список галочек — «никому»: так не бывает осмысленно, но хранится как есть.
                 LevelIds = set.LevelIds?.Distinct().ToList(),
+                Main = set.Main,
             };
             foreach (var line in lines)
             {
@@ -142,6 +143,7 @@ public static class WorkoutRules
                 Title = x.Set.Title ?? $"Set {x.No}",
                 Repeat = x.Set.Repeat,
                 LevelIds = null,
+                Main = x.Set.Main,
                 Lines = x.Set.Lines.Select(l => new WorkoutLineDto
                 {
                     Reps = l.Reps,
