@@ -2,13 +2,22 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createPortal } from 'react-dom';
 import { useDeepThemeClass } from '../../../../../components/deep/use-deep-theme-class';
 import { DEFAULT_PRINT_VIEW, PRINT_VIEWS } from './print-views';
-import { availableViews, pickView } from './print-view-pick';
+import { availableViews, pickView, readSavedView, saveView } from './print-view-pick';
 import { previewScale, sheetSize } from './print-preview-scale';
 import type { PrintSheetFit, WorkoutPrintSource, WorkoutPrintView } from './print-types';
 import { usePrintSession } from './use-print-session';
 
 /** Зазор между листами в предпросмотре, px листа (до масштаба). При печати его нет. */
 const PAGE_GAP = 24;
+
+/** `localStorage`, если он есть (сам доступ к нему бросает, когда хранилище запрещено). */
+function browserStorage(): Storage | null {
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Окно «Print preview» (docs/plans/workout-print-plan.md §2 Р1, §4): листы вида в масштабе под экран
@@ -21,22 +30,28 @@ const PAGE_GAP = 24;
  * их больше одного; листов у вида сколько угодно — стопкой (масштаб по одному листу, дальше прокрутка);
  * `duplex` — подсказка включить двустороннюю печать. `views` — реестр (по умолчанию `PRINT_VIEWS`;
  * стенд ui-kit подставляет свой).
+ *
+ * Выбранный вид запоминается в `localStorage` (В21, Влад 27.11.2026) и открывается в следующий раз;
+ * запомненного нет, он пропал из реестра или не годится для этого workout — `defaultView`.
+ * `remember={false}` — не читать и не писать (стенд ui-kit открывает окно на виде из своих пропсов).
  */
 export function WorkoutPrintDialog({
   source,
   onClose,
   views = PRINT_VIEWS,
   defaultView = DEFAULT_PRINT_VIEW,
+  remember = true,
 }: {
   source: WorkoutPrintSource;
   onClose: () => void;
   views?: Record<string, WorkoutPrintView>;
   defaultView?: string;
+  remember?: boolean;
 }) {
   const themeClass = useDeepThemeClass();
   const list = useMemo(() => availableViews(views, source), [views, source]);
-  const [viewId, setViewId] = useState<string>(defaultView);
-  const view = pickView(list, viewId);
+  const [viewId, setViewId] = useState<string>(() => (remember && readSavedView(browserStorage())) || defaultView);
+  const view = pickView(list, viewId, defaultView);
   const orientation = view?.orientation ?? 'portrait';
   const { root, print } = usePrintSession(orientation);
   const [status, setStatus] = useState<PrintSheetFit | null>(null);
@@ -108,6 +123,7 @@ export function WorkoutPrintDialog({
     if (id === view?.id) return;
     setStatus(null);
     setViewId(id);
+    if (remember) saveView(browserStorage(), id);
   };
 
   return createPortal(

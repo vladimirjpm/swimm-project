@@ -3,7 +3,8 @@ import { cellLabel, intensityKeys, lineDir, repsDistanceLabel } from '../workout
 import { setSwumBy } from '../workout-for-level';
 import { formatKm, formatMeters, levelMeters, setMeters } from '../workout-totals';
 import type {
-  MainLayoutModel, SheetCube, SheetDir, SheetLeftItem, SheetLine, SheetModel, WorkoutPrintSource,
+  MainLayoutModel, SheetCube, SheetDir, SheetLeftItem, SheetLine, SheetModel, SheetRichText, SheetTextPart,
+  WorkoutPrintSource,
 } from './print-types';
 
 /**
@@ -54,18 +55,56 @@ export function sheetDir(workout: Workout): SheetDir {
 
 const chipLabel = (key: string) => (key === 'sprint' ? 'Sprint' : key.toUpperCase());
 
-function sheetLine(line: WorkoutLine, levelKey: string | null): SheetLine {
+/**
+ * Уровень нагрузки внутри текста тренера (хендофф 27.11 §5, решения Влада 27.11: «все V1, V2 — в
+ * бордере», «4V это V4», `1-3V` в тексте — «один раз на V3»): `4V` / `V4`, перед ним может стоять
+ * «1-». Цифра — шкала 0…5, как у `intensityKeys`; «Valve», «2Vx», «50V» не трогаются.
+ */
+const TEXT_LEVEL = /(?<![A-Za-z0-9])(\d+-)?(?:([0-5])V|V([0-5]))(?![A-Za-z0-9])/g;
+
+/** Текст строки → куски «текст / чип уровня (с приставкой «1-»)». Уровней нет — один кусок текста. */
+export function textLevelParts(text: string): SheetTextPart[] {
+  const parts: SheetTextPart[] = [];
+  let at = 0;
+  for (const m of text.matchAll(TEXT_LEVEL)) {
+    const start = m.index ?? 0;
+    if (start > at) parts.push({ kind: 'text', text: text.slice(at, start) });
+    parts.push({ kind: 'level', label: `V${m[2] ?? m[3]}`, prefix: m[1] ?? '' });
+    at = start + m[0].length;
+  }
+  if (at < text.length) parts.push({ kind: 'text', text: text.slice(at) });
+  return parts;
+}
+
+/**
+ * Текст строки для листа строк: уровни чипами; чипы поля `intensity` — только если в тексте уровня
+ * нет (без дублей: «הכל 2V» + поле «2V» → один [V2]). Направление — по буквам, оставшимся после
+ * уровней; букв нет («1-4V, 1-1V») — направление листа, иначе в ивритском листе такая строка одна
+ * развернулась бы слева направо.
+ */
+export function richText(text: string, intensityChips: string[] | null, sheet: SheetDir): SheetRichText {
+  const parts = textLevelParts(text);
+  const hasLevel = parts.some((p) => p.kind === 'level');
+  const letters = parts.map((p) => (p.kind === 'text' ? p.text : '')).join('');
+  const dir: SheetDir = HEBREW_OR_ARABIC.test(letters) ? 'rtl' : LATIN.test(letters) ? 'ltr' : sheet;
+  return { parts, dir, chips: hasLevel ? null : intensityChips };
+}
+
+function sheetLine(line: WorkoutLine, levelKey: string | null, dir: SheetDir): SheetLine {
   const own = levelKey != null ? line.per_level?.[levelKey] : undefined;
   const text = (line.text ?? '').trim();
   const intensity = (line.intensity ?? '').trim();
   const keys = intensityKeys(intensity);
+  const chips = keys ? keys.map(chipLabel) : null;
   return {
     head: repsDistanceLabel(own?.reps ?? line.reps, line.distance),
     text,
     textDir: lineDir(text),
-    chips: keys ? keys.map(chipLabel) : null,
+    chips,
     intensityText: !keys && intensity ? intensity : null,
     cell: own ? cellLabel({ ...own, send_off: restLabel(own.send_off) }) : '',
+    time: own ? restLabel(own.send_off) : '',
+    rich: richText(text, chips, dir),
   };
 }
 
@@ -75,7 +114,7 @@ const hasContent = (l: SheetLine) => !!(l.head || l.text || l.chips || l.intensi
  * Кубы листа по порядку выполнения. Сеты, которых уровень не плывёт, пропускаются, а номера
  * остаются тренерскими (дырка в нумерации, как у «Set N» в `workoutForLevel`).
  */
-function sheetCubes(source: WorkoutPrintSource): SheetCube[] {
+function sheetCubes(source: WorkoutPrintSource, dir: SheetDir): SheetCube[] {
   const { workout, levelId, setNumbers } = source;
   const levelKey = levelId == null ? null : String(levelId);
   const cubes: SheetCube[] = [];
@@ -83,14 +122,17 @@ function sheetCubes(source: WorkoutPrintSource): SheetCube[] {
     if (!setSwumBy(set, levelId)) return;
     const no = setNumbers?.[i] ?? i + 1;
     const meters = setMeters(set, levelId);
+    const title = set.title?.trim() || null;
     cubes.push({
       no,
-      title: set.title?.trim() || `Set ${no}`,
+      title: title || `Set ${no}`,
+      // «Set N» подставляет версия уровня вместо пустого названия (`workoutForLevel`, серверный `ForLevel`).
+      ownTitle: title && title !== `Set ${no}` ? title : null,
       repeat: set.repeat,
       meters,
       metersLabel: meters > 0 ? formatMeters(meters) : null,
       main: isMainSet(set),
-      lines: set.lines.map((line) => sheetLine(line, levelKey)).filter(hasContent),
+      lines: set.lines.map((line) => sheetLine(line, levelKey, dir)).filter(hasContent),
     });
   });
   return cubes;
@@ -118,11 +160,12 @@ export function splitMain(cubes: SheetCube[]): MainLayoutModel | null {
 }
 
 export function toSheetModel(source: WorkoutPrintSource): SheetModel {
-  const cubes = sheetCubes(source);
+  const dir = sheetDir(source.workout);
+  const cubes = sheetCubes(source, dir);
   const totalMeters = levelMeters(source.workout, source.levelId);
   const cellChars = Math.max(0, ...cubes.flatMap((c) => c.lines.map((l) => l.cell.length)));
   return {
-    dir: sheetDir(source.workout),
+    dir,
     header: { groupName: source.groupName, level: source.level, kmLabel: formatKm(totalMeters) },
     note: source.workout.note?.trim() || null,
     cubes,

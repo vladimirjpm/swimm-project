@@ -6,7 +6,7 @@ import '../ts-resolve-hook.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-const { toSheetModel, restLabel, sheetDir, splitMain, isMainSet } = await import('./print-sheet-model.ts');
+const { toSheetModel, restLabel, sheetDir, splitMain, isMainSet, textLevelParts, richText } = await import('./print-sheet-model.ts');
 const { workoutForLevel } = await import('../workout-for-level.ts');
 const { levelMeters, setMeters } = await import('../workout-totals.ts');
 
@@ -216,4 +216,75 @@ test('лист 22.11 (другой лист): модель собирается,
   assert.equal(m.totalMeters, levelMeters(workout, INT));
   assert.ok(m.cubes.every((c) => c.lines.length > 0));
   assert.ok(m.cubes.flatMap((c) => c.lines).every((l) => !/rest/i.test(l.cell)));
+});
+
+// ── Уровни нагрузки в тексте строки (хендофф 27.11 §5, §8) ──────────────────────
+
+const lvl = (label, prefix = '') => ({ kind: 'level', label, prefix });
+const txt = (text) => ({ kind: 'text', text });
+
+test('textLevelParts: «4V» и «V4» → чип V4; текст вокруг остаётся', () => {
+  assert.deepEqual(textLevelParts('רגליים הלוך 2V חזור 4V'), [txt('רגליים הלוך '), lvl('V2'), txt(' חזור '), lvl('V4')]);
+  assert.deepEqual(textLevelParts('V4'), [lvl('V4')]);
+  assert.deepEqual(textLevelParts('kick V3 easy'), [txt('kick '), lvl('V3'), txt(' easy')]);
+});
+
+test('textLevelParts: «1-3V» — «1-» и чип V3 одной парой (один раз на V3, не диапазон)', () => {
+  assert.deepEqual(textLevelParts('חתירה 1-3V, 1-1V'), [txt('חתירה '), lvl('V3', '1-'), txt(', '), lvl('V1', '1-')]);
+  assert.deepEqual(textLevelParts('1-4V, 1-1V'), [lvl('V4', '1-'), txt(', '), lvl('V1', '1-')]);
+});
+
+test('textLevelParts: «4V-1V» → два чипа через дефис', () => {
+  assert.deepEqual(textLevelParts('חתירה הגברה 1-4, 4V-1V, לשמור'), [txt('חתירה הגברה 1-4, '), lvl('V4'), txt('-'), lvl('V1'), txt(', לשמור')]);
+});
+
+test('textLevelParts: «Valve», «2Vx», «50V», «V8» и текст без уровней — без изменений', () => {
+  for (const t of ['Valve', '2Vx', 'x2V', '50V', 'V8', 'VV', 'free 4x100', 'חתירה ארוך']) {
+    assert.deepEqual(textLevelParts(t), [txt(t)], t);
+  }
+  assert.deepEqual(textLevelParts(''), []);
+});
+
+test('richText: без дублей — уровень в тексте есть → чипы поля intensity не добавляются; нет → добавляются', () => {
+  assert.equal(richText('חתירה: 4 כפות אמות, הכל 2V', ['V2'], 'rtl').chips, null);
+  assert.deepEqual(richText('חתירה', ['V2'], 'rtl').chips, ['V2']);
+  assert.deepEqual(richText('', ['V1', 'V2'], 'rtl').chips, ['V1', 'V2']);
+  assert.equal(richText('free', null, 'ltr').chips, null);
+});
+
+test('richText: направление — по буквам; строка без букв («1-4V, 1-1V») — направление листа', () => {
+  assert.equal(richText('1-4V, 1-1V', null, 'rtl').dir, 'rtl');
+  assert.equal(richText('1-4V, 1-1V', null, 'ltr').dir, 'ltr');
+  assert.equal(richText('', null, 'rtl').dir, 'rtl');
+  assert.equal(richText('kick 2V', null, 'rtl').dir, 'ltr', 'латиница кроме уровня — ltr');
+  assert.equal(richText('חתירה 2V', null, 'ltr').dir, 'rtl');
+});
+
+test('лист 26.11: «8×50 … הכל 2V» + поле 2V → один [V2]; «1-4V, 1-1V» — по листу rtl', () => {
+  const m = toSheetModel(source(sheet2611()));
+  const paddles = m.cubes[2].lines[0];
+  assert.equal(paddles.rich.chips, null);
+  assert.equal(paddles.rich.parts.filter((p) => p.kind === 'level').length, 1);
+  assert.deepEqual(paddles.chips, ['V2'], 'вид large по-прежнему видит поле');
+  const noLetters = m.cubes[3].lines.find((l) => l.head === '2×50');
+  assert.equal(noLetters.rich.dir, 'rtl');
+  assert.equal(m.cubes[3].lines[0].rich.chips[0], 'V2', '«חתירה» + поле 2V — чип после текста');
+});
+
+test('время строки: свои повторы уровня — в дистанции («3×100»), время — без «3×»', () => {
+  const line = { reps: 4, distance: 100, text: 'חתירה', intensity: null, per_level: { [INT]: { reps: 3, send_off: 'rest :20' } } };
+  const m = toSheetModel(source({ sets: [{ title: 'x', repeat: 1, level_ids: null, lines: [line] }] }));
+  const l = m.cubes[0].lines[0];
+  assert.equal(l.head, '3×100');
+  assert.equal(l.time, 'R:20');
+  assert.equal(l.cell, '3× R:20');
+  assert.equal(toSheetModel(source({ sets: [{ title: 'x', repeat: 1, level_ids: null, lines: [line] }] }, null)).cubes[0].lines[0].time, '');
+});
+
+test('ownTitle: своё название; «Set N» от версии уровня и пустое — null', () => {
+  const m = toSheetModel(source(sheet2611()));
+  assert.deepEqual(m.cubes.map((c) => c.ownTitle), [null, 'שנורקל', 'כפות', 'מרכזי · סט שני עם זומרס', null]);
+  const server = toSheetModel({ ...source({ sets: [plainSet('a'), plainSet('Set 3')] }, INT), setNumbers: [1, 3] });
+  assert.deepEqual(server.cubes.map((c) => c.ownTitle), ['a', null]);
+  assert.equal(toSheetModel(source({ sets: [plainSet('Set 7')] }, null)).cubes[0].ownTitle, 'Set 7', 'чужой номер — название тренера');
 });

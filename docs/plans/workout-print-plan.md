@@ -318,7 +318,7 @@ export interface WorkoutPrintView {
   available?: (source: WorkoutPrintSource) => boolean; // нет — годится всегда
 }
 // workout/print/print-views.ts
-export const PRINT_VIEWS = { large: LARGE_VIEW } satisfies Record<string, WorkoutPrintView>;
+export const PRINT_VIEWS = { large: LARGE_VIEW, rows: ROWS_VIEW, 'two-sides': TWO_SIDES_VIEW } satisfies Record<string, WorkoutPrintView>;
 export type WorkoutPrintViewId = keyof typeof PRINT_VIEWS;
 export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
 ```
@@ -327,7 +327,9 @@ export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
   Порядок строк = порядок сегментов. Окно, кнопка, механика печати не меняются.
 - **Выбор вида** — в окне предпросмотра сегментом (рецепт `.deep-seg`), сам, когда годных видов
   больше одного (`availableViews` / `pickView` в `print-view-pick.ts`). Запоминать выбор в
-  `localStorage` — когда видов станет два и Влад захочет.
+  `localStorage` (В21, ключ `swimm.workoutPrint.view`, `readSavedView` / `saveView`): окно
+  открывается на запомненном виде; нет его в реестре или не годится для workout — `DEFAULT_PRINT_VIEW`
+  (`pickView(list, wanted, fallback)`). Стенд ui-kit передаёт `remember={false}`.
 - **Несколько листов**: вид рисует несколько `.wprint-sheet` подряд. `workout-print.css` ставит разрыв
   страницы после каждого, кроме последнего (иначе Chrome добавит пустую). Окно показывает листы
   стопкой (масштаб по одному листу, дальше прокрутка) и пишет «N pages».
@@ -359,8 +361,47 @@ export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
 | `print-view-pick.ts` | чистое: годные виды для workout (`available`) и выбранный вид |
 | `views/large-view.tsx`, `views/large-main-layout.tsx`, `views/large-cubes-layout.tsx` | вид `large` и его раскладки |
 | `parts/print-set-cube.tsx`, `parts/print-arrow.tsx`, `parts/print-intensity.tsx` | куб сета, SVG-стрелка, чип нагрузки контуром |
-| `workout-print.css` | `@media print` и стили листа, всё под `.wprint` |
-| `print-sheet-model.test.mjs`, `print-fit.test.mjs` | юнит-тесты |
+| `workout-print.css` | `@media print` и механика листа (`.wprint-*`); вид листа — у самого вида (`views/large-view.css`, `views/rows-sheet.css`) |
+| `use-probe-fit.ts` | DOM: скрытые копии листа порталом в `<body>` и перемер после `fonts.ready` — общая часть `use-sheet-fit.ts` и листа строк |
+| `rows-fit-measure.ts` | DOM без React: правило «текст под дистанцией» и подгонка листа строк (§4.3) |
+| `views/rows-view.tsx`, `views/two-sides-view.tsx`, `views/rows-sheets.tsx`, `views/rows-sheet-frame.tsx`, `views/rows-set.tsx`, `views/rows-pages.ts`, `views/rows-sheet.css` | виды `rows` и `two-sides` (§4.3) |
+| `parts/print-rich-text.tsx` | текст строки с уровнями `4V` / `1-3V` чипами |
+| `print-sheet-model.test.mjs`, `print-fit.test.mjs`, `rows-fit-measure.test.mjs`, `views/rows-pages.test.mjs` | юнит-тесты |
+
+### 4.3 Виды `rows` и `two-sides` (27.11.2026)
+
+Ответ дизайнера на бриф — хендофф `docs/design-briefs/workout-print/handoff-workout-print-views-2026-11-27/`
+(README, эталон `rows-sheet.css`, `fit-reference.js`, макеты `mockups/*.html|png`; папка в гит не
+добавлена, лежит в основном чекауте). Влад посмотрел оба вида на 26.11 — «нравится».
+
+- **Сегменты окна: Large · Rows · Two sides.** `rows` — один лист, доступен всегда. `two-sides` —
+  два листа, `duplex: true`, доступен, когда у версии уровня есть сет `main` и он не первый
+  (`splitTwoSides` в `views/rows-pages.ts`; уровень, который главный не плывёт, вида не видит).
+- **Лист строк** (оба вида): сеты сверху вниз в порядке выполнения, одна сетка на лист
+  «рейка | дистанция | текст | время» — сет и строка `subgrid`, поэтому дистанции и времена стоят
+  столбиком через весь лист. Рейка — номер у тренера в кружке и метры сета; строка заголовка — только
+  при своём названии, повторе или `main` («Set N», который подставляет версия уровня, не печатается —
+  `SheetCube.ownTitle`); главный — в рамке, кружок залит; линия над сетом — не у первого, не у
+  главного и не сразу после главного (`setRuled`). Время — только `restLabel(send_off)`
+  (`SheetLine.time`): свои повторы уровня уже в дистанции. Лишняя высота — между сетами.
+- **Текст под дистанцией:** текст рядом с дистанцией занял бы 3+ строк или слово шире колонки —
+  уходит второй строкой во всю ширину. Пересчитывается на каждом пробном шрифте
+  (`applyBelowRule`), итог переносится на видимый лист.
+- **`two-sides`:** лицо — сеты до первого главного, внизу полоса «Next ④ Main set … page 2 →»
+  (всегда LTR); оборот — главный и всё после. В шапке «1 / 2», «2 / 2»; км — за всю тренировку.
+- **Уровни нагрузки в тексте** (решения Влада 27.11): `4V` / `V4` → чип [V4], `1-3V` → «1-[V3]»
+  неразрывно («один раз на V3», не диапазон), без дублей с полем `intensity`, строка без букв — по
+  направлению листа. Разбор — `textLevelParts` / `richText` в `print-sheet-model.ts`
+  (`SheetLine.rich`), чип — `PrintChip` в `parts/print-intensity.tsx`. В `large` — тоже (В19):
+  `PrintSetCube` рисует `PrintRichText`; лист 26.11 остался на 27 pt.
+- **Подгонка:** `searchFontSize` по каждому листу отдельно (`fitRowsSheet`); «влез» — блок шапка +
+  сеты + полоса в копии без растяжки не выше области, ничего не вылезло по ширине, рамка каждого сета
+  внутри области до полпикселя. Подпись в окне — `sheetsCaption`: «Rows · 29 pt»,
+  «Two sides · 40 pt / 45 pt»; «не влезло» — если не влез хоть один лист.
+- **Проверено 27.11** (стенд ui-kit `workout-print-rows`, PDF через `/browse` с открытого окна):
+  Rows — 1 страница, Two sides — 2; ничего ближе 10 мм к краю; времена и дистанции одним столбиком.
+  Кегли: 26.11 — 29 pt и 40 / 45 pt (как в макетах); 24.11 — 22 pt и 40 / 38 pt (макет 23 и 40 / 39);
+  22.11 — 28 pt.
 
 ## 5. Кто видит кнопку и где она
 
@@ -430,6 +471,21 @@ export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
 | В18 | Показывать «Main» на сайте | **показывать**: чип у сета участнику и в превью тренера |
 
 В14–В18 — «Да, по умолчанию» (Влад, 26.11.2026). **Открытых вопросов нет — план готов к реализации.**
+
+### Решено 27.11.2026 (виды `rows` и `two-sides`, §4.3)
+
+- Оба вида макета («нравится») — добавить рядом с `large`.
+- Главный сет — только галочка `main`, без эвристик; главный может быть один или несколько,
+  `two-sides` делит по первому.
+- «Все V1, V2 — в бордере», «4V это V4», `1-3V` в тексте — «один раз на V3».
+
+### Решено 27.11.2026, второй заход («Да, как рекомендовано»)
+
+| # | Вопрос | Ответ Влада |
+|---|---|---|
+| В19 | Чипы уровней из текста — и в `large`? | **да**: `PrintSetCube` рисует `SheetLine.rich`, без дублей с полем `intensity` |
+| В20 | Какой вид открывается первым | **`large`** (`DEFAULT_PRINT_VIEW` не меняется) |
+| В21 | Запоминать выбранный вид в `localStorage` | **да**; несуществующий / недоступный запомненный вид → вид по умолчанию |
 
 ## 8. Тесты и проверка
 

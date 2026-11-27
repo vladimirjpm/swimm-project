@@ -16,6 +16,7 @@ import UI_SwimmStyleIcon, {
 } from '../../projects/components/mix/swimm-style-icon/swimm-style-icon';
 import PrintLargePreview, { PRINT_FIXTURES } from './print-large-preview';
 import PrintDemoViews, { DEMO_PRINT_VIEWS } from './print-demo-views';
+import PrintRowsPreview, { ROWS_FIXTURES, ROWS_STAND_VIEWS } from './print-rows-preview';
 
 interface PropCommon {
   name: string;
@@ -288,6 +289,30 @@ export const COMPONENTS: ComponentEntry[] = [
       { name: 'view', kind: 'enum', def: 'large-notes', options: Object.keys(DEMO_PRINT_VIEWS) },
     ],
     render: (v) => <PrintDemoViews view={v.view} />,
+  },
+  {
+    id: 'workout-print-rows',
+    name: 'ROWS_VIEW · TWO_SIDES_VIEW',
+    file: 'src/projects/hub-groups-project/components/trainings/workout/print/views/rows-sheets.tsx',
+    summary:
+      'Виды печати Rows и Two sides (хендофф 27.11): «лист строк» — сеты сверху вниз, колонки «дистанция · текст · время» общие на лист; Two sides — лицо до главного и оборот с главным.',
+    notes: [
+      'Листы — в масштабе 0.5, подпись — итог подгонки: «Rows · 29 pt», «Two sides · 40 pt / 45 pt» (на Windows на 1–2 pt иначе, чем в макетах).',
+      'Open print dialog — настоящее окно с прод-реестром (Large · Rows · Two sides), открытое на выбранном виде; Print → PDF: Rows — 1 страница, Two sides — 2.',
+      '22.11 без главного: Two sides в окне не показывается. 224 lines — не влезает и на полу 8 pt: красная плашка.',
+    ],
+    defaultWidth: 0,
+    props: [
+      { name: 'view', kind: 'enum', def: 'rows', options: [...ROWS_STAND_VIEWS] },
+      {
+        name: 'fixture',
+        kind: 'enum',
+        def: 'mid-main',
+        options: Object.keys(ROWS_FIXTURES),
+        labels: Object.fromEntries(Object.entries(ROWS_FIXTURES).map(([k, f]) => [k, f.label])),
+      },
+    ],
+    render: (v) => <PrintRowsPreview view={v.view} fixture={v.fixture} />,
   },
 ];
 
