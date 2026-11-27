@@ -5,6 +5,7 @@ import { timeRangeLabel } from '../next/next-format';
 import { CancelledPill, SessionTag } from '../next/session-tag';
 import { formatSheetDate } from '../sheets/link-helpers';
 import { useTrainingsTab } from '../trainings-context';
+import { planViewer, viewablePast } from './viewable-plans';
 
 /**
  * Список «Past» (CF9, docs/plans/trainings-coach-flow-plan.md): прошедшие занятия, сначала новые.
@@ -76,13 +77,11 @@ function PastRow({ item }: { item: PastTraining }) {
 
 /** `className` — отступ сверху: у тренера список стоит под карточками (`mt-4`), у участника — секцией. */
 function PastSessions({ className = 'mt-4' }: { className?: string }) {
-  const { past, lanePreview, lanePlans } = useTrainingsTab();
+  const { past, manages, lanePreview, lanePlans } = useTrainingsTab();
   const [all, setAll] = useState(false);
-  // «👁 View» тренера: сервер отдал ему свой список (черновики, занятия только с ответами) — оставляем
-  // то, что увидит участник: занятия с опубликованным планом.
-  const list = lanePreview
-    ? past.list?.filter((p) => lanePlans?.some((lp) => lp.session_id === p.session.id && lp.status === 'published')) ?? null
-    : past.list;
+  // Тренеру — весь его список (и занятия только с ответами). Участнику и «👁 View» тренера — то, что
+  // можно открыть «посмотреть план» (`viewable-plans.ts`; у «👁 View» сервер отдал тренерский список).
+  const list = manages ? past.list : viewablePast(past.list, lanePlans, planViewer(manages, lanePreview));
   if (!list || list.length === 0) return null;
   const shown = all ? list : list.slice(0, SHOWN);
 

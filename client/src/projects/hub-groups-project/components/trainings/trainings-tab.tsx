@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { TrainingRsvpState } from '../../use-training-rsvp';
 import type { HubGroupDetails } from '../../types';
 import { TrainingsTabProvider, useTrainingsTab } from './trainings-context';
@@ -63,10 +63,28 @@ function GroupTrainingsTab({
       onNextTrainingsChanged={onNextTrainingsChanged}
       onMarksChange={onMarksChange}
     >
-      <TrainingsLayout />
+      <ScrollToDesk>
+        <TrainingsLayout />
+      </ScrollToDesk>
       <SheetHost />
     </TrainingsTabProvider>
   );
+}
+
+/**
+ * Открыли занятие (`?session=`) — вид занятия заменяет весь таб, и он короче списка. Кнопка («Open»
+ * в «Past», «View plan» в ленте, 27.11.2026) бывает далеко внизу страницы: без прокрутки зритель
+ * оказался бы под видом. Поднимаем к началу таба — только если оно над экраном.
+ */
+function ScrollToDesk({ children }: { children: React.ReactNode }) {
+  const { deskSession } = useTrainingsTab();
+  const ref = useRef<HTMLDivElement>(null);
+  const id = deskSession?.id ?? null;
+  useEffect(() => {
+    const el = ref.current;
+    if (id && el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: 'start' });
+  }, [id]);
+  return <div ref={ref} style={{ scrollMarginTop: 72 }}>{children}</div>;
 }
 
 function TrainingsLayout() {

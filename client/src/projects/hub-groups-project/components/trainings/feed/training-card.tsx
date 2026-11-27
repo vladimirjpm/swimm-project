@@ -38,7 +38,7 @@ function Metric({ value, label, isDesktop }: { value: React.ReactNode; label: st
 }
 
 function TrainingCard({
-  session, canAddMedia, monthDivider, expanded, onToggleSets, sets, setsLoading, onToggleKey,
+  session, canAddMedia, monthDivider, expanded, onToggleSets, sets, setsLoading, onToggleKey, planKey = null,
 }: {
   session: TrainingSession;
   canAddMedia: boolean;
@@ -49,8 +49,14 @@ function TrainingCard({
   sets: TrainingSessionSets | null;
   setsLoading: boolean;
   onToggleKey: (setNo: number | null) => Promise<string | null>;
+  /**
+   * Ключ занятия, план которого можно открыть (`past/viewable-plans.ts`, 27.11.2026); `null` — кнопки
+   * «📋 View plan» нет. Открывает тот же `?session=`, что «Open» в «Past»: участнику — вид «только
+   * смотреть» с workout всех уровней и Print, тренеру — его стол.
+   */
+  planKey?: string | null;
 }) {
-  const { manages, isDesktop, openSheet, sessions } = useTrainingsTab();
+  const { manages, isDesktop, openSheet, sessions, openDesk } = useTrainingsTab();
   // Ссылка, ожидающая подтверждения удаления (общий ConfirmDialog, ui-components.md).
   const [pending, setPending] = useState<TrainingSessionMedia | null>(null);
 
@@ -105,7 +111,8 @@ function TrainingCard({
             background: isDesktop ? 'var(--deep-card-bg-raised)' : 'var(--deep-card-bg)',
             padding: isDesktop ? '12px 14px' : '10px 12px',
             // С плиткой «+ Add video» не приглушаем: тренировка ждёт видео, а не «пустая» (хендофф 4a).
-            opacity: empty && !noMediaTile ? 0.6 : 1,
+            // С планом тоже: тренировка не «пустая», у неё есть что открыть.
+            opacity: empty && !noMediaTile && !planKey ? 0.6 : 1,
           }}
         >
           <div className="flex items-start justify-between gap-3">
@@ -199,8 +206,18 @@ function TrainingCard({
             />
           )}
 
-          {((canAddMedia && !noMediaTile) || session.has_results) && (
+          {((canAddMedia && !noMediaTile) || session.has_results || planKey) && (
             <div className="flex flex-wrap gap-4">
+              {planKey && (
+                <button
+                  type="button"
+                  className={linkBtn}
+                  style={{ color: 'var(--deep-accent)' }}
+                  onClick={() => openDesk(planKey)}
+                >
+                  📋 View plan ›
+                </button>
+              )}
               {canAddMedia && !noMediaTile && (
                 <button
                   type="button"

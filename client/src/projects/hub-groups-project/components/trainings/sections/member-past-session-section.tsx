@@ -32,7 +32,8 @@ function MemberPastSessionSection() {
           className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-extrabold"
           style={{ color: 'var(--t-text-3)' }}
         >
-          ← Back to Next
+          {/* Открывают и из «Past» в Next, и из ленты Trainings (27.11.2026) — назад туда, откуда пришли. */}
+          ← Back
         </button>
       </div>
       <TrainingsSection id="member-past-session" style={isDesktop ? { padding: 16 } : undefined}>
