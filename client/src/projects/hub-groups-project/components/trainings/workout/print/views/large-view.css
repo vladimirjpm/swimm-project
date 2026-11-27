@@ -154,6 +154,14 @@
   font-size: 0.72em;
   line-height: 1.2;
 }
+/* Уровень, найденный в тексте тренера (В19): чип на месте; «1-[V3]» не рвётся. */
+.wpl-chip-in-text {
+  margin: 0 0.08em;
+  vertical-align: 0.05em;
+}
+.wpl-nowrap {
+  white-space: nowrap;
+}
 .wpl-main-chip {
   flex: none;
   font-size: 0.75em;

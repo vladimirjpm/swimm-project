@@ -65,7 +65,7 @@ const PrintDemoViews: React.FC<{ view: string }> = ({ view }) => {
         Open print dialog
       </button>
       {open && (
-        <WorkoutPrintDialog source={source} views={DEMO_PRINT_VIEWS} defaultView={view} onClose={() => setOpen(false)} />
+        <WorkoutPrintDialog source={source} views={DEMO_PRINT_VIEWS} defaultView={view} remember={false} onClose={() => setOpen(false)} />
       )}
     </div>
   );

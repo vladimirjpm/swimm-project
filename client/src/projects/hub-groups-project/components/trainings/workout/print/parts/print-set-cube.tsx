@@ -3,6 +3,7 @@ import { lineDir } from '../../workout-format';
 import type { SheetCube, SheetDir, SheetLine } from '../print-types';
 import { FIT_X_ATTR } from '../sheet-fit-measure';
 import { PrintIntensity } from './print-intensity';
+import { PrintRichText } from './print-rich-text';
 import { PrintSetNo } from './print-set-no';
 import { PrintText } from './print-text';
 
@@ -13,24 +14,30 @@ import { PrintText } from './print-text';
  * Строка раскладывается по направлению ЛИСТА (§3.6): подпись со стороны начала, ячейка уровня — с
  * противоположной, одной ширины на весь лист (`cellChars`, моноширинные цифры — времена стоят
  * столбиком). Внутри подписи — изоляты, как в `WorkoutLineLabel`: «4×150» не станет «150×4».
+ *
+ * Уровни нагрузки в тексте тренера — чипами, как на листе строк (В19, Влад 27.11.2026: «4V» → [V4],
+ * «1-3V» → «1-[V3]»); чипы поля `intensity` — только если уровня в тексте нет (`SheetLine.rich`).
  */
-const PrintLine: React.FC<{ line: SheetLine; cellChars: number }> = ({ line, cellChars }) => (
-  <div className="wpl-line">
-    {/* FIT_X: слово шире подписи наезжает на ячейку внутри куба — сам куб этого не видит. */}
-    <span className="wpl-label" {...{ [FIT_X_ATTR]: '' }}>
-      {line.head && <bdi dir="ltr" className="wpl-reps">{line.head}</bdi>}
-      {line.head && line.text ? ' ' : ''}
-      {line.text && <bdi dir={line.textDir}><PrintText text={line.text} /></bdi>}
-      {(line.chips || line.intensityText) && ' '}
-      <PrintIntensity chips={line.chips} text={line.intensityText} />
-    </span>
-    {cellChars > 0 && (
-      <bdi dir="ltr" className="wpl-cell" style={{ width: `${cellChars}ch` }}>
-        {line.cell}
-      </bdi>
-    )}
-  </div>
-);
+const PrintLine: React.FC<{ line: SheetLine; cellChars: number }> = ({ line, cellChars }) => {
+  const { rich } = line;
+  return (
+    <div className="wpl-line">
+      {/* FIT_X: слово шире подписи наезжает на ячейку внутри куба — сам куб этого не видит. */}
+      <span className="wpl-label" {...{ [FIT_X_ATTR]: '' }}>
+        {line.head && <bdi dir="ltr" className="wpl-reps">{line.head}</bdi>}
+        {line.head && line.text ? ' ' : ''}
+        {line.text && <PrintRichText rich={rich} chipClassName="wpl-chip wpl-chip-in-text" nowrapClassName="wpl-nowrap" />}
+        {(rich.chips || line.intensityText) && ' '}
+        <PrintIntensity chips={rich.chips} text={line.intensityText} />
+      </span>
+      {cellChars > 0 && (
+        <bdi dir="ltr" className="wpl-cell" style={{ width: `${cellChars}ch` }}>
+          {line.cell}
+        </bdi>
+      )}
+    </div>
+  );
+};
 
 export const PrintSetCube: React.FC<{
   cube: SheetCube;

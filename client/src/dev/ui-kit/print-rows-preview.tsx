@@ -67,7 +67,7 @@ const PrintRowsPreview: React.FC<{ fixture: string; view: string }> = ({ fixture
       {view === 'two-sides' && !fx.workout.sets.some((s) => (s as { main?: boolean }).main) && (
         <p className="text-sm">Two sides is not available for this workout (no main set) — the dialog hides it.</p>
       )}
-      {open && <WorkoutPrintDialog source={source} defaultView={view} onClose={() => setOpen(false)} />}
+      {open && <WorkoutPrintDialog source={source} defaultView={view} remember={false} onClose={() => setOpen(false)} />}
     </div>
   );
 };
