@@ -3,12 +3,13 @@ import { DEEP_DESKTOP_QUERY, useMediaQuery } from '../../../../hooks/useMediaQue
 import { readViewParam, writeViewParam } from '../../../components/deep/view-chips';
 import { useTrainingSessions, type TrainingSessionsState } from '../../use-training-sessions';
 import { useTrainingRsvp, type TrainingRsvpState } from '../../use-training-rsvp';
-import type { HubGroupDetails, LaneChange, LanePlan, LanePlanSummary, NextTraining, RsvpAnswer, RsvpNote, TrainingRsvpPerson } from '../../types';
+import type { HubGroupDetails, LaneChange, LanePlan, LanePlanSummary, NextTraining, PastTraining, RsvpAnswer, RsvpNote, TrainingRsvpPerson } from '../../types';
 import ConfirmDialog from '../../../components/confirm-dialog/confirm-dialog';
 import { lanePlansApi } from '../lane-plans-api';
 import { useGroupBreaks } from '../use-group-breaks';
 import { NEXT_ENTRIES_MAX, nextSessions } from './next/next-format';
 import { usePastTrainings, type PastTrainingsState } from './past/use-past-trainings';
+import { planViewer, viewablePast } from './past/viewable-plans';
 import type { TrainingsSheet } from './trainings-sheets';
 import { goldMark, useTrainingMarks, type TrainingMarks } from './use-training-marks';
 
@@ -28,7 +29,8 @@ import { goldMark, useTrainingMarks, type TrainingMarks } from './use-training-m
  * контекст (один раз за монтирование), секции о нём не знают.
  */
 
-export type TrainingsView = 'next' | 'trainings' | 'lanes';
+/** `past` — прошедшие с планом (27.11.2026), рядом с Next: телефон — свой сегмент, десктоп — над левой колонкой. */
+export type TrainingsView = 'next' | 'past' | 'trainings' | 'lanes';
 
 /** Ответ и заметка человека — до и после правки тренером (тост «Undo», шторка человека, Т6). */
 export interface RollAnswerState {
@@ -58,7 +60,7 @@ export type PoolCommand =
   | { kind: 'pin'; swimmerId: number; on: boolean };
 
 /** `?view=` — старое `sessions` (до редизайна) читается как `next`: неизвестное → по умолчанию. */
-const VIEWS: readonly TrainingsView[] = ['next', 'trainings', 'lanes'];
+const VIEWS: readonly TrainingsView[] = ['next', 'past', 'trainings', 'lanes'];
 const DEFAULT_VIEW: TrainingsView = 'next';
 
 /**
@@ -160,6 +162,16 @@ export interface TrainingsTabState {
    * Тренеру Lanes виден всегда — он может создать план.
    */
   lanesHidden: boolean;
+  /**
+   * Прошедшие, план которых зритель может открыть (`past/viewable-plans.ts`): вид Past (27.11.2026)
+   * и кнопка «View plan» ленты. `null` — ещё не пришло.
+   */
+  pastViewable: PastTraining[] | null;
+  /**
+   * Сегмент Past скрыт: прошедших с планом нет. Пока список не пришёл — тоже скрыт (сегмент не мигает),
+   * но диплинк `?view=past` не откатывается.
+   */
+  pastHidden: boolean;
   /** «Set schedule» тренера — открыть Admin и прокрутить к расписанию; нет — кнопки нет. */
   openSchedule?: () => void;
   /**
@@ -341,6 +353,18 @@ export function TrainingsTabProvider({
     if (lanesHidden && lanePlans != null && view === 'lanes') applyView('next');
   }, [lanesHidden, lanePlans, view, applyView]);
 
+  // Вид Past (27.11.2026): что можно открыть — одно правило с «View plan» ленты. Участнику хватает
+  // списка сервера; «👁 View» и тренеру нужен ещё список планов.
+  const viewer = planViewer(manages, lanePreview);
+  const pastViewable = useMemo(
+    () => (viewer !== 'member' && lanePlans == null ? null : viewablePast(past.list, lanePlans, viewer)),
+    [past.list, lanePlans, viewer],
+  );
+  const pastHidden = pastViewable == null || pastViewable.length === 0;
+  useEffect(() => {
+    if (pastViewable != null && pastViewable.length === 0 && view === 'past') applyView('next');
+  }, [pastViewable, view, applyView]);
+
   // Таб рисуется только своим (у остальных замок) — список тренировок можно грузить сразу.
   const sessions = useTrainingSessions(group.id, true);
   const r = rsvp?.rsvp;
@@ -453,11 +477,11 @@ export function TrainingsTabProvider({
   const value = useMemo<TrainingsTabState>(() => ({
     group, manages, lanePreview, previewLane, setPreviewLane, isDesktop, view, setView, openLanes, lanesKey, lanesDirty, setLanesDirty, rsvp: rsvp ?? null, upcoming,
     deskSession, deskIsPast, selectedRoll, past, openDesk, closeDesk,
-    rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown,
+    rollIndex, setRollIndex, lanePlans, reloadLanePlans, lanesHidden, pastViewable, pastHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown,
     onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions, breaks, marks, openSheet: setSheet, closeSheet, sheet,
   }), [
     group, manages, lanePreview, previewLane, isDesktop, view, setView, openLanes, lanesKey, lanesDirty, setLanesDirty, rsvp, upcoming, rollIndex, setRollIndex,
-    deskSession, deskIsPast, selectedRoll, past, openDesk, closeDesk, lanePlans, reloadLanePlans, lanesHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions,
+    deskSession, deskIsPast, selectedRoll, past, openDesk, closeDesk, lanePlans, reloadLanePlans, lanesHidden, pastViewable, pastHidden, openSchedule, reloadNextTrainings, upcomingPlans, markLanesShown, onRollChange, setRollChangeListener, sendPoolCommand, setPoolListener, sessions,
     breaks, marks, closeSheet, sheet,
   ]);
 

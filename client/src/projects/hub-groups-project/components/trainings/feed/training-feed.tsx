@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { TrainingSession, TrainingSessionList, TrainingSessionSets, TrainingType } from '../../../types';
-import { feedPlanKey, planViewer, viewablePast } from '../past/viewable-plans';
+import { feedPlanKey } from '../past/viewable-plans';
 import { useTrainingsTab } from '../trainings-context';
 import TrainingsEmpty from '../trainings-empty';
 import { trainingTypeOf } from '../training-types';
@@ -41,10 +41,11 @@ export function NewTrainingButton({ height }: { height: number }) {
 }
 
 function TrainingFeed({ data }: { data: TrainingSessionList }) {
-  const { manages, lanePreview, isDesktop, sessions, past, lanePlans } = useTrainingsTab();
-  // Ключи занятий, план которых можно открыть (`past/viewable-plans.ts`) — кнопка «View plan» и чип «📋 Plan».
+  const { manages, isDesktop, sessions, pastViewable } = useTrainingsTab();
+  // Ключи занятий, план которых можно открыть (`past/viewable-plans.ts`, тот же список, что вид Past) —
+  // кнопка «View plan» и чип «📋 Plan».
   const planKeys = new Set(
-    (viewablePast(past.list, lanePlans, planViewer(manages, lanePreview)) ?? [])
+    (pastViewable ?? [])
       .map((p) => p.session.id)
       .filter((id): id is string => !!id),
   );
