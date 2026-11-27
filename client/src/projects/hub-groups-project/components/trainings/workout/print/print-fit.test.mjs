@@ -184,7 +184,7 @@ test('cubeGrid: неполный нижний ряд заполняется от
   assert.deepEqual(cubeGrid(7, 3, 'rtl').rows, [[2, 1, 0], [3, 4, 5], [null, null, 6]]);
 });
 
-test('sheetsCaption: подпись вида с подгонкой по листам — «Rows · 29 pt», «Two sides · 40 pt / 45 pt»', () => {
-  assert.equal(sheetsCaption('Rows', [38.5]), 'Rows · 29 pt');
-  assert.equal(sheetsCaption('Two sides', [53, 60.5]), 'Two sides · 40 pt / 45 pt');
+test('sheetsCaption: подпись вида с подгонкой по листам — «Numbers · 34 pt», «Two sides · 50 pt / 57 pt»', () => {
+  assert.equal(sheetsCaption('Numbers', [45.2]), 'Numbers · 34 pt');
+  assert.equal(sheetsCaption('Two sides', [66.2, 76.2]), 'Two sides · 50 pt / 57 pt');
 });

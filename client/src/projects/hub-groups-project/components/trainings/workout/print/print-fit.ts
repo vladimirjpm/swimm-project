@@ -124,7 +124,7 @@ export function layoutCaption(choice: LayoutChoice): string {
 
 /**
  * Подпись вида, у которого шрифт подбирается по каждому листу отдельно (`rows`, `two-sides`):
- * «Rows · 29 pt», «Two sides · 40 pt / 45 pt» — размеры всех листов по порядку.
+ * «Numbers · 34 pt», «Two sides · 50 pt / 57 pt» — размеры всех листов по порядку.
  */
 export function sheetsCaption(label: string, sizes: number[]): string {
   return `${label} · ${sizes.map((s) => `${Math.round(pxToPt(s))} pt`).join(' / ')}`;

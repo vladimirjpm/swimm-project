@@ -47,3 +47,15 @@ test('readSavedView / saveView: запомненный вид; пусто, не�
   assert.equal(readSavedView(broken), null);
   assert.doesNotThrow(() => saveView(broken, 'rows'));
 });
+
+test('запомненный вид (хендофф 27.11 §8): numbers-two-sides на тренировке без главного → large; неизвестный id, в том числе старые rows / two-sides → large', () => {
+  const twoSides = view('numbers-two-sides', { available: (s) => s.levels > 1 }); // «есть главный не первым»
+  const views = { large: view('large'), numbers: view('numbers'), 'numbers-two-sides': twoSides };
+  const noMain = availableViews(views, source(1));
+  assert.deepEqual(noMain.map((v) => v.id), ['large', 'numbers']);
+  assert.equal(pickView(noMain, 'numbers-two-sides', 'large').id, 'large');
+  const withMain = availableViews(views, source(2));
+  assert.equal(pickView(withMain, 'numbers-two-sides', 'large').id, 'numbers-two-sides');
+  for (const old of ['rows', 'two-sides', 'focus', '']) assert.equal(pickView(withMain, old, 'large').id, 'large', old);
+  assert.equal(pickView(withMain, 'numbers', 'large').id, 'numbers');
+});

@@ -3,7 +3,7 @@ import { cellLabel, intensityKeys, lineDir, repsDistanceLabel } from '../workout
 import { setSwumBy } from '../workout-for-level';
 import { formatKm, formatMeters, levelMeters, setMeters } from '../workout-totals';
 import type {
-  MainLayoutModel, SheetCube, SheetDir, SheetLeftItem, SheetLine, SheetModel, SheetRichText, SheetTextPart,
+  MainLayoutModel, SheetCube, SheetDir, SheetLeftItem, SheetLine, SheetModel, SheetRichText, SheetTextPart, SheetTimeKind,
   WorkoutPrintSource,
 } from './print-types';
 
@@ -30,6 +30,38 @@ export function restLabel(sendOff: string | null | undefined): string {
   if (rest.startsWith(':')) return `R${rest}`;
   if (/^\d/.test(rest)) return `R:${rest}`;
   return text;
+}
+
+/**
+ * Время уровня на печатном листе (хендофф 27.11 §10, решение Влада 27.11: «использовать этот символ
+ * для времени выхода»): отдых — как у `restLabel` («rest :20» → «R:20»; уже «R:20» — тоже отдых),
+ * любое другое непустое значение — время выхода со знаком «@» без пробела: «2:10» → «@2:10». Свой
+ * «@» тренера второго не получает. Только печать: на сайте время показывается как раньше.
+ */
+export function sendOffLabel(sendOff: string | null | undefined): { label: string; kind: SheetTimeKind | null } {
+  const label = restLabel(sendOff);
+  if (!label) return { label: '', kind: null };
+  if (/^R:/i.test(label)) return { label, kind: 'rest' };
+  return { label: label.startsWith('@') ? label : `@${label}`, kind: 'send-off' };
+}
+
+/** Слова, которые в названии главного сета значат «главный»: их часть названия встаёт в рамку (§4). */
+const MAIN_WORD = /^(מרכזי|main|main set)$/i;
+
+/**
+ * Название сета для подписи куба (хендофф 27.11 §4, решение Влада 27.11: «מרכזי сделай в бордере как
+ * Main, а сам Main убери»). У главного: части названия через « · »; часть «מרכזי» / «Main» /
+ * «Main set» — слово в рамке, остальные — текст следом. Такой части нет (или названия нет) — в рамке
+ * `Main`, название целиком следом. У не главного название не разбирается.
+ */
+export function mainTitleParts(ownTitle: string | null, main: boolean): { word: string | null; rest: string | null } {
+  if (!main) return { word: null, rest: ownTitle };
+  if (!ownTitle) return { word: 'Main', rest: null };
+  const parts = ownTitle.split('·').map((p) => p.trim()).filter(Boolean);
+  const at = parts.findIndex((p) => MAIN_WORD.test(p));
+  if (at < 0) return { word: 'Main', rest: ownTitle };
+  const rest = parts.filter((_, i) => i !== at).join(' · ');
+  return { word: parts[at], rest: rest || null };
 }
 
 const HEBREW_OR_ARABIC = /[֐-׿؀-ۿ]/;
@@ -77,7 +109,7 @@ export function textLevelParts(text: string): SheetTextPart[] {
 }
 
 /**
- * Текст строки для листа строк: уровни чипами; чипы поля `intensity` — только если в тексте уровня
+ * Текст строки для всех видов: уровни чипами; чипы поля `intensity` — только если в тексте уровня
  * нет (без дублей: «הכל 2V» + поле «2V» → один [V2]). Направление — по буквам, оставшимся после
  * уровней; букв нет («1-4V, 1-1V») — направление листа, иначе в ивритском листе такая строка одна
  * развернулась бы слева направо.
@@ -96,14 +128,16 @@ function sheetLine(line: WorkoutLine, levelKey: string | null, dir: SheetDir): S
   const intensity = (line.intensity ?? '').trim();
   const keys = intensityKeys(intensity);
   const chips = keys ? keys.map(chipLabel) : null;
+  const time = sendOffLabel(own?.send_off);
   return {
     head: repsDistanceLabel(own?.reps ?? line.reps, line.distance),
     text,
     textDir: lineDir(text),
     chips,
     intensityText: !keys && intensity ? intensity : null,
-    cell: own ? cellLabel({ ...own, send_off: restLabel(own.send_off) }) : '',
-    time: own ? restLabel(own.send_off) : '',
+    cell: own ? cellLabel({ ...own, send_off: time.label || null }) : '',
+    time: time.label,
+    timeKind: time.kind,
     rich: richText(text, chips, dir),
   };
 }
@@ -123,15 +157,20 @@ function sheetCubes(source: WorkoutPrintSource, dir: SheetDir): SheetCube[] {
     const no = setNumbers?.[i] ?? i + 1;
     const meters = setMeters(set, levelId);
     const title = set.title?.trim() || null;
+    // «Set N» подставляет версия уровня вместо пустого названия (`workoutForLevel`, серверный `ForLevel`).
+    const ownTitle = title && title !== `Set ${no}` ? title : null;
+    const main = isMainSet(set);
+    const { word, rest } = mainTitleParts(ownTitle, main);
     cubes.push({
       no,
       title: title || `Set ${no}`,
-      // «Set N» подставляет версия уровня вместо пустого названия (`workoutForLevel`, серверный `ForLevel`).
-      ownTitle: title && title !== `Set ${no}` ? title : null,
+      ownTitle,
+      mainWord: word,
+      titleRest: rest,
       repeat: set.repeat,
       meters,
       metersLabel: meters > 0 ? formatMeters(meters) : null,
-      main: isMainSet(set),
+      main,
       lines: set.lines.map((line) => sheetLine(line, levelKey, dir)).filter(hasContent),
     });
   });

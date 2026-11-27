@@ -140,7 +140,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Чипы нагрузки и «Main» — контуром, без заливки. */
+/* Чипы нагрузки и слово главного сета — контуром, без заливки. */
 .wpl-chips {
   display: inline-flex;
   gap: 0.15em;
@@ -162,9 +162,14 @@
 .wpl-nowrap {
   white-space: nowrap;
 }
-.wpl-main-chip {
-  flex: none;
-  font-size: 0.75em;
+/* Слово главного сета («מרכזי» / «Main», хендофф 27.11 §4): рамка, размер как у названия. */
+.wpl-main-word {
+  font-size: 1em;
+  border-width: 0.1em;
+  border-radius: 0.25em;
+  padding: 0 0.3em;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 .wpl-intensity-text {
   font-weight: 600;

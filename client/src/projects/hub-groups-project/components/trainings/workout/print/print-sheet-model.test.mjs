@@ -6,7 +6,7 @@ import '../ts-resolve-hook.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-const { toSheetModel, restLabel, sheetDir, splitMain, isMainSet, textLevelParts, richText } = await import('./print-sheet-model.ts');
+const { toSheetModel, restLabel, sendOffLabel, mainTitleParts, sheetDir, splitMain, isMainSet, textLevelParts, richText } = await import('./print-sheet-model.ts');
 const { workoutForLevel } = await import('../workout-for-level.ts');
 const { levelMeters, setMeters } = await import('../workout-totals.ts');
 
@@ -158,14 +158,14 @@ test('свои повторы уровня (cell.reps): в подписи, в я
   const workout = { sets: [{ title: 'x', repeat: 2, level_ids: null, lines: [line] }] };
   const m = toSheetModel(source(workout));
   assert.equal(m.cubes[0].lines[0].head, '3×100');
-  assert.equal(m.cubes[0].lines[0].cell, '3× 1:45');
+  assert.equal(m.cubes[0].lines[0].cell, '3× @1:45', 'время выхода — со знаком @ (§10)');
   assert.equal(m.cubes[0].meters, 600, '2 × 3 × 100');
   assert.equal(m.totalMeters, 600);
-  assert.equal(m.cellChars, 7);
+  assert.equal(m.cellChars, 8);
   // другой уровень — свои 4×100 и своё время
   const other = toSheetModel(source(workout, 1));
   assert.equal(other.cubes[0].lines[0].head, '4×100');
-  assert.equal(other.cubes[0].lines[0].cell, '1:30');
+  assert.equal(other.cubes[0].lines[0].cell, '@1:30');
   // дорожка без уровня — ячеек нет
   assert.equal(toSheetModel(source(workout, null)).cubes[0].lines[0].cell, '');
 });
@@ -174,8 +174,8 @@ test('ширина ячейки — по самой длинной ячейке 
   const mk = (cell) => ({ reps: 1, distance: 50, text: 'x', intensity: null, per_level: { [INT]: cell } });
   const workout = { sets: [plainSet('a', false, [mk({ send_off: 'rest :30' }), mk({ send_off: '1:45' })]), plainSet('b', false, [mk({ reps: 3, send_off: '2:10' })])] };
   const m = toSheetModel(source(workout));
-  assert.deepEqual(m.cubes.map((c) => c.lines.map((l) => l.cell)), [['R:30', '1:45'], ['3× 2:10']]);
-  assert.equal(m.cellChars, 7);
+  assert.deepEqual(m.cubes.map((c) => c.lines.map((l) => l.cell)), [['R:30', '@1:45'], ['3× @2:10']]);
+  assert.equal(m.cellChars, 8);
   assert.equal(toSheetModel(source({ sets: [plainSet('a')] }, null)).cellChars, 0);
 });
 
@@ -239,7 +239,7 @@ test('textLevelParts: «4V-1V» → два чипа через дефис', () =
 });
 
 test('textLevelParts: «Valve», «2Vx», «50V», «V8» и текст без уровней — без изменений', () => {
-  for (const t of ['Valve', '2Vx', 'x2V', '50V', 'V8', 'VV', 'free 4x100', 'חתירה ארוך']) {
+  for (const t of ['Valve', '2Vx', 'x2V', '12V', '50V', 'V8', 'VV', 'free 4x100', 'חתירה ארוך']) {
     assert.deepEqual(textLevelParts(t), [txt(t)], t);
   }
   assert.deepEqual(textLevelParts(''), []);
@@ -287,4 +287,65 @@ test('ownTitle: своё название; «Set N» от версии уров�
   const server = toSheetModel({ ...source({ sets: [plainSet('a'), plainSet('Set 3')] }, INT), setNumbers: [1, 3] });
   assert.deepEqual(server.cubes.map((c) => c.ownTitle), ['a', null]);
   assert.equal(toSheetModel(source({ sets: [plainSet('Set 7')] }, null)).cubes[0].ownTitle, 'Set 7', 'чужой номер — название тренера');
+});
+
+// ── Хендофф 27.11, вторая версия: время выхода «@» (§10), слово главного сета (§4) ──────────────
+
+test('sendOffLabel: «rest :20» → R:20 (отдых); «2:10» → @2:10, «:35» → @:35 (выход); свой «@» — без второго; пусто — пусто', () => {
+  assert.deepEqual(sendOffLabel('rest :20'), { label: 'R:20', kind: 'rest' });
+  assert.deepEqual(sendOffLabel('R:20'), { label: 'R:20', kind: 'rest' }, 'уже «R:20» — тоже отдых, без «@»');
+  assert.deepEqual(sendOffLabel('2:10'), { label: '@2:10', kind: 'send-off' });
+  assert.deepEqual(sendOffLabel(':35'), { label: '@:35', kind: 'send-off' });
+  assert.deepEqual(sendOffLabel('@1:55'), { label: '@1:55', kind: 'send-off' });
+  assert.deepEqual(sendOffLabel(''), { label: '', kind: null });
+  assert.deepEqual(sendOffLabel(null), { label: '', kind: null });
+  assert.deepEqual(sendOffLabel('  '), { label: '', kind: null });
+});
+
+test('строка: time и timeKind — отдых / выход / нет; ячейка Large «3× @2:10»', () => {
+  const mk = (send_off, reps = null) => ({ reps: 1, distance: 50, text: 'x', intensity: null, per_level: { [INT]: { reps, send_off } } });
+  const m = toSheetModel(source({ sets: [plainSet('a', false, [mk('rest :20'), mk('2:10', 3), mk(null)])] }));
+  assert.deepEqual(m.cubes[0].lines.map((l) => [l.time, l.timeKind, l.cell]), [
+    ['R:20', 'rest', 'R:20'],
+    ['@2:10', 'send-off', '3× @2:10'],
+    ['', null, ''],
+  ]);
+});
+
+test('mainTitleParts: «מרכזי · סט שני» → рамка «מרכזי» + «סט שני»; «מרכזי» → только рамка', () => {
+  assert.deepEqual(mainTitleParts('מרכזי · סט שני', true), { word: 'מרכזי', rest: 'סט שני' });
+  assert.deepEqual(mainTitleParts('מרכזי', true), { word: 'מרכזי', rest: null });
+  assert.deepEqual(mainTitleParts('סט שני · מרכזי · זומרס', true), { word: 'מרכזי', rest: 'סט שני · זומרס' }, 'разделитель рядом с рамкой убирается');
+});
+
+test('mainTitleParts: «זומרס» с main → рамка Main + «זומרס»; без названия → Main; «Main · fins» → Main + fins; «main set» — без учёта регистра', () => {
+  assert.deepEqual(mainTitleParts('זומרס', true), { word: 'Main', rest: 'זומרס' });
+  assert.deepEqual(mainTitleParts(null, true), { word: 'Main', rest: null });
+  assert.deepEqual(mainTitleParts('Main · fins', true), { word: 'Main', rest: 'fins' });
+  assert.deepEqual(mainTitleParts('fins · main set', true), { word: 'main set', rest: 'fins' });
+  assert.deepEqual(mainTitleParts('Mainly kick', true), { word: 'Main', rest: 'Mainly kick' }, 'часть целиком, не начало слова');
+});
+
+test('mainTitleParts: у сета без main название не разбирается', () => {
+  assert.deepEqual(mainTitleParts('מרכזי · סט שני', false), { word: null, rest: 'מרכזי · סט שני' });
+  assert.deepEqual(mainTitleParts(null, false), { word: null, rest: null });
+});
+
+test('лист 26.11 с главным ④: в кубе слово «מרכזי» в рамке и «סט שני עם זומרס» следом; у остальных рамки нет', () => {
+  const m = toSheetModel(source(sheet2611({ mainNos: [4] })));
+  assert.deepEqual(m.cubes.map((c) => [c.mainWord, c.titleRest]), [
+    [null, null], [null, 'שנורקל'], [null, 'כפות'], ['מרכזי', 'סט שני עם זומרס'], [null, null],
+  ]);
+});
+
+test('Large: те же части текста и то же слово главного — «1-3V, 1-1V» двумя чипами, intensity без дубля, чипа Main нет', () => {
+  const m = toSheetModel(source(sheet2611({ mainNos: [4] })));
+  const main = m.cubes[3];
+  const levels = main.lines.flatMap((l) => l.rich.parts.filter((p) => p.kind === 'level').map((p) => p.prefix + p.label));
+  assert.ok(levels.includes('1-V3') && levels.includes('1-V1'), levels.join());
+  const eight = m.cubes[2].lines.find((l) => l.head === '8×50');
+  assert.equal(eight.rich.chips, null, 'уровень уже в тексте — поле intensity не дублируется');
+  // Куб Large рисует слово из модели (PrintChip) и не печатает своего «Main».
+  const cubeSrc = readFileSync(new URL('./parts/print-set-cube.tsx', import.meta.url), 'utf8');
+  assert.ok(cubeSrc.includes('cube.mainWord') && !/>\s*Main\s*</.test(cubeSrc), 'в кубе Large нет отдельного чипа Main');
 });
