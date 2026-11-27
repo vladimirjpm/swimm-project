@@ -122,6 +122,14 @@ export function layoutCaption(choice: LayoutChoice): string {
   return choice.layout === 'main' ? `Main on the right · ${pt}` : `Blocks · ${choice.columns} per row · ${pt}`;
 }
 
+/**
+ * Подпись вида, у которого шрифт подбирается по каждому листу отдельно (`rows`, `two-sides`):
+ * «Rows · 29 pt», «Two sides · 40 pt / 45 pt» — размеры всех листов по порядку.
+ */
+export function sheetsCaption(label: string, sizes: number[]): string {
+  return `${label} · ${sizes.map((s) => `${Math.round(pxToPt(s))} pt`).join(' / ')}`;
+}
+
 // ── Сетка кубов змейкой ─────────────────────────────────────────────────────────
 
 export type ArrowKind = 'left' | 'right' | 'down';

@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 const {
   A4_HEIGHT, A4_WIDTH, COLUMN_WIDTH, CONTENT_HEIGHT, CONTENT_WIDTH, F_FLOOR, F_MAX, F_READABLE, F_STEP,
-  chooseLayout, cubeGrid, cubeWidth, layoutCaption, pickCubeColumns, pxToPt, searchFontSize,
+  chooseLayout, cubeGrid, cubeWidth, layoutCaption, pickCubeColumns, pxToPt, searchFontSize, sheetsCaption,
 } = await import('./print-fit.ts');
 
 test('размеры листа: A4 794×1123, рабочая область 718×1047, колонка 347; пороги 8 / 14 / 72 pt', () => {
@@ -182,4 +182,9 @@ test('cubeGrid: неполный нижний ряд заполняется от
   assert.deepEqual(cubeGrid(4, 3, 'rtl').rows, [[2, 1, 0], [3, null, null]]);
   // 7 кубов, k = 3: третий ряд — снова справа налево, один куб справа
   assert.deepEqual(cubeGrid(7, 3, 'rtl').rows, [[2, 1, 0], [3, 4, 5], [null, null, 6]]);
+});
+
+test('sheetsCaption: подпись вида с подгонкой по листам — «Rows · 29 pt», «Two sides · 40 pt / 45 pt»', () => {
+  assert.equal(sheetsCaption('Rows', [38.5]), 'Rows · 29 pt');
+  assert.equal(sheetsCaption('Two sides', [53, 60.5]), 'Two sides · 40 pt / 45 pt');
 });
