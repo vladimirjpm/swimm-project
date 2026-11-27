@@ -3,7 +3,8 @@ import type { TrainingType } from '../../../types';
 import { TRAINING_TYPES } from '../training-types';
 
 /**
- * Чипы ленты тренировок: `All · ⏱ Times · ▶ Videos` с числом справа. Состояние фильтра держит
+ * Чипы ленты тренировок: `All · ⏱ Times · ▶ Videos · 📋 Plan` с числом справа (по умолчанию —
+ * All; «📋 Plan» — тренировки с планом, который можно открыть, 27.11.2026). Состояние фильтра держит
  * лента (`training-feed.tsx`), в адрес он не пишется. Выбранный чип у участника — акцент,
  * у управляющего — цвет тренера (`--deep-ow-*`), как в прототипе 2a / 3b.
  *
@@ -12,18 +13,25 @@ import { TRAINING_TYPES } from '../training-types';
  * рядом («Technique» + «▶ Videos»); повторное нажатие на выбранный тип снимает его.
  */
 
-export type FeedFilter = 'all' | 'times' | 'videos';
+export type FeedFilter = 'all' | 'times' | 'videos' | 'plan';
 
 export interface FeedFilterCounts {
   all: number;
   times: number;
   videos: number;
+  /** Тренировки, у которых можно открыть план (27.11.2026, `past/viewable-plans.ts`). */
+  plan: number;
 }
 
-const CHIPS: { id: FeedFilter; label: string }[] = [
+/**
+ * `whenEmpty: false` — чипа нет, пока в ленте нет ни одной такой тренировки (у группы без планов
+ * чип «📋 Plan» с нулём только путал бы). Выбранный чип виден всегда — иначе фильтр не снять.
+ */
+const CHIPS: { id: FeedFilter; label: string; whenEmpty?: false }[] = [
   { id: 'all', label: 'All' },
   { id: 'times', label: '⏱ Times' },
   { id: 'videos', label: '▶ Videos' },
+  { id: 'plan', label: '📋 Plan', whenEmpty: false },
 ];
 
 function FeedFilters({
@@ -68,7 +76,7 @@ function FeedFilters({
   return (
     <div className="mb-3 flex flex-col gap-2">
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter trainings">
-        {CHIPS.map((c) => chip(c.id, c.label, counts[c.id], value === c.id, () => onChange(c.id)))}
+        {CHIPS.filter((c) => c.whenEmpty !== false || counts[c.id] > 0 || value === c.id).map((c) => chip(c.id, c.label, counts[c.id], value === c.id, () => onChange(c.id)))}
       </div>
       {present.length > 1 && (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Training type">

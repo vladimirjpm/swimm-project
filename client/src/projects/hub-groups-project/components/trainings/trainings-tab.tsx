@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { TrainingRsvpState } from '../../use-training-rsvp';
 import type { HubGroupDetails } from '../../types';
 import { TrainingsTabProvider, useTrainingsTab } from './trainings-context';
 import {
-  COACH_DESK_SECTIONS, COACH_LIST_SECTIONS, LANES_SECTIONS, MEMBER_PAST_SECTIONS, NEXT_SECTIONS, SectionList,
-  TRAININGS_SECTIONS, VIEW_SECTIONS,
+  COACH_DESK_SECTIONS, COACH_LIST_SECTIONS, LANES_SECTIONS, MEMBER_PAST_SECTIONS, NEXT_SECTIONS, PAST_SECTIONS,
+  SectionList, TRAININGS_SECTIONS, VIEW_SECTIONS,
 } from './trainings-sections';
-import TrainingsSegments from './trainings-segments';
+import TrainingsSegments, { NextPastSegments } from './trainings-segments';
 import type { TrainingMarks } from './use-training-marks';
 import { TrainingsSheetHost } from './trainings-sheets';
 
@@ -24,12 +24,12 @@ import { TrainingsSheetHost } from './trainings-sheets';
  * Управляющий (docs/plans/trainings-coach-flow-plan.md, CF1): видов нет — список занятий
  * (`coach-sessions` + лента) и рабочий стол одного занятия (`coach-desk`, `?session=<id>`).
  *
- * Участник (26.11.2026): в Next — список «Past» прошедших с опубликованным планом; Open — вид
+ * Участник (26.11.2026; свой вид Past — 27.11): список «Past» прошедших с опубликованным планом; Open — вид
  * «только смотреть» того же `?session=<id>` (`member-past-session`): все дорожки, workout всех уровней.
  *
  * Раскладка участника:
- * - телефон — переключатель `Next · Trainings · Lanes` (`?view=`, старое `sessions` → Next);
- * - десктоп (≥960) — без переключателя: две колонки `1.1fr / 1fr` (Next | Trainings), а Lanes —
+ * - телефон — переключатель `Next · Past · Trainings · Lanes` (`?view=`, старое `sessions` → Next);
+ * - десктоп (≥960) — две колонки `1.1fr / 1fr`: слева Next или Past (сегмент над колонкой), справа Trainings; Lanes —
  *   во всю ширину с «← Back to Next» (6b: редактору дорожек нужна ширина под колонки).
  */
 function GroupTrainingsTab({
@@ -63,10 +63,28 @@ function GroupTrainingsTab({
       onNextTrainingsChanged={onNextTrainingsChanged}
       onMarksChange={onMarksChange}
     >
-      <TrainingsLayout />
+      <ScrollToDesk>
+        <TrainingsLayout />
+      </ScrollToDesk>
       <SheetHost />
     </TrainingsTabProvider>
   );
+}
+
+/**
+ * Открыли занятие (`?session=`) — вид занятия заменяет весь таб, и он короче списка. Кнопка («Open»
+ * в «Past», «View plan» в ленте, 27.11.2026) бывает далеко внизу страницы: без прокрутки зритель
+ * оказался бы под видом. Поднимаем к началу таба — только если оно над экраном.
+ */
+function ScrollToDesk({ children }: { children: React.ReactNode }) {
+  const { deskSession } = useTrainingsTab();
+  const ref = useRef<HTMLDivElement>(null);
+  const id = deskSession?.id ?? null;
+  useEffect(() => {
+    const el = ref.current;
+    if (id && el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: 'start' });
+  }, [id]);
+  return <div ref={ref} style={{ scrollMarginTop: 72 }}>{children}</div>;
 }
 
 function TrainingsLayout() {
@@ -107,7 +125,11 @@ function TrainingsLayout() {
 
   return (
     <div className="grid items-start gap-3.5" style={{ gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr)' }}>
-      <SectionList sections={NEXT_SECTIONS} />
+      {/* Левая колонка — Next или Past (27.11.2026); `?view=trainings` с телефона здесь значит Next. */}
+      <div className="flex min-w-0 flex-col gap-3.5">
+        <NextPastSegments />
+        <SectionList sections={view === 'past' ? PAST_SECTIONS : NEXT_SECTIONS} />
+      </div>
       <SectionList sections={TRAININGS_SECTIONS} />
     </div>
   );

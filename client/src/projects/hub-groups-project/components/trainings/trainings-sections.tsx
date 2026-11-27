@@ -15,7 +15,7 @@ import TrainingFeedSection from './sections/training-feed-section';
  *
  * `when` решает, показывать ли секцию (роль, ширина, наличие данных); по умолчанию — всегда.
  *
- * Виды `Next · Trainings · Lanes` — участнику. У управляющего их нет
+ * Виды `Next · Past · Trainings · Lanes` — участнику. У управляющего их нет
  * (docs/plans/trainings-coach-flow-plan.md, CF1): список занятий (`COACH_LIST_SECTIONS`) и рабочий
  * стол одного занятия (`COACH_DESK_SECTIONS`).
  */
@@ -27,12 +27,16 @@ export interface TrainingsSectionDef {
   Component: React.ComponentType;
 }
 
-/**
- * Next участника: ближайшие занятия (Т5), под ними — прошедшие с опубликованным планом (26.11.2026).
- * На десктопе — левая колонка.
- */
+/** Next участника: ближайшие занятия (Т5). На десктопе — левая колонка (сегмент Next). */
 export const NEXT_SECTIONS: TrainingsSectionDef[] = [
   { id: 'member-next', Component: MemberNextSection },
+];
+
+/**
+ * Past участника (27.11.2026; с 26.11 список стоял под Next): прошедшие с опубликованным планом.
+ * Телефон — свой сегмент, десктоп — левая колонка (сегмент Past над ней).
+ */
+export const PAST_SECTIONS: TrainingsSectionDef[] = [
   { id: 'member-past', Component: MemberPastSection },
 ];
 
@@ -56,6 +60,7 @@ export const LANES_SECTIONS: TrainingsSectionDef[] = [
 
 export const VIEW_SECTIONS: Record<TrainingsView, TrainingsSectionDef[]> = {
   next: NEXT_SECTIONS,
+  past: PAST_SECTIONS,
   trainings: TRAININGS_SECTIONS,
   lanes: LANES_SECTIONS,
 };

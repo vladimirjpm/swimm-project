@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import type { TrainingSessionList, TrainingSessionSets, TrainingType } from '../../../types';
+import type { TrainingSession, TrainingSessionList, TrainingSessionSets, TrainingType } from '../../../types';
+import { feedPlanKey } from '../past/viewable-plans';
 import { useTrainingsTab } from '../trainings-context';
 import TrainingsEmpty from '../trainings-empty';
 import { trainingTypeOf } from '../training-types';
@@ -40,7 +41,15 @@ export function NewTrainingButton({ height }: { height: number }) {
 }
 
 function TrainingFeed({ data }: { data: TrainingSessionList }) {
-  const { manages, isDesktop, sessions } = useTrainingsTab();
+  const { manages, isDesktop, sessions, pastViewable } = useTrainingsTab();
+  // Ключи занятий, план которых можно открыть (`past/viewable-plans.ts`, тот же список, что вид Past) —
+  // кнопка «View plan» и чип «📋 Plan».
+  const planKeys = new Set(
+    (pastViewable ?? [])
+      .map((p) => p.session.id)
+      .filter((id): id is string => !!id),
+  );
+  const planKeyOf = (s: TrainingSession): string | null => feedPlanKey(s, planKeys);
   // Ссылку к тренировке видят участники — нужны право показывать и право добавлять хоть что-то
   // (права на контент, content-permissions-plan); иначе кнопок «Add video» нет.
   const { permissions } = useAuth();
@@ -64,10 +73,12 @@ function TrainingFeed({ data }: { data: TrainingSessionList }) {
     all: ofType.length,
     times: ofType.filter((s) => s.has_results).length,
     videos: ofType.filter((s) => s.media.length > 0).length,
+    plan: ofType.filter((s) => planKeyOf(s) != null).length,
   };
   const filtered = filter === 'times' ? ofType.filter((s) => s.has_results)
     : filter === 'videos' ? ofType.filter((s) => s.media.length > 0)
-      : ofType;
+      : filter === 'plan' ? ofType.filter((s) => planKeyOf(s) != null)
+        : ofType;
   const shown = filtered.slice(0, visible);
 
   const changeFilter = (next: FeedFilter) => {
@@ -106,7 +117,9 @@ function TrainingFeed({ data }: { data: TrainingSessionList }) {
 
   let emptyText: string | null = null;
   if (all.length > 0 && filtered.length === 0) {
-    emptyText = filter === 'times' ? 'No trainings with times yet.' : 'No trainings with videos yet.';
+    emptyText = filter === 'times' ? 'No trainings with times yet.'
+      : filter === 'plan' ? 'No trainings with a plan yet.'
+        : 'No trainings with videos yet.';
   }
 
   return (
@@ -156,6 +169,7 @@ function TrainingFeed({ data }: { data: TrainingSessionList }) {
           sets={setsCache.get(s.id) ?? null}
           setsLoading={!setsCache.has(s.id)}
           onToggleKey={(setNo) => toggleKey(s.id, setNo)}
+          planKey={planKeyOf(s)}
         />
       ))}
 

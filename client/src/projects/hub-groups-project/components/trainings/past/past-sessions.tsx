@@ -74,31 +74,40 @@ function PastRow({ item }: { item: PastTraining }) {
   );
 }
 
-/** `className` — отступ сверху: у тренера список стоит под карточками (`mt-4`), у участника — секцией. */
-function PastSessions({ className = 'mt-4' }: { className?: string }) {
-  const { past, lanePreview, lanePlans } = useTrainingsTab();
-  const [all, setAll] = useState(false);
-  // «👁 View» тренера: сервер отдал ему свой список (черновики, занятия только с ответами) — оставляем
-  // то, что увидит участник: занятия с опубликованным планом.
-  const list = lanePreview
-    ? past.list?.filter((p) => lanePlans?.some((lp) => lp.session_id === p.session.id && lp.status === 'published')) ?? null
-    : past.list;
+/**
+ * `className` — отступ сверху: у тренера список стоит под карточками (`mt-4`), у участника — секцией.
+ * `showAll` — весь список без «Show all», `heading={false}` — без надписи «Past»: вид Past участника
+ * (27.11.2026), где список один на экране, а надпись — уже сегмент.
+ */
+function PastSessions({ className = 'mt-4', showAll = false, heading = true }: {
+  className?: string;
+  showAll?: boolean;
+  heading?: boolean;
+}) {
+  const { past, manages, pastViewable } = useTrainingsTab();
+  const [more, setMore] = useState(false);
+  const all = showAll || more;
+  // Тренеру — весь его список (и занятия только с ответами). Участнику и «👁 View» тренера — то, что
+  // можно открыть «посмотреть план» (`viewable-plans.ts`; у «👁 View» сервер отдал тренерский список).
+  const list = manages ? past.list : pastViewable;
   if (!list || list.length === 0) return null;
   const shown = all ? list : list.slice(0, SHOWN);
 
   return (
     <div className={className} data-section="past-sessions">
-      <div className="mb-2 text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
-        Past
-      </div>
+      {heading && (
+        <div className="mb-2 text-[10px] font-extrabold uppercase tracking-[.07em]" style={{ color: 'var(--t-text-3)' }}>
+          Past
+        </div>
+      )}
       <section className="deep-card mb-0 min-w-0 py-1">
         <ul className="m-0 list-none p-0">
           {shown.map((p) => <PastRow key={p.session.id ?? `${p.session.date}-${p.session.start}`} item={p} />)}
         </ul>
-        {list.length > SHOWN && (
+        {!showAll && list.length > SHOWN && (
           <button
             type="button"
-            onClick={() => setAll((v) => !v)}
+            onClick={() => setMore((v) => !v)}
             className="mb-1.5 mt-0.5 cursor-pointer border-0 bg-transparent p-0 text-[12.5px] font-extrabold"
             style={{ color: 'var(--deep-ow)' }}
           >

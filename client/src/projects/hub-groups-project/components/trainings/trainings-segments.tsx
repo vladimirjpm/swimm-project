@@ -1,13 +1,13 @@
 import React from 'react';
 import { useTrainingsTab, type TrainingsView } from './trainings-context';
 import { MarkDot } from './trainings-section';
-import type { TrainingMark } from './use-training-marks';
+import type { TrainingMark, TrainingMarks } from './use-training-marks';
 
 /**
- * Переключатель видов таба Trainings на телефоне: `Next · Trainings · Lanes` (хендофф 2a), вид
- * в `?view=`. Участнику — акцентный сегмент (`--deep-seg-*`). На сегменте — метка внимания своего
+ * Переключатель видов таба Trainings на телефоне: `Next · Past · Trainings · Lanes` (хендофф 2a;
+ * Past — 27.11.2026), вид в `?view=`. Участнику — акцентный сегмент (`--deep-seg-*`). На сегменте — метка внимания своего
  * вида (Т8). Участнику без расписания и без опубликованных планов Lanes скрыт (`lanesHidden`, Т9).
- * На десктопе переключателя нет — две колонки.
+ * На десктопе — две колонки; над левой — `Next · Past` (`NextPastSegments`).
  *
  * У тренера этих видов нет (docs/plans/trainings-coach-flow-plan.md, CF1): он видит список занятий
  * и рабочий стол. Сам ВИД сегментов — `SegmentBar` — общий: рабочий стол тренера рисует им
@@ -65,12 +65,22 @@ export function SegmentBar<T extends string>({
 
 const SEGMENTS: { id: TrainingsView; label: string }[] = [
   { id: 'next', label: 'Next' },
+  { id: 'past', label: 'Past' },
   { id: 'trainings', label: 'Trainings' },
   { id: 'lanes', label: 'Lanes' },
 ];
 
+/** Метка вида; у Past меток нет (прошедшее ничего от зрителя не ждёт). */
+function markOf(marks: TrainingMarks, id: TrainingsView): TrainingMark | null {
+  return id === 'past' ? null : marks[id];
+}
+
+/**
+ * Сегменты на телефоне: `Next · Past · Trainings · Lanes`. Past (27.11.2026) скрыт, когда прошедших
+ * с планом нет (`pastHidden`), Lanes — по `lanesHidden` (Т9).
+ */
 function TrainingsSegments() {
-  const { view, setView, marks, lanesHidden } = useTrainingsTab();
+  const { view, setView, marks, lanesHidden, pastHidden } = useTrainingsTab();
   return (
     <div className="deep-panel-row mb-3">
       <SegmentBar
@@ -78,10 +88,30 @@ function TrainingsSegments() {
         value={view}
         onChange={setView}
         options={SEGMENTS
-          .filter(({ id }) => !(id === 'lanes' && lanesHidden))
-          .map(({ id, label }) => ({ id, label, mark: marks[id] }))}
+          .filter(({ id }) => !(id === 'lanes' && lanesHidden) && !(id === 'past' && pastHidden))
+          .map(({ id, label }) => ({ id, label, mark: markOf(marks, id) }))}
       />
     </div>
+  );
+}
+
+/**
+ * Десктоп: над левой колонкой — `Next · Past` (27.11.2026). Trainings — правая колонка, Lanes — ссылкой
+ * из Next, поэтому сегментов здесь два. Прошедших с планом нет — переключателя нет вовсе.
+ */
+export function NextPastSegments() {
+  const { view, setView, marks, pastHidden } = useTrainingsTab();
+  if (pastHidden) return null;
+  return (
+    <SegmentBar
+      label="Next or past trainings"
+      value={view === 'past' ? 'past' : 'next'}
+      onChange={setView}
+      options={[
+        { id: 'next', label: 'Next', mark: marks.next },
+        { id: 'past', label: 'Past' },
+      ]}
+    />
   );
 }
 
