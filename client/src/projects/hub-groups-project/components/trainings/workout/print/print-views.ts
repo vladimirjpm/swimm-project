@@ -1,17 +1,18 @@
 // Реестр видов печати (docs/plans/workout-print-plan.md §4). Новый вид = файл `views/<id>-view.tsx`
 // + строка здесь; убрать вид — убрать строку. Окно предпросмотра само покажет сегмент выбора, когда
 // видов больше одного, и спрячет вид, у которого `available(source)` — false. Порядок строк = порядок
-// сегментов: Large · Rows · Two sides (хендофф 27.11).
+// сегментов: Large · Numbers · Two sides (хендофф 27.11, вторая версия; Rows и Two sides в виде
+// строк отклонены — запомненный `rows` / `two-sides` открывает вид по умолчанию, `pickView`).
 
 import type { WorkoutPrintView } from './print-types';
 import { LARGE_VIEW } from './views/large-view';
-import { ROWS_VIEW } from './views/rows-view';
-import { TWO_SIDES_VIEW } from './views/two-sides-view';
+import { NUMBERS_TWO_SIDES_VIEW } from './views/numbers-two-sides-view';
+import { NUMBERS_VIEW } from './views/numbers-view';
 
 export const PRINT_VIEWS = {
   large: LARGE_VIEW,
-  rows: ROWS_VIEW,
-  'two-sides': TWO_SIDES_VIEW,
+  numbers: NUMBERS_VIEW,
+  'numbers-two-sides': NUMBERS_TWO_SIDES_VIEW,
 } satisfies Record<string, WorkoutPrintView>;
 
 export type WorkoutPrintViewId = keyof typeof PRINT_VIEWS;

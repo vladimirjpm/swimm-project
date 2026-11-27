@@ -318,7 +318,7 @@ export interface WorkoutPrintView {
   available?: (source: WorkoutPrintSource) => boolean; // нет — годится всегда
 }
 // workout/print/print-views.ts
-export const PRINT_VIEWS = { large: LARGE_VIEW, rows: ROWS_VIEW, 'two-sides': TWO_SIDES_VIEW } satisfies Record<string, WorkoutPrintView>;
+export const PRINT_VIEWS = { large: LARGE_VIEW, numbers: NUMBERS_VIEW, 'numbers-two-sides': NUMBERS_TWO_SIDES_VIEW } satisfies Record<string, WorkoutPrintView>;
 export type WorkoutPrintViewId = keyof typeof PRINT_VIEWS;
 export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
 ```
@@ -361,47 +361,70 @@ export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
 | `print-view-pick.ts` | чистое: годные виды для workout (`available`) и выбранный вид |
 | `views/large-view.tsx`, `views/large-main-layout.tsx`, `views/large-cubes-layout.tsx` | вид `large` и его раскладки |
 | `parts/print-set-cube.tsx`, `parts/print-arrow.tsx`, `parts/print-intensity.tsx` | куб сета, SVG-стрелка, чип нагрузки контуром |
-| `workout-print.css` | `@media print` и механика листа (`.wprint-*`); вид листа — у самого вида (`views/large-view.css`, `views/rows-sheet.css`) |
-| `use-probe-fit.ts` | DOM: скрытые копии листа порталом в `<body>` и перемер после `fonts.ready` — общая часть `use-sheet-fit.ts` и листа строк |
-| `rows-fit-measure.ts` | DOM без React: правило «текст под дистанцией» и подгонка листа строк (§4.3) |
-| `views/rows-view.tsx`, `views/two-sides-view.tsx`, `views/rows-sheets.tsx`, `views/rows-sheet-frame.tsx`, `views/rows-set.tsx`, `views/rows-pages.ts`, `views/rows-sheet.css` | виды `rows` и `two-sides` (§4.3) |
+| `workout-print.css` | `@media print` и механика листа (`.wprint-*`); вид листа — у самого вида (`views/large-view.css`, `views/numbers-sheet.css`) |
+| `use-probe-fit.ts` | DOM: скрытые копии листа порталом в `<body>` и перемер после `fonts.ready` — общая часть `use-sheet-fit.ts` и листа кубов |
+| `numbers-fit-measure.ts` | DOM без React: правило «текст под дистанцией» и подгонка листа кубов (§4.3) |
+| `views/numbers-view.tsx`, `views/numbers-two-sides-view.tsx`, `views/numbers-sheets.tsx`, `views/numbers-sheet-frame.tsx`, `views/numbers-set.tsx`, `views/numbers-pages.ts`, `views/numbers-sheet.css` | виды `numbers` и `numbers-two-sides` (§4.3) |
 | `parts/print-rich-text.tsx` | текст строки с уровнями `4V` / `1-3V` чипами |
-| `print-sheet-model.test.mjs`, `print-fit.test.mjs`, `rows-fit-measure.test.mjs`, `views/rows-pages.test.mjs` | юнит-тесты |
+| `print-sheet-model.test.mjs`, `print-fit.test.mjs`, `numbers-fit-measure.test.mjs`, `views/numbers-pages.test.mjs`, `print-view-pick.test.mjs` | юнит-тесты |
 
-### 4.3 Виды `rows` и `two-sides` (27.11.2026)
+### 4.3 Виды `numbers` и `numbers-two-sides` (27.11.2026, хендофф вторая версия)
 
 Ответ дизайнера на бриф — хендофф `docs/design-briefs/workout-print/handoff-workout-print-views-2026-11-27/`
-(README, эталон `rows-sheet.css`, `fit-reference.js`, макеты `mockups/*.html|png`; папка в гит не
-добавлена, лежит в основном чекауте). Влад посмотрел оба вида на 26.11 — «нравится».
+(README, эталон `numbers-sheet.css`, `fit-reference.js`, макеты `mockups/numbers-*.html|png`; папка в
+гит не добавлена, лежит в основном чекауте). **Вторая версия заменила утреннюю:** Влад посмотрел ещё
+четыре варианта и выбрал Numbers; виды `rows` / `two-sides` («лист строк» с рейкой, PR #311) убраны
+из реестра, их компоненты и стили удалены. Запомненный в `localStorage` `rows` / `two-sides` открывает
+`large` (`pickView`: id нет в реестре → вид по умолчанию).
 
-- **Сегменты окна: Large · Rows · Two sides.** `rows` — один лист, доступен всегда. `two-sides` —
-  два листа, `duplex: true`, доступен, когда у версии уровня есть сет `main` и он не первый
-  (`splitTwoSides` в `views/rows-pages.ts`; уровень, который главный не плывёт, вида не видит).
-- **Лист строк** (оба вида): сеты сверху вниз в порядке выполнения, одна сетка на лист
-  «рейка | дистанция | текст | время» — сет и строка `subgrid`, поэтому дистанции и времена стоят
-  столбиком через весь лист. Рейка — номер у тренера в кружке и метры сета; строка заголовка — только
-  при своём названии, повторе или `main` («Set N», который подставляет версия уровня, не печатается —
-  `SheetCube.ownTitle`); главный — в рамке, кружок залит; линия над сетом — не у первого, не у
-  главного и не сразу после главного (`setRuled`). Время — только `restLabel(send_off)`
-  (`SheetLine.time`): свои повторы уровня уже в дистанции. Лишняя высота — между сетами.
-- **Текст под дистанцией:** текст рядом с дистанцией занял бы 3+ строк или слово шире колонки —
-  уходит второй строкой во всю ширину. Пересчитывается на каждом пробном шрифте
-  (`applyBelowRule`), итог переносится на видимый лист.
-- **`two-sides`:** лицо — сеты до первого главного, внизу полоса «Next ④ Main set … page 2 →»
+- **Сегменты окна: Large · Numbers · Two sides.** `numbers` — один лист, доступен всегда.
+  `numbers-two-sides` (подпись `Two sides`) — два листа, `duplex: true`, доступен, когда у версии
+  уровня есть сет `main` и он не первый (`splitTwoSides` в `views/numbers-pages.ts`; уровень, который
+  главный не плывёт, вида не видит).
+- **Лист кубов** (оба вида): куб во всю ширину на сет, сверху вниз в порядке выполнения; одна сетка
+  на лист «дистанция | текст | время» — куб и строка `subgrid`, поэтому дистанции и времена стоят
+  столбиком через весь лист. Дистанция — `1em` (самое крупное), текст `.64em`, время `.8em`
+  (в двустороннем `.66em`). Лишняя высота — между кубами.
+- **Подпись куба** (есть всегда): номер у тренера в кружке → «×2» чёрной плашкой → слово главного в
+  рамке → название → метры у дальнего края (распоркой — в обоих направлениях; на ивритских PNG
+  макета метры стоят рядом с названием из-за `margin-inline-start` на LTR-изоляте, сделано по тексту
+  README §3 и английскому макету). «Set N» не печатается (`SheetCube.ownTitle`). Главный: рамка
+  `.26em` накладкой `::before` (поля как у обычного — колонки не съезжают), кружок залит.
+- **Слово главного сета** (§4 хендоффа, Влад: «מרכזי сделай в бордере как Main, а сам Main убери»):
+  `mainTitleParts` в `print-sheet-model.ts` — часть названия «מרכזי» / «Main» / «Main set» через « · »
+  в рамку, остальное текстом; нет такой части или названия — рамка `Main`. В `SheetCube.mainWord` /
+  `titleRest`; так же в `large` — отдельного чипа `Main` больше нет ни в одном виде.
+- **Время выхода — со знаком `@`** (§10, Влад: «использовать этот символ для времени выхода»):
+  `sendOffLabel` рядом с `restLabel` — отдых «R:20», остальное «@2:10», свой «@» тренера не
+  удваивается (`SheetLine.time` / `timeKind`, ячейка `large` — «3× @1:45»). Только печать; на сайте
+  время как раньше.
+- **Подпись внизу листа:** `R = מנוחה` — если на листе есть отдых, `@ = יציאה` — если есть выход,
+  через « · »; язык по направлению листа (`R = rest`, `@ = send-off`); в двустороннем — своя у каждой
+  стороны (`legendParts`). В `large` подписи нет.
+- **Текст в одну строку** (Влад: перенос рядом с дистанцией «вышел плохо»): рядом с дистанцией текст
+  стоит, только если помещается в ОДНУ строку; иначе — второй строкой во всю ширину куба (там может
+  перенестись). Строка без дистанции — текст и на её колонке, без времени — и на колонке времени
+  (`lineTextSpan`). Пересчёт на каждом пробном шрифте (`applyBelowRule` в `numbers-fit-measure.ts`:
+  высота текста > 1.5 высоты строки или слово шире колонки), итог переносится на видимый лист.
+- **Двусторонний:** лицо — сеты до первого главного, внизу полоса «Next ④ Main set … page 2 →»
   (всегда LTR); оборот — главный и всё после. В шапке «1 / 2», «2 / 2»; км — за всю тренировку.
 - **Уровни нагрузки в тексте** (решения Влада 27.11): `4V` / `V4` → чип [V4], `1-3V` → «1-[V3]»
   неразрывно («один раз на V3», не диапазон), без дублей с полем `intensity`, строка без букв — по
-  направлению листа. Разбор — `textLevelParts` / `richText` в `print-sheet-model.ts`
-  (`SheetLine.rich`), чип — `PrintChip` в `parts/print-intensity.tsx`. В `large` — тоже (В19):
-  `PrintSetCube` рисует `PrintRichText`; лист 26.11 остался на 27 pt.
-- **Подгонка:** `searchFontSize` по каждому листу отдельно (`fitRowsSheet`); «влез» — блок шапка +
-  сеты + полоса в копии без растяжки не выше области, ничего не вылезло по ширине, рамка каждого сета
-  внутри области до полпикселя. Подпись в окне — `sheetsCaption`: «Rows · 29 pt»,
-  «Two sides · 40 pt / 45 pt»; «не влезло» — если не влез хоть один лист.
-- **Проверено 27.11** (стенд ui-kit `workout-print-rows`, PDF через `/browse` с открытого окна):
-  Rows — 1 страница, Two sides — 2; ничего ближе 10 мм к краю; времена и дистанции одним столбиком.
-  Кегли: 26.11 — 29 pt и 40 / 45 pt (как в макетах); 24.11 — 22 pt и 40 / 38 pt (макет 23 и 40 / 39);
-  22.11 — 28 pt.
+  направлению листа. Разбор — `textLevelParts` / `richText` (`SheetLine.rich`), чип — `PrintChip`.
+  В `large` — тоже (В19).
+- **Заливки печатаются:** `print-color-adjust: exact` на листе — «×2» и кружок главного чёрные и при
+  выключенной «Background graphics».
+- **Подгонка:** `searchFontSize` по каждому листу отдельно (`fitNumbersSheet`); «влез» — блок шапка +
+  кубы + полоса + подпись в копии без растяжки не выше области, ничего не вылезло по ширине, рамка
+  каждого куба внутри области до полпикселя. Подпись в окне — `sheetsCaption`: «Numbers · 34 pt»,
+  «Two sides · 50 pt / 57 pt»; «не влезло» — если не влез хоть один лист.
+- **Проверено 27.11** (стенд ui-kit `workout-print-numbers`, PDF через `/browse` с открытого окна,
+  без фоновой графики): Numbers — 1 страница, Two sides — 2; ничего ближе 10 мм к краю; времена и
+  дистанции одним столбиком; заливки в PDF без фона чёрные. Кегли: 26.11 — 34 pt и 50 / 57 pt (как в
+  макете); 24.11 — 25 pt и 52 / 39 pt (макет 25 и 53 / 39); 22.11 — 33 pt (как в макете); английская
+  фикстура стенда (с заметкой тренера, данные не как в макете) — 43 pt и 57 / 72 pt. Заметка тренера
+  не растёт с кеглем (`clamp`, как шапка). `large` 26.11 — по-прежнему 27 pt, одна страница, «מרכזי» в рамке. Скриншоты —
+  `docs/plans/workout-print/numbers-*.png`, `two-sides-*.png`, `large-2611-main-word.png`.
 
 ## 5. Кто видит кнопку и где она
 
@@ -472,7 +495,7 @@ export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
 
 В14–В18 — «Да, по умолчанию» (Влад, 26.11.2026). **Открытых вопросов нет — план готов к реализации.**
 
-### Решено 27.11.2026 (виды `rows` и `two-sides`, §4.3)
+### Решено 27.11.2026 (виды `rows` и `two-sides` — заменены, см. ниже)
 
 - Оба вида макета («нравится») — добавить рядом с `large`.
 - Главный сет — только галочка `main`, без эвристик; главный может быть один или несколько,
@@ -486,6 +509,22 @@ export const DEFAULT_PRINT_VIEW: WorkoutPrintViewId = 'large';
 | В19 | Чипы уровней из текста — и в `large`? | **да**: `PrintSetCube` рисует `SheetLine.rich`, без дублей с полем `intensity` |
 | В20 | Какой вид открывается первым | **`large`** (`DEFAULT_PRINT_VIEW` не меняется) |
 | В21 | Запоминать выбранный вид в `localStorage` | **да**; несуществующий / недоступный запомненный вид → вид по умолчанию |
+
+### Решено 27.11.2026, третий заход (хендофф вторая версия, §4.3)
+
+Влад выбрал из четырёх новых вариантов **Numbers** на один лист и **Numbers two sides** на двусторонний;
+Rows, Two sides в виде строк, Focus и Main poster отклонены. Решения (README хендоффа §9):
+
+| # | Вопрос | Ответ Влада |
+|---|---|---|
+| В22 | Какие виды | **`numbers` и `numbers-two-sides`** (подпись «Two sides»); `rows` / `two-sides` убрать, запомненный старый id → `large` |
+| В23 | Слово главного сета | **в рамке, отдельного чипа `Main` нет** — во всех видах, `large` тоже |
+| В24 | Размеры строки | дистанция `1em`, текст `.64em`, время `.8em` (двусторонний — `.66em`) |
+| В25 | Текст строки | **в одну строку** рядом с дистанцией, иначе под ней во всю ширину |
+| В26 | Время выхода | **со знаком `@`** («@2:10») на листах всех видов; на сайте без изменений |
+| В27 | Подпись про знаки | мелко внизу листа: `R = מנוחה`, `@ = יציאה` — только у листа кубов |
+
+В19–В21 остаются в силе (чипы из текста во всех видах, первым — `large`, вид запоминается).
 
 ## 8. Тесты и проверка
 

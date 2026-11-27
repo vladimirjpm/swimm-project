@@ -1,5 +1,5 @@
 // Скрытые копии листа печати для замера (docs/plans/workout-print-plan.md §3.5, §9) — общая часть
-// подгонки всех видов: `use-sheet-fit.ts` (large), `views/use-rows-fit.ts` (rows, two-sides).
+// подгонки всех видов: `use-sheet-fit.ts` (large), `views/numbers-sheets.tsx` (numbers, numbers-two-sides).
 //
 // Копии — порталом прямо в `<body>`: не внутри окна предпросмотра, где `transform: scale` исказил
 // бы замер, а при печати `body > :not(#wprint-root)` их прячет (плюс `.wprint-noprint`). Класс
