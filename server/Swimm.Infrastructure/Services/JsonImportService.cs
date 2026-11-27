@@ -185,6 +185,8 @@ public class JsonImportService : IImportService
         private Dictionary<string, Country> countryByName = null!;
         private Dictionary<string, Competition> competitionCache = null!;
         private Dictionary<string, Competition> linkedDaysByDate = null!;
+        // Событие, в котором уже лежат дни этого compID (одно на всех), — см. AttachToEventAsync.
+        private int? linkedEventId;
         // Ключи, по которым уже предупредили «имя → X, compID → Y» (Р118): строк у дня тысячи.
         private readonly HashSet<string> divergenceWarned = [];
         private Dictionary<string, Club> clubCache = null!;
@@ -468,9 +470,12 @@ public class JsonImportService : IImportService
             // одиночном соревновании (Competition.OrgCompId — альтернативный ключ), либо на событии
             // (CompetitionEvent.OrgCompId). Дни с чужим штампом и неоднозначные даты — не берутся.
             linkedDaysByDate = new Dictionary<string, Competition>();
+            linkedEventId = null;
             if (orgCompId is int linkOrgCompId)
             {
                 var linkedDays = await CompetitionIdentity.ResolveDaysAsync(_db, linkOrgCompId);
+                var linkedEvents = linkedDays.Select(d => d.EventId).Distinct().ToList();
+                if (linkedEvents is [int onlyEvent]) linkedEventId = onlyEvent;
                 linkedDaysByDate = ImportCompetitionMatcher.BuildLinkedDayIndex(linkedDays, linkOrgCompId,
                     items.Select(i => (i.Competition ?? string.Empty, i.Date ?? string.Empty)), out var ambiguous);
                 foreach (var date in ambiguous)
@@ -553,15 +558,24 @@ public class JsonImportService : IImportService
             nextDayNumber = 1;
             if (eventOptions?.EventId is int existingEventId)
             {
-                targetEvent = await _db.CompetitionEvents.FindAsync(existingEventId);
-                if (targetEvent == null)
-                    throw new InvalidOperationException($"Событие {existingEventId} не найдено");
-
-                var maxDay = await _db.Competitions
-                    .Where(c => c.EventId == targetEvent.Id)
-                    .MaxAsync(c => (int?)c.DayNumber) ?? 0;
-                nextDayNumber = maxDay + 1;
+                targetEvent = await _db.CompetitionEvents.FindAsync(existingEventId)
+                    ?? throw new InvalidOperationException($"Событие {existingEventId} не найдено");
+                await ContinueDayNumbersAsync();
                 diagnosticLog.Add($"Event: attach to #{targetEvent.Id} \"{targetEvent.Name}\", starting day {nextDayNumber}");
+            }
+            else if (!string.IsNullOrWhiteSpace(eventOptions?.NewEventName)
+                     && linkedEventId is int linked
+                     && await _db.CompetitionEvents.FindAsync(linked) is { } linkedEvent)
+            {
+                // «Перезатянуть» многодневки: превью по умолчанию предлагает «новое событие», а дни
+                // этого compID уже лежат в событии. Дни из файла находятся по дате и остаются в своём
+                // событии, а день, которого в базе нет, лёг бы в НОВОЕ пустое событие отдельной
+                // карточкой (16862, 27.11.2026: убранный до проплыва день 3). Новое событие для
+                // compID, у которого событие уже есть, не нужно никогда — дописываем в него.
+                targetEvent = linkedEvent;
+                await ContinueDayNumbersAsync();
+                diagnosticLog.Add($"Event: дни compID {orgCompId} уже в событии #{targetEvent.Id} \"{targetEvent.Name}\" — " +
+                                  $"новое событие «{eventOptions.NewEventName!.Trim()}» не заводим, новые дни с {nextDayNumber}");
             }
             else if (!string.IsNullOrWhiteSpace(eventOptions?.NewEventName))
             {
@@ -570,6 +584,15 @@ public class JsonImportService : IImportService
                 await _db.SaveChangesAsync(); // нужен Id для привязки дней
                 diagnosticLog.Add($"Event: created new #{targetEvent.Id} \"{targetEvent.Name}\"");
             }
+        }
+
+        /// <summary>Новые дни события нумеруются после уже имеющихся.</summary>
+        private async Task ContinueDayNumbersAsync()
+        {
+            var maxDay = await _db.Competitions
+                .Where(c => c.EventId == targetEvent!.Id)
+                .MaxAsync(c => (int?)c.DayNumber) ?? 0;
+            nextDayNumber = maxDay + 1;
         }
 
         private async Task<ImportResult?> ImportRowAsync(ResultJsonItem item, int idx)
