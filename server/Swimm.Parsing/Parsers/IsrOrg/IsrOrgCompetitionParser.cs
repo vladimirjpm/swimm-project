@@ -37,9 +37,14 @@ public static class IsrOrgCompetitionParser
     private const string GenderPatternWithMix =
         GenderPatternOriginal + "|" + GenderPatternReversed + "|" + HebrewMix + "|" + HebrewMixReversed;
 
+    // «מיקס» вместо пола — совместный личный заплыв с возрастом цифрами: «800 חופשי - מיקס 14-18»
+    // (16862, 26.11.2026). Без него заголовок не брал ни один шаблон, и 800 м дописались в
+    // предыдущую эстафету 4X100 комплексом — вместе с её датой (день 3 вместо дня 1).
+    // NormalizeGenderHE отдаёт на «מיקס» «none»: пол импорт берёт с пловца, как у шабатных.
+    // Эстафеты «… שליחים - מיקס 14-15» сюда не доходят: их раньше забирает RelayHeaderRxHE.
     private static Regex HeaderRxHE => _headerRxHE ??= new Regex(
         @"^(?<len>\d+[Kk]?)\s+(?<style>.+?)\s*-\s*(?<gender>" +
-        GenderPatternOriginal + "|" + GenderPatternReversed +
+        GenderPatternWithMix +
         @")\s+(?<age>\d+(-\d+)?)$",
         RegexOptions.Compiled);
 
